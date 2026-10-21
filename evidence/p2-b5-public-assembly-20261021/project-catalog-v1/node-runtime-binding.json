@@ -1,0 +1,35 @@
+{
+  "allowed_plan": "Bind an already-present exact compatible isolated Node+ELF/image under original separate runtime plan, or obtain explicit different runtime provisioning approval; no split or limit increase",
+  "approved_runtime_binding": null,
+  "bytes": 126595440,
+  "elf": {
+    "interpreter": "/lib64/ld-linux-x86-64.so.2",
+    "needed": [
+      "libdl.so.2",
+      "libstdc++.so.6",
+      "libm.so.6",
+      "libgcc_s.so.1",
+      "libpthread.so.0",
+      "libc.so.6",
+      "ld-linux-x86-64.so.2"
+    ]
+  },
+  "excess_bytes": 109818224,
+  "interpreter_record": null,
+  "path": "/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node",
+  "resolution": "UNKNOWN_NO_LOADER_SEARCH_OR_IMAGE_PROOF",
+  "retained_library_candidates": {
+    "ld-linux-x86-64.so.2": [],
+    "libc.so.6": [],
+    "libdl.so.2": [],
+    "libgcc_s.so.1": [],
+    "libm.so.6": [],
+    "libpthread.so.0": [],
+    "libstdc++.so.6": []
+  },
+  "sdk_engine_requirement": ">=24.16.0 <25 || >=26.1.0",
+  "selected_for_transfer": false,
+  "sha256": "7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c",
+  "state": "RETAINED_BYTES_BOUND_NOT_EXECUTED",
+  "transfer_limit_bytes": 16777216
+}

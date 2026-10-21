@@ -1,0 +1,493 @@
+{
+  "conditional_computed_packages": [
+    {
+      "bytes": null,
+      "declared_version": "8.21.3",
+      "note": "Do not infer mandatory runtime inclusion or safe exclusion until native profile/branch closure",
+      "package": "ws",
+      "package_json_member": "node_modules/ws/package.json",
+      "resource_member": "node_modules/ws/wrapper.mjs",
+      "sha256": null,
+      "state": "CONDITIONAL_COMPUTED_RESOURCE_NOT_SELECTED",
+      "witness": {
+        "body": "require.resolve(ws/package.json) -> sibling wrapper.mjs -> import(file URL)",
+        "caller_line": 197,
+        "calling_function": "loadWebSocket",
+        "line": 14,
+        "parent": "dist/websocket-session-C3AfDQbz.mjs",
+        "scope": "realtime transcription path, not proven selected by readonly Gateway route"
+      }
+    }
+  ],
+  "counts": {
+    "conditional_additional": 1,
+    "eager": 14
+  },
+  "eager_bare_packages": [
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "0.21.1",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "@openclaw/fs-safe",
+      "package_json_member": "node_modules/@openclaw/fs-safe/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 3,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/advanced",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 60,
+          "parent": "dist/io.factory-PvUbTCjh.mjs",
+          "specifier": "@openclaw/fs-safe/atomic",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 18,
+          "parent": "dist/sqlite-wal-BgkaymT5.mjs",
+          "specifier": "@openclaw/fs-safe/copy",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 3,
+          "parent": "dist/crypto-digest-y6oZN-_F.mjs",
+          "specifier": "@openclaw/fs-safe/durability",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 4,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/errors",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 1,
+          "parent": "dist/file-lock-manager-D-LVVqdD.mjs",
+          "specifier": "@openclaw/fs-safe/file-lock",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 2,
+          "parent": "dist/json-files-Br8qKrAz.mjs",
+          "specifier": "@openclaw/fs-safe/json",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 5,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/output",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 7,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/path",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 6,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/root",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 31,
+          "parent": "dist/github-tool-identity-Ch5hxQmB.mjs",
+          "specifier": "@openclaw/fs-safe/secret",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 8,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/secure-file",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 15,
+          "parent": "dist/install-source-utils-CbOTn25m.mjs",
+          "specifier": "@openclaw/fs-safe/temp",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 9,
+          "parent": "dist/fs-safe-CHQXnCPk.mjs",
+          "specifier": "@openclaw/fs-safe/walk",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "0.3.12",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "@openclaw/proxyline",
+      "package_json_member": "node_modules/@openclaw/proxyline/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 6,
+          "parent": "dist/env-Dg3QhGtH.mjs",
+          "specifier": "@openclaw/proxyline",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 4,
+          "parent": "dist/undici-global-dispatcher-DuFEBy_H.mjs",
+          "specifier": "@openclaw/proxyline/dispatcher-brand",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "8.18.0",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "acorn",
+      "package_json_member": "node_modules/acorn/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 27,
+          "parent": "dist/plugin-generation-artifact-CWV3FtVc.mjs",
+          "specifier": "acorn",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "6.0.0",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "chalk",
+      "package_json_member": "node_modules/chalk/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 14,
+          "parent": "dist/subsystem-BdcD5rKP.mjs",
+          "specifier": "chalk",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "15.0.0",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "commander",
+      "package_json_member": "node_modules/commander/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 3,
+          "parent": "dist/setup-contract-B8gsukg0.mjs",
+          "specifier": "commander",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "18.0.1",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "dotenv",
+      "package_json_member": "node_modules/dotenv/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 9,
+          "parent": "dist/dotenv-global-CP3dmTvh.mjs",
+          "specifier": "dotenv",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "10.0.1",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "execa",
+      "package_json_member": "node_modules/execa/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 18,
+          "parent": "dist/exec-spawn-8ljdD_1X.mjs",
+          "specifier": "execa",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "4.2.0",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "import-meta-resolve",
+      "package_json_member": "node_modules/import-meta-resolve/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 39,
+          "parent": "dist/plugin-setup-module-D0o6Vfcg.mjs",
+          "specifier": "import-meta-resolve",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "2.2.3",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "json5",
+      "package_json_member": "node_modules/json5/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 21,
+          "parent": "dist/io.read-helpers-CZUctY0z.mjs",
+          "specifier": "json5",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "7.3.3",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "p-limit",
+      "package_json_member": "node_modules/p-limit/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 24,
+          "parent": "dist/user-profiles-D31WR8kz.mjs",
+          "specifier": "p-limit",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "7.8.5",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "semver",
+      "package_json_member": "node_modules/semver/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 37,
+          "parent": "dist/openclaw-state-db-existing-schema-DXYsEyhD.mjs",
+          "specifier": "semver",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "5.2.0",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "tslog",
+      "package_json_member": "node_modules/tslog/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 21,
+          "parent": "dist/logger-Cn5hoa7J.mjs",
+          "specifier": "tslog",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "1.3.34",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "typebox",
+      "package_json_member": "node_modules/typebox/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 4,
+          "parent": "dist/error-codes-DI20vDEB.mjs",
+          "specifier": "typebox",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 2,
+          "parent": "dist/protocol-validator-C_V-gGjM.mjs",
+          "specifier": "typebox/compile",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 11,
+          "parent": "dist/schema-validator-CbLrj3Mc.mjs",
+          "specifier": "typebox/format",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 2,
+          "parent": "dist/json-schema-Cjtt-qSo.mjs",
+          "specifier": "typebox/guard",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 10,
+          "parent": "dist/schema-validator-CbLrj3Mc.mjs",
+          "specifier": "typebox/schema",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        },
+        {
+          "line": 31,
+          "parent": "dist/src-D2gvuSyP.mjs",
+          "specifier": "typebox/value",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    },
+    {
+      "declaration_source": {
+        "bytes": 145276,
+        "member": "package.json",
+        "sdk_version": "2026.9.9",
+        "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95"
+      },
+      "declared_version": "2.9.1",
+      "exports_conditions": null,
+      "installed_package_json_available": false,
+      "installed_version": null,
+      "native_resources": null,
+      "package": "yaml",
+      "package_json_member": "node_modules/yaml/package.json",
+      "recursive_members": null,
+      "specifier_witnesses": [
+        {
+          "line": 30,
+          "parent": "dist/github-tool-identity-Ch5hxQmB.mjs",
+          "specifier": "yaml",
+          "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+        }
+      ],
+      "state": "UNRESOLVED_INSTALLED_BYTES_EXPORTS_TRANSITIVES"
+    }
+  ],
+  "installed_package_exports_or_native_closure_complete": false
+}

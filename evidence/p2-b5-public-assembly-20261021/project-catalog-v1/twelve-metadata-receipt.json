@@ -1,0 +1,10 @@
+{
+  "actual_file_received": true,
+  "bytes": 10487,
+  "closed_gap": "METADATA_ONLY",
+  "file_name": "b5-consolidated-twelve-manifest-join.json",
+  "not_claimed": "SDK bytes or runtime closure",
+  "row_count": 12,
+  "sha256": "ebe88249500a1d4864c4ff32021ac3f77a03f216b07cdccbf2bb30e0338b5570",
+  "source_comment": "PR17#6316671622"
+}

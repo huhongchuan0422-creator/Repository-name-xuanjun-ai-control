@@ -1,0 +1,35 @@
+{
+  "additional_received_dynamic_reuse": 40,
+  "catalog": {
+    "bytes": 6919,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/catalog.candidate.json",
+    "sha256": "62b1eef3a48b004c2b426cfff1ee7489af0eecaecdc80d4953479b7b581f2689"
+  },
+  "checks": [
+    "source SHA/metadata12 join matches exact prior inventory",
+    "372 unique metadata entries and4114893B sum",
+    "all788 reused file hashes/bytes match local copies",
+    "0 existing members in missing frontier",
+    "all372 within2MiB single file and total frontier within16MiB; not complete budget proof",
+    "194 callsite parent/line hashes match received source;192 literal/2computed",
+    "14 eager manifests absent from received material; conditional ws branch kept explicit",
+    "selected_members empty; no dispatchable or installation claim"
+  ],
+  "computed_or_other": 2,
+  "conditional_additional_packages": 1,
+  "dynamic_sites": 194,
+  "existing_reverified": 788,
+  "installed_manifests_available": 0,
+  "known_frontier_bytes": 4114893,
+  "known_frontier_count": 372,
+  "literal_sites": 192,
+  "metadata_received": {
+    "bytes": 10487,
+    "sha256": "ebe88249500a1d4864c4ff32021ac3f77a03f216b07cdccbf2bb30e0338b5570"
+  },
+  "packages": 14,
+  "selected_members_final": 0,
+  "state": "CANDIDATE_BLOCKED_NOT_DISPATCHABLE",
+  "unique_literal_targets": 158,
+  "unreceived_literal_targets_not_selected": 114
+}

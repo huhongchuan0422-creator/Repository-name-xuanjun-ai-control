@@ -1,0 +1,157 @@
+{
+  "acceptance": [
+    "all selected member paths/SHA/bytes/version/necessity unambiguous",
+    "no existing verified member selected again",
+    "all resolved branches/package exports/native/resources accounted for or proven excluded",
+    "whole selected set within original limits before dispatch",
+    "fixed original tar+manifest digests and private recipient custody verified",
+    "retained failure output never overwritten/deleted and no blind retry",
+    "material transfer success never implies SDK/authentication/CP11 success"
+  ],
+  "additional_existing_dynamic_members": {
+    "bytes": 14517,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/additional-received-dynamic-members.json",
+    "sha256": "2a097c69802246c8926b0bf4cead9cf4ae3877e2d5f2b57f250c19cbeed9170c"
+  },
+  "blocking_gates": [
+    "unreceived native startup bodies prevent exact executable profile",
+    "unreceived child modules prevent recursive source closure",
+    "14 eager installed package trees plus1 conditional computed ws resource unresolved; no exports/native/resource closure proof",
+    "Node/ELF/image binding exceeds source budget and is unproven",
+    "real recipient/operation/source-root/recipient-root mapping not enrolled"
+  ],
+  "connection_contract": {
+    "budget": "B5 16MiB overrides generic256MiB; no split or promotion",
+    "live_tool_usage": "No B5 read attempted through OS-only tools",
+    "path": "docs/development/CLOUD_CONNECTION_SOURCE_CONTACTS_20261022.md",
+    "required_binding": {
+      "approved_catalog_sha256": null,
+      "invoke_id": null,
+      "operation": "fetch_approved_object",
+      "original_success_request": null,
+      "receiver_root_ref": null,
+      "recipient_id": null,
+      "source_root_ref": null
+    },
+    "source_chain": "PrivateMcp.read_project_chunk -> worker.ExistingProjectFiles.read -> private_transfer.export_chunk -> bound_job -> fixed-root descriptor read -> Receiver.accept/reconcile",
+    "source_commit": "78e339dbeead0d8c38944bc46018fd857df75ddd",
+    "state": "INTERNAL_DEFAULT_DISABLED_NOT_LIVE_ENTRY"
+  },
+  "critical_native_dynamic_gaps": [
+    {
+      "bytes": null,
+      "line": 8198,
+      "member": "dist/server-active-work-Bhfd47cA.mjs",
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "reason": "Unconditional await within finishGatewayStartup before its updateCanary return; not in old372 metadata frontier",
+      "sha256": null
+    },
+    {
+      "bytes": null,
+      "line": 5483,
+      "member": "dist/server-shutdown.runtime.js",
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "reason": "Original deferred shutdown module differs from received server-shutdown-6hlRrMSx.mjs; no alias substitution",
+      "sha256": null
+    }
+  ],
+  "do_not_recollect_existing_total": 828,
+  "dynamic_literal_target_summary": {
+    "branch_selection": "NOT_PROVEN_FOR_ALL_NAMES",
+    "currently_unreceived_names": 114,
+    "not_a_transfer_selection": true,
+    "unique_member_names": 158
+  },
+  "dynamic_resolution": {
+    "bytes": 149255,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/dynamic-callsite-classification.json",
+    "sha256": "51d6af22d4efebc6c3abd54a16d97db5f6cc14dc960ac2ab94c27f704d440a32"
+  },
+  "existing_members": {
+    "actual_current_local_hash_matches": 788,
+    "bytes": 152060,
+    "count": 788,
+    "path": "evidence/p2-b5-public-assembly-20261021/consolidated-available.json",
+    "recollect": false,
+    "sha256": "f44e52d790471b9a0b6767fe45d6e2b382b813368d7b0ff1ccdc4fa89314b441"
+  },
+  "final_selection_state": "NOT_FROZEN_CLOSURE_AND_PROFILE_UNRESOLVED",
+  "index": "PR17#6329032582",
+  "installation": "NOT_EXECUTED",
+  "known_frontier_fits_16MiB": true,
+  "known_frontier_is_complete_closure": false,
+  "known_required_frontier": {
+    "bytes": 9892,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/known-required-frontier.json",
+    "sha256": "b4366a03df091ac8901b90b412d6c135f64519773c63b56833500c55dc90fdc7"
+  },
+  "known_required_frontier_bytes": 4114893,
+  "known_required_frontier_count": 372,
+  "limits": {
+    "child_memory_bytes": 805306368,
+    "child_wall_seconds": 240,
+    "cpu_seconds": 180,
+    "materials_tar_bytes": 18874368,
+    "node_analysis_only_bytes": 134217728,
+    "open_files": 128,
+    "output_total_max_bytes": 25165824,
+    "parent_watchdog_seconds": 270,
+    "report_bytes": 2097152,
+    "selected_content_bytes": 16777216,
+    "selected_files": 2000,
+    "single_source_bytes": 2097152,
+    "source_fetch_wall_seconds": 45
+  },
+  "node_runtime": {
+    "bytes": 1175,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/node-runtime-binding.json",
+    "sha256": "8c34c8365fbf469e9484fc38a32515f462dfb2e70dcee601740e09c05171ef25"
+  },
+  "operation_reference": {
+    "currently_exposed_read_only_capability": "approved existing OS-release results only; cannot read arbitrary B5 paths",
+    "entry_owner": "original connection window",
+    "operation_id": null,
+    "state": "NOT_ENROLLED_FOR_B5"
+  },
+  "package_resolution": {
+    "bytes": 17073,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/package-resolution.json",
+    "sha256": "992732780ef19864e14d0b8fcdd733bcbe2e8bc28178f15461c85e53eb5d1800"
+  },
+  "profile": {
+    "bytes": 2516,
+    "path": "evidence/p2-b5-public-assembly-20261021/project-catalog-v1/runtime-profile.candidate.json",
+    "sha256": "448c883ff2317c8069cd7ffa9619614ccfbf8897e787adc3c1099142d3ac75be"
+  },
+  "project": "P2_B5",
+  "purpose": "One bounded complete material selection after actual recursive/package/profile closure; no repeated small batches or recollection of received788",
+  "recipient_root_reference": {
+    "approved_transport_ref": null,
+    "path": null,
+    "requirement": "real verified recipient + private workspace mapping from existing connection owner; do not infer from workspace label",
+    "state": "UNBOUND"
+  },
+  "schema": 1,
+  "scope": "RETAINED_ARCHIVE_MATERIALS_AND_OFFLINE_CLOSURE_ONLY_NOT_INSTALLATION",
+  "sdk": "NOT_EXECUTED",
+  "selected_members": [],
+  "server_actions": "NOT_EXECUTED",
+  "source_archive_binding": {
+    "bytes": 559237632,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/source-tree.tar.pending",
+    "sha256": "e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485"
+  },
+  "source_baseline": "1b39db7bba010b8f990b3455f5be1ef438d9d2e9",
+  "source_manifest_binding": {
+    "bytes": 5635704,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/manifest.json",
+    "sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+  },
+  "source_root_reference": {
+    "approved_transport_ref": null,
+    "owner_task": "PR17#6328988789",
+    "state": "RETAINED_SOURCE_PATH_BOUND_TRANSPORT_CATALOG_MAPPING_UNBOUND"
+  },
+  "state": "CANDIDATE_BLOCKED_NOT_DISPATCHABLE",
+  "task": "PR17#6316275680"
+}

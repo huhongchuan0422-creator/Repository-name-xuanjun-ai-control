@@ -1,0 +1,84 @@
+{
+  "acceptance": [
+    "real loader registry and lease release",
+    "native startupSettled",
+    "original authenticated describe response and unauthorized rejection",
+    "native client stop + public close + work drain",
+    "cross-process retained evidence/recovery"
+  ],
+  "authentication": {
+    "authority_binding": null,
+    "hand_filled_scopes": false,
+    "required": "original native authentication/subject/context/authorized scopes",
+    "state": "NOT_EXECUTED_UNBOUND"
+  },
+  "entry_members": [
+    "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "dist/server-ChnNHwLm.mjs",
+    "dist/client-B4O1WKhF.mjs"
+  ],
+  "envelope": {
+    "cap_drop": [
+      "ALL"
+    ],
+    "credentials": "NO_PRODUCTION_CREDENTIALS",
+    "gid": 1002,
+    "home_config_state_run": "NEW_PRIVATE_ISOLATED_ONLY_NOT_YET_BOUND",
+    "network": "none",
+    "readonly_root": true,
+    "sdk_mount": "readonly",
+    "security_opt": [
+      "no-new-privileges"
+    ],
+    "uid": 1002
+  },
+  "exact_config_bytes": null,
+  "exact_config_sha256": null,
+  "forbidden": [
+    "model invocation",
+    "ledger business writes",
+    "OAuth",
+    "admit/launch",
+    "production credentials/customer data",
+    "production Gateway changes"
+  ],
+  "native_option_witness": {
+    "lines": [
+      5200,
+      5203,
+      5254,
+      5481,
+      8181,
+      8204,
+      8328,
+      8571,
+      8606
+    ],
+    "member": "dist/server-start-Bz-KV48j.mjs",
+    "sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17"
+  },
+  "profile_blockers": [
+    {
+      "member": "dist/server-startup-config-helpers-U6xkM_57.mjs",
+      "reason": "native config/auth initializer unreceived"
+    },
+    {
+      "member": "dist/server-startup-early-BLUjqlAE.mjs",
+      "reason": "real early startup side effects unreceived"
+    },
+    {
+      "member": "dist/server-startup-post-attach-CsYAFanV.mjs",
+      "reason": "called even with updateCanary at core8204; actual no-model/no-ledger/no-side-service behavior unproven"
+    }
+  ],
+  "route": "Separate real inspection lease -> release -> dedicated original public Gateway -> await original startupSettled -> original authenticated GatewayClient describe -> client stop -> original server.close/drain. No private owner injection.",
+  "runtime": "openclaw@2026.9.9",
+  "schema": 1,
+  "scope": "ISOLATED_TEST_ONLY",
+  "startup_or_auth_executed": false,
+  "state": "DRAFT_NOT_EXECUTABLE",
+  "verified_supported_option_intent": {
+    "ambientEnvTriggers": "suppress",
+    "updateCanary": true
+  }
+}

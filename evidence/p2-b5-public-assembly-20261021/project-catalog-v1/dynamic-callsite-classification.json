@@ -1,0 +1,3399 @@
+[
+  {
+    "callsite_excerpt": "\t\tresolveApiKeyForProvider: async (params) => (await import(\"./runtime-model-auth.runtime.js\")).resolveProviderRuntimeApiKey(params),",
+    "line": 162,
+    "line_sha256": "ec95d7b73c8e60101303b02a6717631f93b3b568ba0739a274fceca2c9e002e1",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "041cf45d0cf2eb087f6a7f869515424337a2b302005c5b3b4b21255020af5641",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-model-auth.runtime.js",
+        "specifier": "./runtime-model-auth.runtime.js"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { mutateConfigFile } = await import(\"./mutate-2lbkQ79v.mjs\");",
+    "line": 355,
+    "line_sha256": "065f3a03e55855686075ad48c6ee7ca83401ca93ea979dce583306350c526cee",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "ec7eebf78a9c7c57d95cb5319e6f43d5cb33768c72829e12d558e7666c703225",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/mutate-2lbkQ79v.mjs",
+        "specifier": "./mutate-2lbkQ79v.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { replaceConfigFile } = await import(\"./mutate-2lbkQ79v.mjs\");",
+    "line": 359,
+    "line_sha256": "5fe8d7b06fd913371464f836bdb3f1f3c77efda2f63a447bf27dbd06ec8bf6ca",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "ec7eebf78a9c7c57d95cb5319e6f43d5cb33768c72829e12d558e7666c703225",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/mutate-2lbkQ79v.mjs",
+        "specifier": "./mutate-2lbkQ79v.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadHeartbeatRunnerRuntime = createLazyRuntimeModule(() => import(\"./heartbeat-runner-DlM4jAmi.mjs\"));",
+    "line": 379,
+    "line_sha256": "ea5d0db7d00795935bed63a61e0738e5510bb81df4bc5b11006d394b0922e9b5",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "166d9265022bb30a8ddb3fe6ccba0e316e91f1f0291a0396b05acdbf8f30ba2d",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/heartbeat-runner-DlM4jAmi.mjs",
+        "specifier": "./heartbeat-runner-DlM4jAmi.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadAttachments = createLazyRuntimeModule(() => import(\"./host-hook-attachments-BKcXbP_S.mjs\"));",
+    "line": 1910,
+    "line_sha256": "4b67ae77f7ca031c0a2aa54354e88da04dfb91491c2302e7a92fec56f6c2296f",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "2628a653515fcee09b2a723bd0aa1a60fffdbbb9e3a6371bb30abe86a102df5d",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/host-hook-attachments-BKcXbP_S.mjs",
+        "specifier": "./host-hook-attachments-BKcXbP_S.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadHookState = createLazyRuntimeModule(() => import(\"./host-hook-state-BZxA0N5P.mjs\"));",
+    "line": 1911,
+    "line_sha256": "2b04e2b16edbbb35a4505353310b5adbbf0347880d31242fd5f2752c003155ae",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "e802558757303b67c4226efc372dcdc2415c33260cd1890a42c9205596221770",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/host-hook-state-BZxA0N5P.mjs",
+        "specifier": "./host-hook-state-BZxA0N5P.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 4244,
+    "line_sha256": "d739ff5a47588e2263bce82bf6cf1ea7c7455cb1c69b62114e976f5fae35d7e9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst loadSessionOwnership = createLazyRuntimeSurface(() => import(\"./registry-runtime-session-ownership-BKMt0OZh.mjs\"), (module) => module.createPluginSessionOwnership(state, pluginId, currentRegistry));",
+    "line": 4604,
+    "line_sha256": "64e962596ea1c1bbec4f32fd1798a49e0a914a967cfc7cbf1a567870301367fb",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "5c7a7196d0142ff2f59d476f094e651687b3ef47edd2fab34a60352c35a99745",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/registry-runtime-session-ownership-BKMt0OZh.mjs",
+        "specifier": "./registry-runtime-session-ownership-BKMt0OZh.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { evaluateDecisionInRegistry } = await import(\"./runtime-5ZTSKkPm.mjs\");",
+    "line": 4707,
+    "line_sha256": "b1f435c14c356b8f73c3bf666a0b1b42e7acfc5803168f040e13c59aab4ce223",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "124698132d9b83d7918f1d63fee80f4400f4f34e817c32b5c97da9ef47ceaccc",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-5ZTSKkPm.mjs",
+        "specifier": "./runtime-5ZTSKkPm.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { resolveApiKeyForProfile } = await import(\"./oauth-CU-K1B4_.mjs\");",
+    "line": 5570,
+    "line_sha256": "3a5e3034a3307dc07366ecacd862e10a935f2a0741219ddf04ae1ee27bd9558a",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "31a18b75537170cc1418de457564b877228d5b53bbe99f4975c838d1e6ee83a4",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/oauth-CU-K1B4_.mjs",
+        "specifier": "./oauth-CU-K1B4_.mjs"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadModelAuthRuntime = createLazyRuntimeModule(() => import(\"./runtime-model-auth.runtime.js\"));",
+    "line": 6090,
+    "line_sha256": "54af7db54e6cf14999e9a75b1c877ba8c3379b976c953e7323fecb2bc2fe73e6",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "041cf45d0cf2eb087f6a7f869515424337a2b302005c5b3b4b21255020af5641",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-model-auth.runtime.js",
+        "specifier": "./runtime-model-auth.runtime.js"
+      }
+    ],
+    "parent": "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "parent_sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\treturn await measureGatewayBootstrapStep(\"gateway.server-start-import\", () => import(\"./server-start-Bz-KV48j.mjs\"));",
+    "line": 13,
+    "line_sha256": "46a06d0785613e97e5529f85ce1c059fae79cbdfe28f1234846b463f3fbbce5c",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-start-Bz-KV48j.mjs",
+        "specifier": "./server-start-Bz-KV48j.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { acquireGatewayLock } = await import(\"./gateway-lock-D3dbA29L.mjs\");",
+    "line": 17,
+    "line_sha256": "198717b4f1b373ce690d53ef075420178ae58a9762cda9237d5a79fddacccaeb",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d14777f46a3e49d17dc54d39725dfd2bef2f95f4edd091a2fb68f0eac37af0b0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/gateway-lock-D3dbA29L.mjs",
+        "specifier": "./gateway-lock-D3dbA29L.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createSqliteReadOnlyWorkerScope } = await import(\"./sqlite-readonly-worker-BFy1GYp8.mjs\");",
+    "line": 45,
+    "line_sha256": "84c1ed5a534007fc8a910dcb0839161a2208467982f0e6584439c2db5b265a8a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-readonly-worker-BFy1GYp8.mjs",
+        "specifier": "./sqlite-readonly-worker-BFy1GYp8.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { withAgentDatabaseStartupAdmission } = await import(\"./agent-database-startup-BQDRwiHX.mjs\");",
+    "line": 47,
+    "line_sha256": "92e83f990d64f079d173f399a63be5cffb48e968f595a4ea882580c0272c4f47",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/agent-database-startup-BQDRwiHX.mjs",
+        "specifier": "./agent-database-startup-BQDRwiHX.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { startGatewaySpawnBroker, runWithSpawnBroker } = await import(\"./context-BpJ1X6yc.mjs\");",
+    "line": 73,
+    "line_sha256": "20ea1f6b862487a69cb5216f62069af9873c4dc78187d4ae24e3b1a300ce9169",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/context-BpJ1X6yc.mjs",
+        "specifier": "./context-BpJ1X6yc.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { createSubsystemLogger } = await import(\"./subsystem-goPiGiB2.mjs\");",
+    "line": 80,
+    "line_sha256": "7eaae7e170889715c0ceafda981058c2f192ddca1f7220b9616fd51c82332aff",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "38caf4b0c4aa50d08c36937101b90202b2e52231f2923325cf137065c2ce26c0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/subsystem-goPiGiB2.mjs",
+        "specifier": "./subsystem-goPiGiB2.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createSubsystemLogger } = await import(\"./subsystem-goPiGiB2.mjs\");",
+    "line": 90,
+    "line_sha256": "7ce93513d08084475612f52833ab50efee3f49f519cbd1fe968c73dfd79f56a1",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "38caf4b0c4aa50d08c36937101b90202b2e52231f2923325cf137065c2ce26c0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/subsystem-goPiGiB2.mjs",
+        "specifier": "./subsystem-goPiGiB2.mjs"
+      }
+    ],
+    "parent": "dist/server-ChnNHwLm.mjs",
+    "parent_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { startSshPortForward } = await import(\"./ssh-tunnel-Df-q3Syd.mjs\");",
+    "line": 1823,
+    "line_sha256": "3c3daa70039c7a03706095bcac91730526ff324ec2ed435e823192f1530e27c2",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "56beb92fd28d28dc5c0538c13d37dc61427b14d6d836bed6b50369412a2ccd95",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/ssh-tunnel-Df-q3Syd.mjs",
+        "specifier": "./ssh-tunnel-Df-q3Syd.mjs"
+      }
+    ],
+    "parent": "dist/client-B4O1WKhF.mjs",
+    "parent_sha256": "5434ab96d41c82f8717e0bb5b1046f06d41cac0b3da9a5cbf384e0aaad8cf5cc",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst secretEgressProxy = cfgAtStart.secrets?.egressProxy?.enabled === true ? await import(\"./runtime-DxGxPjej.mjs\").then((egressRuntime) => egressRuntime.startGatewaySecretEgressProxy({",
+    "line": 343,
+    "line_sha256": "a95c3700595316f2726296c650d74888800aa5fa59bfaba78dab9e781469b53b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-DxGxPjej.mjs",
+        "specifier": "./runtime-DxGxPjej.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst [{ startGatewayEventSubscriptions }, { startGatewayChannelHealthMonitor }] = await startupTrace.measure(\"runtime.post-early-imports\", () => Promise.all([import(\"./server-runtime-subscriptions-CLhV3Vvh.mjs\"), import(\"./server-runtime-startup-services-BOtX2LoM.mjs\")]));",
+    "line": 404,
+    "line_sha256": "437f335f95d57324ad01a63dd08e201dbfe05c17bba9a67ca948d7f5b6628044",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-runtime-subscriptions-CLhV3Vvh.mjs",
+        "specifier": "./server-runtime-subscriptions-CLhV3Vvh.mjs"
+      },
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-runtime-startup-services-BOtX2LoM.mjs",
+        "specifier": "./server-runtime-startup-services-BOtX2LoM.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createOperatorApprovalSessionEventRuntime } = await import(\"./operator-approval-session-events-cBwTRygo.mjs\");",
+    "line": 430,
+    "line_sha256": "a9e671b08230e393ff57b105b2e320bddff1dfcaf8c038e487b564387590490b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/operator-approval-session-events-cBwTRygo.mjs",
+        "specifier": "./operator-approval-session-events-cBwTRygo.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst [{ createGatewayAuxHandlers }, { coreGatewayHandlers: coreGatewayHandlersLocal }] = await Promise.all([import(\"./server-aux-handlers-ZAnivsB0.mjs\"), import(\"./server-methods-DmuZ2oH_.mjs\")]);",
+    "line": 445,
+    "line_sha256": "d362cf6d29bd77484d1eb33feabcbc4492d2d93821f3495b999e57e20d628f72",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-aux-handlers-ZAnivsB0.mjs",
+        "specifier": "./server-aux-handlers-ZAnivsB0.mjs"
+      },
+      {
+        "actual_received_sha256": "28e78f59498d06d42b4e8c639d48dc2f05c694d504413d44bc875509c5c6cc9c",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-methods-DmuZ2oH_.mjs",
+        "specifier": "./server-methods-DmuZ2oH_.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { activatePluginRegistry } = await import(\"./loader-shared-C6nSwYew.mjs\");",
+    "line": 535,
+    "line_sha256": "41cd469c5ca40b9d358c43d9eedadb0c4321e5a89acca826e8f888bb53b47121",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/loader-shared-C6nSwYew.mjs",
+        "specifier": "./loader-shared-C6nSwYew.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { reloadGatewayPlugins } = await import(\"./server-plugin-reload-BeiD3aB3.mjs\");",
+    "line": 566,
+    "line_sha256": "298b2460d1ae40a030fc313bcab21d6d338f4ff8b840e51c4d63a9adfdc299dd",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-plugin-reload-BeiD3aB3.mjs",
+        "specifier": "./server-plugin-reload-BeiD3aB3.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\tconst { deleteGatewaySession } = await import(\"./sessions-delete-QwJLANQV.mjs\");",
+    "line": 632,
+    "line_sha256": "fcea2697553127f11b7a54942da6520b35a213e6d83a7c0a01169a14ac7c5cb6",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sessions-delete-QwJLANQV.mjs",
+        "specifier": "./sessions-delete-QwJLANQV.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { loadGatewayConfigRevisionProjector } = await import(\"./config-revision-token-Cv9BxMai.mjs\");",
+    "line": 789,
+    "line_sha256": "b2bf773aa132636851ca8b856f63685bfa51f548f9fb1f3907a8573c71979d1f",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/config-revision-token-Cv9BxMai.mjs",
+        "specifier": "./config-revision-token-Cv9BxMai.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createGatewayRequestContext } = await import(\"./server-request-context-Bfv-uwwO.mjs\");",
+    "line": 793,
+    "line_sha256": "86f0842b006977de6e1038cb4058265a80fdd603c621ea80fc390e3ade6db135",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-request-context-Bfv-uwwO.mjs",
+        "specifier": "./server-request-context-Bfv-uwwO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createSessionRowProjection } = await import(\"./session-row-projection-BaDNXHuO.mjs\");",
+    "line": 803,
+    "line_sha256": "a55adc7090d062b19224b4b102823c01b3533c5728e1cf149095130214dd2077",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-row-projection-BaDNXHuO.mjs",
+        "specifier": "./session-row-projection-BaDNXHuO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createGatewayInstanceRuntime } = await import(\"./server-instance-runtime-bbRmFlZT.mjs\");",
+    "line": 850,
+    "line_sha256": "79d4d6b55a7445236083a8f26167dbaab8dada0934ab2f0864b42174ec413f56",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-instance-runtime-bbRmFlZT.mjs",
+        "specifier": "./server-instance-runtime-bbRmFlZT.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst cronStateLoader = createLazyPromiseLoader(() => import(\"./server-cron-D_hctTzl.mjs\").then(({ buildGatewayCronService }) => {",
+    "line": 908,
+    "line_sha256": "d7cae6b64a320fe285ca609646be5778c681739d1287c8f7112bef176bac756b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-cron-D_hctTzl.mjs",
+        "specifier": "./server-cron-D_hctTzl.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createGatewayNodeSessionRuntime } = await import(\"./server-node-session-runtime-NSQ3OD_Q.mjs\");",
+    "line": 1490,
+    "line_sha256": "4233d3371360a29363744913284112181d10e4e49072a583d1b4338ba8e6e681",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-node-session-runtime-NSQ3OD_Q.mjs",
+        "specifier": "./server-node-session-runtime-NSQ3OD_Q.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst nodeDesktopService = (await import(\"./node-source-cJsqe-Qk.mjs\")).createNodeDesktopService({",
+    "line": 1514,
+    "line_sha256": "ba8adb530181c277810e130067fe57d609f0635e5674cad58ee94017bd1f0db9",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/node-source-cJsqe-Qk.mjs",
+        "specifier": "./node-source-cJsqe-Qk.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createWatchNodeHttpRuntime } = await import(\"./watch-node-http-Cp27yLBg.mjs\");",
+    "line": 1524,
+    "line_sha256": "37ca008eb1c294e3776f6c6c1ada14217161030106287180de06effbf768aada",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/watch-node-http-Cp27yLBg.mjs",
+        "specifier": "./watch-node-http-Cp27yLBg.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { TerminalSessionManager, DEFAULT_TERMINAL_DETACH_SECONDS } = await import(\"./session-manager-BmR6563z.mjs\");",
+    "line": 1575,
+    "line_sha256": "ee441f0b46535356fe2f575ce4a0457eb925f7baf1d1905125deff346b2c7007",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-manager-BmR6563z.mjs",
+        "specifier": "./session-manager-BmR6563z.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createTerminalSessionTransport } = await import(\"./gateway-transport-BFWZ9htS.mjs\");",
+    "line": 1576,
+    "line_sha256": "319ff74482a6f4832a941096c5bfef2b3df5a288beb1abf44aac32918760a7b9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "022b67066bb281c67a97855a56fa0db7c4dbf3db44faf1c0f4cc9c62542a2f14",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/gateway-transport-BFWZ9htS.mjs",
+        "specifier": "./gateway-transport-BFWZ9htS.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst hookRunner = (await import(\"./hooks-CQ6Gzjbg.mjs\")).createHookRunner(pluginRuntime.registry);",
+    "line": 1700,
+    "line_sha256": "22e473ac346617b5b5519cb8c0400ecbef77ed447182e77d336908a95248c871",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/hooks-CQ6Gzjbg.mjs",
+        "specifier": "./hooks-CQ6Gzjbg.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst nodeDesktopStreamBroker = (await startupTrace.measure(\"node-desktop.runtime-import\", () => import(\"./node-stream-broker-CeTeSb9_.mjs\"))).createNodeDesktopStreamBroker();",
+    "line": 4754,
+    "line_sha256": "ae9a9c4a6562e2bfd81dd0f08ab7406dbff5dd93435607448d76d2c7c9654d53",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/node-stream-broker-CeTeSb9_.mjs",
+        "specifier": "./node-stream-broker-CeTeSb9_.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst hostDesktopService = (await startupTrace.measure(\"host-desktop.runtime-import\", () => import(\"./host-source-J6bYF2bD.mjs\"))).createHostDesktopService({",
+    "line": 4755,
+    "line_sha256": "5a6ceae5f240b04afea150f27e5d14a5e0971ba6c1a07db53265d3b982d9a567",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/host-source-J6bYF2bD.mjs",
+        "specifier": "./host-source-J6bYF2bD.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst gatewayComputerService = (await startupTrace.measure(\"computer.runtime-import\", () => import(\"./computer-service-MaQCiIAT.mjs\"))).createGatewayComputerService({",
+    "line": 4759,
+    "line_sha256": "fbb51df40e39faa610905f3e97d7703186d089e8c23475e90c9e805a3910e0d5",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/computer-service-MaQCiIAT.mjs",
+        "specifier": "./computer-service-MaQCiIAT.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { captureAbortedPartial, persistAbortedPartials } = await import(\"./chat-transcript-persistence.runtime.js\");",
+    "line": 4802,
+    "line_sha256": "e52f55aa9201a8d4a299b8ca2a0ee1bc84ccde861b0243884c323e61b2ad6346",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "942784311c2d2acb4359bd123983ecc0bf9b9bcb15dc9f7be29b0e3ada8bd078",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/chat-transcript-persistence.runtime.js",
+        "specifier": "./chat-transcript-persistence.runtime.js"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { cancelGatewayWorkerSessionWork } = await import(\"./server-worker-placement-cancel-CAcVs6qq.mjs\");",
+    "line": 4818,
+    "line_sha256": "6c0345b66da528d24761ffd0d40b781ad0f0ea9153127027c33f992e32d1250e",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-worker-placement-cancel-CAcVs6qq.mjs",
+        "specifier": "./server-worker-placement-cancel-CAcVs6qq.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createDevicePlacementDemandReader } = await import(\"./device-placement-demand-DkucqL9N.mjs\");",
+    "line": 4831,
+    "line_sha256": "f0b7005fa4001982b710ffce0ab1a373f129bb9161637c0ffff41de0f0009c65",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/device-placement-demand-DkucqL9N.mjs",
+        "specifier": "./device-placement-demand-DkucqL9N.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { resolveGatewayRuntimeConfig } = await import(\"./server-runtime-config-DuqqRtgz.mjs\");",
+    "line": 4858,
+    "line_sha256": "bdc39772604a4bcb329a8f2f4784ad0c6cea9c17090cf6bc939baf657fb78136",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-runtime-config-DuqqRtgz.mjs",
+        "specifier": "./server-runtime-config-DuqqRtgz.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { ensureStartupLocalCliPairing } = await startupTrace.measure(\"runtime.local-cli-pairing-import\", () => import(\"./startup-local-cli-pairing-CZwdZ3GS.mjs\"));",
+    "line": 4871,
+    "line_sha256": "1b89da97ed72c2ea7ab28a6c448f4265749fd4c234402da733a794d585353a45",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/startup-local-cli-pairing-CZwdZ3GS.mjs",
+        "specifier": "./startup-local-cli-pairing-CZwdZ3GS.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createTerminalLaunchPolicy } = await startupTrace.measure(\"terminal.launch-import\", () => import(\"./launch-BvZIYPAI.mjs\"));",
+    "line": 4917,
+    "line_sha256": "e14462d9aea4d4b63abaed8cb24bf1bd862709fcc1d367e49b9222d0e5ea527e",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/launch-BvZIYPAI.mjs",
+        "specifier": "./launch-BvZIYPAI.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { runDefaultChannelSetupWizard, runDefaultSetupWizard } = await startupTrace.measure(\"gateway.wizard-imports\", () => import(\"./wizard-BJD4NY1u.mjs\"));",
+    "line": 4919,
+    "line_sha256": "90cbd98ce9f17a8d263999c44c3f0d05f8eb6db34c48a648623937a739e14e05",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/wizard-BJD4NY1u.mjs",
+        "specifier": "./wizard-BJD4NY1u.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createChannelManager } = await startupTrace.measure(\"gateway.channel-manager-import\", () => import(\"./server-channels-CM8JGKOq.mjs\"));",
+    "line": 4938,
+    "line_sha256": "17e508fbf3752e617ee38c2205cf899f1ad473f3014274290b1851166c62df8d",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-channels-CM8JGKOq.mjs",
+        "specifier": "./server-channels-CM8JGKOq.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { assertConfiguredWorkspaceStateReady } = await import(\"./workspace-state-dirs-C7XYpegp.mjs\");",
+    "line": 5132,
+    "line_sha256": "32b7c53e21b1c2a38fe2d0b409b9016e9051f1331172ac57536762e36abb63a6",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/workspace-state-dirs-C7XYpegp.mjs",
+        "specifier": "./workspace-state-dirs-C7XYpegp.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { OPENCLAW_DATABASE_SCHEMA_DOCS_URL, OpenClawDatabaseSchemaPreflightError, preflightOpenClawDatabaseSchemas } = await startupTrace.measure(\"state.runtime-imports\", () => import(\"./openclaw-database-preflight-DuWvuin4.mjs\"));",
+    "line": 5172,
+    "line_sha256": "98f12c0b38cb8a62556d316a671273990a0a7b39f4724f2c1d13d76053a23f39",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-database-preflight-DuWvuin4.mjs",
+        "specifier": "./openclaw-database-preflight-DuWvuin4.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { ensureGlobalUndiciEnvProxyDispatcher } = await startupTrace.measure(\"runtime.network-imports\", () => import(\"./undici-global-dispatcher-BZpLk8dO.mjs\"));",
+    "line": 5188,
+    "line_sha256": "e833524d41ab53ff9d39d66b87eaf7e194ae6796d2ca84ad10aa43ebc0adf194",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "0a49acdb6fc5f61401c3031aeb6b8a00822385a0e91e44c53f4c348c340e4733",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/undici-global-dispatcher-BZpLk8dO.mjs",
+        "specifier": "./undici-global-dispatcher-BZpLk8dO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst startupConfigModulePromise = startupTrace.measure(\"config.runtime-imports\", () => import(\"./server-startup-config-Hx2M1x7s.mjs\"));",
+    "line": 5201,
+    "line_sha256": "20c58a4487483d0063e8f66ad6548e40ad5354ec0987e2667d5fb25e4866a80d",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "c6c846ead6ec7b1eaf081530966d7b41a6363e8f05e6590daf2469fbc329ee97",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-startup-config-Hx2M1x7s.mjs",
+        "specifier": "./server-startup-config-Hx2M1x7s.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst loadStartupPluginsModule = createLazyPromise(() => import(\"./server-startup-plugins-Cajv-q3y.mjs\"), { cacheRejections: true });",
+    "line": 5202,
+    "line_sha256": "a058d562d9a07ec60521d29dc8f8ce4c1c33ec7efa9733f5de6332cd3dde06dc",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-startup-plugins-Cajv-q3y.mjs",
+        "specifier": "./server-startup-plugins-Cajv-q3y.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { publishCanonicalUserChannelPolicy } = await import(\"./user-channel-identity-operations-C8Dgco0P.mjs\");",
+    "line": 5246,
+    "line_sha256": "10d4615267dd3366de2fff5ddb5163f8ecfec315973a75f3380e8b9777af075b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/user-channel-identity-operations-C8Dgco0P.mjs",
+        "specifier": "./user-channel-identity-operations-C8Dgco0P.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { prepareGatewayStartupConfig } = await import(\"./server-startup-config-helpers-U6xkM_57.mjs\");",
+    "line": 5254,
+    "line_sha256": "67872a0bf8a270da9d47929580a614525ca98622dd13720afb45f756dac96ee5",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": true,
+        "member": "dist/server-startup-config-helpers-U6xkM_57.mjs",
+        "specifier": "./server-startup-config-helpers-U6xkM_57.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { cleanupRetiredManagedGitHubProfiles } = await import(\"./github-tool-profile-cleanup-IxkgbLEO.mjs\");",
+    "line": 5267,
+    "line_sha256": "757a95d7a32ea1178581517dacfe4e9478350c90805f9a755d92b0e1ee525b8a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/github-tool-profile-cleanup-IxkgbLEO.mjs",
+        "specifier": "./github-tool-profile-cleanup-IxkgbLEO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayModelCatalogModule = createLazyRuntimeModule(() => import(\"./server-model-catalog-BYzdocx7.mjs\"));",
+    "line": 5477,
+    "line_sha256": "a87c69472ae66bf5769be96ee47d6d4aebf587e6360646be16df5a02757145a8",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-model-catalog-BYzdocx7.mjs",
+        "specifier": "./server-model-catalog-BYzdocx7.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadWorkerEnvironmentStartupModule = createLazyRuntimeModule(() => import(\"./server-worker-environment-startup-HJia58DJ.mjs\"));",
+    "line": 5479,
+    "line_sha256": "28a5659270240118057f4766f2cf27f3550e6885b0c1949ac9c731a8e29b6a47",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-worker-environment-startup-HJia58DJ.mjs",
+        "specifier": "./server-worker-environment-startup-HJia58DJ.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadWorkerPlacementStartupModule = createLazyRuntimeModule(() => import(\"./server-worker-placement-startup-CY__2YA2.mjs\"));",
+    "line": 5480,
+    "line_sha256": "bf654812f875e7f0aa514ec26a9a139bb3c1b40d2ae10220a25b07ab0ca9c55a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-worker-placement-startup-CY__2YA2.mjs",
+        "specifier": "./server-worker-placement-startup-CY__2YA2.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayStartupEarlyModule = createLazyRuntimeModule(() => import(\"./server-startup-early-BLUjqlAE.mjs\"));",
+    "line": 5481,
+    "line_sha256": "f055195b3def1905a0daf240bfe10358f98a509a22e9e8bbf49f638e2cd393be",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": true,
+        "member": "dist/server-startup-early-BLUjqlAE.mjs",
+        "specifier": "./server-startup-early-BLUjqlAE.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayPluginBootstrapModule = createLazyRuntimeModule(() => import(\"./server-plugin-bootstrap-BF-wNIVo.mjs\"));",
+    "line": 5482,
+    "line_sha256": "6b954328b7cae306635799cb38cdf51e7c8b0e02f47303f4cc9267421a0c1278",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+        "specifier": "./server-plugin-bootstrap-BF-wNIVo.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayShutdownModule = createLazyRuntimeModule(() => import(\"./server-shutdown.runtime.js\"));",
+    "line": 5483,
+    "line_sha256": "28d777daad1533e7e1de7efd1bd0c9345ea04e8772f1e0e3da1394b78812bb6c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-shutdown.runtime.js",
+        "specifier": "./server-shutdown.runtime.js"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getChannelRuntime = createLazyRuntimeModule(() => import(\"./runtime-channel-Bj9-7nOq.mjs\").then(({ createRuntimeChannel }) => createRuntimeChannel()));",
+    "line": 5506,
+    "line_sha256": "23722edba94eabac4a43fcbd9dd50a9db2b7099cad4e6399509af6573eef82b1",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-channel-Bj9-7nOq.mjs",
+        "specifier": "./runtime-channel-Bj9-7nOq.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { cancelPreparedModelRuntimeRefresh } = await import(\"./prepared-model-runtime-DZfcn0kK.mjs\");",
+    "line": 5539,
+    "line_sha256": "f49e9114f9f4f8f7bd96fff9fae3d2af3cd07c2471f7ab6e5f829d90aca2af95",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/prepared-model-runtime-DZfcn0kK.mjs",
+        "specifier": "./prepared-model-runtime-DZfcn0kK.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t], createLazyRuntimeNamedExport(() => import(\"./plugin-icon-http-CiIfUtGq.mjs\"), \"handlePluginIconHttpRequest\")],",
+    "line": 6480,
+    "line_sha256": "5f8e7cda205b2eebbcff0c6f3df4a6e2328e3f16b99d029578b09560fe0a29b8",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-icon-http-CiIfUtGq.mjs",
+        "specifier": "./plugin-icon-http-CiIfUtGq.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t[[\"pluginThemeArt\"], createLazyRuntimeNamedExport(() => import(\"./plugin-theme-art-http-Gul_udEV.mjs\"), \"handlePluginThemeArtHttpRequest\")],",
+    "line": 6481,
+    "line_sha256": "817a5e71463bd1f6e5fa7cf90fb712636c6825dfa125e52331ae4d667e589485",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-theme-art-http-Gul_udEV.mjs",
+        "specifier": "./plugin-theme-art-http-Gul_udEV.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t[[\"workspaceIcon\"], createLazyRuntimeNamedExport(() => import(\"./workspace-icon-http-DQswZ07C.mjs\"), \"handleWorkspaceIconHttpRequest\")],",
+    "line": 6482,
+    "line_sha256": "7ba2267982735d1734a09407efe2ebccc62b0b5c99d5b2ab7ae2c6bcc43c4a61",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/workspace-icon-http-DQswZ07C.mjs",
+        "specifier": "./workspace-icon-http-DQswZ07C.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t[[\"channelAvatar\"], createLazyRuntimeNamedExport(() => import(\"./channel-avatar-http-f6eKvygp.mjs\"), \"handleChannelAvatarHttpRequest\")]",
+    "line": 6483,
+    "line_sha256": "93d09c0f6d8f37d4be2c27e840b857ef5e2b91f19c148d5be0c722141132eb87",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/channel-avatar-http-f6eKvygp.mjs",
+        "specifier": "./channel-avatar-http-f6eKvygp.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { resolvePublicSessionShareToken } = await import(\"./control-ui-public-session-token-BYQvQeRj.mjs\");",
+    "line": 6613,
+    "line_sha256": "92e306e01136f5262a6e553880b3338c50e2f521740247294bb704d2899e9b93",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-public-session-token-BYQvQeRj.mjs",
+        "specifier": "./control-ui-public-session-token-BYQvQeRj.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { isPublicSessionShareActive, readPublicSessionShare } = await import(\"./control-ui-public-session-read-ChzN693l.mjs\");",
+    "line": 6619,
+    "line_sha256": "82a66d76ac3b4ac0e652e752035f3945bc0c7eb6136dffb855097680405fe0db",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-public-session-read-ChzN693l.mjs",
+        "specifier": "./control-ui-public-session-read-ChzN693l.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { renderPublicSessionDocument } = await import(\"./control-ui-public-session-render-D-kWaCPM.mjs\");",
+    "line": 6620,
+    "line_sha256": "d0d01154268642b6f68a9eedd1a7734338e7bd5a8f9528d7e146269614cea7b1",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-public-session-render-D-kWaCPM.mjs",
+        "specifier": "./control-ui-public-session-render-D-kWaCPM.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getControlUiModule = createLazyRuntimeModule(() => import(\"./control-ui-AC9fNfiV.mjs\"));",
+    "line": 6694,
+    "line_sha256": "f2da0b9bf6a0c8641f51720183c089c530767483be92d985d1502a1a0f4cdf0c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-AC9fNfiV.mjs",
+        "specifier": "./control-ui-AC9fNfiV.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getControlUiPluginAssetsModule = createLazyRuntimeModule(() => import(\"./control-ui-plugin-assets-CVEIcUwk.mjs\"));",
+    "line": 6695,
+    "line_sha256": "d8d9b0fdcb795231395af7304ff040d2e1e302c76c35da9eb778d4f5e1594c30",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-plugin-assets-CVEIcUwk.mjs",
+        "specifier": "./control-ui-plugin-assets-CVEIcUwk.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getCanvasServeModule = createLazyRuntimeModule(() => import(\"./serve.runtime.js\"));",
+    "line": 6696,
+    "line_sha256": "0e25310de026c8394271f3c66bfc6c6e0fb9dfc299845dfb72368969b6a64353",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/serve.runtime.js",
+        "specifier": "./serve.runtime.js"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getBoardHttpModule = createLazyRuntimeModule(() => import(\"./board-http-w3wtOY6P.mjs\"));",
+    "line": 6697,
+    "line_sha256": "27820fe8908e216843af2053b1872e719075ecb3c1a715b3d54399bd64909c3b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/board-http-w3wtOY6P.mjs",
+        "specifier": "./board-http-w3wtOY6P.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getEmbeddingsHttpModule = createLazyRuntimeModule(() => import(\"./embeddings-http-_7vACN0h.mjs\"));",
+    "line": 6698,
+    "line_sha256": "9b8bcaf1365deb740839513cbb45638ca244fb5828a5de34b6111860be60680a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/embeddings-http-_7vACN0h.mjs",
+        "specifier": "./embeddings-http-_7vACN0h.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getManagedMediaAttachmentsModule = createLazyRuntimeModule(() => import(\"./managed-image-attachments-CIS_t-Bw.mjs\"));",
+    "line": 6699,
+    "line_sha256": "6c1757f25d284162dbe47d83d7f26527b465b8c0eed7cdcadc0f43fee047db65",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/managed-image-attachments-CIS_t-Bw.mjs",
+        "specifier": "./managed-image-attachments-CIS_t-Bw.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getArtifactDownloadsModule = createLazyRuntimeModule(() => import(\"./artifact-downloads-Bu2rYsDj.mjs\"));",
+    "line": 6700,
+    "line_sha256": "8c3ea4eaa4c4a15746d6604741de5663c9039d601efc60e1dc723abc13b8d82c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/artifact-downloads-Bu2rYsDj.mjs",
+        "specifier": "./artifact-downloads-Bu2rYsDj.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getMcpAppStandaloneModule = createLazyRuntimeModule(() => import(\"./mcp-app-standalone-Cg4UtRiL.mjs\"));",
+    "line": 6701,
+    "line_sha256": "6aafaad835ff87e2ca57aaa464ede97e235b2c8962aad76ba400e149734d509c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/mcp-app-standalone-Cg4UtRiL.mjs",
+        "specifier": "./mcp-app-standalone-Cg4UtRiL.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getModelsHttpModule = createLazyRuntimeModule(() => import(\"./models-http-DNCFQcEd.mjs\"));",
+    "line": 6702,
+    "line_sha256": "a082ae9dd04438081a7926ce11e3c6279d534b46a5c93d232bed3d0c8193aeab",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/models-http-DNCFQcEd.mjs",
+        "specifier": "./models-http-DNCFQcEd.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getOpenAiHttpModule = createLazyRuntimeModule(() => import(\"./openai-http-CQ7X8xZA.mjs\"));",
+    "line": 6703,
+    "line_sha256": "1bc908084144770da61fa997908e91df83136121a3cbacc4aed4fd93aff93e38",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openai-http-CQ7X8xZA.mjs",
+        "specifier": "./openai-http-CQ7X8xZA.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getOpenResponsesHttpModule = createLazyRuntimeModule(() => import(\"./openresponses-http-D6UJZmTP.mjs\"));",
+    "line": 6704,
+    "line_sha256": "3940b5332844843c6fc5d86c42a3c1b19b2db75fc70892a08b6c51b8f13af793",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openresponses-http-D6UJZmTP.mjs",
+        "specifier": "./openresponses-http-D6UJZmTP.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getSessionHistoryHttpModule = createLazyRuntimeModule(() => import(\"./sessions-history-http-BvoA2IjS.mjs\"));",
+    "line": 6705,
+    "line_sha256": "72487aa84f4b95fac9de3595253bf751f1fc0369e6a6ecb1a68fb8924492ed94",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sessions-history-http-BvoA2IjS.mjs",
+        "specifier": "./sessions-history-http-BvoA2IjS.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getSessionKillHttpModule = createLazyRuntimeModule(() => import(\"./session-kill-http-Ch2plwpB.mjs\"));",
+    "line": 6706,
+    "line_sha256": "5302a0e4f5acda3979746637cb623e4ad2e7518935825a8da596207ebd93bb26",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-kill-http-Ch2plwpB.mjs",
+        "specifier": "./session-kill-http-Ch2plwpB.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getToolsInvokeHttpModule = createLazyRuntimeModule(() => import(\"./tools-invoke-http-CZkNXVex.mjs\"));",
+    "line": 6707,
+    "line_sha256": "8ccb8f8c5b16a5ce6a5d7be746c8fd6712553af627ea3a31b7ded6cd22a7f3ff",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/tools-invoke-http-CZkNXVex.mjs",
+        "specifier": "./tools-invoke-http-CZkNXVex.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getUserProfilesHttpModule = createLazyRuntimeModule(() => import(\"./user-profiles-http-CvCAu5_1.mjs\"));",
+    "line": 6708,
+    "line_sha256": "e4d7e1bcf44f590b7fc6447ad461c79287f41e941c7c45f9d92636b9babe452e",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/user-profiles-http-CvCAu5_1.mjs",
+        "specifier": "./user-profiles-http-CvCAu5_1.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getDevicePairingJoinHttpModule = createLazyRuntimeModule(() => import(\"./device-pairing-join-http-a_OElZkR.mjs\"));",
+    "line": 6709,
+    "line_sha256": "6d9642796fac4df0b5fed920d165dd2a3b79d4d1c44e7f8d83471108a29ac4b4",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/device-pairing-join-http-a_OElZkR.mjs",
+        "specifier": "./device-pairing-join-http-a_OElZkR.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getPluginNodeCapabilityAuthModule$1 = createLazyRuntimeModule(() => import(\"./plugin-node-capability-auth-uYFX4IQX.mjs\"));",
+    "line": 6710,
+    "line_sha256": "fb982e1f862259aa0923a86cc64e33ced3d85d8d62ea77adaf20bf642b0a621e",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "e303b01d7a99fba14cde5e32ec094bc254d98c4bce530df0fd27b8de1dfb0a42",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-node-capability-auth-uYFX4IQX.mjs",
+        "specifier": "./plugin-node-capability-auth-uYFX4IQX.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getHttpAuthUtilsModule$2 = createLazyRuntimeModule(() => import(\"./http-auth-utils-dwL5zbrO.mjs\"));",
+    "line": 6711,
+    "line_sha256": "dbcca937445682a3a91aa8e6602ee55e88b83aa9af0c15d8d81c2b5732298ab3",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "7442bbd14db6c9974483f27cfd2b6ac25ea03958a90f31eba60964049b335d49",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/http-auth-utils-dwL5zbrO.mjs",
+        "specifier": "./http-auth-utils-dwL5zbrO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getPluginRouteRuntimeScopesModule$1 = createLazyRuntimeModule(() => import(\"./plugin-route-runtime-scopes-DryagZUx.mjs\"));",
+    "line": 6712,
+    "line_sha256": "d67c2b1fcd67142a1ea1e683df57b4bbe2ad9b20946774ec8e36d662e289f91a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-route-runtime-scopes-DryagZUx.mjs",
+        "specifier": "./plugin-route-runtime-scopes-DryagZUx.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getHttpAuthUtilsModule$1 = createLazyRuntimeModule(() => import(\"./http-auth-utils-dwL5zbrO.mjs\"));",
+    "line": 6767,
+    "line_sha256": "cb9f594c335c34a2831019ce4319b4881508b7d884a7eb9894b5b4c2f4a93946",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "7442bbd14db6c9974483f27cfd2b6ac25ea03958a90f31eba60964049b335d49",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/http-auth-utils-dwL5zbrO.mjs",
+        "specifier": "./http-auth-utils-dwL5zbrO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getPluginNodeCapabilityAuthModule = createLazyRuntimeModule(() => import(\"./plugin-node-capability-auth-uYFX4IQX.mjs\"));",
+    "line": 6893,
+    "line_sha256": "3d1341794eaa977bacb267782f32a17f881c881a53e0036495ef0ccdd555b583",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "e303b01d7a99fba14cde5e32ec094bc254d98c4bce530df0fd27b8de1dfb0a42",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-node-capability-auth-uYFX4IQX.mjs",
+        "specifier": "./plugin-node-capability-auth-uYFX4IQX.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getHttpAuthUtilsModule = createLazyRuntimeModule(() => import(\"./http-auth-utils-dwL5zbrO.mjs\"));",
+    "line": 6894,
+    "line_sha256": "fb34a4537f62b15dbfebd61f1b75a159a70311c7d193e8846361d613fa29c03e",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "7442bbd14db6c9974483f27cfd2b6ac25ea03958a90f31eba60964049b335d49",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/http-auth-utils-dwL5zbrO.mjs",
+        "specifier": "./http-auth-utils-dwL5zbrO.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const getPluginRouteRuntimeScopesModule = createLazyRuntimeModule(() => import(\"./plugin-route-runtime-scopes-DryagZUx.mjs\"));",
+    "line": 6895,
+    "line_sha256": "d653bae57795c09251a937fd1545b6e08c09886e266093d630f4b23d10806f4f",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-route-runtime-scopes-DryagZUx.mjs",
+        "specifier": "./plugin-route-runtime-scopes-DryagZUx.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\tconst { handleDesktopAudioUpgrade } = await import(\"./audio-bridge-DSnsisJe.mjs\");",
+    "line": 7140,
+    "line_sha256": "c1c38cabee283e4f012926e0ff60642cc08c3a1dfc95b428202c4dabab4da0b7",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/audio-bridge-DSnsisJe.mjs",
+        "specifier": "./audio-bridge-DSnsisJe.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { handleDesktopObserveUpgrade } = await import(\"./observe-bridge-D0JqWnva.mjs\");",
+    "line": 7144,
+    "line_sha256": "fc145e5cd1208e5ae3d643cab721e6724a1b35ed44360f902b54eaa01792e2f7",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/observe-bridge-D0JqWnva.mjs",
+        "specifier": "./observe-bridge-D0JqWnva.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayPluginsHttpModule = async () => await import(\"./plugins-http-BUaSTYmo.mjs\");",
+    "line": 7673,
+    "line_sha256": "949e83725a1405ca4a0c018d9c1e806290c96b86e4e55ba63fd0110698517b67",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugins-http-BUaSTYmo.mjs",
+        "specifier": "./plugins-http-BUaSTYmo.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createGatewayHookDispatcher } = await import(\"./hooks-C29GGXZg.mjs\");",
+    "line": 7692,
+    "line_sha256": "45755dac46b4e6ec0f7782976f0d1ef1b50a8954eb507c49da2dc891296c08db",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/hooks-C29GGXZg.mjs",
+        "specifier": "./hooks-C29GGXZg.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { createGatewayHooksRequestHandler } = await import(\"./hooks-C29GGXZg.mjs\");",
+    "line": 7707,
+    "line_sha256": "038403b32b0f40b7d61376f3e25386492b3fe32333c8b5a9160a699103817c15",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/hooks-C29GGXZg.mjs",
+        "specifier": "./hooks-C29GGXZg.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { handleMcpOAuthCallback } = await import(\"./mcp-oauth-callback-wAujdViE.mjs\");",
+    "line": 7724,
+    "line_sha256": "f7388a15f2345778478079348164ec6d1771ffbc5e36d8e5371a78c2e90e5753",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d756acfec90458db9369bf6d96eca3efa72bf9129a5ed2e0226baaa783287bd8",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/mcp-oauth-callback-wAujdViE.mjs",
+        "specifier": "./mcp-oauth-callback-wAujdViE.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\timport(\"./server-startup-session-migration-DySHbsZd.mjs\"),",
+    "line": 7995,
+    "line_sha256": "5a6195bfa7c4bf907eff4940b243982974eead90094b708aceaf9c6676f1001a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-startup-session-migration-DySHbsZd.mjs",
+        "specifier": "./server-startup-session-migration-DySHbsZd.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\timport(\"./prepared-model-runtime-DZfcn0kK.mjs\"),",
+    "line": 7996,
+    "line_sha256": "d63fbb5171ed86cd0613e8f4a316fbb71ed2ce30ee70ef0d664e6d349347cf32",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/prepared-model-runtime-DZfcn0kK.mjs",
+        "specifier": "./prepared-model-runtime-DZfcn0kK.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\timport(\"./prepared-model-runtime.configured-Bksvpsv-.mjs\"),",
+    "line": 7997,
+    "line_sha256": "fa13bc7fe3bf2901f5d07a80893620fa474e9b944f830a5e6b50590fc8d955d4",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/prepared-model-runtime.configured-Bksvpsv-.mjs",
+        "specifier": "./prepared-model-runtime.configured-Bksvpsv-.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\timport(\"./runtime-C6q6ABJJ.mjs\")",
+    "line": 7998,
+    "line_sha256": "5109ae944ebe71bfff2bf6753df425e92374e19cf4cab5aece79152b4a294cf9",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-C6q6ABJJ.mjs",
+        "specifier": "./runtime-C6q6ABJJ.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { attachGatewayWsConnectionHandler } = await startupTrace.measure(\"gateway.ws-imports\", () => import(\"./ws-connection-CsJ9cE0L.mjs\"));",
+    "line": 8141,
+    "line_sha256": "dafad01db41d8556f07f0f1596a04bef0d6608668c2dbde4cc9aa91cfa142303",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/ws-connection-CsJ9cE0L.mjs",
+        "specifier": "./ws-connection-CsJ9cE0L.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst loadScheduledServicesModule = createLazyPromise(() => import(\"./server-runtime-services-BPkg4Ml_.mjs\"), { cacheRejections: true });",
+    "line": 8179,
+    "line_sha256": "6695079ba65946bad5003849d2949cc7d1cb7c03a4f52f40dcab4c7f2bb33a7e",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-runtime-services-BPkg4Ml_.mjs",
+        "specifier": "./server-runtime-services-BPkg4Ml_.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { createGatewayServerActiveWorkInspectors } = await startupTrace.measure(\"gateway.active-work-import\", () => import(\"./server-active-work-Bhfd47cA.mjs\"));",
+    "line": 8198,
+    "line_sha256": "ee00a7f97cf0fb5b4843a1fb7bd9a77466d84a94aaeb92eab9075ed4421f358f",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-active-work-Bhfd47cA.mjs",
+        "specifier": "./server-active-work-Bhfd47cA.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { startOpenClawDatabaseIntegrityVerifier } = await import(\"./openclaw-database-verify-BSKcOplo.mjs\");",
+    "line": 8330,
+    "line_sha256": "7df33221f82d3a2b4c8eab3bdaafd2705f2cc29230529676f1dfb93f9cc85c4a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-database-verify-BSKcOplo.mjs",
+        "specifier": "./openclaw-database-verify-BSKcOplo.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { startManagedGatewayConfigReloader } = await import(\"./server-reload-managed-1XOA8RcW.mjs\");",
+    "line": 8335,
+    "line_sha256": "c5d0c222ab93bb545b39bbfeaa94cc58aaf1f98aa8c9348cda33235378025d86",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-reload-managed-1XOA8RcW.mjs",
+        "specifier": "./server-reload-managed-1XOA8RcW.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\tconst { listControlUiPluginCatalog } = await import(\"./control-ui-plugin-assets-CVEIcUwk.mjs\");",
+    "line": 8453,
+    "line_sha256": "55542b8afe408057fe5316c4d033ccb0019be96b0cc93a98b1479e60b1b1240b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/control-ui-plugin-assets-CVEIcUwk.mjs",
+        "specifier": "./control-ui-plugin-assets-CVEIcUwk.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { cleanupRetainedPluginInstallGenerations } = await import(\"./server-retained-plugin-cleanup-CjuQWUfv.mjs\");",
+    "line": 8542,
+    "line_sha256": "059784bfd2aec21ca7fe69f6d3d658c0863a4584f263add87cc6476720daffe6",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-retained-plugin-cleanup-CjuQWUfv.mjs",
+        "specifier": "./server-retained-plugin-cleanup-CjuQWUfv.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { reclaimAbandonedSqliteSnapshotsAsync } = await import(\"./sqlite-snapshot-staging-CnDkst2L.mjs\");",
+    "line": 8560,
+    "line_sha256": "faafecfd634faa845e32f838fe6abcefc17e85836293c79527e1835facf87778",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-snapshot-staging-CnDkst2L.mjs",
+        "specifier": "./sqlite-snapshot-staging-CnDkst2L.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadGatewayStartupPostAttachModule = createLazyRuntimeModule(() => import(\"./server-startup-post-attach-CsYAFanV.mjs\"));",
+    "line": 8571,
+    "line_sha256": "80565576e6d2897084b242bbd91a5dd15efb0d223bf65bb1aed2f6c37604c25b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": true,
+        "member": "dist/server-startup-post-attach-CsYAFanV.mjs",
+        "specifier": "./server-startup-post-attach-CsYAFanV.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { startGatewayTailscaleExposure } = await import(\"./server-tailscale-DFG9tU2t.mjs\");",
+    "line": 8593,
+    "line_sha256": "12a3b5a7c261b2eec2793c049474658317f34039416d093d947c4846420ed111",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-tailscale-DFG9tU2t.mjs",
+        "specifier": "./server-tailscale-DFG9tU2t.mjs"
+      }
+    ],
+    "parent": "dist/server-start-Bz-KV48j.mjs",
+    "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst loadSecretsRuntime = createLazyPromise(() => import(\"./runtime-C6q6ABJJ.mjs\"), { cacheRejections: true });",
+    "line": 135,
+    "line_sha256": "8f0508fc0a4660dd86932cd14aceb34deb55b7b342fb21ebb9f92be6211bb6bb",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-C6q6ABJJ.mjs",
+        "specifier": "./runtime-C6q6ABJJ.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-config-Hx2M1x7s.mjs",
+    "parent_sha256": "c6c846ead6ec7b1eaf081530966d7b41a6363e8f05e6590daf2469fbc329ee97",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst loadAuthProfiles = createLazyPromise(() => import(\"./auth-profiles-BK4ah3aF.mjs\"), { cacheRejections: true });",
+    "line": 136,
+    "line_sha256": "450519c7d76ed11c9fc2c31ea23f1087e855f88101b9b2140146a4f9ba310a17",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "251743b3f80f3407ed8f5b2f04f1ede2dcfbfbe40e2f4c9159cd792f43b3533e",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/auth-profiles-BK4ah3aF.mjs",
+        "specifier": "./auth-profiles-BK4ah3aF.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-config-Hx2M1x7s.mjs",
+    "parent_sha256": "c6c846ead6ec7b1eaf081530966d7b41a6363e8f05e6590daf2469fbc329ee97",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { runChannelPluginStartupMaintenance } = await import(\"./lifecycle-startup-C2u-XSGr.mjs\");",
+    "line": 39,
+    "line_sha256": "f065fd8c31e37cf68f03df04fff0c882393f4e2491556db30237ed083dec245a",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/lifecycle-startup-C2u-XSGr.mjs",
+        "specifier": "./lifecycle-startup-C2u-XSGr.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { migrateLegacyDesktopStreamOptOuts } = await import(\"./device-pairing-node-desktop-migration-DkL75nod.mjs\");",
+    "line": 46,
+    "line_sha256": "8e4acd4c9dcb686ceca5dee2973e56e1f8bdfaaba35e7f6015a4b8a6c60d0932",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/device-pairing-node-desktop-migration-DkL75nod.mjs",
+        "specifier": "./device-pairing-node-desktop-migration-DkL75nod.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { runStartupSessionMigration } = await import(\"./server-startup-session-migration-DySHbsZd.mjs\");",
+    "line": 49,
+    "line_sha256": "523bf683ab2edda7aa2942c786d3d8d1660cfbc142807332a2eba842e5c5d60f",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-startup-session-migration-DySHbsZd.mjs",
+        "specifier": "./server-startup-session-migration-DySHbsZd.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { listLegacyPairingStoreFiles } = await import(\"./pairing-files-Dv7TfwSi.mjs\");",
+    "line": 55,
+    "line_sha256": "d90cddea0fd17ae9f73c4d7dcf3facdfd3e7ed03fe6ceb65600e97109ef82cea",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/pairing-files-Dv7TfwSi.mjs",
+        "specifier": "./pairing-files-Dv7TfwSi.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { prepareGatewayPluginLoad } = await import(\"./server-plugin-bootstrap-BF-wNIVo.mjs\");",
+    "line": 182,
+    "line_sha256": "67cea5f46efcc36703f87a30af5c084297984da88814074f5f62c62044d99e1a",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+        "specifier": "./server-plugin-bootstrap-BF-wNIVo.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { settlePluginNativeAdmissions } = await import(\"./plugin-native-admission-state-D-co6kqI.mjs\");",
+    "line": 224,
+    "line_sha256": "7bf2b137dacb16b3de10ab0a1689b9b48f5428b37dfd7d8fd1507cdab1f16fe3",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-native-admission-state-D-co6kqI.mjs",
+        "specifier": "./plugin-native-admission-state-D-co6kqI.mjs"
+      }
+    ],
+    "parent": "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "parent_sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst [{ shouldLogVerbose }, { logDebug, logError }] = await Promise.all([import(\"./globals-DJ8xiBNH.mjs\"), import(\"./logger-FmcYtINb.mjs\")]);",
+    "line": 850,
+    "line_sha256": "460664c83962f36fe29231bf6a5192fd5cd0fb6bfb82580fabcb3bbce152b30f",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d7f919936bbf6229ac85be528d56846c5e0daf05bd1ba430f3ac9feccaef6ceb",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/globals-DJ8xiBNH.mjs",
+        "specifier": "./globals-DJ8xiBNH.mjs"
+      },
+      {
+        "actual_received_sha256": "4dc775f88118707a05b9f0cbcd6b14acdb78dcc9e9b517ba0e9f2bd75304c768",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/logger-FmcYtINb.mjs",
+        "specifier": "./logger-FmcYtINb.mjs"
+      }
+    ],
+    "parent": "dist/exec-CErrQhRv.mjs",
+    "parent_sha256": "008803440b01a4539c3f23ea788255ea30123a478514b621e7536896d2bb1636",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst logging = await Promise.all([import(\"./globals-DJ8xiBNH.mjs\"), import(\"./logger-FmcYtINb.mjs\")]).catch(() => void 0);",
+    "line": 882,
+    "line_sha256": "99111c73ed000ae751c7bbefc3da064648c691b0b8967d3de97000cfb22fd0a7",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d7f919936bbf6229ac85be528d56846c5e0daf05bd1ba430f3ac9feccaef6ceb",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/globals-DJ8xiBNH.mjs",
+        "specifier": "./globals-DJ8xiBNH.mjs"
+      },
+      {
+        "actual_received_sha256": "4dc775f88118707a05b9f0cbcd6b14acdb78dcc9e9b517ba0e9f2bd75304c768",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/logger-FmcYtINb.mjs",
+        "specifier": "./logger-FmcYtINb.mjs"
+      }
+    ],
+    "parent": "dist/exec-CErrQhRv.mjs",
+    "parent_sha256": "008803440b01a4539c3f23ea788255ea30123a478514b621e7536896d2bb1636",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { resolveNpmSpecMetadata } = await import(\"./install-source-utils-B-oukNKT.mjs\");",
+    "line": 117,
+    "line_sha256": "69da2d6746e5cfbbae298e7be06e7d5c3d60afa2ff552e313719e730f146af16",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "8f56072c8b0a92df5fa4ea6fe64d4a6b6f4361f6be393c8db0bce80f9e1c00bf",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/install-source-utils-B-oukNKT.mjs",
+        "specifier": "./install-source-utils-B-oukNKT.mjs"
+      }
+    ],
+    "parent": "dist/official-external-plugin-catalog-DrcXuabu.mjs",
+    "parent_sha256": "12583739e840682a8747d2dd8e076123fc9d47499fbe3919bc2eb4719f88960f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { loadHostedOfficialExternalPluginCatalogEntries } = await import(\"./official-external-plugin-catalog-hosted-DUYU4b8W.mjs\");",
+    "line": 322,
+    "line_sha256": "8c8c4614290fb0316bd161de95946add640705271440e9be97ee6b81ed94e990",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "ab53ab34b7b5316a1834d925585e4122f38118a6a4157eb7476d98002e8c0a09",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/official-external-plugin-catalog-hosted-DUYU4b8W.mjs",
+        "specifier": "./official-external-plugin-catalog-hosted-DUYU4b8W.mjs"
+      }
+    ],
+    "parent": "dist/official-external-plugin-catalog-DrcXuabu.mjs",
+    "parent_sha256": "12583739e840682a8747d2dd8e076123fc9d47499fbe3919bc2eb4719f88960f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "    : await import(specifier);",
+    "line": 595,
+    "line_sha256": "ac35cf3137a2390323049a03a717dbe94e10a0ae87a63bce9d835ef5fd5786f5",
+    "literal_targets": [],
+    "parent": "dist/plugin-setup-module-D0o6Vfcg.mjs",
+    "parent_sha256": "2ce9ae5947c0d1990960b68f9428ddf961acec84bf4c09f2648fa00e51fa86f4",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "COMPUTED_OR_OTHER_DYNAMIC_EXPRESSION"
+  },
+  {
+    "callsite_excerpt": "const loadRegistryDisposer = lifecycle.loadRegistryDisposer ??= createLazyRuntimeNamedExport(() => import(\"./runtime-BMi3UtVn.mjs\"), \"disposePluginRegistryInstances\");",
+    "line": 81,
+    "line_sha256": "8af22ff98e824210226e51f36b6da64caa3ab38ab63b9e42d130dc5969cb02a2",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "10fc07b52e79732ca645e1509340d366c0cd75c6f487740e329678349094a457",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-BMi3UtVn.mjs",
+        "specifier": "./runtime-BMi3UtVn.mjs"
+      }
+    ],
+    "parent": "dist/registry-lifecycle-DyhiReoE.mjs",
+    "parent_sha256": "2da2111b77487c3bd64bacf9aa5a8ffb21d972445ca08100c393dd4e475da851",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadMemoryRuntime = createLazyRuntimeModule(() => import(\"./memory-runtime-Dr9hsLrT.mjs\"));",
+    "line": 639,
+    "line_sha256": "abe2d38619fb36d778d0bd420ea62392cd120c36d21a5dd4f906de534d316a9d",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "ca50ace59dcb2cfc40cc715b9a51b50dca772b56569c2500417388948e062cd0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/memory-runtime-Dr9hsLrT.mjs",
+        "specifier": "./memory-runtime-Dr9hsLrT.mjs"
+      }
+    ],
+    "parent": "dist/runtime-9cxii0oQ.mjs",
+    "parent_sha256": "9f18ed5dbca908c9a71f126d08f09bcfed73e93d80efe9e668fecb5a6e568356",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadPluginHostCleanupRuntime = createLazyRuntimeModule(() => import(\"./host-hook-cleanup-COhu9Epn.mjs\"));",
+    "line": 655,
+    "line_sha256": "0ee1d946704915267b4c481fa28d8b8ab1f1f92fe6401976ee3016e7580ae2c8",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "30b7c1995ff0296aafc038a1e607cb426335ac096b112606248740d44aa8e1fe",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/host-hook-cleanup-COhu9Epn.mjs",
+        "specifier": "./host-hook-cleanup-COhu9Epn.mjs"
+      }
+    ],
+    "parent": "dist/runtime-9cxii0oQ.mjs",
+    "parent_sha256": "9f18ed5dbca908c9a71f126d08f09bcfed73e93d80efe9e668fecb5a6e568356",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { prepareHttpCaptureForTransport, resolveDebugProxyFetchTransport } = await import(\"./runtime-CCa5Lhcq.mjs\");",
+    "line": 340,
+    "line_sha256": "69d4ca0e23873727075cef1153ed5d10dc949e45428c980562b7745edcd9de57",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "c025d10cf9d18d4dfbf5fc86f8fa6ec79efcc98f98eacff4620e899101cbeda0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-CCa5Lhcq.mjs",
+        "specifier": "./runtime-CCa5Lhcq.mjs"
+      }
+    ],
+    "parent": "dist/fetch-guard-CERuBdTD.mjs",
+    "parent_sha256": "60a4333772ed8b29662e14ca81a962334aaec2abb5fb753f494a5ab4c6df0058",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\treturn webSocketConstructor ??= import(pathToFileURL(path.join(path.dirname(require.resolve(\"ws/package.json\")), \"wrapper.mjs\")).href).then((module) => module.default);",
+    "line": 14,
+    "line_sha256": "e169521cc51d4473c8df8ddd996a74ace1733f330d7432ff0ebf54165581c684",
+    "literal_targets": [],
+    "parent": "dist/websocket-session-C3AfDQbz.mjs",
+    "parent_sha256": "1c6e3137ba625092f7d05d5b7ffabdea7444d1dfce62fb8ee28763bc9b96986b",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "COMPUTED_OR_OTHER_DYNAMIC_EXPRESSION"
+  },
+  {
+    "callsite_excerpt": "\treturn (await import(\"./provider-http-errors-C0RQghBe.mjs\")).createProviderHttpError(...args);",
+    "line": 66,
+    "line_sha256": "842c2d2c04ca67e176f6fc34645069c701ba7b54321b25f9eb88fef72e017866",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "edee3cb7a9e7aee08891db67893305fe36bf5b7d71292f4d938abe2a2b3d5c11",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/provider-http-errors-C0RQghBe.mjs",
+        "specifier": "./provider-http-errors-C0RQghBe.mjs"
+      }
+    ],
+    "parent": "dist/gateway-startup-plugin-config-CMrbR8yD.mjs",
+    "parent_sha256": "97d6daf43eccc39d86408f29d231d7d5b55e1ae6b53803e4e59b7202697ff780",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { resolveAgentDir, tryResolveAmbientOwnerAgentId } = await import(\"./agent-scope-config-zhU6xZV8.mjs\");",
+    "line": 157,
+    "line_sha256": "4a29f15f6078c2f8f390f11e0b51da5093ef4db52efa3567d16e1d69a1f30008",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "0e976e4ecb793b1acdaef86aeb4c33fc39481f064c9bc99087e3447c22259fba",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/agent-scope-config-zhU6xZV8.mjs",
+        "specifier": "./agent-scope-config-zhU6xZV8.mjs"
+      }
+    ],
+    "parent": "dist/gateway-startup-plugin-config-CMrbR8yD.mjs",
+    "parent_sha256": "97d6daf43eccc39d86408f29d231d7d5b55e1ae6b53803e4e59b7202697ff780",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { resolveScopedAuthProfileStore, resolveProviderEntryApiKeyAuth } = await import(\"./model-auth-provider-B7Wp3TdD.mjs\");",
+    "line": 161,
+    "line_sha256": "acad47144cc3c9ffffc813c6aa7bd4d335e1dcd1bc8a0aeef919dbffab3140f3",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "8c7160097dfd90947ca0d678fa6aedef2304baf8ef924019d8a6751f90553b1f",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/model-auth-provider-B7Wp3TdD.mjs",
+        "specifier": "./model-auth-provider-B7Wp3TdD.mjs"
+      }
+    ],
+    "parent": "dist/gateway-startup-plugin-config-CMrbR8yD.mjs",
+    "parent_sha256": "97d6daf43eccc39d86408f29d231d7d5b55e1ae6b53803e4e59b7202697ff780",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { embeddingProviderOwnsDestination, resolveEmbeddingEndpointUrl } = await import(\"./plugin-sdk/memory-core-host-engine-embeddings.js\");",
+    "line": 261,
+    "line_sha256": "0b508fe58eb5720d26bbf9e83617ebf49606d1fffca9562af88ef097a22a5acd",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "6d287e8385653a7d426a4363147e1b37693212a2b2c13c255b8d784263554a52",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-sdk/memory-core-host-engine-embeddings.js",
+        "specifier": "./plugin-sdk/memory-core-host-engine-embeddings.js"
+      }
+    ],
+    "parent": "dist/gateway-startup-plugin-config-CMrbR8yD.mjs",
+    "parent_sha256": "97d6daf43eccc39d86408f29d231d7d5b55e1ae6b53803e4e59b7202697ff780",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { resolveApiKeyForProfile } = await import(\"./oauth-CU-K1B4_.mjs\");",
+    "line": 290,
+    "line_sha256": "3a5e3034a3307dc07366ecacd862e10a935f2a0741219ddf04ae1ee27bd9558a",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "31a18b75537170cc1418de457564b877228d5b53bbe99f4975c838d1e6ee83a4",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/oauth-CU-K1B4_.mjs",
+        "specifier": "./oauth-CU-K1B4_.mjs"
+      }
+    ],
+    "parent": "dist/model-auth-provider-config-DXZ8j4Ub.mjs",
+    "parent_sha256": "d71c69f33e2ae9a741cd19da1cfd1f71f92077d05d10fe8dc82524bad12a38ff",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { formatConsoleDiagnosticLine } = await import(\"./json-console-line-C5Mwx1HJ.mjs\");",
+    "line": 44,
+    "line_sha256": "df6e7bedde35425993d6d9b469fd25572118e0720c1cc3ca11fba71de621a26e",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/json-console-line-C5Mwx1HJ.mjs",
+        "specifier": "./json-console-line-C5Mwx1HJ.mjs"
+      }
+    ],
+    "parent": "dist/startup-trace-QSFX7cwD.mjs",
+    "parent_sha256": "dffd4f39990fee639d731a75beb5b3779a5cc2959cbcc6337d0bb037e1d09c83",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst timelineModule = hasDiagnosticsTimelinePath(process.env) ? import(\"./diagnostics-timeline-ouSRuT1e.mjs\").catch(() => null) : null;",
+    "line": 68,
+    "line_sha256": "dccfc69a61910d552150097d3de4b7eb443db21175e765388679cb13b58e8735",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/diagnostics-timeline-ouSRuT1e.mjs",
+        "specifier": "./diagnostics-timeline-ouSRuT1e.mjs"
+      }
+    ],
+    "parent": "dist/startup-trace-QSFX7cwD.mjs",
+    "parent_sha256": "dffd4f39990fee639d731a75beb5b3779a5cc2959cbcc6337d0bb037e1d09c83",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { withConsoleLogsRoutedToStderr } = await import(\"./json-output-mode-CObM-WjA.mjs\");",
+    "line": 231,
+    "line_sha256": "869fd09db7058783cf8dc8259d77275a88240de89a32e61ac7b994bcc0641dce",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "fe536e8b88b9a1fe73def94e64adccad38355f3a384af792722ee0cad746f8c9",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/json-output-mode-CObM-WjA.mjs",
+        "specifier": "./json-output-mode-CObM-WjA.mjs"
+      }
+    ],
+    "parent": "dist/startup-trace-QSFX7cwD.mjs",
+    "parent_sha256": "dffd4f39990fee639d731a75beb5b3779a5cc2959cbcc6337d0bb037e1d09c83",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { readSourceConfigBestEffort } = await import(\"./io-6etGxnS5.mjs\");",
+    "line": 232,
+    "line_sha256": "114f695ea39d57e9bef07fd6b3176554b6da60ebe1dc81da1e35f241aa690d48",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "5fbd35e1c8f27956a9b549c3c553b3ba5bc9e43222a615e4326617e445bde9b5",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/io-6etGxnS5.mjs",
+        "specifier": "./io-6etGxnS5.mjs"
+      }
+    ],
+    "parent": "dist/startup-trace-QSFX7cwD.mjs",
+    "parent_sha256": "dffd4f39990fee639d731a75beb5b3779a5cc2959cbcc6337d0bb037e1d09c83",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { formatConsoleDiagnosticLine } = await import(\"./json-console-line-C5Mwx1HJ.mjs\");",
+    "line": 238,
+    "line_sha256": "f2bc42762b973c553c214fd69df4f4a824150f05493a4ccdce02d7022c8e9f16",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/json-console-line-C5Mwx1HJ.mjs",
+        "specifier": "./json-console-line-C5Mwx1HJ.mjs"
+      }
+    ],
+    "parent": "dist/startup-trace-QSFX7cwD.mjs",
+    "parent_sha256": "dffd4f39990fee639d731a75beb5b3779a5cc2959cbcc6337d0bb037e1d09c83",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadLog = createLazyPromise(() => import(\"./subsystem-goPiGiB2.mjs\").then(({ createSubsystemLogger }) => createSubsystemLogger(\"env\")), { cacheRejections: true });",
+    "line": 5,
+    "line_sha256": "d62c2109e61ff95a524a6bd0f181d2346eeffd0b8c5f95ed589195ba413e84d8",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "38caf4b0c4aa50d08c36937101b90202b2e52231f2923325cf137065c2ce26c0",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/subsystem-goPiGiB2.mjs",
+        "specifier": "./subsystem-goPiGiB2.mjs"
+      }
+    ],
+    "parent": "dist/env-DyLpZ8a5.mjs",
+    "parent_sha256": "d63a999d7db73ae6de69c51d469a76f02f71b26120b70b60847237bc2a532227",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { createSpawnBrokerHost, spawnBrokerEntryPath } = await import(\"./host-Cd8YncsC.mjs\");",
+    "line": 13,
+    "line_sha256": "25d76f3481f235e042435f2290cd675732f4ed1e47aa317f0898db1c6a4e446d",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/host-Cd8YncsC.mjs",
+        "specifier": "./host-Cd8YncsC.mjs"
+      }
+    ],
+    "parent": "dist/context-ioczjISi.mjs",
+    "parent_sha256": "a571eff8012d5c93fa4369211a8cb5ea59e7205bb5bb1f5a1194c5bb81401d7f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 373,
+    "line_sha256": "c5e9e498760d5e3e25a4c8d3a33d0e133d03bd799f23bef9394320f78cbb7682",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-db-cache-IdIaBoUp.mjs",
+    "parent_sha256": "e0cddcf3fa25fc081f0edb4cc9d31c4d29dabd1206dc440dd239f1bf665a543e",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { inspectOpenClawStateDatabase } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 751,
+    "line_sha256": "ac664c3cd4973253008fe458a58b150e0b7fae71678759ff2208aff23c1fb651",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-db-cache-IdIaBoUp.mjs",
+    "parent_sha256": "e0cddcf3fa25fc081f0edb4cc9d31c4d29dabd1206dc440dd239f1bf665a543e",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { findDoctorLegacyConfigIssues } = await import(\"./legacy-config-issues-BcZxGopK.mjs\");",
+    "line": 1628,
+    "line_sha256": "40800fe1be564342d23debaaaf0188524ec01b06e0cfd9d4177b3441dfce67b7",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "485a0797f2bc8c8ba194fbab962b849d4844e7b67e0701dabdf2ed336c981e38",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/legacy-config-issues-BcZxGopK.mjs",
+        "specifier": "./legacy-config-issues-BcZxGopK.mjs"
+      }
+    ],
+    "parent": "dist/io.factory-PvUbTCjh.mjs",
+    "parent_sha256": "f2b5c1f97a774f667be97994675cc3bbb81139ec01de760d0bf586a352fd4e0b",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { writeConfigFileFromContext } = await import(\"./io.write-BhA7707_.mjs\");",
+    "line": 2424,
+    "line_sha256": "0899a55f986d42e359efd60a3ac3f7eaeb8dbbaf4a5078922133114af6ed3810",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "e7f267f258fc7ceeb1a4fc165ca7f66a9391781f546b5adf4f1f2bf77f163548",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/io.write-BhA7707_.mjs",
+        "specifier": "./io.write-BhA7707_.mjs"
+      }
+    ],
+    "parent": "dist/io.factory-PvUbTCjh.mjs",
+    "parent_sha256": "f2b5c1f97a774f667be97994675cc3bbb81139ec01de760d0bf586a352fd4e0b",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst module = getFacadeActivationCheckRuntimeModule() ?? await import(\"./facade-activation-check.runtime.js\");",
+    "line": 67,
+    "line_sha256": "c26d7cc792b62bd2c362b74cbf09d847383ac223cf6fffe1b3f60995b4eb0643",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/facade-activation-check.runtime.js",
+        "specifier": "./facade-activation-check.runtime.js"
+      }
+    ],
+    "parent": "dist/facade-runtime-CgunKGnZ.mjs",
+    "parent_sha256": "933f64de40a2016101ae934a5b6ca4edefaa095ae2200e5a6c93e63fcb601bd3",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { preflightOpenClawDatabaseSchemas } = await import(\"./openclaw-database-preflight-DuWvuin4.mjs\");",
+    "line": 318,
+    "line_sha256": "35330a9ce2bed4633458a3d6a727232faeea83a240320336aec41b674e903bf2",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-database-preflight-DuWvuin4.mjs",
+        "specifier": "./openclaw-database-preflight-DuWvuin4.mjs"
+      }
+    ],
+    "parent": "dist/agent-database-admission-zlA3mo0j.mjs",
+    "parent_sha256": "e3c246daf2f4dc62cdefc44c9ae7c1faae716157c7fb05405c518658b9cff7b3",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { resolveConfiguredAgentDatabaseCandidatePaths } = await import(\"./targets-CUF7arSI.mjs\");",
+    "line": 319,
+    "line_sha256": "b4bfbb92c742c1ec418e6ae3e0ea50a17cbb878b89643c21b54cdaabaf8bd6ee",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/targets-CUF7arSI.mjs",
+        "specifier": "./targets-CUF7arSI.mjs"
+      }
+    ],
+    "parent": "dist/agent-database-admission-zlA3mo0j.mjs",
+    "parent_sha256": "e3c246daf2f4dc62cdefc44c9ae7c1faae716157c7fb05405c518658b9cff7b3",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { captureOpenClawAgentDatabaseExecution } = await import(\"./openclaw-agent-execution-Tnx7rnza.mjs\");",
+    "line": 319,
+    "line_sha256": "7c2717ace47fcafce7bf6b14e649746088e9d94692c2787908e0d7b40008c3d9",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-agent-execution-Tnx7rnza.mjs",
+        "specifier": "./openclaw-agent-execution-Tnx7rnza.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-agent-db-DRy3ui_B.mjs",
+    "parent_sha256": "f851c6fa5b6a766e6afff83684ad02883c45589532bd8ac1e790f20bbb3b0d93",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { executeOpenClawStateWorker } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 71,
+    "line_sha256": "2aedde0090647c9baf27ac642e9dd87489894a5f5c37791cae9ee5c7293ed67b",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/user-profiles-D31WR8kz.mjs",
+    "parent_sha256": "c8b61c21d5ddfd3b8aa4957cd0e537f5eb0e8f0d54b73235811672625b150e42",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { executeOpenClawStateWorker } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 80,
+    "line_sha256": "2aedde0090647c9baf27ac642e9dd87489894a5f5c37791cae9ee5c7293ed67b",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/user-profiles-D31WR8kz.mjs",
+    "parent_sha256": "c8b61c21d5ddfd3b8aa4957cd0e537f5eb0e8f0d54b73235811672625b150e42",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst [{ readRemoteMediaBuffer }, { fileTypeFromBuffer }] = await Promise.all([import(\"./fetch-Qt34g-5o.mjs\"), import(\"file-type\")]);",
+    "line": 99,
+    "line_sha256": "0aa887be01ea6438b49f0c982badb35e916f8db505e215c29d33eb69bf5b95b5",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/fetch-Qt34g-5o.mjs",
+        "specifier": "./fetch-Qt34g-5o.mjs"
+      },
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": null,
+        "specifier": "file-type"
+      }
+    ],
+    "parent": "dist/user-profiles-D31WR8kz.mjs",
+    "parent_sha256": "c8b61c21d5ddfd3b8aa4957cd0e537f5eb0e8f0d54b73235811672625b150e42",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { executeOpenClawStateWorker, runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 287,
+    "line_sha256": "3ede5e0c6918a087a3691fb366f5028ed352aa644797af0df8aa8154d1f64e1d",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/user-profiles-D31WR8kz.mjs",
+    "parent_sha256": "c8b61c21d5ddfd3b8aa4957cd0e537f5eb0e8f0d54b73235811672625b150e42",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst [{ withOpenClawStateSettlementRead }, { createSqliteWorkerOperationAdmission }] = await Promise.all([import(\"./openclaw-state-settlement-read-ZkLK-axC.mjs\"), import(\"./sqlite-worker-operation-admission-07APjmkF.mjs\")]);",
+    "line": 303,
+    "line_sha256": "e4b807addd7f35054c5d73954a3a95425043afff181e4b44dfc3d3affff28003",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-settlement-read-ZkLK-axC.mjs",
+        "specifier": "./openclaw-state-settlement-read-ZkLK-axC.mjs"
+      },
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-worker-operation-admission-07APjmkF.mjs",
+        "specifier": "./sqlite-worker-operation-admission-07APjmkF.mjs"
+      }
+    ],
+    "parent": "dist/user-profiles-D31WR8kz.mjs",
+    "parent_sha256": "c8b61c21d5ddfd3b8aa4957cd0e537f5eb0e8f0d54b73235811672625b150e42",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { withSessionHistoryWorkerDatabase } = await import(\"./session-transcript-worker-runtime-CAP1mNI7.mjs\");",
+    "line": 245,
+    "line_sha256": "4a819051fde5964cee6005911aaffe3ba8930a176e3c981e1c2aa8262d7cde9f",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-transcript-worker-runtime-CAP1mNI7.mjs",
+        "specifier": "./session-transcript-worker-runtime-CAP1mNI7.mjs"
+      }
+    ],
+    "parent": "dist/session-accessor.sqlite-entry-BrsmAX-T.mjs",
+    "parent_sha256": "bb80d5b238fb5eaeb23a0f2a12d9a978b9cafa3962e78984538d801eb6f86e64",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { restoreSessionColdTranscript } = await import(\"./session-cold-storage-BFJ8dCI-.mjs\");",
+    "line": 1250,
+    "line_sha256": "5b44f0c90cd091f34b098f5fede3e5cb29f31edf499acea9e7b4965a4acf3c88",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-cold-storage-BFJ8dCI-.mjs",
+        "specifier": "./session-cold-storage-BFJ8dCI-.mjs"
+      }
+    ],
+    "parent": "dist/session-accessor-WMUIp1Kx.mjs",
+    "parent_sha256": "ee241de4a74bc1d44529b4c8ddba311ba1285147bdf965c1cb64b253d502e131",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { restoreSessionColdTranscript } = await import(\"./session-cold-storage-BFJ8dCI-.mjs\");",
+    "line": 1651,
+    "line_sha256": "7297b48cb77a6ae2de4aa2969bfa08d6ab11bd4354383481370adf8316607b8d",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-cold-storage-BFJ8dCI-.mjs",
+        "specifier": "./session-cold-storage-BFJ8dCI-.mjs"
+      }
+    ],
+    "parent": "dist/session-accessor-WMUIp1Kx.mjs",
+    "parent_sha256": "ee241de4a74bc1d44529b4c8ddba311ba1285147bdf965c1cb64b253d502e131",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { restoreSessionColdTranscript } = await import(\"./session-cold-storage-BFJ8dCI-.mjs\");",
+    "line": 2110,
+    "line_sha256": "7297b48cb77a6ae2de4aa2969bfa08d6ab11bd4354383481370adf8316607b8d",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/session-cold-storage-BFJ8dCI-.mjs",
+        "specifier": "./session-cold-storage-BFJ8dCI-.mjs"
+      }
+    ],
+    "parent": "dist/session-accessor-WMUIp1Kx.mjs",
+    "parent_sha256": "ee241de4a74bc1d44529b4c8ddba311ba1285147bdf965c1cb64b253d502e131",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { createChannelOutboundRuntimeSend } = await import(\"./channel-outbound-send-DSKUvTTi.mjs\");",
+    "line": 37,
+    "line_sha256": "476ff30cdc929299fb866896433957c15d9ae6b06a7fc779b676f73139822b56",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/channel-outbound-send-DSKUvTTi.mjs",
+        "specifier": "./channel-outbound-send-DSKUvTTi.mjs"
+      }
+    ],
+    "parent": "dist/deps-ClPYgsOf.mjs",
+    "parent_sha256": "a2efaac803aa8dd56210f1bc5becc954ccade37a4cd820b76a3343103020cf38",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadNativeWebPushStore = createLazyRuntimeModule(() => import(\"./push-web-store.native-Bl7nHiHZ.mjs\"));",
+    "line": 90,
+    "line_sha256": "86184e65aa0751b51839c43b754c893bed8f009b74f03efee16c940b517b94e1",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/push-web-store.native-Bl7nHiHZ.mjs",
+        "specifier": "./push-web-store.native-Bl7nHiHZ.mjs"
+      }
+    ],
+    "parent": "dist/push-web-Db6hT6JQ.mjs",
+    "parent_sha256": "97da30b0dee5b24ab4466c413781b172e75af55cfff314f5f3b4305ef09f32ea",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "const loadWebPushRuntime = createLazyRuntimeModule(() => import(\"web-push\").then((mod) => mod.default ?? mod));",
+    "line": 247,
+    "line_sha256": "55895742c2c3c427346e850c26b3869386e7d347983f3188f57de0897904eaae",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": null,
+        "specifier": "web-push"
+      }
+    ],
+    "parent": "dist/push-web-Db6hT6JQ.mjs",
+    "parent_sha256": "97da30b0dee5b24ab4466c413781b172e75af55cfff314f5f3b4305ef09f32ea",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\timport(\"./agent-scope-C_9iBeRH.mjs\"),",
+    "line": 156,
+    "line_sha256": "c4dc5523e9369188b9677819c6732b1d7337b412166ed7f3e4b578ea9a97ae8f",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "1074d8663b67a5803d5c5e77348082ec069c91135e63b3a588f03c5f826a00d1",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/agent-scope-C_9iBeRH.mjs",
+        "specifier": "./agent-scope-C_9iBeRH.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\timport(\"./simple-completion-runtime-DkppuyR0.mjs\"),",
+    "line": 157,
+    "line_sha256": "d1e9c1221ddb1e26947f4622373a2e2fb7f35b9d93c174f922635ffd3601180c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/simple-completion-runtime-DkppuyR0.mjs",
+        "specifier": "./simple-completion-runtime-DkppuyR0.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\timport(\"./isolated-completion-CWliE6SR.mjs\"),",
+    "line": 158,
+    "line_sha256": "03cd65581ca6840c71617d54e6213e4ecfdb8d2ec6ef090c8f9d571a93d5ab68",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/isolated-completion-CWliE6SR.mjs",
+        "specifier": "./isolated-completion-CWliE6SR.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\timport(\"./model-fallback-runner-BRXVDf9Y.mjs\"),",
+    "line": 159,
+    "line_sha256": "c4492af95272ca55d816527f5fa593facffc0ce5ad031a0f33051f71d387be48",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/model-fallback-runner-BRXVDf9Y.mjs",
+        "specifier": "./model-fallback-runner-BRXVDf9Y.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\timport(\"./runtime-llm.runtime.js\")",
+    "line": 160,
+    "line_sha256": "3afdcdeaa65224fba970814c0bcd2dc3ab47a0ed6e2672733efb81e1aa8a50ab",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/runtime-llm.runtime.js",
+        "specifier": "./runtime-llm.runtime.js"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\timport(\"./model-ref-CVAkHM3K.mjs\"),",
+    "line": 270,
+    "line_sha256": "5195a579a50564ec9c00e6a69aa283cb91584bd02b2aeec4b70570fbeff79f9c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/model-ref-CVAkHM3K.mjs",
+        "specifier": "./model-ref-CVAkHM3K.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\timport(\"./agent-scope-C_9iBeRH.mjs\"),",
+    "line": 271,
+    "line_sha256": "7fd3db058ebdd772fd32359b5095840587aba0a456a6ec73d2450de809154e45",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "1074d8663b67a5803d5c5e77348082ec069c91135e63b3a588f03c5f826a00d1",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/agent-scope-C_9iBeRH.mjs",
+        "specifier": "./agent-scope-C_9iBeRH.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\timport(\"./plugin-metadata-snapshot-CIzYUKvI.mjs\")",
+    "line": 272,
+    "line_sha256": "4c4b16bd882f0079c53b84f6af0dc88c52d541370ae2b27c7ad2f7456cfb77db",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-metadata-snapshot-CIzYUKvI.mjs",
+        "specifier": "./plugin-metadata-snapshot-CIzYUKvI.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { dispatchLowLevelChannelReplyFromConfig } = await import(\"./dispatch-from-config-BYT5mGiz.mjs\");",
+    "line": 438,
+    "line_sha256": "8171b4ed8984e6da51e0f86703ab3338c85e0c0df17997cb061135c71684a49c",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/dispatch-from-config-BYT5mGiz.mjs",
+        "specifier": "./dispatch-from-config-BYT5mGiz.mjs"
+      }
+    ],
+    "parent": "dist/server-plugins-CzOpf53P.mjs",
+    "parent_sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { runSqliteReadOnlyWorker } = await import(\"./sqlite-readonly-worker-BFy1GYp8.mjs\");",
+    "line": 156,
+    "line_sha256": "5508bfa0136890b24c94741fc42524f79775cffcc67dee612c362dafdc14dc33",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-readonly-worker-BFy1GYp8.mjs",
+        "specifier": "./sqlite-readonly-worker-BFy1GYp8.mjs"
+      }
+    ],
+    "parent": "dist/sqlite-snapshot-staging-Dps3-rWN.mjs",
+    "parent_sha256": "2adc5d5c22d27c3a8a7031f286657042fb7dc5999fdd9508b3ecf5a8cb202d95",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { allocateWorkerOwnedSqliteSnapshotDirectory } = await import(\"./sqlite-snapshot-staging-owner-UJrHPB5J.mjs\");",
+    "line": 211,
+    "line_sha256": "e6b25b02e6bc836b4bb5c565b9764518415df0089c91ab07e96185d8ded50c50",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-snapshot-staging-owner-UJrHPB5J.mjs",
+        "specifier": "./sqlite-snapshot-staging-owner-UJrHPB5J.mjs"
+      }
+    ],
+    "parent": "dist/sqlite-snapshot-staging-Dps3-rWN.mjs",
+    "parent_sha256": "2adc5d5c22d27c3a8a7031f286657042fb7dc5999fdd9508b3ecf5a8cb202d95",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 23,
+    "line_sha256": "abd965415e2d07b9af4019a85c82946d25f1f2f148ceaf71d3ab6f966ecfbae9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/bundled-discovery-state-DMo7u4_0.mjs",
+    "parent_sha256": "229c928c6d6b2b6d8b6491d833bc01b439d94c546b0298c037e81f8444048f6f",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\t\t\tconst { inspectOtherOpenClawProcesses } = await import(\"./openclaw-process-census-CB_ke5x8.mjs\");",
+    "line": 202,
+    "line_sha256": "188c0a903932bb1cb25cdc29eb06ad773559e9ce56b2350352a4bf1757637cb4",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-process-census-CB_ke5x8.mjs",
+        "specifier": "./openclaw-process-census-CB_ke5x8.mjs"
+      }
+    ],
+    "parent": "dist/plugin-source-capture-directory-sbJ-9RsX.mjs",
+    "parent_sha256": "8508ff6f80852af1fd4bfd62f3a2c566d30a8446ec14cc4ed019199da3aedab2",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 1084,
+    "line_sha256": "1d364c72beb619e0adab01dabba0813ef6c420328c9f3bb5cbd5b8ba598d3e29",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/plugin-generation-artifact-CWV3FtVc.mjs",
+    "parent_sha256": "7e6c0a57c1e00a7728ec927fcd228c2c455283ddda1e81b0f2600d199adb9d8c",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 116,
+    "line_sha256": "1d364c72beb619e0adab01dabba0813ef6c420328c9f3bb5cbd5b8ba598d3e29",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/deferred-plugin-migrations-BryNSEB7.mjs",
+    "parent_sha256": "0da0089889440f86225d85088b5b3f9463076b3367485afcd1cc4b14d7c924a5",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 137,
+    "line_sha256": "1d364c72beb619e0adab01dabba0813ef6c420328c9f3bb5cbd5b8ba598d3e29",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/deferred-plugin-migrations-BryNSEB7.mjs",
+    "parent_sha256": "0da0089889440f86225d85088b5b3f9463076b3367485afcd1cc4b14d7c924a5",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { withPluginLifecycleLease } = await import(\"./plugin-lifecycle-lease-mJzJp0VR.mjs\");",
+    "line": 267,
+    "line_sha256": "b3f6ef4fa6f75826469e5f8a06310faf576452ed33bb224e6d0ac542fc227711",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/plugin-lifecycle-lease-mJzJp0VR.mjs",
+        "specifier": "./plugin-lifecycle-lease-mJzJp0VR.mjs"
+      }
+    ],
+    "parent": "dist/deferred-plugin-migrations-BryNSEB7.mjs",
+    "parent_sha256": "0da0089889440f86225d85088b5b3f9463076b3367485afcd1cc4b14d7c924a5",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\tconst { runWithOpenClawStateLeaseWorker } = await import(\"./openclaw-state-lease-worker-storage-Cs7_dG_a.mjs\");",
+    "line": 268,
+    "line_sha256": "e39a00e1933f0069e82e591213df4c26a7e05c9f0905aa04b4ee44db89cd2993",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-lease-worker-storage-Cs7_dG_a.mjs",
+        "specifier": "./openclaw-state-lease-worker-storage-Cs7_dG_a.mjs"
+      }
+    ],
+    "parent": "dist/deferred-plugin-migrations-BryNSEB7.mjs",
+    "parent_sha256": "0da0089889440f86225d85088b5b3f9463076b3367485afcd1cc4b14d7c924a5",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { readUpdateDatabaseGenerationsIsolated } = await import(\"./update-candidate-state-CPqBVcMo.mjs\");",
+    "line": 114,
+    "line_sha256": "2c4c5398390b4aaf0859c5242068489f9170a4bfc2eef2e7037f10287a82424b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/update-candidate-state-CPqBVcMo.mjs",
+        "specifier": "./update-candidate-state-CPqBVcMo.mjs"
+      }
+    ],
+    "parent": "dist/update-doctor-result-CaCB62wM.mjs",
+    "parent_sha256": "0513433c58e1ebd9cbb06c98c225a4ba371e035272489f5e0a92513eb92208e5",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst [{ runOpenClawStateWorkerOperation }, { createSqliteWorkerWriteAdmission }] = await Promise.all([import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\"), import(\"./sqlite-worker-store-B2xBi7aj.mjs\")]);",
+    "line": 22,
+    "line_sha256": "d97c474480fa855296514c5aeba3d169ffffedcea35230f17c938ac987fbd9df",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      },
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-worker-store-B2xBi7aj.mjs",
+        "specifier": "./sqlite-worker-store-B2xBi7aj.mjs"
+      }
+    ],
+    "parent": "dist/plugin-state-worker-client-7ByaGIDy.mjs",
+    "parent_sha256": "bee1c828bf9a23d3aeafd84e91d3dfd2b2d685b2d560fc5a9e01aabcd0346217",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { readChannelAllowFromStore } = await import(\"./pairing-store-Sl74U9Ij.mjs\");",
+    "line": 9,
+    "line_sha256": "852f692902e4843342058101db5c4c1de9be049b54d53b62ec88fdb82c5c533b",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/pairing-store-Sl74U9Ij.mjs",
+        "specifier": "./pairing-store-Sl74U9Ij.mjs"
+      }
+    ],
+    "parent": "dist/store-allow-from-CGaszK7l.mjs",
+    "parent_sha256": "09384a04f7fb2eedbca6384feaba0dfe6c7cf41aa487b1beb69b7683532b14ef",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { authorizeGatewayRequestPreDispatch, createRequestGatewayMethodRegistry } = await import(\"./server-methods-DmuZ2oH_.mjs\");",
+    "line": 367,
+    "line_sha256": "98852f19b73d1b7e920c510c47812d63d2e7b5818b138883ed5c5720a53b4aa9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "28e78f59498d06d42b4e8c639d48dc2f05c694d504413d44bc875509c5c6cc9c",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/server-methods-DmuZ2oH_.mjs",
+        "specifier": "./server-methods-DmuZ2oH_.mjs"
+      }
+    ],
+    "parent": "dist/server-plugin-in-process-dispatch-CBGxjSoo.mjs",
+    "parent_sha256": "52e483b1c420b61514cc11c8d75fb134ddada9f61f63326a066fd96f78811c37",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 9,
+    "line_sha256": "d739ff5a47588e2263bce82bf6cf1ea7c7455cb1c69b62114e976f5fae35d7e9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 26,
+    "line_sha256": "abd965415e2d07b9af4019a85c82946d25f1f2f148ceaf71d3ab6f966ecfbae9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { readDatabasePathIdentity } = await import(\"./sqlite-worker-identity-MNf8JgCY.mjs\");",
+    "line": 83,
+    "line_sha256": "552f6b0d55c04bb40e3773c58277cc65566903e81488b83c7969cd3b073c7874",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-worker-identity-MNf8JgCY.mjs",
+        "specifier": "./sqlite-worker-identity-MNf8JgCY.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { runSqliteWorkerStoreOperation } = await import(\"./sqlite-worker-store-B2xBi7aj.mjs\");",
+    "line": 84,
+    "line_sha256": "7e6dc7750a4b0ade7b4848baf9e63bfd91e61c349af6f9b970d68782b4fd80c5",
+    "literal_targets": [
+      {
+        "bytes_available": false,
+        "frontier_metadata_bound": false,
+        "member": "dist/sqlite-worker-store-B2xBi7aj.mjs",
+        "specifier": "./sqlite-worker-store-B2xBi7aj.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\t\tconst { openOpenClawStateWorkerCleanupStore } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 85,
+    "line_sha256": "c56dbdfe511a9b05163e860634b448fb3840d61664cbcd6939b6f034379ca553",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { runOpenClawStateWorkerOperation } = await import(\"./openclaw-state-worker-store-DRKGvWWN.mjs\");",
+    "line": 127,
+    "line_sha256": "d739ff5a47588e2263bce82bf6cf1ea7c7455cb1c69b62114e976f5fae35d7e9",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "d567e4897230641cd70eeeade81cc6281c67bf76626e1fa7cfb19987ce0b73ca",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/openclaw-state-worker-store-DRKGvWWN.mjs",
+        "specifier": "./openclaw-state-worker-store-DRKGvWWN.mjs"
+      }
+    ],
+    "parent": "dist/openclaw-state-lease-worker-storage-CTe98nAl.mjs",
+    "parent_sha256": "c624dbbf0792bbbd98c6c5d5489c596d0aeaf559a26d770ea55ca336db058264",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\t\tconst { getEmbeddedQuestionBroker } = await import(\"./embedded-question-broker-Ba2rSom2.mjs\");",
+    "line": 58,
+    "line_sha256": "2b6c6d7960a81d3439ad3b6388682edd541ea0cdd89a1ebb0e53dc442b416b6b",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "32b926f00bf035046605f5086814fdab37b1bdd931c46d473b26d6db77d65727",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/embedded-question-broker-Ba2rSom2.mjs",
+        "specifier": "./embedded-question-broker-Ba2rSom2.mjs"
+      }
+    ],
+    "parent": "dist/gateway-question-dispatch-DHzvWEkh.mjs",
+    "parent_sha256": "3d369b12032e1c295597a0ae400df2977b5de899adbfeb16ff77057daebd0ed6",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  },
+  {
+    "callsite_excerpt": "\t\tconst { callGatewayTool } = await import(\"./gateway-question-dispatch.runtime.js\");",
+    "line": 66,
+    "line_sha256": "17ab12a609da3dbdddcef6927d52c5176473c5cda1e214abc2f03fc30634641c",
+    "literal_targets": [
+      {
+        "actual_received_sha256": "55c0532b5d08a9601aa06abf5be7b46e026050d6a0f00b4693f0660fa315c0b2",
+        "bytes_available": true,
+        "frontier_metadata_bound": false,
+        "member": "dist/gateway-question-dispatch.runtime.js",
+        "specifier": "./gateway-question-dispatch.runtime.js"
+      }
+    ],
+    "parent": "dist/gateway-question-dispatch-DHzvWEkh.mjs",
+    "parent_sha256": "3d369b12032e1c295597a0ae400df2977b5de899adbfeb16ff77057daebd0ed6",
+    "profile_branch": "UNPROVEN_NOT_AUTO_SELECTED",
+    "syntax": "LITERAL_IMPORT_PRESENT"
+  }
+]

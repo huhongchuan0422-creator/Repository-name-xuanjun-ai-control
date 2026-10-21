@@ -117,3 +117,67 @@ At present a complete once-only extraction cannot be guaranteed from the receive
 ### Actual validation and retained checkpoints
 
 New offline enumeration: roots/witness lines matched actual source SHA; unique names checked; all overlapping metadata bindings agree;360 bound-row sum3750367 B;12 unknowns retained;788 available hashes recorded;29 prior rows excluded by reachability; no SDK execution. Old10 lifecycle and candidate Hosted success reused, not rerun. This is documentation/evidence only, no new runtime-code test or CI-pass claim. B1–B4 unchanged. All original archives, failed outputs and previous evidence retained. Final install selected_members remains empty; SDK/authentication/CP11/installation NOT_EXECUTED.
+
+## B5 project catalog continuation — original#6316275680 / index#6329032582
+
+This section supersedes the older claim that the12 manifest metadata rows are still missing.
+Actual b5-consolidated-twelve-manifest-join.json is received:10487B,
+SHA ebe88249500a1d4864c4ff32021ac3f77a03f216b07cdccbf2bb30e0338b5570.
+Each row matches the original inventory's member/parent/line/kind/reason and unique original-manifest
+binding. Combined known frontier is372 unique members /4114893B, not complete closure or approval.
+The existing360 are referenced by exact old file SHA; the12 are added in one bounded index, not a
+new extraction batch. The old source manifest need not be requested again.
+
+Machine-readable candidate and validations:
+`evidence/p2-b5-public-assembly-20261021/project-catalog-v1/catalog.candidate.json`.
+Its local referenced JSONs cover known frontier, actually received12 metadata, runtime profile,
+package resolution, all194 dynamic callsites, Node binding, additional received dynamic files and
+actual validation. This is a project-side candidate, not a replacement transport/protocol or
+approved catalog. It cannot be enrolled/dispatched while its required bindings are null.
+
+| Scope | Actual result / installation limit |
+|---|---|
+| Reuse | Original788 eager-reachable source files match existing byte/SHA pins. A further40 already-received dynamic-target files match the original1718-member report or previous pinned core material table; do not re-request them.828 is a reuse union, not a complete SDK tree |
+| Metadata frontier |372 /4114893B, largest307392B; within the old single2MiB and selected16MiB limits only as a known lower bound. No received object overlaps this missing set |
+| Dynamic analysis |194 received parent/line hashes checked;192 lines contain a literal import target,2 computed expressions.158 unique literal target names,114 currently unreceived names; neither count is selected or claimed necessary as a whole |
+| Computed specifics |plugin-setup-module-D0o6Vfcg.mjs:595 import(specifier) needs real selected-plugin resolution. websocket-session-C3AfDQbz.mjs:14 resolves ws/package.json then wrapper.mjs, in realtime-transcription code called at197; branch applicability remains unproven, not automatically included/excluded |
+| Packages |14 eager bare package declarations have exact versions from received openclaw2026.9.9 package.json (145276B, SHA214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95); their installed package.json/export/condition/transitive/native/resource bytes are not received. One additional conditional ws8.21.3 resource is explicit. Declared version is not proof of installed bytes |
+| Exact native profile |Route and intended updateCanary=true/ambientEnvTriggers=suppress options have real source witnesses, but executable config/auth bytes remain DRAFT. Core8204 calls unreceived post-attach before the8328 updateCanary return; external network none cannot prove forbidden internal work is never invoked |
+| Additional actual source gaps |Core8198 awaits server-active-work-Bhfd47cA.mjs before that return, outside old372 metadata. Deferred server-shutdown.runtime.js at5483 is distinct from received server-shutdown-6hlRrMSx.mjs. Do not alias them or ask for separate tiny field commands; resolve in the original retained-manifest/closure pass |
+| Node |Known24.21.0 binary126595440B/SHA7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c. It exceeds16MiB by109818224B; excluded from source-member transfer. Actual existing Node/ELF/image binding or separately approved runtime plan remains required, with no split/limit increase |
+| Final selection |selected_members remains empty with NOT_FROZEN status. Known frontier and optional branches cannot truthfully be promoted to a final approved selection while their bodies/profile/package/runtime remain unproven |
+
+Source artifact references are the existing retained tar559237632B/SHA
+e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485 at
+/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/source-tree.tar.pending,
+and manifest5635704B/SHA cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba
+at that original directory/manifest.json. These are historical source bindings, not approval or
+proof of a currently enrolled transport root. Recipient root/path is UNKNOWN; no workspace label
+is used as identity or a root. The catalog records null transport source/recipient root_ref,
+original SUCCESS request, InvokeId, actual recipient and approved catalog binding until supplied
+by the original connection owner. No path is guessed, no task dispatched.
+
+Read actual connection contract at78e339db:
+docs/development/CLOUD_CONNECTION_SOURCE_CONTACTS_20261022.md.
+PrivateMcp.read_project_chunk -> ExistingProjectFiles -> export_chunk -> bound_job -> Receiver is
+internal/default-disabled and requires real recipient/custody, approved catalog, original
+SUCCESS/fetch_approved_object/InvokeId/manifest/budget/full-SHA binding. Current exposed tools only
+read approved OS-release results. They cannot retrieve arbitrary B5 materials, and no such call
+was attempted. Original connection scope remains with that window; no new public transport,
+credential, account, permission or Writer is introduced. Generic256MiB does not replace B5's16MiB.
+
+Independent work completed here:12-row reception/join, source/received-set reuse, actual194-line
+classification, concrete computed-package/resource gaps and native branch witnesses, full candidate
+inputs/outputs/limits/purpose/acceptance/root-reference projections. This is metadata/static evidence
+only; old lifecycle/WS/contract Hosted results are reused, no SDK/parser/Node/authentication/server
+execution. Material acceptance will require each exact object/version/SHA, whole-set budget,
+protected source+private receiver roots, final explicit selection and retained recovery/no overwrite.
+Only a later specifically authorized native loader/authenticated describe/startupSettled/close+drain
+run can prove CP11. No install ETA is invented from material count.
+
+Next dependency owner is explicit: original connection window supplies approved actual private
+project read/root/recipient binding, then Work reads original archive data through that same route,
+resolves the remaining body/export/resource branches and freezes one final bounded selection.
+No Owner ferry or new small-batch terminal command is requested. Until then catalog status is
+CANDIDATE_BLOCKED_NOT_DISPATCHABLE / PARTIAL, not B5 complete. B1--B4 and B6 checkpoints retained.
+
