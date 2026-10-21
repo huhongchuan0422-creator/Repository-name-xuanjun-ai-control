@@ -7,6 +7,7 @@ and workspace access; writing this file does not create that enrollment.
 import base64
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import stat
@@ -116,10 +117,12 @@ class PrivateMcp:
             if method == 'initialize':
                 if self.initialized:
                     raise Hold('ALREADY_INITIALIZED')
-                if p.get('protocolVersion') not in PROTOCOLS:
-                    raise Hold('PROTOCOL_VERSION_NOT_SUPPORTED')
+                version = p.get('protocolVersion')
+                if type(version) is not str or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', version):
+                    raise Hold('PROTOCOL_VERSION_FORMAT')
+                negotiated = version if version in PROTOCOLS else PROTOCOLS[-1]
                 self.initialized = True
-                result = {'protocolVersion': p['protocolVersion'], 'capabilities': {'tools': {}},
+                result = {'protocolVersion': negotiated, 'capabilities': {'tools': {}},
                           'serverInfo': {'name': 'xuanjun-private-connection', 'version': '1.0.0'},
                           'instructions': 'Read existing connection status and approved non-sensitive OS release results only. No dispatch, arbitrary paths, production approval or shell. Private transport/workspace enrollment is required separately.'}
             elif method == 'ping':
@@ -131,7 +134,7 @@ class PrivateMcp:
             elif method == 'tools/call':
                 if not self.ready:
                     raise Hold('INITIALIZATION_REQUIRED')
-                if set(p) != {'name', 'arguments'}:
+                if set(p) - {'_meta'} != {'name', 'arguments'} or ('_meta' in p and type(p['_meta']) is not dict):
                     raise Hold('TOOL_CALL_FIELDS')
                 result = self.call(p['name'], p['arguments'])
             else:
