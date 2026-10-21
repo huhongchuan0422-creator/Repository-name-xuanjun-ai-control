@@ -1,0 +1,19 @@
+name: P2 B5 public WS seam
+on:
+  push:
+    branches: [repair/p2-resumable-install-20261020]
+    paths:
+      - production/p2_install/b5_ws_public_contract.mjs
+      - tests/p2_install/test_b5_public_ws.mjs
+      - evidence/p2-b5-ws-20261021/**
+      - .github/workflows/p2-b5-public-ws.yml
+  workflow_dispatch:
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node tests/p2_install/test_b5_public_ws.mjs
