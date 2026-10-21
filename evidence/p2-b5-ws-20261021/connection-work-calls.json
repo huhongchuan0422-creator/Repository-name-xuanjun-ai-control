@@ -1,0 +1,120 @@
+{
+  "scope": "REAL_RECEIVED_SOURCE_STATIC_ONLY",
+  "owner_implementation": "UNREAD_UNBOUND",
+  "calls": [
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 2827,
+      "literal": "handler.connectionWork.signal.throwIfAborted();"
+    },
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 3243,
+      "literal": "isCancelled: () => context.handler.connectionWork.signal.aborted"
+    },
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 3314,
+      "literal": "readinessSignal: context.handler.connectionWork.signal"
+    },
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 3413,
+      "literal": "params.connectionWork.track(() => runWithGatewayIndependentRootWorkAdmission(run, \"ws:preauth\", params.connectionWork.signal)).catch(onError);"
+    },
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 3671,
+      "literal": "const admission = params.connectionWork.isClosing ? \"continuation\" : void 0;"
+    },
+    {
+      "source": "dist/message-handler-DKklmnFX.mjs",
+      "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
+      "line": 3676,
+      "literal": "params.connectionWork.track(() => runWithDiagnosticTraceContext(createDiagnosticTraceContext(), () => handleIncomingMessage(data, admission))).catch((error) => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 113,
+      "literal": "params.connectionWork.track(async () => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 116,
+      "literal": "if (params.isClosed() || params.connectionWork.isClosing) return;"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 184,
+      "literal": "if (connectionWork.isClosing) {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 263,
+      "literal": "connectionController.abort();"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 281,
+      "literal": "const releaseConnection = connectionWork.registerConnection(() => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 454,
+      "literal": "connectionController.abort();"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 455,
+      "literal": "connectionWork.trackCleanup(() => handleSocketClose(code, reason)).catch((error) => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 458,
+      "literal": "}).finally(releaseConnection);"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 475,
+      "literal": "next.connectionSignal = connectionController.signal;"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 1096,
+      "literal": "params.connectionWork.track(() => runWithGatewayIndependentRootWorkContinuation(() => dispatch(parsed.method === \"worker.computer\" || parsed.method === \"worker.presence\" ? connectionToolLifetime.signal : void 0), \"worker:dispatch\").catch(() => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 1119,
+      "literal": "if (disposed || params.connectionWork.isClosing) return;"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 1130,
+      "literal": "queue = params.connectionWork.track(() => previous.then(async () => {"
+    },
+    {
+      "source": "dist/ws-connection-CsJ9cE0L.mjs",
+      "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
+      "line": 1172,
+      "literal": "if (params.connectionWork.isClosing) {"
+    }
+  ]
+}

@@ -43,3 +43,28 @@ B5 installation time cannot be promised before exact closure/native-owner/runtim
 20 local/Hosted-targeted contract cases now include5 anomalous drain return values(false,true,null,object,zero): no original release/RELEASED/OBSERVED. Undefined is only the internal callback contract, not native proof. Delayed handshake/request plus cleanup which schedules further cleanup must all settle before release. Captured old ingress callback throws during drain and after release, with no new tracked work. Successful synthetic contract output now explicitly includes executionReadiness HOLD_REAL_OWNER_UNBOUND. No compiled/native drain implementation has been invented.
 
 The fixed4051-byte server member is absent from both locally verified material sets; exact-name attachment search also has no file-byte result. Its manifest pin is known, not UNKNOWN. A one-member retained archive candidate is documented in SERVER_MEMBER_CANDIDATE.md; only separate onsite confirmation may permit it. No80-file/560-file request is made.
+
+
+## Received-source lifecycle alignment after1fa440b8
+
+The original twenty cases are retained and NOT_RERUN by this increment. Workflow now runs only the9 newly affected close/drain cases; no prior tests are deleted or relabeled as new results. Real SDK/owner/installation remain NOT_EXECUTED/UNBOUND.
+
+Source-backed gap fixed: adapter previously detached ingress then called an unspecified quiesceAndDrain. It now calls the ORIGINAL per-connection params.close(1000, reason) explicitly after ingress removal, and awaits the trusted owner's complete drain before setting drained=true or allowing original lease release. A void close return is not drain proof. Close errors or non-void close return still attempt drain, but retain HOLD and suppress original release/OBSERVED/RELEASED. No generic abort/registration replacement or native cleanup implementation is invented.
+
+| Stage | Actual received source binding | Adapter obligation |
+|---|---|---|
+| Stop own ingress | message-handler onMessage queue and ws-connection isClosing checks | Detach only adapter guard; retained guard refuses after stop. Do not set shared connectionWork.isClosing. |
+| Close original connection | ws-connection L260–280 retireTransport→closed=true→connectionController.abort→transport cleanup;closeWithGrace→retireConnection→closeGatewayTransportWithGrace | Call original params.close, preserve socket/context/client authority. Do not abort global work.signal or implement transport close. |
+| Track normal/handshake work | message-handler L3413,L3676;ws-connection L113 on-demand loading | Native connectionWork.track remains exact owner object; onMessage void and isClosing are not drained evidence. |
+| Track socket cleanup | ws-connection L453–458 socket.close listener→connectionController.abort→connectionWork.trackCleanup(handleSocketClose).catch(...).finally(releaseConnection) | Wait cleanup and releaseConnection completion, including later enqueued work, using real owner drain once its implementation is received. |
+| Connection registration | ws-connection L281–283 registerConnection(original close callback) | Do not create a second registration or call unregister early. releaseConnection is distinct from plugin lease.release. |
+| Abort scope | message-handler handler.connectionWork.signal;ws-connection L190,L263,L454,L475 connection-local controller/next.connectionSignal | Aborted signal is cancellation only, never proof of request or cleanup completion. |
+| Lease release | Original inspectReadonlyLease finally, gated by adapter drained flag | Drained true only after original close and owner completion; otherwise leave journal/handle uncertain HOLD. |
+
+Exact source callsites with member SHA and line literals: evidence/p2-b5-ws-20261021/connection-work-calls.json. This is static inspection of real bytes, not a copied owner implementation or SDK execution.
+
+Nine new cases: normal delayed cleanup;already-aborted/isClosing still waits;close throw;close false;close object;drain throw;drain false;successful real-journal adapter close→asynchronous cleanup→registration retirement→drain→lease release;uncertain-close real-journal adapter retains handle and suppresses success/release. Retained guard is rejected during and after drain. Cleanup/tracker functions in these scheduling tests are explicit fixtures, with no authentication or native owner claim.
+
+Current true byte dependency is unchanged: same existing10240-byte tar/SHAf9cf2764f46910d1be1bc8209fe533b6416e4f21c521bcc3c85489f02470dd52 and936-byte report/SHA0800cf8dde686b3b27fd2f2c47ac97dce04671e6cd96bb60dead5ed4135d7ab0, containing server-ChnNHwLm4051/pin26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56. UK generation already succeeded. No new source filename can be inferred before reading that file. Transfer existing raw attachments only, not re-capture. Once read, follow actual composition owner rather than all lexical edges.
+
+Installation remaining: (1) receive/hash existing one-member source;(2) bind native connectionWork creation/quiesce/trackCleanup/drain from its actual composition chain, only subsequent indispensable byte gaps may be named;(3) close Node/native/image dependencies and freeze bounded isolated final operation/recovery candidate;(4) separately confirmed real loader/authenticated metadata/refusal/disconnect/drain/recovery evidence. Only the source increment ETA is30minutes; no honest installation ETA exists until owner implementation and runtime dependency bytes are known. No additional global review is initiated.

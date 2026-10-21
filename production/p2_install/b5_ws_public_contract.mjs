@@ -19,6 +19,22 @@ export function bindPublicWsNamespace(namespace,files,packageBytes) {
  if(!d||!Object.hasOwn(d,'value')||typeof d.value!=='function')hold('HOLD_WS_NAMESPACE');
  return Object.freeze({attach:d.value,sourceState:'STATIC_BYTES_BOUND_ONLY',runtimeProvenance:'UNBOUND'});
 }
+/** Close is the original per-connection callback, NOT connectionWork.signal abort.
+ * Native close triggers socket-close trackCleanup/releaseConnection asynchronously.
+ * We still await the trusted owner's entire drain; void close is not proof.
+ */
+export async function closeThenDrainOwnedWs({params,quiesceAndDrain}) {
+ let closeError,drainError;
+ try {if(params.close(1000,'B5 readonly inspection completed')!==undefined)hold('HOLD_WS_CLOSE_RESULT_UNKNOWN');}
+ catch(error){closeError=error;}
+ try {
+  const completed=await quiesceAndDrain({socket:params.socket,connectionWork:params.connectionWork});
+  if(completed!==undefined)hold('HOLD_WS_DRAIN_RESULT_CONTRACT');
+ }catch(error){drainError=error;}
+ // Drain is attempted even after close failure, but uncertain close cannot release.
+ if(closeError||drainError){const error=new Error('HOLD_WS_CLOSE_OR_DRAIN_UNKNOWN');error.closeCause=closeError;error.drainCause=drainError;throw error;}
+}
+
 /** Owner provides native quiesce+work/cleanup drain. This callback's actual compiled
  * implementation is still UNBOUND; a fixture or returned flag is never real proof.
  * No copies of the internal dispatcher, auth client, scopes or connectionWork.
@@ -62,7 +78,7 @@ export async function withPublicWsContract({acquire,registryApi,attach,params,ex
    accepting=false;
    // If attach threw before returning, owner must remove partial native listeners too.
    if(guard)params.socket.off('message',guard);
-   try {const completed=await quiesceAndDrain({socket:params.socket,connectionWork:params.connectionWork});if(completed!==undefined)hold('HOLD_WS_DRAIN_RESULT_CONTRACT');drained=true;}
+   try {await closeThenDrainOwnedWs({params,quiesceAndDrain});drained=true;}
    catch(e){errors.push(e);}
   }
   if(!drained)hold('HOLD_WS_WORK_NOT_DRAINED');
