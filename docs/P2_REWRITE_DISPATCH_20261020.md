@@ -232,3 +232,56 @@ Owner已执行1条初始化命令（内部3容器，不算3次安装）；剩余
 本轮源码0c09b3ae24fcb3e2697a94ef190337a792bca102，Tree5756fee7e7b0e172858af209775637cafcb577c5；[Hosted39377081631](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39377081631) SUCCESS：双Python各11项、精确3.6.8宿主3项、两角色真实Docker及真实宿主main重开验收。复用原111运行文件及499bcc43运行组件原字节。薄适配实际调用原ledger准备CLI与原sandbox policy，不启动正常ledger、不改原guard。有限进程身份为独立role/PID的UID1002，不把未知service_uid或B7启动授权写PASS。
 
 本轮只证明CP10新隔离有限契约；原宿主OpenClaw全sandbox等价NOT_CLAIMED，英国B4运行NOT_EXECUTED。B5/B6/B7/P3未前移。详细固定制品、路径/角色挂载、截止时间、退出/恢复及完整单命令候选见[本批操作清单](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/blob/repair/p2-resumable-install-20261020/docs/p2-b4-20261020/OPERATIONS.md)。新目录/进程动作仍待Owner按完整清单确认，七批总体验收不因本轮Hosted成功自动关闭。
+
+
+### B6 offline application persistence adapter (CP12/13; no field completion)
+
+`production/p2_install/b6_persistence.py` binds the existing application contract from
+`evidence/p2-epoch7-access-repair-20261014/runtime/stage1/execution_ledger.py`
+SHA256 `8c607f0e2222d906b8450b302dad014a69dfedcb710a257731454e0d97aaf8c6`
+(Git blob `ca96518cda81be2820d693de5a2659a34bb0e802`), and original `activation_control.py`
+SHA256 `169a30ee858ef0e1ecb0b366702f35463993db34042410a43bc98018a9471eb4`.
+It reuses original `_validate_schema`, `_validate_side_schema`, ActivationStore journal/descriptor
+reconciliation and `_assert_activation`. No duplicate business schema/DB or coordinator journal
+is introduced. Source hashes are checked before fixed-source loading; no caller-chosen modules.
+
+API: `observe(request, 'CP12'|'CP13', previous_outcome='KNOWN'|'UNKNOWN')`.
+Request fields are exactly scope=ISOLATED_TEST_ONLY, profile=B6_EXISTING_APPLICATION_DATABASE_OBSERVATION,
+root, db_path, uid, gid, activation={descriptor,epoch_journal,lock_path,owner_uid},
+expected=original full activation descriptor, task_ids=bounded explicit fixture/application row IDs.
+The caller must bind these to original frozen identity evidence; a request is not itself production authority.
+Only original isolated root descendants or `/tmp/p2-b6-test-*` offline roots are accepted, with
+canonical private owner paths, regular single-link DB/WAL/SHM and actual current UID/GID.
+No missing directory/DB is created. No migration, DDL/DML, WAL deletion, empty bootstrap,
+service/SDK start, activation transition, or checkpoint/task replay occurs.
+
+CP12 reopens the existing DB read-only with a held FD, validates original base+side schema,
+reads original task/fence/checkpoint and bounded existing event rows, checks identity before/after.
+No ExecutionLedger constructor is invoked here because it can create side tables.
+CP13 additionally requires original ACTIVE journal/descriptor identity and the original ledger
+activation fence. B3 `ISOLATED_NEW_PREPARE_ONLY` is rejected and nonACTIVE cannot pass CP13.
+This is read-access evidence only, not socket authentication, business write authorization,
+B7 activation, or original service-start permission. Missing runtime profile/identity/ACTIVE handoff
+only blocks live CP13 integration; offline tests proceed using explicit temporary fixtures.
+
+UNKNOWN yields a fresh `RECONCILED_READBACK` observation without replay; journal/descriptor
+mismatch or unreadable/changed identity returns HOLD and must be reconciled by the original
+owner, never automatically repaired. The adapter does not call activation.reconcile or fabricate
+an installation COMMITTED receipt. Caller persists observation through the existing receipt layer;
+DB/WAL and original transaction state remain the recovery checkpoint. SQLite may create/update
+its own SHM coordination file during a read-only WAL open; this is disclosed, not called zero-write.
+No prior batch file is modified. Query busy timeout1s plus5s SQLite progress deadline bounds local reads.
+
+Targeted test: `python -B tests/p2_install/test_b6_persistence.py -v` (8 cases).
+Fixture uses original schema definitions and real ExecutionLedger writes; an open WAL connection
+is SIGKILLed, preserving a nonempty WAL. Main-only fixture snapshot lacks a marker event while
+independent CP12/CP13 processes read that WAL-only marker. DB/WAL SHA and prior B1–B5 fixture
+remain unchanged. Missing DB, wrong schema/generation/UID/path, symlink DB/WAL, B3 preparation
+profile and original nonACTIVE fence are refused; UNKNOWN reads back without replay.
+Fixture activation proofs/rows are explicitly synthetic test state, not old UK/production history.
+
+Local Python3.12 eight cases PASS. Existing Hosted journal workflow runs only test_journal.py;
+it does NOT automatically execute the new B6 test. This task's four-file scope does not modify
+workflow or imply Hosted B6 PASS. Python3.11 target/real container, actual runtime access,
+CP12/13 installation receipts and UK recovery remain NOT_EXECUTED until independently verified.
+B5 checkpoints/paused extraction remain intact; no Owner material ferry required by this adapter.
