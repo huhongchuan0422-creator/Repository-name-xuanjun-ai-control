@@ -43,19 +43,74 @@ jobs:
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/community-preview-package"
-          mkdir -p "$OUT/root"
-          cp -a scripts tests demos clients/community-mini deploy/community-preview "$OUT/root/"
-          (
-            cd "$OUT/root"
-            find . -type f -print0 | sort -z | xargs -0 sha256sum > ../MANIFEST.sha256
+          mkdir -p "$OUT"
+
+          # Export only Git-tracked files from the fixed source commit.
+          git ls-files -z --             scripts             tests             demos             clients/community-mini             deploy/community-preview > "$OUT/TRACKED.zlist"
+          test -s "$OUT/TRACKED.zlist"
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "community-preview-package"
+          raw = (out / "TRACKED.zlist").read_bytes()
+          paths = [p.decode() for p in raw.split(b"\0") if p]
+
+          required = (
+              "clients/community-mini/app.js",
+              "deploy/community-preview/deploy.sh",
+              "deploy/community-preview/server.py",
           )
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner             -C "$OUT/root" -czf "$OUT/community-preview-candidate.tar.gz" .
+          for path in required:
+              if path not in paths:
+                  raise SystemExit("REQUIRED_TRACKED_PATH_MISSING:" + path)
+
+          for path in paths:
+              if path.startswith("/") or ".." in Path(path).parts:
+                  raise SystemExit("UNSAFE_TRACKED_PATH:" + path)
+              if not path.startswith((
+                  "scripts/", "tests/", "demos/",
+                  "clients/community-mini/", "deploy/community-preview/"
+              )):
+                  raise SystemExit("UNEXPECTED_TRACKED_PATH:" + path)
+          PY
+
+          # Build manifest from the exact tracked list; generated caches cannot enter.
+          : > "$OUT/MANIFEST.sha256"
+          while IFS= read -r -d '' path; do
+            test -f "$path"
+            sha256sum "$path" >> "$OUT/MANIFEST.sha256"
+          done < "$OUT/TRACKED.zlist"
+
+          tar --null --files-from="$OUT/TRACKED.zlist"             --sort=name --mtime='UTC 1970-01-01'             --owner=0 --group=0 --numeric-owner             -czf "$OUT/community-preview-candidate.tar.gz"
+
+          # Verify archive members preserve parents and exactly match Git-tracked input.
+          tar -tzf "$OUT/community-preview-candidate.tar.gz" | sort > "$OUT/PACKAGE.members"
+          tr '\0' '\n' < "$OUT/TRACKED.zlist" | sort > "$OUT/TRACKED.members"
+          diff -u "$OUT/TRACKED.members" "$OUT/PACKAGE.members"
+          grep -Fx 'clients/community-mini/app.js' "$OUT/PACKAGE.members"
+          grep -Fx 'deploy/community-preview/deploy.sh' "$OUT/PACKAGE.members"
+          ! grep -E '(^|/)(__pycache__|\.pytest_cache|node_modules|\.coverage)(/|$)|\.pyc
+      - name: Upload candidate package
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-isolated-preview-candidate
+          path: |
+            ${{ runner.temp }}/community-preview-package/community-preview-candidate.tar.gz
+            ${{ runner.temp }}/community-preview-package/MANIFEST.sha256
+            ${{ runner.temp }}/community-preview-package/PACKAGE.members
+            ${{ runner.temp }}/community-preview-package/RECEIPT.txt
+          retention-days: 7
+ "$OUT/PACKAGE.members"
+
           {
             echo "SOURCE_COMMIT=865d52a86e1ca735af49925419d66336fffc8891"
             echo "SOURCE_TREE=01e914b05adde56e3c7e1786c5bd71b477bc8dc4"
             echo "PACKAGE_SHA256=$(sha256sum "$OUT/community-preview-candidate.tar.gz" | awk '{print $1}')"
             echo "MANIFEST_SHA256=$(sha256sum "$OUT/MANIFEST.sha256" | awk '{print $1}')"
-            echo "FILE_COUNT=$(wc -l < "$OUT/MANIFEST.sha256")"
+            echo "MEMBERS_SHA256=$(sha256sum "$OUT/PACKAGE.members" | awk '{print $1}')"
+            echo "FILE_COUNT=$(wc -l < "$OUT/TRACKED.members")"
           } | tee "$OUT/RECEIPT.txt"
 
       - name: Upload candidate package
