@@ -248,7 +248,6 @@ jobs:
     timeout-minutes: 12
     env:
       COMMUNITY_PREVIEW_PROFILE: legacy
-      COMMUNITY_PREVIEW_READINESS_RECEIPT: ${{ runner.temp }}/community-mini-preview/backend-readiness.json
     steps:
       - name: Verify existing domestic upload runner before loading credentials
         shell: bash
@@ -336,6 +335,7 @@ jobs:
           COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
           COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
           COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
+          COMMUNITY_PREVIEW_READINESS_RECEIPT: ${{ runner.temp }}/community-mini-preview/backend-readiness.json
         run: '"$COMMUNITY_NODE_BINARY" scripts/community_mini_preview.cjs'
       - name: Preserve sanitized preview receipt
         if: always()

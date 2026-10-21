@@ -138,6 +138,8 @@ class EndpointContract(unittest.TestCase):
         workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         self.assertIn('COMMUNITY_PREVIEW_PROFILE: legacy',workflow)
         self.assertIn('COMMUNITY_PREVIEW_READINESS_RECEIPT:',workflow)
+        job_config=workflow.split('  mini-preview:\n',1)[1].split('    steps:',1)[0]
+        self.assertNotIn('runner.temp',job_config)
         self.assertIn("hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]",workflow)
         self.assertIn("'deploy/community-preview/endpoint-profiles.json'",workflow)
         self.assertIn('stat.S_ISREG(item.external_attr >> 16)',workflow)
