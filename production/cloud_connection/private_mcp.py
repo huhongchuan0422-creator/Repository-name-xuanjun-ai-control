@@ -115,8 +115,9 @@ class PrivateMcp:
             if type(p) is not dict:
                 raise Hold('PARAMETERS')
             if method == 'initialize':
-                if self.initialized:
-                    raise Hold('ALREADY_INITIALIZED')
+                # Tunnel discovery and the connector can initialize the same
+                # stdio child. Repeating this handshake grants no authority
+                # and must neither fail nor reset an established ready state.
                 version = p.get('protocolVersion')
                 if type(version) is not str or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', version):
                     raise Hold('PROTOCOL_VERSION_FORMAT')
