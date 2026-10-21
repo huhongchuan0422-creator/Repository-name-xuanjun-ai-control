@@ -52,3 +52,23 @@ production/cloud_connection/private_mcp.py：标准输入输出JSON-RPC，每消
 5. 新持久访问/凭据/工作区共享须按正常机制完成具体确认；不因当前root服务获准而推定新平台访问已获准。
 
 本轮只完成代码、离线验证和准确交付。不安装客户端、不创建隧道、不扩大访问、不签发业务许可。
+
+## 2026-10-22 现场续接（前节为最初交付检查点）
+
+Owner分别确认隧道、目标工作区及专用Read/Use凭据后，正常平台创建
+`xuanjun-cloud-connection-readonly`。官方0.0.16 Linux amd64 ZIP为28046718字节，
+SHA256 `d60cdba019bce451bcc3a15478cc5b9cb11270b049f5b56ea39a80b517f8b117`。
+英国新增独立服务 `xuanjun-cloud-readonly-tunnel.service`，不替换原连接执行器。
+真实doctor退出0；healthz/readyz为200；control-plane轮询成功。
+
+凭据仅Tunnels Read/Use、其他权限None，保管于英国root0600私有文件。
+永久期限选项被自动审核拒绝后未重试，采用更安全的30天期限；平台显示2026-11-20到期。
+当前没有自动轮换凭据机制，不能将这份有期限凭据称作永久接线完成。
+密钥值不得进入仓库、公开回执、命令参数、截图或日志。
+
+真实ChatGPT插件登记失败后，采用不记录参数/正文的64KiB有界方法诊断：
+initialize → notifications/initialized → initialize，第二次返回-32000。
+本增量允许重复合法initialize，不重置ready；非法协议格式仍拒绝，工具/路径/Actor/SHA门禁不变。
+新增三项回归覆盖重复握手、通知前拒绝工具以及握手后越界拒绝。
+此修复需取得新Hosted和实际发现验证，不能以健康200冒充插件可用。
+诊断配置保留原配置备份，不启用原始HTTP正文日志。
