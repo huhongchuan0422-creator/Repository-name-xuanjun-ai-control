@@ -608,3 +608,141 @@ The existing workflow (unchanged this round) runs this file on Python3.11/3.12; 
 are reported with the exact new commit in PR17. Earlier 12-case Hosted run39638090841 remains
 valid for its unchanged scope. No server/SDK/permission/B5 work, WAL deletion, DB bootstrap,
 activation transition or B7 advancement is performed by the adapter.
+
+### B6 real integration input/action decision — f0366810 continuation
+
+Task: PR17#6321856078. **DRAFT / SOURCE_AND_ROLE_DECISIONS_REQUIRED**.
+This freezes the integration route and its gaps; it is not an executable installation package.
+No new wrapper, source guard, server action, DB, permission, SDK or B7 change this round.
+The source baseline is f03668104441b250234bf7ebdea4d85065550234. Unchanged B6 Hosted
+run39640271883 (Python3.11/3.12 each22, zero skip) is reused; no repeated runtime tests.
+
+#### Same-instance input facts and provenance
+
+| Input | Frozen source / actual limit |
+|---|---|
+| Accepted CP03 | PR17#6283178324; receipt bede2ebc9f9c5458c92307c974358eb61947e7ec80a9611cc76735891ffae433; original descriptor 6d3c95521492ba90640e723081a8d0f21fa2a2bfb3c896c0708ecb86e8ef93f1; seq/epoch/generation1 PREPARED, no DB/socket then |
+| Original identity | Retained original fixed CP03 payload receipt bytes match that accepted receipt SHA: installation p2-uk-isolated-20261020; instance0891a51b-feea-520e-850a-c8fc7c840d94; ledger_uuid093955da-4b7d-5c8d-b85e-3adaa304c675; generation1, epoch1; must rebind actual current original files before any future effect |
+| Release/config/binary | Original release591855b35c820c486ae07bbb91e681b983a3a2310feaedb57ae7c87fc9b66592; binding-config f772644e9a8587cda9e0df4c1e53dc64d647195407d29c69ef52625ebb0160ad; Python9bee109da0dce17a7c9eeaca9f420cc6770a9fe143b9382d73bd22fe59b21a5f, 6809944B, /usr/bin/python3.11, actual3.11.2 via#6282808058 |
+| CP04--09 history | PR17#6284188828; original prepared/preparation-receipt.json SHA34d1530271efaabb4b65c5c44d2e76bd04258247dfc36a9a613aa829ec18dc8b; request199938d73d46f5a841cd56f5f51f814256b28bdc5c7cc88d43e3ff07226ee5b9; PREPARATION_COMMITTED, service_started=false, cp03_unchanged=true |
+| B4 inheritance | PR17#6284722235; CP10_FINITE_COMMITTED, b3_unchanged=true, service_started=false; b4_sandbox.py consumes original non-starting check and records database_opened=false; it is not an application DB source |
+| Canonical target | /var/lib/xuanjun-p2-isolated-test/b3-initialize/data/ledger.sqlite3; socket at the same root/run/ledger.sock; retain these descriptor paths and identity, do not substitute coordinator management DB or old production history |
+| Actual DB source | UNKNOWN / NOT_DELIVERED_IN_REVIEWED_INPUTS: no bound application snapshot, export receipt, file SHA/size, table manifest or same-instance source provenance in the above accepted records. Historical absence does not prove current onsite ABSENT. No server read performed here |
+| Current state | Last accepted onsite CP03/B3/B4 evidence is PREPARED/non-starting. Current onsite descriptor/DB/sidecars UNKNOWN, not a fresh QUIESCED observation. Hosted transitions and WAL fixtures are not these onsite objects |
+
+The SHA-matching retained payload supplies exact original identity fields; it does not replace a
+fresh fixed-scope read of the current descriptor, journal, DB and sidecars before a future effect.
+Do not search old production DB/history to manufacture a source for this ISOLATED_NEW instance.
+
+#### Actual reusable interfaces and non-reusable assumptions
+
+All paths below are under evidence/p2-epoch7-access-repair-20261014 at the fixed source baseline.
+
+| Interface | Concrete behavior / reuse decision |
+|---|---|
+| runtime/stage1/ledger_install_stage.py:35--77 stage_existing_registry | Requires an existing source registry, measured five-key quiescence proof, separate rollback and staging paths. Consistent backup preserves original tables, then original ExecutionLedger side tables and callback migration are applied only to the staged copy. Returns STAGED_NOT_ACTIVE, not REOPENED. This is not an initial base-schema/business-data creator |
+| runtime/stage1/ledger_backup.py:17--124 database_manifest/verify/backup/stage_restore | Original manifest covers physical SHA/size, schema, table counts/digests and pragmas. stage_restore accepts an existing verified backup containing base+side schemas; restores into a fresh target and checks logical equivalence/no sidecars. It does not bind UUID/instance itself, grant access or emit CP12 REOPENED. Need source-custody association from the retained export receipt, not SQLite filename |
+| runtime/stage1/execution_ledger.py:36--47,79--87,242--266 | Original tasks/approvals/events schema and execution_specs/worker_heartbeats foreign-key validation. Constructor validates existing base tables before side DDL; it cannot create the first three tables or be used as an initial empty DB builder. B6 observation keeps readonly validators, not constructor side effects |
+| runtime/stage1/uk_owner_callback_core.py:28--44,259--280 | Original callback schema validation plus offline owner_callback_requests/owner_callback_replays migration; never a replacement for base application tables. Check callback schema too: stage_restore.verify alone only validates base+execution side tables |
+| recovery-kit-source/helpers/epoch7_runtime_effects.py:410--462 | Only identified original effect emitting durable ledger-access.json REOPENED: ACCESS_INTENT -> guarded ownership transfer -> ACCESS_DONE -> bounded real consumer quick_check -> same inode/metadata and no-sidecar recheck -> REOPENED. CP13 then requires QUIESCED+REOPENED and check_observation. No such isolated effect producer is implemented by f036 B6 |
+| Same file:187--189,249--265,331--335; epoch7_host_factory.py:82--89 | Legacy command uses runuser/xuanjun-dispatcher and /usr/bin/python3, fixed old DB/release/transaction, old epoch7->8 context, root-owned initial DB0600 and named1003:1006 policy. Do not invoke that host driver against the new instance or patch away those guards |
+| recovery-kit-source/helpers/epoch7_runtime_acceptance.py:25--31,71--88,278--348 | Original actual-subject preactivation access worker and strictly bound observation exist. It requires real NSS/group/unit policy and pinned rendered paths; reports database_operations=0 and service_namespace_reproduced=false. It is a file/path access predicate, not an application request or proof of DB write access |
+| runtime/stage1/activation_control.py:310--338 | Existing same-epoch PREPARED->QUIESCED CAS requires identity_verified/coordinator_inactive/parent_unit_inactive/cgroups_empty/restart_inhibited. Proof must be produced by bounded actual measurements of this isolated instance; a dict of true fixture values is not onsite evidence. No ACTIVE transition in B6 |
+
+Original roles are gateway/relay1002:1002, dispatcher1003:1003, ledger1003:1006,
+callback/dashboard1004:1006, per original ROLES. These are original policy targets, not newly
+provisioned or verified identities in the container. Current isolated service_uid remains UNKNOWN.
+CP13's original access compiler also covers all six roles and protected configuration paths;
+testing only a UID1002 preparer or two roles cannot be labelled complete original CP13.
+
+Two concrete binding conflicts must be fixed by a future functional B6 adapter, not by passing true:
+1. f036 b6_persistence.py:67--84,228--232,269--272 couples root/data/run/activation and DB ownership
+   to the observing preparer UID, and derives ActivationStore.owner_uid from it. A real1003 DB owner
+   after CP12 transfer will fail this current evidence path. Keep the history reader at its own
+   proven subject; add separately measured runtime-consumer evidence with exact OS UID/GID/groups,
+   descriptor, source pins and DB inode. Neither result authorizes the other role.
+2. B3's existing private ancestors and activation custody are1002-owned preparation objects;
+   ledger_service.py:19--31 uses root-owned trusted ActivationStore plus callback/native/Owner
+   verifiers on actual startup. Chowning only a0600 DB cannot fix700 ancestor traversal or establish
+   trusted activation. Container account names, persistent-directory ownership, read access to
+   root-owned live activation/config and the eventual B7 custody handoff need an explicit policy.
+   Do not chmod/chown B3 history, treat preparer profile as runtime config, or mount ephemeral WAL.
+
+#### Selected data/WAL route and exact alternatives
+
+Preferred **conditional** route is import of a real authorized isolated application snapshot,
+with original base+side+callback schemas and source-custody evidence. No such snapshot is selected yet.
+If a base-only *existing* registry is supplied, use original stage_existing_registry on a separate
+staged copy with its real measured proof; never fabricate the base tables or add dummy tasks.
+If there is no real existing isolated data source, a first business initialization contract and its
+actual initializer/data are a new required business decision. Owner's earlier choice B established
+a new identity and reserved paths; it did not supply a business DB. No executable first-base-schema
+initializer was identified among the above original installation interfaces.
+
+WAL boundary can be reconciled without deleting source WAL **only for a fresh target**:
+retain the source DB/WAL/SHM evidence, take a consistent logical SQLite backup including committed
+WAL rows, and validate table/pragmas/schema equivalence into a separate no-sidecar staging DB.
+Publish once to the originally reserved canonical target only if it is proven absent; CP12 can
+then check a no-sidecar target while the nonempty source WAL remains preserved.
+Readonly SQLite may still create/update its SHM coordination file: list that effect explicitly,
+retain before/after evidence and choose compatible read-only source mounts. Never use immutable=1
+to pretend committed WAL rows have been included. Original DB/WAL data preservation must be measured.
+This is a proposal, not proof that such a source/target currently exists.
+
+If that canonical target already exists with WAL, preserve it and its unknown transactions.
+Do not stage over it, copy just its main file, delete/truncate/checkpoint its WAL to satisfy legacy
+CP12, or silently change the descriptor DB path/generation. Its current inode/effects must first be
+reconciled; a WAL-tolerant isolated CP12 policy would be a separate explicit compatibility decision,
+not original legacy CP12 PASS. Do not use RestoreActivator.restore: it requires current ACTIVE,
+creates a later epoch/generation and activates the result, violating this B6 scope.
+
+New functional work needed after source/policy selection: one finite B6 import/reopen/access bridge
+using the original schema/backup validators, original transition, original effect state meanings and
+existing protected receipt publication/lock mechanisms. It must produce real effects and measured
+recovery evidence; a further observer that merely returns HOLD is not the implementation.
+Original backup uses list(src.iterdump()) and replace-at-target: source size/row budget and exclusive
+target publication/recovery must be bounded before reuse under512MiB; do not assume an arbitrary DB
+fits memory or that target precheck alone protects against replacement races.
+
+#### One controlled sequence, checkpoints and acceptance (candidate only)
+
+These are internal checkpoints of B6[12,13], not additional installation batches.
+Candidate-only new output root: /var/lib/xuanjun-p2-isolated-test/b6-persistence.
+Actual final names/manifest/command SHA remain NOT_FROZEN until source and policy are supplied.
+
+| Step | Exact action / possible writes | Durable stop/recovery point | Required acceptance |
+|---|---|---|---|
+| 1 Input freeze | Same-instance historical pins plus bounded current descriptor/journal, canonical DB and its exact sidecars only; source snapshot SHA/manifest and custody. Existing B1--B5 records readonly; no host-wide census or old Writer search | Retained input fingerprints; unknown/existing conflict stops before mutations | Same instance/epoch/generation/release/config/binary; actual source semantics and current target status established |
+| 2 Isolation/quiescence | Exclusive existing install lock; measure only selected new-instance consumers, mount ownership, restart policy and process/cgroup containment; CAS PREPARED->QUIESCED only if still PREPARED and all five measurements prove it. Already QUIESCED must reconcile same head, no repeated transition | Before/after native journal/descriptor head; journal-appended/descriptor-not-published crash remains stopped for original reconciliation | No fixture proof, no ACTIVE, no old host services stopped; immutable identity unchanged |
+| 3 Data preservation/import | Source remains unchanged; create new private rollback/staging outputs and bounded manifests/logs in candidate B6 root; original restore or staged migration as selected. No business task execution | Intent before creating outputs; manifest/table counts/digests and source sidecar fingerprints. Partial target or missing response retains all bytes, classify actual effect before any continuation | Base+side+callback schemas; original task/approval/event and callback state/pragmas preserved, no unknown running/leased task adopted |
+| 4 First canonical publication | Only after proof target was reserved and absent; finite protected, non-overwriting publication with original DB path and full source/staged/current inode association. Existing implementation gap: final exclusive publication/partial recovery is not yet delivered | Publication intent, exact inode and staged content manifest. Existing or ambiguous target never auto-replaced; preserve staging and destination | Actual canonical file persists, no empty-schema substitute; source and prior receipts unchanged |
+| 5 Runtime custody/access preparation | Only the explicitly approved new-instance account/mount/ancestor and activation-custody actions; immutable history stays protected. This is a permission boundary and cannot be hidden inside a read-only command | Per-path prior/after metadata and named operation receipt; no recursive chmod/chown or rollback of previous batches | Actual subject/groups can traverse exact persistent paths; no credential/production mount; runtime role separate from preparer |
+| 6 CP12 real reopen | Under same-instance QUIESCED guard, publish ACCESS_INTENT; perform only approved exact ownership effect, record ACCESS_DONE; actual selected runtime subject opens existing DB mode=ro, quick_check and original schema validators; bind PID/UID/GID/groups, descriptor head, path/inode, schema/source hashes and bounded result; then durable REOPENED | Before transfer, after transfer/before receipt, after child/response loss, after REOPENED publication. Do not reinvoke non-retry original entry; read actual metadata/child result/receipt. Unproven result remains UNKNOWN with DB/WAL retained | Real consumer exit+strict result+same DB identity; no target sidecars on selected legacy-equivalent fresh-target route; REOPENED from this operation, not copied fixture status |
+| 7 CP13 preactivation access | Read CP12 REOPENED plus current QUIESCED and real scoped role/path evidence; run the applicable original path predicates for all required mapped consumers, no listener/model/task writes | Separate bound observations, failure/timeout logs and new-process readback; ownership mismatch does not trigger chmod automatically | Strict context+request/role/path/SHA association; actual OS consumers and expected denials; no hand-filled PASS or claim of service namespace/HTTP startup |
+| 8 Reopen verifier process | Exit finite children; new process reads the same real files/receipts and proves prior B1--B5 inputs unchanged; no service start | Final CP12/CP13 receipt+input/output manifest and per-step resume state; partial earlier checkpoints retained | Only both actual predicates pass may B6 commit. Unknown effects stop that step; no full seven-batch restart, no B7 activation |
+
+Proposed operational boundaries: reuse frozen Python3.11 container/image, host wrapper compatible
+with3.6.8, network none/read-only root/cap-drop ALL/no-new-privileges and original resource limits.
+A privileged *host* custody operation, additional role container or persistent mount is a new
+specific action to list for confirmation, not an implicit permission from this plan. Existing
+cap-drop container cannot create accounts, set arbitrary UIDs, chown root trust or stand in for
+the old root/runuser worker; no privilege escalation or runtime installation is part of this round.
+
+Centralized decisions still required, with exact dependency owner:
+- Application data owner: supply one authorized real isolated snapshot/export plus table manifest,
+  size/SHA and association to this original UUID/instance, or define a genuine first business
+  initialization contract. Transport alone supplies none of these semantics.
+- P2 integration/Owner policy: approve the explicit mapping of existing runtime roles, groups,
+  persistent paths and live activation custody. Actual NSS/image bytes are currently UNKNOWN;
+  existing preparer and permission records remain unchanged.
+- P2 compatibility policy: choose fresh-target consistent import with preserved source WAL
+  (recommended conditional route), or define an explicit isolated WAL-bearing canonical CP12
+  contract. Do not assert both no-sidecar and nonempty canonical WAL at once.
+- Functional adapter work: implement and test the identified bounded import/publication, actual
+  role reopen and effect recovery bridge after those inputs are fixed; current f036 is evidence
+  consumption only, and the original fixed legacy effect cannot simply be retargeted.
+
+No server command or approval question is issued by this document-only task. The remaining
+installation invocation count is UNKNOWN until those concrete choices/inputs are closed; one
+normal controlled command is a packaging goal, not a promised number of successful attempts.
+
