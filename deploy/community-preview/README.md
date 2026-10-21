@@ -1,6 +1,8 @@
 # Community isolated preview candidate
 
-Status: CANDIDATE_ONLY / NOT_DEPLOYED.
+Status: HISTORICAL_SYNTHETIC_CANDIDATE / NOT_FOR_FORMAL_DEPLOYMENT.
+
+Owner placement: community payment and public-benefit video run in separate containers on the existing UK host. The domestic Runner is only for existing uploads/checks. This directory's systemd/fixture server is not the formal UK backend. See docs/development/COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md for the current routing, persistent Center binding, resource evidence and pending Owner confirmation.
 
 ## Isolation
 - Proposed hostname: community-preview.wenwenwenyiyiyi.work.
@@ -33,13 +35,10 @@ Status: CANDIDATE_ONLY / NOT_DEPLOYED.
 - `prepare-mini.cjs` can create a separate connected-preview source copy with this exact baseUrl, `commerce=true`, `payments=false`; it does not upload or modify the AppID account/domain allowlist.
 - Real wx.login acceptance later requires an admitted AppSecret-backed WechatCodeClient, existing account-to-openid binding, and persistent admitted Center. None is claimed here.
 
-## Required later authorization
-1. DNS for the dedicated hostname.
-2. TLS certificate covering that hostname.
-3. Root execution on the domestic host.
-4. Create only /opt/xuanjun-community-preview/**, /etc/systemd/system/xuanjun-community-preview.service, /etc/nginx/conf.d/xuanjun-community-preview.conf, and /run/xuanjun-community-preview/preview.sock.
-5. Reload Nginx and start/stop only this preview unit.
-6. If mini access is desired, add only this hostname to the existing mini-program request-domain allowlist.
+## Current deployment boundary
 
-The deploy candidate saves old current/unit/nginx/enabled/active state before mutation. Installation, nginx validation, service start, internal HTTPS, DNS-path, and public HTTPS failures are all inside rollback coverage.
-The GitHub workflow is package-only and cannot deploy.
+The old domestic systemd deployment candidate is superseded by the UK container placement decision. Do not execute this directory's deploy.sh to install a formal customer backend. No UK container/image/volume/network/secret binding or capacity is certified by this directory.
+
+The original UK host manager must first provide timestamped capacity and B5/P2 reservation evidence, existing container/runtime identifiers and actual ingress mapping. The original Center owner must supply its actual instance/data location and approved same-process integration or migration/service-boundary plan. Then prepare an exact UK container release, limits and rollback candidate for Owner confirmation. Numeric CPU/memory/PID/disk/log limits remain HOLD until supported by evidence; no new credentials, accounts or permissions are created here.
+
+Historical rollback tests for deploy.sh remain development evidence only. They are not authority to deploy on either host. The BACKEND_NOT_READY upload gate remains mandatory.

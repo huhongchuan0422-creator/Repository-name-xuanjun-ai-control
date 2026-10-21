@@ -1,6 +1,6 @@
 # 社区预览正式后端接线与现场依赖
 
-本文件是原Issue76的源码接线与待确认候选，不证明现场已安装。现有`deploy/community-preview/server.py`使用fixture、Mock兑换和临时数据，不能作为真实客户后端发布。
+本文件是原Issue76的源码接线与待确认候选，不证明现场已安装。Owner部署归属沿原Issue76 #6162297518、#6230418580及#6313250273：社区分账与公益视频均在英国既有主机的独立容器；国内Runner只承担既有上传/检查。此前本文件的国内应用服务/systemd候选方向作废，不作为现场操作依据。现有`deploy/community-preview/server.py`使用fixture、Mock兑换和临时数据，不能作为真实客户后端发布。
 
 ## 已有正式入口与配置
 
@@ -22,18 +22,64 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 
 支付admissions是已知scene的非空子集，未选门店没有支付配置；同店多scene继续幂等。可信FINISHED查询须经过原RSA验签与原持久记录，再投影sub_mchid；受保护JSAPI/分账产品资格独立校验。状态查询当前是审核员主动wechat_query，自动轮询尚未实现。
 
+## 入口、英国容器与原Center接入
+
+| 层次 | 固定目标/已具备 | 证据缺项与边界 |
+|---|---|---|
+| 小程序入口 | https://community-preview.wenwenwenyiyiyi.work，pages/home/index?scene=shop1；payments=false | 当前仍BACKEND_NOT_READY；DNS、TLS终结点、入口反代所在主机及实际upstream映射UNKNOWN。国内Runner位置不证明入口或应用部署位置 |
+| 社区应用 | 英国既有主机iZd7oeikknn1z21sq6ji6zZ；规划项目域uk-community-payment | 容器名/不可变image digest、非root UID/GID、容器内启动入口、网络/端口/卷及当前存在状态待原始回执；不能沿用原国内systemd候选，也不能挪用P2/B5容器 |
+| 正式源码接点 | MiniApplication.from_existing_runtime → 原configure方法 → listen_proxy | 是同进程Python组合API，不是已冻结的容器启动命令。宿主bootstrap、受保护配置引用、实际健康端点路由及同版本运行回执尚缺 |
+| 原Center | 精确原Center对象、原StageRuntime与已有持久库 | 原实例实际位置/归属及8类store历史路径UNKNOWN。该API不支持把远端HTTP服务伪装为Center；若原Center不在英国同进程，须先由Owner选择经批准的迁移/服务边界方案，不跨主机挂载活动SQLite、不新建空Center或第二身份系统 |
+| 持久数据 | 每项目独立卷/数据库角色/备份；config.stores校验容器命名空间内准确路径 | 缺host→container映射、原数据来源/非空历史、schema/版本、单Writer/锁、服务UID和恢复演练证据；不得让两个应用Writer同时打开同一活动数据库 |
+| 公益视频 | 同一英国物理主机上的另一独立项目域uk-public-benefit-video | 仅记录部署资源/隔离候选；本窗口不开发视频业务、不另开Writer，不假定其容器或资源已部署 |
+| 国内Runner | 原miniprogram-ci上传及既有检查 | 不承担社区或视频应用后端；不把上传成功作为英国服务可用或客户验收证据 |
+
+## 容量证据与资源上限候选
+
+证据范围：
+- 原Issue76 #6162297518只确定英国多容器归属，明确UK_CAPACITY_AND_SECURITY_VERIFIED=NO；#6230418580再次保留英国归属，未提供可分配资源数值。
+- PR133 #6281322867的RESOURCE_LIMITS仍为UNKNOWN，要求原管理方读回CPU/memory/pids原限额；其中1002:1002是P2历史sandbox profile，不能直接给新业务复用。
+- 最近已读PR17 #6313179688的AS768MiB、CPU180s、wall240/270s等是B5单次材料取件工具的进程限额，不是英国可用容量，也不是B5服务预留。不能据此分配社区或视频资源。
+- V27 §21.1的4C16G是参考规格，不能作为当前CPU/内存余量证据。现有资料缺带时间戳的当前占用及B5保留预算，本轮不执行英国探测。
+
+因此不填写猜测的CPU/内存/PID/磁盘/日志数值，不生成可执行的无上限容器配置。以下为必须冻结的独立硬上限合同；数值缺项时两项目部署准入HOLD，不将null、0或-1写成容器限额（部分运行时可能将其解释为无限制）。
+
+| 项目 | CPU硬上限 | 内存硬上限/Swap策略 | PID硬上限 | 持久磁盘与临时空间 | 日志上限 | 本轮准入 |
+|---|---|---|---|---|---|---|
+| uk-community-payment | 待容量回执与社区负载峰值确定；独立cpu quota/period或对应控制器硬限额 | 待定；独立memory hard limit，Swap能力/策略须实证 | 待定；独立pids limit | 独立业务卷、DB/WAL、备份、上传与tmp配额分别冻结 | 单文件大小×保留数及总量均须有界 | HOLD，未设置 |
+| uk-public-benefit-video | 待视频API/worker负载与剩余预算确定；转码不得挤占社区和B5 | 待定；API/worker/队列/DB按实际组件分项，合计不超项目上限 | 待定；按实际组件合计受项目上限约束 | 原件/产物/转码tmp/队列/DB/备份独立配额与生命周期 | 每组件轮转及项目总量上限 | HOLD，未设置 |
+
+冻结方法：对CPU、内存、PID、磁盘分别取得宿主可分配总预算H、已有非本项目且不含B与R的占用/硬预留E、原管理方批准且不可削减的B5/P2预算B、系统运行与故障恢复预留R，定义可分配新增预算A=H-E-B-R。社区C与视频V必须均为有限正硬上限，且C+V≤A；不得把当前低使用率当作可侵占B5的预算。每项以业务有界负载测得的峰值与Owner批准的余量选值，不自行创造比例。若预算或硬限额不能由现有cgroup/文件系统证明可强制执行，则不启动该负载。
+
+必须由既有现场管理方一次回交的容量字段：采集时间/hostname、在线CPU与既有限额、CPU峰值/压制信息、MemTotal/MemAvailable/Swap与容器内存峰值、当前容器及B5/P2实际硬配额和Owner保留预算、pids.current/pids.max或v1对应值、目标卷可用空间/inode/现存配额机制、DB/WAL/备份与视频临时峰值、日志驱动及轮转能力、实际cgroup版本和CPU/memory/pids控制器可用性。最新占用缺失时不得宣称可承载。仅列核查合同，本轮不执行命令。
+
+## 隔离与既有凭据引用合同
+
+两项目使用独立非root运行身份、bridge网络/受限出站、卷/数据库/备份/日志/队列和已有SecretRef。项目之间及对B5/P2默认拒绝互访，不使用host network、特权容器、Docker socket或控制面数据/令牌挂载；非必要宿主路径不挂载。具体现有UID/GID、网络名/路由、存储路径、数据库角色和SecretRef均待权威配置引用，不能在本轮新增账号、密钥、角色或权限。社区微信AppSecret/商户凭据不提供给视频；视频发布/对象存储凭据不提供给社区。
+
 ## 一次性现场依赖与确认范围
 
-以下动作均未执行。Owner确认后，由原国内现场管理方/唯一发布Writer执行；源码窗口只准备候选与检查，不自行操作服务器、DNS、凭据或Actions服务器命令。
+以下动作均未执行。Owner确认后，由原英国现场管理方/唯一容器发布Writer执行；源码窗口只准备候选，不自行操作服务器、DNS、凭据或Actions服务器命令。
 
 | 目标与待核证据 | 最小动作候选 | 影响 | 回滚/停止点 | 责任方 |
 |---|---|---|---|---|
-| community-preview.wenwenwenyiyiyi.work；公开路径已有502/503观察，但根因未知 | 只读核DNS目标、TLS证书、Host到独立Nginx路由、/community/health；不改主域 | 只读网络请求 | 保存原响应与时间，不因失败重启任何服务 | 国内域名/运维管理方 |
-| 国内候选iZvt5t8tlrm8oiZ；xuanjun-community-preview.service、/etc/nginx/conf.d/xuanjun-community-preview.conf、/run/xuanjun-community-preview/preview.sock | 只读核单元/路由/socket存在与当前状态、有限脱敏错误日志，定位拒绝连接层 | 不启动/停止或重载；不读取环境变量/密钥原文 | 留原版本/状态/文件摘要；身份或路径不符停止 | 原国内现场管理方 |
-| 原Center与8个store路径、schema/版本、非空历史、备份、当前占用者 | 管理方提供准确对象创建入口、路径、服务UID/GID、锁/单Writer与备份回执，再离线核config | 不迁库、不初始化、不修改原数据 | 未找到历史或所有权不明即停止；保留原数据库 | 原客户中心/数据管理方 |
-| 原AppID、AppSecret引用、真实code2session出口与原账号openid绑定 | 只核既有secretRef与受保护读取入口可用，不展示/复制密钥；用原绑定流程验收真实身份 | 登录验收需单独确认测试账号及审计 | 失败保留未绑定/未登录；不自动绑定或放宽权限 | 小程序账号/身份管理方 |
-| 真实正式组合服务候选 | 在上述证据齐全后，准备固定SHA版本、隔离路径、原配置引用、唯一Writer与备份，再交Owner确认最小发布变更 | 仅独立预览服务；不得发布现有fixture server冒充真实后端 | 切回原已备份版本/单元/路由/状态；未知副作用先核对，不盲目重试 | 唯一发布Writer；Owner批准 |
-| request合法域名、预览访问身份、同版本真机页面与登录业务 | 管理方核现有合法域名；真机验证本人资料/门店/订单，留同版本证据 | 如需修改账号安全设置，另列精确字段交Owner确认 | 配置变更前保存原值；失败不发布客户验收码 | 小程序管理员与Owner验收方 |
-| 真实商户FINISHED/JSAPI/可选分账、资金与Finance | 单独提供渠道资格与资金验收方案；本轮不触发 | 不影响本轮源码完成 | 资格缺失保持payments=false；Finance UNCONFIRMED | 商户/财务/Owner |
+| 指定预览origin及入口→英国社区容器路由 | 先只读核DNS、TLS、Host反代与upstream，再按真实根因列最小变更 | 只读阶段不改DNS/入口；后继精确变更另确认 | 保留原记录/证书引用/路由摘要；未核入口归属即停止 | 现有域名/入口管理方与英国管理方 |
+| 英国既有主机、容器引擎、cgroup及上述容量字段 | 原管理方经既有通道一次性只读回交当前容器/配额/余量及B5预留 | 不启停、不拉镜像、不重配B5、不新建网络/卷 | 预算不明或资源不足即HOLD；不以缩减B5换空间 | 英国原现场管理方；B5负责人只提供已持有预算回执 |
+| 原Center、8类store及现有服务组合根 | 核准确实例位置/创建入口、历史、锁/单Writer、配置与备份；确认英国接入方式 | 不迁库、不初始化、不复制活动SQLite、不读密钥原文 | 历史或位置不明即停止；保留原服务/数据库 | 原客户中心/数据管理方与Owner |
+| 英国社区容器启动候选 | 证据齐全后冻结image digest、非root身份、只读代码、独立卷/网络/硬配额、配置/SecretRef与健康检查 | 只涉及社区容器，实际发布仍需Owner确认；不启动fixture server冒充正式应用 | 发布前保留原镜像/配置/卷快照及Writer状态；失败切回准确旧版本，不盲目重试或回写不明数据库 | 英国唯一发布Writer；Owner批准 |
+| 英国公益视频容器候选 | 原视频责任方据本表冻结其独立资源/网络/存储/凭据引用，不重做业务 | 不与社区并行启动未获准负载，不另开Writer | 失败只停止/恢复视频项目，不调整社区和B5 | 原公益视频责任方与英国唯一发布Writer |
+| request合法域名、真实code2session及原openid绑定 | 由既有管理员核引用与测试身份；变更精确字段另交Owner确认 | 不新建凭据或自动绑定账号 | 未核真实身份即未登录，不关闭TLS/合法域名检查 | 小程序/身份管理方 |
+| 同版本HTTPS健康、真机本人资料/门店/订单 | 后端READY且真实身份接线完成后，原上传通道出码并留真机回执 | 国内Runner只执行获准上传/检查 | 后端未READY不上传；健康不等于客户验收通过 | 原上传负责人及Owner验收方 |
+| 商户产品资格、真实资金与Finance | 独立提供资格/资金验收方案，本轮不触发 | 不影响源码交付 | 资格缺失payments=false；Finance UNCONFIRMED | 商户/财务/Owner |
 
-先完成只读定位，再按真实根因提交最小变更，不把整张表当作已经授权的现场操作。HTTPS健康READY只证明进程和数据库连通；真实微信身份、持久数据及同版本业务旅程未核验时，客户验收仍未通过。保留BACKEND_NOT_READY硬门禁，不生成不可用新码。
+这些是待确认的目标与最小动作，不是部署、DNS、凭据或账号操作许可。保留BACKEND_NOT_READY硬门禁；客户预览仍未通过，无英国服务或容器已创建/已部署的声明。
+
+## 证据引用与准确验收层次
+
+- [原英国部署决定](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/76#issuecomment-6162297518)
+- [英国归属与原Center现场依赖复核](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/76#issuecomment-6230418580)
+- [本次英国容器交接更正](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/issues/76#issuecomment-6313250273)
+- [PR133资源精确值缺项](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/133#issuecomment-6281322867)
+- [B5取件工具限额，非可分配容量](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6313179688)
+- 正式接线源码1ac19e4a564de161ad65c1db6300a9ee4bc9a536，Tree16e3646830fb05a68e7cc7112804eb0cd84216aa，[Hosted39580901541](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39580901541) SUCCESS，1090+342 Python与334+40+8+7 Node合计1821项；含非root Unix代理、真实RSA合成签名接线。不是英国容器运行或真实商户/资金验收。
+- 后续仅文档更正不改写该Run/源码包的SHA绑定，不宣称新文档Commit已有同SHA Hosted或已重包。BACKEND_NOT_READY、真实登录/客户验收未通过及Finance UNCONFIRMED继续保留。

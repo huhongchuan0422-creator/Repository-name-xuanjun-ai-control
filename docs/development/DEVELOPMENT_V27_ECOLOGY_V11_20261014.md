@@ -3210,3 +3210,13 @@ Owner真机截图显示无样式首页和SERVICE_RESULT_UNKNOWN，客户预览�
 支付admissions恢复原MiniPayments的非空已知scene子集；未选门店拒绝，未知scene/空集合拒绝，同店多scene幂等保留。新增真实RSA合成签名FINISHED查询经原transport验签、原加密记录持久化，再由正式入口配置sub_mchid的薄旅程；不使用手填FINISHED摘要代替该旅程，不进行真实微信外联或资金操作。状态查询当前为受保护审核员主动wechat_query；自动后台轮询尚未实现，原需求中的自动查询表述已更正。
 
 BACKEND_NOT_READY硬门禁和客户真机验收FAIL状态继承；无服务器、DNS、凭据或账号权限操作授权。真实宿主Center/store绑定、AppSecret引用、域名/TLS/socket/服务状态、真实登录和商户资格等现场依赖只提交候选给Owner确认，不以fixture填补。
+
+#### 英国独立容器归属更正（2026-10-21，覆盖此前国内应用候选）
+
+沿原Issue76 #6162297518、#6230418580、#6313250273：社区分账与公益视频均归英国既有主机iZd7oeikknn1z21sq6ji6zZ的独立项目容器。国内Runner仅执行原上传/检查，位置不证明后端、DNS或入口反代所在。此前COMMUNITY_FORMAL_BACKEND_HANDOFF中的国内systemd应用候选作废；旧deploy/community-preview/server.py仍为fixture/Mock/tempDB，旧deploy.sh不可作为正式英国部署依据。
+
+交接文档已列入口→英国社区应用容器→原Center的准确接线边界。from_existing_runtime仅接受同进程原Center与StageRuntime；原Center位置/8类持久库路径未核，不以远端HTTP冒充对象，不跨主机挂载活动SQLite或新建空身份库。公益视频仅列独立资源/网络/存储/既有SecretRef方案，不新增开发Writer或业务实现。
+
+CPU/内存/PID/磁盘/日志必须分别冻结有限硬上限；PR133 #6281322867仍缺精确值，B5 #6313179688的768MiB/CPU180s等仅取件工具限额，V27的4C16G仅参考，均不能当当前可分配容量。现有最新占用、B5/P2不可削减预算、系统预留及cgroup/磁盘/日志可强制机制未齐，数值保持待定、部署HOLD，不填猜测或无限制默认。两项目新增上限合计不得超过扣除现有占用、B5预留及系统恢复预留后的核准预算。完整资源表与证据缺项见COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md。
+
+正式接线1ac19e4a / Tree16e3646830fb05a68e7cc7112804eb0cd84216aa的Hosted39580901541已SUCCESS，1821项；本次仅文档更正复用源码结果，不重跑未变测试、不把该Run改绑文档Commit。无现场/服务器/云/Actions服务器命令/DNS/凭据或安全设置操作；BACKEND_NOT_READY和客户未验收状态不变。
