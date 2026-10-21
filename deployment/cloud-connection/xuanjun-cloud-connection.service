@@ -1,0 +1,30 @@
+[Unit]
+Description=Xuanjun enrolled cloud connection worker (no P2 activation)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+UMask=0077
+WorkingDirectory=/opt/xuanjun-cloud-connection/current
+ExecStart=/usr/bin/python3 -B -m production.cloud_connection.runtime --config /etc/xuanjun-cloud-executor/connection.json
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=45
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/xuanjun-cloud-connection
+ReadOnlyPaths=/etc/xuanjun-cloud-executor /etc/xuanjun-development/github-intake-token
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
