@@ -59,6 +59,7 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(prepared.returncode,0,prepared.stdout)
                 receipt=json.loads((output/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
                 self.assertEqual(receipt['baseUrl'],'https://community-preview.wenwenwenyiyiyi.work')
+                self.assertEqual(receipt['appid'],json.loads((output/'project.config.json').read_text())['appid'])
                 self.assertTrue(receipt['commerce']);self.assertFalse(receipt['payments'])
                 self.assertTrue((output/'pages/home/index.wxml').is_file())
                 isolated=subprocess.run(

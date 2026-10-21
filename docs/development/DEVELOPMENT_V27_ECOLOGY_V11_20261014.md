@@ -3190,3 +3190,9 @@ GEO阶段执行方向：先自用验证，再客户试点和SaaS选配；总体�
 - 上传源码必须先由 `deploy/community-preview/prepare-mini.cjs` 生成 connected-preview 副本；`baseUrl=https://community-preview.wenwenwenyiyiyi.work`、`commerce=true`、支付未获真实资格时 `payments=false`。
 - 官方预览固定入口 `pages/home/index`，查询参数 `scene=shop1`。不得把空 baseUrl、旧默认页、仅 SDK 成功或仅上传成功当客户验收。
 - 客户可验收至少还要证明：二维码绑定准确源码SHA、真机能打开实际业务页面、预览域名HTTPS/request-domain有效、后端连通、对应业务路径可操作。缺任一项标 UNKNOWN/NOT_VERIFIED，不得称完整验收。
+
+#### 源包与正式组合验收补充（2026-10-21）
+
+- `community_stage_package.py` 必须显式纳入并要求 `deploy/community-preview/prepare-mini.cjs`；不得只在完整checkout验证。回归测试将实际生成的ZIP解至空目录，以工作流相同cwd运行准备脚本，核AppID、固定后端、主页文件及commerce=true/payments=false，逐文件manifest校验继续保留。
+- 正式组合测试复用原Center、mini token/scene、已审核商家及原订单SQLite，调用实际 `MiniApplication.configure_payments_from_applyments`，核原支付对象/身份/商户号接线、listen后禁止再次配置、撤权后prepare拒绝且provider零调用。这些均为合成环境测试，不等于生产准入或真实支付。
+- 客户现场验收仍需集中核DNS/TLS、request合法域名、官方真机扫码、真实code2session、商户进件确认/签约及JSAPI资格；真实支付、退款、分账与Finance核销分别留证，未取得证据一律UNKNOWN/UNCONFIRMED。

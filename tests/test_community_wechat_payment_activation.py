@@ -1,5 +1,6 @@
 """Verified applyment -> existing MiniPayments startup projection; synthetic only."""
-import json,unittest
+import json,unittest,tempfile,sqlite3
+from pathlib import Path
 from unittest.mock import Mock
 import test_community_merchant_opening as opening_fixture
 import test_community_wechat_sp_readonly as key_fixture
@@ -109,6 +110,37 @@ class WechatPaymentActivation(unittest.TestCase):
  def test_cross_store_scope_change_rejects_current_projection(self):
   self.identity.runtime.bindings[self.identity.scenes[self.scene]['principal']]['store_id']='other_store'
   with self.assertRaises(PermissionError):self.project()
+ def test_formal_application_startup_reuses_original_identity_orders_and_runtime_guard(self):
+  from scripts.community_mini_application import MiniApplication
+  token=self.fx.fx.fx.token('composed_code')
+  self.fx.fx.fx.checkout(token,'composed_order')
+  runtime=self.identity.runtime
+  scope=runtime.bindings[self.identity.scenes[self.scene]['principal']]
+  with tempfile.TemporaryDirectory() as root:
+   # Preserve the original fixture stores, including the admitted merchant and order.
+   for name,source in [('orders',runtime.demo.db),('merchants',self.fx.db)]:
+    with sqlite3.connect(str(Path(root)/(name+'.sqlite'))) as destination:
+     source.backup(destination)
+   with MiniApplication(self.center,root,runtime.bindings,scope,self.identity.scenes,
+                        self.identity.appid,'a'*32) as app:
+    app.configure_onboarding({self.fx.fx.fx.uid2:'project1'})
+    app.configure_operations(self.fx.grants)
+    app.configure_wechat_applyment(self.reader)
+    client=app.configure_payments_from_applyments(self.reader,self.admissions)
+    self.assertIs(client,app.gateway.payments)
+    self.assertIs(client.identity,app.identity)
+    self.assertIs(client.prepay.center,self.center)
+    binding=client._authorize(token,self.scene,'composed_order')
+    self.assertEqual(binding['sub_mchid'],'1234567891')
+    self.assertEqual(binding['user_id'],self.fx.fx.fx.uid1)
+    app.listen()
+    with self.assertRaisesRegex(ValueError,'PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING'):
+     app.configure_payments_from_applyments(self.reader,self.admissions)
+    self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
+    self.reader._fetch=Mock()
+    with self.assertRaises(PermissionError):
+     client.dispatch(token,{'scene':self.scene,'operation':'prepare','reference':'composed_order'})
+    self.reader._fetch.assert_not_called()
  def test_reopen_is_idempotent_and_client_never_supplies_submerchant(self):
   first=self.project()
   self.fx.fx.fx.reopen()
