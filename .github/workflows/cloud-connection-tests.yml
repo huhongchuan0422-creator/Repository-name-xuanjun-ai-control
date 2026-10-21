@@ -21,10 +21,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
       - name: Exact source and runtime
         run: |
-          git log -1 --format='%H %T %P'
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git -c safe.directory="$GITHUB_WORKSPACE" log -1 --format='%H %T %P'
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
           python -c 'import sys,sqlite3; print(sys.version); print(sqlite3.sqlite_version)'
       - name: Offline queue, transport and custody regression
         run: python -m unittest discover -s tests -p 'test_cloud_connection*.py' -v
