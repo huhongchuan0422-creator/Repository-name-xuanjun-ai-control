@@ -70,5 +70,5 @@ export async function withPublicWsContract({acquire,registryApi,attach,params,ex
   if(errors.length){const e=new Error('HOLD_WS_WORK_OR_RESPONSE');e.cause=errors[0];throw e;}
   if(!publications.size||[...publications.values()].some(x=>x.count!==1||!x.ok))hold('HOLD_WS_NO_CORRELATED_RESPONSE');
  }});
- return {...result,scope:'CONTRACT_ONLY',publicEntry:'attachGatewayWsMessageHandler',compiledEntry:'STATIC_BYTES_BOUND_ONLY',nativeWorkDrain:'UNBOUND_OWNER_CONTRACT',realLoader:'NOT_EXECUTED',authenticatedDispatch:'NOT_EXECUTED',dependencyClosure:'UNKNOWN',cp11:'NOT_EXECUTED'};
+ return {...result,scope:'CONTRACT_ONLY',executionReadiness:'HOLD_REAL_OWNER_UNBOUND',publicEntry:'attachGatewayWsMessageHandler',compiledEntry:'STATIC_BYTES_BOUND_ONLY',nativeWorkDrain:'UNBOUND_OWNER_CONTRACT',realLoader:'NOT_EXECUTED',authenticatedDispatch:'NOT_EXECUTED',dependencyClosure:'UNKNOWN',cp11:'NOT_EXECUTED'};
 }

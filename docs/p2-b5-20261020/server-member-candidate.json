@@ -1,0 +1,11 @@
+{
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "bootstrap_bytes": 44113,
+  "bootstrap_sha256": "8af5bf3c7891b3e7896049d2771dd69de3ffaa920791016e679e9e96b526ea3c",
+  "bootstrap_git_blob": "1ff621105e7445f75075f1de9effe0bef131375a",
+  "command_sha256": "dd89540d9300c6db03eed85dc9383b54ce5a7eca460a99bab7dff81589b66e51",
+  "selected_member": "dist/server-ChnNHwLm.mjs",
+  "selected_bytes": 4051,
+  "selected_sha256": "26067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56",
+  "owner_binding": "UNBOUND"
+}

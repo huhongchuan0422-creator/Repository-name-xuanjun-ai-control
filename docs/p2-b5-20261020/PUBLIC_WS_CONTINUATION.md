@@ -26,7 +26,7 @@ IMPORTANT: this delivery does not supply or authenticate the actual native owner
 
 [evidence/p2-b5-ws-20261021/static-edges.json](../../evidence/p2-b5-ws-20261021/static-edges.json) records bounded lexical literal candidates against existing1718+3 files (not all AST edges): message-handler-DKklmnFX.mjs: 30 unavailable / 113 relative candidates, run-BNH_gC9b.mjs: 36 unavailable / 94 relative candidates, ws-connection-CsJ9cE0L.mjs: 22 unavailable / 45 relative candidates. Static from/side-effect imports, dynamic imports and require are searched separately with matching quote delimiters, avoiding cross-quote consumption. These overlap and are not a minimal executable closure or authority to fetch them all. No archived AST parser was run.
 
-Actual run-BNH L2362 imports ./server-ChnNHwLm.mjs; L2376 takes startGatewayServer from that module. This exact server composition source is absent from current1718+3 bytes. It is the focused next composition-owner source dependency, with SHA UNKNOWN until original manifest is read. Do not guess a replacement server or claim owner/drain source is available.
+Actual run-BNH L2362 imports ./server-ChnNHwLm.mjs; L2376 takes startGatewayServer from that module. This exact server composition source is absent from current1718+3 bytes. It is the focused next composition-owner source dependency, with manifest-bound4051 bytes/SHA25626067e9a59a2addaeb05f39945dee9a42dc7ae9d22f6de530fc6f1d5ce25ae56 (file bytes not yet received). Do not guess a replacement server or claim owner/drain source is available.
 
 | Remaining item | Current evidence / exact limit |
 |---|---|
@@ -36,3 +36,10 @@ Actual run-BNH L2362 imports ./server-ChnNHwLm.mjs; L2376 takes startGatewayServ
 | Real transport/authentication acceptance | Needs genuine isolated socket/handshake owner, original profile/device/current-authority chain, no-model metadata positive+refusal, tracked cleanup/disconnect and release/restart evidence. All NOT_EXECUTED. |
 
 B5 installation time cannot be promised before exact closure/native-owner/runtime candidate is frozen and separately confirmed. This source increment removes the wrong private-export seam but is not an executable UK installation operation. No new onsite command or permission request hidden here; B1–B4 stay inherited.
+
+
+## Next independent increment after a01251a6
+
+20 local/Hosted-targeted contract cases now include5 anomalous drain return values(false,true,null,object,zero): no original release/RELEASED/OBSERVED. Undefined is only the internal callback contract, not native proof. Delayed handshake/request plus cleanup which schedules further cleanup must all settle before release. Captured old ingress callback throws during drain and after release, with no new tracked work. Successful synthetic contract output now explicitly includes executionReadiness HOLD_REAL_OWNER_UNBOUND. No compiled/native drain implementation has been invented.
+
+The fixed4051-byte server member is absent from both locally verified material sets; exact-name attachment search also has no file-byte result. Its manifest pin is known, not UNKNOWN. A one-member retained archive candidate is documented in SERVER_MEMBER_CANDIDATE.md; only separate onsite confirmation may permit it. No80-file/560-file request is made.
