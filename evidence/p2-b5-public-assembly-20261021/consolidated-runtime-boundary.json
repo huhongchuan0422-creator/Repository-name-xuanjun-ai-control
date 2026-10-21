@@ -1,0 +1,440 @@
+{
+  "scope": "CONSOLIDATED_PROFILE_DEPENDENCY_BOUNDARY_NOT_COMPLETE_CLOSURE",
+  "route_frozen": "Separate real inspection lease -> release -> dedicated original public Gateway -> await original startupSettled -> original authenticated GatewayClient describe -> client stop -> original server.close/drain. No private owner injection.",
+  "profile_status": "DESIGN_ROUTE_FIXED_EXECUTABLE_PROFILE_DRAFT",
+  "runtime_roots": [
+    "dist/loader-runtime-load-DpgEqnzx.mjs",
+    "dist/server-ChnNHwLm.mjs",
+    "dist/client-B4O1WKhF.mjs"
+  ],
+  "chosen_dynamic_analysis_roots": [
+    "dist/server-start-Bz-KV48j.mjs",
+    "dist/server-startup-config-Hx2M1x7s.mjs",
+    "dist/server-startup-plugins-Cajv-q3y.mjs",
+    "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+    "dist/server-startup-config-helpers-U6xkM_57.mjs",
+    "dist/server-startup-early-BLUjqlAE.mjs",
+    "dist/server-startup-post-attach-CsYAFanV.mjs"
+  ],
+  "direct_dynamic_witnesses": {
+    "dist/server-start-Bz-KV48j.mjs": [
+      "dist/server-ChnNHwLm.mjs",
+      13
+    ],
+    "dist/server-startup-config-Hx2M1x7s.mjs": [
+      "dist/server-start-Bz-KV48j.mjs",
+      5201
+    ],
+    "dist/server-startup-plugins-Cajv-q3y.mjs": [
+      "dist/server-start-Bz-KV48j.mjs",
+      5202
+    ],
+    "dist/server-plugin-bootstrap-BF-wNIVo.mjs": [
+      "dist/server-startup-plugins-Cajv-q3y.mjs",
+      182
+    ],
+    "dist/server-startup-config-helpers-U6xkM_57.mjs": [
+      "dist/server-start-Bz-KV48j.mjs",
+      5254
+    ],
+    "dist/server-startup-early-BLUjqlAE.mjs": [
+      "dist/server-start-Bz-KV48j.mjs",
+      5481
+    ],
+    "dist/server-startup-post-attach-CsYAFanV.mjs": [
+      "dist/server-start-Bz-KV48j.mjs",
+      8571
+    ]
+  },
+  "enumeration": "Recomputed from selected roots and exactly witnessed native startup bodies; not default384/389 selection; stdlib static line scan, no archived SDK/parser execution.",
+  "counts": {
+    "available_reachable": 788,
+    "known_missing": 360,
+    "unknown_missing": 12,
+    "known_missing_bytes": 3750367,
+    "missing_total": 372,
+    "bare_specifiers": 33,
+    "unclassified_dynamic_call_sites": 194,
+    "unsupported_static_declarations": 0
+  },
+  "bare_specifiers": [
+    {
+      "specifier": "@openclaw/fs-safe/advanced",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 3,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/atomic",
+      "parent": "dist/io.factory-PvUbTCjh.mjs",
+      "line": 60,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/copy",
+      "parent": "dist/sqlite-wal-BgkaymT5.mjs",
+      "line": 18,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/durability",
+      "parent": "dist/crypto-digest-y6oZN-_F.mjs",
+      "line": 3,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/errors",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 4,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/file-lock",
+      "parent": "dist/file-lock-manager-D-LVVqdD.mjs",
+      "line": 1,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/json",
+      "parent": "dist/json-files-Br8qKrAz.mjs",
+      "line": 2,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/output",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 5,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/path",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 7,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/root",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 6,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/secret",
+      "parent": "dist/github-tool-identity-Ch5hxQmB.mjs",
+      "line": 31,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/secure-file",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 8,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/temp",
+      "parent": "dist/install-source-utils-CbOTn25m.mjs",
+      "line": 15,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/fs-safe/walk",
+      "parent": "dist/fs-safe-CHQXnCPk.mjs",
+      "line": 9,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/proxyline",
+      "parent": "dist/env-Dg3QhGtH.mjs",
+      "line": 6,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "@openclaw/proxyline/dispatcher-brand",
+      "parent": "dist/undici-global-dispatcher-DuFEBy_H.mjs",
+      "line": 4,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "acorn",
+      "parent": "dist/plugin-generation-artifact-CWV3FtVc.mjs",
+      "line": 27,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "chalk",
+      "parent": "dist/subsystem-BdcD5rKP.mjs",
+      "line": 14,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "commander",
+      "parent": "dist/setup-contract-B8gsukg0.mjs",
+      "line": 3,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "dotenv",
+      "parent": "dist/dotenv-global-CP3dmTvh.mjs",
+      "line": 9,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "execa",
+      "parent": "dist/exec-spawn-8ljdD_1X.mjs",
+      "line": 18,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "import-meta-resolve",
+      "parent": "dist/plugin-setup-module-D0o6Vfcg.mjs",
+      "line": 39,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "json5",
+      "parent": "dist/io.read-helpers-CZUctY0z.mjs",
+      "line": 21,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "p-limit",
+      "parent": "dist/user-profiles-D31WR8kz.mjs",
+      "line": 24,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "semver",
+      "parent": "dist/openclaw-state-db-existing-schema-DXYsEyhD.mjs",
+      "line": 37,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "tslog",
+      "parent": "dist/logger-Cn5hoa7J.mjs",
+      "line": 21,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox",
+      "parent": "dist/error-codes-DI20vDEB.mjs",
+      "line": 4,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox/compile",
+      "parent": "dist/protocol-validator-C_V-gGjM.mjs",
+      "line": 2,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox/format",
+      "parent": "dist/schema-validator-CbLrj3Mc.mjs",
+      "line": 11,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox/guard",
+      "parent": "dist/json-schema-Cjtt-qSo.mjs",
+      "line": 2,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox/schema",
+      "parent": "dist/schema-validator-CbLrj3Mc.mjs",
+      "line": 10,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "typebox/value",
+      "parent": "dist/src-D2gvuSyP.mjs",
+      "line": 31,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    },
+    {
+      "specifier": "yaml",
+      "parent": "dist/github-tool-identity-Ch5hxQmB.mjs",
+      "line": 30,
+      "status": "PACKAGE_EXPORT_NATIVE_RESOURCE_RESOLUTION_UNKNOWN"
+    }
+  ],
+  "unsupported_static_declarations": [],
+  "node": {
+    "bytes": 126595440,
+    "elf": {
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "needed": [
+        "libdl.so.2",
+        "libstdc++.so.6",
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libpthread.so.0",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ]
+    },
+    "interpreter_record": null,
+    "path": "/home/xuanjun_dev/.openclaw/tools/node-v24.21.0/bin/node",
+    "resolution": "UNKNOWN_NO_LOADER_SEARCH_OR_IMAGE_PROOF",
+    "retained_library_candidates": {
+      "ld-linux-x86-64.so.2": [],
+      "libc.so.6": [],
+      "libdl.so.2": [],
+      "libgcc_s.so.1": [],
+      "libm.so.6": [],
+      "libpthread.so.0": [],
+      "libstdc++.so.6": []
+    },
+    "sha256": "7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c",
+    "state": "RETAINED_BYTES_BOUND_NOT_EXECUTED"
+  },
+  "image": {
+    "inherited_evidence": "Python3.11.2 UID/GID1002:1002 only",
+    "known_python_image_id": "sha256:5341f193a5741b64f2acc63a99dc95910289fcc39ff17dacff373a50e233724d",
+    "node_compatibility": "UNKNOWN",
+    "required": [
+      "compatible Node execution proof",
+      "UID1002 read-only mount map",
+      "ELF interpreter/shared-library resolution"
+    ],
+    "source_receipt": "PR17#6281525690"
+  },
+  "limits": {
+    "selected_members": 2000,
+    "selected_bytes": 16777216,
+    "single_source_bytes": 2097152,
+    "tar_bytes": 18874368,
+    "report_bytes": 2097152,
+    "node_bytes_transfer": "126595440 exceeds selected16MiB; separate already-present runtime binding or explicitly authorized different plan required; not hidden limit increase"
+  },
+  "three_member_candidate": "PAUSED_NOT_EXECUTED_IN_THIS_WINDOW; intermediate analysis only, superseded for field execution by this consolidation request",
+  "extraction_selected_members": [],
+  "sdk": "NOT_EXECUTED",
+  "authentication": "NOT_EXECUTED",
+  "installation": "NOT_EXECUTED",
+  "completeness": "Cannot assert one extraction closes unseen recursive/dynamic/package/resource/native edges. No command emitted until this entire plan has all required bindings and fits original limits.",
+  "prior_join_not_requested_again": [
+    {
+      "member": "dist/agent-list-D2qmTsmo.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/board-website-CZkEDDYp.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/chat-attachment-policy-CKvVmzxz.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/control-ui-link-base-BwOaYXQb.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/device-bootstrap-BoRuM4yL.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/device-pairing-approval-BPjLEL_O.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/device-pairing-node-state-Dp9rpQyr.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/exec-approvals-BjkcJgMD.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/exec-approvals-migration-gate-Buu906aC.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/exec-approvals-sqlite-mBooZADp.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/github-public-api-CRZ_6Nw_.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/health-refresh-admission-ClB0VSQb.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/local-id-BQi-8keq.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/local-user-ingress-ZOgaKhJA.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/node-computer-use-descriptor-D_tS4bop.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/node-connect-reconcile-ByWz7dAc.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/node-pairing-surface-C1xjno3P.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/node-registry-C36_nNE7.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/node-runtime-state-Dv88ufqC.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/placement-session-tool-operations-C7ZLn2--.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/request-diagnostics-DBxjZYOJ.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/serialized-json-NESMkLos.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/voicewake-CMZgpbfZ.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/voicewake-routing-BHi37OC3.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/websocket-keepalive-DYmRD_O3.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/worker-protocol-primitives-vA8IesMt.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/worker-skill-workshop-Cj5K2lzY.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/worker-transcript-budget-D99fl0AU.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    },
+    {
+      "member": "dist/ws-BdD3UP1C.mjs",
+      "reason": "NOT_REACHED_BY_FROZEN_ROOTS_NOT_SELECTED"
+    }
+  ],
+  "known_necessary_missing_members_file": "consolidated-known-missing.json",
+  "known_necessary_missing_members_sha256": "75cf380489e454d73fdf90b29a2f28e123d449fcab8e5a75f3e1f72faf5c4e2d",
+  "unknown_missing_members_file": "consolidated-unknown-missing.json",
+  "unknown_missing_members_sha256": "08f4224745191619e02eadad2072771ba6958e5ea5147d6ce6aa31a40195c38f",
+  "available_reachable_members_file": "consolidated-available.json",
+  "available_reachable_members_sha256": "f44e52d790471b9a0b6767fe45d6e2b382b813368d7b0ff1ccdc4fa89314b441",
+  "unclassified_dynamic_call_sites_file": "consolidated-dynamic-sites.json"
+}
