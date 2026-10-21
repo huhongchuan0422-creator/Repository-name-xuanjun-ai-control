@@ -219,10 +219,16 @@ def execute_ready(queue, cloud, request_id, now):
     request = queue.begin_dispatch(request_id, now)
     try:
         # The database dispatch intent commits BEFORE this network side effect.
-        v = cloud.call(request['target'], 'RunCommand', {
+        if request['operation'] == 'project_fixed_action':
+            if queue.project_actions is None:
+                raise Hold('PROJECT_ACTION_NOT_ENROLLED')
+            command = queue.project_actions.command(request)
+        else:
+            command = {
             'CommandContent': fixed_command(request), 'Type': 'RunShellScript',
             'WorkingUser': 'admin', 'WorkingDir': '/home/admin', 'Timeout': 30,
-            'Name': 'xuanjun-enrolled-readonly-task'})
+            'Name': 'xuanjun-enrolled-readonly-task'}
+        v = cloud.call(request['target'], 'RunCommand', command)
         queue.record_invoke(request_id, v['InvokeId'])
     except BaseException:
         queue.unknown(request_id)
@@ -240,7 +246,12 @@ def query_existing(queue, cloud, request_id, file_sink):
         queue.unknown(request_id)
         raise Hold('NO_INVOKE_UNKNOWN_NO_DISPATCH')
     response = cloud.call(request['target'], 'DescribeInvocationResult', {'InvokeId': status['invoke_id']})
-    receipt, data = validate_result(request, status['invoke_id'], response)
+    if request['operation'] == 'project_fixed_action':
+        if queue.project_actions is None:
+            raise Hold('PROJECT_ACTION_NOT_ENROLLED')
+        receipt, data = queue.project_actions.result(request, status['invoke_id'], response)
+    else:
+        receipt, data = validate_result(request, status['invoke_id'], response)
     if receipt is not None:
         if data is not None:
             # Private authenticated transfer adapter is REQUIRED; never fall

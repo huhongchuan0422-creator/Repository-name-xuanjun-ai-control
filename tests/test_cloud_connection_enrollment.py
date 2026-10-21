@@ -16,7 +16,7 @@ spec.loader.exec_module(enroll)
 def frozen_source(path):
     # enroll.py deliberately installs its original frozen source_commit.
     # New candidate code must not rewrite that old manifest or installer.
-    if path in ('production/cloud_connection/worker.py','production/cloud_connection/runtime.py'):
+    if path in ('production/cloud_connection/queue.py','production/cloud_connection/worker.py','production/cloud_connection/runtime.py'):
         return ROOT/'tests/fixtures/cloud_connection_enrollment'/Path(path).name
     return ROOT/path
 

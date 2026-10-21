@@ -193,10 +193,34 @@ class Loop:
 
 def code_pin(directory):
     records = []
-    for name in ('queue.py', 'worker.py', 'runtime.py', 'private_transfer.py', 'credential_lifecycle.py'):
+    for name in ('queue.py', 'worker.py', 'runtime.py', 'private_transfer.py', 'credential_lifecycle.py', 'fixed_actions.py', 'pr122_baseline_collector.py'):
         raw = (Path(directory) / name).read_bytes()
         records.append([name, hashlib.sha256(raw).hexdigest()])
     return hashlib.sha256(canonical(records).encode()).hexdigest()
+
+
+def optional_hooks(config, source_directory):
+    """Only root host config selects candidates; no request can enable them."""
+    expiry, actions = None, None
+    for key, filename in (('expiry_watch', 'tunnel-expiry.json'),
+                          ('website_baseline', 'website-baseline-binding.json')):
+        if key not in config:
+            continue
+        entry = config[key]
+        if (type(entry) is not dict or set(entry) != {'metadata_ref', 'metadata_sha256'}
+                or entry['metadata_ref'] != '/etc/xuanjun-cloud-executor/' + filename):
+            raise Hold('OPTIONAL_HOST_CONFIG_SCOPE')
+        raw = protected_read(entry['metadata_ref'], 16384)
+        if (type(entry['metadata_sha256']) is not str or
+                hashlib.sha256(raw).hexdigest() != entry['metadata_sha256']):
+            raise Hold('OPTIONAL_HOST_CONFIG_SHA')
+        if key == 'expiry_watch':
+            expiry = (raw, entry['metadata_sha256'])
+        else:
+            from .fixed_actions import WebsiteBaselinePolicy
+            source = (Path(source_directory) / 'pr122_baseline_collector.py').read_bytes()
+            actions = WebsiteBaselinePolicy(source, raw, entry['metadata_sha256'])
+    return expiry, actions
 
 
 def main():
@@ -210,7 +234,8 @@ def main():
         raise Hold('ENROLLED_ROOT_SERVICE_ONLY')
     fields = {'executor_sha256', 'allowed_actor_ids', 'github_token_ref', 'github_token_owner',
               'credentials_ref', 'state_root', 'poll_seconds'}
-    if set(config) != fields or code_pin(Path(__file__).parent) != config['executor_sha256']:
+    if (not fields <= set(config) or set(config) - fields - {'expiry_watch', 'website_baseline'}
+            or code_pin(Path(__file__).parent) != config['executor_sha256']):
         raise Hold('HOST_CONFIG_OR_CODE_PIN')
     if (config['allowed_actor_ids'] != [332398908] or config['github_token_owner'] != 1003
             or config['github_token_ref'] != '/etc/xuanjun-development/github-intake-token'
@@ -218,6 +243,7 @@ def main():
             or config['state_root'] != '/var/lib/xuanjun-cloud-connection'
             or type(config['poll_seconds']) is not int or not 15 <= config['poll_seconds'] <= 300):
         raise Hold('HOST_ENROLLMENT_SCOPE')
+    expiry_watch, project_actions = optional_hooks(config, Path(__file__).parent)
     root = config['state_root']
     store = PrivateStore(root + '/private-results')
     lockfd = os.open(root + '/worker.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -225,10 +251,10 @@ def main():
     if not stat.S_ISREG(ls.st_mode) or ls.st_uid != 0 or ls.st_nlink != 1 or stat.S_IMODE(ls.st_mode) != 0o600:
         raise Hold('LOCK_METADATA')
     fcntl.flock(lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    q = Queue(root + '/queue.sqlite', config['executor_sha256'], config['allowed_actor_ids'])
+    q = Queue(root + '/queue.sqlite', config['executor_sha256'], config['allowed_actor_ids'], project_actions=project_actions)
     network = Network()
     loop = Loop(q, Github(config['github_token_ref'], network, config['github_token_owner']),
-                Cloud(config['credentials_ref'], network), store)
+                Cloud(config['credentials_ref'], network), store, expiry_watch=expiry_watch)
     # Interrupted POST is uncertain; never replay it after restart.
     q.db.execute("UPDATE connection_outbox SET state='UNKNOWN' WHERE state='POSTING'")
     stopping = []
