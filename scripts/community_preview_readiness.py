@@ -1,8 +1,9 @@
-"""Read-only fixed-origin health gate before credentialed preview upload.
+"""Read-only allowlisted-target health gate before credentialed preview upload.
 
 This proves connectivity only, not real login, merchant admission or acceptance.
 """
-import json
+import json, os, time
+from pathlib import Path
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 ORIGIN='https://community-preview.wenwenwenyiyiyi.work'
@@ -11,14 +12,31 @@ URL=ORIGIN+'/community/health'
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):return None
 
-def check(open_url=None):
+def target_for(profile):
+    expected = {
+        'legacy': 'https://community-preview.wenwenwenyiyiyi.work',
+        'uk-path-candidate': 'https://uk.wenwenwenyiyiyi.work/community-preview',
+    }
+    profiles = json.loads((Path(__file__).resolve().parents[1] /
+                          'deploy/community-preview/endpoint-profiles.json').read_text())
+    if type(profile) is not str or profile not in expected or profiles != expected:
+        raise ValueError('EXACT_PREVIEW_PROFILE_REQUIRED')
+    base = profiles[profile]
+    origin = 'https://' + base.split('/')[2]
+    return dict(profile=profile, baseUrl=base, origin=origin,
+                health_url=base+'/community/health')
+
+def check(open_url=None, profile=None):
     opener=open_url or build_opener(NoRedirect()).open
     report=dict(origin=ORIGIN,status='BACKEND_NOT_READY',login_verified=False,
                 customer_acceptance=False,payment_enabled=False)
     try:
-        with opener(Request(URL,headers={'Accept':'application/json'}),timeout=10) as response:
+        target=target_for(profile if profile is not None else os.environ.get('COMMUNITY_PREVIEW_PROFILE','legacy'))
+        report.update(target,source_sha=os.environ.get('GITHUB_SHA'),observed_at=int(time.time()))
+        url=target['health_url']
+        with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
             report['http_status']=response.status
-            if response.status!=200 or response.geturl()!=URL:return report
+            if response.status!=200 or response.geturl()!=url:return report
             if response.headers.get_content_type()!='application/json':return report
             raw=response.read(4097)
             if len(raw)>4096:return report

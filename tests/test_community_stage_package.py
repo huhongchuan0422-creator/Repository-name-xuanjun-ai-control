@@ -38,6 +38,8 @@ class SourcePackage(unittest.TestCase):
             required_pages=(
                 'clients/community-mini/app.wxss',
                 'deploy/community-preview/prepare-mini.cjs',
+                'deploy/community-preview/endpoint.cjs',
+                'deploy/community-preview/endpoint-profiles.json',
                 'clients/community-mini/pages/home/index.js',
                 'clients/community-mini/pages/home/index.json',
                 'clients/community-mini/pages/home/index.wxml',

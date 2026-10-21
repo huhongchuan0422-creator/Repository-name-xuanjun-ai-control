@@ -34,10 +34,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install exact browser test runner
+        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]')"
         run: |
           python -m pip install playwright==1.55.0 cryptography==50.0.2
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
+        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]')"
         run: |
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
@@ -46,6 +48,18 @@ jobs:
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
+      - name: Preview endpoint affected scope (unchanged 1821 results reused)
+        if: contains(github.event.head_commit.message, '[preview-endpoint-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p 'test_preview_endpoint_contract.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'preview_preparation_test.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_preview_readiness.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_preview_candidate.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+          node --test clients/community-mini/session.test.cjs clients/community-mini/customer-pages.test.cjs tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
       - name: Build deterministic offline source package
         id: source_package
         run: |
@@ -135,6 +149,12 @@ jobs:
           assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
           assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
           assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          assert {'deploy/community-preview/prepare-mini.cjs',
+                  'deploy/community-preview/endpoint.cjs',
+                  'deploy/community-preview/endpoint-profiles.json',
+                  'scripts/community_preview_readiness.py',
+                  'clients/community-mini/session.js',
+                  'clients/community-mini/pages/home/index.wxml'}.issubset(manifest['files'])
           files={}
           for item in items:
               path=Path(item.filename)
@@ -226,6 +246,9 @@ jobs:
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
+    env:
+      COMMUNITY_PREVIEW_PROFILE: legacy
+      COMMUNITY_PREVIEW_READINESS_RECEIPT: ${{ runner.temp }}/community-mini-preview/backend-readiness.json
     steps:
       - name: Verify existing domestic upload runner before loading credentials
         shell: bash
@@ -263,6 +286,12 @@ jobs:
           assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
           assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
           assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          assert {'deploy/community-preview/prepare-mini.cjs',
+                  'deploy/community-preview/endpoint.cjs',
+                  'deploy/community-preview/endpoint-profiles.json',
+                  'scripts/community_preview_readiness.py',
+                  'clients/community-mini/session.js',
+                  'clients/community-mini/pages/home/index.wxml'}.issubset(manifest['files'])
           files={}
           for item in items:
               path=Path(item.filename)

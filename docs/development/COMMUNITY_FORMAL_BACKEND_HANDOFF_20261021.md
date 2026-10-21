@@ -113,3 +113,20 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 依据V27 §8.2.6及原客户开发预览门禁，仅修改 connected 副本准备，不切换现场域名、登录或数据。prepare-mini.cjs 在复制前校验原AppID、项目类型、源码基线、首页和全部已声明页面的JS/JSON/WXML及全树软链；失败不发布输出。副本在同父目录临时准备完成后重命名发布，现有输出及悬空软链拒绝；源目录不写入。此脚本只用于原单Writer构建，不是并发发布锁或现场安装器。
 
 tests/preview_preparation_test.py 从实际生成的 community-stage-source.zip 验证逐文件manifest摘要，解到空目录，以workflow相同源码根cwd执行prepare。覆盖成功非空首页、坏基线、缺首页、错AppID、源码软链、输出悬空软链，未触发上传/微信API/真实身份写入。专用Hosted仅验此6项，未变1821项复用。默认域名仍是历史固定目标；既有uk域名及子路径候选未在现场启用，本次不宣称域名/后端/真实登录/二维码验收通过。
+
+
+## 既有英国域名子路径离线接线（2026-10-21）
+
+需求依据：V27 §8.2.6、原支付需求“业务终端与页面”1—3、原域名规划 §1—2允许复用已有域名下的路径；Owner要求先完成不依赖云连接的工作。对应缺口是客户端原先拒绝任何HTTPS子路径，而prepare、health和上传脚本分别硬编码旧域名，不能安全选择既有英国入口。
+
+现在共用 deploy/community-preview/endpoint-profiles.json：legacy保持历史默认地址；uk-path-candidate固定为 https://uk.wenwenwenyiyiyi.work/community-preview。仅受保护构建环境的 COMMUNITY_PREVIEW_PROFILE 选择准确名称，拒绝未知配置，不能从客户端请求指定origin。没有切换现场或默认目标，也没有建立DNS记录。session.js只增加该准确子路径，其他任意路径、查询、fragment、凭据、编码路径和非443端口仍拒绝；原根域/本机开发规则保留。
+
+调用链：工作流固定同一个profile→readiness读配置检查精确health URL（无重定向、JSON、READY/connectivity scope）→prepare同profile生成connected副本→上传核prepared app摘要、AppID、scene和目标，并核同source SHA、同profile/baseUrl/origin/health URL且HTTP200的十分钟内健康回执，之后才读取上传密钥。回执仍明确login_verified=false/customer_acceptance=false/payment_enabled=false，不把健康证明升级为身份或客户验收。UNKNOWN或错目标/过期/源码不匹配均拒绝。非connected源码、已有preview.png或receipt.json输出拒绝，防止误用旧二维码或重复提交未知上传结果。
+
+源码ZIP显式包含并要求endpoint.cjs及endpoint-profiles.json；国内解包工作流增加必需输入断言，同时完整保留外层摘要、manifest逐文件SHA、大小/数量/常规文件/路径安全检查。新增测试实际生成ZIP、核manifest、空目录解压并以原workflow cwd执行两种profile的prepare和无密钥上传边界，不只在checkout跑。
+
+nginx-uk-path-candidate.conf仅为既有UK HTTPS server内的两个受限location候选：mini API前缀剥离及精确health，不接管根路由、证书或控制面，继续覆盖原可信来源头。没有Nginx二进制语法验收或现场应用回执；网页工作台全站子路径、TLS/路由冲突及真实原身份/数据运行仍需现场核实，不声称已发布。原MiniApplication、Center SHA/type、身份和门店裁定均未修改。
+
+本次提交使用[preview-endpoint-scope]让Hosted只执行新端点合同、受影响prepare/readiness/候选/ZIP组合与原session/客户页面测试，再构建准确源码包；未变业务1821项复用，不改变普通完整回归或官方上传门禁。未使用[mini-preview]，不触发上传或国内服务器任务。旧本地扩范围执行因root触发既有离线回滚测试保护的记录保留，没有放宽保护。
+
+到此本轮已定位、可离线闭合的端点/构建/上传防错源码已接通。剩余是现场原身份宿主和持久数据/scene配置的权威绑定、实际HTTPS和后端同版本运行、真实微信code2session、合法域名及真机非空业务验收；不得伪造为已通过，也不以空库或我方客服补齐。BACKEND_NOT_READY、payments=false及Finance UNCONFIRMED继续保持。

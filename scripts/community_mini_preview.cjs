@@ -6,19 +6,34 @@ async function main(){
  const destination=process.env.COMMUNITY_PREVIEW_OUTPUT;
  if(!destination)throw Error('OUTPUT_DIRECTORY_REQUIRED');
  fs.mkdirSync(destination,{recursive:true,mode:0o700});
+ for(const name of ['preview.png','receipt.json']){
+  try{fs.lstatSync(path.join(destination,name));throw Error('PREVIEW_OUTPUT_ALREADY_USED');}
+  catch(e){if(e.code!=='ENOENT')throw e;}
+ }
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
  const appSource=fs.readFileSync(path.join(projectPath,'app.js'),'utf8');
  const connected=process.env.COMMUNITY_MINI_PROJECT_PATH;
+ if(!connected)throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
+ let target=null;
  if(connected){
-  if(!appSource.includes("baseUrl: 'https://community-preview.wenwenwenyiyiyi.work'")||
+  const {endpoint,verifyReadiness}=require('../deploy/community-preview/endpoint.cjs');
+  target=endpoint();
+  const prepared=JSON.parse(fs.readFileSync(path.join(projectPath,'CONNECTED_PREVIEW_RECEIPT.json'),'utf8'));
+  if(prepared.baseUrl!==target.baseUrl||prepared.profile!==target.profile||prepared.origin!==target.origin||
+     prepared.connected_app_sha256!==crypto.createHash('sha256').update(appSource).digest('hex')||
+     prepared.appid!==config.appid||prepared.scene!=='shop1'||prepared.commerce!==true||prepared.payments!==false||
+     !appSource.includes("baseUrl: '"+target.baseUrl+"'")||
      !appSource.includes("payments: false")||!appSource.includes("commerce: true"))
    throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
+  const proof=process.env.COMMUNITY_PREVIEW_READINESS_RECEIPT;
+  if(!proof)throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
+  verifyReadiness(JSON.parse(fs.readFileSync(proof,'utf8')),target,process.env.GITHUB_SHA);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
    public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
-   backend_origin:connected?'https://community-preview.wenwenwenyiyiyi.work':null,
+   backend_origin:target?target.origin:null,backend_base_url:target?target.baseUrl:null,
    entry_page:'pages/home/index',scene:'shop1',source_hashes:{},status:'NOT_RUN'};
  function source(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   const file=path.join(dir,entry.name);if(entry.isSymbolicLink())throw Error('SYMLINK_SOURCE_DENIED');

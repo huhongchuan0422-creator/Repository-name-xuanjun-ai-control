@@ -44,7 +44,8 @@ class PreviewCandidateContract(unittest.TestCase):
   self.assertIn('if rollback; then exit 90; else exit 91; fi',DEPLOY)
   self.assertNotIn('echo ROLLBACK_COMPLETE\n}',DEPLOY)
  def test_connected_mini_candidate_is_exact_and_non_mutating(self):
-  self.assertIn("https://community-preview.wenwenwenyiyiyi.work",MINI)
+  self.assertIn("require('./endpoint.cjs')",MINI)
+  self.assertEqual(json.loads((ROOT/'deploy/community-preview/endpoint-profiles.json').read_text())['legacy'],'https://community-preview.wenwenwenyiyiyi.work')
   self.assertIn("request_domain_change_performed:false",MINI)
   self.assertIn("upload_performed:false",MINI)
   self.assertIn('"real_wechat_login_verified": false',CONNECTION)

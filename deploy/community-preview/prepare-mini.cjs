@@ -3,7 +3,9 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const ROOT=path.resolve(__dirname,'../..');
 const SOURCE=path.join(ROOT,'clients/community-mini');
 const OUT=process.env.COMMUNITY_CONNECTED_MINI_OUTPUT;
-const HOST='https://community-preview.wenwenwenyiyiyi.work';
+const {endpoint}=require('./endpoint.cjs');
+const target=endpoint();
+const HOST=target.baseUrl;
 if(!OUT)throw Error('OUTPUT_DIRECTORY_REQUIRED');
 function absent(p){try{fs.lstatSync(p);return false;}catch(e){if(e.code==='ENOENT')return true;throw e;}}
 if(!absent(OUT))throw Error('OUTPUT_MUST_NOT_EXIST');
@@ -32,7 +34,7 @@ const replacement="App({\n  globalData: {baseUrl: '"+HOST+"', token: '', mode: '
 const updated=original.replace(needle,replacement);
 const receipt={
  status:'CONNECTED_PREVIEW_SOURCE_PREPARED_NOT_UPLOADED',
- baseUrl:HOST,commerce:true,payments:false,scene:'shop1',
+ ...target,commerce:true,payments:false,scene:'shop1',
  appid:config.appid,
  source_app_sha256:crypto.createHash('sha256').update(original).digest('hex'),
  connected_app_sha256:crypto.createHash('sha256').update(updated).digest('hex'),
