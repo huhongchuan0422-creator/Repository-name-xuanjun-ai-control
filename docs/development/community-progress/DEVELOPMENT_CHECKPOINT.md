@@ -408,3 +408,75 @@ Status: EXTERNAL REVIEW REQUIRED / NOT_COMPLETE.
 5. **Dots / independent reviewer** — final concentrated Phase 1/2 review bound to the exact final candidate.
 
 No other project-side source defect is newly established by this official-material reconciliation.
+
+
+## 2026-10-21 external-independent closure and evidence levels
+
+This section supersedes stale status wording above where it conflicts with the evidence below. It does not mark production acceptance.
+
+### Exact source and CI baseline
+
+- Business/candidate source baseline: `865d52a86e1ca735af49925419d66336fffc8891` / tree `01e914b05adde56e3c7e1786c5bd71b477bc8dc4`.
+- Exact full Hosted business regression reused from `41092c734b06d35c48d44299e273c290fac3ca2e` / tree `60c0998359e0118abb94948709538c246eb9d5e6`: run `39460791444` SUCCESS. Project counting convention: 1792 = 1062 community + 342 Stage5 + 333 + 40 + 8 + 7 Node executions. Optional mini SDK/runtime/preview jobs were SKIPPED, not PASS.
+- Diff from `41092c73` to `865d52a8` is limited to the package-only candidate workflow, `deploy/community-preview/deploy.sh`, and its candidate syntax test; no business-domain source changed.
+- Later supervision commits after `865d52a8` only update `docs/development/community-progress/README.md` and `status.json`; they do not replace this business baseline.
+
+### Persistent identity / mini composition — source complete for synthetic acceptance
+
+Existing source already composes the original identity chain; no second IAM/database is required or permitted:
+
+- `community_mini_center_identity.py`: `CenterIdentity` reuses original Center accounts/sessions/links/events/audit, project membership and current revocation state.
+- `community_mini_login.py`: `WechatCodeClient` + `MiniGateway`; AppSecret/session_key are not returned to clients; login resolves only an existing verified Center account.
+- `community_mini_application.py`: composes existing `Center`, `CenterIdentity`, `WechatCodeClient`, `MiniGateway`, Stage runtime and the existing HTTP handler.
+- `community_mini_http.py`: loopback/local transport plus the admitted HTTPS-proxy contract; it is not itself production HTTPS admission.
+
+Existing unchanged tests already prove, with synthetic provider IO and temporary databases:
+- code consumption and mini sessions survive real Center database reopen;
+- unknown provider result remains consumed after restart;
+- original membership/provider-link/Center-session revocation takes effect on subsequent requests;
+- WeChat subject cannot be rebound to a different existing Center account;
+- protected Center session + CSRF is required for binding;
+- composed listener reuses Center rather than creating a second identity store;
+- loopback HTTP login/business/logout and binding paths use the same gateway/identity chain.
+
+Therefore no additional independent source work is justified here without a newly reproduced defect. This is **synthetic/local acceptance**, not real WeChat credential or production admission evidence.
+
+### Preview / mini evidence classification
+
+Keep these evidence classes separate:
+
+1. **Source implementation** — present at the fixed candidate baseline above.
+2. **Synthetic/local HTTP and browser tests** — present; Mock WeChat exchange and temporary/synthetic data are explicitly non-production.
+3. **Hosted business regression** — `39460791444` SUCCESS / 1792 under the project convention.
+4. **Official mini preview upload** — prior official preview chain exists, including `09aa74112c77db6a1e7249641d213b45d6b73943` / run `39452235200` SUCCESS. This proves an official development-preview upload only.
+5. **Real device connected to admitted backend** — NOT_VERIFIED. The prior QR does not prove real AppSecret-backed login or a usable production-like backend.
+6. **Production acceptance** — NOT_EXECUTED.
+
+### PR136 package-only gate
+
+- Draft PR #136 is a separate safe entry on `main`; current corrected head is `39b93d8ff4fa0d794cf0c370e4025b73c928f3c0`.
+- It adds only `.github/workflows/community-preview-package.yml`, manual `workflow_dispatch`, GitHub Hosted `ubuntu-latest`, `contents: read`, and fixed checkout of `865d52a8` / tree `01e914b...`.
+- Packaging now derives its member list from Git-tracked files only and preserves repository-relative `clients/community-mini/**` and `deploy/community-preview/**` parent paths; package membership must match the tracked list exactly and cache/generated paths are rejected.
+- `community-preview-package.yml` is intentionally named “package”, not “deploy”: it is a Hosted packaging gate and must not be confused with or replace the source-branch deployment candidate.
+- PACKAGE_ONLY_HOSTED_GATE remains **NOT_EXECUTED**; no package Artifact/receipt exists yet.
+- Local container execution of the exact fixed commit was attempted but the local environment could not resolve GitHub, so an exact local tar/unpack/hash PASS is **ENVIRONMENT_BLOCKED**, not PASS.
+- Repository tree inspection of fixed tree `01e914b...` finds 404 tracked files in the approved package prefixes, required `clients/community-mini/app.js`, `deploy/community-preview/deploy.sh`, and `deploy/community-preview/server.py` are present, and no tracked cache-like path was found. This is structural evidence only, not a substitute for executing the package gate.
+
+### Phase 1 / Phase 2 remaining classification after local gap review
+
+No additional external-independent product source defect was confirmed in this review. Existing unchanged passed code/tests are reused rather than rewritten.
+
+Source/test groups already represented include original Center identity/profile/RBAC; merchant onboarding and review state machine; merchant workbench/store/staff/catalog; consumer mini/profile/order/refund/attribution; community administration/promotion/reports; payment/refund/query/callback/reconciliation candidates; split rules/returns/recovery; platform/finance read views; and the four-role same-order journey.
+
+Remaining items are evidence/admission gates, or authoritative-contract gaps that must not be guessed:
+- dedicated preview/public DNS and TLS admission;
+- WeChat mini request-domain admission;
+- admitted real AppSecret-backed `WechatCodeClient` and exact account/openid/scene-store production bindings;
+- real merchant/submerchant/product/payment/refund/split permissions and authorized transaction evidence;
+- authoritative receiver-detail split/return/unfreeze bill contract plus Finance cutoff/population evidence; keep `UNKNOWN_SCHEMA / NOT_RECONCILED / UNCONFIRMED`;
+- real-device mini connected-backend acceptance;
+- production host/runtime/secretRef/database/recovery admission and deployment;
+- final concentrated independent Phase 1 / Phase 2 review bound to the exact final candidate.
+
+These external items do not justify inventing parallel local identity, Finance or provider rules.
+
