@@ -5,6 +5,8 @@ on:
       - feature/chatgpt-community-wechat-sp-offline-20261017
     paths:
       - tests/test_authorization_consumption_negative.py
+      - tests/test_authorization_consumption_reservation.py
+      - scripts/authorization_consumption_community.py
       - .github/workflows/community-authorization-consumer-negative.yml
   workflow_dispatch:
 permissions:
@@ -23,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python -B -m unittest discover -s tests -p 'test_authorization_consumption_negative.py' -v 2>&1 | tee authorization-negatives.log
+          python -B -m unittest discover -s tests -p 'test_authorization_consumption_*.py' -v 2>&1 | tee authorization-negatives.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
