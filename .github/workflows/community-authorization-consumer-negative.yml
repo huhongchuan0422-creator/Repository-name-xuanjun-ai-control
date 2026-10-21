@@ -6,6 +6,7 @@ on:
     paths:
       - tests/test_authorization_consumption_negative.py
       - tests/test_authorization_consumption_reservation.py
+      - tests/test_platform_login_independence.py
       - scripts/authorization_consumption_community.py
       - .github/workflows/community-authorization-consumer-negative.yml
   workflow_dispatch:
@@ -22,12 +23,20 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install cryptography
       - name: Original community authorization boundary negatives only
+        if: "!contains(github.event.head_commit.message, '[platform-login-scope]')"
         shell: bash
         run: |
           set -o pipefail
           python -B -m unittest discover -s tests -p 'test_authorization_consumption_*.py' -v 2>&1 | tee authorization-negatives.log
+      - name: Original platform login independence
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p 'test_platform_login_independence.py' -v 2>&1 | tee platform-login-independence.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: community-authorization-negative-evidence
-          path: authorization-negatives.log
+          path: |
+            authorization-negatives.log
+            platform-login-independence.log
