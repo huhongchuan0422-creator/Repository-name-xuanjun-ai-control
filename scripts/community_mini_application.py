@@ -45,6 +45,16 @@ class MiniApplication:
             raise
 
     @classmethod
+    def from_existing_config_file(cls,center,runtime,principals,config_path,app_secret):
+        """Load protected host config, then reuse exact original live objects.
+
+        No Center/database opening, account creation, listener or secret lookup.
+        """
+        from scripts.community_mini_host_config import load_protected
+        return cls.from_existing_runtime(center,runtime,principals,
+            load_protected(config_path),app_secret)
+
+    @classmethod
     def from_existing_runtime(cls,center,runtime,principals,config,app_secret):
         """Validate protected config and reuse host-owned stores without seeding.
 

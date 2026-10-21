@@ -2,12 +2,63 @@
 
 No filesystem/database creation, secret loading, network IO or deployment.
 """
-import os,re,stat
+import json,os,re,stat
 from pathlib import Path
 from scripts.pr122_customer_core import Center,private_path
 from scripts.community_stage_runtime import StageRuntime
 from scripts.community_saas_phase2 import Principal
 from scripts.community_mini_login import APPID
+
+def load_protected(path):
+    """Read one existing host-owned JSON config, without creating any state.
+
+    This is a host composition API, never an HTTP/client-supplied path.
+    Walk with directory descriptors so links in any component are refused.
+    """
+    raw_path=os.fspath(path)
+    if (type(raw_path) is not str or len(raw_path)>4096
+            or not Path(raw_path).is_absolute() or '..' in Path(raw_path).parts
+            or len(Path(raw_path).parts)<2):
+        raise ValueError('ABSOLUTE_PROTECTED_HOST_CONFIG_REQUIRED')
+    parts=Path(raw_path).parts[1:]
+    directory=None
+    try:
+        flags=os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW
+        directory=os.open('/',flags)
+        for component in parts[:-1]:
+            child=os.open(component,flags,dir_fd=directory)
+            os.close(directory);directory=child
+        parent=os.fstat(directory)
+        if parent.st_uid!=os.geteuid() or parent.st_mode&0o077:
+            raise PermissionError('PRIVATE_HOST_CONFIG_PARENT_REQUIRED')
+        fd=os.open(parts[-1],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=directory)
+        try:
+            before=os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid!=os.geteuid()
+                    or before.st_mode&0o077 or before.st_nlink!=1):
+                raise PermissionError('PRIVATE_HOST_CONFIG_FILE_REQUIRED')
+            if not 0<before.st_size<=65536:
+                raise ValueError('HOST_CONFIG_SIZE_LIMIT')
+            raw=os.read(fd,65537)
+            after=os.fstat(fd)
+            fields=('st_dev','st_ino','st_size','st_uid','st_mode','st_nlink','st_mtime_ns','st_ctime_ns')
+            if len(raw)!=before.st_size or any(getattr(before,k)!=getattr(after,k) for k in fields):
+                raise ValueError('HOST_CONFIG_CHANGED_DURING_READ')
+        finally:os.close(fd)
+    except OSError:
+        raise PermissionError('PROTECTED_HOST_CONFIG_UNREADABLE') from None
+    finally:
+        if directory is not None:os.close(directory)
+    def unique(pairs):
+        value={}
+        for key,item in pairs:
+            if key in value:raise ValueError('DUPLICATE_HOST_CONFIG_FIELD')
+            value[key]=item
+        return value
+    def finite(value):raise ValueError('NONFINITE_HOST_CONFIG_VALUE')
+    try:return json.loads(raw.decode('utf-8'),object_pairs_hook=unique,parse_constant=finite)
+    except (ValueError,UnicodeError):
+        raise ValueError('INVALID_PROTECTED_HOST_CONFIG_JSON') from None
 
 def stores(center,runtime):
     return dict(center=center.db,orders=runtime.demo.db,merchants=runtime.demo.merchant_db,

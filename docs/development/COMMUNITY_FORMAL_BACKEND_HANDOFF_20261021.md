@@ -139,3 +139,21 @@ nginx-uk-path-candidate.conf仅为既有UK HTTPS server内的两个受限locatio
 复核最多2000个文件/目录项、总文件字节10000000，拒绝非普通文件；最终文件以O_NOFOLLOW打开，核stat身份、有限读取长度及前后size/mtime/ctime。清单使用无原型对象，防止特殊文件名遗漏。该预检用于唯一Writer私有临时构建目录，不声称SDK读取期间与其他并发Writer具有原子快照，也不替代外层源ZIP和manifest验证。
 
 测试继续使用真实ZIP空目录解包，并在两种profile准备后修改各文件再调用无密钥上传入口，验证拒绝发生于SDK调用前；新Node测试覆盖特殊文件名、改/增/删/软链及字节/目录项预算。不读取真实密钥、不调用微信或现场身份接口、不生成新二维码。原身份/门店/支付门禁与既有默认目标均不变。
+
+
+### 受保护宿主配置文件到原应用入口（2026-10-22）
+
+依据原任务正式MiniApplication接线及持久配置要求（Issue76 #6316014038）；原from_existing_runtime只有内存dict输入，缺少宿主既有配置文件到该入口的受保护读取。本轮不创建宿主、身份或数据库，也不生成仅返回HOLD的独立启动器。
+
+实际新增调用链：
+MiniApplication.from_existing_config_file(center, runtime, principals, config_path, app_secret)
+→ community_mini_host_config.load_protected(config_path)
+→ 原from_existing_runtime/validate
+→ 原WechatCodeClient及CenterIdentity/MiniGateway。
+调用方仍必须提供原客户平台已打开的精确Center/StageRuntime、原Principal和既有AppSecret值；文件只保存原既定schema（version/appid/https_origin/scenes/stores），不含Secret。该接口仅供宿主组合调用，没有HTTP文件路径接口、环境扫描、默认配置路径或自动选择账户。
+
+读取现有绝对路径，逐级目录fd+O_NOFOLLOW拒绝父级/文件软链；父目录和普通文件必须属当前宿主用户且无其他用户权限，文件单链接，最多65536字节。FIFO/目录/硬链接、缺失/相对/越界路径、重复JSON字段、非有限数、无效UTF8及读中变化拒绝，不打印正文。读取后继续原8类store连接路径匹配、原项目当前有效性、CUSTOMER Principal与scene/租户绑定校验，配置错误不会构造提供商客户端。没有自动建目录/文件/库、初始化商家、迁库、写真实身份或打开listener；关闭应用保留宿主持有的8个连接。
+
+新增tests/test_community_mini_config_file.py，复用原合成身份及真实持久SQLite夹具，验证不调用sqlite3.connect/LocalStage、不创建状态、宿主所有权、原登录、未绑定拒绝/不建号、错scene与项目撤权及上述读取负例；另跑受影响原host_config/application测试。真实微信网络仍为明确合成provider，不能当现场真实登录。Hosted使用[host-config-scope]仅验该接点，未变1821项及预览端点55项复用；普通完整回归仍包含新test_community文件。
+
+源码现在可直接消费现有宿主配置文件，但真实客户身份对象、配置路径与历史数据的现场归属仍未证。不能将此入口称已存在的英国bootstrap、已配置原平台身份或可用二维码；既有BACKEND_NOT_READY与支付/资金门禁保持，部署/凭据/权限边界未改变。
