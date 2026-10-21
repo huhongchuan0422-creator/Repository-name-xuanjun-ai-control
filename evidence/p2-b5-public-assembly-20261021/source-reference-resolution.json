@@ -1,0 +1,92 @@
+{
+  "state": "CORRECTED_REFERENCE_EXPLAINED",
+  "attachment_bytes": 4161,
+  "attachment_sha256": "49cabdbf25a529caea6123c88d1a715335b5fc3c8bd12f62a5ef72b617a1da8f",
+  "canonical_and_extra_lf_recomputed": true,
+  "historical_files": "PRESERVED_NOT_REWRITTEN",
+  "correction": {
+    "scope": "OFFLINE_MANIFEST_REFERENCE_CORRECTION_AND_FOUR_ROW_INCREMENT_NOT_PERMISSION",
+    "source_commit": "8da4cdcc6028cfc1af01447948e562b39d7cd68d",
+    "source_tree": "3b9369bcb71afa1ab3d7e698726a137034778ea7",
+    "prior_join": {
+      "bytes": 162364,
+      "sha256": "8757c44ba0321f2b8873390a8aca6bb954cb319d0cf2920b47753f16585568ae",
+      "preserved": true
+    },
+    "source_reference_correction": {
+      "inventory_commit": "ad2c6d1db9e4ea1034b4d93e661bf0c5a97ace5d",
+      "inventory_path": "evidence/p2-b5-convergence-20261021/installation-prerequisites.json",
+      "canonical_bytes": 82903,
+      "canonical_sha256": "63345c45bd7d5af61f93ded86543978465ed52f38765359ed78296031c62fb4e",
+      "canonical_git_blob": "9f858ce882fd89b0b645425f4c136b0fc97a476a",
+      "prior_local_bytes": 82904,
+      "prior_claimed_sha256": "aa601bc0632c08f693d63d5b1ef02ff08de1baf5b20706684c61c020c6cf0c57",
+      "cause": "Prior local inventory has exactly one extra trailing LF byte. Removing only that final byte yields both canonical SHA256 and Git blob. JSON semantics unchanged. Historical files are not overwritten.",
+      "corrected_source_inventory_sha256": "63345c45bd7d5af61f93ded86543978465ed52f38765359ed78296031c62fb4e"
+    },
+    "source_manifest": {
+      "bytes": 5635704,
+      "sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+    },
+    "summary": {
+      "rows": 4,
+      "unique_matches": 4,
+      "missing": 0,
+      "ambiguous": 0,
+      "total_bytes": 46229
+    },
+    "rows": [
+      {
+        "member": "dist/server-startup-plugins-Cajv-q3y.mjs",
+        "parent": "dist/server-start-Bz-KV48j.mjs",
+        "line": 5202,
+        "source_reason": "dynamic import; prepareGatewayPluginBootstrap L5383/L5394; loadGatewayStartupPluginRuntime L8243",
+        "source_evidence": "8da4cdcc6028cfc1af01447948e562b39d7cd68d/docs/p2-b5-20261020/PUBLIC_ASSEMBLY_DECISION.md; client import references independently read from verified retained materials.tar",
+        "manifest_matches": 1,
+        "match_status": "UNIQUE",
+        "bytes": 12979,
+        "sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f"
+      },
+      {
+        "member": "dist/server-startup-config-Hx2M1x7s.mjs",
+        "parent": "dist/server-start-Bz-KV48j.mjs",
+        "line": 5201,
+        "source_reason": "dynamic import; startup config/auth policy",
+        "source_evidence": "8da4cdcc6028cfc1af01447948e562b39d7cd68d/docs/p2-b5-20261020/PUBLIC_ASSEMBLY_DECISION.md; client import references independently read from verified retained materials.tar",
+        "manifest_matches": 1,
+        "match_status": "UNIQUE",
+        "bytes": 24633,
+        "sha256": "c6c846ead6ec7b1eaf081530966d7b41a6363e8f05e6590daf2469fbc329ee97"
+      },
+      {
+        "member": "dist/proxy-lifecycle-Dl57fEmL.mjs",
+        "parent": "dist/client-B4O1WKhF.mjs",
+        "line": 25,
+        "source_reason": "static direct client import",
+        "source_evidence": "8da4cdcc6028cfc1af01447948e562b39d7cd68d/docs/p2-b5-20261020/PUBLIC_ASSEMBLY_DECISION.md; client import references independently read from verified retained materials.tar",
+        "manifest_matches": 1,
+        "match_status": "UNIQUE",
+        "bytes": 7794,
+        "sha256": "de283d5f397582801b5f35b43ffbe17cb4f49e70c14233a7d6bac2ac3fb794f6"
+      },
+      {
+        "member": "dist/url-protocol-OU3K-ySz.mjs",
+        "parent": "dist/client-bootstrap-DVBT55k1.mjs",
+        "line": 3,
+        "source_reason": "static client dependency import; also websocket-transport-D9CzXxr_.mjs L2",
+        "source_evidence": "8da4cdcc6028cfc1af01447948e562b39d7cd68d/docs/p2-b5-20261020/PUBLIC_ASSEMBLY_DECISION.md; client import references independently read from verified retained materials.tar",
+        "manifest_matches": 1,
+        "match_status": "UNIQUE",
+        "bytes": 823,
+        "sha256": "8ad6637ea5831197a0ec03be4ef69c44f08ea616e06ab39b960f0f49b76f196e"
+      }
+    ],
+    "selected_members": [],
+    "limitations": [
+      "Metadata only; target bytes not received by this join.",
+      "Not a frozen extraction or installation batch; no SDK/runtime/closure claim.",
+      "Core callsites are cited from Work source evidence; client dependency lines independently inspected in existing verified archive."
+    ]
+  },
+  "runtime": "NOT_EXECUTED"
+}

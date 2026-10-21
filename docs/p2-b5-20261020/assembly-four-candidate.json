@@ -1,0 +1,32 @@
+{
+  "scope": "EXACT_FOUR_MEMBER_ANALYSIS_NOT_INSTALLATION",
+  "execution": "NOT_EXECUTED_REQUIRES_SPECIFIC_CONFIRMATION",
+  "bootstrap_bytes": 44701,
+  "bootstrap_sha256": "b554c695c685fb7418276876c25effad5842994be4b9582d1cfa6071cbdcc95c",
+  "bootstrap_git_blob": "2c2ce62d1387bf9374fb6e77eead2bbba491df92",
+  "command_bytes": 1716,
+  "command_sha256": "93e14b5495cbc2cddc4ce52a586648007d79928039374e48d4da1a8cfd084c1e",
+  "selected_bytes": 46229,
+  "selected_members": {
+    "dist/server-startup-plugins-Cajv-q3y.mjs": {
+      "bytes": 12979,
+      "sha256": "be588e2acbd30d55efb0c15a142354337dc220e107f2c00bda78067c07ec121f"
+    },
+    "dist/server-startup-config-Hx2M1x7s.mjs": {
+      "bytes": 24633,
+      "sha256": "c6c846ead6ec7b1eaf081530966d7b41a6363e8f05e6590daf2469fbc329ee97"
+    },
+    "dist/proxy-lifecycle-Dl57fEmL.mjs": {
+      "bytes": 7794,
+      "sha256": "de283d5f397582801b5f35b43ffbe17cb4f49e70c14233a7d6bac2ac3fb794f6"
+    },
+    "dist/url-protocol-OU3K-ySz.mjs": {
+      "bytes": 823,
+      "sha256": "8ad6637ea5831197a0ec03be4ef69c44f08ea616e06ab39b960f0f49b76f196e"
+    }
+  },
+  "output_directories": [
+    "/home/admin/p2-b5-assembly-four-candidate-v1-20261021",
+    "/home/admin/p2-b5-assembly-four-members-v1-20261021"
+  ]
+}
