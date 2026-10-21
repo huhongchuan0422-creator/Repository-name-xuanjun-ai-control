@@ -8,6 +8,7 @@ HOST=community-preview.wenwenwenyiyiyi.work
 SERVICE=xuanjun-community-preview.service
 RELEASE_CREATED=0
 if [ "${COMMUNITY_PREVIEW_TEST_MODE:-0}" = 1 ]; then
+  test "$(/usr/bin/id -u)" -ne 0 || { echo ROOT_TEST_MODE_DENIED >&2; exit 65; }
   : "${COMMUNITY_PREVIEW_TEST_ROOT:?test root required}"
   case "$COMMUNITY_PREVIEW_TEST_ROOT" in /tmp/*|/var/tmp/*) ;; *) echo TEST_ROOT_DENIED >&2; exit 64;; esac
   BASE="$COMMUNITY_PREVIEW_TEST_ROOT/opt/xuanjun-community-preview"
