@@ -74,7 +74,7 @@ def capture_audit(c,project,event,obj):
     if event in ('SAVE','SUBMIT','BEGIN_REVIEW','REQUEST_CHANGES','APPROVE'):kind='MATERIAL'
     elif event.startswith('CHANGE_') and event not in ('CHANGE_HISTORY_READ',):
         if c.db.execute('SELECT 1 FROM change_events WHERE id=? AND project=?',(obj,project)).fetchone():kind='CHANGE'
-    elif event in ('OUTBOUND_PENDING','OUTBOUND_ATTEMPT_UNKNOWN','OUTBOUND_ACCEPTED','OUTBOUND_RESTORE_UNKNOWN'):kind='DELIVERY'
+    elif event in ('OUTBOUND_PENDING','OUTBOUND_ATTEMPT_UNKNOWN','OUTBOUND_ACCEPTED','OUTBOUND_RESTORE_UNKNOWN','OUTBOUND_CANCELLED'):kind='DELIVERY'
     if kind:
         audit=c.db.execute('SELECT seq,sha FROM audit WHERE seq=last_insert_rowid()').fetchone()
         capture(c,kind,obj,audit)

@@ -49,6 +49,42 @@ class ProviderTests(CustomerTests):
  def test_unlink_or_revocation_blocks_queued_send(self):
   self.linked();enqueue(self.c,self.owner,'project-a','TELEGRAM','hello');self.c.unlink(self.owner,'project-a','TELEGRAM')
   with self.assertRaises(Denied):drain_message(self.c,Providers({}))
+ def test_revoked_head_does_not_starve_authorized_other_tenant(self):
+  for revoke in ('unlink','membership'):
+   with self.subTest(revoke=revoke):
+    self.setUp()
+    other={**self.p,'id':'project-b','tenant':'tenant-b','customer':'customer-b','owner_email':'other@example.com'}
+    self.imported(2,[self.p,other]);self.linked()
+    challenge=self.c.binding_challenge(self.other,'project-b','TELEGRAM','456')['challenge']
+    self.c.channel_event('TELEGRAM','bind-b','456','/bind '+challenge)
+    link=self.c.pending_links(self.other,'project-b')[0];self.c.confirm_link(self.other,'project-b',link['id'])
+    a=enqueue(self.c,self.owner,'project-a','TELEGRAM','A');self.now+=1
+    b=enqueue(self.c,self.other,'project-b','TELEGRAM','B')
+    if revoke=='unlink':self.c.unlink(self.owner,'project-a','TELEGRAM')
+    else:
+     with self.c.tx():self.c.db.execute('DELETE FROM members WHERE project=? AND user_id=?',('project-a',self.owner))
+    calls=[]
+    def send(token,subject,text):calls.append((subject,text));return {'ok':True,'result':{'message_id':32}}
+    provider=Providers({'telegram':{'bot_token':'fixture'}},telegram_transport=send)
+    for _ in range(3):
+     try:drain_message(self.c,provider)
+     except Denied:pass
+    self.assertEqual(calls,[('456','B')])
+    self.assertEqual(self.c.db.execute('SELECT status FROM messages WHERE id=?',(a['id'],)).fetchone()[0],'CANCELLED')
+    self.assertEqual(self.c.db.execute('SELECT status FROM messages WHERE id=?',(b['id'],)).fetchone()[0],'ACCEPTED')
+    self.assertEqual(self.c.db.execute("SELECT count(*) FROM audit WHERE event='OUTBOUND_CANCELLED' AND object_id=?",(a['id'],)).fetchone()[0],1)
+    self.assertFalse(drain_message(self.c,provider)['pending'])
+    self.assertEqual(self.c.db.execute("SELECT count(*) FROM project_activity_evidence e JOIN audit a ON e.audit_seq=a.seq WHERE a.event='OUTBOUND_CANCELLED' AND e.source_kind='DELIVERY' AND e.source_id=?",(a['id'],)).fetchone()[0],1)
+ def test_cancelled_head_audit_failure_rolls_back_and_integrity_denial_stays_pending(self):
+  self.linked();message=enqueue(self.c,self.owner,'project-a','TELEGRAM','A')
+  self.c.unlink(self.owner,'project-a','TELEGRAM')
+  with patch.object(self.c,'audit',side_effect=RuntimeError('audit unavailable')):
+   with self.assertRaisesRegex(RuntimeError,'audit unavailable'):drain_message(self.c,Providers({}))
+  self.assertEqual(self.c.db.execute('SELECT status FROM messages WHERE id=?',(message['id'],)).fetchone()[0],'PENDING')
+  with patch('scripts.pr122_customer_evidence.authorized_records',side_effect=Denied('MESSAGE_EVIDENCE_PROJECT_IDENTITY_DRIFT')):
+   with self.assertRaisesRegex(Denied,'MESSAGE_EVIDENCE_PROJECT_IDENTITY_DRIFT'):drain_message(self.c,Providers({}))
+  self.assertEqual(self.c.db.execute('SELECT status FROM messages WHERE id=?',(message['id'],)).fetchone()[0],'PENDING')
+  self.assertEqual(self.c.db.execute("SELECT count(*) FROM audit WHERE event='OUTBOUND_CANCELLED'").fetchone()[0],0)
  def test_web_ai_bound_context_archived_reply_unknown_no_retry(self):
   from scripts.pr122_customer_providers import ai_reply
   p=Providers({'web_ai':{'provider':'openai','model_key':'approved-fixture'}})

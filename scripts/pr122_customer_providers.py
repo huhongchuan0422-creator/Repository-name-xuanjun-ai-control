@@ -194,13 +194,25 @@ def enqueue(center,uid,pid,channel,text):
 def drain_message(center,providers):
     r=center.db.execute("SELECT * FROM messages WHERE status='PENDING' ORDER BY created LIMIT 1").fetchone()
     if not r:return {'pending':False}
+    denied=None
     with center.tx():
         from scripts.pr122_customer_evidence import authorized_records
-        authorized_records(center,r['user_id'],r['project'])
-        link=center.db.execute('SELECT * FROM links WHERE user_id=? AND project=? AND channel=? AND active=1',(r['user_id'],r['project'],r['channel'])).fetchone()
-        if not link:raise Denied('LINK_REVOKED')
-        if center.db.execute("UPDATE messages SET status='UNKNOWN' WHERE id=? AND status='PENDING'",(r['id'],)).rowcount!=1:return {'claimed':False}
-        center.audit(r['project'],r['user_id'],'OUTBOUND_ATTEMPT_UNKNOWN',r['id'])
+        try:
+            authorized_records(center,r['user_id'],r['project'])
+            link=center.db.execute('SELECT * FROM links WHERE user_id=? AND project=? AND channel=? AND active=1',(r['user_id'],r['project'],r['channel'])).fetchone()
+            if not link:raise Denied('LINK_REVOKED')
+        except Denied as error:
+            # Only definite permission/link rejection is terminal. Integrity
+            # failures and unknown outcomes retain their existing fail-closed path.
+            if str(error) not in ('PROJECT_PERMISSION_REQUIRED','LINK_REVOKED'):raise
+            if center.db.execute("UPDATE messages SET status='CANCELLED' WHERE id=? AND status='PENDING'",(r['id'],)).rowcount!=1:return {'claimed':False}
+            center.audit(r['project'],r['user_id'],'OUTBOUND_CANCELLED',r['id'])
+            denied=error
+        if denied is None:
+            if center.db.execute("UPDATE messages SET status='UNKNOWN' WHERE id=? AND status='PENDING'",(r['id'],)).rowcount!=1:return {'claimed':False}
+            center.audit(r['project'],r['user_id'],'OUTBOUND_ATTEMPT_UNKNOWN',r['id'])
+    # Preserve caller-visible denial, after committing cancellation and audit.
+    if denied is not None:raise denied
     try:
         subject=center.decrypt(link['payload'],'link').decode();text=center.decrypt(r['payload'],r['id']).decode()
         status,ref=providers.send(r['channel'],subject,text,r['id'])
