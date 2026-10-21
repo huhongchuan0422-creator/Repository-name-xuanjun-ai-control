@@ -1,0 +1,339 @@
+{
+  "scope": "ACTUAL_BYTES_STATIC_ANALYSIS_NOT_SDK_EXECUTION",
+  "input_candidate_commit": "ea3180aed9718eb49d464c4ce99bf5d710a8d52e",
+  "actual_inputs": {
+    "materials (7).tar": {
+      "bytes": 20480,
+      "sha256": "8d1943f77a25b1c94552d9f71b4f475829034da09f257f3f2b57035972ff0b0e"
+    },
+    "report (6).json": {
+      "bytes": 1340,
+      "sha256": "2a494c0b0291c89009425c13e621d253a300e5ec6cb58c8bd5f11de267434148"
+    }
+  },
+  "verification": "Exact two regular members, total15004 bytes, each size/SHA matches frozen candidate and report; report binding to original manifest/tar matches existing source pins",
+  "terminal_receipt": "NOT_RECEIVED_THIS_TURN; original_inputs UNCHANGED not independently asserted from missing terminal JSON",
+  "report": {
+    "authenticated_dispatch": "NOT_EXECUTED",
+    "cp11": "NOT_EXECUTED",
+    "dependency_closure": "UNKNOWN",
+    "owner_binding": "UNBOUND",
+    "scope": "ISOLATED_TEST_ONLY_PUBLIC_ASSEMBLY_TWO_MEMBER_ANALYSIS",
+    "sdk": "NOT_EXECUTED",
+    "selected": {
+      "dist/server-plugin-bootstrap-BF-wNIVo.mjs": {
+        "binding": "FIXED_PIN_AND_FULL_MANIFEST_ALL_MEMBER_VERIFICATION",
+        "bytes": 3726,
+        "sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+        "source_member": "home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/server-plugin-bootstrap-BF-wNIVo.mjs"
+      },
+      "dist/server-startup-config-helpers-d2nPJiVj.mjs": {
+        "binding": "FIXED_PIN_AND_FULL_MANIFEST_ALL_MEMBER_VERIFICATION",
+        "bytes": 11278,
+        "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde",
+        "source_member": "home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/dist/server-startup-config-helpers-d2nPJiVj.mjs"
+      }
+    },
+    "selection": "EXACT_TWO_FIXED_MEMBERS_NO_RECURSION",
+    "source_manifest_sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba",
+    "source_tar_sha256": "e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485",
+    "source_validation": {
+      "all_members_content_sha_verified": true,
+      "members_verified": 20000,
+      "payload_bytes_verified": 524824595,
+      "source_tar_termination": "MEMBER_BOUNDARY_EOF"
+    }
+  },
+  "source_references": [
+    {
+      "member": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "bytes": 3726,
+      "sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+      "lines": [
+        28
+      ],
+      "literal": "function prepareGatewayPluginLoad"
+    },
+    {
+      "member": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "bytes": 3726,
+      "sha256": "d52477f026b0aeb3c2ee9baafc4a081506ac7a08bff645ec9850e19dd8483881",
+      "lines": [
+        51
+      ],
+      "literal": "const loaded = loadGatewayPlugins"
+    },
+    {
+      "member": "dist/server-plugins-CzOpf53P.mjs",
+      "bytes": 27233,
+      "sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+      "lines": [
+        456
+      ],
+      "literal": "function loadGatewayPlugins"
+    },
+    {
+      "member": "dist/server-plugins-CzOpf53P.mjs",
+      "bytes": 27233,
+      "sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+      "lines": [
+        501
+      ],
+      "literal": "runtimeSideEffects: true"
+    },
+    {
+      "member": "dist/server-plugins-CzOpf53P.mjs",
+      "bytes": 27233,
+      "sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9",
+      "lines": [
+        511
+      ],
+      "literal": "onlyPluginIds: pluginIds"
+    },
+    {
+      "member": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "bytes": 11278,
+      "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde",
+      "lines": [
+        21
+      ],
+      "literal": "function resolveGatewayStartupSourceConfig"
+    },
+    {
+      "member": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "bytes": 11278,
+      "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde",
+      "lines": [
+        172
+      ],
+      "literal": "const authBootstrap ="
+    },
+    {
+      "member": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "bytes": 11278,
+      "sha256": "d969dec157ce6a62f7c999d09e5682c9abfa0430b1fa7baeaa4106ceeb90fcde",
+      "lines": [
+        183
+      ],
+      "literal": "const activatedConfig ="
+    },
+    {
+      "member": "dist/startup-auth-CrK_ffN0.mjs",
+      "bytes": 7346,
+      "sha256": "a00429b3ccb543ac77f0e66d4ff0e10a2c6b04a7b733acca7cb3658afba01491",
+      "lines": [
+        130
+      ],
+      "literal": "crypto.randomBytes(24)"
+    },
+    {
+      "member": "dist/startup-auth-CrK_ffN0.mjs",
+      "bytes": 7346,
+      "sha256": "a00429b3ccb543ac77f0e66d4ff0e10a2c6b04a7b733acca7cb3658afba01491",
+      "lines": [
+        127,
+        159
+      ],
+      "literal": "persistedGeneratedToken: false"
+    }
+  ],
+  "direct_imports_available": [
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 1,
+      "member": "dist/plugin-cache-Bn9I3v9Q.mjs",
+      "bytes": 22035,
+      "sha256": "f22a675c5fc881a9204908bfe04a6efbc095aba4e1efad0e2d30119d3e8f7915"
+    },
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 2,
+      "member": "dist/discovery-BDmn67Fz.mjs",
+      "bytes": 54981,
+      "sha256": "d9f11ae88434a8029672b1bf4cbc21ae87bbefa8204c69261a81e24816a68e87"
+    },
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 3,
+      "member": "dist/worker-provider-manifest-BsH9aoJD.mjs",
+      "bytes": 1464,
+      "sha256": "343f74dcd1e60cd82d64f9679531083b4b93a5129907f6249f48abf2e73950c7"
+    },
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 4,
+      "member": "dist/plugin-auto-enable-Bi-LZVAQ.mjs",
+      "bytes": 20676,
+      "sha256": "898b3e08732164e0a9bd66bc38c6610604083e1527fa0c665afcb8bf6787eaa0"
+    },
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 5,
+      "member": "dist/server-plugins-CzOpf53P.mjs",
+      "bytes": 27233,
+      "sha256": "e72dfe589e9c3568992c7925942faf2f8db9c717d4e6c8674dc1ae4a92a038f9"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 1,
+      "member": "dist/env-DyLpZ8a5.mjs",
+      "bytes": 2604,
+      "sha256": "d63a999d7db73ae6de69c51d469a76f02f71b26120b70b60847237bc2a532227"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 2,
+      "member": "dist/paths-CtO6iw0c.mjs",
+      "bytes": 13275,
+      "sha256": "0fcef768ea381d210de1044327b4afb4602c76d1167a6f7147c729e7fd579b70"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 3,
+      "member": "dist/resolution-facts-CYe39-eJ.mjs",
+      "bytes": 7862,
+      "sha256": "64b099c31d42f74443de49d7788d5ffb5e9d743348e8278b23f34bef88e23bb7"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 4,
+      "member": "dist/io.factory-PvUbTCjh.mjs",
+      "bytes": 95226,
+      "sha256": "f2b5c1f97a774f667be97994675cc3bbb81139ec01de760d0bf586a352fd4e0b"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 5,
+      "member": "dist/io.invalid-config-DkKUeCUl.mjs",
+      "bytes": 2598,
+      "sha256": "ac0fb83f86d736de1edc1b595a4362c8ceefe082ec004ac4ef260321b44a328e"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 6,
+      "member": "dist/legacy.default-agent-owner-C1atgXtB.mjs",
+      "bytes": 1173,
+      "sha256": "1d78e3e09139b7a5f85fb2e7f9d3bc94bf4c35425f58a9d2ce8750b8dbc04715"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 7,
+      "member": "dist/legacy.roster-DRT2Q23d.mjs",
+      "bytes": 12085,
+      "sha256": "10e05342ab0d2b21fcfa40951d7092868086f092e7bb8a752f77b11a21c352c9"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 9,
+      "member": "dist/io.runtime-w45cmCNp.mjs",
+      "bytes": 25005,
+      "sha256": "12c678073ff907a2e1315bb0831f8d63422957f13c366e47b003362869dad627"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 10,
+      "member": "dist/io-Cc8N4j2R.mjs",
+      "bytes": 332,
+      "sha256": "25a5a90615305c03c0754480e2083f9a30f2e9ef05e11e0f7e6c75fc3b456298"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 11,
+      "member": "dist/plugin-auto-enable-Bi-LZVAQ.mjs",
+      "bytes": 20676,
+      "sha256": "898b3e08732164e0a9bd66bc38c6610604083e1527fa0c665afcb8bf6787eaa0"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 12,
+      "member": "dist/auth-resolve-DjugjR30.mjs",
+      "bytes": 4576,
+      "sha256": "905222412b8b6101855b5d4c35f9011280458df5237c4a95b9da9ac05dae1507"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 13,
+      "member": "dist/known-weak-gateway-secrets-BLCyfEDY.mjs",
+      "bytes": 2633,
+      "sha256": "751f0b77aaba50e22fab572ffe0013f6ab081050a80d82e6c5133553ff17796d"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 14,
+      "member": "dist/runtime-gateway-auth-surfaces-CUoEzMkq.mjs",
+      "bytes": 5605,
+      "sha256": "6fb8bd7c41f0f1c6a1a3e936f8ed419fba99f14ff35a662ae29ac97729c2053f"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 15,
+      "member": "dist/startup-auth-CrK_ffN0.mjs",
+      "bytes": 7346,
+      "sha256": "a00429b3ccb543ac77f0e66d4ff0e10a2c6b04a7b733acca7cb3658afba01491"
+    }
+  ],
+  "direct_imports_missing": [
+    {
+      "parent": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "line": 6,
+      "member": "dist/plugin-activation-runtime-config-DIBrwFOO.mjs",
+      "bytes": 2958,
+      "sha256": "711dbf3e028e01a3dffe401a5f4205baa26ec868daddefb0f4cac57480bff26b",
+      "status": "NOT_RECEIVED_NOT_SELECTED",
+      "manifest_binding": "EXISTING_384_JOIN_UNIQUE_MATCH_NOT_SELECTION"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 8,
+      "member": "dist/recovery-policy-D5E-mA-L.mjs",
+      "bytes": 4762,
+      "sha256": "f518b69e31a66bab70e252abf8bfba1c6bad569695ef811445973043ed996714",
+      "status": "NOT_RECEIVED_NOT_SELECTED",
+      "manifest_binding": "EXISTING_384_JOIN_UNIQUE_MATCH_NOT_SELECTION"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 16,
+      "member": "dist/config-recovery-hints-BpoTGCnY.mjs",
+      "bytes": null,
+      "sha256": null,
+      "status": "NOT_RECEIVED_NOT_SELECTED"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 17,
+      "member": "dist/issue-location-D9EcrsIq.mjs",
+      "bytes": null,
+      "sha256": null,
+      "status": "NOT_RECEIVED_NOT_SELECTED"
+    },
+    {
+      "parent": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "line": 18,
+      "member": "dist/plugin-activation-runtime-config-DIBrwFOO.mjs",
+      "bytes": 2958,
+      "sha256": "711dbf3e028e01a3dffe401a5f4205baa26ec868daddefb0f4cac57480bff26b",
+      "status": "NOT_RECEIVED_NOT_SELECTED",
+      "manifest_binding": "EXISTING_384_JOIN_UNIQUE_MATCH_NOT_SELECTION"
+    }
+  ],
+  "findings": [
+    "Native loader chain is now linked in actual bytes: startup plugin module -> prepareGatewayPluginLoad -> existing loadGatewayPlugins -> existing loadOpenClawPlugins. This is static linkage, not runtime binding.",
+    "Native load uses activate:false, cache:false AND runtimeSideEffects:true, onlyPluginIds, original gateway context and runtime bindings. Inspection-only scope cannot be substituted for native runtime.",
+    "Startup config helper applies runtime overrides, native auth bootstrapping and activates runtime secrets. SKIP_CHANNELS/SKIP_PROVIDERS branch removes channels only; it does not prove all providers/model/auth-store side effects are disabled.",
+    "Existing startup-auth implementation retains native weak-secret assertions and can generate an ephemeral 24-byte random token with persistedGeneratedToken:false. This is not permission to create or expose credentials, nor proof of an authenticated client.",
+    "Existing original startup-auth/auth-resolve/known-weak/io.runtime/server-plugins bytes reused; no new collection needed for these."
+  ],
+  "next_steps": [
+    "Resolve restricted public-native startup config and registry activation using existing source; activation runtime module remains unread; use existing manifest metadata before any new extraction candidate.",
+    "Determine exact Node/shared-library/package-export/native-resource closure; no runtime resolver executed.",
+    "Only after frozen restricted profile and environment bindings prepare a concrete SDK execution candidate with all side effects; no execution authorization inferred."
+  ],
+  "installation_selected_members": [],
+  "dependency_closure": "UNKNOWN",
+  "sdk": "NOT_EXECUTED",
+  "authenticated_dispatch": "NOT_EXECUTED",
+  "cp11": "NOT_EXECUTED",
+  "checks": "stdlib tar exact-member/content SHA and static literal-reference checks PASS; old candidate CI reused; no new runtime tests",
+  "limitations": "Direct-import inventory only, not recursive closure. Four unique missing relative modules (activation appears twice). Existing join binds activation/recovery policy; issue-location/config-recovery-hints bindings not found in existing 384 join. No request to recollect original manifest; no new extraction selected."
+}
