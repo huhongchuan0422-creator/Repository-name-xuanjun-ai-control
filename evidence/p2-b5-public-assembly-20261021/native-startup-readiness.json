@@ -1,0 +1,84 @@
+{
+  "scope": "PUBLIC_NATIVE_STARTUP_ROUTE_CORRECTION_AND_READINESS_CONTRACT",
+  "previous_evidence": "implementation-pair-source-analysis.json retained unchanged; d2n helper facts apply only to its bytes, not actual core U6x invocation",
+  "route": [
+    {
+      "member": "dist/server-startup-config-helpers-U6xkM_57.mjs",
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_lines": [
+        5254
+      ],
+      "purpose": "Actual prepareGatewayStartupConfig invoked by core; d2n helper same function name cannot establish this implementation.",
+      "actual_bytes": "NOT_RECEIVED",
+      "manifest_size": null,
+      "manifest_sha256": null,
+      "status": "UNKNOWN_NOT_SELECTED"
+    },
+    {
+      "member": "dist/server-startup-early-BLUjqlAE.mjs",
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_lines": [
+        5481
+      ],
+      "purpose": "Original early runtime receives updateCanary; must inspect actual suppression and startup side effects.",
+      "actual_bytes": "NOT_RECEIVED",
+      "manifest_size": null,
+      "manifest_sha256": null,
+      "status": "UNKNOWN_NOT_SELECTED"
+    },
+    {
+      "member": "dist/server-startup-post-attach-CsYAFanV.mjs",
+      "parent": "dist/server-start-Bz-KV48j.mjs",
+      "parent_sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "reference_lines": [
+        8571
+      ],
+      "purpose": "Original post-attach runtime decides when loadStartupPlugins is called and startupSettled resolves; required to establish readiness with native plugin.",
+      "actual_bytes": "NOT_RECEIVED",
+      "manifest_size": null,
+      "manifest_sha256": null,
+      "status": "UNKNOWN_NOT_SELECTED"
+    }
+  ],
+  "known_native_sequence": [
+    {
+      "line": 8172,
+      "action": "HTTP listener startup (startListening call near this line); listener is not plugin-ready proof"
+    },
+    {
+      "line": 8175,
+      "action": "await startEarlyRuntime"
+    },
+    {
+      "line": 8204,
+      "action": "await original post-attach runtime under connectionWork.track"
+    },
+    {
+      "line": 8243,
+      "action": "pass loadStartupPlugins callback; invocation timing belongs to unread post-attach implementation"
+    }
+  ],
+  "runtime_binding": "UNBOUND",
+  "fix": "publicGatewayReadonlyLifecycle now requires native startupSettled thenable and awaits it with finite validated deadline before authenticated-client callback; failure/missing/timeout still reaches original close; late settlement never triggers a probe",
+  "contract_tests": {
+    "local_node24_cases": 10,
+    "new_cases": [
+      "delayed native startup forbids early client",
+      "startup rejection closes",
+      "missing startupSettled closes",
+      "startup timeout closes and late readiness never sends client",
+      "invalid deadline rejected before acquisition"
+    ],
+    "scope": "Own fixture tests only; original SDK/authentication not executed"
+  },
+  "remaining": [
+    "Four missing direct dependencies from previous record retained; this is not a recursive closure.",
+    "Three newly explicit native dynamic implementations need original manifest binding before any combined extraction candidate. Do not guess SHA, collect all references or re-request old files.",
+    "Node/native/package/environment bindings and restricted native side-effect profile remain UNKNOWN."
+  ],
+  "onsite": "NOT_EXECUTED",
+  "sdk": "NOT_EXECUTED",
+  "cp11": "NOT_EXECUTED"
+}
