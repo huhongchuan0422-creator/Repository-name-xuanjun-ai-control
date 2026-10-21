@@ -1,0 +1,84 @@
+{
+  "scope": "STATIC_REAL_BYTES_ONLY",
+  "runtime": "NOT_EXECUTED",
+  "sources": [
+    {
+      "member": "dist/server-start-Bz-KV48j.mjs",
+      "bytes": 382422,
+      "sha256": "e3feab1b6f29558035cb7bb49d9d4e296f7f1ea4462c72a03c5912991f526e17",
+      "excerpts": [
+        {
+          "first_line": 5380,
+          "last_line": 5403,
+          "text": "\t\tconst workerEnvironmentStartup = minimalTestGateway || opts.updateCanary ? void 0 : await startupTrace.measure(\"worker-environments.store-import\", async () => {\n\t\t\treturn await (await loadWorkerEnvironmentStartupModule()).loadGatewayWorkerEnvironmentStartupState();\n\t\t});\n\t\tconst { prepareGatewayPluginBootstrap, runGatewayStartupMaintenance } = await startupTrace.measure(\"plugins.bootstrap-imports\", loadStartupPluginsModule);\n\t\tconst pluginGatewayContext = { current: void 0 };\n\t\tconst resolvePluginGatewayContext = () => pluginGatewayContext.current;\n\t\tif (opts.updateCanary) log.warn(\"candidate gateway: session catalogs and maintenance deferred until activation\");\n\t\telse await startupTrace.measure(\"startup.maintenance\", () => runGatewayStartupMaintenance({\n\t\t\tcfgAtStart,\n\t\t\tstartupRuntimeConfig,\n\t\t\tminimalTestGateway,\n\t\t\tlog\n\t\t}));\n\t\tpublishSystemEventStoreConfig(cfgAtStart);\n\t\tconst pluginBootstrap = await startupTrace.measure(\"plugins.bootstrap\", () => prepareGatewayPluginBootstrap({\n\t\t\tcfgAtStart,\n\t\t\tactivationSourceConfig: startupActivationSourceConfig,\n\t\t\tpluginMetadataSnapshot: startupConfigLoad.pluginMetadataSnapshot,\n\t\t\tworkerProviderIds: workerEnvironmentStartup?.durableProviderIds ?? [],\n\t\t\tminimalTestGateway,\n\t\t\tambientEnvTriggers,\n\t\t\tlog\n\t\t}));\n\t\tconst { gatewayPluginConfigAtStart, defaultWorkspaceDir, pluginWorkspaceDir, startupPluginIds, pluginManifestRecords, pluginMetadataSnapshot, pluginLookUpTable, baseMethods, ambientAutostartSuppressedChannelIds } = pluginBootstrap;"
+        },
+        {
+          "first_line": 5557,
+          "last_line": 5562,
+          "text": "\t\t}));\n\t\tcloseStartupTrace = bootstrap.startupTrace.close;\n\t\tpluginRegistryOwner = createPluginRegistryOwner(bootstrap.pluginBootstrap.pluginRegistry, bootstrap.pluginBootstrap.pluginWorkspaceDir);\n\t\tpluginMetadata.publish(bootstrap.pluginMetadataSnapshot);\n\t\tconst preparedPluginRegistryOwner = pluginRegistryOwner;\n\t\tconst runtime = await bootstrap.startupTrace.measure(\"gateway.kernel-state\", () => prepareGatewayKernelState({"
+        },
+        {
+          "first_line": 8239,
+          "last_line": 8261,
+          "text": "\t\tlogChannels,\n\t\tunlockStartupMethods: kernel.unlockStartupMethods,\n\t\trefreshChatMetadata: chatMetadataLifecycle.refresh,\n\t\tloadStartupPlugins: async () => {\n\t\t\tconst { loadGatewayStartupPluginRuntime } = await loadStartupPluginsModule();\n\t\t\treturn loadGatewayStartupPluginRuntime({\n\t\t\t\tcfg: gatewayPluginConfigAtStart,\n\t\t\t\tactivationSourceConfig: startupActivationSourceConfig,\n\t\t\t\tworkspaceDir: runtime.pluginWorkspaceDir,\n\t\t\t\tlog,\n\t\t\t\tbaseMethods,\n\t\t\t\tcoreGatewayMethodNames,\n\t\t\t\thostServices: pluginHostServices,\n\t\t\t\tstartupPluginIds,\n\t\t\t\tpluginLookUpTable,\n\t\t\t\tstartupTrace,\n\t\t\t\tambientEnvTriggers,\n\t\t\t\tresolveGatewayContext: resolvePluginGatewayContext,\n\t\t\t\tpluginRuntimeClaim: startupPluginRuntimeClaim,\n\t\t\t\tgetCurrentPluginRegistry: () => pluginRuntime.registry\n\t\t\t});\n\t\t},\n\t\tonStartupPluginsLoading: () => {"
+        },
+        {
+          "first_line": 8571,
+          "last_line": 8584,
+          "text": "const loadGatewayStartupPostAttachModule = createLazyRuntimeModule(() => import(\"./server-startup-post-attach-CsYAFanV.mjs\"));\nconst { log, logTailscale, logChannels, logHealth, logCron, logReload, logHooks, logWsControl } = gatewayKernelLogs;\nconst POST_READY_WORK_START_DELAY_MS = 500;\nasync function startGatewayServerCore(port = 18789, opts = {}) {\n\tconst sdkResourceHost = new LegacyPluginSdkResourceHost();\n\treturn await sdkResourceHost.run(() => startGatewayServerWithSdkHost(port, opts, sdkResourceHost));\n}\nasync function startGatewayServerWithSdkHost(port, opts, sdkResourceHost) {\n\tconst { promise: postReadyWorkBarrier, resolve: releasePostReadyWork } = createDeferredCore();\n\tconst gatewayKernel = await createGatewayKernel(port, opts, {\n\t\tdeferEarlyRuntime: true,\n\t\tsdkResourceHost\n\t});\n\tbumpSkillsSnapshotVersion({ reason: \"manual\" });"
+        },
+        {
+          "first_line": 8633,
+          "last_line": 8669,
+          "text": "\t\t\trun: releasePostReadyWork\n\t\t});\n\t}, () => {});\n\tlet closePromise;\n\treturn {\n\t\tstartupSettled,\n\t\tgetTailscaleIngressEndpoint: gatewayKernel.transportBridge.getTailscaleIngressEndpoint,\n\t\tclose: (optsLocal) => {\n\t\t\tif (!closePromise) closePromise = sdkResourceHost.run(async () => {\n\t\t\t\tconst prelude = beginClosePrelude(optsLocal);\n\t\t\t\treleasePostReadyWork();\n\t\t\t\tawait prelude;\n\t\t\t\tconst close = await prepareClose(optsLocal);\n\t\t\t\tawait runGatewayCloseSteps({\n\t\t\t\t\towner: gatewayKernel,\n\t\t\t\t\tclose,\n\t\t\t\t\tdisposeTerminalSessions: () => terminalSessions.disposeAll(),\n\t\t\t\t\trunStopHooks: async () => {\n\t\t\t\t\t\tawait shutdownRuntime.runGlobalGatewayStopSafely({\n\t\t\t\t\t\t\tregistry: gatewayKernel.pluginRuntime.registry,\n\t\t\t\t\t\t\tevent: { reason: optsLocal?.reason ?? \"gateway stopping\" },\n\t\t\t\t\t\t\tctx: { port },\n\t\t\t\t\t\t\tonError: (error) => log.warn(`gateway_stop hook failed: ${formatErrorMessage(error)}`)\n\t\t\t\t\t\t});\n\t\t\t\t\t},\n\t\t\t\t\tonError: (message) => log.error(message)\n\t\t\t\t});\n\t\t\t}).catch((error) => {\n\t\t\t\tif (hasRetainedPluginRuntimeCloseError(error)) closePromise = void 0;\n\t\t\t\tthrow error;\n\t\t\t});\n\t\t\treturn closePromise;\n\t\t}\n\t};\n}\n//#endregion\nexport { startGatewayServerCore };"
+        }
+      ]
+    },
+    {
+      "member": "dist/client-B4O1WKhF.mjs",
+      "bytes": 77353,
+      "sha256": "5434ab96d41c82f8717e0bb5b1046f06d41cac0b3da9a5cbf384e0aaad8cf5cc",
+      "excerpts": [
+        {
+          "first_line": 1765,
+          "last_line": 1808,
+          "text": "\t}\n}\nvar GatewayClient = class {\n\t#client;\n\t#options;\n\t#tunnel;\n\t#starting;\n\t#stopping;\n\t#lifetime = new AbortController();\n\tconstructor(opts) {\n\t\tif (opts.sshTunnel && !opts.deviceAuthScope) throw new Error(\"Gateway SSH route requires its own device-auth scope\");\n\t\tif (opts.preparedSshTunnel && !opts.sshTunnel) throw new Error(\"Prepared Gateway SSH tunnel requires its selected route\");\n\t\tthis.#options = opts;\n\t\tthis.#tunnel = opts.preparedSshTunnel;\n\t\tif (!opts.sshTunnel) this.#client = this.createClient(opts.url);\n\t}\n\tcreateClient(url, tlsServerName) {\n\t\tconst opts = this.#options;\n\t\tconst { deviceAuthScope, preparedDeviceAuth, sharedStateMode, sshTunnel, preparedSshTunnel: _preparedSshTunnel, ...baseOptions } = opts;\n\t\tconst runtimeIdentity = resolveGatewayClientPlatformIdentity(process.platform);\n\t\tconst suppressStoredAuth = shouldSuppressStoredDeviceAuth(opts);\n\t\tfor (const value of Object.values(baseOptions.edgeAuthHeaders ?? {})) registerSecretValueForRedaction(value);\n\t\tconst hostDeps = createOpenClawGatewayClientHostDeps(baseOptions.hostDeps, deviceAuthScope, suppressStoredAuth, sharedStateMode, preparedDeviceAuth);\n\t\tif (sshTunnel) {\n\t\t\tconst beforeConnect = hostDeps.beforeConnect;\n\t\t\thostDeps.beforeConnect = () => {\n\t\t\t\tbeforeConnect?.();\n\t\t\t\tif (this.#lifetime.signal.aborted || !this.#tunnel?.isActive()) throw new Error(\"Gateway SSH tunnel is no longer active\");\n\t\t\t};\n\t\t}\n\t\treturn new GatewayClient$1({\n\t\t\t...baseOptions,\n\t\t\turl,\n\t\t\t...tlsServerName ? { tlsServerName } : {},\n\t\t\tclientVersion: baseOptions.clientVersion ?? VERSION,\n\t\t\tplatform: baseOptions.platform ?? runtimeIdentity.platform,\n\t\t\tdeviceFamily: baseOptions.deviceFamily ?? (baseOptions.platform === void 0 ? runtimeIdentity.deviceFamily : void 0),\n\t\t\thostDeps\n\t\t});\n\t}\n\tstart() {\n\t\tif (!this.#options.sshTunnel) {\n\t\t\tthis.#client?.start();\n\t\t\treturn;"
+        },
+        {
+          "first_line": 1859,
+          "last_line": 1884,
+          "text": "\t\t}\n\t}\n\tstop() {\n\t\tif (!this.#options.sshTunnel) {\n\t\t\tthis.#client?.stop();\n\t\t\treturn;\n\t\t}\n\t\tthis.stopAndWait().catch((error) => logError(String(error)));\n\t}\n\tstopAndWait(opts) {\n\t\tif (!this.#options.sshTunnel) return this.#client?.stopAndWait(opts) ?? Promise.resolve();\n\t\tthis.#lifetime.abort();\n\t\tthis.#client?.stop();\n\t\treturn this.#stopping ??= (async () => {\n\t\t\ttry {\n\t\t\t\tawait this.#starting;\n\t\t\t\tawait this.#client?.stopAndWait(opts);\n\t\t\t} finally {\n\t\t\t\tawait this.#tunnel?.stop();\n\t\t\t}\n\t\t})();\n\t}\n\trequest(method, params, opts) {\n\t\treturn this.#client ? this.#client.request(method, params, opts) : Promise.reject(/* @__PURE__ */ new Error(\"Gateway SSH connection has not started\"));\n\t}\n\t/** Current transport state, including CLOSING before the close callback fires."
+        },
+        {
+          "first_line": 1904,
+          "last_line": 1906,
+          "text": "};\n//#endregion\nexport { prepareGatewayClientDeviceAuth as n, GatewayClient as t };"
+        }
+      ]
+    },
+    {
+      "member": "dist/loader-runtime-load-DpgEqnzx.mjs",
+      "bytes": 273593,
+      "sha256": "3c30c5d43fb3cd19525853bb6b756cf45cfd05f5da32a732dc129b85cb309787",
+      "excerpts": [
+        {
+          "first_line": 6166,
+          "last_line": 6214,
+          "text": "}\n/** Acquires a fresh discovery registry; release waits for its registration resources. */\nasync function acquirePluginRegistryForInspection(options = {}) {\n\treturn acquireRegistryResources((resources) => loadOpenClawPluginsCore({\n\t\t...options,\n\t\tactivate: false,\n\t\tcache: false\n\t}, loaderBindings, void 0, resources));\n}\nasync function acquireRegistryResources(load) {\n\tconst cache = createPluginCache();\n\tconst resources = new PluginRegistryInspectionResources(async (registry, rollbackInstances) => {\n\t\tconst instances = new Set(cache.instances);\n\t\tfor (const record of registry?.plugins ?? []) {\n\t\t\tconst instance = getPluginInstance(record);\n\t\t\tif (instance && instance.owner?.registry === registry) instances.add(instance);\n\t\t}\n\t\tconst results = await Promise.allSettled([...instances].filter((instance) => !rollbackInstances.has(instance)).map((instance) => instance.dispose()));\n\t\tfor (const instance of instances) releasePluginCacheInstance(instance, cache);\n\t\ttry {\n\t\t\tawait retirePluginCache(cache);\n\t\t} catch (reason) {\n\t\t\tresults.push({\n\t\t\t\tstatus: \"rejected\",\n\t\t\t\treason\n\t\t\t});\n\t\t}\n\t\tconst failures = results.flatMap((result) => result.status === \"rejected\" ? [result.reason] : []);\n\t\tif (failures.length) throw new PluginRuntimeCloseRetainedError(new AggregateError(failures, \"Plugin inspection instances failed to retire\"));\n\t});\n\ttry {\n\t\tinheritPluginNativeAdmissions(getPluginCache(), cache);\n\t\treturn {\n\t\t\tregistry: withPluginCache(cache, () => load(resources)),\n\t\t\trelease: () => resources.release()\n\t\t};\n\t} catch (error) {\n\t\ttry {\n\t\t\tawait resources.release();\n\t\t} catch (disposalError) {\n\t\t\tthrow new AggregateError([error, disposalError], \"Plugin inspection failed and its resources could not be disposed\", { cause: disposalError });\n\t\t}\n\t\tthrow error;\n\t}\n}\nfunction loadOpenClawPluginsWithInternalOverrides(options, overrides) {\n\treturn loadRegistryWithInternalOverrides(options, overrides);\n}\n/** Owns the same narrow capability runtime without publishing or caching its registrations. */"
+        }
+      ]
+    },
+    {
+      "member": "dist/server-methods-DJEQKCcV.mjs",
+      "bytes": 41747,
+      "sha256": "6a4db1ab8f440777eb96f7149dc00f12d311770d1400629092c990f6e92a3848",
+      "excerpts": [
+        {
+          "first_line": 662,
+          "last_line": 684,
+          "text": "\tasync function invokeWithRequestScope() {\n\t\tconst postAdmissionRateLimitError = isSuspendPrepare ? void 0 : rejectRateLimitedControlPlaneWrite();\n\t\tif (postAdmissionRateLimitError) return await options.reject(postAdmissionRateLimitError);\n\t\tconst releaseForegroundWork = retainSessionListForegroundWork();\n\t\ttry {\n\t\t\tconst pluginRegistry = options.methodRegistry.pluginRegistry ?? getPluginRuntimeGatewayRequestScope()?.pluginRegistry ?? getActivePluginRegistry() ?? void 0;\n\t\t\tconst invoke = () => withPluginRuntimeGatewayRequestScope({\n\t\t\t\tcontext: options.context,\n\t\t\t\tresolveGatewayContext: options.context.resolveGatewayContext,\n\t\t\t\tclient,\n\t\t\t\tsignal: options.signal,\n\t\t\t\thasCurrentClientAuthority: options.hasCurrentClientAuthority,\n\t\t\t\tisWebchatConnect: options.isWebchatConnect,\n\t\t\t\t...client?.internal?.nodeInvokeStream ? getPluginRuntimeGatewayNodeAuthorities() : {},\n\t\t\t\t...pluginRegistry ? { pluginRegistry } : {}\n\t\t\t}, fn);\n\t\t\treturn await (options.methodRegistry.isObservation(method) ? runWithGatewayObservationScope(invoke, [options.signal, client?.connectionSignal], () => options.reject(getGatewayRestartDrainSignal().aborted ? workAdmissionUnavailableError(method) : errorShape(ErrorCodes.UNAVAILABLE, `${method} observation cancelled`, { retryable: true }))) : invoke());\n\t\t} catch (error) {\n\t\t\tif (error instanceof SessionMutationAuthorizationChangedError) return await options.reject(error.error);\n\t\t\tconst staleInstall = classifyGatewayStaleInstall(error);\n\t\t\tif (staleInstall) return await options.reject(staleInstall.error);\n\t\t\tthrow error;\n\t\t} finally {"
+        }
+      ]
+    }
+  ]
+}
