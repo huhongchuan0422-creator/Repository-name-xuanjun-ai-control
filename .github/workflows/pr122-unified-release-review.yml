@@ -3,6 +3,7 @@ on:
   push:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
+      - 'tools/pr122_static_baseline_readonly.py'
       - 'scripts/pr122_static_*.py'
       - 'scripts/pr122_customer_workflow.py'
       - 'scripts/pr122_customer_review.py'
@@ -32,6 +33,43 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Exact 23 static baseline readonly regressions as nonroot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pr122-unified-reports
+          export PR122_SOURCE_TREE="$(git rev-parse HEAD^{tree})"
+          python -B - <<'PYBASELINE' 2>&1 | tee /tmp/pr122-unified-reports/STATIC_BASELINE_READONLY_TESTS.log
+          import hashlib,json,os,sys,unittest
+          from pathlib import Path
+          assert sys.version_info[:2]==(3,11), 'Target Python version changed'
+          assert os.geteuid()!=0, 'Readonly synthetic tests must run non-root'
+          blocked=[]
+          def guard(event,args):
+              if event.startswith('socket.') or event in ('subprocess.Popen','os.system','os.posix_spawn','os.fork','os.forkpty','os.exec'):
+                  blocked.append(event)
+                  raise AssertionError('FORBIDDEN_NETWORK_OR_PROCESS')
+              if event=='open' and args and isinstance(args[0],str) and any(args[0]==p or args[0].startswith(p+'/') for p in ('/etc/nginx','/etc/systemd/system','/var/www/wenwenwenyiyiyi.work','/var/lib/xuanjun-pr122-site-hub','/var/lib/xuanjun-site-hub-preview','/usr/local/libexec/pr122_website_release.py')):
+                  blocked.append('protected-path')
+                  raise AssertionError('FORBIDDEN_PRODUCTION_PATH')
+          sys.addaudithook(guard)
+          suite=unittest.defaultTestLoader.loadTestsFromName('tests.test_pr122_static_baseline_readonly')
+          def cases(group):
+              for item in group:
+                  if isinstance(item,unittest.TestSuite):yield from cases(item)
+                  else:yield item.id()
+          case_ids=list(cases(suite))
+          assert suite.countTestCases()==len(set(case_ids))==23, 'Readonly test collection changed'
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.testsRun==23 and result.wasSuccessful() and not result.skipped and not result.expectedFailures and not result.unexpectedSuccesses and not blocked
+          bindings=[]
+          for name in ('tools/pr122_static_baseline_readonly.py','tests/test_pr122_static_baseline_readonly.py','.github/workflows/pr122-unified-release-review.yml'):
+              body=Path(name).read_bytes()
+              bindings.append({'path':name,'size':len(body),'sha256':hashlib.sha256(body).hexdigest()})
+          receipt={'source_commit':os.environ['GITHUB_SHA'],'source_tree':os.environ['PR122_SOURCE_TREE'],'run_id':os.environ['GITHUB_RUN_ID'],'python':sys.version,'euid':os.geteuid(),'case_ids':case_ids,'total':result.testsRun,'passed':result.testsRun,'skipped':0,'errors':0,'failures':0,'blocked_network_process_or_protected_path_attempts':blocked,'files':bindings,'scope':'SYNTHETIC_FD_FIXTURES_ONLY','real_collect':'NOT_RUN','field_execution':'NOT_RUN','production_release':'HOLD'}
+          Path('/tmp/pr122-unified-reports/STATIC_BASELINE_READONLY_BINDING.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          PYBASELINE
       - name: Static controlled profile and inherited ledger regressions
         run: |
           set -euo pipefail
