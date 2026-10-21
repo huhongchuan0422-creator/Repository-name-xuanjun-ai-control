@@ -1,0 +1,70 @@
+{
+  "scope": "STATIC_VERIFIED_BYTES_ONLY",
+  "parent": "0dbc64b1cd14b7ce326bb71911f92fef93b0839a",
+  "archive": {
+    "bytes": 51200,
+    "sha256": "dbbdfae719e63f8472be92ad08a0c1adbc0857ac5608add0f8fbf829079635ce"
+  },
+  "report": {
+    "bytes": 1968,
+    "sha256": "581c04f097899c1f5fb3c3705226f5ed0b956a202564b10e061e318aa8811f70"
+  },
+  "verification": "Exact four regular members; each size/SHA matches fixed report and frozen pins; total 46229 bytes",
+  "original_inputs": "UNCHANGED per Owner terminal receipt",
+  "findings": [
+    {
+      "source": "dist/server-startup-plugins-Cajv-q3y.mjs",
+      "facts": [
+        "prepareGatewayPluginBootstrap calls initSubagentRegistry unconditionally, creates/marks an empty registry active and records original runtime load context.",
+        "Real startup runtime dynamically imports server-plugin-bootstrap-BF-wNIVo.mjs and calls prepareGatewayPluginLoad(loadIntent=startup,channelPluginLoadIntent=full).",
+        "Superseded pluginRuntimeClaim returns current registry; validation failure retires bindings and disposes registry instances.",
+        "minimalTestGateway skips lookup-table loading; it is not proof of real plugin startup."
+      ]
+    },
+    {
+      "source": "dist/server-startup-config-Hx2M1x7s.mjs",
+      "facts": [
+        "Real configuration delegates to server-startup-config-helpers-d2nPJiVj.mjs.",
+        "Secrets startup can take a fast path, but only after checking legacy auth sources; otherwise auth profiles/runtime are dynamically loaded.",
+        "Weak-auth assertion remains in finishPreparedSnapshot. No basis to bypass real authentication or claim no auth-store access from this module alone."
+      ]
+    },
+    {
+      "source": "dist/proxy-lifecycle-Dl57fEmL.mjs",
+      "facts": [
+        "Statically imports @openclaw/proxyline even if startProxy returns null for disabled configuration.",
+        "Inherited OPENCLAW_PROXY_ACTIVE may reinstall process-wide proxy routing; future isolated environment must exclude inherited proxy activation.",
+        "Client relative file gap is closed; Proxyline and static transitive dependencies remain unresolved."
+      ]
+    },
+    {
+      "source": "dist/url-protocol-OU3K-ySz.mjs",
+      "facts": [
+        "Standalone protocol predicates; no imports. Actual bytes now verified."
+      ]
+    }
+  ],
+  "next_required_implementation_bytes": [
+    {
+      "path": "dist/server-plugin-bootstrap-BF-wNIVo.mjs",
+      "reason": "Actual prepareGatewayPluginLoad implementation is required to prove startup plugin selection, registration and side effects.",
+      "binding": "Not present in received four or existing extracted source; size/SHA NOT_YET_LOCATED; no guessed pin."
+    },
+    {
+      "path": "dist/server-startup-config-helpers-d2nPJiVj.mjs",
+      "reason": "Actual config snapshot/auth override and source resolution behavior required to freeze restricted native startup profile.",
+      "binding": "Not present in received four or existing extracted source; size/SHA NOT_YET_LOCATED; no guessed pin."
+    }
+  ],
+  "remaining": [
+    "Restricted native startup profile and its side effects are not proven.",
+    "Node/shared libraries/SDK package exports/native/resource dependency closure UNKNOWN.",
+    "Actual authenticated client subject/scopes/context must come from original handshake/current authorization chain; no fixture substitution.",
+    "Real SDK loading, authenticated request and ordered shutdown are NOT_EXECUTED."
+  ],
+  "installation_selected_members": [],
+  "sdk": "NOT_EXECUTED",
+  "cp11": "NOT_EXECUTED",
+  "dependency_closure": "UNKNOWN",
+  "tests": "Only offline stdlib tar/report/exact-member size/SHA checks executed; no archived SDK/Node/parser execution; unchanged old contract CI reused."
+}
