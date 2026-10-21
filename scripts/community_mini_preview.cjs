@@ -6,7 +6,7 @@ async function main(){
  const destination=process.env.COMMUNITY_PREVIEW_OUTPUT;
  if(!destination)throw Error('OUTPUT_DIRECTORY_REQUIRED');
  fs.mkdirSync(destination,{recursive:true,mode:0o700});
- const projectPath=path.resolve('clients/community-mini');
+ const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
