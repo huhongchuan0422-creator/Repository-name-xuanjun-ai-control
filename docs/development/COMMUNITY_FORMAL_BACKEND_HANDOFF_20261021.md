@@ -29,7 +29,7 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 | 小程序入口 | https://community-preview.wenwenwenyiyiyi.work，pages/home/index?scene=shop1；payments=false | 当前仍BACKEND_NOT_READY；DNS、TLS终结点、入口反代所在主机及实际upstream映射UNKNOWN。国内Runner位置不证明入口或应用部署位置 |
 | 社区应用 | 英国既有主机iZd7oeikknn1z21sq6ji6zZ；规划项目域uk-community-payment | 容器名/不可变image digest、非root UID/GID、容器内启动入口、网络/端口/卷及当前存在状态待原始回执；不能沿用原国内systemd候选，也不能挪用P2/B5容器 |
 | 正式源码接点 | MiniApplication.from_existing_runtime → 原configure方法 → listen_proxy | 是同进程Python组合API，不是已冻结的容器启动命令。宿主bootstrap、受保护配置引用、实际健康端点路由及同版本运行回执尚缺 |
-| 原Center | 精确原Center对象、原StageRuntime与已有持久库 | 原实例实际位置/归属及8类store历史路径UNKNOWN。该API不支持把远端HTTP服务伪装为Center；若原Center不在英国同进程，须先由Owner选择经批准的迁移/服务边界方案，不跨主机挂载活动SQLite、不新建空Center或第二身份系统 |
+| 原Center | 精确原Center对象、原StageRuntime与已有持久库 | 原实例实际位置/归属及8类store历史路径UNKNOWN。该API不支持把远端HTTP服务伪装为Center；公共大脑、客服中心固定留国内；源码Center与国内实际服务对应关系NOT_VERIFIED，仅沿既有受控接口明确服务边界，不迁库，不跨主机挂载活动SQLite、不新建空Center或第二身份系统 |
 | 持久数据 | 每项目独立卷/数据库角色/备份；config.stores校验容器命名空间内准确路径 | 缺host→container映射、原数据来源/非空历史、schema/版本、单Writer/锁、服务UID和恢复演练证据；不得让两个应用Writer同时打开同一活动数据库 |
 | 公益视频 | 同一英国物理主机上的另一独立项目域uk-public-benefit-video | 仅记录部署资源/隔离候选；本窗口不开发视频业务、不另开Writer，不假定其容器或资源已部署 |
 | 国内Runner | 原miniprogram-ci上传及既有检查 | 不承担社区或视频应用后端；不把上传成功作为英国服务可用或客户验收证据 |
@@ -46,10 +46,10 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 
 | 项目 | CPU硬上限 | 内存硬上限/Swap策略 | PID硬上限 | 持久磁盘与临时空间 | 日志上限 | 本轮准入 |
 |---|---|---|---|---|---|---|
-| uk-community-payment | 待容量回执与社区负载峰值确定；独立cpu quota/period或对应控制器硬限额 | 待定；独立memory hard limit，Swap能力/策略须实证 | 待定；独立pids limit | 独立业务卷、DB/WAL、备份、上传与tmp配额分别冻结 | 单文件大小×保留数及总量均须有界 | HOLD，未设置 |
-| uk-public-benefit-video | 待视频API/worker负载与剩余预算确定；转码不得挤占社区和B5 | 待定；API/worker/队列/DB按实际组件分项，合计不超项目上限 | 待定；按实际组件合计受项目上限约束 | 原件/产物/转码tmp/队列/DB/备份独立配额与生命周期 | 每组件轮转及项目总量上限 | HOLD，未设置 |
+| uk-community-payment | ≤英国CPU总资源1/5，实际quota待容量回执，且受剩余预算约束 | ≤英国内存总资源1/5，实际hard limit待核；Swap策略须实证 | 待定；独立pids limit | 可分配业务存储≤英国对应总资源1/5；业务卷/DB/WAL/备份/上传/tmp分别冻结 | 单文件大小×保留数及总量均须有界 | HOLD，未设置 |
+| uk-public-benefit-video | ≤英国CPU总资源1/3；API/worker合计，实际quota待核 | ≤英国内存总资源1/3；API/worker/队列/DB合计，实际hard limit待核 | 待定；按实际组件合计受项目上限约束 | 可分配业务存储≤英国对应总资源1/3；原件/产物/tmp/队列/DB/备份分项 | 每组件轮转及项目总量上限 | HOLD，未设置 |
 
-冻结方法：对CPU、内存、PID、磁盘分别取得宿主可分配总预算H、已有非本项目且不含B与R的占用/硬预留E、原管理方批准且不可削减的B5/P2预算B、系统运行与故障恢复预留R，定义可分配新增预算A=H-E-B-R。社区C与视频V必须均为有限正硬上限，且C+V≤A；不得把当前低使用率当作可侵占B5的预算。每项以业务有界负载测得的峰值与Owner批准的余量选值，不自行创造比例。若预算或硬限额不能由现有cgroup/文件系统证明可强制执行，则不启动该负载。
+冻结方法：对CPU、内存、PID、磁盘分别取得宿主可分配总预算H、已有非本项目且不含B与R的占用/硬预留E、原管理方批准且不可削减的B5/P2预算B、系统运行与故障恢复预留R，定义可分配新增预算A=H-E-B-R。社区C与视频V必须均为有限正硬上限，且C+V≤A；不得把当前低使用率当作可侵占B5的预算。每项以业务有界负载测得的峰值与Owner批准的余量选值，按Owner #6313455771，CPU、内存、可分配业务存储还须分别满足C≤H/5、V≤H/3，C+V≤min(8H/15,A)。比例是上限而非预留或已设置值；PID与日志仍按实际容量冻结有限值，不从CPU比例推算。若预算或硬限额不能由现有cgroup/文件系统证明可强制执行，则不启动该负载。
 
 必须由既有现场管理方一次回交的容量字段：采集时间/hostname、在线CPU与既有限额、CPU峰值/压制信息、MemTotal/MemAvailable/Swap与容器内存峰值、当前容器及B5/P2实际硬配额和Owner保留预算、pids.current/pids.max或v1对应值、目标卷可用空间/inode/现存配额机制、DB/WAL/备份与视频临时峰值、日志驱动及轮转能力、实际cgroup版本和CPU/memory/pids控制器可用性。最新占用缺失时不得宣称可承载。仅列核查合同，本轮不执行命令。
 
@@ -83,3 +83,7 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 - [B5取件工具限额，非可分配容量](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6313179688)
 - 正式接线源码1ac19e4a564de161ad65c1db6300a9ee4bc9a536，Tree16e3646830fb05a68e7cc7112804eb0cd84216aa，[Hosted39580901541](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39580901541) SUCCESS，1090+342 Python与334+40+8+7 Node合计1821项；含非root Unix代理、真实RSA合成签名接线。不是英国容器运行或真实商户/资金验收。
 - 后续仅文档更正不改写该Run/源码包的SHA绑定，不宣称新文档Commit已有同SHA Hosted或已重包。BACKEND_NOT_READY、真实登录/客户验收未通过及Finance UNCONFIRMED继续保留。
+
+## 国内服务复用证据增量
+
+公共大脑、客服中心留国内。实际国内源码的受控bridge、身份模型与社区Center的差异、接口缺项、下一最小改动及域名候选见[跨机接口增量](COMMUNITY_DOMESTIC_INTERFACE_DELTA_20261021.md)。已存在的round-trip不能当身份/门店授权接口；不放宽本地Center类型检查、不挂远端活动SQLite、不迁库或新建身份系统。本节与Owner #6313455771覆盖此前位置待定表述；现场操作仍单独确认。

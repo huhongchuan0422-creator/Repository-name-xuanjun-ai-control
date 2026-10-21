@@ -3220,3 +3220,11 @@ BACKEND_NOT_READY硬门禁和客户真机验收FAIL状态继承；无服务器�
 CPU/内存/PID/磁盘/日志必须分别冻结有限硬上限；PR133 #6281322867仍缺精确值，B5 #6313179688的768MiB/CPU180s等仅取件工具限额，V27的4C16G仅参考，均不能当当前可分配容量。现有最新占用、B5/P2不可削减预算、系统预留及cgroup/磁盘/日志可强制机制未齐，数值保持待定、部署HOLD，不填猜测或无限制默认。两项目新增上限合计不得超过扣除现有占用、B5预留及系统恢复预留后的核准预算。完整资源表与证据缺项见COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md。
 
 正式接线1ac19e4a / Tree16e3646830fb05a68e7cc7112804eb0cd84216aa的Hosted39580901541已SUCCESS，1821项；本次仅文档更正复用源码结果，不重跑未变测试、不把该Run改绑文档Commit。无现场/服务器/云/Actions服务器命令/DNS/凭据或安全设置操作；BACKEND_NOT_READY和客户未验收状态不变。
+
+#### 国内公共服务与英国业务边界（Owner #6313455771）
+
+社区CPU、内存及可分配业务存储各≤英国对应总资源1/5，公益视频各≤1/3；实际额度还须扣除既有服务、B5/P2不可削减预算及系统预留，合计≤min(8H/15,H-E-B-R)。比例不是预留或已设置值；容量未核，数值未设置，PID/日志仍须有界。
+
+公共大脑、客服中心留国内，不迁库。已核国内源码存在受控/provider-neutral/bridge/v1/round-trip、独立model/complete及healthz；有HMAC/TTL/防重放，但允许channel不含小程序，未提供社区用户的tenant/project/store授权证明。国内CustomerSource/CustomerRepository与源码PR122 Center映射NOT_VERIFIED，不能把远端服务当本地Center或直接跨机挂活动SQLite。下一最小改动先由原国内责任方提供既有身份/微信绑定和权限投影合同，再按原受控接口确定薄接线；不新建身份系统，不把模型调用作为支付准入。
+
+准确源码hash、接口证据、缺项和验证方案见[跨机接口增量](COMMUNITY_DOMESTIC_INTERFACE_DELTA_20261021.md)。域名优先现有community-preview.wenwenwenyiyiyi.work；视频二级域名仅候选，center现有网站域名不挪用。复用1ac19e4a Hosted39580901541的1821项通过结果，本轮文档不等于跨机联通或现场通过；BACKEND_NOT_READY保持。
