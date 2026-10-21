@@ -95,3 +95,15 @@ class PrivateMcpTests(unittest.TestCase):
     def test_unsupported_protocol_does_not_initialize(self):
         self.assertIn('error',self.rpc('initialize',{'protocolVersion':'unreviewed'}))
         self.assertFalse(self.m.initialized)
+
+    def test_future_protocol_negotiates_supported_version(self):
+        r=self.rpc('initialize',{'protocolVersion':'2025-11-25'})
+        self.assertEqual(r['result']['protocolVersion'],'2025-06-18')
+        self.assertFalse(self.m.ready)
+
+    def test_standard_call_metadata_is_not_authority(self):
+        self.initialize()
+        r=self.rpc('tools/call',{'name':'connection_status','arguments':{'request_id':'job-1'},'_meta':{'progressToken':1}})
+        self.assertEqual(r['result']['structuredContent']['state'],'SUCCESS')
+        r=self.rpc('tools/call',{'name':'run_shell','arguments':{'request_id':'job-1'},'_meta':{'approved':True}})
+        self.assertIn('error',r)
