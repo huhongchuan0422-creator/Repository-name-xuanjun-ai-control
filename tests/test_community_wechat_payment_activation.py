@@ -77,12 +77,11 @@ class WechatPaymentActivation(unittest.TestCase):
   second=project_wechat_merchants(identity,service,self.reader,self.admissions)
   self.assertEqual(first,second)
   self.assertNotIn('sub_mchid',json.dumps(self.admissions))
- def test_application_mapping_conflict_and_missing_admission_rejected(self):
+ def test_same_application_same_store_scene_replay_is_idempotent_and_missing_admission_rejected(self):
   with self.assertRaises(PermissionError):self.project({})
-  # A second scene pointing at the same opened application must not silently reuse it.
   self.identity.scenes['shop2']=dict(self.identity.scenes['shop1'])
-  with self.assertRaises(PermissionError):
-   project_wechat_merchants(self.identity,self.fx.fx.service,self.reader,
+  result=project_wechat_merchants(self.identity,self.fx.fx.service,self.reader,
       dict(self.admissions,shop2=dict(self.admissions[self.scene])))
+  self.assertEqual(result['shop1'],result['shop2'])
 
 if __name__=='__main__':unittest.main()

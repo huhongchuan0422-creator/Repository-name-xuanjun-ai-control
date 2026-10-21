@@ -52,7 +52,7 @@ def project_wechat_merchants(identity,onboarding,reader,admissions):
         raise PermissionError('PAYMENT_PRODUCT_ADMISSION_REQUIRED')
 
     result={}
-    seen_applications=set()
+    seen_applications={}
     c=identity.center
     for scene,binding in identity.scenes.items():
         if scene not in admissions:
@@ -77,9 +77,10 @@ def project_wechat_merchants(identity,onboarding,reader,admissions):
                 or record.get('project')!=binding['project']):
             raise PermissionError('SCENE_OPENING_BINDING_MISMATCH')
         authorize_workspace(onboarding,onboarding.operations,record['workspace'],owner)
-        if application in seen_applications:
+        prior_scope=seen_applications.get(application)
+        if prior_scope is not None and prior_scope!=scope:
             raise PermissionError('APPLICATION_PAYMENT_MAPPING_CONFLICT')
-        seen_applications.add(application)
+        seen_applications[application]=dict(scope)
 
         applyment=onboarding.wechat_applyment._read(application)
         if (type(applyment) is not dict
