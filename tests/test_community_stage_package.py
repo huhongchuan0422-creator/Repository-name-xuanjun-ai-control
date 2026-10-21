@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,7 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
+                'deploy/community-preview/prepare-mini.cjs',
                 'clients/community-mini/pages/home/index.js',
                 'clients/community-mini/pages/home/index.json',
                 'clients/community-mini/pages/home/index.wxml',
@@ -49,6 +51,16 @@ class SourcePackage(unittest.TestCase):
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
             with tempfile.TemporaryDirectory() as tmp:
                 archive.extractall(tmp)
+                output=Path(tmp)/'connected-preview'
+                prepared=subprocess.run(
+                    ['node','deploy/community-preview/prepare-mini.cjs'],cwd=tmp,
+                    env=dict(os.environ,COMMUNITY_CONNECTED_MINI_OUTPUT=str(output)),
+                    stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=30)
+                self.assertEqual(prepared.returncode,0,prepared.stdout)
+                receipt=json.loads((output/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
+                self.assertEqual(receipt['baseUrl'],'https://community-preview.wenwenwenyiyiyi.work')
+                self.assertTrue(receipt['commerce']);self.assertFalse(receipt['payments'])
+                self.assertTrue((output/'pages/home/index.wxml').is_file())
                 isolated=subprocess.run(
                     [sys.executable,'-B','-m','unittest','discover','-s','tests',
                      '-p','test_community_bill_contract_evidence.py','-v'],
