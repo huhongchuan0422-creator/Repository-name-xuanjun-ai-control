@@ -33,13 +33,14 @@ case "$cmd" in
  show) cat "$S/pid";;
  stop) rm -f "$S/active";;
  start|restart)
+   if [ "${FAIL_START_ONCE:-0}" = 1 ] && [ ! -e "$S/start_failed_once" ];then : >"$S/start_failed_once";exit 70;fi
    [ "${FAIL_START:-0}" != 1 ] || exit 70
    old=0; [ -f "$S/pid" ] && old="$(cat "$S/pid")"
    if [ "${KEEP_OLD_PID:-0}" = 1 ] && [ "$old" -gt 0 ];then pid="$old";else pid=$((old+1));[ "$pid" -ge 101 ]||pid=101;fi
    echo "$pid" >"$S/pid";: >"$S/active"
    rm -rf "$FAKE_PROC/$pid";mkdir -p "$FAKE_PROC/$pid"
    target="$(readlink -f "$FAKE_CURRENT")"
-   [ "${WRONG_CWD:-0}" != 1 ] || target="$FAKE_WRONG_RELEASE"
+   if [ "${WRONG_CWD_ONCE:-0}" = 1 ] && [ ! -e "$S/wrong_cwd_once" ];then : >"$S/wrong_cwd_once";target="$FAKE_WRONG_RELEASE";elif [ "${WRONG_CWD:-0}" = 1 ];then target="$FAKE_WRONG_RELEASE";fi
    ln -s "$target" "$FAKE_PROC/$pid/cwd"
    python - "$FAKE_SOCKET" <<'PY'
 import os,socket,sys
@@ -96,6 +97,14 @@ exit 73
   rel=self.base()/'releases/new-release';rel.mkdir(parents=True);sent=rel/'KEEP';sent.write_text('sentinel')
   p=self.run();self.assertEqual(p.returncode,32,p.stdout+p.stderr)
   self.assertEqual(sent.read_text(),'sentinel');self.assertFalse((self.base()/'transactions/new-release').exists())
+ def test_release_mkdir_failure_does_not_delete_foreign_directory(self):
+  releases=self.base()/'releases';releases.mkdir(parents=True)
+  foreign=releases/'foreign';foreign.mkdir();sent=foreign/'KEEP';sent.write_text('foreign')
+  releases.chmod(0o500)
+  try:p=self.run()
+  finally:releases.chmod(0o700)
+  self.assertNotEqual(p.returncode,0);self.assertEqual(sent.read_text(),'foreign')
+  self.assertFalse((releases/'new-release').exists())
  def test_first_start_commits_only_running_new_release(self):
   p=self.run();self.assertEqual(p.returncode,0,p.stdout+p.stderr)
   rel=self.base()/'releases/new-release';pid=(self.state/'pid').read_text().strip()
@@ -111,13 +120,14 @@ exit 73
   self.assertNotEqual(p.returncode,0);self.assertFalse((self.base()/'transactions/new-release/COMMITTED').exists())
   self.assertEqual((self.base()/'current').resolve(),old.resolve())
  def test_wrong_running_version_cwd_cannot_commit(self):
-  old=self.seed_old();(self.root/'wrong-release').mkdir();p=self.run(WRONG_CWD=1)
+  old=self.seed_old();(self.root/'wrong-release').mkdir();p=self.run(WRONG_CWD_ONCE=1)
   self.assertNotEqual(p.returncode,0);self.assertFalse((self.base()/'transactions/new-release/COMMITTED').exists())
   self.assertEqual((self.base()/'current').resolve(),old.resolve())
  def test_start_failure_restores_old_and_removes_only_owned_release(self):
-  old=self.seed_old();p=self.run(FAIL_START=1)
-  self.assertNotEqual(p.returncode,0);self.assertEqual((self.base()/'current').resolve(),old.resolve())
+  old=self.seed_old();p=self.run(FAIL_START_ONCE=1)
+  self.assertEqual(p.returncode,90,p.stdout+p.stderr);self.assertEqual((self.base()/'current').resolve(),old.resolve())
   self.assertFalse((self.base()/'releases/new-release').exists());self.assertTrue((old/'KEEP').exists())
+  self.assertTrue((self.state/'active').exists());self.assertTrue((self.base()/'transactions/new-release/ROLLED_BACK').exists())
  def test_rollback_failure_records_hold(self):
   self.seed_old();p=self.run(FAIL_START=1,FAIL_RELOAD=1)
   tx=self.base()/'transactions/new-release'

@@ -74,7 +74,16 @@ rollback(){
  record systemctl_cmd daemon-reload
  if nginx_cmd -t >/dev/null 2>&1;then record systemctl_cmd reload nginx;else failures="$failures\nnginx_cmd -t";fi
  if [ -e "$BACKUP/enabled" ];then record systemctl_cmd enable xuanjun-community-preview.service;else record systemctl_cmd disable xuanjun-community-preview.service;fi
- if [ -e "$BACKUP/active" ];then record systemctl_cmd start xuanjun-community-preview.service;else record systemctl_cmd stop xuanjun-community-preview.service;fi
+ if [ -e "$BACKUP/active" ];then
+   if systemctl_cmd start "$SERVICE";then
+     RESTORED_PID="$(systemctl_cmd show -p MainPID --value "$SERVICE" 2>/dev/null || true)"
+     case "$RESTORED_PID" in ''|*[!0-9]*) failures="$failures\nrestore MainPID";;
+       *) if [ "$RESTORED_PID" -le 0 ] || [ "$(readlink -f "$PROC_ROOT/$RESTORED_PID/cwd" 2>/dev/null || true)" != "$(readlink -f "$CURRENT" 2>/dev/null || true)" ];then failures="$failures\nrestore running version";fi;;
+     esac
+   else failures="$failures\nsystemctl start $SERVICE";fi
+ else
+   record systemctl_cmd stop "$SERVICE"
+ fi
  if [ "$RELEASE_CREATED" = 1 ] && [ -d "$RELEASE" ];then record rm -rf --one-file-system "$RELEASE";fi
  if [ -n "$failures" ];then
    printf 'ROLLBACK_HOLD%s\n' "$failures" >"$TX/HOLD"
