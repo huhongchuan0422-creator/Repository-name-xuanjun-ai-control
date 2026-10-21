@@ -96,3 +96,15 @@ unit仅保留CAP_DAC_READ_SEARCH以读取原UID1003私有凭据，开启NoNewPri
 5. 完整运维操作按真实业务授权注册；连接组件不能自动批准P2、官网或资金写入。
 
 OVERALL_ACCEPTANCE=INCOMPLETE。B5/SDK/生产部署/采购均NOT_EXECUTED。
+
+
+## 冻结前部署入口与CI修复
+
+部署入口deployment/cloud-connection/enroll.py默认只做plan；仅--apply才创建新服务对象。
+其运行源码固定f3bfc3fe531c7dcbaa4d94bb8ef52b83e3f02565，逐文件绑定queue/worker/runtime/unit四个SHA；不取浮动分支。
+任何既有目标对象/部分安装均HOLD，不覆盖、不盲重启，不触及旧P2。
+新增6项enrollment负向/模拟测试，最终本地49项通过（43已包含于49）。
+
+首轮Hosted 39621957992：Python3.6.15的43项通过；Python3.12因容器Git目录属主检查在测试前退出，不能写双版本全PASS。
+修复只为准确已检出workspace按命令指定safe.directory，继续强制git HEAD等于GITHUB_SHA，并保留真实Git Tree/Parent日志；不使用||true忽略版本检查，不降低测试。
+新版Hosted以最终提交回执为准。所有Hosted均为GitHub托管离线容器，无self-hosted、云秘密或服务器命令。
