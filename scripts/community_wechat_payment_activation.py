@@ -31,13 +31,8 @@ def _admission(value):
     return value
 
 
-def project_wechat_merchants(identity,onboarding,reader,admissions):
-    """Return the existing MiniPayments merchants mapping for startup composition.
-
-    sub_mchid is derived only from the provider-signed applyment record. The host
-    admission supplies product eligibility and non-secret presentation/callback
-    configuration. Missing/unknown/revoked evidence fails closed.
-    """
+def project_wechat_scene(identity,onboarding,reader,scene,product):
+    """Revalidate one scene against current Center/applyment state."""
     from scripts.community_mini_center_identity import CenterIdentity
     from scripts.community_merchant_onboarding import MerchantOnboarding
     from scripts.community_wechat_sp_readonly import PartnerOrderReader
@@ -48,60 +43,65 @@ def project_wechat_merchants(identity,onboarding,reader,admissions):
             or onboarding.wechat_applyment is None
             or onboarding.wechat_applyment.reader is not reader):
         raise ValueError('SAME_EXISTING_PAYMENT_COMPOSITION_REQUIRED')
-    if type(admissions) is not dict or not admissions:
-        raise PermissionError('PAYMENT_PRODUCT_ADMISSION_REQUIRED')
-
-    result={}
-    seen_applications={}
-    c=identity.center
-    for scene,binding in identity.scenes.items():
-        if scene not in admissions:
-            raise PermissionError('SCENE_PAYMENT_ADMISSION_REQUIRED')
-        product=_admission(admissions[scene])
-        principal=binding['principal']
-        if principal not in identity.runtime.bindings:
-            raise PermissionError('REGISTERED_SCENE_PRINCIPAL_REQUIRED')
-        scope=dict(identity.runtime.bindings[principal])
-        if binding['project'] is None:
-            raise PermissionError('SCENE_PROJECT_REQUIRED')
-        key=hashlib.sha256(canonical(scope)).hexdigest()
-        rows=c.db.execute(
-            "SELECT user_id,project,payload,active FROM links "
-            "WHERE channel='COMMUNITY_MERCHANT_OPENING' AND subject_idx=?",
-            (key,)).fetchall()
-        if len(rows)!=1 or rows[0]['active']!=1:
-            raise PermissionError('CURRENT_OPENED_MERCHANT_REQUIRED')
-        owner,application,payload,_=rows[0]
-        record=onboarding._decode(payload,'community-opening:'+key+':'+application)
-        if (record.get('state')!='OPENED' or record.get('scope')!=scope
-                or record.get('project')!=binding['project']):
-            raise PermissionError('SCENE_OPENING_BINDING_MISMATCH')
-        authorize_workspace(onboarding,onboarding.operations,record['workspace'],owner)
-        prior_scope=seen_applications.get(application)
-        if prior_scope is not None and prior_scope!=scope:
-            raise PermissionError('APPLICATION_PAYMENT_MAPPING_CONFLICT')
-        seen_applications[application]=dict(scope)
-
-        applyment=onboarding.wechat_applyment._read(application)
-        if (type(applyment) is not dict
-                or applyment.get('provider_state')!='APPLYMENT_STATE_FINISHED'
-                or type(applyment.get('provider_sub_mchid')) is not str
-                or type(applyment.get('provider_sp_mchid')) is not str
-                or applyment.get('provider_sp_mchid')!=reader._mchid
-                or not applyment.get('business_code')
-                or not applyment.get('applyment_id')):
-            raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
-        sub_mchid=applyment['provider_sub_mchid']
-        if not sub_mchid.isdigit() or not 6<=len(sub_mchid)<=32:
-            raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
-
-        result[scene]={
+    product=_admission(product)
+    binding=identity.scenes.get(scene)
+    if binding is None:
+        raise PermissionError('REGISTERED_SCENE_PRINCIPAL_REQUIRED')
+    principal=binding['principal']
+    if principal not in identity.runtime.bindings:
+        raise PermissionError('REGISTERED_SCENE_PRINCIPAL_REQUIRED')
+    scope=dict(identity.runtime.bindings[principal])
+    key=hashlib.sha256(canonical(scope)).hexdigest()
+    rows=identity.center.db.execute(
+        "SELECT user_id,project,payload,active FROM links "
+        "WHERE channel='COMMUNITY_MERCHANT_OPENING' AND subject_idx=?",
+        (key,)).fetchall()
+    if len(rows)!=1 or rows[0]['active']!=1:
+        raise PermissionError('CURRENT_OPENED_MERCHANT_REQUIRED')
+    owner,application,payload,_=rows[0]
+    record=onboarding._decode(payload,'community-opening:'+key+':'+application)
+    if (record.get('state')!='OPENED' or record.get('scope')!=scope
+            or record.get('project')!=binding['project']):
+        raise PermissionError('SCENE_OPENING_BINDING_MISMATCH')
+    authorize_workspace(onboarding,onboarding.operations,record['workspace'],owner)
+    applyment=onboarding.wechat_applyment._read(application)
+    if (type(applyment) is not dict
+            or applyment.get('provider_state')!='APPLYMENT_STATE_FINISHED'
+            or type(applyment.get('provider_sub_mchid')) is not str
+            or type(applyment.get('provider_sp_mchid')) is not str
+            or applyment.get('provider_sp_mchid')!=reader._mchid
+            or not applyment.get('business_code')
+            or not applyment.get('applyment_id')):
+        raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
+    sub_mchid=applyment['provider_sub_mchid']
+    if not sub_mchid.isdigit() or not 6<=len(sub_mchid)<=32:
+        raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
+    return {
+        'application':application,
+        'scope':scope,
+        'merchant':{
             'sp_appid':identity.appid,
             'sub_mchid':sub_mchid,
             'description':product['description'],
             'notify_url':product['notify_url'],
             'profit_sharing':product['profit_sharing']
         }
-    if set(result)!=set(identity.scenes):
+    }
+
+
+def project_wechat_merchants(identity,onboarding,reader,admissions):
+    """Build current startup merchants map; all scenes must be admitted."""
+    if type(admissions) is not dict or not admissions:
+        raise PermissionError('PAYMENT_PRODUCT_ADMISSION_REQUIRED')
+    if set(admissions)!=set(identity.scenes):
         raise PermissionError('COMPLETE_SCENE_PAYMENT_MAPPING_REQUIRED')
+    result={};seen={}
+    for scene in identity.scenes:
+        projection=project_wechat_scene(identity,onboarding,reader,scene,admissions[scene])
+        application=projection['application'];scope=projection['scope']
+        prior=seen.get(application)
+        if prior is not None and prior!=scope:
+            raise PermissionError('APPLICATION_PAYMENT_MAPPING_CONFLICT')
+        seen[application]=dict(scope)
+        result[scene]=projection['merchant']
     return result

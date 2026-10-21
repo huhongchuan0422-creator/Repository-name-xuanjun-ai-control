@@ -45,6 +45,11 @@ class MiniPayments:
             merchant=self.merchants.get(scene)
             if merchant is None or merchant['project']!=pid or merchant['scope']!=scope:
                 raise PermissionError('PROTECTED_MERCHANT_PAYMENT_BINDING_REQUIRED')
+            guard=getattr(self,'activation_guard',None)
+            if guard is not None:
+                current=guard(scene)
+                if current!=merchant['record']:
+                    raise PermissionError('PAYMENT_ACTIVATION_CHANGED')
             openid=session.get('openid')
             if type(openid) is not str or i._subject(i.appid,openid)!=session['subject_idx']:
                 raise PermissionError('FRESH_VERIFIED_MINI_LOGIN_REQUIRED')

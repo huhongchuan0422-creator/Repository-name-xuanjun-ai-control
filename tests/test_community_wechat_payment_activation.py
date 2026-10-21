@@ -4,7 +4,7 @@ import test_community_merchant_opening as opening_fixture
 import test_community_wechat_sp_readonly as key_fixture
 from scripts.community_wechat_sp_readonly import PartnerOrderReader
 from scripts.community_wechat_applyment import WechatApplyment
-from scripts.community_wechat_payment_activation import project_wechat_merchants
+from scripts.community_wechat_payment_activation import project_wechat_merchants,project_wechat_scene
 from scripts.community_mini_login import MiniGateway
 from scripts.community_wechat_sp_prepay import PartnerPrepay
 from scripts.community_mini_payments import MiniPayments
@@ -62,6 +62,13 @@ class WechatPaymentActivation(unittest.TestCase):
  def test_revoked_opening_or_scope_change_rejects_projection(self):
   self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
   with self.assertRaises(PermissionError):self.project()
+ def test_runtime_guard_rejects_revoked_opening_after_startup_projection(self):
+  result=self.project()
+  client=MiniPayments(self.identity,PartnerPrepay(self.center,self.reader,{}),merchants=result)
+  client.activation_guard=lambda scene:project_wechat_scene(
+      self.identity,self.fx.fx.service,self.reader,scene,self.admissions[scene])['merchant']
+  self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
+  with self.assertRaises(PermissionError):client.activation_guard(self.scene)
  def test_reopen_is_idempotent_and_client_never_supplies_submerchant(self):
   first=self.project()
   self.fx.fx.fx.reopen()

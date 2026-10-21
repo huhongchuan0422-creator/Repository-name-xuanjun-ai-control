@@ -109,9 +109,12 @@ class MiniApplication:
             raise ValueError('PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING')
         if self.onboarding is None or self.onboarding.wechat_applyment is None:
             raise ValueError('ORIGINAL_WECHAT_APPLYMENT_REQUIRED')
-        from scripts.community_wechat_payment_activation import project_wechat_merchants
+        from scripts.community_wechat_payment_activation import project_wechat_merchants,project_wechat_scene
         merchants=project_wechat_merchants(self.identity,self.onboarding,reader,admissions)
-        return self.configure_payments(reader,merchants=merchants)
+        payments=self.configure_payments(reader,merchants=merchants)
+        payments.activation_guard=lambda scene:project_wechat_scene(
+            self.identity,self.onboarding,reader,scene,admissions[scene])['merchant']
+        return payments
 
     def configure_payments(self,reader,bindings=None,*,merchants=None):
         """Protected opt-in; original customer orders and verified payer required."""
