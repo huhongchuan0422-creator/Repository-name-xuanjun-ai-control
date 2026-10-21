@@ -12,7 +12,7 @@ from scripts.community_mini_http import serve
 
 
 class MiniApplication:
-    def __init__(self,center,state_directory,bindings,merchant_scope,scenes,appid,app_secret):
+    def __init__(self,center,state_directory,bindings,merchant_scope,scenes,appid,app_secret,*,existing_runtime=None):
         if type(center) is not Center:
             raise ValueError('EXISTING_CENTER_INSTANCE_REQUIRED')
         self.stage=None
@@ -30,12 +30,32 @@ class MiniApplication:
         self.center=center
         try:
             provider=WechatCodeClient(appid,app_secret)
-            self.stage=LocalStage(state_directory,bindings,merchant_scope,clock=center.now)
-            self.identity=CenterIdentity(center,self.stage.runtime,appid,scenes)
-            self.gateway=MiniGateway(self.stage.runtime,self.identity,provider)
+            if existing_runtime is None:
+                self.stage=LocalStage(state_directory,bindings,merchant_scope,clock=center.now)
+                runtime=self.stage.runtime
+            else:
+                from scripts.community_stage_runtime import StageRuntime
+                if type(existing_runtime) is not StageRuntime:
+                    raise ValueError('EXISTING_STAGE_RUNTIME_REQUIRED')
+                runtime=existing_runtime
+            self.identity=CenterIdentity(center,runtime,appid,scenes)
+            self.gateway=MiniGateway(runtime,self.identity,provider)
         except BaseException:
             self.close()
             raise
+
+    @classmethod
+    def from_existing_runtime(cls,center,runtime,principals,config,app_secret):
+        """Validate protected config and reuse host-owned stores without seeding.
+
+        This does not open/import Center, create stores, bind accounts or listen.
+        The host retains ownership of every supplied database connection.
+        """
+        from scripts.community_mini_host_config import validate
+        scenes=validate(center,runtime,principals,config)
+        app=cls(center,None,None,None,scenes,config['appid'],app_secret,existing_runtime=runtime)
+        app.https_origin=config['https_origin']
+        return app
 
     def listen(self,port=0):
         """Loopback backend for the admitted HTTPS host; never a public bind."""
@@ -100,7 +120,7 @@ class MiniApplication:
         if self.server is not None or self.saas is not None:
             raise ValueError('SAAS_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_center_saas import CenterSaas
-        self.saas=CenterSaas(self.center,self.stage.runtime,grants)
+        self.saas=CenterSaas(self.center,self.identity.runtime,grants)
         return self.saas
 
     def configure_payments_from_applyments(self,reader,admissions):
@@ -132,7 +152,7 @@ class MiniApplication:
         if self.server is not None or self.operations is not None:
             raise ValueError('OPERATIONS_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_center_operations import CenterOperations
-        self.operations=CenterOperations(self.center,self.stage.runtime,grants,onboarding=self.onboarding)
+        self.operations=CenterOperations(self.center,self.identity.runtime,grants,onboarding=self.onboarding)
         if self.onboarding is not None:self.onboarding.operations=self.operations
         return self.operations
 
@@ -184,6 +204,8 @@ class MiniApplication:
         from scripts.pr122_customer_source import TrustedNginxSource
         from scripts.community_mini_http import make_handler
         if self.server is not None:raise ValueError('ALREADY_LISTENING')
+        if getattr(self,'https_origin',https_origin)!=https_origin:
+            raise PermissionError('PROTECTED_HTTPS_ORIGIN_MISMATCH')
         if os.geteuid()==0:raise PermissionError('NONROOT_PROXY_APPLICATION_REQUIRED')
         path=private_path(Path(socket_path).absolute())
         parent=path.parent.stat()

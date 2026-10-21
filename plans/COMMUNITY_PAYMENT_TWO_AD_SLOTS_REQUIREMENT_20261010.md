@@ -67,7 +67,7 @@ Stage5 两广告位规则PR73已合并，独立SQLite候选PR75待审；这些�
 
 1. 商家在原 Center / CRM 完成注册、资料提交、平台审核和工作台开通。
 2. 原 `WechatApplyment` 负责微信特约商户资料、媒体、内部审核、正式提交和签名查询。
-3. 微信状态 `APPLYMENT_STATE_TO_BE_CONFIRMED / TO_BE_SIGNED / SIGNING` 仍属于商家/法人需要完成的微信确认或签约阶段；系统自动查询状态，但不得替商家确认。
+3. 微信状态 `APPLYMENT_STATE_TO_BE_CONFIRMED / TO_BE_SIGNED / SIGNING` 仍属于商家/法人需要完成的微信确认或签约阶段；当前由获授权审核员主动执行wechat_query读取可信签名状态；自动后台轮询尚未实现，不得替商家确认。
 4. 仅可信签名查询得到 `APPLYMENT_STATE_FINISHED` 且返回不可冲突的 `sub_mchid` 后，才可进入支付配置投影。
 5. `community_wechat_payment_activation.py` 从既有 `COMMUNITY_MERCHANT_OPENING`、原 scene/project/store 映射和原 `COMMUNITY_WECHAT_APPLYMENT` 记录生成现有 `MiniPayments` 的 `merchants` 配置。客户端不能提交或覆盖 `sub_mchid`。
 6. `FINISHED` 只证明微信进件完成，不证明 JSAPI、分账等产品资格。宿主必须提供受保护的产品准入：`jsapi_admitted`；启用分账时还必须有 `profit_sharing_admitted`。UNKNOWN、缺资格、撤销、错服务商、错门店或冲突全部保持关闭。

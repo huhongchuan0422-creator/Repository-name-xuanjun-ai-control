@@ -162,5 +162,25 @@ class WechatPaymentActivation(unittest.TestCase):
   result=project_wechat_merchants(self.identity,self.fx.fx.service,self.reader,
       dict(self.admissions,shop2=dict(self.admissions[self.scene])))
   self.assertEqual(result['shop1'],result['shop2'])
+ def test_only_admitted_scene_receives_payment_configuration(self):
+  from scripts.community_saas_phase2 import Principal
+  from scripts.community_order_store import create_order
+  principal=Principal('tenant1','CUSTOMER')
+  other_scope=dict(self.identity.runtime.bindings[self.identity.scenes[self.scene]['principal']],store_id='store_b')
+  self.identity.runtime.bindings[principal]=other_scope
+  self.identity.scenes['unadmitted']=dict(project='project1',principal=principal)
+  result=self.project()
+  self.assertEqual(set(result),{self.scene})
+  token=self.fx.fx.fx.token('subset_code')
+  self.fx.fx.fx.checkout(token,'subset_order')
+  client=self.configured_client()
+  self.assertEqual(client._authorize(token,self.scene,'subset_order')['sub_mchid'],'1234567891')
+  self.identity.reserve_order(token,'unadmitted','store_b_order',101,self.center.now())
+  create_order(self.identity.runtime.demo.db,other_scope,'store_b_order',101)
+  with self.assertRaisesRegex(PermissionError,'PROTECTED_MERCHANT_PAYMENT_BINDING_REQUIRED'):
+   client._authorize(token,'unadmitted','store_b_order')
+  with self.assertRaises(PermissionError):self.project({})
+  with self.assertRaisesRegex(PermissionError,'REGISTERED_SCENE_PRINCIPAL_REQUIRED'):
+   self.project({'unknown':self.admissions[self.scene]})
 
 if __name__=='__main__':unittest.main()

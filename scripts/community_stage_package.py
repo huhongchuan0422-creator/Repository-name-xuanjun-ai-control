@@ -21,6 +21,7 @@ def build(root):
                 'deploy/community-preview/prepare-mini.cjs',
                 'docs/development/COMMUNITY_STAGE_INTEGRATION_20261017.md',
                 'docs/development/COMMUNITY_CENTER_EXACT_INTEGRATION_20261018.md',
+                'docs/development/COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md',
                 'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
                 'scripts/pr122_customer_core.py',
                 'scripts/pr122_customer_source.py',
@@ -37,6 +38,7 @@ def build(root):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
     required = {'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
                 'scripts/community_preview_readiness.py',
+                'scripts/community_mini_host_config.py',
                 'scripts/community_stage_package.py', 'clients/community-mini/app.json',
                 'scripts/pr122_customer_core.py', 'scripts/pr122_customer_source.py',
                 'scripts/pr122_customer_runtime.py', 'scripts/pr122_customer_evidence.py',

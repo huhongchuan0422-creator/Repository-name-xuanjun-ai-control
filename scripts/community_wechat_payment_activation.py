@@ -108,13 +108,13 @@ def project_wechat_scene(identity,onboarding,reader,scene,product):
 
 
 def project_wechat_merchants(identity,onboarding,reader,admissions):
-    """Build current startup merchants map; all scenes must be admitted."""
+    """Project only the explicitly admitted nonempty subset of known scenes."""
     if type(admissions) is not dict or not admissions:
         raise PermissionError('PAYMENT_PRODUCT_ADMISSION_REQUIRED')
-    if set(admissions)!=set(identity.scenes):
-        raise PermissionError('COMPLETE_SCENE_PAYMENT_MAPPING_REQUIRED')
+    if not set(admissions).issubset(identity.scenes):
+        raise PermissionError('REGISTERED_SCENE_PRINCIPAL_REQUIRED')
     result={};seen={}
-    for scene in identity.scenes:
+    for scene in admissions:
         projection=project_wechat_scene(identity,onboarding,reader,scene,admissions[scene])
         application=projection['application'];scope=projection['scope']
         prior=seen.get(application)

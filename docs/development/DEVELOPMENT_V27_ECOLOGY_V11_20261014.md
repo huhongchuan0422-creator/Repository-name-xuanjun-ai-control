@@ -3202,3 +3202,11 @@ GEO阶段执行方向：先自用验证，再客户试点和SaaS选配；总体�
 Owner真机截图显示无样式首页和SERVICE_RESULT_UNKNOWN，客户预览验收明确FAIL。官方上传成功与源码非空不能推定可交客户。首页/本人资料页补统一WXSS和中文状态，网络或服务失败保持未登录，不暴露原始诊断或假造成功。app.wxss纳入实际source ZIP且为必需成员。
 
 官方预览上传前新增community_preview_readiness.py：只读检查固定HTTPS域名/community/health，禁止重定向，限时和响应大小；非200、非JSON、非READY或错误scope均拒绝上传，保留脱敏backend-readiness.json。健康通过只证明连通，login_verified和customer_acceptance仍false。后端503、合法域名、真实code2session与真机业务证据没有解决前，不生成或宣传客户验收二维码。当前范围不包含服务器部署或权限变更；不改用模拟登录绕过故障。
+
+#### 正式持久运行时接线及门店子集（2026-10-21续接）
+
+新增MiniApplication.from_existing_runtime：复用宿主已打开的原Center/StageRuntime，不调用LocalStage或创建新库；严格校验原持久store路径、私有权限/所有权、已有CUSTOMER Principal和有效同租户项目，关闭应用不关闭宿主连接。原开发入口保留兼容；正式入口是组合API，尚无已核现场宿主或服务启动回执，不能宣称部署完成。schema、目标、最小动作、影响、回滚和责任方集中见COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md。
+
+支付admissions恢复原MiniPayments的非空已知scene子集；未选门店拒绝，未知scene/空集合拒绝，同店多scene幂等保留。新增真实RSA合成签名FINISHED查询经原transport验签、原加密记录持久化，再由正式入口配置sub_mchid的薄旅程；不使用手填FINISHED摘要代替该旅程，不进行真实微信外联或资金操作。状态查询当前为受保护审核员主动wechat_query；自动后台轮询尚未实现，原需求中的自动查询表述已更正。
+
+BACKEND_NOT_READY硬门禁和客户真机验收FAIL状态继承；无服务器、DNS、凭据或账号权限操作授权。真实宿主Center/store绑定、AppSecret引用、域名/TLS/socket/服务状态、真实登录和商户资格等现场依赖只提交候选给Owner确认，不以fixture填补。
