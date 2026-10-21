@@ -213,7 +213,10 @@ def main():
         if args.action=='serve':
             from scripts.pr122_customer_http import serve
             from scripts.pr122_customer_identity import boundary_from_config
-            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',deployment_profile=selected,identity_boundary=boundary_from_config(config));return
+            options={'deployment_profile':selected}
+            boundary=boundary_from_config(config)
+            if boundary is not None:options['identity_boundary']=boundary
+            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',**options);return
         if args.action=='worker':
             p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
             if selected==FULL:result['message']=drain_message(c,p)
