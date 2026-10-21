@@ -39,10 +39,11 @@ class CustomerUnixServer(socketserver.UnixStreamServer):
     request_queue_size=128
 
 class App:
-    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted,deployment_profile=FULL):
+    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted,deployment_profile=FULL,identity_boundary=None):
         if origin!='https://wenwenwenyiyiyi.work':raise ValueError('PINNED_ORIGIN_REQUIRED')
         self.deployment_profile=profile({'deployment_profile':deployment_profile})
         self.factory=factory;self.providers=providers;self.origin=origin;self.assets=Path(assets);self.source_identity=source_identity
+        self.identity_boundary=identity_boundary
     def handler(self):
         app=self
         class Handler(BaseHTTPRequestHandler):
@@ -83,16 +84,24 @@ class App:
                         if not allowed:raise Denied('LOGIN_ONLY_AUTH_SCOPE')
                     if not path.startswith((PREFIX+'api/',PREFIX+'preview/')) and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
                     body={};raw=b''
+                    service_identity=path==PREFIX+'api/authorization/consume'
                     if self.command=='POST':
                         if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length',[]))!=1:raise ValueError('CONTENT_LENGTH_REQUIRED')
                         length=self.headers.get('Content-Length','')
                         if not re.fullmatch(r'[0-9]{1,8}',length) or not 1<=int(length)<=7_000_000:return self.reply(413,{'error':'REQUEST_TOO_LARGE'})
+                        if service_identity and int(length)>8192:return self.reply(413,{'error':'REQUEST_TOO_LARGE'})
                         if self.headers.get_content_type()!='application/json':raise ValueError('JSON_REQUIRED')
                         raw=self.rfile.read(int(length))
                         if len(raw)!=int(length):raise ValueError('INCOMPLETE_BODY')
                         if '/webhooks/' not in path:
-                            if self.headers.get('Origin')!=app.origin or self.headers.get('Sec-Fetch-Site') not in (None,'same-origin'):raise Denied('ORIGIN_REQUIRED')
+                            if not service_identity and (self.headers.get('Origin')!=app.origin or self.headers.get('Sec-Fetch-Site') not in (None,'same-origin')):raise Denied('ORIGIN_REQUIRED')
                             body=strict_json(raw)
+                    if service_identity:
+                        if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
+                        if app.identity_boundary is None:raise Denied('IDENTITY_CALLER_TRUST')
+                        if len(raw)>8192:raise ValueError('IDENTITY_REQUEST_SIZE')
+                        center=app.factory()
+                        return self.reply(200,app.identity_boundary.consume(center,body))
                     center=app.factory()
                     if '/webhooks/' in path:
                         if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
@@ -132,6 +141,10 @@ class App:
                         center.logout(self.token())
                         return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
+                    if operation=='authorization':
+                        if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
+                        if app.identity_boundary is None:raise Denied('IDENTITY_CALLER_TRUST')
+                        return self.reply(200,app.identity_boundary.issue(center,self.token(),self.headers.get('X-CSRF-Token',''),body))
                     if app.deployment_profile==LOGIN_ONLY:
                         # session() already verifies the account and current epoch.
                         # No project enumeration or provider status is exposed.
@@ -223,7 +236,7 @@ class App:
             def do_PATCH(self):self.execute()
         return Handler
 
-def serve(factory,providers,assets,*,deployment_profile=FULL):
+def serve(factory,providers,assets,*,deployment_profile=FULL,identity_boundary=None):
     # Single-process bounded service serializes permission revocation and outbound
     # work; each request gets a fresh SQLite connection. application limits authenticated writes and credential attempts.
     import grp,os,socketserver
@@ -231,7 +244,7 @@ def serve(factory,providers,assets,*,deployment_profile=FULL):
     # Private service-owned directory plus pinned Nginx group prevents another
     # local application impersonating a crashed loopback backend.
     if path.exists() or path.is_symlink():raise RuntimeError('SOCKET_EXISTS_INSPECT_FIRST')
-    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid),deployment_profile=deployment_profile).handler())
+    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid),deployment_profile=deployment_profile,identity_boundary=identity_boundary).handler())
     os.chown(path,-1,grp.getgrnam('nginx').gr_gid);os.chmod(path,0o660)
     try:server.serve_forever()
     finally:server.server_close();path.unlink(missing_ok=True)

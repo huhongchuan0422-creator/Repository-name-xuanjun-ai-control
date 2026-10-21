@@ -29,9 +29,14 @@ def validate_runtime_contexts(config, runtime):
     fields={'message_evidence_context':set(CONTEXT_FIELDS), 'privacy_policy_context':set(POLICY_FIELDS),
             'privacy_processing_context':{'requester_id','project_id','tenant_id','customer_id','request_id','revision','status','status_ref','actor_ref','occurred_at','outcome_ref'}}
     required={'keys','active_key','providers'}
-    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH)-{'deployment_profile'}:
+    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH)-{'deployment_profile','identity_authorization'}:
         raise Denied('RUNTIME_CREDENTIAL_MINIMUM')
     selected=validate_pair(config,runtime)
+    from scripts.pr122_customer_identity import boundary_from_config
+    if 'identity_authorization' in runtime or 'identity_authorization' in config:
+        if selected!=FULL:raise Denied('LOGIN_ONLY_IDENTITY_SCOPE')
+        if canonical(config.get('identity_authorization'))!=canonical(runtime.get('identity_authorization')):raise Denied('IDENTITY_RUNTIME_BINDING')
+        boundary_from_config(config);boundary_from_config(runtime)
     if selected==LOGIN_ONLY and canonical(config['providers'])!=canonical(runtime['providers']):
         raise Denied('RUNTIME_PROVIDER_BINDING')
     def mapping(value, depth, allowed, integer_fields):
@@ -152,7 +157,7 @@ def restore(backup_file,target,backup_key,keys,active_key):
     finally:c.db.close()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-identity-mapping','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
     config=None
@@ -167,6 +172,10 @@ def main():
         from scripts.pr122_customer_publication_worker import main_worker
         print(json.dumps(main_worker(),sort_keys=True));return
     delivery_input=None
+    mapping_input=None;mapping_evidence={}
+    if args.action=='import-identity-mapping':
+        from scripts.pr122_customer_identity import load_operator_mapping
+        mapping_input,mapping_evidence=load_operator_mapping(args.input)
     if args.action=='issue-preview-delivery':
         path=private_path(args.input)
         fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
@@ -203,12 +212,16 @@ def main():
     try:
         if args.action=='serve':
             from scripts.pr122_customer_http import serve
-            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',deployment_profile=selected);return
+            from scripts.pr122_customer_identity import boundary_from_config
+            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',deployment_profile=selected,identity_boundary=boundary_from_config(config));return
         if args.action=='worker':
             p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
             if selected==FULL:result['message']=drain_message(c,p)
         elif args.action=='import-authority':
             result=c.import_authority(json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
+        elif args.action=='import-identity-mapping':
+            from scripts.pr122_customer_identity import import_mapping
+            result=import_mapping(c,mapping_input,base64.b64decode(config['authority_verify_key'],validate=True),config.get('identity_mapping_confirmers'),mapping_evidence.__getitem__)
             # Resume is a separate reviewed operator decision after restore; CLI
             # import alone intentionally does not clear maintenance.
         elif args.action=='import-change-authority':

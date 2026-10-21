@@ -108,6 +108,8 @@ class Center:
         self.db.execute("INSERT OR IGNORE INTO settings VALUES('index_key',?)",(self.key_id,))
         self.index_key=self.db.execute("SELECT v FROM settings WHERE k='index_key'").fetchone()[0]
         if self.index_key not in keys: raise Unavailable('INDEX_KEY_RESTORE_REQUIRED')
+        from scripts.pr122_customer_identity import install as install_identity
+        install_identity(self)
         from scripts.pr122_customer_evidence import install
         try:
             install(self)
@@ -344,6 +346,7 @@ class Center:
             self.project(uid,pid,('OWNER',)); r=self.db.execute('SELECT role FROM members WHERE project=? AND user_id=?',(pid,target)).fetchone()
             if not r or r[0] in ('OWNER','REVIEWER'): raise Denied('PROTECTED_ROLE')
             self.db.execute('UPDATE members SET active=0 WHERE project=? AND user_id=?',(pid,target)); self.db.execute('UPDATE links SET active=0 WHERE project=? AND user_id=?',(pid,target))
+            self.db.execute('UPDATE identity_grants SET used=1 WHERE project_id=? AND user_id=?',(pid,target))
             self.db.execute("UPDATE challenges SET used=1 WHERE kind IN ('invite','bind','confirm_link') AND user_id=?",(target,)); self.audit(pid,uid,'REVOKE',target)
         return {'revoked':True}
     def save(self,uid,pid,item,revision,kind,content,expires=None):
