@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -239,7 +240,11 @@ class PreparationBinding(unittest.TestCase):
                          epoch_journal=str(self.root/'activation/epochs.jsonl'),
                          lock_path=str(self.root/'activation/activation.lock'), owner_uid=os.geteuid())
         self.store = Activation(**self.args)
-        binary = Path(os.path.realpath(sys.executable))
+        # Hosted setup-python may expose group-writable interpreter metadata.
+        # Preserve it; provision only a byte-identical protected fixture copy.
+        binary = self.root.parent/'fixture-python'
+        shutil.copyfile(os.path.realpath(sys.executable), binary)
+        binary.chmod(0o500)
         binary_sha = b3.sha(binary.read_bytes())
         binding = dict(installation_id='fixture-original-b3', batch_id='b3-initialize',
                        attempt_id='fixture-a1', origin='ISOLATED_NEW', scope='ISOLATED_TEST_ONLY',
@@ -277,7 +282,9 @@ class PreparationBinding(unittest.TestCase):
             self.put(self.root/'prepared'/name, value)
         # Real original non-starting config consumer only, no dispatch/identity
         # re-run and no application server. Historical state is still PREPARED.
-        check_result = subprocess.run(check, capture_output=True, text=True, timeout=10)
+        fixture_env = dict(os.environ, PYTHONHOME=sys.prefix,
+                           LD_LIBRARY_PATH=str(Path(sys.prefix)/'lib'))
+        check_result = subprocess.run(check, env=fixture_env, capture_output=True, text=True, timeout=10)
         self.assertEqual(check_result.returncode, 0, check_result.stderr)
         consumer = json.loads(check_result.stdout)
         self.assertEqual(consumer['status'], 'PREPARED_CONFIG_VALIDATED')
