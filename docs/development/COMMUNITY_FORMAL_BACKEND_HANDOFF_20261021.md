@@ -130,3 +130,12 @@ nginx-uk-path-candidate.conf仅为既有UK HTTPS server内的两个受限locatio
 本次提交使用[preview-endpoint-scope]让Hosted只执行新端点合同、受影响prepare/readiness/候选/ZIP组合与原session/客户页面测试，再构建准确源码包；未变业务1821项复用，不改变普通完整回归或官方上传门禁。未使用[mini-preview]，不触发上传或国内服务器任务。旧本地扩范围执行因root触发既有离线回滚测试保护的记录保留，没有放宽保护。
 
 到此本轮已定位、可离线闭合的端点/构建/上传防错源码已接通。剩余是现场原身份宿主和持久数据/scene配置的权威绑定、实际HTTPS和后端同版本运行、真实微信code2session、合法域名及真机非空业务验收；不得伪造为已通过，也不以空库或我方客服补齐。BACKEND_NOT_READY、payments=false及Finance UNCONFIRMED继续保持。
+
+
+### 上传前全文件复核补修（2026-10-21）
+
+继续检查发现，前节仅比对app.js摘要，未阻止connected准备完成后其他文件变化。现在prepare对最终副本生成prepared_files逐文件SHA256清单（仅排除回执本身，避免自引用）；上传在健康/版本核验后、读取上传密钥前复核完整文件集合和摘要。改动session.js、首页WXML/样式、增删文件、源码软链及缺少旧版prepared_files均拒绝，不能用只有app.js匹配冒充准确构建。
+
+复核最多2000个文件/目录项、总文件字节10000000，拒绝非普通文件；最终文件以O_NOFOLLOW打开，核stat身份、有限读取长度及前后size/mtime/ctime。清单使用无原型对象，防止特殊文件名遗漏。该预检用于唯一Writer私有临时构建目录，不声称SDK读取期间与其他并发Writer具有原子快照，也不替代外层源ZIP和manifest验证。
+
+测试继续使用真实ZIP空目录解包，并在两种profile准备后修改各文件再调用无密钥上传入口，验证拒绝发生于SDK调用前；新Node测试覆盖特殊文件名、改/增/删/软链及字节/目录项预算。不读取真实密钥、不调用微信或现场身份接口、不生成新二维码。原身份/门店/支付门禁与既有默认目标均不变。

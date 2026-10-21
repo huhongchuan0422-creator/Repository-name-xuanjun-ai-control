@@ -2,6 +2,38 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {endpoint,verifyReadiness}=require('../deploy/community-preview/endpoint.cjs');
 const {createSession}=require('../clients/community-mini/session.js');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
+test('full prepared manifest detects non-app edits, additions, removals and links',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'mini-source-manifest-'));
+ try{
+  fs.writeFileSync(path.join(root,'session.js'),'original');
+  fs.writeFileSync(path.join(root,'__proto__'),'must be hashed');
+  const expected=sourceManifest(root);
+  assert.match(expected.__proto__,/^[a-f0-9]{64}$/);
+  verifySource(root,JSON.parse(JSON.stringify(expected)));
+  fs.writeFileSync(path.join(root,'session.js'),'changed');
+  assert.throws(()=>verifySource(root,expected),/PREPARED_SOURCE_CHANGED/);
+  fs.writeFileSync(path.join(root,'session.js'),'original');
+  fs.writeFileSync(path.join(root,'extra.js'),'extra');
+  assert.throws(()=>verifySource(root,expected),/PREPARED_SOURCE_CHANGED/);
+  fs.unlinkSync(path.join(root,'extra.js'));fs.unlinkSync(path.join(root,'session.js'));
+  assert.throws(()=>verifySource(root,expected),/PREPARED_SOURCE_CHANGED/);
+  fs.symlinkSync(path.join(root,'__proto__'),path.join(root,'session.js'));
+  assert.throws(()=>verifySource(root,expected),/SOURCE_SYMLINK_DENIED/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('prepared manifest enforces byte and entry budgets before hashing oversized input',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'mini-source-budget-'));
+ try{
+  const file=path.join(root,'large'),fd=fs.openSync(file,'wx');
+  try{fs.ftruncateSync(fd,10000001);}finally{fs.closeSync(fd);}
+  assert.throws(()=>sourceManifest(root),/SOURCE_MANIFEST_BUDGET_EXCEEDED/);
+  fs.unlinkSync(file);
+  for(let i=0;i<2001;i++)fs.mkdirSync(path.join(root,'d'+i));
+  assert.throws(()=>sourceManifest(root),/SOURCE_MANIFEST_BUDGET_EXCEEDED/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
 test('UK prefix carries code-only login, scoped business and logout on same base',async()=>{
  const target=endpoint('uk-path-candidate'),calls=[];
  const wx={login:o=>o.success({code:'synthetic-once'}),request:o=>{

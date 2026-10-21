@@ -17,7 +17,7 @@ async function main(){
  if(!connected)throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
  let target=null;
  if(connected){
-  const {endpoint,verifyReadiness}=require('../deploy/community-preview/endpoint.cjs');
+  const {endpoint,verifyReadiness,verifySource}=require('../deploy/community-preview/endpoint.cjs');
   target=endpoint();
   const prepared=JSON.parse(fs.readFileSync(path.join(projectPath,'CONNECTED_PREVIEW_RECEIPT.json'),'utf8'));
   if(prepared.baseUrl!==target.baseUrl||prepared.profile!==target.profile||prepared.origin!==target.origin||
@@ -29,6 +29,7 @@ async function main(){
   const proof=process.env.COMMUNITY_PREVIEW_READINESS_RECEIPT;
   if(!proof)throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
   verifyReadiness(JSON.parse(fs.readFileSync(proof,'utf8')),target,process.env.GITHUB_SHA);
+  verifySource(projectPath,prepared.prepared_files);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',

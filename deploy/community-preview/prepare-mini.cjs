@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const ROOT=path.resolve(__dirname,'../..');
 const SOURCE=path.join(ROOT,'clients/community-mini');
 const OUT=process.env.COMMUNITY_CONNECTED_MINI_OUTPUT;
-const {endpoint}=require('./endpoint.cjs');
+const {endpoint,sourceManifest}=require('./endpoint.cjs');
 const target=endpoint();
 const HOST=target.baseUrl;
 if(!OUT)throw Error('OUTPUT_DIRECTORY_REQUIRED');
@@ -47,6 +47,7 @@ const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(OUT)),'.connected-
 try{
  fs.cpSync(SOURCE,temp,{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});
  fs.writeFileSync(path.join(temp,'app.js'),updated);
+ receipt.prepared_files=sourceManifest(temp);
  fs.writeFileSync(path.join(temp,'CONNECTED_PREVIEW_RECEIPT.json'),JSON.stringify(receipt,null,2)+'\n');
  if(!absent(OUT))throw Error('OUTPUT_MUST_NOT_EXIST');
  fs.renameSync(temp,OUT);
