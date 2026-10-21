@@ -7,6 +7,8 @@ protected startup input. Other channels can implement the same projection
 boundary without changing MiniPayments or the original order/identity model.
 """
 import hashlib
+import json
+import re
 from scripts.pr122_customer_core import canonical
 from scripts.community_merchant_opening import authorize_workspace
 
@@ -64,14 +66,30 @@ def project_wechat_scene(identity,onboarding,reader,scene,product):
             or record.get('project')!=binding['project']):
         raise PermissionError('SCENE_OPENING_BINDING_MISMATCH')
     authorize_workspace(onboarding,onboarding.operations,record['workspace'],owner)
-    applyment=onboarding.wechat_applyment._read(application)
+    rows=identity.center.db.execute(
+        "SELECT user_id,payload,active FROM links "
+        "WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=?",
+        (application,application)).fetchall()
+    if len(rows)!=1 or rows[0]['active']!=1 or rows[0]['user_id']!=owner:
+        raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
+    try:
+        applyment=json.loads(identity.center.decrypt(
+            rows[0]['payload'],'wechat-applyment:'+application))
+    except Exception:
+        raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED') from None
     if (type(applyment) is not dict
             or applyment.get('provider_state')!='APPLYMENT_STATE_FINISHED'
             or type(applyment.get('provider_sub_mchid')) is not str
             or type(applyment.get('provider_sp_mchid')) is not str
             or applyment.get('provider_sp_mchid')!=reader._mchid
             or not applyment.get('business_code')
-            or not applyment.get('applyment_id')):
+            or not applyment.get('applyment_id')
+            or type(applyment.get('provider_query_signed_at')) is not int
+            or applyment['provider_query_signed_at']<0
+            or type(applyment.get('provider_query_signature_sha256')) is not str
+            or not re.fullmatch('[0-9a-f]{64}',applyment['provider_query_signature_sha256'])
+            or type(applyment.get('provider_response_sha256')) is not str
+            or not re.fullmatch('[0-9a-f]{64}',applyment['provider_response_sha256'])):
         raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
     sub_mchid=applyment['provider_sub_mchid']
     if not sub_mchid.isdigit() or not 6<=len(sub_mchid)<=32:

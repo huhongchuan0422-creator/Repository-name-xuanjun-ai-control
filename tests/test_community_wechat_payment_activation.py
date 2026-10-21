@@ -35,7 +35,8 @@ class WechatPaymentActivation(unittest.TestCase):
   appid=self.app['application']
   record={'version':1,'state':'SUBMITTED_TO_PROVIDER','provider_state':state,
           'business_code':'biz_fixture','applyment_id':'1001',
-          'provider_sp_mchid':sp_mchid}
+          'provider_sp_mchid':sp_mchid,'provider_query_signed_at':1700000000,
+          'provider_query_signature_sha256':'1'*64,'provider_response_sha256':'2'*64}
   if sub_mchid is not None:record['provider_sub_mchid']=sub_mchid
   with self.center.tx():self.applyment._save(appid,self.fx.fx.fx.uid1,record)
  def project(self,admissions=None):
@@ -82,6 +83,19 @@ class WechatPaymentActivation(unittest.TestCase):
   with self.assertRaises(PermissionError):
    client.dispatch(token,{'scene':self.scene,'operation':'prepare','reference':'paused_order'})
   self.reader._fetch.assert_not_called()
+ def test_wrong_applyment_owner_or_missing_signed_query_proof_is_rejected(self):
+  appid=self.app['application']
+  self.center.db.execute("UPDATE links SET user_id=? WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=?",
+      (self.fx.fx.fx.uid2,appid))
+  with self.assertRaises(PermissionError):self.project()
+  self.center.db.execute("UPDATE links SET user_id=? WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=?",
+      (self.fx.fx.fx.uid1,appid))
+  record=self.applyment._read(appid);record.pop('provider_query_signature_sha256')
+  with self.center.tx():self.applyment._save(appid,self.fx.fx.fx.uid1,record)
+  with self.assertRaises(PermissionError):self.project()
+ def test_cross_store_scope_change_rejects_current_projection(self):
+  self.identity.runtime.bindings[self.identity.scenes[self.scene]['principal']]['store_id']='other_store'
+  with self.assertRaises(PermissionError):self.project()
  def test_reopen_is_idempotent_and_client_never_supplies_submerchant(self):
   first=self.project()
   self.fx.fx.fx.reopen()
