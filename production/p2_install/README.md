@@ -553,5 +553,58 @@ path access mapping; original access checker/context/observation binding; explic
 WAL versus legacy no-sidecar/ownership equivalence. Missing contracts block only preactivation
 acceptance, not existing persistence tests. B6 CP12/13 site completion NOT_EXECUTED, not closed.
 No B7 activation is moved forward; B1–B5/old guard/config remain unchanged. B5 checkpoint waits
-for long-term channel, no Owner ferry task. New12-case Hosted coverage/Python3.11 target remains
-NOT_EXECUTED: existing workflow runs test_journal.py only; this round does not modify workflow.
+for long-term channel, no Owner ferry task.
+Historical note for a74a3c: B6 Hosted coverage was not yet included then. Superseded by
+3c0d0d8a / run39638090841: both Python3.11/3.12 ran the original12 B6 tests, PASS/zero skip.
+
+
+### B6 retained B3 history binding (CP12/13 still HOLD)
+
+New B6 entry: `observe_prepared(request, anchors, stage, previous_outcome='KNOWN')`.
+It accepts the existing DB observation request **without** `expected`; extra expected/PASS
+fields are rejected. `anchors` has exactly `cp03_receipt_sha256` and
+`preparation_receipt_sha256`, from the caller's retained, independently obtained receipts.
+A caller-supplied digest establishes byte identity, not historical authenticity or a new permit.
+No evidence source is inferred merely from a filename or a hand-filled identity.
+
+Read-only `consume_preparation` reuses `b3_contracts.pinned_file` (per-component
+O_NOFOLLOW/dirfd, bounded regular-file read, before/after metadata and SHA), the original
+B3 safe intent reader and pure `b3_ledger.documents`. It never calls B3 dispatch,
+cp03_identity, check_prepared against the current state, reconcile, or an arbitrary callback.
+Original terminal/pending two-link publication is accepted (1 or 2 links, no group/other writes),
+not mistaken for a corrupt single-link file. The prepared tree remains owner-private.
+
+| Source / binding | Read-only consumption |
+|---|---|
+| Original commit-receipt.json and binding-config.json | Pinned CP03 receipt -> original config digest; ISOLATED_NEW/PREPARED, installation, UUID/instance/generation, release/config/binary and reserved DB/socket paths |
+| Original ActivationStore chain | Original native full journal validation and descriptor/head agreement; first canonical PREPARED record/descriptor match CP03 digests; current same immutable identity/epoch must be QUIESCED, with exactly its original transition; no new epoch or ACTIVE adoption |
+| CP04--09 and preparation-receipt.json | Walk backwards from pinned final SHA through CP09 to CP04 and CP03; schema/stage/request/predecessor/status checked; missing/changed links HOLD |
+| intent/config/profile/invocation/expected-identity | Original request SHA and canonical intent, CP07 file digests, pure original documents equality, CP05 consumer/invocation, CP06 identity, CP09 TLS binding; role separation unchanged |
+| Original application / interpreter bytes | Fixed names from original source map, exact source SHA and bounded binary bytes/SHA; no source execution by consumption, no substitute runtime profile |
+| Current DB observation | Derive expected only from history-bound current descriptor, reuse original DB validators/readonly FD readback; check current descriptor again after observation |
+
+Historical PREPARED is not the current-state predicate: current QUIESCED is validated separately.
+PREPARED/ACTIVE, descriptor-journal drift, changed instance/generation/release/config/binary,
+DB/path escape, symlink ancestor, missing originals, wrong source version, broken SHA chain and
+hand-filled expected/PASS all HOLD. Temporary fixture scope additionally permits the original
+`/tmp/p2-b3-test-*/b3-initialize` shape, so the real original non-starting consumer can validate
+fixture config before a fixture DB exists. This is not a new onsite path or identity.
+
+Positive output `BOUND_HISTORY_ONLY` proves exact input binding and current observing subject's
+readonly DB path access; it is nested evidence, never a phase COMMITTED result.
+`service_uid=UNKNOWN`, callback role and `runtime_roles_granted_access=false` are preserved.
+CP08 is consumed as pinned historical preparation evidence, not reissued as fresh runtime denial.
+Still missing for real CP12/13: trusted REOPENED effect/inode/transaction provenance,
+service/callback role-path access consumer and validated observation, and explicit legacy
+no-sidecar/ownership versus isolated WAL equivalence. `phase_complete=false`, site HOLD.
+
+Affected tests: original 12 retained plus 10 new history cases, **22 PASS / zero skip locally
+on Python3.12**. Original-format fixture uses pure original documents and the actual original
+non-starting prepared-config consumer, then independent-process B6 binding/readback; it does not
+rerun B3 dispatch/cp03_identity. Historical CP08 record is fixture-only, not a new independent
+OS denial proof. Negatives also cover reanchored contradictory identity/version, state drift,
+missing originals, path escape/symlink, hand input and original two-link publication.
+The existing workflow (unchanged this round) runs this file on Python3.11/3.12; Hosted results
+are reported with the exact new commit in PR17. Earlier 12-case Hosted run39638090841 remains
+valid for its unchanged scope. No server/SDK/permission/B5 work, WAL deletion, DB bootstrap,
+activation transition or B7 advancement is performed by the adapter.

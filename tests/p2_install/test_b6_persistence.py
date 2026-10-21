@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 spec = importlib.util.spec_from_file_location('b6', str(ROOT / 'production/p2_install/b6_persistence.py'))
 b6 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b6)
@@ -220,9 +221,238 @@ class Persistence(unittest.TestCase):
         self.assertEqual(value['error']['code'],'REQUEST_FIELDS')
 
 
+class PreparationBinding(unittest.TestCase):
+    """Original B3 documents/consumer, temporary retained history, no dispatch.
+
+    CP08 is a labelled historical fixture record, NOT a new independent denial
+    proof. Its pinned chain tests consumption, not historical authenticity.
+    """
+    def setUp(self):
+        from production.p2_install import b3_ledger as b3
+        self.b3 = b3
+        self.tmp = tempfile.TemporaryDirectory(prefix='p2-b3-test-')
+        self.root = Path(self.tmp.name)/'b3-initialize'
+        self.root.mkdir(mode=0o700)
+        for name in ('activation', 'data', 'run', 'prepared'):
+            (self.root/name).mkdir(mode=0o700)
+        self.args = dict(descriptor=str(self.root/'activation/active.json'),
+                         epoch_journal=str(self.root/'activation/epochs.jsonl'),
+                         lock_path=str(self.root/'activation/activation.lock'), owner_uid=os.geteuid())
+        self.store = Activation(**self.args)
+        binary = Path(os.path.realpath(sys.executable))
+        binary_sha = b3.sha(binary.read_bytes())
+        binding = dict(installation_id='fixture-original-b3', batch_id='b3-initialize',
+                       attempt_id='fixture-a1', origin='ISOLATED_NEW', scope='ISOLATED_TEST_ONLY',
+                       initial_state='PREPARED', initial_epoch=1, generation=1,
+                       release_manifest_sha256='a'*64, instance='22222222-2222-4222-8222-222222222222',
+                       ledger_uuid='11111111-1111-4111-8111-111111111111',
+                       db_path=str(self.root/'data/ledger.sqlite3'), ledger_socket=str(self.root/'run/ledger.sock'),
+                       start_services=False, create_database=False, bind_socket=False)
+        self.put(self.root/'binding-config.json', binding)
+        initial = self.store.prepare('a'*64, b3.sha(b3.encode(binding)), binary_sha,
+                                     binding['ledger_uuid'], 1, binding['instance'],
+                                     binding['db_path'], binding['ledger_socket'])
+        cp03 = dict(schema=1, scope='ISOLATED_TEST_ONLY', origin='ISOLATED_NEW', status='COMMITTED',
+                    installation_id=binding['installation_id'], batch_id='b3-initialize', attempt_id='fixture-a1',
+                    request_sha256='f'*64, config_sha256=b3.sha(b3.encode(binding)),
+                    descriptor_head_sha256=self.store.head(initial),
+                    descriptor_file_sha256=b3.sha(Path(self.args['descriptor']).read_bytes()),
+                    journal_sha256=b3.sha(Path(self.args['epoch_journal']).read_bytes()),
+                    binary_sha256=binary_sha, full_b3_complete=False,
+                    database='RESERVED_NOT_CREATED', socket='RESERVED_NOT_BOUND')
+        self.put(self.root/'commit-receipt.json', cp03)
+        cp03_sha = b3.sha(b3.encode(cp03))
+        app = b6.SOURCE_ROOT
+        req = dict(schema=1, scope='ISOLATED_TEST_ONLY', root=str(self.root), application=str(app),
+                   binary=dict(path=str(binary), bytes=binary.stat().st_size, sha256=binary_sha),
+                   sources={n:b3.sha((app/n).read_bytes()) for n in b3.NAMES},
+                   operation_id='fixture-b3-original-format', cp03_receipt_sha256=cp03_sha)
+        expected = {k:(binding['installation_id'] if k == 'installation_id' else initial[k]) for k in
+                    ('installation_id','instance','ledger_uuid','generation','release_sha256',
+                     'config_sha256','binary_sha256','db_path','ledger_socket')}
+        cfg, profile, invocation, check, identity = b3.documents(req, expected)
+        files = dict(zip(('ledger-config.json','profile.json','runtime-invocation.json','expected-identity.json'),
+                         (cfg,profile,invocation,identity)))
+        for name, value in files.items():
+            self.put(self.root/'prepared'/name, value)
+        # Real original non-starting config consumer only, no dispatch/identity
+        # re-run and no application server. Historical state is still PREPARED.
+        check_result = subprocess.run(check, capture_output=True, text=True, timeout=10)
+        self.assertEqual(check_result.returncode, 0, check_result.stderr)
+        consumer = json.loads(check_result.stdout)
+        self.assertEqual(consumer['status'], 'PREPARED_CONFIG_VALIDATED')
+        self.request_sha = b3.sha(b3.encode(req))
+        self.put(self.root/'prepared/intent.json', dict(request_sha256=self.request_sha, request=req))
+        self.evidence = {
+            'CP04':dict(status='VALIDATED', scope='NEW_PREPARED_NO_RUNTIME_OBJECTS',
+                        cp03_receipt_sha256=cp03_sha, old_instance_stopped='NOT_CLAIMED'),
+            'CP05':dict(status='VALIDATED', consumer=consumer, invocation_sha256=b3.sha(b3.encode(invocation))),
+            'CP06':dict(status='VALIDATED', identity_sha256=b3.sha(b3.encode(identity)),
+                        process_identity='NOT_STARTED', start_role_handoff='NOT_READY'),
+            'CP07':dict(status='VALIDATED', subject_uid=os.geteuid(), private_root=str(self.root/'prepared'),
+                        access=dict(authorized_access='PASS', unauthorized_denial='NOT_EXECUTED'),
+                        files={n:b3.sha(b3.encode(v)) for n,v in files.items()}, service_uid='UNKNOWN',
+                        callback_uid=1004, runtime_roles_granted_access=False),
+            'CP08':dict(status='VALIDATED', denial=dict(status='PASS',uid=65534,gid=65534,operation='OPEN_DIRECTORY',
+                                    scope='EXACT_PATH_ONLY'),
+                        scope='PREPARATION_HANDOFF_DIRECTORY_ONLY'),
+            'CP09':dict(status='VALIDATED', tls=consumer['tls'], global_p2_tls='NOT_CLAIMED')}
+        self.anchors = dict(cp03_receipt_sha256=cp03_sha, preparation_receipt_sha256='')
+        self.rechain()
+        # DB schema exists ONLY as temporary test fixture; no activation or
+        # production schema creation by the B6 adapter.
+        with sqlite3.connect(binding['db_path']) as conn:
+            for table, columns in Ledger.SCHEMAS.items():
+                conn.execute('CREATE TABLE '+table+' ('+','.join(
+                    n+' '+t+(' PRIMARY KEY' if pk else '') for n,t,pk in columns)+')')
+            conn.execute('CREATE TABLE execution_specs (task_id TEXT PRIMARY KEY REFERENCES tasks(id), '
+                         'spec TEXT NOT NULL, revision INTEGER NOT NULL, hash TEXT NOT NULL)')
+            conn.execute('CREATE TABLE worker_heartbeats (worker_id TEXT NOT NULL, '
+                         'task_id TEXT PRIMARY KEY REFERENCES tasks(id), fence INTEGER NOT NULL, '
+                         'seen_at REAL NOT NULL, phase TEXT NOT NULL)')
+        os.chmod(binding['db_path'], 0o600)
+        self.store.transition('PREPARED','QUIESCED',1,initial['instance'],
+                              {k:True for k in ('identity_verified','coordinator_inactive','parent_unit_inactive',
+                                               'cgroups_empty','restart_inhibited')})
+        self.req = dict(scope='ISOLATED_TEST_ONLY', profile='B6_EXISTING_APPLICATION_DATABASE_OBSERVATION',
+                        root=str(self.root), db_path=binding['db_path'], uid=os.geteuid(), gid=os.getegid(),
+                        activation=self.args, task_ids=[])
+        self.snapshot = {str(p):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+
+    def put(self, path, value):
+        if path.exists():
+            path.chmod(0o600)  # deliberate mutation of this temporary fixture only
+        path.write_bytes(self.b3.encode(value))
+        path.chmod(0o400)
+
+    def rechain(self):
+        previous = self.anchors['cp03_receipt_sha256']
+        for stage in self.b3.STAGES:
+            value = dict(schema=1, scope='ISOLATED_TEST_ONLY', stage=stage,
+                         status='PREPARATION_CHECKPOINT_COMMITTED', request_sha256=self.request_sha,
+                         previous_receipt_sha256=previous, evidence=self.evidence[stage])
+            path = self.root/'prepared'/(stage+'-committed.json')
+            self.put(path, value)
+            previous = self.b3.sha(path.read_bytes())
+        final = dict(schema=1, scope='ISOLATED_TEST_ONLY', status='PREPARATION_COMMITTED',
+                     request_sha256=self.request_sha, last_checkpoint_sha256=previous,
+                     service_started=False, production_permission=False, full_b3_complete=False)
+        path = self.root/'prepared/preparation-receipt.json'
+        self.put(path, final)
+        self.anchors['preparation_receipt_sha256'] = self.b3.sha(path.read_bytes())
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def call(self):
+        return b6.observe_prepared(self.req, self.anchors, 'CP13', 'UNKNOWN')
+
+    def rejected(self):
+        value = self.call()
+        self.assertEqual(value['status'], 'HOLD', value)
+        self.assertNotIn('preparation_evidence', value, value)
+        self.assertFalse(value['phase_complete'])
+        return value
+
+    def test_original_format_positive_binding_and_separate_process(self):
+        value = self.call()
+        self.assertEqual(value['preparation_evidence']['status'], 'BOUND_HISTORY_ONLY', value)
+        self.assertEqual(value['preparation_evidence']['historical_state'], 'PREPARED')
+        self.assertEqual(value['preparation_evidence']['current_state'], 'QUIESCED')
+        self.assertEqual(value['preparation_evidence']['roles']['service_uid'], 'UNKNOWN')
+        self.assertFalse(value['preparation_evidence']['runtime_roles_granted_access'])
+        self.assertEqual(value['database_evidence']['status'], 'RECONCILED_READBACK')
+        self.assertEqual(value['status'], 'HOLD')
+        p = subprocess.run([sys.executable,'-B',str(Path(__file__).resolve()),'--prepared',
+                            json.dumps(self.req),json.dumps(self.anchors)], capture_output=True,text=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(json.loads(p.stdout)['preparation_evidence']['identity'],
+                         value['preparation_evidence']['identity'])
+        for path, raw in self.snapshot.items():
+            self.assertEqual(Path(path).read_bytes(),raw)
+
+    def test_original_two_link_publication_is_readable(self):
+        # Original publish intentionally retains .pending and terminal links.
+        for path in (self.root/'commit-receipt.json',
+                     self.root/'prepared/preparation-receipt.json',
+                     self.root/'prepared/CP07-committed.json'):
+            os.link(path, path.parent/('.'+path.name+'.pending-fixture'))
+        self.assertEqual(self.call()['preparation_evidence']['status'],'BOUND_HISTORY_ONLY')
+
+    def test_tampered_source_and_wrong_version(self):
+        path = self.root/'prepared/ledger-config.json'
+        cfg = json.loads(path.read_bytes()); cfg['source_commit'] = '0'*40
+        self.put(path,cfg)
+        self.evidence['CP07']['files']['ledger-config.json'] = self.b3.sha(path.read_bytes())
+        self.rechain()
+        self.assertEqual(self.rejected()['error']['code'],'HISTORY_DOCUMENT_CONFLICT')
+
+    def test_broken_checkpoint_chain(self):
+        path = self.root/'prepared/CP06-committed.json'
+        value = json.loads(path.read_bytes());value['previous_receipt_sha256'] = '0'*64
+        self.put(path,value)
+        self.rejected()
+
+    def test_missing_original_and_untrusted_anchor(self):
+        path = self.root/'prepared/expected-identity.json'
+        path.unlink()
+        self.assertEqual(self.rejected()['error']['type'],'FileNotFoundError')
+        self.anchors['preparation_receipt_sha256'] = '0'*64
+        self.rejected()
+
+    def test_alien_instance_and_generation(self):
+        path = self.root/'prepared/expected-identity.json'
+        original = json.loads(path.read_bytes())
+        for key, value in [('instance','33333333-3333-4333-8333-333333333333'),('generation',2)]:
+            changed = copy.deepcopy(original);changed['expected'][key] = value
+            self.put(path,changed)
+            # Even reanchoring later checkpoints cannot make a contradictory
+            # identity document match the original CP03/native journal.
+            pin = self.b3.sha(path.read_bytes())
+            self.evidence['CP06']['identity_sha256'] = pin
+            self.evidence['CP07']['files']['expected-identity.json'] = pin
+            self.rechain()
+            self.assertEqual(self.rejected()['error']['code'],'HISTORY_DOCUMENT_CONFLICT')
+
+    def test_path_escape_and_symlink_parent(self):
+        self.req['db_path'] = str(self.root.parent/'escaped.sqlite3')
+        self.assertEqual(self.rejected()['error']['code'],'HISTORY_RESERVED_PATHS')
+        self.req['db_path'] = str(self.root/'data/ledger.sqlite3')
+        folder = self.root/'prepared'; retained = self.root/'retained-prepared'
+        folder.rename(retained);folder.symlink_to(retained,target_is_directory=True)
+        self.rejected()
+
+    def test_prepared_and_active_are_not_current_quiesced(self):
+        # Native fence makes a new PREPARED epoch; no hand-built descriptor.
+        current = self.store.read()
+        fenced = self.store.fence(current['epoch'],current['instance'])
+        self.assertEqual(self.rejected()['error']['code'],'HISTORY_CURRENT_QUIESCED_IDENTITY')
+        self.store.transition('PREPARED','QUIESCED',fenced['epoch'],fenced['instance'],
+                              {k:True for k in ('identity_verified','coordinator_inactive','parent_unit_inactive',
+                                               'cgroups_empty','restart_inhibited')})
+        # Test only: ACTIVE rejection independently proves no early B7 credit.
+        self.store.transition('QUIESCED','ACTIVE',fenced['epoch'],fenced['instance'],dict(database_reopened=True))
+        self.rejected()
+
+    def test_descriptor_journal_drift(self):
+        path = Path(self.args['descriptor'])
+        value = json.loads(path.read_bytes());value['state'] = 'ACTIVE'
+        self.put(path,value)
+        self.assertEqual(self.rejected()['error']['type'],'ActivationError')
+
+    def test_hand_expected_or_pass_not_an_input(self):
+        self.req['expected'] = self.store.read()
+        self.assertEqual(self.rejected()['error']['code'],'BOUND_REQUEST_FIELDS')
+        del self.req['expected']
+        self.req['runtime_access'] = dict(status='PASS')
+        self.rejected()
+
+
 if __name__ == '__main__':
     if len(sys.argv)>1 and sys.argv[1]=='--writer':
         writer(json.loads(sys.argv[2]))
+    elif len(sys.argv)>1 and sys.argv[1]=='--prepared':
+        print(json.dumps(b6.observe_prepared(json.loads(sys.argv[2]),json.loads(sys.argv[3]),'CP13','UNKNOWN'),sort_keys=True))
     elif len(sys.argv)>1 and sys.argv[1]=='--observe':
         print(json.dumps(b6.observe_database_evidence(json.loads(sys.argv[2]),sys.argv[3]),sort_keys=True))
     else:
