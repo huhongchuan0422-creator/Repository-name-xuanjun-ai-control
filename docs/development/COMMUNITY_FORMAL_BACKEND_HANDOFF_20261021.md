@@ -106,3 +106,10 @@ scene必须指向现有CUSTOMER Principal及当前有效、同租户原项目。
 ### 国内身份回交后的范围修正
 
 同SHA国内源码复核确认：消息workflow未知身份会get_or_create_customer创建LEAD，round-trip不是只读身份查询。Resolver仅做渠道映射、可选审计，不是会话/微信验证或租户门店授权；实际认证入口全项目状态UNKNOWN，已核桥接内相关端点NOT_IMPLEMENTED。英国调用许可仍UNKNOWN。准确增量见跨机接口文档，不重新列现场清单；未取得原权威读取合同前不写RemoteCenter或消息fallback，不触发建号。
+
+
+## 连接之外的预览构建收口（2026-10-21）
+
+依据V27 §8.2.6及原客户开发预览门禁，仅修改 connected 副本准备，不切换现场域名、登录或数据。prepare-mini.cjs 在复制前校验原AppID、项目类型、源码基线、首页和全部已声明页面的JS/JSON/WXML及全树软链；失败不发布输出。副本在同父目录临时准备完成后重命名发布，现有输出及悬空软链拒绝；源目录不写入。此脚本只用于原单Writer构建，不是并发发布锁或现场安装器。
+
+tests/preview_preparation_test.py 从实际生成的 community-stage-source.zip 验证逐文件manifest摘要，解到空目录，以workflow相同源码根cwd执行prepare。覆盖成功非空首页、坏基线、缺首页、错AppID、源码软链、输出悬空软链，未触发上传/微信API/真实身份写入。专用Hosted仅验此6项，未变1821项复用。默认域名仍是历史固定目标；既有uk域名及子路径候选未在现场启用，本次不宣称域名/后端/真实登录/二维码验收通过。
