@@ -3,6 +3,8 @@ on:
   push:
     branches: [repair/p2-resumable-install-20261020]
     paths:
+      - production/p2_install/b5_server_root_binding.mjs
+      - tests/p2_install/test_b5_server_root_binding.mjs
       - production/p2_install/b5_ws_public_contract.mjs
       - tests/p2_install/test_b5_public_ws.mjs
       - tests/p2_install/test_b5_close_drain.mjs
@@ -17,5 +19,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: New affected close and cleanup cases; prior twenty retained
-        run: node tests/p2_install/test_b5_close_drain.mjs
+      - name: New affected server-root byte cases; prior lifecycle cases retained
+        run: node tests/p2_install/test_b5_server_root_binding.mjs
