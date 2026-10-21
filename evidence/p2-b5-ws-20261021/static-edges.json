@@ -2,7 +2,7 @@
   "dist/message-handler-DKklmnFX.mjs": {
     "bytes": 176118,
     "sha256": "ff332fdec514638bdd1655a510a7544f5b9a848eccf11c951851b97e192410f0",
-    "exact_relative_edges": [
+    "literal_relative_candidates": [
       "dist/abort-signal-Z3A36sLL.mjs",
       "dist/agent-id-D1-Q6vR4.mjs",
       "dist/agent-list-D2qmTsmo.mjs",
@@ -117,7 +117,7 @@
       "dist/ws-policy-close-BgtfQbi3.mjs",
       "dist/ws-shared-generation-BeRsGF9T.mjs"
     ],
-    "unavailable_relative_edges": [
+    "unavailable_relative_candidates": [
       "dist/agent-list-D2qmTsmo.mjs",
       "dist/chat-attachment-policy-CKvVmzxz.mjs",
       "dist/close-reason-B67wSC7I.mjs",
@@ -149,13 +149,13 @@
       "dist/ws-BdD3UP1C.mjs",
       "dist/ws-origin-policy-BGvHnYP1.mjs"
     ],
-    "analysis": "LEXICAL_ONLY_NOT_CLOSURE",
-    "ambiguous_lexical_tokens": []
+    "bare_literal_candidates": [],
+    "analysis": "BOUNDED_LEXICAL_CANDIDATES_NOT_AST_OR_COMPLETE_CLOSURE"
   },
   "dist/run-BNH_gC9b.mjs": {
     "bytes": 122958,
     "sha256": "55673f688f7e455cd1bfdaf6a0f26270ff5e6565881403c1b066a82530ab810f",
-    "exact_relative_edges": [
+    "literal_relative_candidates": [
       "dist/abort-signal-Z3A36sLL.mjs",
       "dist/async-work-scope-BYeX3gh6.mjs",
       "dist/auth-B1PbGNfv.mjs",
@@ -223,6 +223,7 @@
       "dist/runtime-snapshot-BFi3jxlO.mjs",
       "dist/schtasks-BgMYulZs.mjs",
       "dist/secret-file-DdkvKxUS.mjs",
+      "dist/server-ChnNHwLm.mjs",
       "dist/server-runtime-config-DUWE9SpT.mjs",
       "dist/server-shutdown-6hlRrMSx.mjs",
       "dist/shared-CeRRyLvA.mjs",
@@ -250,7 +251,7 @@
       "dist/worker-cpu-EKuz4_X-.mjs",
       "dist/ws-logging-86BGsxSJ.mjs"
     ],
-    "unavailable_relative_edges": [
+    "unavailable_relative_candidates": [
       "dist/claw-banner-CEOk95iU.mjs",
       "dist/cleanup-budget-B-yQr9sD.mjs",
       "dist/cli/gateway-lifecycle.runtime.js",
@@ -275,6 +276,7 @@
       "dist/restart-trace-BRfpl70Q.mjs",
       "dist/runtime-parse-B34Z1eD8.mjs",
       "dist/secret-file-DdkvKxUS.mjs",
+      "dist/server-ChnNHwLm.mjs",
       "dist/server-runtime-config-DUWE9SpT.mjs",
       "dist/server-shutdown-6hlRrMSx.mjs",
       "dist/shared-CeRRyLvA.mjs",
@@ -287,15 +289,13 @@
       "dist/triage-failure-NtJw5nRW.mjs",
       "dist/ws-logging-86BGsxSJ.mjs"
     ],
-    "analysis": "LEXICAL_ONLY_NOT_CLOSURE",
-    "ambiguous_lexical_tokens": [
-      ", () => import("
-    ]
+    "bare_literal_candidates": [],
+    "analysis": "BOUNDED_LEXICAL_CANDIDATES_NOT_AST_OR_COMPLETE_CLOSURE"
   },
   "dist/ws-connection-CsJ9cE0L.mjs": {
     "bytes": 48210,
     "sha256": "b51e1190bd1ca47b2497311e798ee95c2d7acd1e1a410bc6f6c1b1aeb5862f53",
-    "exact_relative_edges": [
+    "literal_relative_candidates": [
       "dist/auth-rate-limit-ljr4u3Yk.mjs",
       "dist/client-presence-BOosSGjY.mjs",
       "dist/connection-transport-close-CUJOsJm7.mjs",
@@ -342,7 +342,7 @@
       "dist/ws-shared-generation-BeRsGF9T.mjs",
       "dist/ws-types-099MIJxx.mjs"
     ],
-    "unavailable_relative_edges": [
+    "unavailable_relative_candidates": [
       "dist/client-presence-BOosSGjY.mjs",
       "dist/connection-transport-close-CUJOsJm7.mjs",
       "dist/device-pairing-node-DmlQG6aE.mjs",
@@ -366,7 +366,7 @@
       "dist/ws-BdD3UP1C.mjs",
       "dist/ws-types-099MIJxx.mjs"
     ],
-    "analysis": "LEXICAL_ONLY_NOT_CLOSURE",
-    "ambiguous_lexical_tokens": []
+    "bare_literal_candidates": [],
+    "analysis": "BOUNDED_LEXICAL_CANDIDATES_NOT_AST_OR_COMPLETE_CLOSURE"
   }
 }

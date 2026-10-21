@@ -24,7 +24,9 @@ IMPORTANT: this delivery does not supply or authenticate the actual native owner
 
 ## Concentrated remaining dependencies, not a new collection request
 
-[evidence/p2-b5-ws-20261021/static-edges.json](../../evidence/p2-b5-ws-20261021/static-edges.json) records all exact literal edges against the existing1718+3 files. New direct missing source edges:message-handler30 of113,ws-connection22 of45,run35 of93. These overlap and are lexical boundaries, NOT a minimal executable closure or authority to fetch all of them. Suspicious regex tokens are kept as ambiguous, not real package names. No archived AST parser was run.
+[evidence/p2-b5-ws-20261021/static-edges.json](../../evidence/p2-b5-ws-20261021/static-edges.json) records bounded lexical literal candidates against existing1718+3 files (not all AST edges): message-handler-DKklmnFX.mjs: 30 unavailable / 113 relative candidates, run-BNH_gC9b.mjs: 36 unavailable / 94 relative candidates, ws-connection-CsJ9cE0L.mjs: 22 unavailable / 45 relative candidates. Static from/side-effect imports, dynamic imports and require are searched separately with matching quote delimiters, avoiding cross-quote consumption. These overlap and are not a minimal executable closure or authority to fetch them all. No archived AST parser was run.
+
+Actual run-BNH L2362 imports ./server-ChnNHwLm.mjs; L2376 takes startGatewayServer from that module. This exact server composition source is absent from current1718+3 bytes. It is the focused next composition-owner source dependency, with SHA UNKNOWN until original manifest is read. Do not guess a replacement server or claim owner/drain source is available.
 
 | Remaining item | Current evidence / exact limit |
 |---|---|
