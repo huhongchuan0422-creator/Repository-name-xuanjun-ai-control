@@ -7,7 +7,6 @@ import concurrent.futures
 import http.client
 import json
 import os
-import re
 import socket
 import time
 import unittest
@@ -59,10 +58,23 @@ class SessionBrowser(unittest.TestCase):
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
                         page.locator('[data-logout]').click();expect(page.locator('#community-session [role=status]')).to_have_text('已退出登录。')
-                        page.goto(base+'/merchant/review');login('two@example.org')
+                        page.goto(base+'/merchant/review')
+                        with page.expect_response(lambda r:r.url.endswith('/merchant/onboarding') and r.request.post_data_json.get('operation')=='review_list' and r.status==200):
+                            login('two@example.org')
                         expect(page.locator('#community-session [role=status]')).to_have_text('已登录原平台审核账户。')
-                        page.wait_for_timeout(150)
-                        self.assertIn(('/merchant/onboarding',200),received)
+                        # A valid reviewer session/CSRF does not inherit the
+                        # other account's original merchant workspace.
+                        denied=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('community-original-csrf')},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
+                        self.assertEqual(denied,403)
+                        for origin in ('https://evil.invalid',None):
+                            conn=http.client.HTTPConnection('unused',timeout=5)
+                            conn.sock=socket.socket(socket.AF_UNIX);conn.sock.settimeout(5);conn.sock.connect(fx.plan['socket_path'])
+                            headers={'Host':'uk.wenwenwenyiyiyi.work','X-Xuanjun-Client-IP':'127.0.0.1','Content-Type':'application/json'}
+                            if origin:headers['Origin']=origin
+                            try:
+                                conn.request('POST','/community/session/login',json.dumps({'email':'one@example.org','password':'FixturePassword123!'}),headers)
+                                response=conn.getresponse();response.read();self.assertEqual(response.status,403)
+                            finally:conn.close()
                         self.assertEqual(errors,[])
                     finally:browser.close()
             # Root cannot be an admitted production peer. Only this synthetic
