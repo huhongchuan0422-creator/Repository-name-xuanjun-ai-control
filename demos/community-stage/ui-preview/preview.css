@@ -36,3 +36,18 @@ body[data-mini="true"] .metrics{display:none}
 body[data-mini="true"] .layout{display:block;max-width:430px;margin:0 auto}body[data-mini="true"] aside{display:none}body[data-mini="true"] .shell-head{display:flex;gap:8px;padding:6px 10px;flex-wrap:wrap;font-size:10px}body[data-mini="true"] .shell-head .brand{font-size:12px;width:auto}body[data-mini="true"] .shell-head .brand span{display:none}body[data-mini="true"] .shell-head label{min-width:0;flex:1;font-size:10px}body[data-mini="true"] .shell-head select{padding:3px;font-size:10px}body[data-mini="true"] main#view{padding:0;min-height:0}body[data-mini="true"] .mini-app main{display:block;width:100%;max-width:none;margin:0;min-height:530px;padding:18px 15px 28px}
 body[data-platform="true"] .layout{grid-template-columns:230px minmax(0,1fr)}body[data-platform="true"] main#view{padding:24px;min-height:0}
 @media(max-width:600px){.platform-orders{padding:14px;border-radius:0}.platform-order-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.platform-order-row.table-head{display:none}.platform-order-row>span:last-child{grid-column:1/-1}.platform-tools{align-items:stretch;flex-direction:column}.platform-field{grid-template-columns:1fr;gap:4px}body[data-mini="true"] .layout{max-width:430px;margin:0 auto}.mini-content{padding-left:14px;padding-right:14px}}
+
+/* Final direction prototype: simple mini-program chrome and compact platform groups. */
+.menu-group-title{font-size:11px;font-weight:700;color:#7b877f;letter-spacing:.04em;padding:14px 12px 4px;margin:0}
+body[data-mini="true"] .layout{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+body[data-mini="true"] .admission-mini{padding-bottom:24px}
+body[data-mini="true"] .admission-mini>.section-heading{display:block}
+body[data-mini="true"] .admission-mini h1{font-size:23px}
+body[data-mini="true"] .admission-mini>.panel{padding:15px;margin:12px 0}
+body[data-mini="true"] .admission-mini .edit-fields{grid-template-columns:1fr;gap:12px}
+body[data-mini="true"] .admission-mini .steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+body[data-mini="true"] .admission-mini .steps li{text-align:center}
+body[data-platform="true"] #menu{gap:2px}
+body[data-platform="true"] #menu a{padding:8px 12px}
+body[data-platform="true"] .menu-group-title{border-top:1px solid #e1e9e3;margin-top:8px}
+@media(max-width:600px){body[data-mini="true"] .layout{padding-bottom:calc(82px + env(safe-area-inset-bottom))}body[data-platform="true"] .layout{display:block}body[data-platform="true"] aside{display:block}body[data-platform="true"] #menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}body[data-platform="true"] .menu-group-title{grid-column:1/-1}}
