@@ -226,3 +226,23 @@ Owner已明确确认本客户平台“首次上线，无历史数据”（原Iss
 本次仅交首次持久运行宿主源码，不称完整正式bootstrap已完成：原Center首次注册/验证及可信微信绑定、首个真实项目/scene/门店业务配置、既有受保护密钥引用、英国资源/HTTPS和实际启动仍需按具体首次上线方案完成。不得直接SQL设verified或伪造签约/项目authority；不得把我方SaaS身份变成客户平台数据。现有公共连接代码不改，人工辅助现场动作需先交准确可审阅方案，尚未发服务器命令或执行初始化。
 
 Hosted以[persistent-runtime-scope]验新8项和实际ZIP组合1项；原21/55/1821未变结果复用，源码包仍走原逐文件manifest。准确Commit/Tree/Run/包摘要见原Issue76后继回执。BACKEND_NOT_READY、payments=false、Finance UNCONFIRMED保留，尚无可用新二维码。
+
+## 正式进程启动组合与受保护凭据消费（2026-10-22）
+
+沿f76a818a继续，Owner确认原AppSecret保存在本地电脑；本窗口未读取、上传或重置该秘密。新增community_platform_host.PlatformHost和同模块CLI，是真正调用原UnixStreamServer.serve_forever的进程入口，不是只返回配置对象；尚未在英国运行。
+
+调用顺序：读取私有plan/key-material/WeChat三文件及原application_config → 精确Center源码SHA → 原Principal/tenant/store绑定 → 已存在Center及业务文件预检 → Center既有文件上的协作flock与原业务runtime.lock → 原PersistentRuntime.open → 原Center → 原MiniApplication.from_existing_runtime → 原onboarding/operations/commerce → 原listen_proxy → 同线程串行serve_forever。没有fixture/LocalStage、浏览器会话替代、远端Center或国内客服；没有支付provider提交配置、QR模拟密钥或本地管理令牌。
+
+plan准确字段：version/center_root/runtime_directory/application_config/principals/bindings/operations/reviewers/socket_path/https_origin/nginx_uid/nginx_gid；仅从本地受保护文件读取，非HTTP参数。principals是名称→{tenant_id,role}，bindings按同名引用原scope，operations引用名称后仍由原CenterOperations检查，reviewers仍走原MerchantOnboarding。完整application_config继续原schema/stores和当前项目校验；AppID和origin必须与独立受保护输入一致。nginx_uid为正整数、gid非负整数，拒绝bool，无默认UID、socket、域名或数据根。
+
+key-material准确为{active_key,keys}，keys是原32字节密钥的base64映射；WeChat文件准确为{appid,app_secret}。两者继续复用原load_protected的私有owner/父目录/普通单链接文件/逐级无软链、64KiB/唯一JSON/有限数/读中不变校验。参数仅接受文件路径，CLI错误只输出BACKEND_NOT_READY，不输出秘密/原始异常/路径正文，不扫描env，不创建或生成真实凭据。具体现场路径与密钥管理方式仍需部署候选冻结，Owner无需把AppSecret发到聊天或GitHub。
+
+仅允许非root进程。打开前要求原center.sqlite、objects和六库全部存在且为私有文件/目录，缺Center不会通过构造函数悄悄建空身份库；仅支持已准备好的原当前schema。Center构造及onboarding沿原机制可能安装其原附加schema，故不是只读采集动作，实际运行需项目部署准入。协作flock约束本入口实例，不宣称能检测不遵守该锁的其他原Center进程；正式发布仍须停用同项目其他Writer而非与其共享活动库。
+
+正常SIGTERM转为受控退出，原应用关闭socket、Center和业务句柄关闭后再释放锁；失败关闭资源但不删库、不重试，SIGKILL等异常留下socket时仍按原拒绝覆盖规则等待明确恢复，不冒称自动容灾。进程启动不会自动创建账号、验证邮箱、签发project authority、赋予门店角色或改映射。
+
+新增test_community_platform_host.py：8项原组合/错AppID/私有凭据/缺Center/错误配置/原微信绑定合成provider/未知身份不建号/撤权/错scene/锁及失败关闭/日志脱敏/信号恢复；另1项在Hosted真实非root子进程启动CLI、原Unix HTTP健康、SIGTERM清理、同版本再次启动。测试使用独立合成Center和私有SQLite；fixture修改有效期只为合成项目，不是生产放宽。根环境本地明确跳过该非root实进程用例并仅隔离mock入口root检查；Hosted该用例必须实际执行才能报告通过。健康scope仍PROCESS_AND_DATABASE_CONNECTIVITY，不是微信登录/客户验收。
+
+首次本地失败来自合成plan缺少reviewers，原onboarding正确拒绝；补原合成reviewer引用，并在plan读取阶段更早拒绝空值，不删门禁。原日志保留。Hosted以[platform-host-scope]只验新9项与ZIP1项，f76原9项及21/55/1821未变范围复用，准确终态见原Issue76回执。
+
+仍未完成的真实预览环节必须分开：本入口要求已有经原流程验证的账户、项目和微信绑定；客户首次上线的注册/验证/首个项目与门店配置尚未产生。当前Center.register是原邮箱验证机制，MiniGateway未知openid拒绝，没有“仅有AppSecret便可首次扫码注册”的生产实现；不能塞测试账号、SQL设verified、伪造authority或借用本方SaaS数据来掩盖。后续必须明确接通客户平台首次身份流程，再把真实配置带入此入口；英国资源/TLS/反代、合法request域名和新官方二维码仍待实际验证。不以本CLI替代首次初始化或源授权，不触发上传或现场操作。
