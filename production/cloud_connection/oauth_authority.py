@@ -47,6 +47,26 @@ def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def consent_form_source(uri):
+    """Serialize one bounded HTTPS CSP source, never arbitrary header syntax.
+
+    Deliberately supports only query-free ASCII host/path callback URLs. Exact
+    OAuth redirect URI matching remains mandatory: CSP redirect checks may
+    ignore the source path and are not an authorization boundary.
+    """
+    if type(uri) is not str or not 1 <= len(uri) <= 2048:
+        raise Hold('OAUTH_CONSENT_CSP_SOURCE')
+    match = re.fullmatch(r'https://([A-Za-z0-9.-]+)(?::([0-9]{1,5}))?(/(?:[A-Za-z0-9._~/-]|%[0-9A-Fa-f]{2})*)', uri)
+    if match is None:
+        raise Hold('OAUTH_CONSENT_CSP_SOURCE')
+    host, port, path = match.groups()
+    if len(host) > 253 or any(re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?', label) is None for label in host.split('.')):
+        raise Hold('OAUTH_CONSENT_CSP_SOURCE')
+    if port is not None and not 1 <= int(port) <= 65535:
+        raise Hold('OAUTH_CONSENT_CSP_SOURCE')
+    return 'https://' + host.lower() + (':' + str(int(port)) if port is not None else '') + path
+
+
 def initialize_new_database(db):
     """Explicit offline/bootstrap operation. Never called by create_app."""
     if db.in_transaction:
@@ -275,7 +295,12 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers['Content-Security-Policy'] = "default-src 'none'; form-action 'self'; frame-ancestors 'none'"
+        form_action = "'self'"
+        if (request.method == 'GET' and request.path == '/consent'
+                and response.status_code == 200 and response.mimetype == 'text/html'
+                and 'consent_form_source' in g):
+            form_action += ' ' + g.consent_form_source
+        response.headers['Content-Security-Policy'] = "default-src 'none'; form-action " + form_action + "; frame-ancestors 'none'"
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
@@ -385,6 +410,12 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
         user = subject(row['sub'])
         if user is None: abort(401)
         if request.method == 'GET':
+            params = json.loads(row['params'])
+            settings = config['clients'].get(params.get('client_id'))
+            redirect_uri = params.get('redirect_uri')
+            if (settings is None or settings['resource_client']
+                    or redirect_uri not in settings['redirect_uris']): abort(403)
+            g.consent_form_source = consent_form_source(redirect_uri)
             from markupsafe import escape
             return ('<form method="post"><p>Allow read-only project connection access?</p>'
                     '<input type="hidden" name="csrf" value="'+str(escape(session['csrf']))+'">'

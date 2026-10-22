@@ -6,6 +6,7 @@ on:
       - production/cloud_connection/**
       - tests/test_cloud_connection*.py
       - tests/oauth/**
+      - tests/browser/**
       - deployment/cloud-connection/**
       - docs/development/CLOUD_CONNECTION*.md
       - .github/workflows/cloud-connection-tests.yml
@@ -104,3 +105,23 @@ jobs:
         env:
           REQUIRE_NGINX_TESTS: '1'
         run: python3 -m unittest discover -s tests -p 'test_cloud_connection_oauth*nginx.py' -v
+  oauth-browser:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.15'
+      - name: Exact source and isolated browser-only dependencies
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git log -1 --format='%H %T %P'
+          python -m venv /tmp/consent-browser-tests
+          timeout 120s /tmp/consent-browser-tests/bin/python -m pip install --index-url https://pypi.org/simple --timeout 15 --retries 0 --require-hashes --only-binary=:all: -r tests/browser/requirements.lock
+          /tmp/consent-browser-tests/bin/python -m pip check
+          PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=30000 timeout 240s /tmp/consent-browser-tests/bin/python -m playwright install --with-deps chromium
+      - name: Sandboxed synthetic two-origin form redirect regression
+        run: timeout 60s /tmp/consent-browser-tests/bin/python -B tests/browser/test_consent_csp_browser.py

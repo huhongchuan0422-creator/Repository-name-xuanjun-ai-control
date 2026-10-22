@@ -123,12 +123,15 @@
           "Old App/tunnel unchanged; static-client incompatibility stops new chain",
           "Pre-egress introspect GET/POST/query are denied without upstream; finite peer observation expires and can be withdrawn",
           "Exact isolated Python3.11.6 dependency/wheel and HTTP/persistence compatibility remains distinct from vendor host and live runtime adoption",
-          "Optional ui_locales is bounded and ignored; duplicate/unknown parameters and all OAuth identity/resource/PKCE/scope checks remain fail-closed"
+          "Optional ui_locales is bounded and ignored; duplicate/unknown parameters and all OAuth identity/resource/PKCE/scope checks remain fail-closed",
+          "Consent form CSP adds only the selected currently registered safe HTTPS callback source; exact OAuth validation remains authoritative, unknown sources fail closed, and browser tests remain synthetic and sandboxed"
         ],
         "tests": [
           "tests/test_cloud_connection_oauth_nginx.py",
           "tests/test_cloud_connection_oauth_pre_egress_nginx.py",
-          "tests/oauth/test_oauth_ui_locales.py"
+          "tests/oauth/test_oauth_ui_locales.py",
+          "tests/oauth/test_oauth_consent_csp.py",
+          "tests/browser/test_consent_csp_browser.py"
         ]
       },
       "reuse": [
@@ -153,7 +156,12 @@
         "deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
         "production/cloud_connection/oauth_authority.py",
         "tests/oauth/test_oauth_ui_locales.py",
-        "docs/development/CLOUD_CONNECTION_UI_LOCALES_20261023.md"
+        "docs/development/CLOUD_CONNECTION_UI_LOCALES_20261023.md",
+        "tests/oauth/test_oauth_consent_csp.py",
+        "tests/browser/test_consent_csp_browser.py",
+        "tests/browser/requirements.lock",
+        ".github/workflows/cloud-connection-tests.yml",
+        "docs/development/CLOUD_CONNECTION_CONSENT_CSP_20261023.md"
       ]
     }
   ]
