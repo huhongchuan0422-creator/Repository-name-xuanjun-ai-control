@@ -304,6 +304,8 @@ class ClickThrough(unittest.TestCase):
             page.reload()
             expect(page.locator('#view h1').first).to_have_text('个人中心')
             page.screenshot(path=str(self.out/'owner-consumer-profile.png'),full_page=True)
+            expect(page.locator('#view')).not_to_contain_text('商品篮子')
+            self.assertTrue(any(p['id']=='consumer-basket' for p in self.data['pages']))
             page.get_by_label('查看身份',exact=True).select_option('platform')
             page.get_by_role('link',name='订单管理',exact=True).first.click()
             expect(page.locator('#view h1').first).to_have_text('订单管理')
