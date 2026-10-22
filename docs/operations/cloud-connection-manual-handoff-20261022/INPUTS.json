@@ -115,10 +115,11 @@
     },
     {
       "id": "domestic_dependency_delivery_result",
-      "state": "UNKNOWN",
-      "reason": "未在国内实际取得18个完整匹配轮子；CI取得不等于国内取得。只允许正常官方PyPI/已获准渠道，超时保留现场不换镜像",
-      "blocks": "G2",
-      "responsible": "原执行方"
+      "state": "OWNER_LIVE_EVIDENCE_PASS",
+      "reason": "准确ZIP已上传并SHA匹配；18轮子6731878B及30源码校验保管，原venv离线安装/pip check/18版本导入均exit0，外层exit0。服务及数据库未创建。",
+      "blocks": "NONE_FOR_G2_DEPENDENCY_INSTALL_IMPORT_SCOPE",
+      "responsible": "原执行方",
+      "evidence": "G2_OWNER_SUCCESS_20261022.json"
     },
     {
       "id": "service_identity_and_access_profile",

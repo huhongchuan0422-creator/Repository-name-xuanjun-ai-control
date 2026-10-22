@@ -31,3 +31,6 @@ Owner返回的6文件/4包结果完整无错误，来源及记录补丁对应已
 
 ## R3：G2/G3集中接续
 G1完成与人工确认已同步。G2_ACQUISITION_AND_ACCEPTANCE.md提供准确30成员、18轮子取得/校验/独立venv与导入步骤；G3_ACCESS_AND_STATE.md集中权限与DB来源规则；B5_BINDINGS.json使用原Writer的实际catalog，不把372项当最终选择。G23_METADATA_COMMAND.txt只输出固定元数据，不读取配置/秘密/数据库正文、不更改现场。R2历史归档保留，不将其称安装包。
+
+## R4：G2实机成功记录
+G2_OWNER_SUCCESS_20261022.json记录Owner原终端实际结果：离线18依赖、pip check、18版本与导入均exit0；30源码保管，未发布release、未启动服务/建DB。原R1/R2/R3与G2 ZIP保持原字节/SHA，不重打包。下一批G3_PREPARE_COMMAND.txt仅专用无登录身份、固定目录/最小组遍历、准确root-owned非激活release及实际服务UID下CLI/import，不创建凭据/DB/current/unit或启动HTTP。G3尚未执行，不能把文档准备写成实机完成。

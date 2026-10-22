@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "revision": "R3_G2_G3_AND_B5_BINDINGS",
-  "purpose": "MANUAL_HANDOFF_NOT_INSTALLER",
+  "revision": "R4_G2_OWNER_SUCCESS_DIRECT_DOCUMENT_UPDATE",
+  "purpose": "CURRENT_DOCUMENT_AND_SOURCE_INDEX_NO_NEW_ARCHIVE",
   "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
   "source_members": 30,
   "wheel_binaries_included": false,
-  "separate_complete_payload": "G2_PAYLOAD_RECEIPT.json",
+  "previous_archives_unchanged": true,
   "members": [
     {
       "path": "ACCEPTANCE_RECOVERY.md",
@@ -56,6 +56,12 @@
       "mode": "0644"
     },
     {
+      "path": "G2_OWNER_SUCCESS_20261022.json",
+      "bytes": 1282,
+      "sha256": "b5b9b0f067a5ec79358cfc15aeaef4e69f756ca1b26bfdda170f63f7903fc450",
+      "mode": "0644"
+    },
+    {
       "path": "G2_PAYLOAD_MANIFEST.json",
       "bytes": 10935,
       "sha256": "9f487759d58718bd9518e860c35f303917e887e0a00406ab41e5b2beae84167f",
@@ -63,8 +69,8 @@
     },
     {
       "path": "G2_PAYLOAD_RECEIPT.json",
-      "bytes": 587,
-      "sha256": "ca2ab624b295d36cdbaec8ef1ed7aab42d796030911f1d87c5033a4012247403",
+      "bytes": 689,
+      "sha256": "43c50343a8dd5401e9c10ea65ca85feec0c748646cb49b0b5a9c515c9a5ef0db",
       "mode": "0644"
     },
     {
@@ -74,9 +80,15 @@
       "mode": "0644"
     },
     {
+      "path": "G3_PREPARE_COMMAND.txt",
+      "bytes": 7503,
+      "sha256": "d03cf117c5ae2360f03548639cc4524418b26166c3a0ed1e5ce258b5dec94f6c",
+      "mode": "0644"
+    },
+    {
       "path": "INPUTS.json",
-      "bytes": 7658,
-      "sha256": "dfdfcd3d00140a815397d9e774dc3be94c91030c2cdb44f037deed47de4a4098",
+      "bytes": 7786,
+      "sha256": "768d4ec0ac8814b3b609dae5d256e78a917ab29bfd1cd39756a1a54ac731c653",
       "mode": "0644"
     },
     {
@@ -87,14 +99,14 @@
     },
     {
       "path": "README.zh.md",
-      "bytes": 3252,
-      "sha256": "410d095bb25482e777de31a7b12823a9760de3b4c44953f291b2d3896ab3366a",
+      "bytes": 3783,
+      "sha256": "f02bbb2485a9b8a889c2b61e368e96ee4a06f8229af0a3858d287833cc8314c4",
       "mode": "0644"
     },
     {
       "path": "STAGES.md",
-      "bytes": 4954,
-      "sha256": "4762531db62949d6eb5f5850308fa5e98c8adc2d8c1a179d348e72b0b39819ec",
+      "bytes": 5007,
+      "sha256": "aefe78bd22e31b28c66df1564699b8521e2f6544ee79eea851ba355bc2644bc9",
       "mode": "0644"
     },
     {

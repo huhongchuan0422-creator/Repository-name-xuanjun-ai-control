@@ -1,0 +1,130 @@
+sudo -n /usr/bin/python3 -I -B -S - <<'PY'
+import os,sys,stat,pwd,grp,json,hashlib,subprocess,shutil
+HOST="iZvt5t8tlrm8oiZ"
+BASE="/opt/xuanjun-cloud-oauth"
+INPUTS=BASE+"/venv-py3116-inputs"
+CUSTODY=INPUTS+"/offline-0177d391/source"
+SHA="0177d3917278c6f243363d7fcb5a18c638dabd51"
+MANIFEST="67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c"
+RELEASE=BASE+"/releases/"+SHA
+ETC="/etc/xuanjun-cloud-oauth"
+DATA="/var/lib/xuanjun-cloud-oauth"
+JOB=INPUTS+"/g3-prepare-0177d391"
+NAME="xuanjun_oauth"
+phase="precheck";claimed=False;results=[]
+def safe_dir(path):
+ fd=os.open("/",os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ try:
+  for part in path.strip("/").split("/"):
+   nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+   os.close(fd);fd=nxt;s=os.fstat(fd)
+   if s.st_uid!=0 or s.st_mode&0o022:raise RuntimeError("UNSAFE_PARENT")
+ finally:os.close(fd)
+def read(path,limit):
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+ try:
+  s=os.fstat(fd)
+  if not stat.S_ISREG(s.st_mode) or s.st_uid!=0 or s.st_mode&0o022 or s.st_nlink!=1 or s.st_size>limit:raise RuntimeError("INPUT_METADATA")
+  with os.fdopen(fd,"rb",closefd=False) as f:raw=f.read(limit+1)
+  z=os.fstat(fd)
+  fp=lambda x:(x.st_dev,x.st_ino,x.st_size,x.st_mtime_ns,x.st_ctime_ns,x.st_mode,x.st_uid,x.st_gid,x.st_nlink)
+  if len(raw)!=s.st_size or fp(s)!=fp(z):raise RuntimeError("INPUT_CHANGED")
+  return raw
+ finally:os.close(fd)
+def save(state,reason=None):
+ r={"state":state,"phase":phase,"results":results,"source_commit":SHA,"service_started":False,"database_created":False,"credentials_created":False}
+ if reason:r["reason"]=reason
+ if claimed:
+  with open(JOB+"/status.tmp","x") as f:json.dump(r,f,sort_keys=True);f.flush();os.fsync(f.fileno())
+  os.replace(JOB+"/status.tmp",JOB+"/status.json")
+ return r
+def run(label,args,env=None):
+ global phase
+ phase=label;save("RUNNING")
+ r=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,env=env,timeout=60)
+ results.append({"step":label,"exit_code":r.returncode})
+ if r.returncode:raise RuntimeError("STEP_FAILED_"+label)
+ save("RUNNING")
+def main():
+ global phase,claimed
+ if os.uname().nodename!=HOST or os.geteuid()!=0 or os.environ.get("SUDO_UID")!="1000":raise RuntimeError("HOST_OR_IDENTITY")
+ for p in (INPUTS,CUSTODY,BASE,ETC,"/var/lib"):safe_dir(p)
+ receipt=json.loads(read(INPUTS+"/g2-receipt.json",65536))
+ if receipt.get("state")!="G2_VENV_DEPENDENCIES_IMPORT_PASS" or receipt.get("source_commit")!=SHA or receipt.get("source_members_verified")!=30:raise RuntimeError("G2_RECEIPT_BINDING")
+ for p in (RELEASE,BASE+"/current",DATA,"/etc/systemd/system/xuanjun-cloud-oauth.service",JOB):
+  if os.path.lexists(p):raise RuntimeError("TARGET_EXISTS_NO_OVERWRITE")
+ for p in ("authority.json","authority.env","session.secret","github.secret"):
+  if os.path.lexists(ETC+"/"+p):raise RuntimeError("CONFIG_NOW_EXISTS")
+ try:pwd.getpwnam(NAME)
+ except KeyError:pass
+ else:raise RuntimeError("SERVICE_ACCOUNT_ALREADY_EXISTS")
+ try:grp.getgrnam(NAME)
+ except KeyError:pass
+ else:raise RuntimeError("SERVICE_GROUP_ALREADY_EXISTS")
+ s=os.lstat(ETC)
+ if not stat.S_ISDIR(s.st_mode) or s.st_uid!=0 or s.st_gid!=0 or stat.S_IMODE(s.st_mode)!=0o700 or s.st_ino!=262323:raise RuntimeError("ETC_STATE_CHANGED")
+ if "system.posix_acl_access" in os.listxattr(ETC):raise RuntimeError("ETC_ACL_REQUIRES_REVIEW")
+ before=(s.st_dev,s.st_ino)
+ tools={}
+ for name in ("groupadd","useradd","runuser"):
+  path=shutil.which(name,path="/usr/sbin:/usr/bin:/sbin:/bin")
+  if not path:raise RuntimeError("MISSING_TOOL_"+name)
+  safe_dir(os.path.dirname(os.path.realpath(path)))
+  t=os.stat(path)
+  if t.st_uid!=0 or t.st_mode&0o022:raise RuntimeError("UNSAFE_SYSTEM_TOOL")
+  tools[name]=path
+ shell=next((p for p in ("/usr/sbin/nologin","/sbin/nologin") if os.path.isfile(p)),None)
+ if shell is None:raise RuntimeError("NO_NOLOGIN_SHELL")
+ mp="deployment/cloud-connection/oauth/SOURCE_MANIFEST.json"
+ raw=read(CUSTODY+"/"+mp,262144)
+ if hashlib.sha256(raw).hexdigest()!=MANIFEST:raise RuntimeError("MANIFEST_SHA")
+ entries=json.loads(raw)["files"]
+ if len(entries)!=30 or len({e["path"] for e in entries})!=30:raise RuntimeError("SOURCE_COUNT")
+ content={mp:raw}
+ for e in entries:
+  p=e["path"]
+  if p.startswith("/") or "\\" in p or any(x in ("",".","..") for x in p.split("/")):raise RuntimeError("SOURCE_PATH")
+  safe_dir(os.path.dirname(CUSTODY+"/"+p))
+  data=read(CUSTODY+"/"+p,1048576)
+  if len(data)!=e["bytes"] or hashlib.sha256(data).hexdigest()!=e["sha256"]:raise RuntimeError("SOURCE_SHA")
+  content[p]=data
+ if os.path.lexists(BASE+"/releases"):safe_dir(BASE+"/releases")
+ os.umask(0o022);os.mkdir(JOB,0o700);claimed=True;save("RUNNING")
+ run("create_dedicated_group",[tools["groupadd"],"--system",NAME])
+ run("create_dedicated_nologin_account",[tools["useradd"],"--system","--gid",NAME,"--no-user-group","--no-create-home","--no-log-init","--home-dir","/nonexistent","--shell",shell,"--password","!","-K","CREATE_MAIL_SPOOL=no",NAME])
+ p=pwd.getpwnam(NAME);g=grp.getgrnam(NAME)
+ if p.pw_uid==0 or p.pw_gid!=g.gr_gid or g.gr_mem:raise RuntimeError("SERVICE_IDENTITY_BINDING")
+ results.append({"step":"service_identity","uid":p.pw_uid,"gid":p.pw_gid,"shell":p.pw_shell})
+ phase="prepare_data_root";save("RUNNING")
+ os.mkdir(DATA,0o700);os.chown(DATA,p.pw_uid,p.pw_gid)
+ phase="limited_config_traversal";save("RUNNING")
+ fd=os.open(ETC,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ try:
+  s=os.fstat(fd)
+  if (s.st_dev,s.st_ino)!=before or s.st_uid!=0 or s.st_gid!=0 or stat.S_IMODE(s.st_mode)!=0o700:raise RuntimeError("ETC_CHANGED_BEFORE_ADAPTATION")
+  os.fchown(fd,0,p.pw_gid);os.fchmod(fd,0o750)
+ finally:os.close(fd)
+ phase="publish_nonactive_source_release";save("RUNNING")
+ if not os.path.lexists(BASE+"/releases"):os.mkdir(BASE+"/releases",0o755)
+ safe_dir(BASE+"/releases");os.mkdir(RELEASE,0o755)
+ for name,data in sorted(content.items()):
+  dst=RELEASE+"/"+name;os.makedirs(os.path.dirname(dst),mode=0o755,exist_ok=True)
+  fd=os.open(dst,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o644)
+  with os.fdopen(fd,"wb") as f:f.write(data);f.flush();os.fsync(f.fileno())
+  if hashlib.sha256(read(dst,1048576)).hexdigest()!=hashlib.sha256(data).hexdigest():raise RuntimeError("RELEASE_READBACK")
+ env={"PATH":"/usr/sbin:/usr/bin:/sbin:/bin","LANG":"C.UTF-8","OAUTH_SOURCE_MANIFEST_SHA256":MANIFEST,"PYTHONDONTWRITEBYTECODE":"1"}
+ prefix=[tools["runuser"],"-u",NAME,"--",BASE+"/venv-py3116/bin/python","-I","-B"]
+ run("service_identity_dependency_imports",prefix+["-c","import authlib,flask,requests,waitress,cryptography,cffi,_ssl,_sqlite3; print('IMPORTS_OK')"],env)
+ run("service_identity_manifest_and_entrypoint_help",prefix+[RELEASE+"/deployment/cloud-connection/oauth/run.py","--help"],env)
+ phase="complete";r=save("G3_IDENTITY_DIRECTORIES_SOURCE_PREPARED")
+ r.update(hostname=HOST,service_uid=p.pw_uid,service_gid=p.pw_gid,release=RELEASE,source_files=30,manifest_sha256=MANIFEST,current_link_created=False,systemd_sandbox_verified=False)
+ with open(JOB+"/receipt.json","x") as f:json.dump(r,f,sort_keys=True);f.flush();os.fsync(f.fileno())
+ print(json.dumps(r,sort_keys=True));return 0
+try:sys.exit(main())
+except BaseException as e:
+ if isinstance(e,SystemExit) and e.code==0:raise
+ try:r=save("HOLD_KEEP_ALL_STATE_NO_RETRY",str(e) if isinstance(e,RuntimeError) else type(e).__name__)
+ except BaseException:r={"state":"UNKNOWN_STATUS_WRITE_FAILED","phase":phase}
+ print(json.dumps(r,sort_keys=True));sys.exit(2)
+PY
+echo "EXIT_CODE=$?"

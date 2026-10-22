@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "evidence_layer": "OWNER_PROVIDED_TERMINAL_RESULT",
+  "outer_exit_code": 0,
+  "receipt": {
+    "archive_sha256": "0e8af44744f768c20c4f4368f86aa8d545881097ea7ab605b4ccfbde7f2035a1",
+    "database_created": false,
+    "hostname": "iZvt5t8tlrm8oiZ",
+    "log_truncated": false,
+    "phase": "complete",
+    "pid": 332342,
+    "results": [
+      {
+        "exit_code": 0,
+        "step": "offline_install_18"
+      },
+      {
+        "exit_code": 0,
+        "step": "pip_check"
+      },
+      {
+        "exit_code": 0,
+        "step": "versions_and_imports"
+      }
+    ],
+    "service_started": false,
+    "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
+    "source_custody": "/opt/xuanjun-cloud-oauth/venv-py3116-inputs/offline-0177d391/source",
+    "source_members_verified": 30,
+    "source_release_installed": false,
+    "state": "G2_VENV_DEPENDENCIES_IMPORT_PASS",
+    "venv_recreated": false,
+    "wheel_bytes": 6731878,
+    "wheel_count": 18
+  },
+  "limitations": [
+    "Terminal echo partly garbled; exact executed bytes not independently asserted",
+    "No independent remote InvokeId",
+    "Not service sandbox, startup or real OAuth acceptance"
+  ],
+  "previous_failure": "Original public PyPI download read timeout retained; not replayed"
+}

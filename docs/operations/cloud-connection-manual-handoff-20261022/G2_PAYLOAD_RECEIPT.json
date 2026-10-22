@@ -11,8 +11,9 @@
   "official_pypi_download_exit": 0,
   "all_49_inputs_length_sha_verified": true,
   "archive_readback": true,
-  "domestic_delivery": "NOT_EXECUTED",
-  "domestic_venv_install": "NOT_EXECUTED",
+  "domestic_delivery": "OWNER_UPLOADED_SHA_MATCH",
+  "domestic_venv_install": "OWNER_RECEIPT_EXIT0_INSTALL_PIP_CHECK_IMPORT_PASS",
   "contains_secrets": false,
-  "contains_installer": false
+  "contains_installer": false,
+  "live_evidence": "G2_OWNER_SUCCESS_20261022.json"
 }
