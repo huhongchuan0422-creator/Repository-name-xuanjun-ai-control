@@ -25,6 +25,62 @@ class FreshPlatform(unittest.TestCase):
         self.clock=lambda:10000
     def initialize(self):
         return FirstInstallation.initialize(str(self.root),{'testkey':b'k'*32},'testkey',self.realm,self.bindings,clock=self.clock)
+    def files(self):
+        plan=dict(version=1,directory=str(self.root),realm=self.realm,
+            principals={'consumer':dict(tenant_id=self.customer.tenant_id,role='CUSTOMER')},
+            bindings={'consumer':self.bindings[self.customer]})
+        material=dict(active_key='testkey',keys={'testkey':base64.b64encode(b'k'*32).decode()})
+        paths=[]
+        for name,value in (('initialize.json',plan),('keys.json',material)):
+            path=Path(self.tmp.name)/name;path.write_text(json.dumps(value));path.chmod(0o600);paths.append(str(path))
+        return paths
+    def test_protected_first_install_files_have_no_account_seed_and_no_reinitialize(self):
+        paths=self.files()
+        with FirstInstallation.from_files(*paths,clock=self.clock) as owner:
+            self.assertEqual(owner.center.db.execute('SELECT count(*) FROM accounts').fetchone()[0],0)
+        with self.assertRaises(FileExistsError):FirstInstallation.from_files(*paths,clock=self.clock)
+    def test_protected_first_install_invalid_inputs_write_no_state(self):
+        for kind in ('extra','role','keys','public','duplicate'):
+            paths=self.files();plan=json.loads(Path(paths[0]).read_text())
+            if kind=='extra':plan['app_secret']='synthetic_wrong_field'
+            elif kind=='role':plan['principals']['consumer']['role']='PLATFORM_OWNER'
+            elif kind=='keys':Path(paths[1]).write_text(json.dumps(dict(active_key='testkey',keys={'testkey':'bad'})))
+            elif kind=='public':Path(paths[1]).chmod(0o644)
+            else:
+                plan['principals']['other']=dict(plan['principals']['consumer'])
+                plan['bindings']['other']=dict(plan['bindings']['consumer'])
+            Path(paths[0]).write_text(json.dumps(plan))
+            with self.subTest(kind=kind),self.assertRaises((ValueError,PermissionError)):
+                FirstInstallation.from_files(*paths,clock=self.clock)
+            self.assertFalse(self.root.exists())
+    @unittest.skipIf(os.geteuid()==0,'actual CLI must run as nonroot in Hosted image')
+    def test_actual_cli_first_install_and_second_process_refusal(self):
+        import subprocess,sys,sqlite3,hashlib
+        self.realm['expires']=int(time.time())+10000
+        paths=self.files()
+        command=[sys.executable,'-B','-m','scripts.community_first_install',
+                 '--plan',paths[0],'--center-keys',paths[1]]
+        first=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20)
+        self.assertEqual(first.returncode,0,first.stdout)
+        self.assertEqual(first.stdout,'FIRST_INSTALL_INITIALIZED_NO_ACCOUNTS\n')
+        dbpath=self.root/'identity'/'center.sqlite'
+        with sqlite3.connect('file:'+str(dbpath)+'?mode=ro',uri=True) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM accounts').fetchone()[0],0)
+        before=hashlib.sha256(dbpath.read_bytes()).hexdigest()
+        second=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20)
+        self.assertEqual(second.returncode,2,second.stdout)
+        self.assertEqual(second.stdout,'BACKEND_NOT_READY\n')
+        self.assertEqual(hashlib.sha256(dbpath.read_bytes()).hexdigest(),before)
+
+    def test_first_install_cli_failure_is_redacted_and_does_not_autostart(self):
+        from scripts.community_first_install import main
+        import io
+        from contextlib import redirect_stdout
+        output=io.StringIO()
+        with patch.object(FirstInstallation,'from_files',side_effect=ValueError('secret_should_not_be_logged')),redirect_stdout(output):
+            self.assertEqual(main(['--plan','/synthetic-plan','--center-keys','/synthetic-keys']),2)
+        self.assertEqual(output.getvalue(),'BACKEND_NOT_READY\n')
+
     def test_zero_seed_first_wechat_registration_profile_and_no_operator_access(self):
         with self.initialize() as owner:
             c=owner.center;runtime=owner.persistence.runtime

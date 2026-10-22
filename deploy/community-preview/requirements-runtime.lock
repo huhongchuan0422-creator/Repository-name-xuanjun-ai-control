@@ -1,0 +1,4 @@
+# Reuse exact original pr122_customer_runtime vendor wheel bytes; no resolver.
+cryptography==46.0.3 --hash=sha256:10b01676fc208c3e6feeb25a8b83d81767e8059e1fe86e1dc62d10a3018fa926
+cffi==2.0.0 --hash=sha256:8941aaadaf67246224cee8c3803777eed332a19d909b47e29c9842ef1e79ac26
+pycparser==2.23 --hash=sha256:e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934

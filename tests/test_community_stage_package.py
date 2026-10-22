@@ -37,6 +37,8 @@ class SourcePackage(unittest.TestCase):
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
                 'clients/community-mini/app.wxss',
+                'deploy/community-preview/Dockerfile',
+                'deploy/community-preview/requirements-runtime.lock',
                 'deploy/community-preview/nginx-uk-path-candidate.conf',
                 'scripts/community_platform_host.py',
                 'scripts/community_persistent_runtime.py',

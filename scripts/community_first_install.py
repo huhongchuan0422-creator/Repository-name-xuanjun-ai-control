@@ -68,6 +68,48 @@ class FirstInstallation:
             owner.close()  # Preserve partial files; no deletion or automatic retry.
             raise
 
+    @classmethod
+    def from_files(cls, plan_path, keys_path, *, clock):
+        """Explicit approved first install; never invoked by PlatformHost startup."""
+        import base64
+        from scripts.community_mini_host_config import load_protected
+        from scripts.community_saas_phase2 import Principal
+        _require_nonroot()
+        plan=load_protected(plan_path)
+        material=load_protected(keys_path)
+        fields={'version','directory','realm','principals','bindings'}
+        if (type(plan) is not dict or set(plan)!=fields
+                or type(plan['version']) is not int or plan['version']!=1
+                or type(plan['principals']) is not dict or not plan['principals']
+                or type(plan['bindings']) is not dict
+                or set(plan['bindings'])!=set(plan['principals'])):
+            raise ValueError('EXACT_FIRST_INSTALL_PLAN_REQUIRED')
+        bindings={};seen=set()
+        for name,value in plan['principals'].items():
+            if (type(name) is not str or type(value) is not dict
+                    or set(value)!={'tenant_id','role'} or value['role']!='CUSTOMER'):
+                raise ValueError('FIRST_INSTALL_CONSUMER_SCOPE_ONLY')
+            principal=Principal(value['tenant_id'],value['role'])
+            marker=canonical(dict(principal=value,scope=plan['bindings'][name]))
+            if marker in seen:
+                raise ValueError('DUPLICATE_FIRST_INSTALL_PRINCIPAL')
+            seen.add(marker)
+            bindings[principal]=plan['bindings'][name]
+        if (type(material) is not dict or set(material)!={'active_key','keys'}
+                or type(material['active_key']) is not str
+                or type(material['keys']) is not dict or not material['keys']):
+            raise ValueError('EXACT_FIRST_INSTALL_KEY_INPUT_REQUIRED')
+        try:
+            keys={}
+            for name,encoded in material['keys'].items():
+                if type(name) is not str or type(encoded) is not str:
+                    raise ValueError()
+                keys[name]=base64.b64decode(encoded,validate=True)
+        except Exception:
+            raise ValueError('INVALID_FIRST_INSTALL_KEY_INPUT') from None
+        return cls.initialize(plan['directory'],keys,material['active_key'],
+                              plan['realm'],bindings,clock=clock)
+
     def close(self):
         first=None
         for target in (self.center,self.persistence):
@@ -82,3 +124,24 @@ class FirstInstallation:
 
     def __enter__(self):return self
     def __exit__(self,*args):self.close()
+
+
+def main(argv=None):
+    import argparse
+    import time
+    parser=argparse.ArgumentParser(description='Explicit approved NEW community installation')
+    parser.add_argument('--plan',required=True)
+    parser.add_argument('--center-keys',required=True)
+    args=parser.parse_args(argv)
+    try:
+        with FirstInstallation.from_files(args.plan,args.center_keys,clock=lambda:int(time.time())):
+            pass
+    except Exception:
+        print('BACKEND_NOT_READY',flush=True)
+        return 2
+    print('FIRST_INSTALL_INITIALIZED_NO_ACCOUNTS',flush=True)
+    return 0
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

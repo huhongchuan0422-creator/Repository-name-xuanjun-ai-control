@@ -283,3 +283,32 @@ tests/test_community_wechat_registration.py新12项覆盖首次/重复、真实�
 因此，“必须寻找不存在的客户旧库”“普通用户必须先邮箱注册”“首个消费者必须先有SaaS项目会员”不再是源码前置。仍待现场的是本客户准确首装计划、私有挂载/新实例原密钥保管、有限容器资源与B5/P2预算、既有UK HTTPS路由、原AppSecret安全录入、request合法域名和真实扫码。任何后续后台权限配置都不由此自动授权；二维码仍服从BACKEND_NOT_READY及真实非空页面验收。
 
 新注册策略还要求原项目payload准确为COMMUNITY_PLATFORM_REALM/OWNER_APPROVED_FIRST_INSTALL及同authority_ref，不接受SaaS合同项目（即使其active且同tenant）。此约束防止误把本方SaaS数据当客户平台。新增对应拒绝测试；原已绑定账号的旧路径不变。上述72项准确分解为注册12、首装6、原操作12、原身份13、原profile8、原application10、平台host10、ZIP1。
+
+
+## 2026-10-22 独立社区容器制品与显式首装入口
+
+本节是可审核的制品准备，不批准或执行英国部署。原域名、已保存request域名和HTTPS的现场回执私下继承；不公开内部配置正文，不重新申请DNS或上传密钥。
+
+### 镜像固定与验证
+
+独立镜像采用Docker Official Images的linux/amd64 Python3.11 slim-bookworm manifest：`python@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199`。来源：https://github.com/docker-library/repo-info/blob/master/repos/python/remote/3.11-slim-bookworm.md ，本次读取的元数据为Python3.11.17。固定的是amd64镜像manifest，不使用浮动tag，不复用或修改P2运行容器，不升级英国宿主Python。英国实际内核/Docker兼容仍须部署前核验，Hosted构建不代替现场结论。
+
+依赖继续使用原`pr122_customer_runtime.py`的三份准确wheel：cryptography46.0.3、cffi2.0.0、pycparser2.23；`requirements-runtime.lock`固定原SHA。Hosted先核原runtime脚本SHA和完整wheel集合，再进行无网络Docker RUN安装（--no-index/--no-deps/--require-hashes）。不修改原Core SHA/type门禁；本次镜像内重新验证的是Python3.11与这组依赖的受影响兼容范围，不能把旧1821/72改称镜像验证。
+
+原workflow以`[formal-package-scope] [community-image]`构建：消费同一Run的实际源码ZIP，核needs.test输出的整包SHA、逐成员SHA、唯一/安全路径、普通文件类型和30MB/2000成员上限，解到新空目录；Dockerfile和lock必须来自该ZIP。verify target以非root执行原首次初始化、正式宿主和原微信注册测试；release不包含测试层、不启动应用、不写身份数据。release另以只读根、network=none、cap-drop ALL、no-new-privileges运行--help和版本/UID导入检查。输出镜像tar.gz、其SHA及镜像ID供后续准确绑定，不自动push registry、下载到英国、load或run。
+
+### 首装命令入口（与服务启动分离）
+
+`python -B -m scripts.community_first_install --plan <受保护首装JSON绝对路径> --center-keys <受保护原Center密钥JSON绝对路径>` 是显式新实例初始化入口；常规PlatformHost启动从不调用它。参数只允许本地受保护文件引用，不接收密钥正文或环境扫描，不生成密钥、账号、门店审核、商品或交易数据。
+
+首装JSON准确字段为`version=1/directory/realm/principals/bindings`；realm继续原project/tenant/customer/title/expires/authority_ref，明确标识本客户首次上线。principals仅允许原CUSTOMER角色，bindings按同名绑定原scope；拒绝重复Principal、后台角色或额外字段。密钥JSON沿用原`active_key/keys`及32字节base64格式，读取走原load_protected。任何既存/部分目录仍拒绝，异常仅输出BACKEND_NOT_READY，保留部分写入供检查，禁止自动重试或删库重建。首次用户仍需可信code2session结果后在原Center中注册，无邮箱、不创建OWNER/EDITOR。
+
+### 拟用挂载和边界（待具体现场方案确认，不是已创建）
+
+- 镜像内源码/app只读；候选容器用户10001:1008，HOME=/home/community。数值UID尚不代表英国宿主已分配账号或完成挂载归属校验。
+- 本项目拟新建独立私有根/var/lib/xuanjun-community-preview，分config与data；config只读挂载，只含本客户准确首装/host/application配置及已有AppSecret和原Center密钥的保护引用。秘密不得进入镜像、日志或公开仓库。
+- 独立共享socket目录/run/xuanjun-community-preview供原Nginx访问；应用目录拥有者为社区服务UID、组1008、0750，socket0660，原SO_PEERCRED仍固定Nginx UID1008。数据根0700/文件0600不为代理访问而放宽。
+- 社区不映射公网应用端口、不挂docker.sock或P2目录。微信出口仅为原code2session所需网络能力；其真实出口、DNS/TLS及官方登录须现场单独验证，不能由network=none的CI证明。
+- 运行资源候选CPU0.5、内存512MiB、pids64、只读根、有限tmpfs和日志；均非已设置。社区仍受英国总资源1/5及既有B5/P2/系统预留共同约束，未核预算不得应用；本轮不分配视频资源、不影响原服务。磁盘/卷硬配额缺少落实证据，不能把memory/cpu cap当磁盘配额。
+- 接入仅增加原UK HTTPS server内/community-preview/mini/及精确健康路径，保留原Owner路由和证书引用。先私有socket验证，再nginx -t、限定reload，最后公网健康及真实微信登录；这些现场动作本批没有执行。
+- 回退只涉及本社区容器及新增路由，保留私有持久数据和失败证据，不自动停整个Nginx或撤销共享权限。无同版本后端、真实登录与非空首页证据时继续BACKEND_NOT_READY，不上传新码。
