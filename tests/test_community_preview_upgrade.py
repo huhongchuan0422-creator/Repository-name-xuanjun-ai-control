@@ -27,7 +27,7 @@ class UpgradeBoundary(unittest.TestCase):
         from scripts.community_web_entries import asset
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():self.assertEqual(digest,hashlib.sha256(asset(path)[0]).hexdigest())
-        self.assertEqual(u.SOURCE,'541f8519a9ba573afd37491d6ef889c75a592374')
+        self.assertEqual(u.SOURCE,'2330dd55c07f58d7f45a7c4510a9761d0d4735d6')
     def test_only_existing_bounded_container_and_mounts_are_admitted(self):
         u.validate(info(),u.OLD_IMAGE,u.OLD_ID)
         for field,value in [('id','b'*64),('image',u.IMAGE),('cpu',0),('memory',0),('swap',-1),('pids',-1),('user','0'),('readonly',False),('privileged',True),('restart','always'),('network','host'),('security',[]),('capdrop',[]),('tmpfs',{}),('log',{}),('cmd',[])]:

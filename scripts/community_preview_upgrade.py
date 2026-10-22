@@ -11,26 +11,26 @@ from urllib.parse import urlsplit
 from urllib.error import HTTPError,URLError
 
 HOST='iZd7oeikknn1z21sq6ji6zZ'
-SOURCE='541f8519a9ba573afd37491d6ef889c75a592374'
-IMAGE='sha256:10c36979cc7efe302afc2d5ea6e0d5ee0f897204f9762412218d979157bc8faf'
+SOURCE='2330dd55c07f58d7f45a7c4510a9761d0d4735d6'
+IMAGE='sha256:0846f7cfc71d443095a6c5e3a59eabf5d2973eda90e29c831f335c163a2c8f32'
 OLD_IMAGE='sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30'
 OLD_ID='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc'
 NAME='xuanjun-community-preview'
-OLD_NAME=NAME+'-before-541f8519'
-FAILED_NAME=NAME+'-failed-541f8519'
+OLD_NAME=NAME+'-before-2330dd55'
+FAILED_NAME=NAME+'-failed-2330dd55'
 ROOT='/var/lib/xuanjun-community-preview'
 RUN='/run/xuanjun-community-preview'
-STAGE='/opt/xuanjun-community-preview/roles-upgrade-541f8519'
+STAGE='/opt/xuanjun-community-preview/roles-upgrade-2330dd55'
 INC='/etc/nginx/community-preview.inc'
 VHOST='/etc/nginx/conf.d/xuanjun-p2-owner.conf'
 DOCKER=['/usr/bin/docker','--host','unix:///var/run/docker.sock']
-ZIP_BYTES=56921382
-ZIP_SHA='7d96d39b2f7903320902b450706244c18f54281ab68ea0d260ec4bb311c71cc3'
-ARCHIVE_SHA='2b464b234ed87d9d24ddf25613203c55628d991d544bde1eb73ce08493dc3568'
+ZIP_BYTES=56933085
+ZIP_SHA='29044f39c16b976164c723484a496ec57f2cf7874cd12706c491c87ab36e4724'
+ARCHIVE_SHA='64ba9ce09e688a27a85ec2278e47cbb66c096a4b35d5f9653d9e1e58af368bbc'
 # Fixed source-derived constants inserted before publication, never request input.
 FRAGMENT=b'# CANDIDATE ONLY: include inside the EXISTING uk HTTPS server after route/TLS review.\n# No listen/server_name/certificate directives; do not replace the host root routes.\n# API only: browser workspace assets/redirects require separate prefix verification.\nlocation ^~ /community-preview/mini/ {\n    rewrite ^/community-preview(/mini/.*)$ $1 break;\n    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;\n    proxy_http_version 1.1;\n    proxy_set_header Host uk.wenwenwenyiyiyi.work;\n    proxy_set_header X-Forwarded-Proto https;\n    proxy_set_header X-Xuanjun-Client-IP "";\n    proxy_set_header X-Xuanjun-Client-IP $remote_addr;\n    proxy_set_header X-Forwarded-For "";\n    proxy_set_header Forwarded "";\n}\nlocation = /community-preview/community/health {\n    rewrite ^ /community/health break;\n    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;\n    proxy_http_version 1.1;\n    proxy_set_header Host uk.wenwenwenyiyiyi.work;\n    proxy_set_header X-Forwarded-Proto https;\n    proxy_set_header X-Xuanjun-Client-IP "";\n    proxy_set_header X-Xuanjun-Client-IP $remote_addr;\n    proxy_set_header X-Forwarded-For "";\n    proxy_set_header Forwarded "";\n}\n\n# Original browser role pages/assets and their existing authenticated API paths only.\nlocation ~ ^/community-preview/(merchant/(join|review|workbench(\\.js|\\.css)?|onboarding(\\.js|\\.css)?)|community/(portal(\\.js|\\.css)?|web-session\\.js|session/(login|check|logout)|entrypoints|operations|directory|commerce|provider-actions|merchant-bills))$ {\n    rewrite ^/community-preview(/.*)$ $1 break;\n    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;\n    proxy_http_version 1.1;\n    proxy_set_header Host uk.wenwenwenyiyiyi.work;\n    proxy_set_header X-Forwarded-Proto https;\n    proxy_set_header X-Xuanjun-Client-IP "";\n    proxy_set_header X-Xuanjun-Client-IP $remote_addr;\n    proxy_set_header X-Forwarded-For "";\n    proxy_set_header Forwarded "";\n}\n'
 OLD_FRAGMENT_SHA='23ced336e2e554b4920c08085fea52d732775e0e341deb5f2187c522d36f76f6'
-ASSET_HASHES={'/merchant/workbench': '0292f9a2f02d5cfc28b561079e6f50066a99df7805f8965d00b46f4de593d05a', '/community/portal': 'f27ddf3d60d2271a4ae49c9ac05f6285b833f5cb031306664ae9d3f13f7da357', '/merchant/review': '1beba4ae6fa0fb65f9a7c7302b0cfbdcc3fb33a3774bc6e4d1a4fbf41fbd899e', '/merchant/join': '1beba4ae6fa0fb65f9a7c7302b0cfbdcc3fb33a3774bc6e4d1a4fbf41fbd899e', '/community/web-session.js': '37605754929335ce8291f391d68c75f8b9feac9d025160d39370a34142b2c567'}
+ASSET_HASHES={'/merchant/workbench': '0292f9a2f02d5cfc28b561079e6f50066a99df7805f8965d00b46f4de593d05a', '/community/portal': 'f27ddf3d60d2271a4ae49c9ac05f6285b833f5cb031306664ae9d3f13f7da357', '/merchant/review': '1beba4ae6fa0fb65f9a7c7302b0cfbdcc3fb33a3774bc6e4d1a4fbf41fbd899e', '/merchant/join': '1beba4ae6fa0fb65f9a7c7302b0cfbdcc3fb33a3774bc6e4d1a4fbf41fbd899e', '/community/web-session.js': 'c01a9ac0781915015ac2873c95ff84badef57ee24b4e5697e4f95b2f5b78c4db'}
 
 class Unknown(RuntimeError):pass
 class Rejected(RuntimeError):pass
