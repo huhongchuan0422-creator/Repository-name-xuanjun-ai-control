@@ -7,11 +7,12 @@ import concurrent.futures
 import http.client
 import json
 import os
+import re
 import socket
 import time
 import unittest
 from unittest.mock import patch
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright,expect
 import test_community_platform_host as fixture
 from scripts.pr122_customer_source import TrustedNginxSource
 
@@ -46,20 +47,20 @@ class SessionBrowser(unittest.TestCase):
                         def login(address):
                             panel=page.locator('#community-session');panel.locator('[name=email]').fill(address)
                             panel.locator('[name=password]').fill('FixturePassword123!');panel.get_by_role('button',name='登录',exact=True).click()
-                            page.wait_for_function("document.querySelector('#community-session [role=status]').textContent.startsWith('已登录')")
+                            expect(panel.locator('[role=status]')).to_contain_text('已登录')
                         base=fx.plan['https_origin']+'/community-preview'
                         page.goto(base+'/merchant/workbench');login('one@example.org')
                         self.assertEqual(page.locator('#community-session select').input_value(),'merchant')
                         with page.expect_response(lambda r:r.url.endswith('/community/operations') and r.status==200):page.locator('#loadOrders').click()
                         page.goto(base+'/community/portal')
-                        page.wait_for_function("document.querySelector('#community-session select').value==='community'")
+                        expect(page.locator('#community-session select')).to_have_value('community')
                         with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):page.locator('#mine').click()
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
-                        page.locator('[data-logout]').click();page.wait_for_function("document.querySelector('#community-session [role=status]').textContent==='已退出登录。'")
+                        page.locator('[data-logout]').click();expect(page.locator('#community-session [role=status]')).to_have_text('已退出登录。')
                         page.goto(base+'/merchant/review');login('two@example.org')
-                        page.wait_for_function("document.querySelector('#community-session [role=status]').textContent==='已登录原平台审核账户。'")
+                        expect(page.locator('#community-session [role=status]')).to_have_text('已登录原平台审核账户。')
                         page.wait_for_timeout(150)
                         self.assertIn(('/merchant/onboarding',200),received)
                         self.assertEqual(errors,[])
