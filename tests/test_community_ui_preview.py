@@ -94,7 +94,8 @@ class ClickThrough(unittest.TestCase):
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
                         if role=='community' and module['id']=='community-4-0-0':
-                            entry=page.locator('#view a[href="'+target+'"]')
+                            # Two cards share this destination; choose the visible order-observation action by its user-facing label.
+                            entry=page.get_by_role('link',name='打开订单观察',exact=True)
                             expect(entry).to_be_visible()
                             entry.click()
                             expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
@@ -306,7 +307,11 @@ class ClickThrough(unittest.TestCase):
             page.goto(self.url+'#/community/home')
             expect(page.locator('#view h1').first).to_have_text('社区运营总览')
             page.get_by_label('查看终端',exact=True).select_option('desktop')
+            page.set_viewport_size({'width':1440,'height':1000})
+            self.assert_layout(page,1440,'role-community-pc')
             page.screenshot(path=str(self.out/'role-community-pc.png'),full_page=True)
+            page.set_viewport_size({'width':390,'height':844})
+            page.get_by_label('查看终端',exact=True).select_option('phone')
             page.get_by_label('查看身份',exact=True).select_option('platform')
             for title in ('订单与交易','入驻与商家','用户与社区','权限、通知与日志'):
                 expect(page.locator('#view')).to_contain_text(title)
@@ -316,8 +321,11 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view h1').first).to_have_text('订单管理')
             expect(page.locator('#view')).to_contain_text('UNCONFIRMED')
             page.get_by_label('查看终端',exact=True).select_option('desktop')
+            page.set_viewport_size({'width':1440,'height':1000})
+            self.assert_layout(page,1440,'role-platform-pc')
             page.goto(self.url+'#/platform/home')
             page.get_by_label('查看终端',exact=True).select_option('desktop')
+            self.assertEqual(page.evaluate('innerWidth'),1440)
             page.screenshot(path=str(self.out/'role-platform-pc.png'),full_page=True)
         finally:
             page.close()
