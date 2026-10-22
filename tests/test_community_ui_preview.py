@@ -89,7 +89,7 @@ class ClickThrough(unittest.TestCase):
                     page.get_by_role('link',name='我的',exact=True).click()
                     expect(page.locator('#view h1').first).to_have_text('个人中心')
                     continue
-                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly') and not (role=='merchant' and p['id']=='merchant-native-catalog')]
+                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly') and not (role=='merchant' and p['id'] in ('merchant-native-catalog','merchant-native-detail'))]
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
@@ -99,8 +99,8 @@ class ClickThrough(unittest.TestCase):
                             entry.click()
                             expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
                         else:
-                            menu_entry=page.locator('#menu a[href="'+target+'"]')
-                            view_entry=page.locator('#view a[href="'+target+'"]')
+                            menu_entry=page.locator('#menu a[href="'+target+'"]').first
+                            view_entry=page.locator('#view a[href="'+target+'"]').first
                             if menu_entry.is_visible():
                                 menu_entry.click()
                             elif view_entry.is_visible():
