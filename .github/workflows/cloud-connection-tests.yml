@@ -72,4 +72,4 @@ jobs:
       - name: Real HTTP01 bootstrap and final vhost regression
         env:
           REQUIRE_NGINX_TESTS: '1'
-        run: python3 -m unittest discover -s tests -p test_cloud_connection_oauth_nginx.py -v
+        run: python3 -m unittest discover -s tests -p 'test_cloud_connection_oauth*nginx.py' -v
