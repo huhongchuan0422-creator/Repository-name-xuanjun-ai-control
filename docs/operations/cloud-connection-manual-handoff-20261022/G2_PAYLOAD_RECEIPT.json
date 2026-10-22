@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "filename": "PR17_G2_OFFLINE_INPUTS_0177d391_20261022.zip",
+  "bytes": 6688532,
+  "sha256": "0e8af44744f768c20c4f4368f86aa8d545881097ea7ab605b4ccfbde7f2035a1",
+  "members": 50,
+  "source_members": 30,
+  "wheels": 18,
+  "wheel_bytes": 6731878,
+  "acquisition_environment": "CURRENT_WORK_SANDBOX_NOT_DOMESTIC_SERVER",
+  "official_pypi_download_exit": 0,
+  "all_49_inputs_length_sha_verified": true,
+  "archive_readback": true,
+  "domestic_delivery": "NOT_EXECUTED",
+  "domestic_venv_install": "NOT_EXECUTED",
+  "contains_secrets": false,
+  "contains_installer": false
+}

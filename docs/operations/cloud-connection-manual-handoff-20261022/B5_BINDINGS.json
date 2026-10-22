@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "source_record": "PR17#6329200842",
+  "catalog_commit": "5a994ac72166a90dcd8289c8320736ddaa80cd66",
+  "catalog_bytes": 6919,
+  "catalog_sha256": "62b1eef3a48b004c2b426cfff1ee7489af0eecaecdc80d4953479b7b581f2689",
+  "state": "CANDIDATE_BLOCKED_NOT_DISPATCHABLE",
+  "source_archive": {
+    "bytes": 559237632,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/source-tree.tar.pending",
+    "sha256": "e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485"
+  },
+  "source_manifest": {
+    "bytes": 5635704,
+    "path": "/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002/manifest.json",
+    "sha256": "cdd3c80360af8b4227d166d8ba643ed534055ea79a75b46dcd345c3e86fb52ba"
+  },
+  "operation": {
+    "approved_catalog_sha256": null,
+    "invoke_id": null,
+    "operation": "fetch_approved_object",
+    "original_success_request": null,
+    "receiver_root_ref": null,
+    "recipient_id": null,
+    "source_root_ref": null
+  },
+  "limits": {
+    "child_memory_bytes": 805306368,
+    "child_wall_seconds": 240,
+    "cpu_seconds": 180,
+    "materials_tar_bytes": 18874368,
+    "node_analysis_only_bytes": 134217728,
+    "open_files": 128,
+    "output_total_max_bytes": 25165824,
+    "parent_watchdog_seconds": 270,
+    "report_bytes": 2097152,
+    "selected_content_bytes": 16777216,
+    "selected_files": 2000,
+    "single_source_bytes": 2097152,
+    "source_fetch_wall_seconds": 45
+  },
+  "selected_members": [],
+  "remaining": [
+    "unreceived native startup bodies prevent exact executable profile",
+    "unreceived child modules prevent recursive source closure",
+    "14 eager installed package trees plus1 conditional computed ws resource unresolved; no exports/native/resource closure proof",
+    "Node/ELF/image binding exceeds source budget and is unproven",
+    "real recipient/operation/source-root/recipient-root mapping not enrolled"
+  ],
+  "do_not_recollect": 828,
+  "next": "原B5 Writer完成profile/package/native/resource/Node闭包及最终选择；连接方绑定真实OAuth接收主体和原运输根。两者准入分别满足后原唯一执行方执行。当前不取件/不安装。"
+}

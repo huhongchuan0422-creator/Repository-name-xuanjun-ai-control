@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "command_bytes": 3559,
+  "command_sha256": "1d8b5a37aa953f41c1dc485e4ef3cf03ee9284d4a7e8065346bf0594ca7db4d8",
+  "local_metadata_tests": {
+    "pass": 8,
+    "scope": "local temporary files, symlink/missing/FD/identity refusal; not domestic execution"
+  },
+  "fixed_metadata_only": true,
+  "hosted_for_this_document_increment": "NOT_RUN",
+  "inherited_product_hosted": "39725473222",
+  "source_unchanged": "0177d3917278c6f243363d7fcb5a18c638dabd51",
+  "live_this_round": "NOT_EXECUTED"
+}

@@ -1,0 +1,45 @@
+sudo -n /usr/bin/python3 -I -B -S - <<'PY'
+import os,stat,pwd,grp,json,signal,sys
+signal.signal(signal.SIGALRM,lambda *_:sys.exit(124))
+signal.alarm(30)
+HOST="iZvt5t8tlrm8oiZ"
+PATHS=('/opt/xuanjun-cloud-oauth', '/opt/xuanjun-cloud-oauth/releases', '/opt/xuanjun-cloud-oauth/releases/0177d3917278c6f243363d7fcb5a18c638dabd51', '/opt/xuanjun-cloud-oauth/current', '/opt/xuanjun-cloud-oauth/venv-py3116', '/opt/xuanjun-cloud-oauth/venv-py3116/bin/python', '/etc/xuanjun-cloud-oauth', '/etc/xuanjun-cloud-oauth/authority.env', '/etc/xuanjun-cloud-oauth/authority.json', '/etc/xuanjun-cloud-oauth/session.secret', '/etc/xuanjun-cloud-oauth/github.secret', '/var/lib/xuanjun-cloud-oauth', '/var/lib/xuanjun-cloud-oauth/authority.sqlite', '/var/lib/xuanjun-cloud-oauth/authority.sqlite-wal', '/var/lib/xuanjun-cloud-oauth/authority.sqlite-shm', '/var/lib/xuanjun-cloud-oauth/authority.sqlite-journal', '/etc/systemd/system/xuanjun-cloud-oauth.service')
+def fp(s):
+ return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+def observe(path):
+ fd=os.open("/",os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ try:
+  parts=path.strip("/").split("/")
+  if path=="/":
+   a=os.fstat(fd)
+   return {"path":path,"state":"OBSERVED_METADATA_ONLY","type":"directory","uid":a.st_uid,"gid":a.st_gid,"mode":format(stat.S_IMODE(a.st_mode),"04o"),"device":a.st_dev,"inode":a.st_ino}
+  for part in parts[:-1]:
+   nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+   os.close(fd);fd=nxt
+  a=os.stat(parts[-1],dir_fd=fd,follow_symlinks=False)
+  z=os.stat(parts[-1],dir_fd=fd,follow_symlinks=False)
+  if fp(a)!=fp(z): return {"path":path,"state":"HOLD_CHANGED"}
+  kind="directory" if stat.S_ISDIR(a.st_mode) else "regular" if stat.S_ISREG(a.st_mode) else "symlink" if stat.S_ISLNK(a.st_mode) else "other"
+  return {"path":path,"state":"OBSERVED_METADATA_ONLY","type":kind,"uid":a.st_uid,"gid":a.st_gid,"mode":format(stat.S_IMODE(a.st_mode),"04o"),"bytes":a.st_size,"device":a.st_dev,"inode":a.st_ino,"nlink":a.st_nlink,"mtime_ns":a.st_mtime_ns,"ctime_ns":a.st_ctime_ns}
+ except FileNotFoundError: return {"path":path,"state":"ABSENT_AT_OBSERVATION_NOT_HISTORY_PROOF"}
+ except OSError as e: return {"path":path,"state":"UNKNOWN_OS_ERROR","errno":e.errno}
+ finally: os.close(fd)
+def main():
+ ident={"hostname":os.uname().nodename,"uid":os.getuid(),"euid":os.geteuid(),"sudo_uid":os.environ.get("SUDO_UID")}
+ if ident["hostname"]!=HOST or ident["euid"]!=0 or ident["sudo_uid"]!="1000":
+  print(json.dumps({"state":"HOLD_IDENTITY","identity":ident}));return 2
+ account={"name":"xuanjun_oauth"}
+ try:
+  p=pwd.getpwnam("xuanjun_oauth");account.update(state="OBSERVED",uid=p.pw_uid,gid=p.pw_gid,home=p.pw_dir,shell=p.pw_shell)
+ except KeyError: account["state"]="ABSENT"
+ try:
+  g=grp.getgrnam("xuanjun_oauth");account["named_group_gid"]=g.gr_gid
+ except KeyError: account["named_group_gid"]=None
+ allpaths=sorted(set(PATHS)|{str(__import__('pathlib').PurePosixPath(p).parent) for p in PATHS}|{"/opt","/etc","/var","/var/lib","/etc/systemd"})
+ rows=[observe(p) for p in allpaths]
+ result={"scope":"G23_FIXED_METADATA_NO_CONTENT_NO_WRITE","identity":ident,"account":account,"paths":rows,"state":"OBSERVED_REVIEW_REQUIRED","db_history":"NOT_INFERRED_FROM_METADATA","service_running":"NOT_QUERIED","secrets_read":False,"writes":False}
+ out=json.dumps(result,sort_keys=True,separators=(",",":"))
+ if len(out.encode())>32768: print('{"state":"HOLD_OUTPUT_LIMIT"}');return 2
+ print(out);return 0
+if __name__=="__main__":sys.exit(main())
+PY

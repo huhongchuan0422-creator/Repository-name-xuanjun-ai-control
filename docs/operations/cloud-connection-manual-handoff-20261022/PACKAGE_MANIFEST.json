@@ -1,240 +1,287 @@
 {
   "schema": 1,
-  "revision": "R2_OWNER_RPM_ADDENDUM",
-  "purpose": "MANUAL_PREPARATION_NOT_EXECUTION",
+  "revision": "R3_G2_G3_AND_B5_BINDINGS",
+  "purpose": "MANUAL_HANDOFF_NOT_INSTALLER",
   "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
-  "source_tree": "6331aa8dcaeb0be705879d5ec4e2ef28d0d6b7f7",
   "source_members": 30,
-  "source_manifest_original_included": true,
   "wheel_binaries_included": false,
+  "separate_complete_payload": "G2_PAYLOAD_RECEIPT.json",
   "members": [
     {
       "path": "ACCEPTANCE_RECOVERY.md",
-      "mode": "0644",
       "bytes": 4049,
-      "sha256": "d18b28faca7535fafe91eecd135bf2c329ba6990c637398f6eddaa83b58fc339"
+      "sha256": "d18b28faca7535fafe91eecd135bf2c329ba6990c637398f6eddaa83b58fc339",
+      "mode": "0644"
+    },
+    {
+      "path": "B5_BINDINGS.json",
+      "bytes": 2181,
+      "sha256": "8a098abf6cc0d8ca1e8603893f855c04909516eae3545dcfd12be08f518d1914",
+      "mode": "0644"
     },
     {
       "path": "COMMAND_REFERENCE.txt",
-      "mode": "0644",
-      "bytes": 2942,
-      "sha256": "7db60da305de3d6664ec95ba009336ffdcd81ec44e045ab25561ddd2f6a294fd"
+      "bytes": 3158,
+      "sha256": "9146fb4e27910816895cab896377cd782b013440eb276ac8ff0a27a2b61ef848",
+      "mode": "0644"
     },
     {
       "path": "EVIDENCE_INDEX.json",
-      "mode": "0644",
       "bytes": 2741,
-      "sha256": "64486168e5d7625be3f9296abe111085f887a2c1f0684594d0f5104d2506be38"
+      "sha256": "64486168e5d7625be3f9296abe111085f887a2c1f0684594d0f5104d2506be38",
+      "mode": "0644"
+    },
+    {
+      "path": "G23_EXPECTED_RECEIPT.md",
+      "bytes": 1138,
+      "sha256": "45a075a785fadf369d822682bbff220acfd1d4efb238d5daee2a123e41f5f4e1",
+      "mode": "0644"
+    },
+    {
+      "path": "G23_METADATA_COMMAND.txt",
+      "bytes": 3559,
+      "sha256": "1d8b5a37aa953f41c1dc485e4ef3cf03ee9284d4a7e8065346bf0594ca7db4d8",
+      "mode": "0644"
+    },
+    {
+      "path": "G23_VALIDATION.json",
+      "bytes": 507,
+      "sha256": "6e6e2af72a6631139333684f965592e8f1254703897fa537c2c24525a8ec5115",
+      "mode": "0644"
+    },
+    {
+      "path": "G2_ACQUISITION_AND_ACCEPTANCE.md",
+      "bytes": 3686,
+      "sha256": "8594e00ab3455fd4749c163d4ceeb4dc54d05a1069b81b41bc27cb1b025c1ac3",
+      "mode": "0644"
+    },
+    {
+      "path": "G2_PAYLOAD_MANIFEST.json",
+      "bytes": 10935,
+      "sha256": "9f487759d58718bd9518e860c35f303917e887e0a00406ab41e5b2beae84167f",
+      "mode": "0644"
+    },
+    {
+      "path": "G2_PAYLOAD_RECEIPT.json",
+      "bytes": 587,
+      "sha256": "ca2ab624b295d36cdbaec8ef1ed7aab42d796030911f1d87c5033a4012247403",
+      "mode": "0644"
+    },
+    {
+      "path": "G3_ACCESS_AND_STATE.md",
+      "bytes": 3692,
+      "sha256": "027310a1d7f76c39051240ed3c98aed37bc32e86c1273eefdb6b3abc5d44f49f",
+      "mode": "0644"
     },
     {
       "path": "INPUTS.json",
-      "mode": "0644",
-      "bytes": 7527,
-      "sha256": "857b29a53b18f1918ec8e8989d54b86ece0cb9bea8126f2b858ad9af3c39e408"
+      "bytes": 7658,
+      "sha256": "dfdfcd3d00140a815397d9e774dc3be94c91030c2cdb44f037deed47de4a4098",
+      "mode": "0644"
     },
     {
       "path": "OWNER_RPM_EVIDENCE_20261022.json",
-      "mode": "0644",
       "bytes": 7850,
-      "sha256": "8add521a9c8709cf8df9118c40e19be1f3f9bd58a340b355da829235f3ec8b50"
+      "sha256": "8add521a9c8709cf8df9118c40e19be1f3f9bd58a340b355da829235f3ec8b50",
+      "mode": "0644"
     },
     {
       "path": "README.zh.md",
-      "mode": "0644",
-      "bytes": 2708,
-      "sha256": "f1f59eb1b471b193fcabb4b8c5b227e288cd9129e5ca769279be29eb54c8002c"
+      "bytes": 3252,
+      "sha256": "410d095bb25482e777de31a7b12823a9760de3b4c44953f291b2d3896ab3366a",
+      "mode": "0644"
     },
     {
       "path": "STAGES.md",
-      "mode": "0644",
-      "bytes": 4933,
-      "sha256": "72aa902b35562f18c25d05b77f88e7fd87c4cb7a1fdb1a5c2b3ce44bdeda3a4f"
+      "bytes": 4954,
+      "sha256": "4762531db62949d6eb5f5850308fa5e98c8adc2d8c1a179d348e72b0b39819ec",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/SOURCE_MANIFEST.json",
-      "mode": "0644",
       "bytes": 6497,
-      "sha256": "67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c"
+      "sha256": "67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/authority.example.json",
-      "mode": "0644",
       "bytes": 471,
-      "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244"
+      "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
-      "mode": "0644",
       "bytes": 6843,
-      "sha256": "2ce00bd99e35f8d3496fd1cae457df9841d136188a7fd014e06d62c17b818e6c"
+      "sha256": "2ce00bd99e35f8d3496fd1cae457df9841d136188a7fd014e06d62c17b818e6c",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
-      "mode": "0644",
       "bytes": 462,
-      "sha256": "5367238723be7258185e2f83c7bbd410a6faafbd0472be722aac9264ade2d8e6"
+      "sha256": "5367238723be7258185e2f83c7bbd410a6faafbd0472be722aac9264ade2d8e6",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
-      "mode": "0644",
       "bytes": 401,
-      "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40"
+      "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
-      "mode": "0644",
       "bytes": 1276,
-      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5"
+      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
-      "mode": "0644",
       "bytes": 1390,
-      "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5"
+      "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/peer-observation.http.conf.template",
-      "mode": "0644",
       "bytes": 320,
-      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64"
+      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/peer-observation.location.conf.template",
-      "mode": "0644",
       "bytes": 358,
-      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef"
+      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/requirements.cp3116.lock",
-      "mode": "0644",
       "bytes": 1795,
-      "sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71"
+      "sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/requirements.lock",
-      "mode": "0644",
       "bytes": 5158,
-      "sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4"
+      "sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/resource.example.json",
-      "mode": "0644",
       "bytes": 390,
-      "sha256": "8ec9d5cec3795d3833ca8abc5c88589d71b24e3481b5fa0e872d5386748bbaab"
+      "sha256": "8ec9d5cec3795d3833ca8abc5c88589d71b24e3481b5fa0e872d5386748bbaab",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/run.py",
-      "mode": "0644",
       "bytes": 1633,
-      "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157"
+      "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/tls-approved.conf.candidate",
-      "mode": "0644",
       "bytes": 228,
-      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1"
+      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
-      "mode": "0644",
       "bytes": 729,
-      "sha256": "1c3511ef8dc0f95d9b4ae7d3a989b25c10258eb8eb322c8cb29807866bc5e89c"
+      "sha256": "1c3511ef8dc0f95d9b4ae7d3a989b25c10258eb8eb322c8cb29807866bc5e89c",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
-      "mode": "0644",
       "bytes": 814,
-      "sha256": "4bd19ae8e36166b27b247c4705bc8ed7fd1210c9b94609065d1a98b11bf0e581"
+      "sha256": "4bd19ae8e36166b27b247c4705bc8ed7fd1210c9b94609065d1a98b11bf0e581",
+      "mode": "0644"
     },
     {
       "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
-      "mode": "0644",
       "bytes": 722,
-      "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d"
+      "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/action_binding.py",
-      "mode": "0644",
       "bytes": 4452,
-      "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752"
+      "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/credential_lifecycle.py",
-      "mode": "0644",
       "bytes": 6064,
-      "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620"
+      "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/fixed_actions.py",
-      "mode": "0644",
       "bytes": 6583,
-      "sha256": "6d8dac97c11a902e05f316eb947415e0e08cda75f93a0805cf837483804961a3"
+      "sha256": "6d8dac97c11a902e05f316eb947415e0e08cda75f93a0805cf837483804961a3",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/github_network.py",
-      "mode": "0644",
       "bytes": 5503,
-      "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6"
+      "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/oauth_authority.py",
-      "mode": "0644",
       "bytes": 20239,
-      "sha256": "658e36743b44b76ade22bf9b053f11ef4331982d0a0143f5c05537f19a48e2f3"
+      "sha256": "658e36743b44b76ade22bf9b053f11ef4331982d0a0143f5c05537f19a48e2f3",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/oauth_entrypoint.py",
-      "mode": "0644",
       "bytes": 6813,
-      "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba"
+      "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/oauth_http.py",
-      "mode": "0644",
       "bytes": 7570,
-      "sha256": "330af26d1ce1e55d43d5b62edaae5f900e7326ed57d9c6e784728d5bac7209d3"
+      "sha256": "330af26d1ce1e55d43d5b62edaae5f900e7326ed57d9c6e784728d5bac7209d3",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/oauth_resource.py",
-      "mode": "0644",
       "bytes": 10069,
-      "sha256": "95c95038ccfdb5cc29eb55a5cc5a08ba1af803ab8b342fc9cec38faa5910e70f"
+      "sha256": "95c95038ccfdb5cc29eb55a5cc5a08ba1af803ab8b342fc9cec38faa5910e70f",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/pr122_baseline_collector.py",
-      "mode": "0644",
       "bytes": 12809,
-      "sha256": "c352c041ab62a1bf3c1c55afeea461ba935016e294975dfb515e19972365250f"
+      "sha256": "c352c041ab62a1bf3c1c55afeea461ba935016e294975dfb515e19972365250f",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/private_mcp.py",
-      "mode": "0644",
       "bytes": 9185,
-      "sha256": "3c8a94a92b39519bd6797656fed6282815f7fbe0fcd8a794fb0edc77da6e0f86"
+      "sha256": "3c8a94a92b39519bd6797656fed6282815f7fbe0fcd8a794fb0edc77da6e0f86",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/private_transfer.py",
-      "mode": "0644",
       "bytes": 26055,
-      "sha256": "be2f0ebbf6087fa6a1c804dc24fc67ef2d90ab507869e60125b0fd1cdad3cc5b"
+      "sha256": "be2f0ebbf6087fa6a1c804dc24fc67ef2d90ab507869e60125b0fd1cdad3cc5b",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/queue.py",
-      "mode": "0644",
       "bytes": 8931,
-      "sha256": "2e884d3b357dab3122c043d0760fb5617a4fc1028340dee482765c62616fd0cb"
+      "sha256": "2e884d3b357dab3122c043d0760fb5617a4fc1028340dee482765c62616fd0cb",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/runtime.py",
-      "mode": "0644",
       "bytes": 13638,
-      "sha256": "0b81971bed28155ba8ed39b27c2db6de7d0b7d41abc58a7b64a9e5d1d2cd74a5"
+      "sha256": "0b81971bed28155ba8ed39b27c2db6de7d0b7d41abc58a7b64a9e5d1d2cd74a5",
+      "mode": "0644"
     },
     {
       "path": "source/production/cloud_connection/worker.py",
-      "mode": "0644",
       "bytes": 13802,
-      "sha256": "085298228d5b6c3f65a1c4e3333478c516cc521b6a34b55808241b8d5ccdd11f"
+      "sha256": "085298228d5b6c3f65a1c4e3333478c516cc521b6a34b55808241b8d5ccdd11f",
+      "mode": "0644"
     }
   ]
 }

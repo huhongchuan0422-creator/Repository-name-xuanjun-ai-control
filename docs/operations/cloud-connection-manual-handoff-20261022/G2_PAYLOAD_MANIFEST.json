@@ -1,0 +1,305 @@
+{
+  "schema": 1,
+  "purpose": "COMPLETE_OFFLINE_INSTALL_INPUTS_NOT_AN_INSTALLER_OR_LIVE_ACCEPTANCE",
+  "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
+  "source_manifest_sha256": "67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c",
+  "source_members": 30,
+  "wheel_count": 18,
+  "wheel_bytes": 6731878,
+  "members": [
+    {
+      "path": "source/deployment/cloud-connection/oauth/SOURCE_MANIFEST.json",
+      "bytes": 6497,
+      "sha256": "67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/authority.example.json",
+      "bytes": 471,
+      "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
+      "bytes": 6843,
+      "sha256": "2ce00bd99e35f8d3496fd1cae457df9841d136188a7fd014e06d62c17b818e6c",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
+      "bytes": 462,
+      "sha256": "5367238723be7258185e2f83c7bbd410a6faafbd0472be722aac9264ade2d8e6",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
+      "bytes": 401,
+      "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
+      "bytes": 1276,
+      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
+      "bytes": 1390,
+      "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/peer-observation.http.conf.template",
+      "bytes": 320,
+      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/peer-observation.location.conf.template",
+      "bytes": 358,
+      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/requirements.cp3116.lock",
+      "bytes": 1795,
+      "sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/requirements.lock",
+      "bytes": 5158,
+      "sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/resource.example.json",
+      "bytes": 390,
+      "sha256": "8ec9d5cec3795d3833ca8abc5c88589d71b24e3481b5fa0e872d5386748bbaab",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/run.py",
+      "bytes": 1633,
+      "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/tls-approved.conf.candidate",
+      "bytes": 228,
+      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
+      "bytes": 729,
+      "sha256": "1c3511ef8dc0f95d9b4ae7d3a989b25c10258eb8eb322c8cb29807866bc5e89c",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
+      "bytes": 814,
+      "sha256": "4bd19ae8e36166b27b247c4705bc8ed7fd1210c9b94609065d1a98b11bf0e581",
+      "mode": "0644"
+    },
+    {
+      "path": "source/deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
+      "bytes": 722,
+      "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/action_binding.py",
+      "bytes": 4452,
+      "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/credential_lifecycle.py",
+      "bytes": 6064,
+      "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/fixed_actions.py",
+      "bytes": 6583,
+      "sha256": "6d8dac97c11a902e05f316eb947415e0e08cda75f93a0805cf837483804961a3",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/github_network.py",
+      "bytes": 5503,
+      "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/oauth_authority.py",
+      "bytes": 20239,
+      "sha256": "658e36743b44b76ade22bf9b053f11ef4331982d0a0143f5c05537f19a48e2f3",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/oauth_entrypoint.py",
+      "bytes": 6813,
+      "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/oauth_http.py",
+      "bytes": 7570,
+      "sha256": "330af26d1ce1e55d43d5b62edaae5f900e7326ed57d9c6e784728d5bac7209d3",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/oauth_resource.py",
+      "bytes": 10069,
+      "sha256": "95c95038ccfdb5cc29eb55a5cc5a08ba1af803ab8b342fc9cec38faa5910e70f",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/pr122_baseline_collector.py",
+      "bytes": 12809,
+      "sha256": "c352c041ab62a1bf3c1c55afeea461ba935016e294975dfb515e19972365250f",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/private_mcp.py",
+      "bytes": 9185,
+      "sha256": "3c8a94a92b39519bd6797656fed6282815f7fbe0fcd8a794fb0edc77da6e0f86",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/private_transfer.py",
+      "bytes": 26055,
+      "sha256": "be2f0ebbf6087fa6a1c804dc24fc67ef2d90ab507869e60125b0fd1cdad3cc5b",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/queue.py",
+      "bytes": 8931,
+      "sha256": "2e884d3b357dab3122c043d0760fb5617a4fc1028340dee482765c62616fd0cb",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/runtime.py",
+      "bytes": 13638,
+      "sha256": "0b81971bed28155ba8ed39b27c2db6de7d0b7d41abc58a7b64a9e5d1d2cd74a5",
+      "mode": "0644"
+    },
+    {
+      "path": "source/production/cloud_connection/worker.py",
+      "bytes": 13802,
+      "sha256": "085298228d5b6c3f65a1c4e3333478c516cc521b6a34b55808241b8d5ccdd11f",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/authlib-1.9.1-py2.py3-none-any.whl",
+      "bytes": 266042,
+      "sha256": "8b9be8b1e5174dcbf5520e984f1a22dc2edae5b6e40a61d4cedbf86b97e9e69b",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/blinker-1.9.0-py3-none-any.whl",
+      "bytes": 8458,
+      "sha256": "ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/certifi-2026.10.19-py3-none-any.whl",
+      "bytes": 136464,
+      "sha256": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "bytes": 217807,
+      "sha256": "34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "bytes": 269972,
+      "sha256": "211d5a3eb6af8f513b8d4ca19a8c1b7accab1b5f0d3175f9826b03c1a920dc1f",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/click-8.5.0-py3-none-any.whl",
+      "bytes": 125251,
+      "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl",
+      "bytes": 4752576,
+      "sha256": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/flask-3.1.2-py3-none-any.whl",
+      "bytes": 103308,
+      "sha256": "ca1d8112ec8a6158cc29ea4858963350011b5c846a414cdb7a954aa9e967d03c",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/idna-3.20-py3-none-any.whl",
+      "bytes": 69583,
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/itsdangerous-2.2.0-py3-none-any.whl",
+      "bytes": 16234,
+      "sha256": "c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/jinja2-3.1.6-py3-none-any.whl",
+      "bytes": 134899,
+      "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/joserfc-1.7.7-py3-none-any.whl",
+      "bytes": 71758,
+      "sha256": "06979cfbab78bc802f14c0358f32969826cc26720e13cb38926ffdc86bc0cb2c",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "bytes": 22961,
+      "sha256": "6da83a088f8ef93b2d483a8232a4dbf4d69d3d8496b568a03c56becac43e1808",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/pycparser-3.11-py3-none-any.whl",
+      "bytes": 51178,
+      "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/requests-2.32.5-py3-none-any.whl",
+      "bytes": 64738,
+      "sha256": "2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/urllib3-2.8.0-py3-none-any.whl",
+      "bytes": 135717,
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/waitress-3.0.2-py3-none-any.whl",
+      "bytes": 56232,
+      "sha256": "c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e",
+      "mode": "0644"
+    },
+    {
+      "path": "wheelhouse/werkzeug-3.1.9-py3-none-any.whl",
+      "bytes": 228700,
+      "sha256": "6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab",
+      "mode": "0644"
+    }
+  ]
+}

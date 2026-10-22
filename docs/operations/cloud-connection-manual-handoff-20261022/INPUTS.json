@@ -171,9 +171,9 @@
     },
     {
       "id": "manual_execution_decision_and_attempt",
-      "state": "UNKNOWN",
-      "reason": "Owner尚未决定采用人工；实际执行入口、范围/时窗/唯一Attempt/适用次数与故障记录待按原准入绑定，不能从旧已消费Attempt恢复额度",
-      "blocks": "G0及所有写动作",
+      "state": "MANUAL_CONTINUATION_CONFIRMED_WRITE_CHECKPOINTS_SEPARATE",
+      "reason": "Owner已确认人工接续，G1已完成；不再索取同一决定。实际新写动作按原具体授权及当前目标/事务绑定处理；新凭据/权限不由本确认代替。",
+      "blocks": "NO_BLOCK_ON_G2_PREPARATION_OR_FIXED_METADATA_CHECK",
       "responsible": "Owner/原准入责任链"
     },
     {
@@ -193,5 +193,6 @@
     "取消安全拒绝",
     "任意Shell/任意文件传输",
     "新凭据或权限默认授权"
-  ]
+  ],
+  "manual_continuation_confirmed": true
 }
