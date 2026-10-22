@@ -222,7 +222,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('main h1')).to_have_text('附近好店与服务')
             expect(page.locator('.mini-tabbar a')).to_have_count(4)
             page.screenshot(path=str(self.out/'owner-consumer-home.png'),full_page=True)
-            page.get_by_role('link',name='我的',exact=True).click()
+            page.get_by_role('link',name='我的').click()
             expect(page.locator('main h1')).to_have_text('个人中心')
             expect(page.locator('main')).to_contain_text('商家入驻')
             expect(page.locator('main')).to_contain_text('当前项目未发现可复用入口')
