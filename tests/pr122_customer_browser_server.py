@@ -38,9 +38,17 @@ server=HTTPServer(('127.0.0.1',0),App(factory,Providers({}),'https://wenwenwenyi
 class Control(BaseHTTPRequestHandler):
     def log_message(self,*_):pass
     def do_POST(self):
-        if self.path!='/revoke-owner-project':
+        if self.path not in ('/revoke-owner-project','/publish-ready'):
             self.send_error(404);return
-        fixture.imported(2,[])
+        c=factory()
+        try:
+            if self.path=='/publish-ready':
+                publish_ready(c)
+            else:
+                payload={'revision':2,'expires':now+3600,'projects':[]}
+                signed={'payload':payload,'signature':hmac.new(fixture.auth,canonical(payload),hashlib.sha256).hexdigest()}
+                c.import_authority(signed,fixture.auth)
+        finally:c.db.close()
         self.send_response(204);self.end_headers()
 
 control=HTTPServer(('127.0.0.1',0),Control)
@@ -50,7 +58,7 @@ def worker():
     c=factory()
     try:
         while not stop.wait(.05):
-            drain(c);publish_ready(c)
+            drain(c)
     finally:c.db.close()
 
 thread=threading.Thread(target=worker,daemon=True);control_thread=threading.Thread(target=control.serve_forever,daemon=True);thread.start();control_thread.start()
