@@ -6,7 +6,8 @@ from pathlib import Path
 from scripts.community_ui_preview_build import build,main,BASE,ROOT
 class SourceBoundary(unittest.TestCase):
     def test_generated_inputs_and_scoped_fields(self):
-        data=build();main()
+        data=build()
+        self.assertEqual((BASE/'ui-preview/sources.js').read_text(),'window.COMMUNITY_UI_PREVIEW='+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n')
         self.assertEqual(len([p for p in data['pages'] if p['role']=='admission' and p['kind']=='stage']),4)
         self.assertEqual(len([p for p in data['pages'] if p['id']=='admission-beneficiary']),1)
         admission=[p for p in data['pages'] if p['role']=='admission']
@@ -29,7 +30,6 @@ class SourceBoundary(unittest.TestCase):
 class ClickThrough(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        main()
         from playwright.sync_api import sync_playwright
         class Handler(SimpleHTTPRequestHandler):
             def log_message(self,*args):pass
@@ -112,7 +112,10 @@ class ClickThrough(unittest.TestCase):
         import tempfile
         from scripts.community_ui_preview_build import bundle
         with tempfile.TemporaryDirectory() as tmp:
-            target=Path(tmp)/'community-ui-preview.html';bundle(target)
+            target=Path(tmp)/'community-ui-preview.html'
+            before={p:p.read_bytes() for p in [ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md',BASE/'ui-preview/sources.js']}
+            bundle(target)
+            self.assertTrue(all(p.read_bytes()==raw for p,raw in before.items()))
             context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();requests=[];errors=[]
             page.on('request',lambda r:requests.append(r.url));page.on('pageerror',lambda error:errors.append(str(error)))
             page.goto(target.as_uri())

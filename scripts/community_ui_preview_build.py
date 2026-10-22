@@ -106,7 +106,7 @@ def main():
         lines.append('|'+data['roles'][p['role']]+'|'+p['title']+'|'+route+'|'+p['source']+'|')
     (ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md').write_text('\n'.join(lines)+'\n')
 def bundle(target):
-    main();out=BASE/'ui-preview';html=(out/'index.html').read_text()
+    out=BASE/'ui-preview';html=(out/'index.html').read_text()
     scripts=[(out/name).read_text() for name in ('sources.js','preview.js')]
     styles=[(out/name).read_text() for name in ('original.css','preview.css')]
     def digest(value):return "'sha256-"+base64.b64encode(hashlib.sha256(value.encode()).digest()).decode()+"'"
