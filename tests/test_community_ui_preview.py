@@ -58,7 +58,7 @@ class ClickThrough(unittest.TestCase):
             page.goto(self.url)
             for role in self.data['roles']:
                 page.get_by_label('查看身份',exact=True).select_option(role)
-                expect(page.locator('#view h1').first).to_have_text('发现身边好店' if role=='consumer' else self.data['roles'][role])
+                expect(page.locator('#view h1').first).to_have_text({'consumer':'发现身边好店','merchant':'邻里生活馆','community':'社区运营总览','platform':'平台管理','admission':self.data['roles']['admission']}[role])
                 self.assert_layout(page,width,role+'-home')
                 if role=='consumer':
                     page.get_by_role('link',name='门店').click()
@@ -89,7 +89,7 @@ class ClickThrough(unittest.TestCase):
                     page.get_by_role('link',name='我的',exact=True).click()
                     expect(page.locator('#view h1').first).to_have_text('个人中心')
                     continue
-                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
+                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly') and not (role=='merchant' and p['id']=='merchant-native-catalog')]
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
@@ -107,7 +107,7 @@ class ClickThrough(unittest.TestCase):
                             expect(page).to_have_url(__import__('re').compile('/list$'))
                             expect(page.locator('.record')).to_be_visible()
                         page.get_by_role('link',name='返回菜单',exact=True).click()
-                        expect(page.locator('#view h1').first).to_have_text(self.data['roles'][role])
+                        expect(page.locator('#view h1').first).to_have_text({'consumer':'发现身边好店','merchant':'邻里生活馆','community':'社区运营总览','platform':'平台管理','admission':self.data['roles']['admission']}[role])
             self.assertEqual(errors,[])
             self.assertTrue(all(method=='GET' and url.startswith(self.url.rsplit('/ui-preview/',1)[0]) for method,url in requests),requests)
             context.close()
@@ -254,6 +254,47 @@ class ClickThrough(unittest.TestCase):
         expect(page.get_by_label('示例状态',exact=True)).to_have_value('sample')
         self.assertTrue(all(method=='GET' for method,url in requests))
         context.close()
+
+    def test_four_role_dashboards_and_merchant_fixed_navigation(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/merchant/home')
+            expect(page.locator('.mini-tabbar a')).to_have_count(5)
+            for label in ('工作台','订单','统计','门店','收款码'):
+                expect(page.locator('.mini-tabbar')).to_contain_text(label)
+            expect(page.locator('#view')).not_to_contain_text('商品管理')
+            self.assertTrue(any(p['id']=='merchant-native-catalog' for p in self.data['pages']))
+            page.screenshot(path=str(self.out/'role-merchant-phone.png'),full_page=True)
+            page.get_by_role('link',name='订单',exact=True).click()
+            expect(page).to_have_url(__import__('re').compile(r'#/merchant/merchant-native-orders/list$'))
+            expect(page.locator('.mini-tabbar a')).to_have_count(5)
+            page.get_by_label('查看身份',exact=True).select_option('community')
+            for title in ('社区运营总览','已入驻商家','社区订单','分账明细','退款'):
+                expect(page.locator('#view')).to_contain_text(title)
+            expect(page.locator('#view')).to_contain_text('未就绪')
+            page.screenshot(path=str(self.out/'role-community-phone.png'),full_page=True)
+            page.get_by_role('link',name='打开订单观察',exact=True).click()
+            expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
+            page.get_by_role('button',name='查看查询状态',exact=True).first.click()
+            expect(page.locator('#community-query-status')).to_contain_text('未返回或伪造订单记录')
+            page.goto(self.url+'#/community/home')
+            expect(page.locator('#view h1').first).to_have_text('社区运营总览')
+            page.get_by_label('查看终端',exact=True).select_option('desktop')
+            page.screenshot(path=str(self.out/'role-community-pc.png'),full_page=True)
+            page.get_by_label('查看身份',exact=True).select_option('platform')
+            for title in ('订单与交易','入驻与商家','用户与社区','权限、通知与日志'):
+                expect(page.locator('#view')).to_contain_text(title)
+            expect(page.locator('#view')).to_contain_text('原模块入口当前预览未就绪')
+            page.screenshot(path=str(self.out/'role-platform-phone.png'),full_page=True)
+            page.get_by_role('link',name='进入订单管理',exact=True).click()
+            expect(page.locator('#view h1').first).to_have_text('订单管理')
+            expect(page.locator('#view')).to_contain_text('UNCONFIRMED')
+            page.get_by_label('查看终端',exact=True).select_option('desktop')
+            page.goto(self.url+'#/platform/home')
+            page.get_by_label('查看终端',exact=True).select_option('desktop')
+            page.screenshot(path=str(self.out/'role-platform-pc.png'),full_page=True)
+        finally:
+            page.close()
 
     def test_admission_conditions_render_matching_fields_and_uploads(self):
         page=self.browser.new_page(viewport={'width':390,'height':844})
