@@ -60,7 +60,32 @@ class ClickThrough(unittest.TestCase):
                 page.get_by_label('查看身份',exact=True).select_option(role)
                 expect(page.locator('#view h1').first).to_have_text('附近好店与服务' if role=='consumer' else self.data['roles'][role])
                 self.assert_layout(page,width,role+'-home')
-                pages=[] if role=='consumer' else [p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
+                if role=='consumer':
+                    page.get_by_role('link',name='门店').click()
+                    expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/list$'))
+                    expect(page.locator('#view')).to_contain_text('邻里生活馆')
+                    page.get_by_role('link',name='查看示例门店详情',exact=True).click()
+                    expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/detail$'))
+                    expect(page.locator('#view')).to_contain_text('邻里服务套餐')
+                    page.get_by_role('link',name='查看操作界面',exact=True).click()
+                    expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/edit$'))
+                    expect(page.locator('#view')).to_contain_text('¥20.00')
+                    page.get_by_role('button',name='结束查看并返回',exact=True).click()
+                    expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/list$'))
+                    expect(page.locator('#view')).to_contain_text('邻里服务套餐')
+                    page.reload()
+                    expect(page.locator('#view')).to_contain_text('邻里生活馆')
+                    page.get_by_role('link',name='我的').click()
+                    expect(page.locator('#view h1').first).to_have_text('个人中心')
+                    community=page.get_by_role('link',name='社区与归属',exact=False).first
+                    expect(community).to_be_visible()
+                    community.click()
+                    expect(page.locator('.mini-tabbar a')).to_have_count(4)
+                    expect(page.locator('#view')).to_contain_text('社区与归属')
+                    page.get_by_role('link',name='我的').click()
+                    expect(page.locator('#view h1').first).to_have_text('个人中心')
+                    continue
+                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
