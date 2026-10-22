@@ -333,18 +333,3 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 if __name__=='__main__':unittest.main()
-))
-            expect(page.locator('.mini-tabbar a')).to_have_count(4)
-            page.get_by_label('查看身份',exact=True).select_option('platform')
-            expect(page.locator('#menu')).to_contain_text('订单管理')
-            expect(page.locator('#menu')).to_contain_text('入驻与商家')
-            expect(page.locator('#menu')).to_contain_text('用户与社区')
-            expect(page.locator('#menu')).to_contain_text('权限、通知与日志')
-            expect(page.locator('#menu')).to_contain_text('支付管理')
-            expect(page.locator('#menu')).to_contain_text('退款管理')
-            expect(page.locator('#menu')).to_contain_text('分账明细')
-            expect(page.locator('#menu')).to_contain_text('对账管理')
-        finally:
-            page.close()
-
-if __name__=='__main__':unittest.main()
