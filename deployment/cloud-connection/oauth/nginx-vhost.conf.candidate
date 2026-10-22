@@ -6,7 +6,14 @@ server {
     server_name cloud-auth.wenwenwenyiyiyi.work;
     access_log off;
     error_log /dev/null;
-    return 308 https://cloud-auth.wenwenwenyiyiyi.work$request_uri;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / {
+        return 308 https://cloud-auth.wenwenwenyiyiyi.work$request_uri;
+    }
 }
 server {
     listen 443 ssl;

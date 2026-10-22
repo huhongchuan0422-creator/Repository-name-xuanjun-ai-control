@@ -56,3 +56,20 @@ jobs:
           python -m pip check
       - name: Real loopback HTTP OAuth and MCP integration - simulated GitHub upstream
         run: python -m unittest discover -s tests/oauth -p 'test_*.py' -v
+  oauth-nginx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exact configuration source
+        run: |
+          git log -1 --format='%H %T %P'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Install distribution Nginx for isolated configuration tests
+        run: sudo apt-get update && sudo apt-get install -y nginx openssl
+      - name: Real HTTP01 bootstrap and final vhost regression
+        env:
+          REQUIRE_NGINX_TESTS: '1'
+        run: python3 -m unittest discover -s tests -p test_cloud_connection_oauth_nginx.py -v

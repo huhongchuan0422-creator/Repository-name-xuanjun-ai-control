@@ -305,3 +305,12 @@ All observations in Work's receipt are historical reads, not fresh server
 checks. This round performs no server commands, deployment, account/App/secret
 creation, network changes, tool refresh or permission edits. The table is the
 single concentrated fact/activation delta, not a request for blanket approval.
+
+
+## Isolated new-App route supersedes in-place migration
+
+See CLOUD_CONNECTION_OAUTH_ISOLATED_ACTIVATION_20261022.md for the current
+preparation, HTTP01 fix and exact remaining admission fields. Preserve the old
+App/tunnel/upstream unchanged; a new App must use its own new tunnel. Original
+7-item in-place migration instructions above are historical, not execution scope.
+No live changes or user OAuth consent are authorized by these documents.

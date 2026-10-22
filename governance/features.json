@@ -103,6 +103,39 @@
         "scripts/p2_uk_readonly_diagnostic.py",
         "tests/test_p2_uk_readonly_diagnostic.py"
       ]
+    },
+    {
+      "feature_id": "CLOUD_CONNECTION_OAUTH_HTTP_ACTIVATION",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/CLOUD_CONNECTION_OAUTH_ISOLATED_ACTIVATION_20261022.md",
+        "section": "2"
+      },
+      "development": {
+        "document": "docs/development/CLOUD_CONNECTION_OAUTH_ISOLATED_ACTIVATION_20261022.md",
+        "section": "6",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "HTTP01 served without server-level redirect, bootstrap rejects other paths",
+          "Exact manifest, real isolated Nginx tests; no live enrollment or credentials",
+          "Old App/tunnel unchanged; static-client incompatibility stops new chain"
+        ],
+        "tests": [
+          "tests/test_cloud_connection_oauth_nginx.py"
+        ]
+      },
+      "reuse": [
+        "PR17 #6330270020 unchanged 211 cases",
+        "PR122 original ACME entry and existing cloud connection queue"
+      ],
+      "paths": [
+        "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
+        "deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
+        "tests/test_cloud_connection_oauth_nginx.py",
+        "docs/development/CLOUD_CONNECTION_OAUTH_ISOLATED_ACTIVATION_20261022.md"
+      ]
     }
   ]
 }

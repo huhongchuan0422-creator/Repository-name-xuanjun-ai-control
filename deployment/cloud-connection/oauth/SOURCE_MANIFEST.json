@@ -8,16 +8,22 @@
       "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244"
     },
     {
+      "bytes": 462,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
+      "sha256": "5367238723be7258185e2f83c7bbd410a6faafbd0472be722aac9264ade2d8e6"
+    },
+    {
       "bytes": 401,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
       "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40"
     },
     {
-      "bytes": 1213,
+      "bytes": 1390,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
-      "sha256": "f81c75890ad4d0c01f768854f1093111d7df80e3577f63912396b1597af2754f"
+      "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5"
     },
     {
       "bytes": 5158,
