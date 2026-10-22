@@ -36,5 +36,7 @@
     "record_time_utc": "2026-10-22T05:37:47Z",
     "no_retries_in_this_package": true
   },
-  "warning": "Referenced reviews/authorizations retain their original signer and limits; no signature is reissued here."
+  "warning": "Referenced reviews/authorizations retain their original signer and limits; no signature is reissued here.",
+  "owner_rpm_addendum": "OWNER_RPM_EVIDENCE_20261022.json",
+  "owner_rpm_attachment_sha256": "f87db53c1d17bb7e962bf522ab434fcaca068051247460e2f3e7ca3c1601a4ca"
 }

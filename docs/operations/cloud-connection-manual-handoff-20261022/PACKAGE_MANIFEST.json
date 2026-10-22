@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "revision": "R2_OWNER_RPM_ADDENDUM",
   "purpose": "MANUAL_PREPARATION_NOT_EXECUTION",
   "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
   "source_tree": "6331aa8dcaeb0be705879d5ec4e2ef28d0d6b7f7",
@@ -22,20 +23,26 @@
     {
       "path": "EVIDENCE_INDEX.json",
       "mode": "0644",
-      "bytes": 2580,
-      "sha256": "59991ce6ce993a87a0c5534d6d30d03068110d9e891f91ec40a069d932734c5a"
+      "bytes": 2741,
+      "sha256": "64486168e5d7625be3f9296abe111085f887a2c1f0684594d0f5104d2506be38"
     },
     {
       "path": "INPUTS.json",
       "mode": "0644",
-      "bytes": 7344,
-      "sha256": "23c9cdffc5d9f1ed75e4e86ef79f6fc9f19803702adc557cecc755bb481e3507"
+      "bytes": 7527,
+      "sha256": "857b29a53b18f1918ec8e8989d54b86ece0cb9bea8126f2b858ad9af3c39e408"
+    },
+    {
+      "path": "OWNER_RPM_EVIDENCE_20261022.json",
+      "mode": "0644",
+      "bytes": 7850,
+      "sha256": "8add521a9c8709cf8df9118c40e19be1f3f9bd58a340b355da829235f3ec8b50"
     },
     {
       "path": "README.zh.md",
       "mode": "0644",
-      "bytes": 2400,
-      "sha256": "ce09573251a66accc46815659ef3a2eb136b77493d9fa245acb69b65d62d34ef"
+      "bytes": 2708,
+      "sha256": "f1f59eb1b471b193fcabb4b8c5b227e288cd9129e5ca769279be29eb54c8002c"
     },
     {
       "path": "STAGES.md",

@@ -107,10 +107,11 @@
     },
     {
       "id": "vendor_source_and_library_patch_mapping",
-      "state": "UNKNOWN",
-      "reason": "待原固定解释器及实际_ssl/_sqlite3关联文件的RPM来源/SourceRPM和适用补丁对应；不重跑已成功身份探针，不扫描",
-      "blocks": "G1→G2",
-      "responsible": "原执行方/包维护记录"
+      "state": "OBSERVED_OWNER_EVIDENCE_SCOPE_CLOSED",
+      "reason": "6文件归属/4包changelog完整；python3/python3-libs同SourceRPM，OpenSSL和SQLite实际库对应发行版包及已有补丁记录。该缺项限定关闭，不推为完整漏洞覆盖或签名密码学校验。",
+      "blocks": "NONE_FOR_ORIGINAL_G1_MAPPING_SCOPE",
+      "responsible": "原执行方/包维护记录",
+      "evidence": "OWNER_RPM_EVIDENCE_20261022.json"
     },
     {
       "id": "domestic_dependency_delivery_result",
