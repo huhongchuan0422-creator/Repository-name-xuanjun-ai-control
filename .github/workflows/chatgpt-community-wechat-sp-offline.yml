@@ -54,6 +54,7 @@ jobs:
           NODE_OPTIONS: --test-reporter=tap
         run: |
           set -o pipefail
+          python -m pip install cryptography==50.0.2
           python -B -m unittest discover -s tests -p 'test_preview_endpoint_contract.py' -v 2>&1 | tee community-tests.log
           python -B -m unittest discover -s tests -p 'preview_preparation_test.py' -v 2>&1 | tee -a community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_preview_readiness.py' -v 2>&1 | tee -a community-tests.log
