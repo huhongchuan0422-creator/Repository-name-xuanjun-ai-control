@@ -133,7 +133,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view')).to_contain_text('邻里生活馆（示例门店）')
             expect(page.locator('#view')).to_contain_text('社区便民服务')
             expect(page.locator('#view')).to_contain_text('支付可用')
-            expect(page.locator('#view')).to_contain_text('merchantID不代表已开通')
+            expect(page.locator('#view')).to_contain_text('merchantID不代表支付已开通')
             expect(page.locator('#view')).to_contain_text('分账可用')
             expect(page.locator('#view')).not_to_contain_text('邻里服务套餐')
             expect(page.locator('#view')).not_to_contain_text('¥20.00')
