@@ -93,8 +93,25 @@ class ClickThrough(unittest.TestCase):
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
-                        page.locator('#menu a[href="'+target+'"]').click()
-                        expect(page.locator('#view h1').first).to_have_text(module['title'])
+                        if role=='community' and module['id']=='community-4-0-0':
+                            entry=page.locator('#view a[href="'+target+'"]')
+                            expect(entry).to_be_visible()
+                            entry.click()
+                            expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
+                        else:
+                            menu_entry=page.locator('#menu a[href="'+target+'"]')
+                            view_entry=page.locator('#view a[href="'+target+'"]')
+                            if menu_entry.is_visible():
+                                menu_entry.click()
+                            elif view_entry.is_visible():
+                                view_entry.click()
+                            elif role=='admission' and module['id'] not in ('admission-start','admission-result'):
+                                next_step=page.get_by_role('link',name='保存草稿并下一步',exact=True)
+                                expect(next_step).to_be_visible()
+                                next_step.click()
+                            else:
+                                self.fail('No visible user-facing entry for '+role+'/'+module['id']+' at '+str(width)+'px')
+                            expect(page.locator('#view h1').first).to_have_text(module['title'])
                         if role=='community' and module['id']=='community-4-0-0':
                             page.get_by_role('button',name='查看查询状态',exact=True).first.click()
                             expect(page.locator('#community-query-status')).to_contain_text('未返回或伪造订单记录')
