@@ -95,6 +95,12 @@ class ClickThrough(unittest.TestCase):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
                         page.locator('#menu a[href="'+target+'"]').click()
                         expect(page.locator('#view h1').first).to_have_text(module['title'])
+                        if role=='community' and module['id']=='community-4-0-0':
+                            page.get_by_role('button',name='查看查询状态',exact=True).first.click()
+                            expect(page.locator('#community-query-status')).to_contain_text('未返回或伪造订单记录')
+                            page.goto(self.url+'#/community/home')
+                            expect(page.locator('#view h1').first).to_have_text('社区运营总览')
+                            continue
                         if role!='admission':
                             page.get_by_role('link',name='查看详情',exact=True).click()
                             expect(page).to_have_url(__import__('re').compile('/detail$'))
