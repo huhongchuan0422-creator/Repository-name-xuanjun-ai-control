@@ -333,7 +333,7 @@ def resume_rolled_back():
     vhost_hash=hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()
     if vhost_hash!=attempt.get('owner_vhost_sha256'):raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
     command(['/usr/bin/systemctl','is-active','--quiet','nginx.service']);command(['/usr/sbin/nginx','-t'])
-    private_ready()
+    if not private_ready():raise Rejected('ORIGINAL_BACKEND_NOT_READY')
     os.mkdir(resume,0o700)
     create(resume+'/attempt.json',json.dumps({'source_sha':SOURCE,'new_id':RESUME_ID,'phase':'RESUME_PREPARED'},sort_keys=True).encode())
     replace_include(old_include,FRAGMENT,mode)

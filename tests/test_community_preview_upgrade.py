@@ -246,6 +246,10 @@ class ResumeRolledBack(unittest.TestCase):
         self.fixture()
         with patch.object(u.os.path,'lexists',return_value=True),self.assertRaisesRegex(u.Rejected,'EXISTING_RESUME'):u.resume_rolled_back()
         self.mutate.assert_not_called();self.replace.assert_not_called()
+    def test_old_health_false_blocks_before_any_write(self):
+        self.fixture();u.private_ready.return_value=False
+        with self.assertRaisesRegex(u.Rejected,'ORIGINAL_BACKEND_NOT_READY'):u.resume_rolled_back()
+        self.create.assert_not_called();self.mutate.assert_not_called()
     def test_wrong_failed_id_blocks_before_any_write(self):
         self.fixture();self.inspect.side_effect=[info(),info(u.IMAGE,'b'*64,False)]
         with self.assertRaisesRegex(u.Rejected,'EXACT_CONTAINER_STATE'):u.resume_rolled_back()
