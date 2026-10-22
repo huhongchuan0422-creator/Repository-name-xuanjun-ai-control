@@ -357,3 +357,12 @@ Nginx 候选按原 workbench 请求增加精确 commerce/provider-actions/mercha
 HttpOnly cookie 不能只靠页面 generation 保护：同源浏览器标签页的会话变更采用 Web Locks，锁持有到整个响应 JSON/后继 check 处理结束，避免两个 Set-Cookie 响应互相越过。BroadcastChannel 只发送固定 changed 通知，不发送身份/token/CSRF；其他标签页清理旧工作区、取消过期等待，不自动重放。未知结果清理可操作状态并要求显式重试。现代 HTTPS 浏览器需支持这两项协调 API；不支持则网页工作人员登录明确不可用，不能退回允许乱序写 cookie 的路径。消费者小程序登录不受此网页协调影响。
 
 原 Center/会话表、cookie 名、Origin/CSRF、项目/门店权限均未改变，不创建授权/管理员或身份体系。新浏览器回归通过真实 Unix HTTP 请求原 Center，只延后完整真实响应；核重复登录/退出交叠只有一个变更请求、Set-Cookie 处理后 cookie+CSRF 可共同通过原 check、晚到启动 check 200/403 均不能破坏新会话。原正常商家/社区/审核业务旅程继续在受影响范围运行。现场角色准入及英国版本替换仍单独待实证，未据此声称四入口可验收。
+
+
+## 2026-10-22 同 context 双标签及生命周期补验（Issue76 #6332676239）
+
+保留541f8519已过单页竞态及原四项接线。本次只增真实浏览器覆盖同browser context双page交叠login/logout、旧页面业务展示清理、共享cookie与各页CSRF通过原check的一致性，以及会话变更响应未完时刷新/离页返回、不重放UNKNOWN。全部身份/业务响应来自同一原非root Unix HTTP/Center，测试只延后完整响应；浏览器取消旧文档请求时保留其真实取消结果，不能把替身消息当跨页实证。
+
+本地Chromium已复现BroadcastChannel构造失败会中断引导、旧CSRF未清理。运行代码仅将协调能力初始化改为检查locks.request并捕获构造异常；不具备API或构造失败仍清旧CSRF、关闭业务展示且零会话变更请求，不降级并发协议。缺locks/缺BroadcastChannel/构造失败三种真实浏览器负例本地通过；原失败日志保留，不将其称为已证实现场越权。
+
+消费者微信登录、原Center会话/授权、Nginx候选、数据和密钥均未修改。现场限定替换授权沿Owner刚确认范围继承，不扩大到真实角色、身份或资金变更；源码补验完成后须绑定最终运行制品，旧541f工具引用不可冒充新候选已发布。英国实际版本及角色准入仍单列，不以本段或CI代替客户验收。

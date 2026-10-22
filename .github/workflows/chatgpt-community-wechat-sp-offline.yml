@@ -34,12 +34,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install exact browser test runner
-        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]')"
+        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           python -m pip install playwright==1.55.0 cryptography==50.0.2
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
-        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]')"
+        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
@@ -163,6 +163,19 @@ jobs:
           set -o pipefail
           python -m pip install cryptography==50.0.2
           python -B -m unittest discover -s tests -p 'test_community_preview_upgrade.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Original session same-context tabs and lifecycle affected scope
+        if: contains(github.event.head_commit.message, '[web-session-tabs-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install playwright==1.55.0 cryptography==50.0.2
+          python -m playwright install --with-deps chromium
+          node tests/community_web_session_races.cjs demos/community-stage/web-session.js 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_coordination.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_tabs.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_browser.py' -v 2>&1 | tee -a community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
       - name: Build deterministic offline source package
         id: source_package

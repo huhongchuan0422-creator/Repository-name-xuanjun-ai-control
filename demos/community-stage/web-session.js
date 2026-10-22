@@ -7,8 +7,12 @@
  // Same-origin tabs share the HttpOnly cookie. Hold the browser lock until the
  // entire mutation response settles, so late Set-Cookie cannot overtake a
  // subsequent login/logout. No bearer, CSRF or identity travels on this channel.
- const coordinated=!!navigator.locks&&typeof BroadcastChannel==='function';
- const channel=coordinated?new BroadcastChannel('community-original-session'):null;
+ let coordinated=false,channel=null;
+ try{
+  if(typeof navigator.locks?.request==='function'&&typeof BroadcastChannel==='function'){
+   channel=new BroadcastChannel('community-original-session');coordinated=true;
+  }
+ }catch(_){/* Unavailable coordination must clear saved state before any IO. */}
  const current=t=>t===generation;
  const controls=()=>{
   for(const button of root.querySelectorAll('button'))button.disabled=active!==null||!coordinated;
