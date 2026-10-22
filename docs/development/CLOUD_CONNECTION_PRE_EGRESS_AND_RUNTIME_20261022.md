@@ -26,7 +26,7 @@ original TCP peer variable. Never change global real_ip settings.
 
 Nginx's `$msec` map fails closed outside those seconds (410); process restart does
 not refresh the window. Only the exact nonce URI accepts GET with no query (204).
-Other methods return405 and queries400. The JSON line contains only nonce, UTC,
+Other methods return405 and queries400. The JSON line contains only nonce, UTC epoch seconds (`$msec`, independent of host timezone),
 original TCP peer `$realip_remote_addr`, method and status. Forwarded headers,
 credentials, query values and body are not recorded. `introspect` remains403.
 No request is sent to the application by this observation location.

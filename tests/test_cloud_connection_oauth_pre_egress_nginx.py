@@ -85,7 +85,7 @@ class Real(unittest.TestCase):
   self.start(observe=True);path='/_xuanjun-connection-peer/'+self.nonce
   self.assertEqual(self.req(path,headers={'X-Forwarded-For':'8.208.119.115','Authorization':'Bearer DO_NOT_LOG'})[0],204)
   self.assertEqual(self.hits,[])
-  row=json.loads(self.log.read_text().splitlines()[0]);self.assertEqual(set(row),{'nonce','utc','peer','method','status'});self.assertEqual(row['peer'],'127.0.0.1');self.assertEqual(row['nonce'],self.nonce);self.assertEqual(row['status'],204)
+  row=json.loads(self.log.read_text().splitlines()[0]);self.assertEqual(set(row),{'nonce','utc_epoch','peer','method','status'});self.assertLess(abs(float(row['utc_epoch'])-time.time()),5);self.assertEqual(row['peer'],'127.0.0.1');self.assertEqual(row['nonce'],self.nonce);self.assertEqual(row['status'],204)
   self.assertNotIn('DO_NOT_LOG',self.log.read_text());self.denied()
   self.start();before=self.log.read_bytes();self.assertEqual(self.req(path)[0],404);self.assertEqual(self.log.read_bytes(),before);self.denied()
  def test_observation_method_query_wrong_nonce(self):

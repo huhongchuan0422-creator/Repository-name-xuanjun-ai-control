@@ -152,10 +152,10 @@
       "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1"
     },
     {
-      "bytes": 322,
+      "bytes": 320,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
-      "sha256": "0b6a43aedc0e0024221bb6f6dd791baa0849f726a89b2c9e406ced8ab94bb648"
+      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64"
     },
     {
       "bytes": 358,
