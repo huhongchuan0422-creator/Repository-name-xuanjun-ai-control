@@ -57,5 +57,6 @@ class ConfigurationTests(unittest.TestCase):
             self.assertEqual(len(raw),entry['bytes'])
             self.assertEqual(hashlib.sha256(raw).hexdigest(),entry['sha256'])
         for name in ('oauth_resource.py','oauth_authority.py','oauth_http.py','oauth_entrypoint.py',
+                     'github_network.py',
                      'private_transfer.py','private_mcp.py','queue.py','runtime.py','worker.py'):
             self.assertIn('production/cloud_connection/'+name,paths)

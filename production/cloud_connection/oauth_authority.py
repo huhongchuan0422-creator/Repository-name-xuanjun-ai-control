@@ -10,6 +10,7 @@ import math
 import secrets
 import sqlite3
 import time
+import threading
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -22,6 +23,7 @@ from authlib.oauth2.rfc7636 import CodeChallenge
 from authlib.oauth2.rfc7662 import IntrospectionEndpoint
 from authlib.oauth2.rfc7009 import RevocationEndpoint
 from .queue import Hold
+from .github_network import GithubApp, GithubNetwork
 
 SCOPES = {'connection.status', 'project.files.read'}
 SCHEMA = '''
@@ -94,7 +96,8 @@ class Token(TokenMixin):
     def is_revoked(self): return self.row['revoked'] != 0
 
 
-def create_app(config, connect, session_secret, github_secret, enabled=False, clock=time.time):
+def create_app(config, connect, session_secret, github_secret, enabled=False, clock=time.time,
+               github_network=None):
     """connect returns a fresh connection to a pre-approved existing auth DB.
 
     No alternate identity fixture is accepted here. Offline GitHub doubles run
@@ -245,9 +248,14 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
     server.register_endpoint(Revoke)
     oauth = OAuth(app)
     github = oauth.register('github', client_id=config['github_client_id'],
+        client_cls=GithubApp,
         client_secret=github_secret, access_token_url='https://github.com/login/oauth/access_token',
         authorize_url='https://github.com/login/oauth/authorize', api_base_url='https://api.github.com/',
-        client_kwargs={'scope':'', 'code_challenge_method':'S256', 'timeout':5})
+        client_kwargs={'scope':'', 'code_challenge_method':'S256'})
+    network=github_network if github_network is not None else GithubNetwork()
+    # The actual service has four HTTP threads. At most two may wait for
+    # callback wire work, reserving capacity for introspection and revocation.
+    callback_slots=threading.BoundedSemaphore(2)
 
     @app.before_request
     def secure_boundary():
@@ -337,16 +345,24 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
     @app.get('/github/callback')
     def callback():
         original = flow()
+        if not callback_slots.acquire(blocking=False):
+            return jsonify(error='temporarily_unavailable'),503
+        g.github_deadline=time.monotonic()+5
+        g.github_network=network
         try:
             token = github.authorize_access_token()
-            response = github.get('user', token=token, timeout=5, allow_redirects=False)
+            response = github.get('user', token=token, allow_redirects=False)
             if response.status_code != 200: abort(401)
             user = response.json()
             if type(user) is not dict or type(user.get('id')) is not int: abort(401)
             sub = 'github:' + str(user['id'])
             if subject(sub) is None: abort(403)
+            if time.monotonic()>=g.github_deadline:raise Hold('GITHUB_TOTAL_DEADLINE')
         except Exception:
             abort(401)
+        finally:
+            g.pop('github_deadline',None);g.pop('github_network',None)
+            callback_slots.release()
         def bind():
             cursor = db().execute('UPDATE oauth_flows SET sub=? WHERE sid_hash=? AND used=0 AND sub IS NULL AND expires>?',
                                   (sub, original['sid_hash'], now()))

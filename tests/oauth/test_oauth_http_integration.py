@@ -33,6 +33,7 @@ from authlib.oauth2.rfc7636 import create_s256_code_challenge
 from production.cloud_connection.oauth_authority import create_app, initialize_new_database, digest
 from production.cloud_connection.oauth_http import create_resource_app
 from production.cloud_connection.oauth_resource import Introspection, bounded_http
+from production.cloud_connection.github_network import GithubNetwork
 from production.cloud_connection.queue import Hold
 from production.cloud_connection.private_mcp import PrivateMcp
 import sys
@@ -88,7 +89,36 @@ class OAuthHTTPTests(unittest.TestCase):
         connection=sqlite3.connect(str(self.path),isolation_level=None)
         initialize_new_database(connection);connection.close();os.chmod(str(self.path),0o600)
         self.subject_id=332398908;self.provider_codes={}
+        self.provider_fault=None;self.provider_stage=None;self.redirect_hits=0
+        self.fault_entered=threading.Event()
+        self.fault_count=0;self.fault_lock=threading.Lock();self.provider_delays={}
         provider=Flask('simulated-github')
+        def fault(stage):
+            if stage in self.provider_delays:time.sleep(self.provider_delays[stage])
+            if self.provider_stage!=stage or self.provider_fault is None:return None
+            from flask import Response
+            self.fault_entered.set()
+            with self.fault_lock:self.fault_count+=1
+            mode=self.provider_fault
+            if mode in ('silent','slow_headers'):
+                time.sleep(8 if mode=='silent' else 6)
+                return jsonify(id=332398908)
+            if mode=='drip':
+                def stream():
+                    for _ in range(100):yield b' ';time.sleep(0.15)
+                return Response(stream(),content_type='application/json')
+            if mode=='oversize':
+                return Response(b'x'* (16385 if stage=='token' else 65537),content_type='application/json')
+            if mode=='oversize_stream':
+                return Response(iter([b'x'*10000]*8),content_type='application/json')
+            if mode=='oversize_headers':
+                return Response(b'{}',headers={'X-Fill':'x'*9000},content_type='application/json')
+            if mode=='redirect':return redirect(self.provider.base+'/leak',302)
+            raise AssertionError(mode)
+        @provider.route('/leak',methods=['GET','POST'])
+        def leak():
+            self.redirect_hits+=1
+            return jsonify(id=332398908)
         @provider.get('/login/oauth/authorize')
         def upstream_login():
             code=secrets.token_urlsafe(24)
@@ -96,6 +126,8 @@ class OAuthHTTPTests(unittest.TestCase):
             return redirect(request.args['redirect_uri']+'?'+urlencode({'code':code,'state':request.args['state']}))
         @provider.post('/login/oauth/access_token')
         def upstream_token():
+            failure=fault('token')
+            if failure is not None:return failure
             code=self.provider_codes.pop(request.form.get('code'),None)
             if (not code or request.form.get('redirect_uri')!=code[1]
                     or create_s256_code_challenge(request.form.get('code_verifier',''))!=code[0]):
@@ -103,9 +135,11 @@ class OAuthHTTPTests(unittest.TestCase):
             return jsonify(access_token='github-simulator-'+str(code[2]),token_type='Bearer')
         @provider.get('/user')
         def upstream_user():
+            failure=fault('user')
+            if failure is not None:return failure
             value=request.headers.get('Authorization','').split('-')[-1]
             return jsonify(id=int(value))
-        self.provider=Server(provider).start()
+        self.provider=Server(provider,self.cert).start()
         self.authority=Server(lambda e,s:[],self.cert)
         self.issuer=self.authority.base
         self.audience='https://resource.example.test/mcp'
@@ -132,13 +166,14 @@ class OAuthHTTPTests(unittest.TestCase):
     def connect(self):return sqlite3.connect(str(self.path),isolation_level=None,timeout=0)
     def clock(self):return time.time()+self.offset
     def make_app(self):
-        return create_app(self.config,self.connect,self.session_secret,'github-fixture-secret',True,self.clock)
+        return create_app(self.config,self.connect,self.session_secret,'github-fixture-secret',True,self.clock,
+                          github_network=GithubNetwork(self.provider.base,self.cert[0]))
     def client(self):
         c=requests.Session();c.trust_env=False;c.verify=self.cert[0];return c
     def tearDown(self):
         self.browser.close();self.authority.close();self.provider.close();self.patcher.stop();self.tmp.cleanup()
 
-    def authorize(self, browser=None, approve=True, **changes):
+    def authorize(self, browser=None, approve=True, pause_callback=False, **changes):
         browser=browser or self.browser
         verifier='v'*64
         params=dict(client_id='chatgpt',redirect_uri='https://client.example.test/callback',
@@ -153,7 +188,10 @@ class OAuthHTTPTests(unittest.TestCase):
             location=response.headers.get('Location','')
             if location=='/consent':break
             if location.startswith('/'):location=self.issuer+location
-            response=browser.get(location,allow_redirects=False,timeout=5)
+            if pause_callback and location.startswith(self.issuer+'/github/callback?'):
+                return response,verifier
+            response=browser.get(location,allow_redirects=False,
+                                 timeout=8 if location.startswith(self.issuer+'/github/callback?') else 5)
             if response.status_code!=302:return response,verifier
         consent=browser.get(self.issuer+'/consent',timeout=5)
         if consent.status_code!=200:return consent,verifier
@@ -439,6 +477,122 @@ class OAuthHTTPTests(unittest.TestCase):
                 self.assertEqual(self.browser.post(endpoint,json=unknown,headers=headers,timeout=8).status_code,401)
                 self.offset=901
                 self.assertEqual(self.browser.post(endpoint,json=message,headers=headers,timeout=8).status_code,401)
+        finally:server.close()
+
+    def assert_no_github_binding(self):
+        with self.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_flows WHERE sub IS NOT NULL').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_codes').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_tokens').fetchone()[0],0)
+
+    def test_github_slow_headers_drip_and_silent_fail_without_identity_or_code(self):
+        for stage in ('token','user'):
+            for mode in ('slow_headers','drip','silent'):
+                with self.subTest(stage=stage,mode=mode):
+                    self.provider_stage=stage;self.provider_fault=mode
+                    before=time.monotonic()
+                    response,_=self.authorize()
+                    elapsed=time.monotonic()-before
+                    self.assertEqual(response.status_code,401)
+                    self.assertGreater(elapsed,4.5);self.assertLess(elapsed,6.5)
+                    self.assert_no_github_binding()
+                    import multiprocessing
+                    self.assertEqual(multiprocessing.active_children(),[])
+
+    def test_github_declared_and_streamed_oversize_response_bounds(self):
+        for stage in ('token','user'):
+            for mode in ('oversize','oversize_stream','oversize_headers'):
+                with self.subTest(stage=stage,mode=mode):
+                    self.provider_stage=stage;self.provider_fault=mode
+                    response,_=self.authorize()
+                    self.assertEqual(response.status_code,401)
+                    self.assert_no_github_binding()
+
+    def test_github_redirect_is_not_followed_on_either_endpoint(self):
+        for stage in ('token','user'):
+            self.provider_stage=stage;self.provider_fault='redirect'
+            response,_=self.authorize()
+            self.assertEqual(response.status_code,401)
+            self.assertEqual(self.redirect_hits,0)
+            self.assert_no_github_binding()
+
+    def test_github_token_and_user_share_one_total_deadline(self):
+        self.provider_delays={'token':3,'user':3}
+        before=time.monotonic();response,_=self.authorize();elapsed=time.monotonic()-before
+        self.assertEqual(response.status_code,401)
+        self.assertGreater(elapsed,4.5);self.assertLess(elapsed,6.5)
+        self.assert_no_github_binding()
+
+    def test_github_transport_does_not_inherit_environment_proxies(self):
+        with patch.dict(os.environ,{'HTTPS_PROXY':'http://127.0.0.1:1','HTTP_PROXY':'http://127.0.0.1:1',
+                                    'ALL_PROXY':'http://127.0.0.1:1','NO_PROXY':''}):
+            tokens,_=self.issue()
+        self.assertTrue(self.inspect(tokens['access_token'])['active'])
+
+    def test_blocked_github_callbacks_leave_introspection_and_revocation_capacity(self):
+        # Four-slot actual TLS/HTTP WSGI host, matching entrypoint threads=4.
+        # Two blocked callbacks plus immediate refusal cannot consume all slots.
+        app=self.authority.server.app;slots=threading.BoundedSemaphore(4)
+        def four_slot_host(environ,start_response):
+            with slots:
+                response=app(environ,start_response)
+                try:yield from response
+                finally:
+                    if hasattr(response,'close'):response.close()
+        self.authority.server.app=four_slot_host
+        tokens,_=self.issue()
+        before_codes=self.connect().execute('SELECT count(*) FROM oauth_codes').fetchone()[0]
+        clients=[self.client() for _ in range(4)];urls=[]
+        for client in clients:
+            response,_=self.authorize(browser=client,pause_callback=True)
+            urls.append(response.headers['Location'])
+        self.provider_stage='token';self.provider_fault='silent'
+        results=[]
+        def call(index):results.append(clients[index].get(urls[index],timeout=8).status_code)
+        blocked=[threading.Thread(target=call,args=(i,)) for i in range(2)]
+        for t in blocked:t.start()
+        end=time.monotonic()+3
+        while self.fault_count<2 and time.monotonic()<end:time.sleep(0.01)
+        self.assertEqual(self.fault_count,2)
+        start=time.monotonic()
+        self.assertEqual(clients[2].get(urls[2],timeout=2).status_code,503)
+        self.assertTrue(self.inspect(tokens['access_token'])['active'])
+        revoked=self.browser.post(self.issuer+'/revoke',data={'client_id':'chatgpt','token':tokens['refresh_token']},timeout=2)
+        self.assertEqual(revoked.status_code,200)
+        self.assertLess(time.monotonic()-start,2)
+        for t in blocked:t.join(8)
+        self.assertEqual(results.count(401),2,results)
+        with self.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_codes').fetchone()[0],before_codes)
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_flows WHERE used=0 AND sub IS NOT NULL').fetchone()[0],0)
+        # Slot permits are released after both failures: a new valid request works.
+        self.provider_fault=None
+        response,_=self.authorize(browser=clients[3]);self.assertEqual(response.status_code,302)
+        for c in clients:c.close()
+
+    def test_real_http_initialize_negotiates_unknown_version_without_shared_identity(self):
+        tokens,_=self.issue()
+        auth=Introspection(self.issuer,self.issuer+'/introspect','resource',lambda:'resource-secret',self.audience,
+            {'github:332398908':{'recipient':'work-window','projects':['project-fixture']}})
+        def no_backend():raise AssertionError('initialize must not open private files')
+        server=Server(create_resource_app(auth,no_backend,{},self.audience,True)).start()
+        headers={'Authorization':'Bearer '+tokens['access_token']}
+        try:
+            with patch.dict(os.environ,{'SSL_CERT_FILE':self.cert[0]}):
+                for proposed,expected in (('2025-06-18','2025-06-18'),('2025-11-25','2025-06-18')):
+                    message={'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':proposed}}
+                    response=self.browser.post(server.base+'/mcp',json=message,
+                        headers=dict(headers,**{'MCP-Protocol-Version':proposed}),timeout=8)
+                    self.assertEqual(response.status_code,200,response.text)
+                    self.assertEqual(response.json()['result']['protocolVersion'],expected)
+                ping={'jsonrpc':'2.0','id':2,'method':'ping'}
+                self.assertEqual(self.browser.post(server.base+'/mcp',json=ping,headers=dict(headers,**{'MCP-Protocol-Version':'2025-06-18'}),timeout=8).status_code,200)
+                self.assertEqual(self.browser.post(server.base+'/mcp',json=ping,headers=dict(headers,**{'MCP-Protocol-Version':'2025-11-25'}),timeout=8).status_code,400)
+                for value in ('invalid','2025/11/25',True,None):
+                    message={'jsonrpc':'2.0','id':3,'method':'initialize','params':{'protocolVersion':value}}
+                    self.assertEqual(self.browser.post(server.base+'/mcp',json=message,headers=headers,timeout=8).status_code,400)
+                # Previous successful initialization grants no next-request identity.
+                self.assertEqual(self.browser.post(server.base+'/mcp',json=ping,timeout=8).status_code,401)
         finally:server.close()
 
 

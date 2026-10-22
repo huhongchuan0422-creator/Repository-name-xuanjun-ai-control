@@ -68,10 +68,16 @@
       "sha256": "6d8dac97c11a902e05f316eb947415e0e08cda75f93a0805cf837483804961a3"
     },
     {
-      "bytes": 19439,
+      "bytes": 5503,
+      "mode": "0644",
+      "path": "production/cloud_connection/github_network.py",
+      "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6"
+    },
+    {
+      "bytes": 20239,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_authority.py",
-      "sha256": "d4290dab540129901f68c6e0a17b944ebdfb9d1c31500f1bf2ee9db4476db15c"
+      "sha256": "658e36743b44b76ade22bf9b053f11ef4331982d0a0143f5c05537f19a48e2f3"
     },
     {
       "bytes": 6813,
@@ -80,10 +86,10 @@
       "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba"
     },
     {
-      "bytes": 7212,
+      "bytes": 7570,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_http.py",
-      "sha256": "e0b738bb17f48c02c752fc04db3d88a662b769acff2d187882ae525dedc44a7b"
+      "sha256": "330af26d1ce1e55d43d5b62edaae5f900e7326ed57d9c6e784728d5bac7209d3"
     },
     {
       "bytes": 10069,

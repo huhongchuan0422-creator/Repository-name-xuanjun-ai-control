@@ -162,3 +162,93 @@ Primary sources: https://docs.authlib.org/en/stable/oauth2/authorization-server/
 https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps
 https://developers.openai.com/plugins/build/auth
 https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+
+## Increment after independent review #6329897984
+
+Review baseline146b0e35419204e7940c9927f35ecca30edd56a1. The three resource-side
+clock/strict-enable/introspection-deadline fixes were independently closed and
+are inherited. `oauth_resource.py` is unchanged in this increment. Only the
+GitHub wire boundary, callback capacity, MCP initialize negotiation, affected
+tests and this manifest/document are changed. Authlib version/protocol,
+authorization DB/grants, queues/workers, live profiles and default-off examples
+are not replaced.
+
+A. `github_network.GithubApp/GithubSession` extend Authlib's documented client
+classes and replace only Requests' wire send. Authlib retains state and S256PKCE
+validation, token exchange/parsing and authentication. The whole callback's
+token+user network chain shares one monotonic5-second deadline. Each fixed
+request runs in a cancellable spawned process; DNS/connect/TLS/headers/body
+are included. There is no per-stage budget reset. Cleanup is bounded separately
+as in the independently accepted resource-side implementation. Both success and
+failure close pipes and reap/terminate children. No exception/request/token body
+is returned or logged on failure.
+
+Only POST `https://github.com/login/oauth/access_token` and GET
+`https://api.github.com/user` are permitted wire targets. No redirects, inherited
+proxies, cookies or arbitrary request URL. Token bodies are bounded16KiB, user
+bodies64KiB, including streamed bodies without Content-Length. Child-local HTTP
+header limits are8KiB/line,32headers and16KiB aggregate before reading the body.
+The normal verified TLS trust store is used. Offline tests inject only a
+loopback TLS transport route/CA, never a principal or auth result; the production
+host loader exposes no such configuration fields. Merely changing the obsolete
+Authlib timeout keyword is not the fix.
+
+At most2callback wire chains may run per authority app. Excess callbacks refuse
+immediately before exchanging a code. The real service's4HTTP threads retain
+capacity for introspection/revocation. The permit is released on every network
+failure/success, not a persistent installation Attempt counter. Failures never
+bind the flow subject or issue local codes. Existing expiry checks and SQL
+single-use/atomicity continue to apply.
+
+B. MCP initialize checks date-shaped string syntax. Supported versions echo
+back; legal unknown versions negotiate `PROTOCOLS[-1]` (currently2025-06-18).
+An initial valid unknown version header can negotiate as well. Subsequent
+requests still reject unsupported protocol headers. Each request independently
+authenticates; negotiation creates no shared principal/session authority.
+Actual HTTP tests cover support/unknown fallback, invalid syntax, subsequent
+supported/unsupported headers and an unauthenticated request after successful
+initialize. This follows the existing stdio adapter's version strategy.
+
+Additional actual TLS/HTTP negative cases cover both GitHub stages with slow
+headers, drip and no response; declared/streamed oversized bodies, oversized
+headers, redirects with a never-hit redirect sink, environment-proxy poisoning,
+and combined3s+3s delays stopped by a single5s chain deadline. A four-slot HTTP
+WSGI host exercises two blocked callbacks plus immediate overload rejection,
+while introspection and revocation still complete; slots are then reusable.
+It is a controlled four-slot test host, not a production Waitress benchmark.
+The simulated GitHub provider and production live evidence remain separate.
+
+## Existing-record binding reconciliation (no new server commands)
+
+| Field | Evidence actually read | Exact conclusion |
+| --- | --- | --- |
+| GitHub App callback | This factory's fixed issuer + `/github/callback`; original Owner-approved design #6329261672 | Fixed design `https://cloud-auth.wenwenwenyiyiyi.work/github/callback`; not a registered/live App callback yet |
+| ChatGPT OAuth callback | Existing original plugin receipt #6321045032 describes the two-tool stdio plugin, no OAuth registration/callback | Not established in the read records; retrieve exact URI from the same plugin's normal OAuth settings, not an example URL or Owner guess |
+| Existing tunnel/plugin | #6320454963 and #6321045032 | Tunnel `tunnel_6ad8e1d2482c8191b542ba8dd38c3545`; plugin `plugin_asdk_app_6ad8e68b582881918fcfd3da6e5b65fd`; these identifiers are not a token audience |
+| Actual audience/resource URI | The retrieved tunnel creation/plugin receipts give IDs and stdio operation, not a verified OAuth resource URI | Not established; obtain through the normal same-plugin/tunnel settings/discovery and bind both issuer and resource exactly; do not invent an HTTPS URL |
+| UK original host compatibility | Original `CLOUD_CONNECTION_CONTINUATION_20261021.md` records actual host observation | Python3.6.8, SQLite3.26.0, systemd239 are inherited history; do not restate them as unknown or freshly measured |
+| Modern UK container/interpreter | Original PR133 #6281322867 | `xuanjun-p2-sandbox:prep-base-20261013` is a known label, but that receipt explicitly leaves immutable digest and actual3.11 executable output unknown; no P2 launch or container approval inherited for OAuth |
+| Modern dependency ABI | Pinned release metadata contains cryptography50.0.2 cp311/cp39 abi3 x86_64 wheels for manylinux2_17/2_28/2_34; hashes are already in the lock | Local/Hosted Bookworm installs are proven; do not infer all wheels require2_34, nor infer a real host interpreter/venv is usable without its own record |
+| UK original credential/profile references | #6318348766/#6321045032 and the original source docs | `/etc/xuanjun-cloud-executor/credentials.json` and `openai-tunnel-runtime.key` remain existing private references, not OAuth secrets to copy; original unit/profile hashes and secret expiry2026-11-20 are inherited |
+| New OAuth configuration | Existing candidate examples plus the fixed loader paths | Source templates only. No real config SHA, new secret, dedicated account, TLS certificate reference or service deployment has been created by this batch |
+
+Remaining exact observations before requesting final live activation: normal
+plugin's actual callback/resource URI; approved modern runtime executable and
+dependency ABI per host; domestic systemd/version and the new dedicated
+account's actual UID/GID; free fixed ports, exact approved certificate/renewal
+references and UK outboundIP used by the Nginx allowlist; actual reviewed
+configuration/source pins and project catalog/root references. Retrieve these
+through existing authorized read-only records/UI/preflight, not public raw
+credentials or broad scans. Historical matches are reused, not recollected.
+
+The prior7-point change list is an enumerated design scope, not a request to
+approve placeholder callback/audience/host values. No final live activation
+request is issued with those fields unbound. Original resource-side3fixes,
+unrelated accepted features and old production operations are not reopened.
+After this source increment passes independent review, continue that precise
+binding/admission phase; this is not overall long-term connection acceptance.
+
+References for this increment:
+https://raw.githubusercontent.com/authlib/authlib/v1.9.1/authlib/integrations/requests_client/oauth2_session.py
+https://raw.githubusercontent.com/authlib/authlib/v1.9.1/authlib/integrations/base_client/sync_app.py
+https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle

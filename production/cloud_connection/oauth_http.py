@@ -4,6 +4,7 @@ Factory is disabled by default. No worker/dispatch/cloud SDK or arbitrary path
 tool. Standard issuer discovery is separate from MCP transport discovery.
 """
 import json
+import re
 import time
 from urllib.parse import urlsplit
 from flask import Flask, jsonify, request
@@ -57,7 +58,7 @@ def create_resource_app(authenticator, backend_factory, catalogs, audience,
         if request.headers.get('Origin') or request.args:
             return jsonify(error='invalid_request'),400
         version=request.headers.get('MCP-Protocol-Version')
-        if version is not None and version not in PROTOCOLS:
+        if version is not None and not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',version):
             return jsonify(error='invalid_request'),400
         header=request.headers.get('Authorization','')
         try:
@@ -78,6 +79,8 @@ def create_resource_app(authenticator, backend_factory, catalogs, audience,
             params=message.get('params',{})
             if type(params) is not dict:raise ValueError()
             method=message['method']
+            if version is not None and version not in PROTOCOLS and method!='initialize':
+                return jsonify(error='invalid_request'),400
             if method=='tools/call' and 'id' in message:
                 if set(params)-{'_meta'} != {'name','arguments'} or (
                         '_meta' in params and type(params['_meta']) is not dict):raise ValueError()
@@ -110,8 +113,10 @@ def create_resource_app(authenticator, backend_factory, catalogs, audience,
                 if method=='notifications/initialized' and 'id' not in message:return '',202
                 if 'id' not in message:raise ValueError()
                 if method=='initialize':
-                    if params.get('protocolVersion') not in PROTOCOLS:raise ValueError()
-                    result={'protocolVersion':params['protocolVersion'],'capabilities':{'tools':{}},
+                    proposed=params.get('protocolVersion')
+                    if type(proposed) is not str or not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',proposed):raise ValueError()
+                    negotiated=proposed if proposed in PROTOCOLS else PROTOCOLS[-1]
+                    result={'protocolVersion':negotiated,'capabilities':{'tools':{}},
                             'serverInfo':{'name':'xuanjun-oauth-connection','version':'1.0.0'}}
                 elif method=='ping':result={}
                 elif method=='tools/list':result={'tools':TOOLS+[FILE_TOOL]}
