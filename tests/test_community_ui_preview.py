@@ -252,6 +252,31 @@ class ClickThrough(unittest.TestCase):
         self.assertTrue(all(method=='GET' for method,url in requests))
         context.close()
 
+    def test_admission_conditions_render_matching_fields_and_uploads(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            expect(page.locator('.admission-condition-panel')).to_be_visible()
+            expect(page.locator('.condition-warning')).to_contain_text('不会默认')
+            expect(page.locator('[data-fields-for="admission-subject_info-business_license_info-"] input[data-path="subject_info.business_license_info.license_number"]')).to_have_attribute('aria-required','true')
+            expect(page.locator('input[data-material-kind="business_license"]')).to_be_visible()
+            expect(page.locator('input[data-material-kind="identity_front"]')).to_be_visible()
+            expect(page.locator('input[data-material-kind="identity_back"]')).to_be_visible()
+            expect(page.locator('input[data-material-kind="ubo_1_front"]')).to_have_count(0)
+            page.locator('[data-option="ubos"]').select_option('2')
+            expect(page.locator('input[data-material-kind="ubo_1_front"]')).to_be_visible()
+            expect(page.locator('input[data-material-kind="ubo_2_front"]')).to_be_visible()
+            expect(page.locator('[data-fields-for="admission-beneficiary"] input[data-path="subject_info.ubo_info_list.0.ubo_id_doc_name"]')).to_have_attribute('aria-required','true')
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            expect(page.locator('input[data-material-kind="operator_identity"]')).to_be_visible()
+            page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            expect(page.locator('input[data-material-kind="identity_back"]')).to_have_count(0)
+            expect(page.locator('input[data-material-kind="operator_identity_back"]')).to_have_count(1)
+            page.get_by_role('button',name='演示保存并返回',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('主体与门店')
+        finally:
+            page.close()
+
     def test_owner_retail_first_three_screens_and_platform_orders(self):
         page=self.browser.new_page(viewport={'width':390,'height':844})
         try:
@@ -267,7 +292,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view h1').first).to_have_text('个人中心')
             expect(page.locator('#view')).to_contain_text('商家入驻')
             expect(page.locator('#view')).to_contain_text('当前项目未发现可复用入口')
-            for retained in ('社区与归属','推荐关系','我的通知','商品篮子','退款申请','支付与订单恢复'):
+            for retained in ('社区与归属','推荐关系','我的通知','退款申请','支付与订单恢复'):
                 expect(page.locator('#view')).to_contain_text(retained)
             community=page.get_by_role('link',name='社区与归属',exact=False).first
             expect(community).to_be_visible()

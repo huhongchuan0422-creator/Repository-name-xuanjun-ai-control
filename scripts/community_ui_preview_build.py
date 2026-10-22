@@ -77,14 +77,17 @@ def build():
     js=(BASE/'onboarding.js').read_text()
     defs=re.findall(r"\['([a-z_]+(?:\.[a-z_]+)+)','([^']+)'\]",js[js.index('const definitions='):js.index('for(const [scene,title]')])
     groups=[('contact_info.','管理员'),('subject_info.business_license_info.','经营主体'),('subject_info.identity_info.id_card_info.','法人身份证'),('subject_info.identity_info.id_doc_info.','其他法人证件'),('business_info.','经营场景'),('settlement_info.','结算规则'),('bank_account_info.','结算账户')]
+    required_fields={'contact_info.contact_type','contact_info.contact_name','contact_info.mobile_phone','contact_info.contact_email','subject_info.business_license_info.license_number','subject_info.business_license_info.merchant_name','subject_info.business_license_info.legal_person','subject_info.identity_info.id_doc_type','subject_info.identity_info.id_card_info.id_card_name','subject_info.identity_info.id_card_info.id_card_number','subject_info.identity_info.id_card_info.card_period_begin','subject_info.identity_info.id_card_info.card_period_end','subject_info.identity_info.id_card_info.id_card_address','subject_info.identity_info.id_doc_info.id_doc_name','subject_info.identity_info.id_doc_info.id_doc_number','subject_info.identity_info.id_doc_info.doc_period_begin','subject_info.identity_info.id_doc_info.doc_period_end','subject_info.identity_info.id_doc_info.id_doc_address','business_info.merchant_shortname','business_info.service_phone','business_info.sales_info.mini_program_info.mini_program_appid','settlement_info.settlement_id','settlement_info.qualification_type','bank_account_info.bank_account_type','bank_account_info.account_name','bank_account_info.account_bank','bank_account_info.account_number'}
+    def field_attrs(key):
+        return ' required aria-required="true"' if key in required_fields or key.startswith('subject_info.ubo_info_list.') else ''
     # Original official enum text stays descriptive; preview does not invent validation.
     for prefix,title in groups:
         fields=[(key,label) for key,label in defs if key.startswith(prefix)]
         if title=='法人身份证':fields.insert(0,('subject_info.identity_info.id_doc_type','法人证件类型'))
         if title=='经营场景':fields.extend([('business_info.sales_info.biz_store_info.'+f,t) for f,t in [('biz_store_name','线下门店名称'),('biz_address_code','线下门店地区代码'),('biz_store_address','线下门店详细地址')]])
-        body=''.join('<label>'+escape(label)+'<input data-path="'+key+'" maxlength="512" autocomplete="off"></label>' for key,label in fields)
+        body=''.join('<label>'+escape(label)+'<input data-path="'+key+'" maxlength="512" autocomplete="off"'+field_attrs(key)+'></label>' for key,label in fields)
         pages.append({'id':'admission-'+prefix.replace('.','-'),'role':'admission','title':title,'html':body,'source':'onboarding.js','kind':'step'})
-    body=''.join('<label>'+title+'<input data-path="subject_info.ubo_info_list.{index}.'+field+'" maxlength="512"></label>' for field,title in [('ubo_id_doc_type','证件类型'),('ubo_id_doc_name','姓名'),('ubo_id_doc_number','证件号'),('ubo_id_doc_address','住址'),('ubo_period_begin','有效期开始'),('ubo_period_end','有效期结束或长期')])
+    body=''.join('<label>'+title+'<input data-path="subject_info.ubo_info_list.{index}.'+field+'" maxlength="512" required aria-required="true"></label>' for field,title in [('ubo_id_doc_type','证件类型'),('ubo_id_doc_name','姓名'),('ubo_id_doc_number','证件号'),('ubo_id_doc_address','住址'),('ubo_period_begin','有效期开始'),('ubo_period_end','有效期结束或长期')])
     pages.append({'id':'admission-beneficiary','role':'admission','title':'其他受益人资料','html':body,'source':'onboarding.js','kind':'step'})
     pages.insert(next(i for i,p in enumerate(pages) if p['role']=='admission')+1,{'id':'admission-materials','role':'admission','title':'资料清单与版本','html':'','source':'onboarding.html','kind':'materials'})
     pages.append({'id':'admission-result','role':'admission','title':'申请状态与补件','html':'','source':'onboarding.html','kind':'result'})
