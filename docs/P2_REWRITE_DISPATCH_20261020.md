@@ -482,3 +482,60 @@ No server command or approval question is issued by this document-only task. The
 installation invocation count is UNKNOWN until those concrete choices/inputs are closed; one
 normal controlled command is a packaging goal, not a promised number of successful attempts.
 
+### B6 owner separation candidate — PR17#6329310341
+
+Baseline5a994ac7; only B6 adapter/tests and these original documents change. The B5 catalog is
+unchanged. This supersedes the f036 coupling identified in the preceding integration decision.
+
+Executable red regression (before the source fix):
+`python -B tests/p2_install/test_b6_persistence.py PreparationBinding.test_history_ignores_runtime_directory_owner_but_observer_refuses_it PreparationBinding.test_history_owner_is_not_inferred_from_reader -v`
+Both cases failed with HISTORY_DIRECTORY_PROTECTION and no bound history. They model a future
+data/run owner distinct from the preparer and a reader distinct from the historical owner.
+These identity/metadata branch fixtures use explicit mocks, not chmod/chown/setuid or real
+cross-UID filesystem evidence. Actual multi-UID OS acceptance remains NOT_EXECUTED.
+
+The minimal functional change separates provenance from observation:
+- request uid/gid still identify the actual current reader, checked against current euid/egid.
+  They do not declare an approved runtime role or become the historical preparation UID.
+- The history-owner candidate comes from the protected root metadata and must agree with the
+  pinned CP07 subject and exact original profile/identity chain. It is not trusted from lstat
+  alone. root/prepared/activation and historical files retain private/owner checks against that
+  provenance owner; original fixed onsite history still requires preparer1002.
+- Original b3_ledger.documents is reused for its format; only historical preparation_uid and
+  preparer_uid are reconstructed from that anchored owner, with original profile digest recomputed.
+  Service/callback roles, service_uid UNKNOWN, configuration/source/binary pins remain unchanged.
+  ActivationStore.owner_uid uses the same provenance owner independently of the caller; its
+  full native journal, descriptor, same-epoch QUIESCED and drift guards remain active.
+- data/run are not history artifacts. Their owner+directory0700 checks are explicitly retained
+  in the bound-path DB observer, alongside the unchanged root/ancestor, database owner and
+  inode/sidecar checks. A foreign runtime owner can leave history BOUND_HISTORY_ONLY while
+  the DB observation remains HOLD. No permission or access policy is inferred from history.
+- observe_prepared builds a separate explicit current-observer DB request and reports
+  database_subject.role_verified=false / CURRENT_OBSERVER_NOT_RUNTIME_AUTHORIZATION.
+  Its actual observing UID can equal the history reader without proving a service/callback
+  mapping. There is no new caller-supplied runtime owner, role-verification flag or PASS input.
+
+History reads also compare before/after pathname metadata around original pinned_file and retain
+the dev/inode/mode/uid/gid/nlink/size/mtime/ctime stamp across rechecks. Original SHA validation is
+preserved. Same-name, same-bytes replacement is rejected both during a read and between rechecks;
+protected history directory stamps are checked at the end. This does not claim to eliminate all
+possible filesystem ABA races or grant new read permissions.
+
+Affected complete regression: local Python3.12 **31 PASS / zero skip** (old22 + new9).
+New coverage is the two red owner-separation cases, wrong historical file owner, wrong historical
+directory owner, same-bytes inode replacement during pinned read and between rechecks, actual
+temporary DB pathname/inode replacement, actual native ActivationStore drift after history
+binding, and run-owner guard relocation. Original wrong pin/identity/path, ACTIVE fencing,
+nonempty WAL/sidecar and cross-process recovery assertions remain. All real filesystem mutations
+are only temporary test-fixture setup/failure injection; metadata/identity mocks are labelled.
+No original source guard or workflow is modified. Existing Hosted workflow runs the same31-case
+file on Python3.11/3.12; exact new commit/run/log outcomes are recorded in PR17 after execution.
+
+Candidate result remains phase_complete=false and site HOLD. Still required before a real runtime
+owner can be admitted: independently trusted role/custody contract binding native subject UID/GID/
+groups, authorized role, same-instance descriptor/head/source pins, exact persistent root/data/run/
+DB paths and inode/sidecar policy, and measured access/denial evidence. None is supplied by a hand
+UID or this history result. Actual DB source/import, REOPENED producer and WAL compatibility remain
+the preceding decision's open interfaces; this source change implements none of those effects.
+No onsite command, permissions/accounts, business DB, WAL deletion, SDK/installation or B7 action.
+

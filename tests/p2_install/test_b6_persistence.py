@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -453,6 +455,155 @@ class PreparationBinding(unittest.TestCase):
         del self.req['expected']
         self.req['runtime_access'] = dict(status='PASS')
         self.rejected()
+
+
+    def test_history_ignores_runtime_directory_owner_but_observer_refuses_it(self):
+        # Metadata contract fixture only: NO chown/setuid/permission changes.
+        # Actual multi-UID filesystem access remains NOT_EXECUTED.
+        actual_lstat = os.lstat
+        runtime_paths = {self.root/'data', self.root/'run', Path(self.req['db_path'])}
+        foreign_uid = os.geteuid()+1
+        def runtime_metadata(path, *args, **kwargs):
+            info = actual_lstat(path, *args, **kwargs)
+            if Path(path) in runtime_paths:
+                value = {k:getattr(info,k) for k in dir(info) if k.startswith('st_')}
+                value['st_uid'] = foreign_uid
+                return SimpleNamespace(**value)
+            return info
+        with patch.object(b6.os,'lstat',side_effect=runtime_metadata):
+            value = self.call()
+        self.assertIn('preparation_evidence',value,value)
+        self.assertEqual(value['preparation_evidence']['status'],'BOUND_HISTORY_ONLY',value)
+        self.assertEqual(value['database_evidence']['status'],'HOLD',value)
+        self.assertFalse(value['phase_complete'])
+        self.assertFalse(value['preparation_evidence']['runtime_roles_granted_access'])
+
+    def test_history_owner_is_not_inferred_from_reader(self):
+        # Identity branch fixture only, not an actual cross-UID OS execution.
+        owner_uid = os.geteuid()
+        req = copy.deepcopy(self.req)
+        req['uid'] += 1;req['gid'] += 1
+        with patch.object(b6.os,'geteuid',return_value=req['uid']), \
+             patch.object(b6.os,'getegid',return_value=req['gid']):
+            value = b6.observe_prepared(req,self.anchors,'CP13')
+        self.assertIn('preparation_evidence',value,value)
+        self.assertEqual(value['preparation_evidence']['history_owner_uid'],owner_uid,value)
+        self.assertEqual(value['preparation_evidence']['reader'],dict(uid=req['uid'],gid=req['gid']))
+        self.assertEqual(value['database_evidence']['status'],'HOLD',value)
+        self.assertFalse(value['phase_complete'])
+
+
+    def test_history_wrong_file_owner_is_still_refused(self):
+        original = os.lstat
+        target = self.root/'prepared/expected-identity.json'
+        def wrong_owner(path,*args,**kwargs):
+            info = original(path,*args,**kwargs)
+            if Path(path) == target:
+                value = {k:getattr(info,k) for k in dir(info) if k.startswith('st_')}
+                value['st_uid'] += 1
+                return SimpleNamespace(**value)
+            return info
+        with patch.object(b6.os,'lstat',side_effect=wrong_owner):
+            value = self.rejected()
+        self.assertEqual(value['error']['code'],'HISTORY_FILE_OWNER')
+
+    def test_history_wrong_directory_owner_is_still_refused(self):
+        original = os.lstat
+        def wrong_owner(path,*args,**kwargs):
+            info = original(path,*args,**kwargs)
+            if Path(path) == self.root/'prepared':
+                value = {k:getattr(info,k) for k in dir(info) if k.startswith('st_')}
+                value['st_uid'] += 1
+                return SimpleNamespace(**value)
+            return info
+        with patch.object(b6.os,'lstat',side_effect=wrong_owner):
+            value = self.rejected()
+        self.assertEqual(value['error']['code'],'HISTORY_DIRECTORY_PROTECTION')
+
+    def test_history_same_bytes_new_inode_during_pinned_read_refused(self):
+        from production.p2_install import b3_contracts
+        original = b3_contracts.pinned_file
+        target = self.root/'prepared/ledger-config.json'
+        replaced = []
+        def swapped(path,pin,limit=1048576):
+            raw = original(path,pin,limit)
+            if Path(path) == target and not replaced:
+                retained = target.parent/'fixture-before-read-swap.json'
+                # Preserve original fixture file and its bytes; no real input.
+                target.rename(retained)
+                target.write_bytes(raw);target.chmod(0o400)
+                replaced.append(retained)
+            return raw
+        with patch.object(b3_contracts,'pinned_file',side_effect=swapped):
+            value = self.rejected()
+        self.assertTrue(replaced)
+        self.assertEqual(value['error']['code'],'HISTORY_PATH_CHANGED')
+
+    def test_history_same_bytes_new_inode_between_rechecks_refused(self):
+        from production.p2_install import b3_contracts
+        original = b3_contracts.pinned_file
+        target = self.root/'prepared/ledger-config.json'
+        replaced = []
+        def swapped(path,pin,limit=1048576):
+            raw = original(path,pin,limit)
+            if Path(path).name == 'fixture-python' and not replaced:
+                retained = target.parent/'fixture-before-recheck-swap.json'
+                target.rename(retained)
+                target.write_bytes(retained.read_bytes());target.chmod(0o400)
+                replaced.append(retained)
+            return raw
+        with patch.object(b3_contracts,'pinned_file',side_effect=swapped):
+            value = self.rejected()
+        self.assertTrue(replaced)
+        self.assertEqual(value['error']['code'],'HISTORY_FILE_IDENTITY_CHANGED')
+
+    def test_database_same_name_new_inode_is_still_refused(self):
+        original = sqlite3.connect
+        target = Path(self.req['db_path'])
+        replaced = []
+        def swapped(*args,**kwargs):
+            conn = original(*args,**kwargs)
+            if not replaced:
+                retained = target.parent/'fixture-original-inode.sqlite3'
+                target.rename(retained)
+                shutil.copyfile(retained,target);target.chmod(0o600)
+                replaced.append(retained)
+            return conn
+        with patch.object(b6.sqlite3,'connect',side_effect=swapped):
+            value = self.call()
+        self.assertEqual(value['preparation_evidence']['status'],'BOUND_HISTORY_ONLY',value)
+        self.assertEqual(value['database_evidence']['status'],'HOLD',value)
+        self.assertEqual(value['database_evidence']['error']['code'],'DATABASE_PATH_CHANGED',value)
+        self.assertFalse(value['phase_complete'])
+
+    def test_activation_drift_after_bound_history_is_refused(self):
+        original = b6.observe
+        def drift(*args,**kwargs):
+            result = original(*args,**kwargs)
+            current = self.store.read()
+            # Real native transition in a temporary fixture, not a fake store.
+            self.store.fence(current['epoch'],current['instance'])
+            return result
+        with patch.object(b6,'observe',side_effect=drift):
+            value = self.rejected()
+        self.assertEqual(value['error']['code'],'HISTORY_ACTIVATION_DRIFT')
+
+
+    def test_run_owner_guard_moved_to_database_observation_not_removed(self):
+        original = os.lstat
+        def wrong_owner(path,*args,**kwargs):
+            info = original(path,*args,**kwargs)
+            if Path(path) == self.root/'run':
+                value = {k:getattr(info,k) for k in dir(info) if k.startswith('st_')}
+                value['st_uid'] += 1
+                return SimpleNamespace(**value)
+            return info
+        with patch.object(b6.os,'lstat',side_effect=wrong_owner):
+            value = self.call()
+        self.assertEqual(value['preparation_evidence']['status'],'BOUND_HISTORY_ONLY',value)
+        self.assertEqual(value['database_evidence']['status'],'HOLD',value)
+        self.assertEqual(value['database_evidence']['error']['code'],'RUNTIME_DIRECTORY_PROTECTION',value)
+        self.assertFalse(value['phase_complete'])
 
 
 if __name__ == '__main__':

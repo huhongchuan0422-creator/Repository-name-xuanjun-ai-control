@@ -77,6 +77,14 @@ def observe_database_evidence(request, stage, previous_outcome='KNOWN'):
         db = Path(request['db_path'])
         need(db.is_absolute() and str(db.resolve()) == str(db) and '..' not in db.parts and
              root in db.parents, 'DATABASE_PATH')
+        # Retained bound B3 data/run owner+0700 guards belong to the current
+        # DB/path observation, not to historical preparation evidence. No
+        # ownership policy or access grant is inferred from the preparer UID.
+        if db == root/'data/ledger.sqlite3':
+            for folder in (root/'data', root/'run'):
+                info = os.lstat(folder)
+                need(stat.S_ISDIR(info.st_mode) and info.st_uid == request['uid'] and
+                     stat.S_IMODE(info.st_mode) == 0o700, 'RUNTIME_DIRECTORY_PROTECTION')
         p = db.parent
         while p != root:
             s = os.lstat(str(p))
@@ -226,22 +234,36 @@ def consume_preparation(request, anchors):
          (str(root).startswith('/tmp/p2-b3-test-') and root.name == 'b3-initialize'), 'HISTORY_ROOT_SCOPE')
     need(type(request['uid']) is int and type(request['gid']) is int and
          (request['uid'], request['gid']) == (os.geteuid(), os.getegid()), 'SUBJECT_IDENTITY')
-    for folder in (root, root/'prepared', root/'activation', root/'data', root/'run'):
+    # Reader is the actual current caller, not the historical provenance owner.
+    # The candidate owner is confirmed below by pinned CP07/profile evidence.
+    history_owner = os.lstat(root).st_uid
+    def stamp(info):
+        return tuple(getattr(info, k) for k in ('st_dev', 'st_ino', 'st_mode',
+                     'st_uid', 'st_gid', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+    directories = {}
+    for folder in (root, root/'prepared', root/'activation'):
         info = os.lstat(folder)
-        need(stat.S_ISDIR(info.st_mode) and info.st_uid == request['uid'] and
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid == history_owner and
              stat.S_IMODE(info.st_mode) == 0o700, 'HISTORY_DIRECTORY_PROTECTION')
+        directories[folder] = stamp(info)
+    # data/run are current runtime resources. Their owner checks remain in the
+    # DB observer; they are not preparation evidence or preparation authority.
     seen = {}
 
     def read(path, pin, limit=1048576):
         path = Path(path)
         need(path.is_absolute() and '..' not in path.parts, 'HISTORY_PATH')
+        before = os.lstat(path)
         raw = pinned_file(path, pin, limit)
         info = os.lstat(path)
+        need(stamp(before) == stamp(info), 'HISTORY_PATH_CHANGED')
         need(stat.S_ISREG(info.st_mode) and info.st_nlink in (1, 2) and not info.st_mode & 0o022,
              'HISTORY_FILE_PROTECTION')
         if root in path.parents:
-            need(info.st_uid == request['uid'], 'HISTORY_FILE_OWNER')
-        seen[str(path)] = (pin, limit)
+            need(info.st_uid == history_owner, 'HISTORY_FILE_OWNER')
+        if str(path) in seen:
+            need(seen[str(path)] == (pin, limit, stamp(info)), 'HISTORY_FILE_IDENTITY_CHANGED')
+        seen[str(path)] = (pin, limit, stamp(info))
         return raw
 
     def decode(raw):
@@ -268,7 +290,7 @@ def consume_preparation(request, anchors):
     _, Activation = application_contract()
     fixed_activation = dict(descriptor=str(root/'activation/active.json'),
                             epoch_journal=str(root/'activation/epochs.jsonl'),
-                            lock_path=str(root/'activation/activation.lock'), owner_uid=request['uid'])
+                            lock_path=str(root/'activation/activation.lock'), owner_uid=history_owner)
     need(request['activation'] == fixed_activation, 'HISTORY_ACTIVATION_PATHS')
     store = Activation(**fixed_activation)
     current = store.read(require_active=False)
@@ -328,13 +350,22 @@ def consume_preparation(request, anchors):
          req['cp03_receipt_sha256'] == anchors['cp03_receipt_sha256'] and
          set(req['sources']) == set(b3_ledger.NAMES), 'HISTORY_REQUEST_BINDING')
     if str(root).startswith('/var/lib/'):
-        need(request['uid'] == 1002 and req['cp03_receipt_sha256'] == b3_ledger.RECEIPT and
+        need(history_owner == 1002 and req['cp03_receipt_sha256'] == b3_ledger.RECEIPT and
              req['application'] == '/application/stage1' and
              req['operation_id'] == 'p2-uk-isolated-20261020:b3-ledger-prepare-a1', 'HISTORY_FIXED_SOURCE')
     expected = {k: (cp03['installation_id'] if k == 'installation_id' else initial[k])
                 for k in ('installation_id', 'instance', 'ledger_uuid', 'generation',
                           'release_sha256', 'config_sha256', 'binary_sha256', 'db_path', 'ledger_socket')}
+    need(type(rows['CP07']['subject_uid']) is int and
+         rows['CP07']['subject_uid'] == history_owner, 'HISTORY_PREPARER_OWNER')
     cfg, profile, invocation, _, identity = b3_ledger.documents(req, expected)
+    # documents() uses the calling UID when generating NEW preparation files.
+    # Here compare HISTORY: restore only its anchored preparer field, preserving
+    # original service/callback policy, configuration and all source digests.
+    profile['preparation_uid'] = history_owner
+    profile['roles'] = dict(profile['roles'], preparer_uid=history_owner)
+    identity['roles'] = profile['roles']
+    identity['profile_sha256'] = digest(encode(profile))
     files = rows['CP07']['files']
     need(set(files) == {'ledger-config.json', 'profile.json', 'runtime-invocation.json',
                         'expected-identity.json'}, 'HISTORY_DOCUMENT_FILES')
@@ -344,7 +375,7 @@ def consume_preparation(request, anchors):
     need(rows['CP04']['cp03_receipt_sha256'] == anchors['cp03_receipt_sha256'] and
          rows['CP05']['invocation_sha256'] == digest(encode(invocation)) and
          rows['CP06']['identity_sha256'] == digest(encode(identity)) and
-         rows['CP07']['subject_uid'] == request['uid'] and
+         rows['CP07']['subject_uid'] == history_owner and
          rows['CP07']['private_root'] == str(root/'prepared') and
          rows['CP07']['service_uid'] == 'UNKNOWN' and
          rows['CP07']['runtime_roles_granted_access'] is False, 'HISTORY_EVIDENCE_BINDING')
@@ -367,17 +398,21 @@ def consume_preparation(request, anchors):
          'HISTORY_BINARY_BINDING')
     need(len(read(binary['path'], binary['sha256'], 32*1024*1024)) == binary['bytes'], 'HISTORY_BINARY_SIZE')
     # Re-read all pins and the native current chain to refuse concurrent drift.
-    for path, (pin, limit) in list(seen.items()):
+    for path, (pin, limit, _) in list(seen.items()):
         read(path, pin, limit)
+    for folder, before in directories.items():
+        need(stamp(os.lstat(folder)) == before, 'HISTORY_DIRECTORY_CHANGED')
     need(store.read(require_active=False) == current and store._journal() == records,
          'HISTORY_ACTIVATION_DRIFT')
     return {'status': 'BOUND_HISTORY_ONLY', 'scope': 'ISOLATED_TEST_ONLY',
             'anchors': dict(anchors), 'identity': expected, 'current': current,
             'historical_state': 'PREPARED', 'current_state': 'QUIESCED',
+            'history_owner_uid': history_owner,
+            'reader': {'uid': request['uid'], 'gid': request['gid']},
             'configuration_sha256': digest(encode(cfg)), 'sources': req['sources'],
             'roles': profile['roles'], 'runtime_roles_granted_access': False,
             'service_access': 'UNKNOWN', 'phase_complete': False,
-            'files_sha256': {path: pin for path, (pin, _) in seen.items()}}
+            'files_sha256': {path: pin for path, (pin, _, _) in seen.items()}}
 
 
 def observe_prepared(request, anchors, stage, previous_outcome='KNOWN'):
@@ -385,13 +420,21 @@ def observe_prepared(request, anchors, stage, previous_outcome='KNOWN'):
     try:
         need(stage in ('CP12', 'CP13'), 'STAGE')
         history = consume_preparation(request, anchors)
-        derived = dict(request, expected=history['current'])
+        # Explicit current observing-subject request, not an inferred service
+        # role or an ownership transfer from the historical preparer. Retained
+        # DB/root/ancestor/inode/sidecar guards must independently accept it.
+        derived = {k: request[k] for k in ('scope', 'profile', 'root', 'db_path',
+                   'uid', 'gid', 'activation', 'task_ids')}
+        derived['expected'] = history['current']
         result = observe(derived, stage, previous_outcome)
         # DB observation revalidates this exact identity. History is evidence,
         # never a REOPENED receipt or a service/callback access authorization.
         _, Activation = application_contract()
         need(Activation(**request['activation']).read() == history['current'], 'HISTORY_ACTIVATION_DRIFT')
         result['preparation_evidence'] = history
+        result['database_subject'] = {'uid': request['uid'], 'gid': request['gid'],
+                                      'role_verified': False,
+                                      'scope': 'CURRENT_OBSERVER_NOT_RUNTIME_AUTHORIZATION'}
         return result
     except Exception as exc:
         return {'scope': 'ISOLATED_TEST_ONLY', 'status': 'HOLD', 'stage': stage,
