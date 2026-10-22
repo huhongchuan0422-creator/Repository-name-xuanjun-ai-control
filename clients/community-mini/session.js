@@ -1,6 +1,9 @@
 'use strict';
 function customerError(error) {
   const code=error&&error.message;
+  if(error&&error.networkKind==='DOMAIN')return '小程序服务域名校验未通过（NET_DOMAIN），请联系项目负责人';
+  if(error&&error.networkKind==='TLS')return '安全连接未建立（NET_TLS），请联系项目负责人';
+  if(error&&error.networkKind==='TIMEOUT')return '登录连接超时（NET_TIMEOUT），请点击重新登录；不会自动重复请求';
   if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
   if(code==='SERVICE_RESULT_UNKNOWN')return '暂时无法连接服务，请检查网络后重试；若仍失败，请联系项目负责人';
   if(code==='SERVICE_UNAVAILABLE')return '服务暂不可用，请稍后重试';
@@ -24,7 +27,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview')throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
-    wx.request({url:baseUrl+path,method:'POST',data,timeout:5000,
+    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/login'?15000:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
@@ -33,7 +36,15 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
         reject(error);
       },
-      fail:()=>reject(Error('SERVICE_RESULT_UNKNOWN'))});
+      fail:detail=>{
+        const error=Error('SERVICE_RESULT_UNKNOWN');
+        // Classify locally; never retain or display raw platform error text or URLs.
+        const message=detail&&typeof detail.errMsg==='string'?detail.errMsg.toLowerCase():'';
+        if(/not in domain list|url not in domain|合法域名/.test(message))error.networkKind='DOMAIN';
+        else if(/ssl|tls|certificate|cert authority/.test(message))error.networkKind='TLS';
+        else if(/timeout|timed out/.test(message))error.networkKind='TIMEOUT';
+        reject(error);
+      }});
   });
   return {
     async login() {

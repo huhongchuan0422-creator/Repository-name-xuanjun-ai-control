@@ -1,5 +1,6 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {parseScene,createSession}=require('./session');
+const {customerError}=require('./session');
 function fixture(change=x=>x){
  const calls=[];let clock=100;
  const wx={login:o=>{calls.push('wx.login');o.success({code:'oncecode'});},request:o=>{
@@ -29,6 +30,26 @@ test('failed login has no retry using same wx code',async()=>{
  let count=0;const wx={login:o=>o.success({code:'oncecode'}),request:o=>{count++;o.fail({errMsg:'sensitive'});}};
  const s=createSession(wx,'https://example.org');await assert.rejects(s.login(),/SERVICE_RESULT_UNKNOWN/);assert.equal(count,1);
  await assert.rejects(s.transport('shop1',{}),/SESSION_EXPIRED/);
+});
+test('login transport outlasts bounded upstream and classifies failures without replay or raw text',async()=>{
+ for(const [message,kind,label] of [
+  ['request:fail url not in domain list https://private.invalid/?code=SECRET','DOMAIN','NET_DOMAIN'],
+  ['request:fail ssl hand shake error SECRET','TLS','NET_TLS'],
+  ['request:fail timeout SECRET','TIMEOUT','NET_TIMEOUT'],
+  ['request:fail SECRET',undefined,null]]){
+  let calls=0;
+  const wx={login:o=>o.success({code:'single-use'}),request:o=>{
+   calls++;assert.equal(o.timeout,15000);o.fail({errMsg:message});
+  }};
+  const session=createSession(wx,'https://uk.wenwenwenyiyiyi.work/community-preview');
+  await assert.rejects(session.login(),e=>{
+   assert.equal(e.message,'SERVICE_RESULT_UNKNOWN');assert.equal(e.networkKind,kind);
+   assert.ok(!JSON.stringify(e).includes('SECRET'));
+   const shown=customerError(e);assert.ok(!shown.includes('SECRET'));if(label)assert.ok(shown.includes(label));
+   return true;
+  });
+  assert.equal(calls,1);await assert.rejects(session.commerce('shop1','profile_read',{}),/SESSION_EXPIRED/);
+ }
 });
 test('clearing while login in flight drops late result',async()=>{
  let done;const wx={login:o=>o.success({code:'oncecode'}),request:o=>{done=o;}};
