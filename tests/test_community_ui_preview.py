@@ -330,6 +330,42 @@ class ClickThrough(unittest.TestCase):
         finally:
             page.close()
 
+    def test_platform_unready_status_labels_remain_readable_on_phone_and_pc(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/platform/home')
+            expect(page.locator('#view h1').first).to_have_text('平台管理')
+            expect(page.locator('#view')).to_contain_text('订单与交易')
+            expect(page.locator('#view')).to_contain_text('入驻与商家')
+            expect(page.locator('#view')).to_contain_text('用户与社区')
+            expect(page.locator('#view')).to_contain_text('权限、通知与日志')
+            for width,height in ((390,844),(320,740)):
+                page.set_viewport_size({'width':width,'height':height})
+                page.get_by_label('查看终端',exact=True).select_option('phone')
+                self.assert_layout(page,width,'role-platform-phone-'+str(width))
+                cards=page.locator('.platform-dashboard .dashboard-card.is-unready')
+                self.assertGreaterEqual(cards.count(),5)
+                for i in range(cards.count()):
+                    card=cards.nth(i)
+                    badge=card.locator('.not-ready')
+                    expect(badge).to_be_visible()
+                    metrics=badge.evaluate("""e=>({text:e.innerText,writing:getComputedStyle(e).writingMode,rect:(()=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}})(),card:(()=>{const r=e.closest('.dashboard-card').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}})(),content:(()=>{const r=e.closest('.dashboard-card').children[1].getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}})()})""")
+                    self.assertEqual(metrics['writing'],'horizontal-tb',metrics)
+                    self.assertTrue(metrics['text'].strip(),metrics)
+                    self.assertGreaterEqual(metrics['rect']['width'],35,metrics)
+                    self.assertLessEqual(metrics['rect']['right'],metrics['card']['right']+0.5,metrics)
+                    self.assertGreaterEqual(metrics['rect']['y'],metrics['content']['bottom']-1,metrics)
+                page.screenshot(path=str(self.out/('role-platform-phone-'+str(width)+'.png')),full_page=True)
+            page.set_viewport_size({'width':1440,'height':1000})
+            page.get_by_label('查看终端',exact=True).select_option('desktop')
+            self.assert_layout(page,1440,'role-platform-pc-1440')
+            self.assertEqual(page.evaluate('innerWidth'),1440)
+            expect(page.locator('#view')).to_contain_text('订单与交易')
+            expect(page.locator('#view')).to_contain_text('权限、通知与日志')
+            page.screenshot(path=str(self.out/'role-platform-pc-1440.png'),full_page=True)
+        finally:
+            page.close()
+
     def test_admission_conditions_render_matching_fields_and_uploads(self):
         page=self.browser.new_page(viewport={'width':390,'height':844})
         try:
