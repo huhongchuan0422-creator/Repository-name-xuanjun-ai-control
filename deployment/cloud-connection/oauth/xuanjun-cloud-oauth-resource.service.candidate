@@ -14,6 +14,7 @@ PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
+InaccessiblePaths=-/etc/xuanjun-development -/etc/xuanjun-cloud-executor/credentials.json -/etc/xuanjun-cloud-executor/openai-tunnel-runtime.key
 CapabilityBoundingSet=
 MemoryMax=256M
 TasksMax=32

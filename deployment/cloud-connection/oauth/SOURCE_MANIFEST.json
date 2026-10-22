@@ -38,10 +38,10 @@
       "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157"
     },
     {
-      "bytes": 669,
+      "bytes": 814,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
-      "sha256": "d62b17f4485a65da463e4ac00aa9253940291bec0e6d72b00288d7586566008a"
+      "sha256": "4bd19ae8e36166b27b247c4705bc8ed7fd1210c9b94609065d1a98b11bf0e581"
     },
     {
       "bytes": 722,

@@ -8,6 +8,8 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 from production.cloud_connection.oauth_entrypoint import private_bytes, load_app, HOSTS
+import production.cloud_connection.oauth_authority  # load dependencies before test-only uname patch
+import production.cloud_connection.oauth_http
 from production.cloud_connection.queue import Hold
 
 
