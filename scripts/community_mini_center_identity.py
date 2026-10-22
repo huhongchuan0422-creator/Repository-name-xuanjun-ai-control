@@ -64,10 +64,30 @@ class CenterIdentity(IdentityPort):
         subject=json.loads(self.center.decrypt(meta[0],'wechat-mini-session'))['subject_idx']
         if self.center.db.execute("SELECT 1 FROM links WHERE channel='WECHAT_MINI' AND subject_idx=? AND user_id=? AND project=? AND active=1",(subject,uid,binding['project'])).fetchone() is None:
             raise PermissionError('PROVIDER_LINK_REVOKED')
-        project,_,_=self.center.project(uid,binding['project'],('OWNER','EDITOR'))
+        from scripts import community_wechat_registration as registration
+        if registration.native(self.center,uid) is not None:
+            project=registration.project(self,uid,scene)
+        else:
+            project,_,_=self.center.project(uid,binding['project'],('OWNER','EDITOR'))
         principal=binding['principal']
         if project['tenant']!=principal.tenant_id:raise PermissionError('PROJECT_TENANT_MISMATCH')
         return uid,binding['project'],principal
+    def configure_registration(self,scenes):
+        """Protected host opt-in, never a login/body-supplied tenant or role."""
+        if hasattr(self,'registration'):
+            raise ValueError('REGISTRATION_ALREADY_CONFIGURED')
+        from scripts.community_wechat_registration import policy
+        self.registration=policy(self,scenes)
+
+    def authorize_customer_project(self,uid,project):
+        from scripts import community_wechat_registration as registration
+        if registration.native(self.center,uid) is None:
+            return self.center.project(uid,project,('OWNER','EDITOR','REVIEWER'))[0]
+        for scene,binding in self.scenes.items():
+            if binding['project']==project and scene in getattr(self,'registration',{}):
+                return registration.project(self,uid,scene)
+        raise PermissionError('REGISTERED_CONSUMER_PROJECT_REQUIRED')
+
     def bind_existing_account(self,web_session,appid,openid):
         """Protected Python binding after trusted provider exchange; no HTTP route.
 
@@ -112,10 +132,18 @@ class CenterIdentity(IdentityPort):
             if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_MINI_LOGIN_FAILED' AND event_id=?",(attempt,)).fetchone():
                 raise PermissionError('FAILED_LOGIN_CONSUMED')
             c.db.execute("INSERT INTO events VALUES('WECHAT_MINI_LOGIN_ISSUED',?,?)",(attempt,now))
+            from scripts.community_wechat_registration import register_if_unknown
+            register_if_unknown(self,attempt,appid,openid)
             rows=c.db.execute("SELECT DISTINCT user_id FROM links WHERE channel='WECHAT_MINI' AND subject_idx=? AND active=1",(subject,)).fetchall()
             if len(rows)!=1:raise PermissionError('EXISTING_ACCOUNT_LINK_REQUIRED')
             uid=rows[0][0];account=c.db.execute('SELECT verified,epoch FROM accounts WHERE id=?',(uid,)).fetchone()
             if account is None or account[0]!=1:raise PermissionError('VERIFIED_ACCOUNT_REQUIRED')
+            from scripts import community_wechat_registration as registration
+            if registration.native(c,uid) is not None:
+                admitted=getattr(self,'registration',{})
+                if not admitted:raise PermissionError('CONSUMER_REGISTRATION_DISABLED')
+                # Do not issue a new session for revoked/expired/changed scopes.
+                for scene in admitted:registration.project(self,uid,scene)
             token=secrets.token_urlsafe(32);csrf=secrets.token_urlsafe(32);expires=now+3600
             c.db.execute('INSERT INTO sessions VALUES(?,?,?,?,?)',(digest(token.encode()),uid,account[1],digest(csrf.encode()),expires))
             session_key=c.idx('wechat-session:'+token)

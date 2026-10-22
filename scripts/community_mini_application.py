@@ -157,12 +157,12 @@ class MiniApplication:
         self.gateway.payments.commerce=self.commerce
         return self.gateway.payments
 
-    def configure_operations(self,grants):
+    def configure_operations(self,grants,*,consumer_only=False):
         """Host-supplied grants for existing Center users; no client role input."""
         if self.server is not None or self.operations is not None:
             raise ValueError('OPERATIONS_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_center_operations import CenterOperations
-        self.operations=CenterOperations(self.center,self.identity.runtime,grants,onboarding=self.onboarding)
+        self.operations=CenterOperations(self.center,self.identity.runtime,grants,onboarding=self.onboarding,consumer_only=consumer_only)
         if self.onboarding is not None:self.onboarding.operations=self.operations
         return self.operations
 

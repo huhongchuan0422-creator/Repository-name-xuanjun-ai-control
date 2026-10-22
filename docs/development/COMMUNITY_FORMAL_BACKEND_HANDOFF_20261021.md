@@ -1,5 +1,10 @@
 # 社区预览正式后端接线与现场依赖
 
+## Owner首次消费者注册确认（2026-10-22，覆盖历史邮箱前置候选）
+
+Owner已明确选择“微信登录后直接注册，无需邮箱”。本项目普通消费者沿真实微信code2session首次注册；不能再要求先有邮箱或我方SaaS账号。以下旧章节关于“微信未知账号一律不能注册/首次注册机制未实现”的记录仅代表当时基线。本次原账号库扩展由受保护宿主明确启用，默认旧配置仍关闭；商家、审核员、平台管理员权限不随消费者注册自动产生。英国现场、首个平台/门店初始配置及真实扫码仍待验收，未因此变为PASS。
+
+
 ## Owner范围纠正（2026-10-21，优先于本文历史接线候选）
 
 社区是客户自己的平台；PR122登录是本方SaaS客户登录，二者用户、身份及权限不得默认等同。社区未选配客服对话，不接入国内客服/公共大脑/CRM，不引入AI费用。本文件中把PR122服务授权或国内客户映射列为社区登录、预览前置的历史候选停止推进；已有源码/测试保留为未启用准备，不删除、不挂到原登录或业务路由。
@@ -246,3 +251,35 @@ key-material准确为{active_key,keys}，keys是原32字节密钥的base64映射
 首次本地失败来自合成plan缺少reviewers，原onboarding正确拒绝；补原合成reviewer引用，并在plan读取阶段更早拒绝空值，不删门禁。原日志保留。Hosted以[platform-host-scope]只验新9项与ZIP1项，f76原9项及21/55/1821未变范围复用，准确终态见原Issue76回执。
 
 仍未完成的真实预览环节必须分开：本入口要求已有经原流程验证的账户、项目和微信绑定；客户首次上线的注册/验证/首个项目与门店配置尚未产生。当前Center.register是原邮箱验证机制，MiniGateway未知openid拒绝，没有“仅有AppSecret便可首次扫码注册”的生产实现；不能塞测试账号、SQL设verified、伪造authority或借用本方SaaS数据来掩盖。后续必须明确接通客户平台首次身份流程，再把真实配置带入此入口；英国资源/TLS/反代、合法request域名和新官方二维码仍待实际验证。不以本CLI替代首次初始化或源授权，不触发上传或现场操作。
+
+## 微信首次注册原账号库扩展（2026-10-22）
+
+实际链仍是原MiniGateway.login：仅{code} → 原持久code预留 → 原WechatCodeClient.exchange → 校验准确AppID/openid → 原CenterIdentity.issue_session事务内注册/签发 → 原会话/个人资料/业务权限。客户端不能传openid、verified、tenant、role或sub_mchid来创建身份。网络UNKNOWN保留已消费code，不重放，不用round-trip或其他身份兜底。
+
+新增community_wechat_registration仅复用原Center accounts/links/events/sessions/audit，未新增身份数据库或表，原Center文件/类型及SHA cfd3c9d6不变。首次仅在受保护registration_scenes已配置、原项目仍active/未过期/同租户且原activity guard通过时创建普通消费者；同一宿主的开放scene必须属于一个客户平台租户，不自动跨租户注册。账号、微信绑定、消费者scope和注册审计全部参与原Center同一事务；审计异常整笔回滚，不遗留可用账号/会话。
+
+accounts是原schema：email_idx使用独立微信账号命名空间的摘要，email_enc为按原账号AAD加密的空字节，明确没有邮箱，不制造地址；盐和密码槽填随机不可用值，不启用原邮箱/密码登录或找回。原verified槽在此表示已经服务端微信验证的身份，附加原links里的加密元数据明确identity_verified=true、email_verified=false、authentication=WECHAT_MINIPROGRAM，绝不宣称邮箱已验证。该分支仅发生于可信provider成功回执后的原登录事务，独立直接调用没有原issued attempt/事务即拒绝，不是人工SQL预置verified或凭客户端自报建号。与既有邮箱账号不按昵称/手机号/相似资料自动合并。
+
+普通消费者不写members，不自动获得OWNER/EDITOR/REVIEWER、商家或平台权限。原Center.project等管理/项目资料权限继续拒绝其访问。消费者场景授权保存在原links，冻结AppID、scene、project、项目客户/owner及原tenant/merchant/store范围；每次业务读取都复查原账号epoch/会话、微信绑定、消费者scope、项目状态/期限、原activity subject guard及当前映射。任何撤权/变更拒绝，不在重新登录时补发或重启时重新激活。个人资料/推荐读取复用该消费者边界，原Web/既有成员路径继续原Center授权。project_customer_id仍为原项目客户标识，不代表不同消费者UID被合并。
+
+原历史微信绑定继续登录同一账号；存在任意历史（包括撤销）绑定时不新建/抢绑。同一新用户重复登录或重启保持同一UID；禁用注册策略后原native账号不可回退为有项目编辑权限的账号。商家审核、进件、JSAPI、分账及Finance门禁没有修改。
+
+PlatformHost保护plan仅新增可选registration_scenes字段，值为要开放的原scene名称列表；原无此字段的plan行为保持不注册未知用户。示例语义为仅开启已核shop1，不是该scene已在现场初始化。新平台正式plan须按Owner本次决定明确配置，并先完成原项目/门店初始配置，不能用fixture补齐。
+
+tests/test_community_wechat_registration.py新12项覆盖首次/重复、真实原会话/空邮箱/无项目成员、UNKNOWN跨重启不重放、客户端身份/角色注入、同项目跨店和跨租户、撤权不再激活、项目/owner归属与映射变化、注册审计故障回滚、重启同ID、个人资料/推荐及撤权、原服务端定价篮子/订单归属/另一买家拒绝/无后台权限。微信提供商和商家资料明确为合成测试；原订单仅PENDING、无provider transaction，不模拟真实支付成功。原平台host另补保护配置启用后的首次native登录/资料及重启集成；原身份13、profile8、application10及host10受影响回归，连同ZIP1纳入本批Hosted共72项（12+6+12+13+8+10+10+1），未变1821及其他范围复用。
+
+本次不读取Owner本地AppSecret，不新增真实凭据、不写真实账号/映射、不操作英国/DNS/权限/真实支付，也不上传尚未可用的二维码。首次消费者注册源码闭合不等于首个平台管理员/门店已配置，更不等于英国启动、真实微信code2session或真机验收。后继仍须准确初始化方案/受保护输入与适用现场准入，保留BACKEND_NOT_READY、payments=false与Finance UNCONFIRMED。
+
+### 首次安装从零原库到普通微信用户的实际源码链
+
+新增community_first_install.FirstInstallation.initialize，仅供原项目已批准的首次安装调用。它不是MCP动作或生产许可，也没有现场CLI自动执行。必须非root、原Center准确SHA、私有既有父目录、全新绝对子目录、原32字节密钥材料、准确平台project/tenant/customer/title/expiry/authority_ref和原绑定；参数必须来自待冻结的受保护首装计划，本批没有猜测现场根/UID、生成真实密钥或自行执行。
+
+在全新根中调用原Center与PersistentRuntime原schema，只建立本客户平台realm（原projects/project_history/audit），不创建任何accounts/members/sessions/商家/商品/订单。realm payload明确kind=COMMUNITY_PLATFORM_REALM、source=OWNER_APPROVED_FIRST_INSTALL及真实待批准引用；没有verified_entity=true、虚构合同/订单或SaaS付款状态。owner字段是初始化组件SYSTEM_OWNER=system_community_platform，表示原系统初始化actor，不是伪造的人类账号；不赋予任何用户OWNER角色、不把首位扫码者当管理员。该realm是本项目独立数据中的业务范围，不接入我方SaaS/国内客服或将不同客户实例的数据合并。
+
+首次没有后台人员是合法状态：CenterOperations新增显式consumer_only=True组合选项，仅允许空grants，普通默认构造仍拒绝空grants；此模式dispatch在原Staff查找前拒绝所有operator workspace，不会从历史Staff回退恢复权限。MiniApplication透传此显式选项，Commerce继续使用同一精确原CenterOperations类。PlatformHost根据保护plan空operations进入消费者模式，空reviewers不启用onboarding后台；存在原grants/reviewers则走原路径，不能带非空操作授权同时自称consumer_only。首次消费者注册、资料与空商品列表可以正常工作，不以虚构商家填充页面；后续商家/审核员/平台管理员必须另外经过真实主体和显式权限配置。
+
+初始化与重启打开仍分离；既有/部分根拒绝重复initialize，不删库/重置、不中断其他项目。部分失败保留现场，跨多个库不宣称原子提交；账号注册/绑定/审计本身仍在原单Center事务内。本批新增test_community_first_install.py六项（无fixture身份种子）已从零账号/成员/商家到合成微信首次消费者、原profile/空商品、无后台及无项目编辑权限，另由新写入的保护配置通过正式PlatformHost重新打开并完成同链；覆盖坏key/realm/expiry/跨租户/源码pin/非root门禁、部分失败保留和不重初始化。补跑受影响原CenterOperations12项，其余范围按上文72项Hosted计算。所有微信回执仍明确为测试provider，不能当真实登录回执。
+
+因此，“必须寻找不存在的客户旧库”“普通用户必须先邮箱注册”“首个消费者必须先有SaaS项目会员”不再是源码前置。仍待现场的是本客户准确首装计划、私有挂载/新实例原密钥保管、有限容器资源与B5/P2预算、既有UK HTTPS路由、原AppSecret安全录入、request合法域名和真实扫码。任何后续后台权限配置都不由此自动授权；二维码仍服从BACKEND_NOT_READY及真实非空页面验收。
+
+新注册策略还要求原项目payload准确为COMMUNITY_PLATFORM_REALM/OWNER_APPROVED_FIRST_INSTALL及同authority_ref，不接受SaaS合同项目（即使其active且同tenant）。此约束防止误把本方SaaS数据当客户平台。新增对应拒绝测试；原已绑定账号的旧路径不变。上述72项准确分解为注册12、首装6、原操作12、原身份13、原profile8、原application10、平台host10、ZIP1。

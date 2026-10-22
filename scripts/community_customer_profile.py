@@ -75,8 +75,9 @@ class CustomerProfile:
                         raise ValueError('INVALID_PROFILE_OR_VERSION')
                     record = dict(user_id=uid, nickname=p['nickname'], contact=p['contact'], version=record['version']+1)
                     c.db.execute("INSERT INTO links VALUES('COMMUNITY_CUSTOMER_PROFILE',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload", (user_key, uid, g['project'], c.encrypt(canonical(record), 'COMMUNITY_CUSTOMER_PROFILE:' + user_key)))
-                # Original CRM-authorized project provides the customer identifier.
-                project, _, _ = c.project(uid, g['project'], ('OWNER', 'EDITOR', 'REVIEWER'))
+                # Original project binding provides the project customer identifier.
+                project = (self.identity.authorize_customer_project(uid,g['project']) if self.identity is not None
+                           else c.project(uid,g['project'],('OWNER','EDITOR','REVIEWER'))[0])
                 result = dict(record, tenant_id=project['tenant'], project_customer_id=project['customer'])
                 referral = self._read(g, 'COMMUNITY_CUSTOMER_REFERRER', user_key)
                 result['referrer_user_id'] = referral[1]['referrer_user_id'] if referral else None
@@ -97,7 +98,8 @@ class CustomerProfile:
                 source = self._read(g, 'COMMUNITY_REFERRAL_CODE', code_key)
                 if source is None or source[0] == uid or source[1]['tenant'] != g['tenant']:
                     raise PermissionError('VALID_SAME_PROJECT_REFERRER_REQUIRED')
-                c.project(source[0], g['project'], ('OWNER', 'EDITOR', 'REVIEWER'))
+                if self.identity is not None:self.identity.authorize_customer_project(source[0],g['project'])
+                else:c.project(source[0],g['project'],('OWNER','EDITOR','REVIEWER'))
                 prior = self._read(g, 'COMMUNITY_CUSTOMER_REFERRER', user_key)
                 if prior:
                     if prior[1]['referrer_user_id'] != source[0]:

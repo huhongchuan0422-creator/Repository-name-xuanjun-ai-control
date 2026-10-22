@@ -29,7 +29,7 @@ def _require_nonroot():
 
 
 def _configuration(plan, key_material, wechat):
-    if type(plan) is not dict or set(plan) != FIELDS or type(plan['version']) is not int or plan['version'] != 1:
+    if type(plan) is not dict or set(plan) not in (FIELDS,FIELDS|{'registration_scenes'}) or type(plan['version']) is not int or plan['version'] != 1:
         raise ValueError('EXACT_PLATFORM_HOST_PLAN_REQUIRED')
     if (type(key_material) is not dict or set(key_material) != {'active_key','keys'}
             or type(key_material['active_key']) is not str
@@ -61,7 +61,7 @@ def _configuration(plan, key_material, wechat):
         principals[name] = Principal(value['tenant_id'], value['role'])
     bindings = {principals[name]:value for name,value in plan['bindings'].items()}
     PersistentRuntime._bindings(bindings, lambda:0)
-    if type(plan['operations']) is not dict or not plan['operations'] or type(plan['reviewers']) is not dict or not plan['reviewers']:
+    if type(plan['operations']) is not dict or type(plan['reviewers']) is not dict:
         raise ValueError('PROTECTED_OPERATION_GRANTS_REQUIRED')
     operations = {}
     for name, value in plan['operations'].items():
@@ -125,8 +125,11 @@ class PlatformHost:
             owner.center = Center(center_root, keys, key_material['active_key'])
             owner.application = MiniApplication.from_existing_runtime(owner.center,
                 owner.persistence.runtime, principals, config, wechat['app_secret'])
-            owner.application.configure_onboarding(plan['reviewers'])
-            owner.application.configure_operations(operations)
+            if 'registration_scenes' in plan:
+                owner.application.identity.configure_registration(plan['registration_scenes'])
+            if plan['reviewers']:
+                owner.application.configure_onboarding(plan['reviewers'])
+            owner.application.configure_operations(operations,consumer_only=not bool(operations))
             owner.application.configure_commerce()
             owner.plan = plan
             return owner

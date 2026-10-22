@@ -13,14 +13,16 @@ from scripts.community_saas_phase2 import Principal
 
 
 class CenterOperations:
-    def __init__(self,center,runtime,grants,*,onboarding=None):
+    def __init__(self,center,runtime,grants,*,onboarding=None,consumer_only=False):
         if (type(center) is not Center or type(runtime) is not StageRuntime
-                or type(grants) is not dict or not grants):
+                or type(grants) is not dict or type(consumer_only) is not bool
+                or (not grants and not consumer_only) or (grants and consumer_only)):
             raise ValueError('EXISTING_CENTER_AND_REGISTERED_GRANTS_REQUIRED')
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
                 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
         self.center,self.runtime=center,runtime
+        self.consumer_only=consumer_only
         self.onboarding=onboarding
         if onboarding is not None:
             from scripts.community_merchant_onboarding import MerchantOnboarding
@@ -47,6 +49,7 @@ class CenterOperations:
                 'onboarding_required':required,'role':p.role,'tenant':p.tenant_id,'scope':dict(runtime.bindings[p])}
 
     def dispatch(self,session,csrf,body):
+        if self.consumer_only:raise PermissionError('OPERATOR_WORKSPACES_DISABLED')
         if (type(body) is not dict or set(body)!={'workspace','operation','params'}
                 or type(body['workspace']) is not str or type(body['operation']) is not str
                 or type(body['params']) is not dict):

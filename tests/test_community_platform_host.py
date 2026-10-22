@@ -31,6 +31,11 @@ class FormalHost(unittest.TestCase):
         self.now=int(time.time())
         # Synthetic project fixture only; not production first-account provisioning.
         self.fx.center.db.execute("UPDATE projects SET expires=?",(self.now+10000,))
+        from scripts.pr122_customer_core import canonical
+        realm=dict(kind='COMMUNITY_PLATFORM_REALM',title='Synthetic community platform',requirements=[],
+            source='OWNER_APPROVED_FIRST_INSTALL',authority_ref='test_platform_realm')
+        self.fx.center.db.execute("UPDATE projects SET authority_ref='test_platform_realm',payload=? WHERE id='project1'",
+            (self.fx.center.encrypt(canonical(realm),'project:project1'),))
         with PersistentRuntime.initialize(str(self.runtime_root),self.fx.stage.api.bindings,clock=lambda:self.now) as owner:
             config=dict(version=1,appid=self.fx.identity.appid,https_origin='https://uk.wenwenwenyiyiyi.work',
                 scenes={'shop1':dict(project='project1',principal='customer')},
@@ -166,6 +171,26 @@ class FormalHost(unittest.TestCase):
             finally:
                 if process.poll() is None:
                     process.kill();process.communicate(timeout=3)
+
+    def test_native_registration_requires_protected_host_optin_and_never_grants_staff(self):
+        self.plan['registration_scenes']=['shop1'];self.write('host.json',self.plan)
+        with self.open() as host:
+            gateway=host.application.gateway
+            gateway.provider.exchange=Mock(return_value=dict(appid=self.wechat['appid'],openid='first_native_customer'))
+            token=gateway.login({'code':'first_native'})['session_token']
+            uid=host.center.session(token)
+            result=gateway.dispatch(token,dict(scene='shop1',operation='commerce.profile_read',params={}))
+            self.assertEqual(result['user_id'],uid)
+            self.assertEqual(host.center.db.execute('SELECT count(*) FROM members WHERE user_id=?',(uid,)).fetchone()[0],0)
+            with self.assertRaises(PermissionError):
+                gateway.dispatch(token,dict(scene='shop1',operation='commerce.project_summary',params={}))
+            with self.assertRaises(PermissionError):
+                gateway.dispatch(token,dict(scene='shop1',operation='community.profile',params={}))
+        with self.open() as host:
+            gateway=host.application.gateway
+            gateway.provider.exchange=Mock(return_value=dict(appid=self.wechat['appid'],openid='first_native_customer'))
+            again=gateway.login({'code':'next_native'})['session_token']
+            self.assertEqual(host.center.session(again),uid)
 
     def test_root_guard_is_not_configurable(self):
         with patch('scripts.community_platform_host.os.geteuid',return_value=0):
