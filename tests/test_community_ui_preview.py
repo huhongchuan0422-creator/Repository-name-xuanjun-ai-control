@@ -58,9 +58,9 @@ class ClickThrough(unittest.TestCase):
             page.goto(self.url)
             for role in self.data['roles']:
                 page.get_by_label('查看身份',exact=True).select_option(role)
-                expect(page.locator('main h1')).to_have_text(self.data['roles'][role])
+                expect(page.locator('main h1')).to_have_text('附近好店与服务' if role=='consumer' else self.data['roles'][role])
                 self.assert_layout(page,width,role+'-home')
-                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
+                pages=[] if role=='consumer' else [p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
@@ -226,6 +226,8 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('main h1')).to_have_text('个人中心')
             expect(page.locator('main')).to_contain_text('商家入驻')
             expect(page.locator('main')).to_contain_text('当前项目未发现可复用入口')
+            for retained in ('社区与归属','推荐关系','我的通知','商品篮子','退款申请','支付与订单恢复'):
+                expect(page.locator('main')).to_contain_text(retained)
             page.screenshot(path=str(self.out/'owner-consumer-profile.png'),full_page=True)
             page.get_by_label('查看身份',exact=True).select_option('platform')
             page.get_by_role('link',name='订单管理',exact=True).first.click()
