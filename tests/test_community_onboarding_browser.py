@@ -145,7 +145,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     page.locator('#loadHistory').click();expect(page.locator('#historyRows')).to_contain_text('REOPEN')
                     expect(page.locator('#historyRows')).to_contain_text('允许原申请号重新开启补件')
                     page.locator('#loadAdmissionNotices').click();expect(page.locator('#admissionNotices')).to_contain_text('已重新开启补件')
-                    upload('storefront_photo',b'%PDF-reopened replacement storefront')
+                    upload('mini_program_screenshot',b'%PDF-reopened replacement mini scene')
                     changed_revision=revision(page);self.assertGreater(changed_revision,reopened_revision)
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     resubmitted_revision=revision(page);self.assertGreater(resubmitted_revision,changed_revision)
@@ -229,7 +229,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     self.assertNotIn('入驻审核通过',admin.locator('#applicationState').inner_text())
 
                     phase('MATERIAL_REVIEW_BEGIN')
-                    for kind in BASE:
+                    for kind in [row.get_attribute('data-kind') for row in admin.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:
                         phase('MATERIAL_REVIEW_'+kind)
                         row=admin.locator('[data-kind="'+kind+'"]')
                         admin.locator('#note').fill('重开后逐份复审通过 '+kind)
@@ -322,17 +322,17 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     open_page(admin,'/merchant/review',fx.reviewer['csrf'])
                     admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')
-                    admin.locator('#note').fill('请更新清晰的门头照片')
-                    admin.locator('[data-kind=storefront_photo]').get_by_role('button',name='资料需补充',exact=True).click()
-                    expect(admin.locator('[data-kind=storefront_photo] p')).to_contain_text('需要补件')
+                    admin.locator('#note').fill('请更新小程序经营页面截图')
+                    admin.locator('[data-kind=mini_program_screenshot]').get_by_role('button',name='资料需补充',exact=True).click()
+                    expect(admin.locator('[data-kind=mini_program_screenshot] p')).to_contain_text('需要补件')
                     admin.locator('[data-action=CORRECTION]').click();expect(admin.locator('#applicationState')).to_have_text('待补件')
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('待补件')
-                    expect(page.locator('#reviewNote')).to_contain_text('请更新清晰的门头照片')
-                    upload('storefront_photo',b'%PDF-updated synthetic storefront')
+                    expect(page.locator('#reviewNote')).to_contain_text('请更新小程序经营页面截图')
+                    upload('mini_program_screenshot',b'%PDF-updated synthetic mini program')
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     admin.locator('#reloadQueue').click();expect(admin.locator('#applications button').first).to_contain_text('待审核')
                     admin.locator('#applications button').first.click();admin.locator('#note').fill('本份资料核对通过')
-                    for kind in BASE:
+                    for kind in [row.get_attribute('data-kind') for row in admin.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:
                         row=admin.locator('[data-kind="'+kind+'"]');row.get_by_role('button',name='资料通过',exact=True).click()
                         expect(row.locator('p')).to_contain_text('资料审核通过')
                     admin.locator('[data-action=APPROVE]').click();expect(admin.locator('#applicationState')).to_have_text('入驻审核通过')
