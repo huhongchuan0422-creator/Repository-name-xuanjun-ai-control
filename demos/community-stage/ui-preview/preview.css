@@ -51,3 +51,5 @@ body[data-platform="true"] #menu{gap:2px}
 body[data-platform="true"] #menu a{padding:8px 12px}
 body[data-platform="true"] .menu-group-title{border-top:1px solid #e1e9e3;margin-top:8px}
 @media(max-width:600px){body[data-mini="true"] .layout{padding-bottom:calc(82px + env(safe-area-inset-bottom))}body[data-platform="true"] .layout{display:block}body[data-platform="true"] aside{display:block}body[data-platform="true"] #menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}body[data-platform="true"] .menu-group-title{grid-column:1/-1}}
+
+.menu-retained{display:block;padding:7px 12px;font-size:12px;color:#68786d;border-left:2px solid #d9e3dc;margin-left:10px}.menu-retained small{display:block;font-size:10px;color:#8a958e}
