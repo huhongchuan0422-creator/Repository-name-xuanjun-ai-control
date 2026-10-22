@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import math
+import re
 import secrets
 import sqlite3
 import time
@@ -314,16 +315,24 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
     @app.get('/authorize')
     def authorize():
         if (set(request.args) - {'client_id','redirect_uri','response_type','scope','state',
-                                 'code_challenge','code_challenge_method','resource'}
+                                 'code_challenge','code_challenge_method','resource','ui_locales'}
                 or request.args.get('resource') != audience
                 or request.args.get('code_challenge_method') != 'S256'
                 or not request.args.get('code_challenge')
                 or not request.args.get('state') or len(request.query_string) > 8192): abort(400)
+        # Optional display hint only: bounded ASCII language-tag-shaped tokens.
+        # This is not language negotiation or an authentication/authorization input.
+        locales = request.args.get('ui_locales')
+        if locales is not None and (not 1 <= len(locales) <= 128
+                or len(locales.split(' ')) > 8
+                or re.fullmatch(r'[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*(?: [A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)*', locales) is None):
+            abort(400)
         # Authlib validates the exact callback, client, scopes and S256 shape.
         try: server.get_consent_grant(end_user=None)
         except Exception: abort(400)
         sid, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         params = request.args.to_dict()
+        params.pop('ui_locales', None)  # Ignored; never persist or forward this display hint.
         def save_flow():
             if db().execute('SELECT count(*) FROM oauth_flows WHERE used=0 AND expires>?', (now(),)).fetchone()[0] >= 128:
                 raise Hold('OAUTH_FLOW_CAPACITY')
