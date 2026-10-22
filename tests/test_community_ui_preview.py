@@ -247,7 +247,11 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#menu')).to_contain_text('订单管理')
             expect(page.locator('#menu')).to_contain_text('入驻与商家')
             expect(page.locator('#menu')).to_contain_text('用户与社区')
-            expect(page.locator('#menu')).to_contain_text('财务与治理')
+            expect(page.locator('#menu')).to_contain_text('权限、通知与日志')
+            expect(page.locator('#menu')).to_contain_text('支付管理')
+            expect(page.locator('#menu')).to_contain_text('退款管理')
+            expect(page.locator('#menu')).to_contain_text('分账明细')
+            expect(page.locator('#menu')).to_contain_text('对账管理')
         finally:
             page.close()
 
