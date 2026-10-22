@@ -145,22 +145,90 @@ class LogicTests(unittest.TestCase):
         self.refuse()
 
     def test_expiry_or_revocation_after_generation_before_write(self):
-        for expired in (True, False):
-            self.clock.side_effect = [1001, 1001, 1100 if expired else 1001]
-            self.adapter.check = SyntheticAdmission().check
-            if not expired:
-                self.adapter.check = Mock(side_effect=lambda request, grant, now:
-                    grant if self.adapter.check.call_count == 1 else False)
-            self.entropy.side_effect = [b'd' * 32, b'b' * 32]
-            self.driver = initial.InitialPreparation(admission=self.adapter,
-                entropy_source=self.entropy, clock=self.clock)
-            result = self.driver.run(**inputs())
-            self.assertEqual(result['state'], 'NOT_PREPARED')
-            self.writer.assert_not_called()
+        # Expand existing time-boundary regression with distinct callback cases;
+        # retain all original test IDs and the existing Hosted exact-23 contract.
+        for boundary, index in (('claim', 1), ('check', 1), ('check', 2),
+                                ('preflight', 1), ('preflight', 2), ('preflight', 3),
+                                ('entropy', 2), ('revocation', 2)):
+            with self.subTest(boundary=boundary, index=index):
+                current = [1001]
+                adapter = SyntheticAdmission()
+                claim, check = adapter.claim, adapter.check
+                calls = {'preflight': 0, 'entropy': 0}
+                def claim_callback(request, now):
+                    grant = claim(request, now)
+                    if boundary == 'claim': current[0] = 1100
+                    return grant
+                def check_callback(request, grant, now):
+                    result = check(request, grant, now)
+                    if len(adapter.checks) == index:
+                        if boundary == 'check': current[0] = 1100
+                        if boundary == 'revocation': return False
+                    return result
+                def preflight_callback(output):
+                    calls['preflight'] += 1
+                    if boundary == 'preflight' and calls['preflight'] == index:
+                        current[0] = 1100
+                def entropy_callback(size):
+                    calls['entropy'] += 1
+                    if boundary == 'entropy' and calls['entropy'] == index:
+                        current[0] = 1100
+                    return (b'd' if calls['entropy'] == 1 else b'b') * size
+                adapter.claim, adapter.check = claim_callback, check_callback
+                entropy = Mock(side_effect=entropy_callback)
+                self.preflight.side_effect = preflight_callback
+                self.writer.reset_mock()
+                driver = initial.InitialPreparation(admission=adapter,
+                    entropy_source=entropy, clock=lambda: current[0])
+                result = driver.run(**inputs())
+                self.assertEqual(result['state'], 'NOT_PREPARED')
+                self.assertEqual(result['error'], 'ADMISSION_DENIED'
+                                 if boundary == 'revocation' else 'ADMISSION_EXPIRED')
+                self.writer.assert_not_called()
+                if boundary == 'claim' or (boundary == 'check' and index == 1) or (
+                        boundary == 'preflight' and index <= 2):
+                    entropy.assert_not_called()
+                else:
+                    self.assertEqual(entropy.call_count, 2)
+                self.assertEqual(driver.run(**inputs())['error'], 'ATTEMPT_ALREADY_USED')
 
     def test_clock_rollback_and_nonfinite_refused(self):
-        for values in ([1001, 1000], [float('nan')], [True]):
-            self.clock.side_effect = values
+        for boundary, index in (('claim', 1), ('check', 1), ('check', 2),
+                                ('preflight', 1), ('preflight', 2), ('preflight', 3)):
+            for invalid in (1000, float('nan'), float('inf'), float('-inf'), True):
+                with self.subTest(boundary=boundary, index=index, invalid=invalid):
+                    current = [1001]
+                    adapter = SyntheticAdmission()
+                    claim, check = adapter.claim, adapter.check
+                    count = [0]
+                    def claim_callback(request, now):
+                        grant = claim(request, now)
+                        if boundary == 'claim': current[0] = invalid
+                        return grant
+                    def check_callback(request, grant, now):
+                        result = check(request, grant, now)
+                        if boundary == 'check' and len(adapter.checks) == index:
+                            current[0] = invalid
+                        return result
+                    def preflight_callback(output):
+                        count[0] += 1
+                        if boundary == 'preflight' and count[0] == index:
+                            current[0] = invalid
+                    adapter.claim, adapter.check = claim_callback, check_callback
+                    entropy = Mock(side_effect=[b'd' * 32, b'b' * 32])
+                    self.preflight.side_effect = preflight_callback
+                    self.writer.reset_mock()
+                    driver = initial.InitialPreparation(admission=adapter,
+                        entropy_source=entropy, clock=lambda: current[0])
+                    result = driver.run(**inputs())
+                    self.assertEqual(result['error'], 'CLOCK_INVALID')
+                    self.assertEqual(result['state'], 'NOT_PREPARED')
+                    self.writer.assert_not_called()
+                    if boundary == 'claim' or (boundary == 'check' and index == 1) or (
+                            boundary == 'preflight' and index <= 2):
+                        entropy.assert_not_called()
+        for invalid in (float('nan'), float('inf'), float('-inf'), True):
+            self.clock.side_effect = [invalid]
             self.driver = initial.InitialPreparation(admission=self.adapter,
                 entropy_source=self.entropy, clock=self.clock)
             self.refuse()

@@ -109,21 +109,28 @@ class InitialPreparation:
                 'observation_sha256': prepare.digest(observation)})
             request_sha = prepare.digest(request)
             grant = adapter.claim(request, now)
-            _grant(grant, request_sha, now)
-            # Existing/unsafe output is refused before entropy or file creation.
-            prepare._preflight_output(output)
 
-            def recheck():
+            def refresh():
                 nonlocal now
                 fresh = _clock(self._clock)
                 _need(fresh >= now, 'CLOCK_INVALID')
                 now = fresh
                 _grant(grant, request_sha, now)
-                _need(adapter.check(request, grant, now) == grant,
-                      'ADMISSION_DENIED')
                 prepare._initial_assessment(frozen['assessment'], observation,
                                             frozen['manifest_sha256'], now)
+
+            refresh()  # claim itself may consume the remaining lifetime.
+            # Existing/unsafe output is refused before entropy or file creation.
+            prepare._preflight_output(output)
+
+            def recheck():
+                refresh()
+                _need(adapter.check(request, grant, now) == grant,
+                      'ADMISSION_DENIED')
+                refresh()  # Reject callback expiry/rollback before preflight.
                 prepare._preflight_output(output)
+                # No dependency callbacks between this validation and the action.
+                refresh()
 
             recheck()
             config, _ = prepare.prepare_initial_pair(

@@ -68,3 +68,9 @@ FIRST_LOGIN_ONLY_V1表示配置创建来源/范围，不表示以后每次备份
 错目标/已有或未知身份、无效观察、拒绝/取消/过期、非私有或已有输出均在生成和写入前拒绝；仅派生独立data/backup，不创建authority。原NOFOLLOW、0600/0700、atomic NOREPLACE及读回不变。实例一经调用即消费，失败不清理现场、不重试；写入调用后异常一律保守UNKNOWN，跨实例/跨进程的唯一消费必须由未来获准适配器保证，不能靠新建实例恢复额度。成功仅为离线候选，仍NOT_INSTALLABLE、四项真实验收NOT_VERIFIED。
 
 对应合成测试：`python -B -m unittest tests.test_pr122_login_initial_prepare -v`。其中LogicTests明确隔离文件系统边界；FilesystemTests要求真实非root runner，使用临时私有目录、合成熵和测试准入，真实调用原安全写入/读回。root环境不得跳过或削弱原NONROOT_ONLY保护冒充文件系统通过。现有工作流只显式加载旧110项，本轮按限定三路径不改workflow，因此新模块未被该Hosted自动覆盖；应区分新模块执行证据与既有CI回归，不能宣称新增场景已由旧110项验收。
+
+### 准备时效增量（PR122 #6329334485）
+
+驱动在claim返回后，以及生成前和写入前的check/输出预检返回后，重新采样有限且不倒退的时间并复核原grant与观察约束；最后一次复核紧邻敏感动作，不循环调用check。耗时跨至expires即拒绝：生成前零生成/零写入，生成后写入前零写入。该检查不保证动作内部的墙钟原子性；撤权仍由两次原check负责，发布异常仍UNKNOWN且不重试。
+
+原23个测试ID和6项真实非root文件系统场景保持，扩展原时效/时钟测试的subTest覆盖claim、两次check、初始及两次动作预检跨期、回调后倒退/NaN/正负Infinity及撤销；不把subTest数量算新增独立测试。现有customer-center Hosted已显式加载本模块，原上段“未覆盖”为早期源码交付历史状态，后续覆盖见#6317715223，本轮沿同入口验收。
