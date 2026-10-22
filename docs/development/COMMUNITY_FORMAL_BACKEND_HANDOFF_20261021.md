@@ -312,3 +312,22 @@ tests/test_community_wechat_registration.py新12项覆盖首次/重复、真实�
 - 运行资源候选CPU0.5、内存512MiB、pids64、只读根、有限tmpfs和日志；均非已设置。社区仍受英国总资源1/5及既有B5/P2/系统预留共同约束，未核预算不得应用；本轮不分配视频资源、不影响原服务。磁盘/卷硬配额缺少落实证据，不能把memory/cpu cap当磁盘配额。
 - 接入仅增加原UK HTTPS server内/community-preview/mini/及精确健康路径，保留原Owner路由和证书引用。先私有socket验证，再nginx -t、限定reload，最后公网健康及真实微信登录；这些现场动作本批没有执行。
 - 回退只涉及本社区容器及新增路由，保留私有持久数据和失败证据，不自动停整个Nginx或撤销共享权限。无同版本后端、真实登录与非空首页证据时继续BACKEND_NOT_READY，不上传新码。
+
+### 2026-10-22 原角色入口与客户预览纠偏（现场启用待回执）
+
+Owner明确：角色入口属于原定制项目交付，应由官网原项目详情动态展示，不另建展示系统。新增只读 `/community/entrypoints` 合同提供角色、端类型、路径和所需授权；它不提供账号、角色授予、会话或可用性验收。官网Writer可消费该合同，但本窗口不修改PR122源码或官网导航，也不把SaaS登录当社区登录前置。
+
+| 角色 | 原入口 | 本次真实范围 |
+|---|---|---|
+| 消费者 | 小程序 `pages/home/index?scene=shop1` | 原生微信入口，不能伪称已有消费者H5登录地址；新码真机登录尚待明确回执 |
+| 商家 | `/community-preview/merchant/workbench`；入驻 `/community-preview/merchant/join` | 原工作台/入驻HTML与JS，保留原Center工作区授权 |
+| 社区 | `/community-preview/community/portal` | 原社区页面，业务请求仍复查原身份与权限 |
+| 平台 | `/community-preview/merchant/review` | 仅原入驻审核范围，不冒充完整平台管理首页 |
+
+固定origin为 `https://uk.wenwenwenyiyiyi.work`。原角色HTML资源链接、脚本内API路径、审核模式判断和入驻成功跳转在响应时按固定前缀适配；请求不能指定前缀、文件或角色。只允许清单内原页面及JS/CSS，保留可信Nginx UID、Host、Origin、CSRF和原Center SHA/type校验。导航可浏览不等于取得授权；当前首次安装未初始化商家/社区管理员/平台审核账号，不能凭公开页面或消费者微信会话推导管理员权限。
+
+镜像修复：原runtime只复制scripts，未复制原业务页面目录；本次将原 `demos/community-stage` 页面资产纳入固定镜像。未使用 `community-local-e2e` fixture服务，也未重建身份/数据库。实际非root Host/Unix集成增加原三角色网页及只读目录HTTP200检查；Chromium只核原文件的资源和导航闭合，不称真实角色业务验收。
+
+消费者小程序从门店/订单页移除不属于社区消费者流程的项目交付表单，保留原处理器及后台成果；页面标题由“模拟收款”改为“门店与订单”。服务端原订单创建与支付未开放分别说明，离线开发分支仍明确标记模拟，不把订单创建当付款成功。
+
+现场仍运行3851b1db镜像，仅原mini/health路由已通；本次网页源码、镜像及限定Nginx规则须以新CI、准确image ID、同原数据卷升级及公开GET验收回执绑定后才可登记可用URL。不得重新执行first-install或生成密钥，不覆盖Owner/P2路由、不授予角色、不发真实资金操作。旧镜像、原数据和失败日志保留，升级与回退只作用本项目容器及本项目include。

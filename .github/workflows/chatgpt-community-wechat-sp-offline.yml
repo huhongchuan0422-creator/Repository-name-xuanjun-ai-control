@@ -36,6 +36,9 @@ jobs:
       - name: Install exact browser test runner
         if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]')"
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y nginx
+          python -B -m unittest discover -s tests -p 'test_community_web_entries_nginx.py' -v 2>&1 | tee -a community-tests.log
           python -m pip install playwright==1.55.0 cryptography==50.0.2
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
@@ -94,6 +97,12 @@ jobs:
           set -o pipefail
           python -m pip install cryptography==50.0.2
           python -B -m unittest discover -s tests -p 'test_community_platform_host.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_proxy.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_entries.py' -v 2>&1 | tee -a community-tests.log
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          python -B -m unittest discover -s tests -p 'test_community_web_entries_browser.py' -v 2>&1 | tee -a community-tests.log
+          node --test clients/community-mini/customer-pages.test.cjs clients/community-mini/checkout-community.test.cjs clients/community-mini/project-lifecycle.test.cjs 2>&1 | tee -a community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
       - name: Native WeChat consumer registration affected scope
         if: contains(github.event.head_commit.message, '[wechat-registration-scope]')

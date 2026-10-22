@@ -299,3 +299,11 @@ test('unavailable login remains unauthenticated and renders a safe customer mess
     assert.doesNotMatch(h.page.data.status,/SERVICE_|private|503/);
   }
 });
+
+test('consumer store page excludes internal delivery forms and preserves community and orders',()=>{
+ const markup=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
+ for(const text of ['原客户项目中心','SECRETREF','projectAction','uploadProjectDocument','saveProjectReference'])assert.ok(!markup.includes(text),text);
+ for(const text of ['communityAction','reloadProducts','loadOrders'])assert.ok(markup.includes(text),text);
+ assert.equal(JSON.parse(fs.readFileSync(__dirname+'/pages/checkout/index.json','utf8')).navigationBarTitleText,'门店与订单');
+ assert.ok(!JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8')).window.navigationBarTitleText.includes('模拟'));
+});

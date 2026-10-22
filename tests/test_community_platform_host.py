@@ -163,6 +163,20 @@ class FormalHost(unittest.TestCase):
                         raw+=chunk
                     self.assertIn(b'200 OK',raw)
                     self.assertEqual(json.loads(raw.split(b'\r\n\r\n',1)[1])['status'],'READY')
+                for path in ('/merchant/workbench','/merchant/review','/community/portal','/community/entrypoints'):
+                    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as connection:
+                        connection.settimeout(3);connection.connect(self.plan['socket_path'])
+                        connection.sendall(('GET '+path+' HTTP/1.0\r\nHost: uk.wenwenwenyiyiyi.work\r\nX-Xuanjun-Client-IP: 127.0.0.1\r\n\r\n').encode())
+                        raw=b''
+                        while True:
+                            chunk=connection.recv(65536)
+                            if not chunk:break
+                            raw+=chunk
+                        self.assertIn(b'200 OK',raw.split(b'\r\n',1)[0])
+                        body=raw.split(b'\r\n\r\n',1)[1]
+                        if path.endswith('entrypoints'):
+                            self.assertFalse(json.loads(body)['production_acceptance'])
+                        else:self.assertIn(b'/community-preview/',body)
                 process.send_signal(signal.SIGTERM)
                 out,err=process.communicate(timeout=5)
                 self.assertEqual(process.returncode,0,err)

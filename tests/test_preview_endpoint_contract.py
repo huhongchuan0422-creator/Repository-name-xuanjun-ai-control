@@ -134,8 +134,8 @@ class EndpointContract(unittest.TestCase):
         self.assertIn('location ^~ /community-preview/mini/',candidate)
         self.assertIn('location = /community-preview/community/health',candidate)
         self.assertNotIn('location / {',candidate)
-        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP "";'),2)
-        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP $remote_addr;'),2)
+        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP "";'),3)
+        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP $remote_addr;'),3)
 
     def test_helpers_are_required_zip_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:

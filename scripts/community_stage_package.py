@@ -46,6 +46,7 @@ def build(root):
                 'scripts/community_preview_readiness.py',
                 'scripts/community_mini_host_config.py',
                 'scripts/community_platform_host.py',
+                'scripts/community_web_entries.py',
                 'scripts/community_persistent_runtime.py',
                 'scripts/community_first_install.py',
                 'scripts/community_wechat_registration.py',

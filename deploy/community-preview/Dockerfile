@@ -7,6 +7,7 @@ COPY deploy/community-preview/requirements-runtime.lock /build/requirements-runt
 COPY wheels/ /build/wheels/
 RUN python -m pip install --no-index --no-deps --no-cache-dir --no-compile --require-hashes --find-links=/build/wheels -r /build/requirements-runtime.lock && rm -rf /build
 COPY scripts/ /app/scripts/
+COPY demos/community-stage/ /app/demos/community-stage/
 ARG SOURCE_SHA
 RUN python -c "import re; assert re.fullmatch('[0-9a-f]{40}', '$SOURCE_SHA')" && mkdir -p /home/community && chown 10001:1008 /home/community && chmod 0700 /home/community
 LABEL org.opencontainers.image.revision=$SOURCE_SHA

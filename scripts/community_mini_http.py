@@ -103,6 +103,18 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         db.execute('SELECT 1').fetchone()
                 except Exception:return self.answer(503,{'status':'UNAVAILABLE'})
                 return self.answer(503 if maintenance else 200,{'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False})
+            if proxy_origin=='https://uk.wenwenwenyiyiyi.work':
+                from scripts.community_web_entries import asset,entries
+                if self.path=='/community/entrypoints':return self.answer(200,entries())
+                selected=asset(self.path)
+                if selected is not None:
+                    raw,mime=selected
+                    self.send_response(200)
+                    for key,value in [('Content-Type',mime),('Content-Length',str(len(raw))),('Cache-Control','no-store'),
+                        ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")]:
+                        self.send_header(key,value)
+                    self.end_headers();self.wfile.write(raw);self.close_connection=True
+                    return
             assets={'/merchant/join':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/review':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/onboarding.js':('onboarding.js','application/javascript; charset=utf-8'),
