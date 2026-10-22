@@ -284,7 +284,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view h1').first).to_have_text('订单管理')
             expect(page.locator('#view')).to_contain_text('EXAMPLE-001')
             expect(page.locator('#view')).to_contain_text('UNCONFIRMED')
-            expect(page.locator('#view')).to_contain_text('隔离合成投影')
+            expect(page.locator('#view')).to_contain_text('合成只读投影')
             self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
             page.screenshot(path=str(self.out/'owner-platform-orders.png'),full_page=True)
             page.goto(self.url+'#/admission/admission-start/edit')
