@@ -209,3 +209,20 @@ MiniApplication.from_existing_config_file(center, runtime, principals, config_pa
 本窗口当前已通过真实只读插件connection_status查询既有conn-uk-20261021T151122Z，返回SUCCESS/t-gbr70pxt9ij2jgg，production_authorization=NOT_GRANTED；没有新任务/重试、没有从OS结果读取客户文件。仅证明本窗口旧状态工具可用，不能代替上述项目动作/私有收件。
 
 后继验收顺序：公共固定动作正常准入→本窗口自行取私有报告并核SHA/原InvokeId→按事实绑定原宿主、持久数据和场景；如首次启动则走原批准初始化→英国同版本服务、精确HTTPS/路由、原平台真实code2session→原官方上传通道→真机非空页面与本人/门店/订单权限。每层分别报告。BACKEND_NOT_READY、payments=false、Finance UNCONFIRMED保留。没有服务器命令、权限修改、微信/资金调用或后台持续运行声明。
+
+## 首次上线确认与原持久运行组合（2026-10-22）
+
+Owner已明确确认本客户平台“首次上线，无历史数据”（原Issue76 #6329634311）。本项目不再把旧客户库/旧身份宿主作为必须寻找的外部材料；原文历史UNKNOWN仅保留为当时记录。首次初始化仍不同于测试fixture，也不等同于真实账号/门店授权已存在。Owner同时确认原AppID wx1d5f8873eaea5392及验收微信开发者权限；所交小程序后台截图显示服务器域名尚未配置，英国8.208.119.115已在IP白名单。IP白名单不等于request合法域名或HTTPS连通。
+
+原LocalStage明确是测试宿主，会生成测试QR密钥和LocalAdminPolicy随机令牌，禁止部署为客户后端。本批新增scripts/community_persistent_runtime.py中的PersistentRuntime，替代这部分宿主职责而不修改原StageRuntime、Center或门店裁定：
+- initialize(directory,bindings,clock=...)仅用于已获准首次安装，准确绝对新子目录及既有0700私有父根；沿原6个物理store opener/schema初始化，复用quotes/modules同一连接，不种子账号/商家/商品/订单，不生成管理令牌/QR密钥，不开listener/网络或支付。
+- open(directory,bindings,clock=...)仅打开已有完整当前schema数据，mode=rw，缺文件/锁拒绝且不补建；逐件原schema及integrity/外键检查，不调用初始化/迁移/自动修复。未知或旧schema停止，不能假称支持自动升级。
+- 原CUSTOMER/tenant/store绑定校验先于写入。原flock单Writer持续到句柄关闭；准确路径、父链、0700根、0600类私有单链接普通文件和SQLite sidecar校验保留。可信同UID私有目录仍要求原唯一Writer，未宣称抵御已控制该UID的并发攻击者。
+- 初始化失败关闭句柄/释放锁，部分文件原样保留，不删除或自动重试；已有目录即便空也不能重新initialize。初始化不是跨6库原子事务，也不是恢复/迁移工具。Center及其原加密/备份仍由单独宿主负责。
+- runtime为精确原StageRuntime，原DemoService仅复用为store容器且admin_policy/qr_key均None，没有启动demo HTTP或开放本地管理令牌。正式MiniApplication必须继续配置原Commerce，服务端定价/原身份门禁不能由初始化取代；不调用模拟订单/支付钩子。MiniApplication.close不关闭该宿主持有的连接，宿主负责最终close。
+
+新增tests/test_community_persistent_runtime.py的8项定向测试使用合成身份和真实私有SQLite，包含独立Python子进程重启读同一订单、第二Writer/重初始化、缺库/未知schema不修复、初始化中途故障保留、软链/硬链接/公开权限、无数据/随机凭据，以及原MiniApplication+Commerce同对象组合。初次本地失败为测试传入空operations grants，原门禁正确拒绝；改用既有合成原授权夹具，未放宽生产检查，原失败日志保留。真实微信网络/现场账号未调用。
+
+本次仅交首次持久运行宿主源码，不称完整正式bootstrap已完成：原Center首次注册/验证及可信微信绑定、首个真实项目/scene/门店业务配置、既有受保护密钥引用、英国资源/HTTPS和实际启动仍需按具体首次上线方案完成。不得直接SQL设verified或伪造签约/项目authority；不得把我方SaaS身份变成客户平台数据。现有公共连接代码不改，人工辅助现场动作需先交准确可审阅方案，尚未发服务器命令或执行初始化。
+
+Hosted以[persistent-runtime-scope]验新8项和实际ZIP组合1项；原21/55/1821未变结果复用，源码包仍走原逐文件manifest。准确Commit/Tree/Run/包摘要见原Issue76后继回执。BACKEND_NOT_READY、payments=false、Finance UNCONFIRMED保留，尚无可用新二维码。
