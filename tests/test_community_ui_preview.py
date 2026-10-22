@@ -93,7 +93,7 @@ class ClickThrough(unittest.TestCase):
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
-                        page.locator('.module-card[href="'+target+'"]').click()
+                        page.locator('#menu a[href="'+target+'"]').click()
                         expect(page.locator('#view h1').first).to_have_text(module['title'])
                         if role!='admission':
                             page.get_by_role('link',name='查看详情',exact=True).click()
@@ -205,7 +205,7 @@ class ClickThrough(unittest.TestCase):
             context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();requests=[];errors=[]
             page.on('request',lambda r:requests.append(r.url));page.on('pageerror',lambda error:errors.append(str(error)))
             page.goto(target.as_uri())
-            expect(page.locator('#view h1').first).to_have_text(self.data['roles']['merchant'])
+            expect(page.locator('#view h1').first).to_have_text('邻里生活馆')
             page.get_by_label('查看身份',exact=True).select_option('admission')
             expect(page.locator('#view h1').first).to_have_text(self.data['roles']['admission'])
             page.locator('.module-card').filter(has_text='主体与门店').click()
@@ -354,7 +354,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view')).not_to_contain_text('商品篮子')
             self.assertTrue(any(p['id']=='consumer-basket' for p in self.data['pages']))
             page.get_by_label('查看身份',exact=True).select_option('platform')
-            page.get_by_role('link',name='订单管理',exact=True).first.click()
+            page.get_by_role('link',name='进入订单管理',exact=True).click()
             expect(page.locator('#view h1').first).to_have_text('订单管理')
             expect(page.locator('#view')).to_contain_text('EXAMPLE-001')
             expect(page.locator('#view')).to_contain_text('UNCONFIRMED')
