@@ -82,6 +82,31 @@ class ClickThrough(unittest.TestCase):
             self.assertEqual(errors,[])
             self.assertTrue(all(method=='GET' and url.startswith(self.url.rsplit('/ui-preview/',1)[0]) for method,url in requests),requests)
             context.close()
+    def test_consumer_store_catalog_and_collection_status_are_isolated(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/consumer/consumer-stores/list')
+            expect(page.locator('main')).to_contain_text('邻里生活馆')
+            expect(page.locator('main')).to_contain_text('邻里服务套餐')
+            expect(page.locator('main')).to_contain_text('非真实营业信息')
+            page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+            page.goto(self.url+'#/merchant/merchant-native-collection/list')
+            for label,expected in [
+                ('查看正式取得条件','本预览从不请求微信'),
+                ('查看不可用状态','尚无已核验的正式收款码'),
+                ('查看取得失败状态','不生成或回退假二维码'),
+                ('查看相册保存失败','无正式图片可保存'),
+            ]:
+                page.get_by_role('button',name=label,exact=True).click()
+                expect(page.locator('#code-review-status')).to_contain_text(expected)
+            self.assertEqual(page.locator('main img').count(),0)
+            page.get_by_label('示例状态',exact=True).select_option('error')
+            expect(page.locator('main')).to_contain_text('暂时无法加载')
+            self.assertEqual(page.locator('[data-code-review]').count(),0)
+            self.assertEqual(page.get_by_role('link',name='查看详情',exact=True).count(),0)
+        finally:
+            page.close()
     def test_admission_conditions_one_shared_draft_history_and_reload(self):
         context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();page.goto(self.url+'#/admission/home')
         page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
