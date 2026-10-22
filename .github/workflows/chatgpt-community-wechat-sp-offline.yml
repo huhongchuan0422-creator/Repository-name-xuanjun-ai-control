@@ -22,6 +22,7 @@ permissions:
   contents: read
 jobs:
   test:
+    if: "!contains(github.event.head_commit.message, '[ui-preview-scope]')"
     outputs:
       source_sha256: ${{ steps.source_package.outputs.sha256 }}
     runs-on: ubuntu-latest

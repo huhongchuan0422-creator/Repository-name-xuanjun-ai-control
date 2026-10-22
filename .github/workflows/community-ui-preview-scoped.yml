@@ -1,0 +1,68 @@
+name: Community isolated UI preview scoped gate
+on:
+  push:
+    branches: [feature/chatgpt-community-wechat-sp-offline-20261017]
+    paths:
+      - demos/community-stage/ui-preview/**
+      - scripts/community_ui_preview_build.py
+      - scripts/community_web_entries.py
+      - scripts/community_stage_package.py
+      - tests/test_community_ui_preview.py
+      - .github/workflows/community-ui-preview-scoped.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  click-through:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      COMMUNITY_UI_EVIDENCE: ui-evidence
+      NODE_OPTIONS: --test-reporter=tap
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install playwright==1.55.0 cryptography==46.0.3
+      - run: python -m playwright install --with-deps chromium
+      - name: Original-field generated assets must be committed exactly
+        run: |
+          python scripts/community_ui_preview_build.py
+          git diff --exit-code -- demos/community-stage/ui-preview/sources.js demos/community-stage/ui-preview/original.css docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md
+      - name: Install official nginx parser on CI only
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nginx
+      - name: Actual desktop and mobile click-through
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p test_community_ui_preview.py -v 2>&1 | tee ui-click-through.log
+      - name: Original role entries and real source ZIP closure
+        shell: bash
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p test_community_ui_nginx.py -v 2>&1 | tee ui-nginx.log
+          python -B -m unittest discover -s tests -p test_community_web_entries.py -v 2>&1 | tee ui-original-entries.log
+          python -B -m unittest discover -s tests -p test_community_stage_package.py -v 2>&1 | tee ui-source-zip.log
+      - name: Self-contained review preview and source
+        run: |
+          python scripts/community_ui_preview_build.py --bundle community-ui-preview.html
+          python scripts/community_stage_package.py --output community-stage-source.zip
+          sha256sum community-ui-preview.html community-stage-source.zip > ui-artifact.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: community-isolated-ui-review
+          path: |
+            ui-evidence/
+            ui-*.log
+            ui-artifact.sha256
+            community-ui-preview.html
+            community-stage-source.zip
+            docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md
+            docs/development/COMMUNITY_ADMISSION_MINIMAL_DELTA_20261022.md

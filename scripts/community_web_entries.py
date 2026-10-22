@@ -21,6 +21,12 @@ ASSETS={
  '/merchant/onboarding.css':('onboarding.css','text/css; charset=utf-8'),
 }
 
+# Isolated static projection; these bytes never receive a session panel or API JS.
+UI_ASSETS={'/community/ui-preview/':('ui-preview/index.html','text/html; charset=utf-8')}
+UI_ASSETS.update({'/community/ui-preview/'+name:('ui-preview/'+name,mime) for name,mime in [
+ ('index.html','text/html; charset=utf-8'),('sources.js','application/javascript; charset=utf-8'),
+ ('preview.js','application/javascript; charset=utf-8'),('preview.css','text/css; charset=utf-8'),('original.css','text/css; charset=utf-8')]})
+
 def entries(projects=()):
     # This catalog describes entry points, never possession of any role or grant.
     source=os.environ.get('COMMUNITY_SOURCE_SHA','')
@@ -34,6 +40,9 @@ def entries(projects=()):
     ]}
 
 def asset(path):
+    if path in UI_ASSETS:
+        name,mime=UI_ASSETS[path]
+        return (ROOT/name).read_bytes(),mime
     if path in PAGES:
         name,title=PAGES[path]
         raw=(ROOT/name).read_text()
