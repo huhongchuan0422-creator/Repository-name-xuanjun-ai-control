@@ -19,7 +19,7 @@
   const passport='IDENTIFICATION_TYPE_OVERSEA_PASSPORT';
   const controlValue=path=>wechatControls.get(path)?.value||'';
   function materialKinds(app){
-    const kinds=new Set([...app.required_materials,'mini_program_screenshot',...Object.keys(app.materials)]);
+    const kinds=new Set([...app.required_materials,'settlement_proof','operator_authorization','storefront_photo','interior_photo','mini_program_screenshot',...Object.keys(app.materials)]);
     if(controlValue('contact_info.contact_type')==='SUPER'){kinds.add('operator_identity');if(controlValue('contact_info.contact_id_doc_type')!==passport)kinds.add('operator_identity_back');}
     if(app.entity_type==='ENTERPRISE')for(let i=0;i<4;i++){
       const prefix='subject_info.ubo_info_list.'+i+'.';
@@ -57,7 +57,7 @@
   function button(text,handler){const b=document.createElement('button');b.type='button';b.textContent=text;b.addEventListener('click',()=>run(handler));return b;}
   function draftFields(){return Object.fromEntries(['legal_name','store_name','address','contact'].map(k=>[k,$(k).value]));}
   function setForm(app){for(const [k,v] of Object.entries(app?.fields||{}))if($(k))$(k).value=v;
-    $('identity_type').value=app?.identity_type||'IDENTIFICATION_TYPE_IDCARD';$('entity_type').value=app?.entity_type||'ENTERPRISE';$('category').value=app?.category||'GENERAL';$('delegated').checked=app?.delegated||false;}
+    $('identity_type').value=app?.identity_type||'IDENTIFICATION_TYPE_IDCARD';$('entity_type').value=app?.entity_type||'ENTERPRISE';$('category').value=app?.category||'GENERAL';$('delegated').checked=app?.delegated||false;setScenes(app?.sales_scenes_type);}
   function withdrawalControls(){
     const withdrawn=current?.status==='WITHDRAWN';
     $('withdrawActions').hidden=reviewMode||!current||!['DRAFT','CORRECTION_REQUIRED'].includes(current.status);
@@ -209,7 +209,7 @@
     $('materials').replaceChildren();
     for(const kind of materialKinds(app)){const description=catalog.materials.find(m=>m.id===kind),record=app.materials[kind];
       const row=document.createElement('div');row.className='material';row.dataset.kind=kind;
-      const title=document.createElement('strong');title.textContent=description?.title||kind;row.append(title);
+      const title=document.createElement('strong');title.textContent=(description?.title||kind)+(app.required_materials.includes(kind)?' *':'（选填）');row.append(title);
       const state=document.createElement('p');state.textContent=record?`已上传 · ${record.review==='ACCEPTED'?'资料审核通过':record.review==='NEEDS_CORRECTION'?'需要补件':'待核验'}${record.review_note?' · '+record.review_note:''}`:'待上传';row.append(state);
       if(record)row.append(button('查看已提交资料',async()=>{const result=await request('download',{application:current.application,kind});
         if(!['application/pdf','image/png','image/jpeg'].includes(result.mime))throw Error('资料格式无效');
@@ -237,7 +237,7 @@
     message(result.applications.length?'已读取最新入驻状态。':reviewMode?'暂无入驻申请。':'尚无申请，请填写经营信息并保存草稿。');}
   async function load(){return run(async()=>{catalog=await request('catalog');await list();});}
   $('profile').addEventListener('submit',event=>{event.preventDefault();run(async()=>{render(await request('save',{application:current?.application||null,revision:current?.revision||0,
-    identity_type:$('identity_type').value,fields:draftFields(),entity_type:$('entity_type').value,category:$('category').value,delegated:$('delegated').checked}));message('草稿已保存，请按清单上传资料。');});});
+    sales_scenes_type:selectedScenes(),identity_type:$('identity_type').value,fields:draftFields(),entity_type:$('entity_type').value,category:$('category').value,delegated:$('delegated').checked}));message('草稿已保存，请按清单上传资料。');});});
   $('newApplication').addEventListener('click',()=>{if(busy)return;resetHistory();resetNotices();current=null;for(const key of ['legal_name','store_name','address','contact'])$(key).value='';setForm(null);$('profile').querySelectorAll('input,select,button').forEach(e=>e.disabled=false);render(null);message('请填写新申请。');});
   $('submitApplication').addEventListener('click',()=>run(async()=>{render(await request('submit',{application:current.application,revision:current.revision}));message('申请已提交，请等待平台审核。');}));
   $('withdrawApplication').addEventListener('click',()=>run(async()=>{
@@ -296,7 +296,7 @@
   $('wechatProfile').onsubmit=e=>{e.preventDefault();run(async()=>{const expected_version=wechatVersion();if(invalidLoadedScenes)throw Error('已保存的经营场景配置无效或尚未支持，请人工核对；禁止覆盖保存。');const scenes=selectedScenes(),context=materialContext,application=current.application;if(!scenes.length)throw Error('请至少选择一个经营场景。');const profile=wechatRecord?.profile?structuredClone(wechatRecord.profile):{};for(const [path,input]of wechatControls){if(input.value)setPath(profile,path,path.endsWith('_pics')||path.endsWith('qualifications')||path.endsWith('store_entrance_pic')||path.endsWith('indoor_pic')?input.value.split(',').map(s=>s.trim()).filter(Boolean):input.value);else{const parts=path.split('.');const at=parts.slice(0,-1).reduce((o,k)=>o?.[k],profile);if(at)delete at[parts.at(-1)];}}if(profile.subject_info?.ubo_info_list)profile.subject_info.ubo_info_list=profile.subject_info.ubo_info_list.filter(u=>u&&Object.keys(u).length);if(profile.subject_info&&(!profile.subject_info.ubo_info_list?.length||current.entity_type!=='ENTERPRISE'))delete profile.subject_info.ubo_info_list;
     if(profile.contact_info?.contact_type!=='SUPER')for(const field of ['contact_id_doc_type','contact_id_number','contact_id_doc_copy','contact_id_doc_copy_back','contact_period_begin','contact_period_end'])delete profile.contact_info?.[field];
     else if(profile.contact_info.contact_id_doc_type===passport)delete profile.contact_info.contact_id_doc_copy_back;
-    for(const ubo of profile.subject_info?.ubo_info_list||[])if(ubo.ubo_id_doc_type===passport)delete ubo.ubo_id_doc_copy_back;setPath(profile,'subject_info.subject_type',current.entity_type==='ENTERPRISE'?'SUBJECT_TYPE_ENTERPRISE':'SUBJECT_TYPE_INDIVIDUAL');setPath(profile,'subject_info.identity_info.id_holder_type','LEGAL');if(!profile.subject_info.identity_info.id_doc_type)setPath(profile,'subject_info.identity_info.id_doc_type',current.identity_type||'IDENTIFICATION_TYPE_IDCARD');if(!profile.contact_info?.contact_type)setPath(profile,'contact_info.contact_type','LEGAL');if(profile.subject_info.identity_info.id_doc_type==='IDENTIFICATION_TYPE_IDCARD')delete profile.subject_info.identity_info.id_doc_info;else delete profile.subject_info.identity_info.id_card_info;setPath(profile,'business_info.sales_info.sales_scenes_type',scenes);const saved=await request('wechat_save',{application,expected_version,profile});if(context!==materialContext||application!==current?.application)throw Error('资料条件已变化；保存结果请刷新后核对。');showWechat(saved);});};
+    for(const ubo of profile.subject_info?.ubo_info_list||[])if(ubo.ubo_id_doc_type===passport)delete ubo.ubo_id_doc_copy_back;setPath(profile,'subject_info.subject_type',current.entity_type==='ENTERPRISE'?'SUBJECT_TYPE_ENTERPRISE':'SUBJECT_TYPE_INDIVIDUAL');setPath(profile,'subject_info.identity_info.id_holder_type','LEGAL');if(!profile.subject_info.identity_info.id_doc_type)setPath(profile,'subject_info.identity_info.id_doc_type',current.identity_type||'IDENTIFICATION_TYPE_IDCARD');if(!profile.contact_info?.contact_type)setPath(profile,'contact_info.contact_type','LEGAL');if(profile.subject_info.identity_info.id_doc_type==='IDENTIFICATION_TYPE_IDCARD')delete profile.subject_info.identity_info.id_doc_info;else delete profile.subject_info.identity_info.id_card_info;setPath(profile,'business_info.sales_info.sales_scenes_type',scenes);const saved=await request('wechat_save',{application,expected_version,profile});if(context!==materialContext||application!==current?.application)throw Error('资料条件已变化；保存结果请刷新后核对。');render(await request(reviewMode?'review_read':'read',{application}));showWechat(saved);});};
   $('wechatSubmitReview').onclick=()=>run(async()=>showWechat(await request('wechat_submit_review',{application:current.application,expected_version:wechatVersion()})));
   for(const [id,decision]of [['wechatApprove','INTERNAL_APPROVED'],['wechatCorrect','CORRECTION']])$(id).onclick=()=>run(async()=>showWechat(await request('wechat_review',{application:current.application,expected_version:wechatVersion(),decision,opinion:$('wechatOpinion').value})));
   $('wechatExecute').onclick=()=>run(async()=>showWechat(await request('wechat_execute',{application:current.application,expected_version:wechatVersion()})));

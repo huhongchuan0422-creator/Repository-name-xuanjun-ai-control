@@ -381,6 +381,8 @@ class WechatApplyment:
             if op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                from scripts.community_merchant_onboarding import profile_scenes
+                profile_scenes(p['profile'])  # Validate any declared scenes before storing this draft.
                 result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':

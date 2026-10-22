@@ -79,6 +79,10 @@ def validate(profile,entity,now):
     elif 'finance_institution' in subject and type(subject['finance_institution']) is not bool:raise ValueError('INVALID_FINANCE_INSTITUTION_FLAG')
     sales=profile['business_info']['sales_info'];scenes=sales.get('sales_scenes_type')
     if type(scenes) is not list or not scenes or any(type(v) is not str for v in scenes) or len(set(scenes))!=len(scenes) or any(v not in ('SALES_SCENES_MINI_PROGRAM','SALES_SCENES_STORE') for v in scenes):raise ValueError('CURRENT_PROJECT_MINI_OR_STORE_SCENES_REQUIRED')
+    if 'SALES_SCENES_MINI_PROGRAM' in scenes:
+        mini=sales.get('mini_program_info')
+        if type(mini) is not dict:raise ValueError('OFFICIAL_MINI_SCENE_REQUIRED')
+        images(mini.get('mini_program_pics'),'business_info.sales_info.mini_program_info.mini_program_pics')
     if 'SALES_SCENES_STORE' in scenes:
         store=sales.get('biz_store_info');required(store,('biz_store_name','biz_address_code','biz_store_address'),'business_info.sales_info.biz_store_info')
         for field in ('store_entrance_pic','indoor_pic'):images(store.get(field),'business_info.sales_info.biz_store_info.'+field)

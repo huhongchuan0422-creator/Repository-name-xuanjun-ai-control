@@ -66,7 +66,7 @@ class MerchantAdmissionJourney(unittest.TestCase):
         self.assertEqual(self.call('mine')['applications'][0]['status'],'DRAFT')
     def test_delegated_and_food_have_conditional_material_lists(self):
         app=self.draft(entity_type='SOLE_PROPRIETOR',category='FOOD',delegated=True)
-        self.assertEqual(set(app['required_materials']),set(BASE)|{'operator_authorization','operator_identity','industry_permit'})
+        self.assertEqual(set(app['required_materials']),set(BASE)|{'storefront_photo','interior_photo','operator_identity','operator_identity_back','industry_permit'})
     def test_materials_and_profile_are_encrypted_at_rest(self):
         app=self.upload(self.draft(),'business_license')
         db=self.fx.center.db

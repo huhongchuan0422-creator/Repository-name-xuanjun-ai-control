@@ -35,7 +35,7 @@ class RejectionRecovery(unittest.TestCase):
         self.fx = fixture.MerchantAdmissionJourney()
         self.fx.setUp()
         self.addCleanup(self.fx.tearDown)
-        self.platform = self.fx.review(self.fx.complete(), 'APPROVE')
+        self.platform = self.fx.review(self.fx.complete(sales_scenes_type=['SALES_SCENES_MINI_PROGRAM']), 'APPROVE')
         self.application = self.platform['application']
         self.center = self.fx.fx.center
         self.reader = PartnerOrderReader.__new__(PartnerOrderReader)
@@ -50,7 +50,8 @@ class RejectionRecovery(unittest.TestCase):
         self.profile = profile()
         for kind, media_id in (('business_license', 'media-license'),
                                ('identity_front', 'media-front'),
-                               ('identity_back', 'media-back')):
+                               ('identity_back', 'media-back'),
+                               ('mini_program_screenshot','media-mini')):
             with self.response(dict(media_id=media_id)):
                 uploaded = self.call('wechat_media', kind=kind)
             self.assertEqual(uploaded['media_id'], media_id)
@@ -151,10 +152,10 @@ class RejectionRecovery(unittest.TestCase):
                          applyment_state=state, audit_detail=[]), **extra)
 
     def second_approved_application(self):
-        self.platform=self.fx.review(self.fx.complete(), 'APPROVE')
+        self.platform=self.fx.review(self.fx.complete(sales_scenes_type=['SALES_SCENES_MINI_PROGRAM']), 'APPROVE')
         self.application=self.platform['application']
         for kind,media_id in (('business_license','media-license'),
-                              ('identity_front','media-front'),('identity_back','media-back')):
+                              ('identity_front','media-front'),('identity_back','media-back'),('mini_program_screenshot','media-mini')):
             with self.response(dict(media_id=media_id)):
                 self.call('wechat_media',kind=kind)
         return self.approve()

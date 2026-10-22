@@ -10,7 +10,7 @@ NOW=1792231200
 def profile():
     return dict(contact_info=dict(contact_type='LEGAL',contact_name='Fixture Owner',mobile_phone='13800000000',contact_email='owner@example.org'),
         subject_info=dict(subject_type='SUBJECT_TYPE_ENTERPRISE',business_license_info=dict(license_copy='media-license',license_number='911100000000000000',merchant_name='Fixture Company',legal_person='Fixture Owner'),identity_info=dict(id_doc_type='IDENTIFICATION_TYPE_IDCARD',id_card_info=dict(id_card_copy='media-front',id_card_national='media-back',id_card_name='Fixture Owner',id_card_number='110000200001010000',id_card_address='Fixture Address',card_period_begin='2020-01-01',card_period_end='长期'))),
-        business_info=dict(merchant_shortname='Fixture Shop',service_phone='13800000000',sales_info=dict(sales_scenes_type=['SALES_SCENES_MINI_PROGRAM'],mini_program_info=dict(mini_program_appid='wx1234567890abcdef'))),
+        business_info=dict(merchant_shortname='Fixture Shop',service_phone='13800000000',sales_info=dict(sales_scenes_type=['SALES_SCENES_MINI_PROGRAM'],mini_program_info=dict(mini_program_appid='wx1234567890abcdef',mini_program_pics=['media-mini']))),
         settlement_info=dict(settlement_id='fixture',qualification_type='fixture-industry'),bank_account_info=dict(bank_account_type='BANK_ACCOUNT_TYPE_CORPORATE',account_name='Fixture Company',account_bank='Fixture Bank',account_number='123456789'))
 
 class ConditionalFields(unittest.TestCase):

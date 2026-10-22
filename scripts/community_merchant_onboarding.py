@@ -22,7 +22,24 @@ MATERIALS={
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
     'operator_identity_back':'经办人证件反面',
     **{'ubo_'+str(i)+'_'+side:'受益人'+str(i)+('证件正面' if side=='front' else '证件反面') for i in range(1,5) for side in ('front','back')}}
-BASE=('business_license','identity_front','identity_back','storefront_photo','interior_photo','settlement_proof')
+BASE=('business_license','identity_front','identity_back')
+STORE_SCENE='SALES_SCENES_STORE'
+MINI_SCENE='SALES_SCENES_MINI_PROGRAM'
+
+def checked_scenes(value):
+    if type(value) is not list or not value or len(value)>2 or any(type(s) is not str or s not in (STORE_SCENE,MINI_SCENE) for s in value) or len(set(value))!=len(value):
+        raise ValueError('INVALID_ONBOARDING_SALES_SCENES')
+    return list(value)
+
+
+def profile_scenes(profile):
+    value=profile
+    for key in ('business_info','sales_info'):
+        if type(value) is not dict:return None
+        value=value.get(key)
+    if type(value) is not dict:return None
+    scenes=value.get('sales_scenes_type')
+    return None if scenes is None else checked_scenes(scenes)
 
 
 def _failure_diagnostic(error,commit_attempted,rollback,object_write):
@@ -60,7 +77,10 @@ class MerchantOnboarding:
                 'materials':[{'id':k,'title':v,'required':k in BASE} for k,v in MATERIALS.items()],
                 'formats':['application/pdf','image/png','image/jpeg'],'max_file_bytes':5_000_000,
                 'industry_permit_required_for':['FOOD'],'operator_materials_when_delegated':True,
-                'scope':'平台业务入驻资料清单；微信进件由支付服务商独立核验',
+                'sales_scenes':[MINI_SCENE,STORE_SCENE],
+                'default_sales_scenes':[MINI_SCENE],
+                'optional_materials':['settlement_proof','operator_authorization'],
+                'scope':'同一申请资料按微信主体与经营场景复用，平台仅核原项目门店归属',
                 'payment_enabled':False}
     def _encode(self,value,aad):return base64.b64encode(self.center.encrypt(canonical(value),aad)).decode()
     def _decode(self,value,aad):return json.loads(self.center.decrypt(base64.b64decode(value,validate=True),aad))
@@ -76,6 +96,17 @@ class MerchantOnboarding:
         if review:self._reviewer(uid)
         elif uid!=owner:raise PermissionError('APPLICATION_ACCESS_DENIED')
         meta=self._decode(row['payload'],'onboarding-meta:'+application)
+        # Current original application draft is authoritative, never a client
+        # success flag or a different merchant's provider result. No PII copies.
+        if self.wechat_applyment is not None:
+            record=self.wechat_applyment._read(application)
+            scenes=profile_scenes((record or {}).get('profile',{}))
+            if scenes is not None:meta['sales_scenes_type']=checked_scenes(scenes)
+            profile=(record or {}).get('profile')
+            contact=profile.get('contact_info') if type(profile) is dict else None
+            if type(contact) is dict and contact.get('contact_type') in ('LEGAL','SUPER'):
+                meta['delegated']=contact['contact_type']=='SUPER'
+                meta['operator_identity_type']=contact.get('contact_id_doc_type','IDENTIFICATION_TYPE_IDCARD')
         data=workflow.get_application(self.center.db,owner,application,
             decode=lambda value:self._decode(value,'onboarding-fields:'+application))
         if data['reviewer_note']:
@@ -86,7 +117,12 @@ class MerchantOnboarding:
             (application,owner,application,self._encode(meta,'onboarding-meta:'+application)))
     def _required(self,meta):
         base=tuple(k for k in BASE if k!='identity_back' or meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
-        return base+(('operator_authorization','operator_identity') if meta['delegated'] else ())+(('industry_permit',) if meta['category']=='FOOD' else ())
+        # Old records without a declaration retain conservative offline requirements.
+        # New UI always submits its selected scenes; no history is rewritten.
+        scenes=checked_scenes(meta.get('sales_scenes_type',[STORE_SCENE]))
+        scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes else ())
+        operator=() if not meta['delegated'] else ('operator_identity',)+(('operator_identity_back',) if meta.get('operator_identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' else ())
+        return base+scene_materials+operator+(('industry_permit',) if meta['category']=='FOOD' else ())
     def _check_materials(self,application,meta):
         for kind in self._required(meta):
             material=meta['materials'].get(kind)
@@ -106,7 +142,7 @@ class MerchantOnboarding:
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
         wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
         return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
-            delegated=meta['delegated'],required_materials=list(self._required(meta)),
+            delegated=meta['delegated'],sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
@@ -134,7 +170,7 @@ class MerchantOnboarding:
                  'download':{'application','kind'}}
         listing=type(op) is str and op in ('mine','review_list')
         if (type(op) is not str or op not in schemas or
-                (not set(params).issubset({'cursor','status'}) if listing else (set(params) not in (schemas[op], schemas[op]|{'identity_type'}) if op=='save' else set(params)!=schemas[op]))):
+                (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         if op=='open_workbench':
@@ -202,6 +238,7 @@ class MerchantOnboarding:
                 identity_type=params.get('identity_type',meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'))
                 if type(identity_type) is not str or identity_type not in DOCS:raise ValueError('INVALID_IDENTITY_TYPE')
                 meta['identity_type']=identity_type
+                if 'sales_scenes_type' in params:meta['sales_scenes_type']=checked_scenes(params['sales_scenes_type'])
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
