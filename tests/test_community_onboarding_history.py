@@ -28,7 +28,7 @@ class AdmissionHistory(unittest.TestCase):
         self.assertEqual(saved,correction);self.assertEqual(saved['note'],'FIRST_CORRECTION_REASON_FIXTURE')
         self.assertEqual(saved['actor'],self.fx.fx.uid2);self.assertEqual(saved['occurred_at'],self.c.now())
         latest=next(m['version'] for m in result['records'][-1]['materials'] if m['kind']=='storefront_photo')
-        self.assertNotEqual(latest,version);self.assertEqual(len(result['material_versions']),7)
+        self.assertNotEqual(latest,version);self.assertEqual(len(result['material_versions']),len(before['material_versions'])+1)
         self.assertEqual(result['records'][-1]['previous_revision'],app['revision']-1)
         self.assertNotIn('object_id',json.dumps(result));self.assertNotIn('content_base64',json.dumps(result))
         self.assertEqual(self.history(app,review=True),result)
@@ -109,7 +109,7 @@ class AdmissionHistory(unittest.TestCase):
         result=self.history(app);row=result['records'][-1]
         self.assertEqual(row['event'],'CORRECTION');self.assertEqual(row['occurred_at'],self.c.now())
         self.assertEqual(row['evidence'],'LEGACY_EVENT_ONLY');self.assertIsNone(row['note']);self.assertIsNone(row['materials'])
-        self.assertEqual(len(result['material_versions']),6)
+        self.assertEqual(len(result['material_versions']),len(app['required_materials']))
         self.assertNotIn('LEGACY_REASON_NOT_IN_EVENT',json.dumps(result))
         with self.c.tx():self.c.audit(app['application'],self.fx.fx.uid2,'MERCHANT_ONBOARDING_REVIEW',str(app['revision']))
         self.assertIsNone(self.history(app)['records'][-1]['occurred_at'])
