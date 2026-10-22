@@ -89,6 +89,8 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('main')).to_contain_text('邻里生活馆')
             expect(page.locator('main')).to_contain_text('邻里服务套餐')
             expect(page.locator('main')).to_contain_text('非真实营业信息')
+            page.get_by_role('link',name='查看示例门店详情',exact=True).click()
+            expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/detail
             page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
             expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
             page.goto(self.url+'#/merchant/merchant-native-collection/list')
@@ -161,7 +163,222 @@ class ClickThrough(unittest.TestCase):
     def test_same_app_entry_and_dual_terminal_selection(self):
         context=self.browser.new_context(viewport={'width':1440,'height':1000});page=context.new_page()
         page.goto(self.url+'#/consumer/consumer-stores/list')
-        page.get_by_role('link',name='商家入驻',exact=True).click()
+        page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
+        expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+        page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
+        page.locator('[data-option="contact"]').select_option('SUPER')
+        page.locator('[data-option="scene"]').select_option('both')
+        page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+        expect(page.get_by_label('查看终端',exact=True)).to_be_disabled()
+        self.assertLessEqual(page.locator('.layout').bounding_box()['width'],432)
+        for role in ('community','platform'):
+            page.get_by_label('查看身份',exact=True).select_option(role)
+            for terminal in ('phone','desktop'):
+                page.get_by_label('查看终端',exact=True).select_option(terminal)
+                self.assertEqual(page.locator('body').get_attribute('data-terminal'),terminal)
+                self.assert_layout(page,1440,role+'-'+terminal)
+        context.close()
+
+    def test_empty_loading_error_expired_and_no_business_requests(self):
+        context=self.browser.new_context(viewport={'width':320,'height':740});page=context.new_page();requests=[]
+        page.on('request',lambda r:requests.append((r.method,r.url)))
+        page.goto(self.url+'#/merchant/merchant-0-0-0/list')
+        # Use a real generated module id rather than relying on fixture numbering.
+        first=next(p for p in self.data['pages'] if p['role']=='merchant' and not p.get('legacyOnly'))
+        page.goto(self.url+'#/merchant/'+first['id']+'/list')
+        for scenario in ['empty','loading','error','expired']:
+            page.get_by_label('示例状态',exact=True).select_option(scenario)
+            self.assertTrue(page.locator('.state').is_visible())
+            self.assertEqual(page.get_by_role('link',name='查看详情',exact=True).count(),0)
+            self.assert_layout(page,320,'state-'+scenario)
+        page.get_by_role('button',name='查看示例记录',exact=True).click()
+        expect(page.get_by_label('示例状态',exact=True)).to_have_value('sample')
+        self.assertTrue(all(method=='GET' for method,url in requests))
+        context.close()
+if __name__=='__main__':unittest.main()
+))
+            expect(page.locator('main h1')).to_have_text('门店与服务')
+            page.get_by_role('link',name='返回列表',exact=True).click()
+            expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-stores/list
+            page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+            page.goto(self.url+'#/merchant/merchant-native-collection/list')
+            for label,expected in [
+                ('查看正式取得条件','本预览从不请求微信'),
+                ('查看不可用状态','尚无已核验的正式收款码'),
+                ('查看取得失败状态','不生成或回退假二维码'),
+                ('查看相册保存失败','无正式图片可保存'),
+            ]:
+                page.get_by_role('button',name=label,exact=True).click()
+                expect(page.locator('#code-review-status')).to_contain_text(expected)
+            self.assertEqual(page.locator('main img').count(),0)
+            page.get_by_label('示例状态',exact=True).select_option('error')
+            expect(page.locator('main')).to_contain_text('暂时无法加载')
+            self.assertEqual(page.locator('[data-code-review]').count(),0)
+            self.assertEqual(page.get_by_role('link',name='查看详情',exact=True).count(),0)
+        finally:
+            page.close()
+    def test_admission_conditions_one_shared_draft_history_and_reload(self):
+        context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();page.goto(self.url+'#/admission/home')
+        page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
+        self.assertEqual(page.get_by_role('link',name='其他受益人资料 ›',exact=True).count(),0)
+        page.locator('[data-option="entity"]').select_option('ENTERPRISE')
+        page.locator('[data-option="contact"]').select_option('SUPER')
+        page.locator('[data-option="scene"]').select_option('both')
+        page.locator('[data-option="ubos"]').select_option('2')
+        page.locator('.module-card').filter(has_text='主体与门店').click()
+        page.locator('.module-card').filter(has_text='其他受益人资料').click()
+        page.locator('[data-path$=".ubo_id_doc_name"]').fill('示例甲')
+        page.get_by_role('button',name='受益人 2',exact=True).click()
+        page.locator('[data-path$=".ubo_id_doc_name"]').fill('示例乙')
+        page.reload();self.assertEqual(page.locator('[data-path$=".ubo_id_doc_name"]').input_value(),'示例乙')
+        page.get_by_role('button',name='受益人 1',exact=True).click()
+        self.assertEqual(page.locator('[data-path$=".ubo_id_doc_name"]').input_value(),'示例甲')
+        page.get_by_role('button',name='演示保存并返回',exact=True).click()
+        self.assertTrue(page.url.endswith('/admission-start/edit'))
+        page.go_back();self.assertIn('admission-beneficiary/edit',page.url)
+        page.go_forward();self.assertIn('admission-start/edit',page.url)
+        for field in [p for p in self.data['pages'] if p.get('kind')=='admission-field']:
+            if field['title']=='其他法人证件':continue
+            page.goto(self.url+'#/admission/'+field['id']+'/edit')
+            self.assert_layout(page,390,field['id'])
+            if field['title']=='管理员':self.assertGreater(page.locator('[data-path="contact_info.contact_id_number"]').count(),0)
+        context.close()
+    def test_self_contained_review_file_clicks_without_network(self):
+        import tempfile
+        from scripts.community_ui_preview_build import bundle
+        with tempfile.TemporaryDirectory() as tmp:
+            target=Path(tmp)/'community-ui-preview.html'
+            before={p:p.read_bytes() for p in [ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md',BASE/'ui-preview/sources.js']}
+            bundle(target)
+            self.assertTrue(all(p.read_bytes()==raw for p,raw in before.items()))
+            context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();requests=[];errors=[]
+            page.on('request',lambda r:requests.append(r.url));page.on('pageerror',lambda error:errors.append(str(error)))
+            page.goto(target.as_uri())
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['merchant'])
+            page.get_by_label('查看身份',exact=True).select_option('admission')
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+            page.locator('.module-card').filter(has_text='主体与门店').click()
+            expect(page.locator('main h1')).to_have_text('主体与门店')
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            page.locator('[data-option="scene"]').select_option('both')
+            page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
+            page.get_by_role('link',name='上一步',exact=True).click()
+            page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+            expect(page.locator('main h1')).to_have_text('主体与门店')
+            self.assertEqual(errors,[]);self.assertFalse(any(url.startswith(('http:','https:')) for url in requests))
+            page.screenshot(path=str(self.out/'self-contained-file.png'),full_page=True)
+            context.close()
+    def test_same_app_entry_and_dual_terminal_selection(self):
+        context=self.browser.new_context(viewport={'width':1440,'height':1000});page=context.new_page()
+        page.goto(self.url+'#/consumer/consumer-stores/list')
+        page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
+        expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+        page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
+        page.locator('[data-option="contact"]').select_option('SUPER')
+        page.locator('[data-option="scene"]').select_option('both')
+        page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+        expect(page.get_by_label('查看终端',exact=True)).to_be_disabled()
+        self.assertLessEqual(page.locator('.layout').bounding_box()['width'],432)
+        for role in ('community','platform'):
+            page.get_by_label('查看身份',exact=True).select_option(role)
+            for terminal in ('phone','desktop'):
+                page.get_by_label('查看终端',exact=True).select_option(terminal)
+                self.assertEqual(page.locator('body').get_attribute('data-terminal'),terminal)
+                self.assert_layout(page,1440,role+'-'+terminal)
+        context.close()
+
+    def test_empty_loading_error_expired_and_no_business_requests(self):
+        context=self.browser.new_context(viewport={'width':320,'height':740});page=context.new_page();requests=[]
+        page.on('request',lambda r:requests.append((r.method,r.url)))
+        page.goto(self.url+'#/merchant/merchant-0-0-0/list')
+        # Use a real generated module id rather than relying on fixture numbering.
+        first=next(p for p in self.data['pages'] if p['role']=='merchant' and not p.get('legacyOnly'))
+        page.goto(self.url+'#/merchant/'+first['id']+'/list')
+        for scenario in ['empty','loading','error','expired']:
+            page.get_by_label('示例状态',exact=True).select_option(scenario)
+            self.assertTrue(page.locator('.state').is_visible())
+            self.assertEqual(page.get_by_role('link',name='查看详情',exact=True).count(),0)
+            self.assert_layout(page,320,'state-'+scenario)
+        page.get_by_role('button',name='查看示例记录',exact=True).click()
+        expect(page.get_by_label('示例状态',exact=True)).to_have_value('sample')
+        self.assertTrue(all(method=='GET' for method,url in requests))
+        context.close()
+if __name__=='__main__':unittest.main()
+))
+            page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+            page.goto(self.url+'#/merchant/merchant-native-collection/list')
+            for label,expected in [
+                ('查看正式取得条件','本预览从不请求微信'),
+                ('查看不可用状态','尚无已核验的正式收款码'),
+                ('查看取得失败状态','不生成或回退假二维码'),
+                ('查看相册保存失败','无正式图片可保存'),
+            ]:
+                page.get_by_role('button',name=label,exact=True).click()
+                expect(page.locator('#code-review-status')).to_contain_text(expected)
+            self.assertEqual(page.locator('main img').count(),0)
+            page.get_by_label('示例状态',exact=True).select_option('error')
+            expect(page.locator('main')).to_contain_text('暂时无法加载')
+            self.assertEqual(page.locator('[data-code-review]').count(),0)
+            self.assertEqual(page.get_by_role('link',name='查看详情',exact=True).count(),0)
+        finally:
+            page.close()
+    def test_admission_conditions_one_shared_draft_history_and_reload(self):
+        context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();page.goto(self.url+'#/admission/home')
+        page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
+        self.assertEqual(page.get_by_role('link',name='其他受益人资料 ›',exact=True).count(),0)
+        page.locator('[data-option="entity"]').select_option('ENTERPRISE')
+        page.locator('[data-option="contact"]').select_option('SUPER')
+        page.locator('[data-option="scene"]').select_option('both')
+        page.locator('[data-option="ubos"]').select_option('2')
+        page.locator('.module-card').filter(has_text='主体与门店').click()
+        page.locator('.module-card').filter(has_text='其他受益人资料').click()
+        page.locator('[data-path$=".ubo_id_doc_name"]').fill('示例甲')
+        page.get_by_role('button',name='受益人 2',exact=True).click()
+        page.locator('[data-path$=".ubo_id_doc_name"]').fill('示例乙')
+        page.reload();self.assertEqual(page.locator('[data-path$=".ubo_id_doc_name"]').input_value(),'示例乙')
+        page.get_by_role('button',name='受益人 1',exact=True).click()
+        self.assertEqual(page.locator('[data-path$=".ubo_id_doc_name"]').input_value(),'示例甲')
+        page.get_by_role('button',name='演示保存并返回',exact=True).click()
+        self.assertTrue(page.url.endswith('/admission-start/edit'))
+        page.go_back();self.assertIn('admission-beneficiary/edit',page.url)
+        page.go_forward();self.assertIn('admission-start/edit',page.url)
+        for field in [p for p in self.data['pages'] if p.get('kind')=='admission-field']:
+            if field['title']=='其他法人证件':continue
+            page.goto(self.url+'#/admission/'+field['id']+'/edit')
+            self.assert_layout(page,390,field['id'])
+            if field['title']=='管理员':self.assertGreater(page.locator('[data-path="contact_info.contact_id_number"]').count(),0)
+        context.close()
+    def test_self_contained_review_file_clicks_without_network(self):
+        import tempfile
+        from scripts.community_ui_preview_build import bundle
+        with tempfile.TemporaryDirectory() as tmp:
+            target=Path(tmp)/'community-ui-preview.html'
+            before={p:p.read_bytes() for p in [ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md',BASE/'ui-preview/sources.js']}
+            bundle(target)
+            self.assertTrue(all(p.read_bytes()==raw for p,raw in before.items()))
+            context=self.browser.new_context(viewport={'width':390,'height':844});page=context.new_page();requests=[];errors=[]
+            page.on('request',lambda r:requests.append(r.url));page.on('pageerror',lambda error:errors.append(str(error)))
+            page.goto(target.as_uri())
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['merchant'])
+            page.get_by_label('查看身份',exact=True).select_option('admission')
+            expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+            page.locator('.module-card').filter(has_text='主体与门店').click()
+            expect(page.locator('main h1')).to_have_text('主体与门店')
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            page.locator('[data-option="scene"]').select_option('both')
+            page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
+            page.get_by_role('link',name='上一步',exact=True).click()
+            page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+            expect(page.locator('main h1')).to_have_text('主体与门店')
+            self.assertEqual(errors,[]);self.assertFalse(any(url.startswith(('http:','https:')) for url in requests))
+            page.screenshot(path=str(self.out/'self-contained-file.png'),full_page=True)
+            context.close()
+    def test_same_app_entry_and_dual_terminal_selection(self):
+        context=self.browser.new_context(viewport={'width':1440,'height':1000});page=context.new_page()
+        page.goto(self.url+'#/consumer/consumer-stores/list')
+        page.get_by_role('link',name='商家入驻（同一小程序）',exact=True).click()
         expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
         page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
         page.locator('[data-option="contact"]').select_option('SUPER')
