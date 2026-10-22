@@ -2,7 +2,7 @@
 The background signer is test-only and never represents production approval or deployment.
 """
 import base64,hashlib,hmac,json,threading
-from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler,HTTPServer
 from types import SimpleNamespace
 from scripts.pr122_customer_core import Center,canonical,digest
 from scripts.pr122_customer_http import App
@@ -35,6 +35,16 @@ def publish_ready(c):
         import_snapshot(c,envelope,fixture.auth);published.add(job)
 
 server=HTTPServer(('127.0.0.1',0),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui',source_identity=lambda connection,headers:'fixture-client').handler())
+class Control(BaseHTTPRequestHandler):
+    def log_message(self,*_):pass
+    def do_POST(self):
+        if self.path!='/revoke-owner-project':
+            self.send_error(404);return
+        fixture.imported(2,[])
+        self.send_response(204);self.end_headers()
+
+control=HTTPServer(('127.0.0.1',0),Control)
+
 
 def worker():
     c=factory()
@@ -43,9 +53,9 @@ def worker():
             drain(c);publish_ready(c)
     finally:c.db.close()
 
-thread=threading.Thread(target=worker,daemon=True);thread.start()
+thread=threading.Thread(target=worker,daemon=True);control_thread=threading.Thread(target=control.serve_forever,daemon=True);thread.start();control_thread.start()
 from scripts.pr122_customer_preview import route
-print(json.dumps({'port':server.server_port,'initial_preview_url':route('project-a',fixture.path,fixture.sha),'initial_sha256':fixture.sha,'scope':'ISOLATED_FIXTURE_NOT_PRODUCTION','fixture_signer':'TEST_ONLY'}),flush=True)
+print(json.dumps({'port':server.server_port,'initial_preview_url':route('project-a',fixture.path,fixture.sha),'initial_sha256':fixture.sha,'scope':'ISOLATED_FIXTURE_NOT_PRODUCTION','fixture_signer':'TEST_ONLY','control_port':control.server_port}),flush=True)
 try:server.serve_forever()
 finally:
-    stop.set();server.server_close();thread.join(timeout=3);fixture.c.db.close();fixture.tmp.cleanup()
+    stop.set();server.server_close();control.shutdown();control.server_close();thread.join(timeout=3);control_thread.join(timeout=3);fixture.c.db.close();fixture.tmp.cleanup()
