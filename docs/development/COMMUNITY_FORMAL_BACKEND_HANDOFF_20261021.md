@@ -346,3 +346,14 @@ Nginx 候选按原 workbench 请求增加精确 commerce/provider-actions/mercha
 目录输出镜像构建 SOURCE_SHA 及受保护 scene 对应项目标识；ROLE_ACCEPTANCE_PENDING/production_acceptance=false 不表示任何角色验收通过。consumer 仍小程序，platform 仍仅原入驻审核页。新浏览器测试通过 Unix HTTP 调用原 Center 和原业务 API，使用合成账户且不伪造 API 响应；它不是现场账号验收。
 
 现场 3851b1db 实例保留。新候选须 Hosted 通过、适用审核、镜像/路由变更范围确认后才可替换；本段不扩展部署授权。真实角色账号/配置尚未准入时不得造 grant/种子。下一验收需分别记录真实微信登录、原角色正向操作、跨角色拒绝、准确运行版本及官网允许链接；不以导航 200、绿灯或目录登记关闭任务。
+
+
+## 2026-10-22 同一原会话的竞态修补（Issue76 #6332445991）
+
+原四项接线及先前 Hosted 保留。新增动态复现：原启动 check 失败晚到会删除后来成功登录的 CSRF；定向 Node 调度原 JS 失败日志保留，修补后通过。此为源码/合成场景，不是已证实的现场越权事故。
+
+同一引导的 login/logout 使用单次执行门禁，点击、重复 submit 和 workspace change 在变更中均不能发第二个会话变更。所有异步结果及 catch/finally 核对所属 generation/active；旧请求不能清新 CSRF、workspace、提示或新输入。check 固定本次 CSRF 快照并由原 Center.session 复查。
+
+HttpOnly cookie 不能只靠页面 generation 保护：同源浏览器标签页的会话变更采用 Web Locks，锁持有到整个响应 JSON/后继 check 处理结束，避免两个 Set-Cookie 响应互相越过。BroadcastChannel 只发送固定 changed 通知，不发送身份/token/CSRF；其他标签页清理旧工作区、取消过期等待，不自动重放。未知结果清理可操作状态并要求显式重试。现代 HTTPS 浏览器需支持这两项协调 API；不支持则网页工作人员登录明确不可用，不能退回允许乱序写 cookie 的路径。消费者小程序登录不受此网页协调影响。
+
+原 Center/会话表、cookie 名、Origin/CSRF、项目/门店权限均未改变，不创建授权/管理员或身份体系。新浏览器回归通过真实 Unix HTTP 请求原 Center，只延后完整真实响应；核重复登录/退出交叠只有一个变更请求、Set-Cookie 处理后 cookie+CSRF 可共同通过原 check、晚到启动 check 200/403 均不能破坏新会话。原正常商家/社区/审核业务旅程继续在受影响范围运行。现场角色准入及英国版本替换仍单独待实证，未据此声称四入口可验收。

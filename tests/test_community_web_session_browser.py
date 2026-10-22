@@ -86,4 +86,80 @@ class SessionBrowser(unittest.TestCase):
                 while not future.done() and time.monotonic()<deadline:server.handle_request()
                 future.result(timeout=2)
 
+
+class SessionMutationRaces(unittest.TestCase):
+    @unittest.skipIf(os.geteuid()==0,'Original non-root cookie/HTTP race chain executes on Hosted')
+    def test_cookie_csrf_coherence_with_delayed_real_center_responses(self):
+        fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.tearDown)
+        with fx.open() as host:
+            server=host.application.listen_proxy(fx.plan['socket_path'],fx.plan['https_origin'],fx.plan['nginx_uid'],fx.plan['nginx_gid'])
+            server.timeout=.1
+            def flow():
+                hold_next={};held={};seen=[]
+                def forward(route):
+                    request=route.request;path=request.url.removeprefix(fx.plan['https_origin']+'/community-preview')
+                    conn=http.client.HTTPConnection('unused',timeout=5)
+                    conn.sock=socket.socket(socket.AF_UNIX);conn.sock.settimeout(5);conn.sock.connect(fx.plan['socket_path'])
+                    headers={k:v for k,v in request.all_headers().items() if k.lower() not in ('host','content-length')}
+                    headers.update({'Host':'uk.wenwenwenyiyiyi.work','X-Xuanjun-Client-IP':'127.0.0.1'})
+                    try:
+                        conn.request(request.method,path,body=request.post_data,headers=headers)
+                        response=conn.getresponse();body=response.read();status=response.status;fields=dict(response.getheaders())
+                    finally:conn.close()
+                    seen.append((path,status))
+                    action=path.rsplit('/',1)[-1]
+                    def release():route.fulfill(status=status,headers=fields,body=body)
+                    if hold_next.pop(action,False):held[action]=release
+                    else:release()
+                with sync_playwright() as p:
+                    browser=p.chromium.launch(headless=True)
+                    try:
+                        context=browser.new_context();page=context.new_page();errors=[]
+                        page.on('pageerror',lambda error:errors.append(str(error)))
+                        context.route(fx.plan['https_origin']+'/**',forward)
+                        base=fx.plan['https_origin']+'/community-preview'
+                        panel=page.locator('#community-session')
+                        def submit(address):
+                            panel.locator('[name=email]').fill(address);panel.locator('[name=password]').fill('FixturePassword123!')
+                            panel.locator('form').dispatch_event('submit')
+                        def logged():expect(panel.locator('[role=status]')).to_contain_text('已登录')
+                        def wait_held(action):
+                            deadline=time.monotonic()+5
+                            while action not in held and time.monotonic()<deadline:page.wait_for_timeout(20)
+                            self.assertIn(action,held)
+                        def live():
+                            status=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/session/check',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':sessionStorage.getItem('community-original-csrf')},body:'{}'});return r.status;}""")
+                            self.assertEqual(status,200)
+                            cookie=next(c for c in context.cookies(base) if c['name']=='__Host-xj_customer')
+                            self.assertTrue(cookie['httpOnly']);self.assertTrue(cookie['secure'])
+                            self.assertEqual(cookie['sameSite'],'Strict')
+                            self.assertNotIn('__Host-xj_customer',page.evaluate('document.cookie'))
+                            return cookie['value'],page.evaluate("sessionStorage.getItem('community-original-csrf')")
+                        page.goto(base+'/merchant/workbench')
+                        hold_next['login']=True;submit('one@example.org');wait_held('login')
+                        expect(panel.locator('button[type=submit]')).to_be_disabled()
+                        submit('two@example.org');page.wait_for_timeout(80)
+                        self.assertEqual(sum(path.endswith('/session/login') for path,_ in seen),1)
+                        held.pop('login')();logged();first_cookie,_=live()
+                        hold_next['logout']=True;panel.locator('[data-logout]').click();wait_held('logout')
+                        submit('two@example.org');page.wait_for_timeout(80)
+                        self.assertEqual(sum(path.endswith('/session/login') for path,_ in seen),1)
+                        held.pop('logout')();expect(panel.locator('[role=status]')).to_have_text('已退出登录。')
+                        self.assertFalse(any(c['name']=='__Host-xj_customer' for c in context.cookies(base)))
+                        submit('two@example.org');logged();second_cookie,_=live();self.assertNotEqual(first_cookie,second_cookie)
+                        for old_status in (200,403):
+                            if old_status==403:page.evaluate("sessionStorage.setItem('community-original-csrf','old-invalid-csrf')")
+                            hold_next['check']=True;page.reload();wait_held('check')
+                            self.assertEqual(seen[-1],('/community/session/check',old_status))
+                            submit('one@example.org');logged();pair=live()
+                            held.pop('check')();page.wait_for_timeout(80)
+                            self.assertEqual(live(),pair)
+                            expect(panel.locator('select')).to_have_value('merchant')
+                        self.assertEqual(errors,[])
+                    finally:browser.close()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future=pool.submit(flow);deadline=time.monotonic()+60
+                while not future.done() and time.monotonic()<deadline:server.handle_request()
+                future.result(timeout=2)
+
 if __name__=='__main__':unittest.main()
