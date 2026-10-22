@@ -213,4 +213,29 @@ class ClickThrough(unittest.TestCase):
         expect(page.get_by_label('示例状态',exact=True)).to_have_value('sample')
         self.assertTrue(all(method=='GET' for method,url in requests))
         context.close()
+
+    def test_owner_retail_first_three_screens_and_platform_orders(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/consumer/home')
+            page.get_by_label('查看身份',exact=True).select_option('consumer')
+            expect(page.locator('main h1')).to_have_text('附近好店与服务')
+            expect(page.locator('.mini-tabbar a')).to_have_count(4)
+            page.screenshot(path=str(self.out/'owner-consumer-home.png'),full_page=True)
+            page.get_by_role('link',name='我的',exact=True).click()
+            expect(page.locator('main h1')).to_have_text('个人中心')
+            expect(page.locator('main')).to_contain_text('商家入驻')
+            expect(page.locator('main')).to_contain_text('当前项目未发现可复用入口')
+            page.screenshot(path=str(self.out/'owner-consumer-profile.png'),full_page=True)
+            page.get_by_label('查看身份',exact=True).select_option('platform')
+            page.get_by_role('link',name='订单管理',exact=True).first.click()
+            expect(page.locator('main h1')).to_have_text('订单管理')
+            expect(page.locator('main')).to_contain_text('EXAMPLE-001')
+            expect(page.locator('main')).to_contain_text('UNCONFIRMED')
+            expect(page.locator('main')).to_contain_text('隔离合成投影')
+            self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
+            page.screenshot(path=str(self.out/'owner-platform-orders.png'),full_page=True)
+        finally:
+            page.close()
+
 if __name__=='__main__':unittest.main()
