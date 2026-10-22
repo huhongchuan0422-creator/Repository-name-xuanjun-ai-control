@@ -5,6 +5,7 @@ on:
     paths:
       - production/cloud_connection/**
       - tests/test_cloud_connection*.py
+      - tests/oauth/**
       - deployment/cloud-connection/**
       - docs/development/CLOUD_CONNECTION*.md
       - .github/workflows/cloud-connection-tests.yml
@@ -32,3 +33,26 @@ jobs:
           python -c 'import sys,sqlite3; print(sys.version); print(sqlite3.sqlite_version)'
       - name: Offline queue, transport and custody regression
         run: python -m unittest discover -s tests -p 'test_cloud_connection*.py' -v
+  oauth-http:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['python:3.11.14-bookworm', 'python:3.12.15-bookworm']
+    container:
+      image: ${{ matrix.image }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Exact source and isolated OAuth dependencies
+        run: |
+          git -c safe.directory="$GITHUB_WORKSPACE" log -1 --format='%H %T %P'
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          python --version
+          python -m pip install --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.lock
+          python -m pip check
+      - name: Real loopback HTTP OAuth and MCP integration - simulated GitHub upstream
+        run: python -m unittest discover -s tests/oauth -p 'test_*.py' -v

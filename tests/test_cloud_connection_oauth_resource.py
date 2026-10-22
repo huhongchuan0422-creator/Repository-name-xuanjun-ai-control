@@ -27,7 +27,8 @@ class AuthenticationTests(unittest.TestCase):
         self.calls = []
         self.raw = None
         self.auth = Introspection(ISSUER, ISSUER+'/introspect', 'client', lambda:'private-secret',
-            AUD, {'github:332398908': {'recipient':'work-window','projects':['p2']}}, self.network)
+            AUD, {'github:332398908': {'recipient':'work-window','projects':['p2']}}, self.network,
+            wall_clock=lambda: NOW)
 
     def network(self, request, timeout):
         self.calls.append((request,timeout))
@@ -48,6 +49,21 @@ class AuthenticationTests(unittest.TestCase):
         self.check();self.claims['active']=False
         with self.assertRaises(Hold):self.check()
         self.assertEqual(len(self.calls),2)
+
+    def test_expires_during_introspection(self):
+        self.auth.wall_clock=lambda:NOW+101
+        with self.assertRaises(Hold):self.check()
+
+    def test_clock_rollback_and_nonfinite(self):
+        for value in (NOW-1,float('nan'),float('inf')):
+            self.auth.wall_clock=lambda:value
+            with self.assertRaises(Hold):self.check()
+
+    def test_monotonic_total_deadline(self):
+        for value in (5,5.1,-1,float('nan')):
+            values=iter([100,100+value])
+            self.auth.monotonic=lambda:next(values)
+            with self.assertRaises(Hold):self.check()
 
     def test_missing_or_invalid_bearer(self):
         for token in ('','Basic xxx',TOKEN+'\n',TOKEN+',other','Bearer short'):
@@ -114,13 +130,14 @@ class ResourceTests(unittest.TestCase):
                 if header != TOKEN:raise Hold('OAUTH_BEARER_REQUIRED')
                 s.last=(scope,project,now)
                 return recipient
-        return OAuthProjectResource(self.q.db,{self.catalog.sha:(self.catalog,{'frozen-input':(str(self.src),0)})},Auth(),enabled)
+        return OAuthProjectResource(self.q.db,{self.catalog.sha:(self.catalog,{'frozen-input':(str(self.src),0)})},Auth(),enabled,clock=lambda:NOW)
 
     def args(self):
         return dict(manifest_sha256=self.catalog.sha,request_id='approved-transfer',object_ref='module-object',offset=0)
 
     def test_default_disabled_before_authentication(self):
-        with self.assertRaisesRegex(Hold,'DISABLED'):self.resource(enabled=False).read(TOKEN,self.args(),NOW)
+        for value in (False,'false',1,None):
+            with self.assertRaisesRegex(Hold,'DISABLED'):self.resource(enabled=value).read(TOKEN,self.args(),NOW)
 
     def test_missing_auth_before_file_read(self):
         with patch('production.cloud_connection.private_transfer.read_object',side_effect=AssertionError('file access')):

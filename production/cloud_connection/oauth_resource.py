@@ -6,6 +6,9 @@ and tunnel metadata are never accepted as identity. Compatible with core 3.6.
 """
 import base64
 import json
+import math
+import multiprocessing
+import time
 import re
 import urllib.parse
 import urllib.request
@@ -21,9 +24,60 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise Hold('OAUTH_REDIRECT_FORBIDDEN')
 
 
+def _http_child(channel, url, data, headers, budget):
+    """No secrets on argv, disk or exception output; parent owns total limit."""
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        with opener.open(req, timeout=budget) as response:
+            if response.getcode() != 200:
+                raise ValueError()
+            raw = response.read(16385)
+            if len(raw) > 16384:
+                raise ValueError()
+        channel.send_bytes(b'1' + raw)
+    except BaseException:
+        channel.send_bytes(b'0')
+    finally:
+        channel.close()
+
+
+def bounded_http(request, budget, context=None):
+    # A socket timeout resets after every successful read and does not bound
+    # DNS/TLS/drip-feed duration. Isolate the whole request and cancel it.
+    if not math.isfinite(budget) or not 0 < budget <= 5:
+        raise Hold('OAUTH_DEADLINE')
+    deadline = time.monotonic() + budget
+    ctx = context or multiprocessing.get_context('spawn')
+    receiving, sending = ctx.Pipe(duplex=False)
+    process = ctx.Process(target=_http_child, args=(sending, request.full_url,
+        request.data, dict(request.header_items()), budget))
+    try:
+        process.start()
+        sending.close()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not receiving.poll(remaining):
+            raise Hold('OAUTH_DEADLINE')
+        result = receiving.recv_bytes(16386)
+        if time.monotonic() >= deadline or result[:1] != b'1':
+            raise Hold('OAUTH_DEADLINE_OR_NETWORK')
+        return result[1:]
+    finally:
+        receiving.close()
+        sending.close()
+        if process.pid is not None:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=0.1)
+            if process.is_alive():
+                import signal, os
+                os.kill(process.pid, signal.SIGKILL)
+                process.join(timeout=0.1)
+
+
 class Introspection:
     def __init__(self, issuer, endpoint, client_id, secret_provider, audience,
-                 subjects, open_url=None):
+                 subjects, open_url=None, wall_clock=None, monotonic=None):
         for value in (issuer, endpoint, audience):
             u = urllib.parse.urlsplit(value)
             if (u.scheme != 'https' or not u.hostname or u.username or u.password
@@ -44,14 +98,18 @@ class Introspection:
         self.secret_provider, self.audience = secret_provider, audience
         # Copy to prevent a caller mutating policy between verification/use.
         self.subjects = json.loads(json.dumps(subjects))
-        self.open_url = open_url or urllib.request.build_opener(
-            urllib.request.ProxyHandler({}), NoRedirect()).open
+        self.open_url = open_url
+        self.wall_clock = wall_clock or time.time
+        self.monotonic = monotonic or time.monotonic
 
     def authenticate(self, authorization, required_scope, project, now):
-        if (required_scope not in SCOPES or type(now) is not int
+        if (required_scope is not None and required_scope not in SCOPES or type(now) is not int
                 or type(authorization) is not str
                 or not re.fullmatch(r'Bearer [A-Za-z0-9._~+/=-]{16,4096}', authorization)):
             raise Hold('OAUTH_BEARER_REQUIRED')
+        start = self.monotonic()
+        if not math.isfinite(start):
+            raise Hold('OAUTH_CLOCK')
         token = authorization[7:]
         try:
             secret = self.secret_provider()
@@ -68,13 +126,25 @@ class Introspection:
                      'Content-Type': 'application/x-www-form-urlencoded',
                      'Accept': 'application/json'}, method='POST')
         try:
-            with self.open_url(request, timeout=5) as response:
-                if response.getcode() != 200:
-                    raise ValueError()
-                raw = response.read(16385)
-                if len(raw) > 16384:
-                    raise ValueError()
+            if self.open_url is None:
+                raw = bounded_http(request, 5 - (self.monotonic() - start))
+            else:
+                # Explicit offline transport seam; the production path always
+                # uses a cancellable process, not a socket inactivity timeout.
+                with self.open_url(request, timeout=5) as response:
+                    if response.getcode() != 200:
+                        raise ValueError()
+                    raw = response.read(16385)
+                    if len(raw) > 16384:
+                        raise ValueError()
             claims = json.loads(raw.decode('utf-8'), object_pairs_hook=unique)
+            elapsed = self.monotonic() - start
+            current = self.wall_clock()
+            if not math.isfinite(elapsed) or elapsed < 0 or elapsed >= 5:
+                raise ValueError()
+            if not math.isfinite(current) or current < now:
+                raise ValueError()
+            now = current
         except Exception:
             # Never propagate endpoint responses, bearer or client secret.
             raise Hold('OAUTH_INTROSPECTION_UNAVAILABLE') from None
@@ -91,12 +161,18 @@ class Introspection:
         if audience != self.audience and audience != [self.audience]:
             raise Hold('OAUTH_RESOURCE_AUDIENCE')
         scope = claims.get('scope')
-        if type(scope) is not str or required_scope not in scope.split():
+        if (type(scope) is not str or not set(scope.split()) & SCOPES
+                or (required_scope is not None and required_scope not in scope.split())):
             raise Hold('OAUTH_SCOPE')
         subject = claims.get('sub')
         mapping = self.subjects.get(subject) if type(subject) is str else None
-        if mapping is None or project not in mapping['projects']:
+        if mapping is None or (project is not None and project not in mapping['projects']):
             raise Hold('OAUTH_SUBJECT_PROJECT')
+        final_time = self.wall_clock()
+        elapsed = self.monotonic() - start
+        if (not math.isfinite(final_time) or final_time < now or claims['exp'] <= final_time
+                or not math.isfinite(elapsed) or not 0 <= elapsed < 5):
+            raise Hold('OAUTH_EXPIRED_OR_DEADLINE')
         return mapping['recipient']
 
 
@@ -106,12 +182,13 @@ class OAuthProjectResource:
     The HTTP host must pass the actual Authorization header. This class is not
     registered by the installed stdio launcher and remains disabled by default.
     """
-    def __init__(self, db, catalogs, authenticator, enabled=False):
+    def __init__(self, db, catalogs, authenticator, enabled=False, clock=time.time):
         self.db, self.catalogs = db, dict(catalogs)
         self.authenticator, self.enabled = authenticator, enabled
+        self.clock = clock
 
     def read(self, authorization, arguments, now):
-        if not self.enabled:
+        if self.enabled is not True:
             raise Hold('OAUTH_RESOURCE_DISABLED')
         if type(arguments) is not dict or set(arguments) != {
                 'manifest_sha256', 'request_id', 'object_ref', 'offset'}:
@@ -123,5 +200,8 @@ class OAuthProjectResource:
         catalog, roots = entry
         recipient = self.authenticator.authenticate(
             authorization, 'project.files.read', catalog.value['project'], now)
+        current = self.clock()
+        if not math.isfinite(current) or current < now:
+            raise Hold('OAUTH_CLOCK')
         return ExistingProjectFiles(self.db, {digest: (catalog, roots)},
-                                    lambda: recipient, True).read(arguments, now)
+                                    lambda: recipient, True).read(arguments, int(current))

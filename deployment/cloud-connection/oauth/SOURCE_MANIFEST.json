@@ -1,0 +1,133 @@
+{
+  "baseline_commit": "c3f30bd8e3077f7aa4c0d21a05c8adfa9f180b26",
+  "files": [
+    {
+      "bytes": 471,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/authority.example.json",
+      "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244"
+    },
+    {
+      "bytes": 401,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
+      "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40"
+    },
+    {
+      "bytes": 1213,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
+      "sha256": "f81c75890ad4d0c01f768854f1093111d7df80e3577f63912396b1597af2754f"
+    },
+    {
+      "bytes": 5158,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/requirements.lock",
+      "sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4"
+    },
+    {
+      "bytes": 390,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/resource.example.json",
+      "sha256": "8ec9d5cec3795d3833ca8abc5c88589d71b24e3481b5fa0e872d5386748bbaab"
+    },
+    {
+      "bytes": 1633,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/run.py",
+      "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157"
+    },
+    {
+      "bytes": 669,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
+      "sha256": "d62b17f4485a65da463e4ac00aa9253940291bec0e6d72b00288d7586566008a"
+    },
+    {
+      "bytes": 722,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
+      "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d"
+    },
+    {
+      "bytes": 4452,
+      "mode": "0644",
+      "path": "production/cloud_connection/action_binding.py",
+      "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752"
+    },
+    {
+      "bytes": 6064,
+      "mode": "0644",
+      "path": "production/cloud_connection/credential_lifecycle.py",
+      "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620"
+    },
+    {
+      "bytes": 6583,
+      "mode": "0644",
+      "path": "production/cloud_connection/fixed_actions.py",
+      "sha256": "6d8dac97c11a902e05f316eb947415e0e08cda75f93a0805cf837483804961a3"
+    },
+    {
+      "bytes": 19439,
+      "mode": "0644",
+      "path": "production/cloud_connection/oauth_authority.py",
+      "sha256": "d4290dab540129901f68c6e0a17b944ebdfb9d1c31500f1bf2ee9db4476db15c"
+    },
+    {
+      "bytes": 6813,
+      "mode": "0644",
+      "path": "production/cloud_connection/oauth_entrypoint.py",
+      "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba"
+    },
+    {
+      "bytes": 7212,
+      "mode": "0644",
+      "path": "production/cloud_connection/oauth_http.py",
+      "sha256": "e0b738bb17f48c02c752fc04db3d88a662b769acff2d187882ae525dedc44a7b"
+    },
+    {
+      "bytes": 10069,
+      "mode": "0644",
+      "path": "production/cloud_connection/oauth_resource.py",
+      "sha256": "95c95038ccfdb5cc29eb55a5cc5a08ba1af803ab8b342fc9cec38faa5910e70f"
+    },
+    {
+      "bytes": 12809,
+      "mode": "0644",
+      "path": "production/cloud_connection/pr122_baseline_collector.py",
+      "sha256": "c352c041ab62a1bf3c1c55afeea461ba935016e294975dfb515e19972365250f"
+    },
+    {
+      "bytes": 9185,
+      "mode": "0644",
+      "path": "production/cloud_connection/private_mcp.py",
+      "sha256": "3c8a94a92b39519bd6797656fed6282815f7fbe0fcd8a794fb0edc77da6e0f86"
+    },
+    {
+      "bytes": 26055,
+      "mode": "0644",
+      "path": "production/cloud_connection/private_transfer.py",
+      "sha256": "be2f0ebbf6087fa6a1c804dc24fc67ef2d90ab507869e60125b0fd1cdad3cc5b"
+    },
+    {
+      "bytes": 8931,
+      "mode": "0644",
+      "path": "production/cloud_connection/queue.py",
+      "sha256": "2e884d3b357dab3122c043d0760fb5617a4fc1028340dee482765c62616fd0cb"
+    },
+    {
+      "bytes": 13638,
+      "mode": "0644",
+      "path": "production/cloud_connection/runtime.py",
+      "sha256": "0b81971bed28155ba8ed39b27c2db6de7d0b7d41abc58a7b64a9e5d1d2cd74a5"
+    },
+    {
+      "bytes": 13802,
+      "mode": "0644",
+      "path": "production/cloud_connection/worker.py",
+      "sha256": "085298228d5b6c3f65a1c4e3333478c516cc521b6a34b55808241b8d5ccdd11f"
+    }
+  ],
+  "purpose": "OAUTH_HTTP_CANDIDATE_NOT_ENROLLED",
+  "schema": 1
+}

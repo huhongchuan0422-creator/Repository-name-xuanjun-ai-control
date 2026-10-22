@@ -1,0 +1,23 @@
+[Unit]
+Description=Xuanjun loopback OAuth MCP resource candidate - no deployment approval
+After=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/xuanjun-cloud-executor/oauth-resource.env
+ExecStart=/opt/xuanjun-cloud-oauth/venv/bin/python -I -B /opt/xuanjun-cloud-oauth/current/deployment/cloud-connection/oauth/run.py --kind resource --config /etc/xuanjun-cloud-executor/oauth-resource.json --sha256 ${OAUTH_CONFIG_SHA256}
+UMask=0077
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+CapabilityBoundingSet=
+MemoryMax=256M
+TasksMax=32
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

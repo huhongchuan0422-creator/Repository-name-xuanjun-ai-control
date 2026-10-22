@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "enabled": false,
+  "hostname": "iZd7oeikknn1z21sq6ji6zZ",
+  "client_secret_ref": "/etc/xuanjun-cloud-executor/oauth-introspection.secret",
+  "settings": {
+    "issuer": "https://cloud-auth.wenwenwenyiyiyi.work",
+    "endpoint": "https://cloud-auth.wenwenwenyiyiyi.work/introspect",
+    "client_id": null,
+    "audience": null,
+    "subjects": {}
+  },
+  "catalogs": []
+}
