@@ -41,7 +41,7 @@ function merchantPanel(p,mode='list'){const x=merchantSample[p.id];if(!x)return 
 
 function consumerStorePanel(){
  if(state.scenario!=='sample')return '';
- return '<section class="panel"><span class="badge">隔离合成演示 · 非真实营业信息</span><h2>邻里生活馆（示例门店）</h2><dl><dt>商家</dt><dd>邻里生活馆 · 未经真实商户核验</dd><dt>商品与服务</dt><dd>邻里服务套餐（合成示例）</dd><dt>展示价格</dt><dd>¥20.00（2000 分；不创建订单）</dd><dt>真实交易</dt><dd>未启用，不提供付款动作</dd></dl><div class="actions">'+link('查看示例门店详情',href('consumer','stores','detail'),'button secondary')+link('商家入驻（同一小程序）',href('admission'),'button')+'</div></section>';
+ return '<section class="panel"><span class="badge">隔离合成演示 · 非真实营业信息</span><h2>邻里生活馆（示例门店）</h2><dl><dt>商家</dt><dd>邻里生活馆 · 未经真实商户核验</dd><dt>商品与服务</dt><dd>邻里服务套餐（合成示例）</dd><dt>展示价格</dt><dd>¥20.00（2000 分；不创建订单）</dd><dt>真实交易</dt><dd>未启用，不提供付款动作</dd></dl><div class="actions">'+link('查看示例门店详情',href('consumer','consumer-stores','detail'),'button secondary')+link('商家入驻（同一小程序）',href('admission'),'button')+'</div></section>';
 }
 function collectionReviewActions(){
  if(state.scenario!=='sample')return '';
