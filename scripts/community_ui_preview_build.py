@@ -63,12 +63,12 @@ def build():
     for page in pages:
         if page['role']=='merchant':page['legacyOnly']=True
     native='clients/community-mini/pages/merchant/index.wxml'
-    native_specs=[('orders','订单与收款记录','<p>示例订单 EXAMPLE-001 · 金额 2000 分 · 待处理（隔离演示，非真实到账）</p><p>原生运行版读取真实权限范围内的订单编号、金额和状态；此处只展示界面字段。</p><label>订单编号<input id="merchant-reference" maxlength="64"></label>',False),
-        ('summary','收款统计','<p>示例订单总额：2000 分（非真实统计）</p><p>微信核实收款：未核实；微信核实退款：未核实</p><p>结算收入：未对账，不显示已到账。</p><p>正式金额由同版本原Center统计接口读取，演示不得作为支付凭证。</p>',False),
+    native_specs=[('orders','订单与收款记录','<label>订单编号<input id="merchant-reference" maxlength="64"></label>',False),
+        ('summary','收款统计','<p>订单总额、微信已核收款及退款观察按原接口分别读取；无真实核验时不显示到账。</p>',False),
         ('profile','门店资料','<label>门店名称<input id="merchant-name" maxlength="120"></label><label>简介<textarea id="merchant-description" maxlength="2048"></textarea></label><label>联系方式<input id="merchant-contact" maxlength="120"></label>',True),
-        ('catalog','商品与服务','<p>示例门店：邻里生活馆 · 示例商品：邻里服务套餐 · 演示价格 2000 分</p><p>仅界面示例，不是商家真实商品；运行版经原目录接口读取，同源原商品后台可维护。</p>',False),
+        ('catalog','商品与服务','<p>沿原目录查看商品；原商品、定价库存和退款后台源码保留。本候选手机端不冒充已覆盖全部维护操作。</p>',False),
         ('detail','订单详情与退款状态','<label>原订单编号<input id="merchant-order-reference" maxlength="64"></label><p>订单、退款与分账状态分别展示，不以预览流水冒充真实执行。</p>',False),
-        ('collection','收款码与保存手机','<p>当前状态：尚未取得正式收款码。隔离预览不访问微信或实际支付接口。</p><p>取得条件：原微信认证、签约、JSAPI及门店资格均需真实通过；未满足时显示不可用。</p><button disabled>取得正式收款码（未满足资格）</button><button disabled>保存手机相册（无正式图片）</button><p>加载失败、无资格和相册授权拒绝均不回退为示例可扫码图片。</p>',False)]
+        ('collection','收款码与保存手机','<p>仅原微信认证、签约、JSAPI及门店资格核验通过后，服务端才取得正式版小程序收款入口码。</p><button disabled>取得正式收款码（隔离预览不调用微信）</button><button disabled>保存手机相册（未取得正式图片）</button>',False)]
     for key,title,body,editable in native_specs:
         pages.append(dict(id='merchant-native-'+key,role='merchant',title=title,html=body,source=native,kind='mini',editable=editable,actions=[]))
     on=load('onboarding.html');profile=next(x for x in on.find('form') if x.attrs.get('id')=='profile')
