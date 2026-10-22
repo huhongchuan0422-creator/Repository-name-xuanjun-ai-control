@@ -69,11 +69,11 @@ class ClickThrough(unittest.TestCase):
                         if role!='admission':
                             page.get_by_role('link',name='查看详情',exact=True).click()
                             expect(page).to_have_url(__import__('re').compile('/detail$'))
-                            page.get_by_role('link',name='编辑示例',exact=True).click()
+                            page.locator('.edit-preview').click()
                         expect(page).to_have_url(__import__('re').compile('/edit$'))
                         self.assert_layout(page,width,module['id']+'-edit')
                         page.reload();expect(page.locator('main h1')).to_have_text(module['title'])
-                        page.get_by_role('button',name='演示保存并返回',exact=True).click()
+                        page.locator('#demo-save').click()
                         if role!='admission':
                             expect(page).to_have_url(__import__('re').compile('/list$'))
                             expect(page.locator('.record')).to_be_visible()

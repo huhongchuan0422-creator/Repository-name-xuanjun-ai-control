@@ -58,7 +58,7 @@ def build():
                     else:chunks.append(((form.find('button')[0].text() if form.find('button') else '编辑') if len(forms)>1 else '',form.html()))
                 if not chunks:chunks=[('', ''.join(c.html() for c in children if c.tag not in ('pre','div','table')))]
                 for k,(suffix,body) in enumerate(chunks):
-                    pages.append({'id':owner+'-'+str(i)+'-'+str(j)+'-'+str(k),'role':owner,'title':subtitle+(' · '+suffix if suffix else ''),'source':name,'source_heading':title,'html':body,'kind':'module','actions':[{'id':b.attrs.get('id',''), 'title':b.text()} for c in children for b in ([c] if c.tag=='button' else c.find('button'))]})
+                    pages.append({'id':owner+'-'+str(i)+'-'+str(j)+'-'+str(k),'role':owner,'title':subtitle+(' · '+suffix if suffix else ''),'source':name,'source_heading':title,'html':body,'kind':'module','editable':bool(forms),'actions':[{'id':b.attrs.get('id',''), 'title':b.text()} for c in children for b in ([c] if c.tag=='button' else c.find('button'))]})
     on=load('onboarding.html');profile=next(x for x in on.find('form') if x.attrs.get('id')=='profile')
     labels=[label for label in profile.find('label') if not any(n.attrs.get('id') in ('legal_name','contact','identity_type','delegated') for n in label.find('input')+label.find('select'))]
     for n in range(0,len(labels),6):pages.append({'id':'admission-basic-'+str(n//6),'role':'admission','title':'经营信息 '+str(n//6+1),'html':''.join(x.html() for x in labels[n:n+6]),'source':'onboarding.html','kind':'step'})
@@ -89,7 +89,7 @@ def build():
     for key,title,fields in consumer_specs:
         body=''.join('<label>'+x+'<input id="consumer-'+key+'-'+str(i)+'" maxlength="120"></label>' for i,x in enumerate(fields))
         source='clients/community-mini/pages/'+('home' if key=='home' else 'profile' if key=='profile' else 'checkout')+'/index.wxml'
-        pages.append({'id':'consumer-'+key,'role':'consumer','title':title,'html':body,'source':source,'kind':'consumer'})
+        pages.append({'id':'consumer-'+key,'role':'consumer','title':title,'html':body,'source':source,'kind':'consumer','editable':bool(fields)})
     for f in ['onboarding.html','onboarding.js']:
         sources[f]=hashlib.sha256((BASE/f).read_bytes()).hexdigest()
     document_types={x.attrs['value']:x.text() for select in on.find('select') if select.attrs.get('id')=='identity_type' for x in select.find('option')}
@@ -102,7 +102,7 @@ def main():
     for p in data['pages']:
         if p['role']=='admission':
             route='`#/admission/'+p['id']+'/edit` → 演示保存返回 `'+(p.get('stage') or p['id'])+'`；仅适用分支可见'
-        else:route='`#/'+p['role']+'/'+p['id']+'/list` → `detail` → `edit` → 演示保存返回列表'
+        else:route='`#/'+p['role']+'/'+p['id']+'/list` → `detail` → `edit` → '+('演示保存返回列表' if p.get('editable') else '只读操作说明后返回列表，不新增业务记录')
         lines.append('|'+data['roles'][p['role']]+'|'+p['title']+'|'+route+'|'+p['source']+'|')
     (ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md').write_text('\n'.join(lines)+'\n')
 def bundle(target):
