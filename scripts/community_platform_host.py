@@ -29,7 +29,7 @@ def _require_nonroot():
 
 
 def _configuration(plan, key_material, wechat):
-    if type(plan) is not dict or set(plan) not in (FIELDS,FIELDS|{'registration_scenes'}) or type(plan['version']) is not int or plan['version'] != 1:
+    if type(plan) is not dict or not FIELDS <= set(plan) <= FIELDS|{'registration_scenes','community_grants'} or type(plan['version']) is not int or plan['version'] != 1:
         raise ValueError('EXACT_PLATFORM_HOST_PLAN_REQUIRED')
     if (type(key_material) is not dict or set(key_material) != {'active_key','keys'}
             or type(key_material['active_key']) is not str
@@ -63,6 +63,8 @@ def _configuration(plan, key_material, wechat):
     PersistentRuntime._bindings(bindings, lambda:0)
     if type(plan['operations']) is not dict or type(plan['reviewers']) is not dict:
         raise ValueError('PROTECTED_OPERATION_GRANTS_REQUIRED')
+    if 'community_grants' in plan and type(plan['community_grants']) is not dict:
+        raise ValueError('PROTECTED_COMMUNITY_GRANTS_REQUIRED')
     operations = {}
     for name, value in plan['operations'].items():
         if type(value) is not dict or type(value.get('principal')) is not str or value['principal'] not in principals:
@@ -130,6 +132,8 @@ class PlatformHost:
             if plan['reviewers']:
                 owner.application.configure_onboarding(plan['reviewers'])
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
+            if plan.get('community_grants'):
+                owner.application.configure_communities(plan['community_grants'])
             owner.application.configure_commerce()
             owner.plan = plan
             return owner

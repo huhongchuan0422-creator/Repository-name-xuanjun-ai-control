@@ -72,12 +72,13 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
         def log_message(self,*args):pass
         def setup(self):
             super().setup();self.rfile.close();self.rfile=_HeaderDeadlineReader(self.connection)
-        def answer(self,status,value):
+        def answer(self,status,value,*,cookie=None):
             raw=json.dumps(value,ensure_ascii=False,allow_nan=False).encode()
             self.send_response(status)
             for k,v in [('Content-Type','application/json; charset=utf-8'),('Content-Length',str(len(raw))),
                         ('Cache-Control','no-store'),('X-Content-Type-Options','nosniff'),
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
+            if cookie is not None:self.send_header('Set-Cookie',cookie)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
             if self.path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None and commerce is None:return self.answer(404,{'error':'NOT_FOUND'})
@@ -105,7 +106,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(503 if maintenance else 200,{'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False})
             if proxy_origin=='https://uk.wenwenwenyiyiyi.work':
                 from scripts.community_web_entries import asset,entries
-                if self.path=='/community/entrypoints':return self.answer(200,entries())
+                if self.path=='/community/entrypoints':return self.answer(200,entries(value['project'] for value in gateway.identity.scenes.values()))
                 selected=asset(self.path)
                 if selected is not None:
                     raw,mime=selected
@@ -154,7 +155,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 try:proxy_source=trusted_proxy(self.connection,self.headers)
                 except PermissionError:return self.answer(403,{'error':'PROXY_DENIED'})
                 except Exception:return self.answer(503,{'error':'PROXY_UNAVAILABLE'})
-            if self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
+            web_session=(proxy_origin=='https://uk.wenwenwenyiyiyi.work' and self.path in ('/community/session/login','/community/session/check','/community/session/logout'))
+            if web_session and (self.headers.get_all('Origin',[]) != [proxy_origin] or self.headers.get_all('Sec-Fetch-Site',[]) not in ([],['same-origin'])):
+                return self.answer(403,{'error':'ORIGIN_DENIED'})
+            if not web_session and self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
                     self.path=='/community/operations' and operations is not None) and not (
                     self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
                     self.path=='/merchant/onboarding' and onboarding is not None) and not (
@@ -232,6 +236,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     return value
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
+                if web_session:
+                    from scripts.community_web_session import WebSession
+                    result,cookie=WebSession(gateway.identity.center,operations,communities,onboarding).dispatch(self.path,self.headers,body,proxy_source)
+                    return self.answer(200,{'result':result,'payment_enabled':False},cookie=cookie)
                 token=self.headers.get('X-Community-Session','')
                 if self.path=='/mini/project-materials':
                     result=commerce.project_document_upload(token,self.headers.get('X-Community-Scene',''),body)

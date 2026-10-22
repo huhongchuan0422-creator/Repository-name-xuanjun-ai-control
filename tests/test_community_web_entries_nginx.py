@@ -8,10 +8,12 @@ class RoleProxy(unittest.TestCase):
         for path in ['/merchant/join','/merchant/review','/merchant/workbench','/merchant/workbench.js',
                      '/merchant/workbench.css','/merchant/onboarding','/merchant/onboarding.js',
                      '/merchant/onboarding.css','/community/portal','/community/portal.js','/community/portal.css',
-                     '/community/entrypoints','/community/operations','/community/directory']:
+                     '/community/entrypoints','/community/operations','/community/directory','/community/commerce',
+                     '/community/provider-actions','/community/merchant-bills','/community/session/login',
+                     '/community/session/check','/community/session/logout','/community/web-session.js']:
             self.assertIsNotNone(re.fullmatch(pattern,'/community-preview'+path))
         for path in ['/owner/','/owner-callback','/owner/api/state','/community-preview/merchant/private',
-                     '/community-preview/community/provider-actions','/community-preview/merchant/workbench/extra','/merchant/review']:
+                     '/community-preview/community/unknown','/community-preview/merchant/workbench/extra','/merchant/review']:
             self.assertIsNone(re.fullmatch(pattern,path))
         nginx=shutil.which('nginx') or '/usr/sbin/nginx'
         self.assertTrue(Path(nginx).is_file(),'CI must install real nginx, no skipped syntax verification')

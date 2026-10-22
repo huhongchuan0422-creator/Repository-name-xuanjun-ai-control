@@ -86,6 +86,22 @@ class FormalHost(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 app.gateway.dispatch(token,dict(scene='shop1',operation='community.storefront',params={}))
         self.assertIsNone(host.center);self.assertIsNone(host.persistence)
+    def test_protected_community_grants_use_same_center_and_commerce(self):
+        self.plan['community_grants']={'community':dict(user_id=self.fx.uid1,project='project1',tenant='tenant1',role='COMMUNITY_ADMIN')}
+        self.write('host.json',self.plan)
+        with self.open() as host:
+            app=host.application
+            self.assertIs(app.communities.center,host.center)
+            self.assertIs(app.communities.commerce,app.commerce)
+            web=host.center.login('one@example.org','FixturePassword123!')
+            self.assertEqual(app.communities.authorize(web['token'],web['csrf'],'community')['role'],'COMMUNITY_ADMIN')
+            host.center.db.execute("UPDATE projects SET active=0 WHERE id='project1'")
+            with self.assertRaises(PermissionError):app.communities.authorize(web['token'],web['csrf'],'community')
+            host.center.db.execute("UPDATE projects SET active=1 WHERE id='project1'")
+        self.plan['community_grants']['community']['role']='SUPERADMIN'
+        self.write('host.json',self.plan)
+        with self.assertRaises(ValueError):self.open()
+
     def test_unknown_provider_subject_does_not_create_an_account(self):
         with self.open() as host:
             before=host.center.db.execute('SELECT count(*) FROM accounts').fetchone()[0]

@@ -42,6 +42,8 @@ class SourcePackage(unittest.TestCase):
                 'deploy/community-preview/nginx-uk-path-candidate.conf',
                 'scripts/community_platform_host.py',
                 'scripts/community_web_entries.py',
+                'scripts/community_web_session.py',
+                'demos/community-stage/web-session.js',
                 'scripts/community_persistent_runtime.py',
                 'scripts/community_first_install.py',
                 'scripts/community_wechat_registration.py',

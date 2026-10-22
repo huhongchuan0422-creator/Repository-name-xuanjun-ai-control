@@ -331,3 +331,18 @@ Owner明确：角色入口属于原定制项目交付，应由官网原项目详
 消费者小程序从门店/订单页移除不属于社区消费者流程的项目交付表单，保留原处理器及后台成果；页面标题由“模拟收款”改为“门店与订单”。服务端原订单创建与支付未开放分别说明，离线开发分支仍明确标记模拟，不把订单创建当付款成功。
 
 现场仍运行3851b1db镜像，仅原mini/health路由已通；本次网页源码、镜像及限定Nginx规则须以新CI、准确image ID、同原数据卷升级及公开GET验收回执绑定后才可登记可用URL。不得重新执行first-install或生成密钥，不覆盖Owner/P2路由、不授予角色、不发真实资金操作。旧镜像、原数据和失败日志保留，升级与回退只作用本项目容器及本项目include。
+
+
+## 2026-10-22 原角色网页会话及代理增量（Issue76 #6332196393）
+
+保留 ee2ed8da 页面/镜像资产成果。网页工作人员登录仅消费本社区所持有的原 Center 已验证账户；不连接官网 SaaS/国内 CRM，不开放注册或创建管理员。消费者仍使用原小程序微信首次登录注册，无需邮箱，不能将网页工作人员登录当作消费者 H5。
+
+新增 /community/session/login、check、logout（外部均加 /community-preview）。POST 必须同源 Origin；登录使用原 Center.login 和持久来源限流；会话仅以 Secure/HttpOnly/SameSite=Strict 的原 __Host-xj_customer cookie 传递。CSRF 仅留本标签页 sessionStorage，不将 session token、身份或角色写入 URL。check 读取当前项目授权，网页选择服务端返回的已授权 workspace；原业务 dispatch 继续复查当前角色、租户、门店绑定及撤权，不以目录或选择框授权。网络失败不自动重放。
+
+正式 host.json 可选 community_grants 仅接受原 CenterCommunities 的受保护配置；省略或空字典不启用，不自动写入现场。它与 operations/reviewers 一样仍须引用原账户/项目的真实授权。未授权用户不能凭登录或前端角色值获得工作区。
+
+Nginx 候选按原 workbench 请求增加精确 commerce/provider-actions/merchant-bills 路径及三条会话路径、固定 JS 资产，禁止整段 community 通配。业务组件未配置仍拒绝，路由存在不证明财务/分账产品可用。真实 Nginx 语法测试放到 platform-host-scope 的独立必跑步骤；缺二进制报错，不 SKIP。
+
+目录输出镜像构建 SOURCE_SHA 及受保护 scene 对应项目标识；ROLE_ACCEPTANCE_PENDING/production_acceptance=false 不表示任何角色验收通过。consumer 仍小程序，platform 仍仅原入驻审核页。新浏览器测试通过 Unix HTTP 调用原 Center 和原业务 API，使用合成账户且不伪造 API 响应；它不是现场账号验收。
+
+现场 3851b1db 实例保留。新候选须 Hosted 通过、适用审核、镜像/路由变更范围确认后才可替换；本段不扩展部署授权。真实角色账号/配置尚未准入时不得造 grant/种子。下一验收需分别记录真实微信登录、原角色正向操作、跨角色拒绝、准确运行版本及官网允许链接；不以导航 200、绿灯或目录登记关闭任务。
