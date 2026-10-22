@@ -2,11 +2,11 @@
 // Dependency-free DOM harness: real app.js and mocked same-origin HTTP only.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 class Element{
- constructor(){this.hidden=false;this.disabled=false;this.children=[];this.textContent='';this.value='';this.valid=true;this.listeners={};this.elements={};}
+ constructor(){this.hidden=false;this.disabled=false;this.children=[];this.textContent='';this.value='';this.valid=true;this.listeners={};this.elements={};this.scrollCalls=0;}
  append(...nodes){this.children.push(...nodes);} prepend(...nodes){this.children.unshift(...nodes);}
  replaceChildren(...nodes){this.children=nodes;this.textContent='';}
  addEventListener(type,fn){this.listeners[type]=fn;}
- reportValidity(){return this.valid;}
+ reportValidity(){return this.valid;} scrollIntoView(){this.scrollCalls++;}
  reset(){for(const field of Object.values(this.elements))field.value='';}
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
@@ -15,7 +15,9 @@ function fixture(){
  const dom=Object.fromEntries(ids.map(id=>[id,new Element()]));
  for(const id of ['login','verification','reset','message','bind','invite','revoke','accept'])for(const field of ['email','password','token','body','subject','user_id','invitation'])dom[id].elements[field]=new Element();
  const requests=[],responses=[],storage=new Map([['xj_csrf','old-csrf']]),events={};let reloads=0;
- const context=vm.createContext({crypto:require('node:crypto').webcrypto,document:{getElementById:id=>dom[id],createElement:()=>new Element()},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},window:{addEventListener:(k,fn)=>events[k]=fn,location:{reload:()=>reloads++}},FormData:class{constructor(form){this.form=form;}*[Symbol.iterator](){for(const [name,input] of Object.entries(this.form.elements))if(['email','password'].includes(name))yield[name,input.value];}},fetch:async(url,options)=>{requests.push({url,options});const response=responses.shift();if(response instanceof Error)throw response;if(typeof response==='function')return response();return {ok:response.status<400,status:response.status,json:async()=>response.body};}});
+ const location={hash:'',pathname:'/customer/center/',search:'',reload:()=>reloads++};
+ const history={replaceState(_a,_b,url){const hash=String(url).indexOf('#');location.hash=hash>=0?String(url).slice(hash):'';}};
+ const context=vm.createContext({crypto:require('node:crypto').webcrypto,document:{getElementById:id=>dom[id],createElement:()=>new Element()},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},location,history,URLSearchParams,requestAnimationFrame:fn=>fn(),window:{addEventListener:(k,fn)=>events[k]=fn,location},FormData:class{constructor(form){this.form=form;}*[Symbol.iterator](){for(const [name,input] of Object.entries(this.form.elements))if(['email','password'].includes(name))yield[name,input.value];}},fetch:async(url,options)=>{requests.push({url,options});const response=responses.shift();if(response instanceof Error)throw response;if(typeof response==='function')return response();return {ok:response.status<400,status:response.status,json:async()=>response.body};}});
  const reply=(status,body)=>responses.push({status,body});
  const me={projects:[{id:'p1',title:'Project',role:'OWNER'}],channels:{web_ai:{state:'PENDING_CONNECTION'},telegram:{state:'PENDING_CONNECTION'},feishu:{state:'PENDING_CONNECTION'}}};
  reply(200,me);vm.runInContext(fs.readFileSync('deploy/pr122-customer-center/ui/app.js','utf8'),context);
@@ -28,6 +30,9 @@ function fixture(){
  f.run("csrf='retained'");f.storage.set('xj_csrf','retained');f.reply(503,{error:'maintenance'});await f.run('start()');assert.match(f.dom.notice.textContent,/暂时无法确认登录状态/);assert.equal(f.storage.get('xj_csrf'),'retained');assert.equal(f.dom.logout.hidden,false);
  f.responses.push(new Error('network failed'));await f.run('start()');assert.match(f.dom.notice.textContent,/network failed/);assert.equal(f.reloads(),0);
  f.reply(200,f.me);await f.run('start()');assert.equal(f.dom.workspace.hidden,false);assert.equal(f.dom.projects.children.length,1);
+ f.context.location.hash='#project=p1&view=changes';f.reply(200,f.me);f.reply(200,{overall:'NOT_STARTED',requirements_revision:1,items:[]});f.reply(200,{messages:[]});f.reply(200,{links:[]});f.reply(200,{cases:[]});f.reply(200,{pages:[]});await f.run('start()');assert.equal(f.run('project'),'p1');assert.equal(f.dom.changes.scrollCalls,1,'deep link must reach changes after project generation changes');
+ f.context.location.hash='#project=missing&view=changes';f.reply(200,f.me);await f.events.hashchange();assert.equal(f.run('project'),'');assert.equal(f.dom.project.hidden,true);assert.equal(f.context.location.hash,'');
+ f.context.location.hash='#project=p1&view=changes';f.reply(200,f.me);f.reply(200,{overall:'NOT_STARTED',requirements_revision:1,items:[]});f.reply(200,{messages:[]});f.reply(200,{links:[]});f.reply(200,{cases:[]});f.reply(200,{pages:[]});await f.events.hashchange();assert.equal(f.run('project'),'p1');assert.equal(f.dom.changes.scrollCalls,2);
  f.dom.login.valid=false;let before=f.requests.length;await f.click('register');assert.equal(f.requests.length,before);
  f.dom.login.valid=true;f.dom.login.elements.email.valid=false;await f.click('reset-request');assert.equal(f.requests.length,before);
  f.dom.login.elements.email.valid=true;f.dom.login.elements.password.valid=false;f.reply(200,{status:'CHECK_VERIFICATION_CHANNEL'});await f.click('reset-request');assert.equal(f.requests.length,before+1);assert.deepEqual(JSON.parse(f.requests.at(-1).options.body),{email:''});
