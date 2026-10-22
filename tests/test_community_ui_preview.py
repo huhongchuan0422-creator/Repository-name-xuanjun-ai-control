@@ -318,7 +318,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('#view')).to_contain_text('当前适用条件下必填')
             page.screenshot(path=str(self.out/'owner-admission.png'),full_page=True)
             page.get_by_role('link',name='我的',exact=True).click()
-            expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-profile/list
+            expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-profile/list$'))
             expect(page.locator('.mini-tabbar a')).to_have_count(4)
             page.get_by_label('查看身份',exact=True).select_option('platform')
             expect(page.locator('#menu')).to_contain_text('订单管理')
