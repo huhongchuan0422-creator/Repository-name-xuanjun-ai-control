@@ -33,6 +33,7 @@ const merchantSample={
 function merchantPanel(p,mode='list'){const x=merchantSample[p.id];if(!x)return null;return header(p)+
  '<section class="panel"><span class="badge">仅合成演示 · 非客户订单、微信认证或支付结果</span><h2>'+e(x.title)+'</h2>'+
  statePanel()+(state.scenario==='sample'?'<dl>'+x.rows.map(([k,v])=>'<dt>'+e(k)+'</dt><dd>'+e(v)+'</dd>').join('')+'</dl>':'')+
+ (mode==='list'&&state.scenario==='sample'?'<div class="record"><div><strong>'+e(x.title)+' · EXAMPLE-001</strong><small>隔离示例 · 非真实业务记录</small></div></div>':'')+
  (p.id==='merchant-native-collection'?'<p class="example-note">无可扫码示例码；微信认证、签约、产品资格、正式码及相册保存均未验收。</p><button disabled>获取正式码（隔离预览禁用）</button><button disabled>保存手机相册（无正式图片）</button>':'')+
  '<div class="actions">'+(mode==='list'?link('查看详情',href('merchant',p.id,'detail'),'button secondary')+link('返回商家工作台',href('merchant'),'button secondary'):mode==='detail'?link('查看操作界面',href('merchant',p.id,'edit'),'button edit-preview')+link('返回列表',href('merchant',p.id),'button secondary'):'<button id="demo-save">结束查看并返回</button>'+link('返回列表',href('merchant',p.id),'button secondary'))+'</div></section>';
 }
