@@ -1,0 +1,25 @@
+[Unit]
+Description=Xuanjun GitHub OAuth authority candidate - no deployment approval
+After=network-online.target
+
+[Service]
+Type=simple
+User=xuanjun_oauth
+Group=xuanjun_oauth
+EnvironmentFile=/etc/xuanjun-cloud-oauth/authority.env
+ExecStart=/opt/xuanjun-cloud-oauth/venv-py3116/bin/python -I -B /opt/xuanjun-cloud-oauth/current/deployment/cloud-connection/oauth/run.py --kind authority --config /etc/xuanjun-cloud-oauth/authority.json --sha256 ${OAUTH_CONFIG_SHA256}
+UMask=0077
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/xuanjun-cloud-oauth
+CapabilityBoundingSet=
+MemoryMax=256M
+TasksMax=32
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

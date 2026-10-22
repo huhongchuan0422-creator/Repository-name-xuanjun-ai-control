@@ -20,10 +20,28 @@
       "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40"
     },
     {
+      "bytes": 1276,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
+      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5"
+    },
+    {
       "bytes": 1390,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
       "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5"
+    },
+    {
+      "bytes": 320,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
+      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64"
+    },
+    {
+      "bytes": 358,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
+      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef"
     },
     {
       "bytes": 5158,
@@ -42,6 +60,18 @@
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/run.py",
       "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157"
+    },
+    {
+      "bytes": 228,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/tls-approved.conf.candidate",
+      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1"
+    },
+    {
+      "bytes": 729,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
+      "sha256": "1c3511ef8dc0f95d9b4ae7d3a989b25c10258eb8eb322c8cb29807866bc5e89c"
     },
     {
       "bytes": 814,
@@ -138,30 +168,6 @@
       "mode": "0644",
       "path": "production/cloud_connection/worker.py",
       "sha256": "085298228d5b6c3f65a1c4e3333478c516cc521b6a34b55808241b8d5ccdd11f"
-    },
-    {
-      "bytes": 1276,
-      "mode": "0644",
-      "path": "deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
-      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5"
-    },
-    {
-      "bytes": 228,
-      "mode": "0644",
-      "path": "deployment/cloud-connection/oauth/tls-approved.conf.candidate",
-      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1"
-    },
-    {
-      "bytes": 320,
-      "mode": "0644",
-      "path": "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
-      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64"
-    },
-    {
-      "bytes": 358,
-      "mode": "0644",
-      "path": "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
-      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef"
     }
   ],
   "purpose": "OAUTH_HTTP_CANDIDATE_NOT_ENROLLED",

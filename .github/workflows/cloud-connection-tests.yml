@@ -12,6 +12,36 @@ on:
 permissions:
   contents: read
 jobs:
+  domestic-py3116:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: python:3.11.6-bookworm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Exact source and independent CPython3.11.6 test environment
+        run: |
+          git -c safe.directory="$GITHUB_WORKSPACE" log -1 --format='%H %T %P'
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          python -c 'import sys; assert sys.version_info[:3] == (3,11,6); print(sys.version)'
+          python -m venv /tmp/oauth-py3116
+          /tmp/oauth-py3116/bin/python -m pip download --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.lock --dest /tmp/approved-wheels
+          /tmp/oauth-py3116/bin/python -m pip install --no-index --find-links=/tmp/approved-wheels --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.lock
+          /tmp/oauth-py3116/bin/python -m pip check
+          /tmp/oauth-py3116/bin/python -I -B tests/oauth/record_py3116_wheels.py deployment/cloud-connection/oauth/requirements.lock /tmp/approved-wheels py3116-evidence
+      - name: Exact-version OAuth HTTP and persistence isolation compatibility
+        run: |
+          /tmp/oauth-py3116/bin/python -m unittest discover -s tests/oauth -p 'test_*.py' -v
+          /tmp/oauth-py3116/bin/python -m unittest discover -s tests -p 'test_cloud_connection*.py' -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: domestic-py3116-compatibility
+          path: py3116-evidence/
+          if-no-files-found: error
+          retention-days: 14
   offline:
     runs-on: ubuntu-latest
     strategy:

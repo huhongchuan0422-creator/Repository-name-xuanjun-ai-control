@@ -73,14 +73,20 @@ only a full pinned archive can be extracted. Preserve both failed domestic files
 
 ## Independent Python3.11.6 alternative: plan, not adoption
 
-Read-only domestic evidence #6332631298: the trusted Certbot launcher points to
-/opt/certbot/bin/python3; it reports3.11.6, base_prefix=/usr, x86_64/glibc2.38.
-That does not establish /usr/bin/python3.11's exact path/hash/ownership. Do not use
-or modify the Certbot venv, install into it, or assume its packages are OAuth deps.
+Correction from PR17 #6330641878/#6332994640 (no repeated host probe):
+/usr/bin/python3.11 is root:root0755,15624 bytes, SHA256
+d9d3833f98fe814c39497d1f05b48474cb214713dd32f3971a5f1877d548ec22.
+RPM python3 3.11.6-30.alnx4 digest matches. Invoke t-sh070rht0th2lfk
+Success/Exit0 confirmed CPython3.11.6, cpython-311-x86_64-linux-gnu,
+SQLite3.42.0 and OpenSSL3.0.12; raw498 bytes SHA256
+cf3f450fc6c59331add0972aca39c3fc12d26f04aed04ff0781e83afe304b25a.
+These are verified inherited facts, not missing interpreter evidence.
+Do not use or modify /opt/certbot or its packages.
 
 Required alternative binding before adoption:
-1. Bounded metadata/version/SHA of the system base3.11.6 interpreter and its fixed
-stdlib/OpenSSL/SQLite linkage, independently of Certbot; no filesystem scan.
+1. Reuse the exact interpreter/ABI/linkage evidence above. Dependency RPM release
+and patch coverage beyond that original bounded probe remain separate facts; do
+not re-collect successful interpreter identity/hash/version checks.
 2. Separate /opt/xuanjun-cloud-oauth/venv-py3116 and the original hash-locked18
 package selection, wheel tags and `pip check`; retain the3.12.15 requirement lock.
 Thecp312 wheel hashes cannot provecp311 selection: record actual chosen wheels.

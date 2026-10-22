@@ -121,7 +121,8 @@
           "HTTP01 served without server-level redirect, bootstrap rejects other paths",
           "Exact manifest, real isolated Nginx tests; no live enrollment or credentials",
           "Old App/tunnel unchanged; static-client incompatibility stops new chain",
-          "Pre-egress introspect GET/POST/query are denied without upstream; finite peer observation expires and can be withdrawn"
+          "Pre-egress introspect GET/POST/query are denied without upstream; finite peer observation expires and can be withdrawn",
+          "Exact isolated Python3.11.6 dependency/wheel and HTTP/persistence compatibility remains distinct from vendor host and live runtime adoption"
         ],
         "tests": [
           "tests/test_cloud_connection_oauth_nginx.py",
@@ -142,7 +143,10 @@
         "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
         "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
         "tests/test_cloud_connection_oauth_pre_egress_nginx.py",
-        "docs/development/CLOUD_CONNECTION_PRE_EGRESS_AND_RUNTIME_20261022.md"
+        "docs/development/CLOUD_CONNECTION_PRE_EGRESS_AND_RUNTIME_20261022.md",
+        "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
+        "tests/oauth/record_py3116_wheels.py",
+        "docs/development/CLOUD_CONNECTION_THREE_HOST_READINESS_20261022.md"
       ]
     }
   ]
