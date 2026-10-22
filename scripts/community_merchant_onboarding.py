@@ -42,6 +42,22 @@ def profile_scenes(profile):
     return None if scenes is None else checked_scenes(scenes)
 
 
+def shared_application_fields(profile,fields):
+    """Platform names/contacts reuse this application's provider draft only."""
+    result=dict(fields)
+    for key,path in {'legal_name':('subject_info','business_license_info','merchant_name'),
+                     'contact':('contact_info','mobile_phone')}.items():
+        value=profile
+        for part in path:
+            value=value.get(part) if type(value) is dict else None
+        if value is not None:
+            if type(value) is not str:raise ValueError('INVALID_SHARED_APPLICATION_FIELD')
+            if value:safe_text(value,512)
+            if key=='contact' and len(value)>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
+            result[key]=value
+    return result
+
+
 def _failure_diagnostic(error,commit_attempted,rollback,object_write):
     # Internal fixed enums only; never expose paths, applicant/material IDs or errors.
     diagnostic=dict(database='ROLLED_BACK_BEFORE_COMMIT' if not commit_attempted and rollback=='COMPLETED' else 'UNKNOWN',
@@ -141,6 +157,7 @@ class MerchantOnboarding:
             if g['user_id']==owner and g['onboarding_required']]
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
         wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
+        if wechat_record is not None:data['fields']=shared_application_fields(wechat_record.get('profile',{}),data['fields'])
         return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
             delegated=meta['delegated'],sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
@@ -234,6 +251,9 @@ class MerchantOnboarding:
                     if type(value) is not str:raise ValueError('INVALID_PROFILE_VALUE')
                     if value:safe_text(value,512)
                 if len(fields['store_name'])>120 or len(fields['contact'])>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
+                if self.wechat_applyment is not None:
+                    record=self.wechat_applyment._read(application)
+                    if record is not None:fields=shared_application_fields(record.get('profile',{}),fields)
                 from scripts.community_applyment_conditions import DOCS
                 identity_type=params.get('identity_type',meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'))
                 if type(identity_type) is not str or identity_type not in DOCS:raise ValueError('INVALID_IDENTITY_TYPE')

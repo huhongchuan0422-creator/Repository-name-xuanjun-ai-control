@@ -72,6 +72,23 @@ class CenterIdentity(IdentityPort):
         principal=binding['principal']
         if project['tenant']!=principal.tenant_id:raise PermissionError('PROJECT_TENANT_MISMATCH')
         return uid,binding['project'],principal
+    def merchant_context(self,token,scene):
+        """Resolve the original mini session; keep its CSRF server-side only.
+
+        This authenticates an applicant, never grants a merchant/staff role.
+        Original operation services enforce the live role on every request.
+        Legacy sessions without this metadata must log in again.
+        """
+        self._time(self.center.now())
+        uid,pid,principal=self._resolve(token,scene)
+        row=self.center.db.execute("SELECT payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND project=? AND active=1",
+            (self.center.idx('wechat-session:'+token),uid,pid)).fetchone()
+        meta=json.loads(self.center.decrypt(row[0],'wechat-mini-session'))
+        csrf=meta.get('merchant_csrf')
+        if type(csrf) is not str or not csrf:raise PermissionError('MINI_RELOGIN_REQUIRED')
+        if self.center.session(token,csrf)!=uid:raise PermissionError('MINI_SESSION_CHANGED')
+        return uid,pid,csrf,principal
+
     def configure_registration(self,scenes):
         """Protected host opt-in, never a login/body-supplied tenant or role."""
         if hasattr(self,'registration'):
@@ -148,7 +165,7 @@ class CenterIdentity(IdentityPort):
             c.db.execute('INSERT INTO sessions VALUES(?,?,?,?,?)',(digest(token.encode()),uid,account[1],digest(csrf.encode()),expires))
             session_key=c.idx('wechat-session:'+token)
             for row in c.db.execute("SELECT project FROM links WHERE channel='WECHAT_MINI' AND subject_idx=? AND user_id=? AND active=1",(subject,uid)).fetchall():
-                payload=c.encrypt(canonical({'subject_idx':subject,'openid':openid}),'wechat-mini-session')
+                payload=c.encrypt(canonical({'subject_idx':subject,'openid':openid,'merchant_csrf':csrf}),'wechat-mini-session')
                 c.db.execute("INSERT INTO links VALUES('WECHAT_MINI_SESSION',?,?,?,?,1)",(session_key,uid,row[0],payload))
             c.audit('',uid,'WECHAT_MINI_LOGIN',attempt)
         return {'session_token':token,'expires_at':expires}

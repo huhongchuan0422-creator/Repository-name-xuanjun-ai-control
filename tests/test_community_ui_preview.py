@@ -60,7 +60,7 @@ class ClickThrough(unittest.TestCase):
                 page.get_by_label('查看身份',exact=True).select_option(role)
                 expect(page.locator('main h1')).to_have_text(self.data['roles'][role])
                 self.assert_layout(page,width,role+'-home')
-                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field']
+                pages=[p for p in self.data['pages'] if p['role']==role and p.get('kind')!='admission-field' and not p.get('legacyOnly')]
                 for module in pages:
                     with self.subTest(width=width,page=module['id']):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
@@ -124,16 +124,40 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
             page.locator('.module-card').filter(has_text='主体与门店').click()
             expect(page.locator('main h1')).to_have_text('主体与门店')
-            page.reload();expect(page.locator('main h1')).to_have_text('主体与门店')
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            page.locator('[data-option="scene"]').select_option('both')
+            page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
+            page.get_by_role('link',name='上一步',exact=True).click()
+            page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+            expect(page.locator('main h1')).to_have_text('主体与门店')
             self.assertEqual(errors,[]);self.assertFalse(any(url.startswith(('http:','https:')) for url in requests))
             page.screenshot(path=str(self.out/'self-contained-file.png'),full_page=True)
             context.close()
+    def test_same_app_entry_and_dual_terminal_selection(self):
+        context=self.browser.new_context(viewport={'width':1440,'height':1000});page=context.new_page()
+        page.goto(self.url+'#/consumer/consumer-stores/list')
+        page.get_by_role('link',name='商家入驻',exact=True).click()
+        expect(page.locator('main h1')).to_have_text(self.data['roles']['admission'])
+        page.locator('[data-option="entity"]').select_option('SOLE_PROPRIETOR')
+        page.locator('[data-option="contact"]').select_option('SUPER')
+        page.locator('[data-option="scene"]').select_option('both')
+        page.reload();expect(page.locator('[data-option="contact"]')).to_have_value('SUPER')
+        expect(page.get_by_label('查看终端',exact=True)).to_be_disabled()
+        self.assertLessEqual(page.locator('.layout').bounding_box()['width'],432)
+        for role in ('community','platform'):
+            page.get_by_label('查看身份',exact=True).select_option(role)
+            for terminal in ('phone','desktop'):
+                page.get_by_label('查看终端',exact=True).select_option(terminal)
+                self.assertEqual(page.locator('body').get_attribute('data-terminal'),terminal)
+                self.assert_layout(page,1440,role+'-'+terminal)
+        context.close()
+
     def test_empty_loading_error_expired_and_no_business_requests(self):
         context=self.browser.new_context(viewport={'width':320,'height':740});page=context.new_page();requests=[]
         page.on('request',lambda r:requests.append((r.method,r.url)))
         page.goto(self.url+'#/merchant/merchant-0-0-0/list')
         # Use a real generated module id rather than relying on fixture numbering.
-        first=next(p for p in self.data['pages'] if p['role']=='merchant')
+        first=next(p for p in self.data['pages'] if p['role']=='merchant' and not p.get('legacyOnly'))
         page.goto(self.url+'#/merchant/'+first['id']+'/list')
         for scenario in ['empty','loading','error','expired']:
             page.get_by_label('示例状态',exact=True).select_option(scenario)

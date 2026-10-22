@@ -3,6 +3,17 @@ on:
   push:
     branches: [feature/chatgpt-community-wechat-sp-offline-20261017]
     paths:
+      - clients/community-mini/**
+      - scripts/community_mini_merchant.py
+      - scripts/community_mini_center_identity.py
+      - scripts/community_mini_http.py
+      - scripts/community_mini_application.py
+      - scripts/community_collection_code.py
+      - scripts/community_merchant_onboarding.py
+      - scripts/community_wechat_applyment.py
+      - tests/test_community_mini_merchant.py
+      - tests/test_community_collection_code.py
+      - tests/community_mini_merchant_http.cjs
       - demos/community-stage/ui-preview/**
       - scripts/community_ui_preview_build.py
       - scripts/community_web_entries.py
@@ -42,6 +53,12 @@ jobs:
         run: |
           set -o pipefail
           python -B -m unittest discover -s tests -p test_community_ui_preview.py -v 2>&1 | tee ui-click-through.log
+      - name: Same mini native controllers and original Center HTTP
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test clients/community-mini/*.test.cjs 2>&1 | tee ui-native.log
+          PYTHONPATH=tests:. python -B -m unittest test_community_mini_merchant test_community_collection_code test_community_mini_center_identity test_community_mini_application test_community_center_operations -v 2>&1 | tee ui-mini-http.log
       - name: Original material scene requirements and permission regression
         if: "!contains(github.event.head_commit.message, '[ui-navigation-only]')"
         shell: bash
@@ -72,3 +89,4 @@ jobs:
             community-stage-source.zip
             docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md
             docs/development/COMMUNITY_ADMISSION_MINIMAL_DELTA_20261022.md
+            docs/development/COMMUNITY_MINI_DUAL_TERMINAL_REVIEW_20261022.md

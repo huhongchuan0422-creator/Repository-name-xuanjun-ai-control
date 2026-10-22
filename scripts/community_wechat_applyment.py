@@ -26,6 +26,19 @@ def provider_applyment_id(data):
     return str(value)
 
 
+def official_signing_url(value):
+    """Official 4012697168 link, from this application's verified query only."""
+    from urllib.parse import urlsplit
+    if (type(value) is not str or not 1<=len(value)<=256
+            or any(ord(c)<33 or ord(c)>126 for c in value) or '\\' in value):
+        raise ValueError('INVALID_OFFICIAL_SIGNING_URL')
+    parsed=urlsplit(value)
+    if (parsed.scheme!='https' or parsed.netloc!='pay.weixin.qq.com'
+            or parsed.path!='/public/apply4ec_sign/s' or not parsed.query or parsed.fragment):
+        raise ValueError('INVALID_OFFICIAL_SIGNING_URL')
+    return value
+
+
 def signed_response_context(value):
     if (type(value) is not dict or type(value.get('signed_at')) is not int
             or value['signed_at']<0 or type(value.get('signature_sha256')) is not str
@@ -276,6 +289,11 @@ class WechatApplyment:
                     if current.get('provider_sub_mchid') not in (None,data['sub_mchid']):
                         raise ValueError('IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT')
                     current['provider_sub_mchid']=data['sub_mchid']
+                current.pop('provider_sign_url',None)
+                current.pop('provider_sign_url_proof',None)
+                if data.get('sign_url') is not None and data['applyment_state'] not in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED'):
+                    current['provider_sign_url']=official_signing_url(data['sign_url'])
+                    current['provider_sign_url_proof']=dict(applyment_id=applyment_id,**verified)
                 current['audit_detail']=data.get('audit_detail',[])
                 # Official 4012697168: a rejected application is corrected using
                 # the SAME business_code. Only a current signed query opens this
@@ -383,6 +401,14 @@ class WechatApplyment:
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
                 from scripts.community_merchant_onboarding import profile_scenes
                 profile_scenes(p['profile'])  # Validate any declared scenes before storing this draft.
+                from scripts.community_merchant_onboarding import shared_application_fields
+                shared=shared_application_fields(p['profile'],platform['fields'])
+                # Preserve submitted/approved historical review snapshots. Current
+                # platform views project this same original provider draft.
+                if shared!=platform['fields'] and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
+                    from scripts import community_onboarding_offline as workflow
+                    workflow.save_draft(c.db,owner,application,uid,dict(shared,license_ref='PRIVATE_ONBOARDING_MATERIALS'),platform['revision'],
+                        encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
                 result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':

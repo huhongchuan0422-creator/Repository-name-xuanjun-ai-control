@@ -160,6 +160,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(403,{'error':'ORIGIN_DENIED'})
             if not web_session and self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
                     self.path=='/community/operations' and operations is not None) and not (
+                    self.path=='/mini/merchant' and onboarding is not None) and not (
                     self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
                     self.path=='/merchant/onboarding' and onboarding is not None) and not (
                     self.path=='/customer/saas-api' and saas is not None) and not (
@@ -181,12 +182,19 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             try:
                 length=int(self.headers.get('Content-Length','-1'))
                 limit=7_000_000 if self.path=='/merchant/onboarding' else 1048576 if notifications is not None and self.path==notifications.path else 16384
+                session=self.headers.get('X-Center-Session','')
+                csrf=self.headers.get('X-Center-CSRF','')
+                if self.path=='/mini/merchant':
+                    from scripts.community_mini_merchant import MiniMerchant
+                    if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token') or self.headers.get_all('Authorization',[]):
+                        raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
+                    mini_merchant=MiniMerchant(gateway.identity,onboarding,operations,getattr(gateway,'collection_codes',None))
+                    mini_merchant.context(self.headers.get('X-Community-Session',''),self.headers.get('X-Community-Scene',''))
+                    limit=7_000_000
                 if self.path=='/mini/project-materials':
                     from scripts.community_project_materials import MAX_UPLOAD_BODY
                     limit=MAX_UPLOAD_BODY
                 if not 0 < length <= limit:raise ValueError('INVALID_LENGTH')
-                session=self.headers.get('X-Center-Session','')
-                csrf=self.headers.get('X-Center-CSRF','')
                 if self.path=='/mini/project-materials':
                     if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token'):
                         raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
@@ -241,6 +249,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     result,cookie=WebSession(gateway.identity.center,operations,communities,onboarding).dispatch(self.path,self.headers,body,proxy_source)
                     return self.answer(200,{'result':result,'payment_enabled':False},cookie=cookie)
                 token=self.headers.get('X-Community-Session','')
+                if self.path=='/mini/merchant':
+                    result=mini_merchant.dispatch(token,self.headers.get('X-Community-Scene',''),body)
+                    return self.answer(200,{'result':result,'payment_enabled':False})
                 if self.path=='/mini/project-materials':
                     result=commerce.project_document_upload(token,self.headers.get('X-Community-Scene',''),body)
                     return self.answer(200,{'result':result,'payment_enabled':False})

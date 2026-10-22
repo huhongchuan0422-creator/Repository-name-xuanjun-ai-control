@@ -118,8 +118,9 @@ test('response behind continuation cursor cannot duplicate or regress history',a
   assert.match(h.page.data.projectMessagesStatus,/返回无效/);
 });
 
-test('WXML wires next page, loading lock and explicit empty/end state',()=>{
+test('consumer storefront excludes internal project feedback controls',()=>{
+  // Keep the current shopper boundary; transport pagination/race tests remain unchanged.
   const source=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
-  assert.match(source,/wx:if="\{\{projectMessagesMore\}\}" bindtap="projectAction" data-operation="project_messages" data-more="true" disabled="\{\{pending\}\}"/);
-  assert.match(source,/projectMessagesLoaded&&!projectMessagesMore/);assert.match(source,/暂无原项目反馈/);
+  assert.doesNotMatch(source,/projectAction|projectMessagesMore|project_messages/);
+  assert.match(source,/bindtap="loadOrders"/);
 });

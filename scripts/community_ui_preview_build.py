@@ -59,6 +59,18 @@ def build():
                 if not chunks:chunks=[('', ''.join(c.html() for c in children if c.tag not in ('pre','div','table')))]
                 for k,(suffix,body) in enumerate(chunks):
                     pages.append({'id':owner+'-'+str(i)+'-'+str(j)+'-'+str(k),'role':owner,'title':subtitle+(' · '+suffix if suffix else ''),'source':name,'source_heading':title,'html':body,'kind':'module','editable':bool(forms),'actions':[{'id':b.attrs.get('id',''), 'title':b.text()} for c in children for b in ([c] if c.tag=='button' else c.find('button'))]})
+    # Keep the original backoffice modules as source evidence, not the mini menu.
+    for page in pages:
+        if page['role']=='merchant':page['legacyOnly']=True
+    native='clients/community-mini/pages/merchant/index.wxml'
+    native_specs=[('orders','订单与收款记录','<label>订单编号<input id="merchant-reference" maxlength="64"></label>',False),
+        ('summary','收款统计','<p>订单总额、微信已核收款及退款观察按原接口分别读取；无真实核验时不显示到账。</p>',False),
+        ('profile','门店资料','<label>门店名称<input id="merchant-name" maxlength="120"></label><label>简介<textarea id="merchant-description" maxlength="2048"></textarea></label><label>联系方式<input id="merchant-contact" maxlength="120"></label>',True),
+        ('catalog','商品与服务','<p>沿原目录查看商品；原商品、定价库存和退款后台源码保留。本候选手机端不冒充已覆盖全部维护操作。</p>',False),
+        ('detail','订单详情与退款状态','<label>原订单编号<input id="merchant-order-reference" maxlength="64"></label><p>订单、退款与分账状态分别展示，不以预览流水冒充真实执行。</p>',False),
+        ('collection','收款码与保存手机','<p>仅原微信认证、签约、JSAPI及门店资格核验通过后，服务端才取得正式版小程序收款入口码。</p><button disabled>取得正式收款码（隔离预览不调用微信）</button><button disabled>保存手机相册（未取得正式图片）</button>',False)]
+    for key,title,body,editable in native_specs:
+        pages.append(dict(id='merchant-native-'+key,role='merchant',title=title,html=body,source=native,kind='mini',editable=editable,actions=[]))
     on=load('onboarding.html');profile=next(x for x in on.find('form') if x.attrs.get('id')=='profile')
     labels=[label for label in profile.find('label') if not any(n.attrs.get('id') in ('legal_name','contact','identity_type','delegated') for n in label.find('input')+label.find('select'))]
     for n in range(0,len(labels),6):pages.append({'id':'admission-basic-'+str(n//6),'role':'admission','title':'经营信息 '+str(n//6+1),'html':''.join(x.html() for x in labels[n:n+6]),'source':'onboarding.html','kind':'step'})
@@ -93,7 +105,9 @@ def build():
     for f in ['onboarding.html','onboarding.js']:
         sources[f]=hashlib.sha256((BASE/f).read_bytes()).hexdigest()
     document_types={x.attrs['value']:x.text() for select in on.find('select') if select.attrs.get('id')=='identity_type' for x in select.find('option')}
-    return {'documentTypes':document_types,'schema':1,'isolated':True,'sources':sources,'roles':{'merchant':'商家工作台','community':'社区管理','platform':'平台管理','admission':'商家入驻','consumer':'消费者小程序界面预览'},'pages':pages}
+    for f in ('app.json','session.js','merchant-form.js','merchant-fields.json','pages/merchant/index.js','pages/merchant/index.wxml','pages/merchant-join/index.js','pages/merchant-join/index.wxml'):
+        sources['clients/community-mini/'+f]=hashlib.sha256((ROOT/'clients/community-mini'/f).read_bytes()).hexdigest()
+    return {'documentTypes':document_types,'schema':1,'isolated':True,'sources':sources,'roles':{'merchant':'商家小程序','community':'社区管理','platform':'平台管理','admission':'商家入驻（同一小程序）','consumer':'用户小程序'},'pages':pages}
 def main():
     data=build();out=BASE/'ui-preview'
     (out/'original.css').write_bytes((BASE/'onboarding.css').read_bytes())
@@ -103,6 +117,7 @@ def main():
         if p['role']=='admission':
             route='`#/admission/'+p['id']+'/edit` → 演示保存返回 `'+(p.get('stage') or p['id'])+'`；仅适用分支可见'
         else:route='`#/'+p['role']+'/'+p['id']+'/list` → `detail` → `edit` → '+('演示保存返回列表' if p.get('editable') else '只读操作说明后返回列表，不新增业务记录')
+        if p.get('legacyOnly'):route='原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明'
         lines.append('|'+data['roles'][p['role']]+'|'+p['title']+'|'+route+'|'+p['source']+'|')
     (ROOT/'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md').write_text('\n'.join(lines)+'\n')
 def bundle(target):

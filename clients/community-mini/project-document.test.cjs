@@ -119,11 +119,12 @@ test('unknown upload result requests checklist refresh and does not resend or su
   assert.match(h.page.data.status,/先刷新资料清单/);assert.equal(h.page.data.pending,false);
   assert.equal(h.requests.length,1);assert.equal(h.page.data.projectChecklist[0].revision,1);
 });
-test('WXML exposes private-document upload separately from reference save and explicit submit',()=>{
+test('consumer storefront excludes internal project document forms',()=>{
+  // Current customer-pages contract separates community shoppers from delivery forms.
+  // Upload/reference/submit authorization and failure behavior remain covered above/below.
   const markup=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
-  assert.match(markup,/item.submission_type=='PRIVATE_DOCUMENT'[^>]*bindtap="uploadProjectDocument"/);
-  assert.match(markup,/item.submission_type!='PRIVATE_DOCUMENT'[^>]*bindtap="selectProjectRequirement"/);
-  assert.match(markup,/bindtap="submitProjectItem"/);
+  assert.doesNotMatch(markup,/uploadProjectDocument|selectProjectRequirement|submitProjectItem/);
+  assert.match(markup,/bindtap="loadOrders"/);
 });
 
 test('local document validation failure is not presented as an uncertain upload',async()=>{

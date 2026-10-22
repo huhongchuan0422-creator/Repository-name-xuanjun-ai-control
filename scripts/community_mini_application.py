@@ -144,7 +144,15 @@ class MiniApplication:
         payments=self.configure_payments(reader,merchants=merchants)
         payments.activation_guard=lambda scene:project_wechat_scene(
             self.identity,self.onboarding,reader,scene,admissions[scene])['merchant']
+        self.configure_collection_codes()
         return payments
+
+    def configure_collection_codes(self):
+        if self.server is not None or getattr(self.gateway,'collection_codes',None) is not None:
+            raise ValueError('COLLECTION_CODE_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_collection_code import CollectionCodes
+        self.gateway.collection_codes=CollectionCodes(self.gateway,self.onboarding,self.operations)
+        return self.gateway.collection_codes
 
     def configure_payments(self,reader,bindings=None,*,merchants=None):
         """Protected opt-in; original customer orders and verified payer required."""

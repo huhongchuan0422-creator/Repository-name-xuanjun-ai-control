@@ -18,6 +18,8 @@ def build(root):
                 'clients/community-mini/pages/checkout/*',
                 'clients/community-mini/pages/home/*',
                 'clients/community-mini/pages/profile/*',
+                'clients/community-mini/pages/merchant/*',
+                'clients/community-mini/pages/merchant-join/*',
                 'deploy/community-preview/Dockerfile',
                 'deploy/community-preview/requirements-runtime.lock',
                 'deploy/community-preview/nginx-uk-path-candidate.conf',
@@ -30,6 +32,7 @@ def build(root):
                 'docs/development/COMMUNITY_CENTER_EXACT_INTEGRATION_20261018.md',
                 'docs/development/COMMUNITY_FORMAL_BACKEND_HANDOFF_20261021.md',
                 'docs/development/COMMUNITY_UI_PREVIEW_PAGE_MAP_20261022.md',
+                'docs/development/COMMUNITY_MINI_DUAL_TERMINAL_REVIEW_20261022.md',
                 'docs/development/COMMUNITY_ADMISSION_MINIMAL_DELTA_20261022.md',
                 'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
                 'scripts/pr122_customer_core.py',
@@ -74,7 +77,15 @@ def build(root):
                 'clients/community-mini/pages/home/index.wxml',
                 'clients/community-mini/pages/profile/index.js',
                 'clients/community-mini/pages/profile/index.json',
-                'clients/community-mini/pages/profile/index.wxml'}
+                'clients/community-mini/pages/profile/index.wxml',
+                'clients/community-mini/pages/merchant/index.js',
+                'clients/community-mini/pages/merchant/index.wxml',
+                'clients/community-mini/pages/merchant-join/index.js',
+                'clients/community-mini/pages/merchant-join/index.wxml',
+                'clients/community-mini/merchant-form.js',
+                'clients/community-mini/merchant-fields.json',
+                'scripts/community_mini_merchant.py',
+                'scripts/community_collection_code.py'}
     if not required.issubset(files):
         raise ValueError('REQUIRED_SOURCE_MISSING')
     manifest = {'format': 1, 'purpose':'OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE',

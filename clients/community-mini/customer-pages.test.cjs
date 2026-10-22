@@ -41,7 +41,7 @@ function loadPage(path,{baseUrl='https://fixture.invalid',env=null}={}){
 
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
   const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
-  assert.deepEqual(app.pages,['pages/home/index','pages/profile/index','pages/checkout/index']);
+  assert.deepEqual(app.pages,['pages/home/index','pages/profile/index','pages/checkout/index','pages/merchant/index','pages/merchant-join/index']);
   const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
   const script=fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8');
   assert.match(checkout,/bindtap="openCustomerHome"/);

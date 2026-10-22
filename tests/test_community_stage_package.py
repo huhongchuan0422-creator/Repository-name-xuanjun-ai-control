@@ -56,6 +56,14 @@ class SourcePackage(unittest.TestCase):
                 'clients/community-mini/pages/profile/index.js',
                 'clients/community-mini/pages/profile/index.json',
                 'clients/community-mini/pages/profile/index.wxml',
+                'clients/community-mini/pages/merchant/index.js',
+                'clients/community-mini/pages/merchant/index.wxml',
+                'clients/community-mini/pages/merchant-join/index.js',
+                'clients/community-mini/pages/merchant-join/index.wxml',
+                'clients/community-mini/merchant-form.js',
+                'clients/community-mini/merchant-fields.json',
+                'scripts/community_mini_merchant.py',
+                'scripts/community_collection_code.py',
             )
             for name in required_pages:
                 raw=archive.read(name)

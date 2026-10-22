@@ -27,7 +27,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview')throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
-    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/login'?15000:5000,
+    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
@@ -81,6 +81,16 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       const reply=await request('/mini/api',{scene,operation:'commerce.'+operation,params},token);
       if(version!==generation)throw Error('STALE_SESSION');
       if(!reply||!reply.result||reply.payment_enabled!==false)throw Error('UNTRUSTED_COMMERCE_REPLY');
+      return reply.result;
+    },
+    async merchant(scene, operation, params) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
+         !['workspaces','onboarding','read','write','collection_code'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
+      const version=generation;
+      const reply=await request('/mini/merchant',{operation,params},token,scene);
+      if(version!==generation)throw Error('STALE_SESSION');
+      if(!reply||reply.payment_enabled!==false||!reply.result)throw Error('UNTRUSTED_MERCHANT_REPLY');
       return reply.result;
     },
     getGeneration() {return generation;},
