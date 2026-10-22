@@ -153,4 +153,102 @@ class RollbackBoundary(unittest.TestCase):
             with self.assertRaisesRegex(u.Unknown,'SOCKET_REMAINS'):u.rollback(NEW_ID,b'old',0o600,'hash')
             mutate.assert_not_called()
 
+class PublicReloadReadiness(unittest.TestCase):
+    def test_transition_rechecks_whole_contract_then_succeeds(self):
+        with patch.object(u,'public_ready_once',side_effect=[u.PublicPending('PUBLIC_HTTP_404'),None]) as probe,patch.object(u.time,'sleep') as sleep,redirect_stdout(io.StringIO()):
+            u.public_ready()
+            self.assertEqual(probe.call_count,2);sleep.assert_called_once_with(1)
+    def test_transition_is_bounded_and_still_fails(self):
+        with patch.object(u,'public_ready_once',side_effect=u.PublicPending('PUBLIC_HTTP_404')) as probe,patch.object(u.time,'sleep'),redirect_stdout(io.StringIO()):
+            with self.assertRaises(u.PublicPending):u.public_ready()
+            self.assertEqual(probe.call_count,4)
+    def test_hash_mismatch_or_unknown_never_retried(self):
+        for error in (u.Rejected('PUBLIC_ASSET_HASH'),u.Unknown('PUBLIC_NETWORK_INSPECT_ONLY')):
+            with self.subTest(error=type(error).__name__),patch.object(u,'public_ready_once',side_effect=error) as probe,patch.object(u.time,'sleep') as sleep:
+                with self.assertRaises(type(error)):u.public_ready()
+                self.assertEqual(probe.call_count,1);sleep.assert_not_called()
+    def test_http_status_classification_and_path_evidence(self):
+        from urllib.error import HTTPError
+        for status,pending in ((404,True),(502,True),(503,True),(403,False),(301,False)):
+            error=HTTPError('https://example.invalid/',status,'status',{},io.BytesIO())
+            opener=Mock();opener.open.side_effect=error
+            output=io.StringIO()
+            with self.subTest(status=status),patch.object(u,'build_opener',return_value=opener),redirect_stdout(output):
+                with self.assertRaises(u.PublicPending if pending else u.Rejected):u.public_ready_once()
+                self.assertIn('/merchant/workbench',output.getvalue())
+                self.assertIn(str(status),output.getvalue())
+                self.assertEqual(opener.open.call_count,1)
+
+class PublicRealHTTP(unittest.TestCase):
+    def test_real_http_404_then_exact_assets_and_catalog(self):
+        import json,threading
+        from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+        from urllib.request import urlopen
+        from scripts.community_web_entries import asset
+        requests=[]
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def do_GET(self):
+                requests.append(self.path)
+                if len(requests)==1:
+                    self.send_response(404);self.end_headers();return
+                path=self.path[len('/community-preview'):]
+                if path in u.ASSET_HASHES:body=asset(path)[0]
+                elif path.endswith('health'):body=json.dumps({'status':'READY','production_acceptance':False}).encode()
+                else:body=json.dumps({'source_sha':u.SOURCE,'project_ids':['community_platform'],'production_acceptance':False}).encode()
+                self.send_response(200);self.end_headers();self.wfile.write(body)
+        server=ThreadingHTTPServer(('127.0.0.1',0),Handler)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        class LocalTransport:
+            def open(self,url,timeout):
+                self.assert_origin(url)
+                return urlopen('http://127.0.0.1:'+str(server.server_port)+url.split('.work',1)[1],timeout=timeout)
+            @staticmethod
+            def assert_origin(url):
+                if not url.startswith('https://uk.wenwenwenyiyiyi.work/community-preview/'):raise AssertionError(url)
+        try:
+            with patch.object(u,'build_opener',return_value=LocalTransport()),patch.object(u.time,'sleep'),redirect_stdout(io.StringIO()):u.public_ready()
+            self.assertEqual(len(requests),8)
+            self.assertEqual(requests[:2],['/community-preview/merchant/workbench']*2)
+            self.assertEqual(set(requests[1:]),{'/community-preview'+p for p in list(u.ASSET_HASHES)+['/community/health','/community/entrypoints']})
+        finally:server.shutdown();server.server_close();thread.join(2)
+
+class ResumeRolledBack(unittest.TestCase):
+    def fixture(self):
+        old,vhost=UpgradeState.fixture(self)
+        attempt={'source_sha':u.SOURCE,'old_id':u.OLD_ID,'new_image':u.IMAGE,
+                 'owner_vhost_sha256':hashlib.sha256(vhost).hexdigest(),'phase':'PREPARED'}
+        def read(path):
+            if path.endswith('/attempt.json'):return __import__('json').dumps(attempt).encode(),0o600
+            if path.endswith('/new-container-id.txt'):return (u.RESUME_ID+'\n').encode(),0o600
+            return (vhost if path==u.VHOST else old),0o600
+        u.read_root_file.side_effect=read
+        self.inspect.side_effect=[info(),info(u.IMAGE,u.RESUME_ID,False),info(),info(u.IMAGE,u.RESUME_ID,False),info(running=False),info(u.IMAGE,u.RESUME_ID)]
+        return old,vhost
+    def test_resume_reuses_exact_stopped_container_no_download_run_or_init(self):
+        self.fixture();u.resume_rolled_back()
+        verbs=[args[3] for args in self.calls if args[:3]==u.DOCKER]
+        self.assertEqual(verbs,['container','stop','rename','rename','start'])
+        u.load_artifact.assert_not_called()
+        self.assertIn(u.STAGE+'/resume-01/receipt.json',self.files)
+        self.rollback.assert_not_called()
+    def test_resume_public_failure_preserves_reason_and_rolls_back(self):
+        self.fixture();self.public.side_effect=u.Rejected('PUBLIC_ASSET_HASH')
+        with self.assertRaisesRegex(u.Rejected,'KNOWN_FAILURE_ROLLED_BACK'):u.resume_rolled_back()
+        self.assertIn(u.STAGE+'/resume-01/failure.json',self.files)
+        self.rollback.assert_called_once()
+    def test_resume_unknown_never_rollback_or_replay(self):
+        self.fixture();self.public.side_effect=u.Unknown('PUBLIC_NETWORK')
+        with self.assertRaises(u.Unknown):u.resume_rolled_back()
+        self.rollback.assert_not_called()
+        self.assertEqual(sum(args[3:4]==['start'] for args in self.calls),1)
+    def test_existing_resume_or_different_container_blocks_all_mutations(self):
+        self.fixture()
+        with patch.object(u.os.path,'lexists',return_value=True),self.assertRaisesRegex(u.Rejected,'EXISTING_RESUME'):u.resume_rolled_back()
+        self.mutate.assert_not_called();self.replace.assert_not_called()
+    def test_wrong_failed_id_blocks_before_any_write(self):
+        self.fixture();self.inspect.side_effect=[info(),info(u.IMAGE,'b'*64,False)]
+        with self.assertRaisesRegex(u.Rejected,'EXACT_CONTAINER_STATE'):u.resume_rolled_back()
+        self.create.assert_not_called();self.mutate.assert_not_called()
+
 if __name__=='__main__':unittest.main()

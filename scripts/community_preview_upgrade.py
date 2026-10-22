@@ -194,7 +194,7 @@ def run_args():
         '--mount','type=bind,src='+RUN+',dst='+RUN,IMAGE,
         '--plan',ROOT+'/config/host.json','--center-keys',ROOT+'/config/center-keys.json','--wechat-secret',ROOT+'/config/wechat.json']
 
-def public_ready():
+def public_ready_once():
     op=build_opener(ProxyHandler({}),NoRedirect())
     paths=dict(ASSET_HASHES);paths['/community/health']=None;paths['/community/entrypoints']=None
     for path,expected in paths.items():
@@ -202,7 +202,11 @@ def public_ready():
             with op.open('https://uk.wenwenwenyiyiyi.work/community-preview'+path,timeout=5) as response:
                 if response.status!=200:raise Rejected('PUBLIC_STATUS')
                 raw=response.read(262145)
-        except HTTPError:raise Rejected('PUBLIC_HTTP_STATUS')
+        except HTTPError as error:
+            print(json.dumps({'check':'PUBLIC','path':path,'http_status':error.code}),flush=True)
+            error.close()
+            if error.code in (404,502,503):raise PublicPending('PUBLIC_HTTP_'+str(error.code))
+            raise Rejected('PUBLIC_HTTP_STATUS')
         except (URLError,TimeoutError):raise Unknown('PUBLIC_NETWORK_INSPECT_ONLY')
         if len(raw)>262144:raise Rejected('PUBLIC_BODY_LIMIT')
         if expected:
@@ -213,6 +217,22 @@ def public_ready():
             if path.endswith('health'):
                 if value.get('status')!='READY':raise Rejected('PUBLIC_HEALTH')
             elif value.get('source_sha')!=SOURCE or value.get('project_ids')!=['community_platform']:raise Rejected('PUBLIC_VERSION')
+
+
+class PublicPending(Rejected):pass
+
+def public_ready():
+    # Reload acknowledgement precedes worker readiness. Retry only bounded,
+    # read-only probes for explicit transitional HTTP statuses. Every attempt
+    # rechecks ALL exact assets and version fields; UNKNOWN never replays.
+    deadline=time.monotonic()+15
+    for attempt in range(4):
+        try:return public_ready_once()
+        except PublicPending as error:
+            print(json.dumps({'check':'PUBLIC_RELOAD_WAIT','attempt':attempt+1,
+                              'reason':str(error)}),flush=True)
+            if attempt==3 or time.monotonic()+1>=deadline:raise
+            time.sleep(1)
 
 
 def rollback(new_id,old_include,mode,vhost_hash):
@@ -277,7 +297,8 @@ def main(url):
         public_ready()
         if hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()!=vhost_hash:raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
     except Unknown:raise
-    except Exception:
+    except Exception as error:
+        print(json.dumps({'check':'KNOWN_FAILURE','reason':str(error) if isinstance(error,Rejected) else type(error).__name__}),flush=True)
         rollback(new_id,old_include,mode,vhost_hash)
         raise Rejected('KNOWN_FAILURE_ROLLED_BACK')
     signal.alarm(0)
@@ -286,8 +307,72 @@ def main(url):
         'cpu':'0.5','memory_bytes':536870912,'pids':64,'payments':False,'role_acceptance':False,'wechat_login_verified':False,'disk_hard_quota':'NOT_CONFIGURED'}
     create(STAGE+'/receipt.json',json.dumps(receipt,sort_keys=True).encode());print(json.dumps(receipt,sort_keys=True),flush=True)
 
+# Owner's bounded rollback receipt pins this exact stopped container.
+RESUME_ID='818fe0b0622c26c43685f61e79c6138ec0afce28adc7adb20aa56e68aac0b23c'
+
+def resume_rolled_back():
+    if os.getuid()!=0 or os.geteuid()!=0 or os.uname().nodename.split('.')[0]!=HOST:raise Rejected('HOST_OR_ROOT')
+    os.umask(0o077)
+    signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(Unknown('DEADLINE_INSPECT_ONLY')));signal.alarm(180)
+    for p in ('/opt/xuanjun-community-preview','/etc/nginx/conf.d',ROOT,STAGE):secure_directory(p)
+    for p in (ROOT+'/config',ROOT+'/data',RUN):secure_directory(p,10001)
+    attempt=json.loads(read_root_file(STAGE+'/attempt.json')[0].decode())
+    if (attempt.get('source_sha')!=SOURCE or attempt.get('old_id')!=OLD_ID or
+        attempt.get('new_image')!=IMAGE or attempt.get('phase')!='PREPARED'):
+        raise Rejected('ORIGINAL_ATTEMPT_MISMATCH')
+    if read_root_file(STAGE+'/new-container-id.txt')[0].decode().strip()!=RESUME_ID:raise Rejected('RESUME_RECEIPT_MISMATCH')
+    resume=STAGE+'/resume-01'
+    if os.path.lexists(resume) or os.path.lexists(STAGE+'/receipt.json'):raise Rejected('EXISTING_RESUME_INSPECT_ONLY')
+    validate(inspect(NAME),OLD_IMAGE,OLD_ID)
+    validate(inspect(FAILED_NAME),IMAGE,RESUME_ID,running=False)
+    names=command(DOCKER+['container','ls','--all','--format','{{.Names}}','--filter','name=^/xuanjun-community-preview']).splitlines()
+    if OLD_NAME in names:raise Rejected('EXISTING_RECOVERY_CONTAINER')
+    old_include,mode=read_root_file(INC)
+    if hashlib.sha256(old_include).hexdigest()!=OLD_FRAGMENT_SHA or read_root_file(STAGE+'/include.before')[0]!=old_include:
+        raise Rejected('ROLLBACK_INCLUDE_MISMATCH')
+    vhost_hash=hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()
+    if vhost_hash!=attempt.get('owner_vhost_sha256'):raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
+    command(['/usr/bin/systemctl','is-active','--quiet','nginx.service']);command(['/usr/sbin/nginx','-t'])
+    private_ready()
+    os.mkdir(resume,0o700)
+    create(resume+'/attempt.json',json.dumps({'source_sha':SOURCE,'new_id':RESUME_ID,'phase':'RESUME_PREPARED'},sort_keys=True).encode())
+    replace_include(old_include,FRAGMENT,mode)
+    try:command(['/usr/sbin/nginx','-t'])
+    except Rejected:
+        replace_include(FRAGMENT,old_include,mode);raise Rejected('CANDIDATE_INVALID_ORIGINAL_NOT_RELOADED')
+    validate(inspect(NAME),OLD_IMAGE,OLD_ID)
+    validate(inspect(FAILED_NAME),IMAGE,RESUME_ID,running=False)
+    if hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()!=vhost_hash:raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
+    mutate(DOCKER+['stop','--time','10',OLD_ID],15)
+    validate(inspect(OLD_ID),OLD_IMAGE,OLD_ID,running=False)
+    if os.path.lexists(RUN+'/preview.sock'):raise Unknown('OLD_SOCKET_REMAINS_INSPECT_ONLY')
+    mutate(DOCKER+['rename',OLD_ID,OLD_NAME])
+    mutate(DOCKER+['rename',RESUME_ID,NAME])
+    mutate(DOCKER+['start',RESUME_ID],15)
+    try:
+        validate(inspect(RESUME_ID),IMAGE,RESUME_ID)
+        await_private_ready(RESUME_ID,IMAGE,True)
+        if hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()!=vhost_hash:raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
+        mutate(['/usr/bin/systemctl','reload','nginx.service'])
+        public_ready()
+        if hashlib.sha256(read_root_file(VHOST)[0]).hexdigest()!=vhost_hash:raise Unknown('OWNER_VHOST_CHANGED_INSPECT_ONLY')
+    except Unknown:raise
+    except Exception as error:
+        reason=str(error) if isinstance(error,Rejected) else type(error).__name__
+        create(resume+'/failure.json',json.dumps({'check':'KNOWN_FAILURE','reason':reason},sort_keys=True).encode())
+        print(json.dumps({'check':'KNOWN_FAILURE','reason':reason}),flush=True)
+        rollback(RESUME_ID,old_include,mode,vhost_hash)
+        raise Rejected('KNOWN_FAILURE_ROLLED_BACK')
+    receipt={'state':'PUBLIC_ORIGINAL_ROLE_ASSETS_READY_AUTH_ACCEPTANCE_PENDING','source_sha':SOURCE,
+        'image_id':IMAGE,'container_id':RESUME_ID,'rollback_container':OLD_NAME,
+        'private_inputs_and_data':'REUSED_UNCHANGED','payments':False,'role_acceptance':False,'wechat_login_verified':False}
+    create(resume+'/receipt.json',json.dumps(receipt,sort_keys=True).encode())
+    signal.alarm(0);print(json.dumps(receipt,sort_keys=True),flush=True)
+
 if __name__=='__main__':
-    try:main(ARTIFACT_URL)
+    try:
+        if globals().get('RESUME_ROLLED_BACK') is True:resume_rolled_back()
+        else:main(ARTIFACT_URL)
     except Unknown:raise SystemExit('HOLD_UNKNOWN_INSPECT_ONLY_NO_RETRY')
     except Rejected as error:raise SystemExit('HOLD_'+str(error))
     except Exception as error:raise SystemExit('HOLD_'+type(error).__name__+'_INSPECT_ONLY')
