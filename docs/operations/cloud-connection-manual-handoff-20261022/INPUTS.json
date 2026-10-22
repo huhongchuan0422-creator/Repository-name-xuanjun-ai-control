@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "purpose": "MANUAL_HANDOFF_PREPARATION_ONLY",
+  "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
+  "source_tree": "6331aa8dcaeb0be705879d5ec4e2ef28d0d6b7f7",
+  "execution_allowed": false,
+  "one_click": false,
+  "secrets_included": false,
+  "hosts": {
+    "domestic": {
+      "hostname": "iZvt5t8tlrm8oiZ",
+      "region": "cn-shanghai",
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57"
+    },
+    "uk": {
+      "hostname": "iZd7oeikknn1z21sq6ji6zZ",
+      "region": "eu-west-1",
+      "instance_id": "40dfc6a47d5e4363b9da7d0d6ab01cb1"
+    },
+    "korea": {
+      "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+      "region": "ap-northeast-2",
+      "instance_id": "09207081a09a466aa0079b07b5e3e7ca"
+    }
+  },
+  "inputs": [
+    {
+      "id": "source_manifest",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "bytes": 6497,
+        "sha256": "67be8d401664d6d5f2ef79a9d65f481047e48de260a04defdc9bdfd076695a1c",
+        "members": 30
+      },
+      "evidence": "#6333168691/#6333368866",
+      "blocks": "G2-G7"
+    },
+    {
+      "id": "domestic_python",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "path": "/usr/bin/python3.11",
+        "version": "3.11.6",
+        "rpm": "python3-3.11.6-30.alnx4",
+        "sha256": "d9d3833f98fe814c39497d1f05b48474cb214713dd32f3971a5f1877d548ec22",
+        "mode": "0755",
+        "owner_uid": 0,
+        "soabi": "cpython-311-x86_64-linux-gnu",
+        "sqlite": "3.42.0",
+        "openssl": "3.0.12",
+        "glibc": "2.38"
+      },
+      "evidence": "#6330641878 Invoke t-sh070rht0th2lfk Success/Exit0",
+      "blocks": "G1-G4"
+    },
+    {
+      "id": "selected_wheels",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "count": 18,
+        "bytes": 6731878,
+        "lock_path": "source/deployment/cloud-connection/oauth/requirements.cp3116.lock",
+        "lock_bytes": 1795,
+        "lock_sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71",
+        "binaries_in_package": false
+      },
+      "evidence": "Run39725473222/job119648256346",
+      "blocks": "G2-G4"
+    },
+    {
+      "id": "uk_successful_install",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "runtime": "/opt/xuanjun-cloud-oauth/runtimes/cpython-3.12.15-20261021/python/",
+        "venv": "/opt/xuanjun-cloud-oauth/venv",
+        "release": "/opt/xuanjun-cloud-oauth/releases/d866f69fa4f0a85f21d593fa2373c5f82d66030d",
+        "repeat": false
+      },
+      "evidence": "#6332421572",
+      "blocks": "REUSE"
+    },
+    {
+      "id": "dns_and_certificate",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "host": "cloud-auth.wenwenwenyiyiyi.work",
+        "A": "47.101.152.210",
+        "certificate": "/etc/letsencrypt/live/cloud-auth.wenwenwenyiyiyi.work/fullchain.pem",
+        "key_reference_only": "/etc/letsencrypt/live/cloud-auth.wenwenwenyiyiyi.work/privkey.pem",
+        "read_private_key": false,
+        "repeat_issuance": false
+      },
+      "evidence": "#6332549770",
+      "blocks": "G5"
+    },
+    {
+      "id": "pre_egress_config",
+      "state": "KNOWN_INHERITED_NOT_REPROBED",
+      "value": {
+        "bytes": 1276,
+        "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5",
+        "introspect": "DENY_403",
+        "live_activation": "NOT_EXECUTED"
+      },
+      "evidence": "#6332662573/#6332994640",
+      "blocks": "G5"
+    },
+    {
+      "id": "vendor_source_and_library_patch_mapping",
+      "state": "UNKNOWN",
+      "reason": "待原固定解释器及实际_ssl/_sqlite3关联文件的RPM来源/SourceRPM和适用补丁对应；不重跑已成功身份探针，不扫描",
+      "blocks": "G1→G2",
+      "responsible": "原执行方/包维护记录"
+    },
+    {
+      "id": "domestic_dependency_delivery_result",
+      "state": "UNKNOWN",
+      "reason": "未在国内实际取得18个完整匹配轮子；CI取得不等于国内取得。只允许正常官方PyPI/已获准渠道，超时保留现场不换镜像",
+      "blocks": "G2",
+      "responsible": "原执行方"
+    },
+    {
+      "id": "service_identity_and_access_profile",
+      "state": "UNKNOWN",
+      "reason": "实际服务UID/GID、配置/秘密读取权、父链穿越、数据根0700及沙箱访问未验。需准确最小权限方案；不得为启动放宽硬化或混用Certbot",
+      "blocks": "G3-G4",
+      "responsible": "原实施方/原准入"
+    },
+    {
+      "id": "authority_state_provenance",
+      "state": "UNKNOWN",
+      "reason": "authority.sqlite是否已存在、首次新域初始化或已有历史来源/未决状态未现场核实；不能用空库替代未知历史",
+      "blocks": "G3-G4",
+      "responsible": "原状态保管方"
+    },
+    {
+      "id": "authority_production_config",
+      "state": "UNKNOWN",
+      "reason": "issuer已定；真实audience、github_client_id、clients/redirect_uris/auth_method/secret_hash/resource_client及secret引用和配置SHA未最终生成；example enabled=false不可直接启动",
+      "blocks": "G3-G4",
+      "responsible": "正常App登记方/Owner与原执行方"
+    },
+    {
+      "id": "resource_production_config",
+      "state": "UNKNOWN",
+      "reason": "英国resource真实client_id/audience/subjects映射、introspection secret及配置SHA待绑定；catalogs必须初始空",
+      "blocks": "G6",
+      "responsible": "原执行方/正常登记方"
+    },
+    {
+      "id": "new_platform_app_and_tunnel",
+      "state": "UNKNOWN",
+      "reason": "保留旧App和隧道；新ID、真实callback/resource、30天Read+Use凭据/profile及独立unit未真实创建/验收",
+      "blocks": "G6-G7",
+      "responsible": "正常平台登记/Owner明确适用确认"
+    },
+    {
+      "id": "real_peer_and_observation_transaction",
+      "state": "UNKNOWN",
+      "reason": "实际nonce/60秒epoch窗口/固定私有日志路径/国内TCP peer与撤除回执未产生；8.208.119.115仅候选",
+      "blocks": "G5→G6",
+      "responsible": "获准的原执行方"
+    },
+    {
+      "id": "actual_oauth_consent",
+      "state": "UNKNOWN",
+      "reason": "真实GitHub/平台同意必须由Owner正常完成，本包和技术PASS不能代替",
+      "blocks": "G7",
+      "responsible": "Owner"
+    },
+    {
+      "id": "manual_execution_decision_and_attempt",
+      "state": "UNKNOWN",
+      "reason": "Owner尚未决定采用人工；实际执行入口、范围/时窗/唯一Attempt/适用次数与故障记录待按原准入绑定，不能从旧已消费Attempt恢复额度",
+      "blocks": "G0及所有写动作",
+      "responsible": "Owner/原准入责任链"
+    },
+    {
+      "id": "project_business_bindings",
+      "state": "UNKNOWN",
+      "reason": "B5完整selected catalog/双端root_ref/接收方/操作/16MiB预算、国内业务各自固定动作、韩国原项目动作分别依原记录；不因OAuth连接而开放",
+      "blocks": "G8各项目分别",
+      "responsible": "原各项目Writer/准入方"
+    }
+  ],
+  "non_goals": [
+    "安装P2/B5或业务项目",
+    "重做英国成功步骤",
+    "Certbot签发/续期/环境更改",
+    "系统Python升级",
+    "旧App/隧道迁移",
+    "取消安全拒绝",
+    "任意Shell/任意文件传输",
+    "新凭据或权限默认授权"
+  ]
+}

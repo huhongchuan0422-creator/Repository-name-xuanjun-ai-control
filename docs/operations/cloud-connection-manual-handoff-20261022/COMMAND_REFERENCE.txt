@@ -1,0 +1,34 @@
+仅供Owner决定采用后的受限命令参考；不是可串行运行的安装器。
+现在不要运行，不上传服务器。本文件没有sudo安装/改权/生成秘密/创建库命令。
+
+R1：国内原admin入口，先确认固定主机，错误主机停止：
+  hostname
+  id
+预期目标为iZvt5t8tlrm8oiZ；该现场身份核对用于本次人工动作，不是重跑历史完整探针。
+
+R2：已核解释器的包来源有限查询（原准入覆盖才执行）：
+  rpm -qf --qf '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH} source=%{SOURCERPM} vendor=%{VENDOR}
+' /usr/bin/python3.11
+
+R3：只用已核系统解释器返回两个实际标准库扩展绑定，不扫描或导入项目：
+  /usr/bin/python3.11 -I -B -S -c 'import _ssl,_sqlite3; print("SSL_MODULE="+_ssl.__file__); print("SQLITE_MODULE="+_sqlite3.__file__)'
+随后仅对R3确切返回的两个文件做rpm -qf同字段查询。禁止把未核字符串拼接到Shell，禁止find/递归ldd扫描。包与底层共享库关系仍须厂商准确包记录证明；模块属包不是所有底层库补丁已齐。
+
+R4：venv和轮子安装参考仅给固定入口/锁，不提供缺条件的执行脚本：
+  已核系统解释器：/usr/bin/python3.11
+  新目标：/opt/xuanjun-cloud-oauth/venv-py3116
+  精确锁：source/deployment/cloud-connection/oauth/requirements.cp3116.lock
+  选择总数18 / 总bytes6731878；逐项SHA见domestic-py3116-compatibility.json
+  必须先完成G0-G2目标/事务/包来源及交付准入。文件冲突不覆盖；网络失败保留记录，不自动重试。取得轮子后按--require-hashes --only-binary=:all:、本地固定wheel目录--no-index/--find-links安装，并pip check；不得在Certbot或系统site-packages安装。
+
+R5：独立环境已获准安装且原始记录完整后，可在准确venv执行版本/导入/pip check；不在本包替换尚不存在的解释器：
+  /opt/xuanjun-cloud-oauth/venv-py3116/bin/python -I -B -c 'import importlib.metadata as m; import authlib,flask,requests,waitress,cryptography; print({k:m.version(k) for k in ("Authlib","Flask","requests","waitress","cryptography")})'
+  /opt/xuanjun-cloud-oauth/venv-py3116/bin/python -m pip check
+运行uid/文件访问/启动还需G3/G4实际同一服务沙箱；导入成功不能代替这些。
+
+R6：启动/验收只列原已审入口，不提前生成缺真实配置的ExecStart：
+  authority run.py --kind authority --config /etc/xuanjun-cloud-oauth/authority.json --sha256 实际配置SHA
+  resource run.py --kind resource --config /etc/xuanjun-cloud-executor/oauth-resource.json --sha256 实际配置SHA
+上两行是非执行引用：真实配置、秘密引用、env、当前source和授权没齐，不能直接替换文字运行。
+
+所有输出只回传非秘密摘要、版本/SHA/退出码/InvokeId或真实等效操作ID；不贴完整环境变量、认证HTTP头、配置正文、token、私钥或认证DB正文。

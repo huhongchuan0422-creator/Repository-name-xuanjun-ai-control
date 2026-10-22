@@ -1,0 +1,40 @@
+{
+  "source_commit": "0177d3917278c6f243363d7fcb5a18c638dabd51",
+  "source_tree": "6331aa8dcaeb0be705879d5ec4e2ef28d0d6b7f7",
+  "independent_review": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333368866",
+  "records": [
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333715145",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333368866",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333168691",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332994640",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6330641878",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332421572",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332549770",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332631298",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332662573",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333489947",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6333620117",
+    "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6332348132"
+  ],
+  "hosted": {
+    "run": 39725473222,
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39725473222",
+    "kind": "DEVELOPMENT_NOT_LIVE",
+    "passed_executions": 661,
+    "conditional_skips": 24,
+    "distinct_cases": 224
+  },
+  "official_security_sources": [
+    "https://help.aliyun.com/zh/alinux/product-overview/alibaba-cloud-linux-4-image-release-notes",
+    "https://www.python.org/downloads/release/python-31117/"
+  ],
+  "credential_observation_block": {
+    "tool": "mcp__cua_repl.js",
+    "method": "runtimeResumeTab.getAXState()",
+    "reason": "credential_observation_restricted",
+    "error_time": "NOT_CAPTURED",
+    "record_time_utc": "2026-10-22T05:37:47Z",
+    "no_retries_in_this_package": true
+  },
+  "warning": "Referenced reviews/authorizations retain their original signer and limits; no signature is reissued here."
+}

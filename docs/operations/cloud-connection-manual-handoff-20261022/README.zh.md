@@ -1,0 +1,27 @@
+# 长期接线人工实施、验收与恢复交接包
+
+状态：PREPARATION_COMPLETE_WITH_EXPLICIT_UNKNOWNS / NOT_ONE_CLICK / NOT_AUTHORIZED_TO_EXECUTE。
+依据原PR17 #6333715145；仅整理原范围，不签发现场许可，不另建通道。
+本包不是新的安装器，不修改0177d391源码；没有安装、回滚、浏览器恢复或秘密读取。
+Owner决定是否采用人工方式之前，不运行命令参考、不上传本包、不改服务器。
+
+## 阅读顺序
+1. INPUTS.json：每项已知证据、真实未知项、来源和对应阻断阶段。
+2. STAGES.md：原流程实施顺序；只阻断依赖该缺项的阶段。
+3. COMMAND_REFERENCE.txt：受限只读命令参考，不能串成一键安装。
+4. ACCEPTANCE_RECOVERY.md：成功判据、停止规则、失败现场及安全续接。
+5. EVIDENCE_INDEX.json：原权威记录、源码、CI和既有成功步骤。
+6. source/：准确0177d391的30成员闭包及原Manifest原件，未改写。
+7. PACKAGE_MANIFEST.json：本包全部成员的长度/模式/SHA。
+
+## 已完成步骤不得重放
+英国3.12.15 runtime、18依赖、原d866 release安装；国内DNS、HTTP01 bootstrap、已签发独立证书；已审源码及Hosted测试。原旧App/隧道/连接保留。
+两份国内失败runtime归档保留，不续传、不删除、不重下；Certbot和系统Python不动。
+
+## 当前不能诚实声称整链一键可执行
+- 包来源/SourceRPM及相关库补丁对应还需原范围内有限只读核实，不能以版本号或个别CVE修复推为完整补丁覆盖。
+- authority专用身份、配置可读权限、已有/首次DB状态及准确生产配置绑定未实测完成。原/etc/xuanjun-cloud-oauth为root0700暂存根，不能直接假设非root authority可读其下配置，也不能擅自放宽该目录。
+- 新GitHub OAuth App/client、平台新App/独立隧道、真实callback/resource、秘密保管引用和用户真实同意仍需正常获准创建/登记产生；本包不会造值或代替同意。
+- 有效现场范围、操作人/时间/Attempt与当前冲突状态须在Owner决定采用后按原准入绑定；没有“自动获得五次/十次额度”的实现。
+
+未知项不是已证源码缺陷；不得借人工交接绕过原观察限制、既有安全拒绝或独审。恢复浏览器并非人工执行的前置，但本包也不新设其他机器身份或访问通道。
