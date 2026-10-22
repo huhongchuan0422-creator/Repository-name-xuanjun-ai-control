@@ -85,7 +85,10 @@ def build(root):
                 'clients/community-mini/merchant-form.js',
                 'clients/community-mini/merchant-fields.json',
                 'scripts/community_mini_merchant.py',
-                'scripts/community_collection_code.py'}
+                'scripts/community_collection_code.py',
+                'scripts/community_review_runtime.py',
+                'demos/community-stage/review-runtime.html',
+                'demos/community-stage/review-native.js'}
     if not required.issubset(files):
         raise ValueError('REQUIRED_SOURCE_MISSING')
     manifest = {'format': 1, 'purpose':'OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE',

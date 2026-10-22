@@ -64,6 +64,9 @@ class SourcePackage(unittest.TestCase):
                 'clients/community-mini/merchant-fields.json',
                 'scripts/community_mini_merchant.py',
                 'scripts/community_collection_code.py',
+                'scripts/community_review_runtime.py',
+                'demos/community-stage/review-runtime.html',
+                'demos/community-stage/review-native.js',
             )
             for name in required_pages:
                 raw=archive.read(name)

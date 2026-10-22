@@ -4,6 +4,10 @@ on:
     branches: [feature/chatgpt-community-wechat-sp-offline-20261017]
     paths:
       - clients/community-mini/**
+      - scripts/community_review_runtime.py
+      - demos/community-stage/review-runtime.html
+      - demos/community-stage/review-native.js
+      - tests/test_community_review_runtime.py
       - scripts/community_mini_merchant.py
       - scripts/community_mini_center_identity.py
       - scripts/community_mini_http.py
@@ -30,6 +34,7 @@ jobs:
     env:
       COMMUNITY_UI_EVIDENCE: ui-evidence
       NODE_OPTIONS: --test-reporter=tap
+      COMMUNITY_REVIEW_EVIDENCE: runtime-evidence
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,6 +70,11 @@ jobs:
         run: |
           set -o pipefail
           PYTHONPATH=tests:. python -B -m unittest test_community_onboarding_scene_materials test_community_merchant_onboarding test_community_merchant_opening test_community_onboarding_conditional_materials test_community_applyment_conditions test_community_applyment_rejection_recovery test_community_wechat_payment_activation -v 2>&1 | tee ui-material-scenes.log
+      - name: Integrated isolated runtime with exact native controllers and original role APIs
+        shell: bash
+        run: |
+          set -o pipefail
+          PYTHONPATH=tests:. python -B -m unittest test_community_review_runtime -v 2>&1 | tee ui-integrated-runtime.log
       - name: Original role entries and real source ZIP closure
         shell: bash
         run: |
@@ -83,6 +93,7 @@ jobs:
           name: community-isolated-ui-review
           path: |
             ui-evidence/
+            runtime-evidence/
             ui-*.log
             ui-artifact.sha256
             community-ui-preview.html
