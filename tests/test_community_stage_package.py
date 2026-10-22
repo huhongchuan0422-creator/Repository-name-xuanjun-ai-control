@@ -37,6 +37,11 @@ class SourcePackage(unittest.TestCase):
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
                 'clients/community-mini/app.wxss',
+                'deploy/community-preview/nginx-uk-path-candidate.conf',
+                'scripts/community_platform_host.py',
+                'scripts/community_persistent_runtime.py',
+                'scripts/community_first_install.py',
+                'scripts/community_wechat_registration.py',
                 'deploy/community-preview/prepare-mini.cjs',
                 'deploy/community-preview/endpoint.cjs',
                 'deploy/community-preview/endpoint-profiles.json',
@@ -54,6 +59,12 @@ class SourcePackage(unittest.TestCase):
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
             with tempfile.TemporaryDirectory() as tmp:
                 archive.extractall(tmp)
+                host_help=subprocess.run(
+                    [sys.executable,'-B','-m','scripts.community_platform_host','--help'],
+                    cwd=tmp,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                    text=True,timeout=20,check=False)
+                self.assertEqual(host_help.returncode,0,host_help.stdout)
+                self.assertIn('--wechat-secret',host_help.stdout)
                 output=Path(tmp)/'connected-preview'
                 prepared=subprocess.run(
                     ['node','deploy/community-preview/prepare-mini.cjs'],cwd=tmp,
