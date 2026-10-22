@@ -53,3 +53,12 @@ body[data-platform="true"] .menu-group-title{border-top:1px solid #e1e9e3;margin
 @media(max-width:600px){body[data-mini="true"] .layout{padding-bottom:calc(82px + env(safe-area-inset-bottom))}body[data-platform="true"] .layout{display:block}body[data-platform="true"] aside{display:block}body[data-platform="true"] #menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}body[data-platform="true"] .menu-group-title{grid-column:1/-1}}
 
 .menu-retained{display:block;padding:7px 12px;font-size:12px;color:#68786d;border-left:2px solid #d9e3dc;margin-left:10px}.menu-retained small{display:block;font-size:10px;color:#8a958e}
+
+/* Merchant-showcase-first prototype; deliberately no product merchandising rules. */
+.mini-merchant-list{display:flex;flex-direction:column;gap:12px;margin:12px 0 18px}
+.mini-merchant-card{display:grid;grid-template-columns:58px minmax(0,1fr) 18px;gap:12px;align-items:center;padding:14px;background:#fff;border:1px solid #e8eee9;border-radius:14px;color:#253d30;min-width:0}
+.merchant-avatar{width:58px;height:58px;display:grid;place-items:center;border-radius:12px;background:#e4eee7;color:#2c6b4b;font-size:25px;font-weight:700}
+.merchant-avatar.avatar-warm{background:#f2e9dc;color:#87683e}
+.mini-merchant-card strong{font-size:15px;display:block}.mini-merchant-card p{font-size:12px;color:#69776f;margin:5px 0}.mini-merchant-card span{font-size:11px;color:#8a958e}.mini-merchant-card>b{font-size:22px;color:#8a958e}
+.profile-primary{display:flex!important;align-items:center;justify-content:space-between;background:#edf5ef;border:1px solid #dcebe0;border-radius:10px;padding:13px!important;color:#205b3e!important;font-weight:700}
+.admission-mini .mini-disclaimer{padding:0 2px}
