@@ -252,3 +252,56 @@ References for this increment:
 https://raw.githubusercontent.com/authlib/authlib/v1.9.1/authlib/integrations/requests_client/oauth2_session.py
 https://raw.githubusercontent.com/authlib/authlib/v1.9.1/authlib/integrations/base_client/sync_app.py
 https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle
+
+
+## Same-round Work deployment delta — #6330030281
+
+This supersedes the earlier incomplete modern-container row above. Work's
+original-record read supplies #6282808058: fixed image prefix5341f193,
+Python3.11.2 at /usr/bin/python3.11,6809944bytes,
+SHA256 9bee109da0dce17a7c9eeaca9f420cc6770a9fe143b9382d73bd22fe59b21a5f,
+UID1002. Reuse that evidence without another request. The P2 container has
+network=none; neither its network nor its role is changed for OAuth. It does
+not prove that the candidate host /opt/xuanjun-cloud-oauth/venv/bin/python
+exists or that the locked dependencies work there.
+
+The existing ChatGPT plugin management UI was read during this round, without
+editing, refreshing tools or creating credentials. App
+asdk_app_6ad8e68b582881918fcfd3da6e5b65fd reports supported authorization=None
+and used authorization=None; current version
+asdk_app_v_6ad8e68b582c8191a9f3586713868d44, DEVELOPMENT. That management surface
+shows no OAuth callback or resource audience. This is evidence about this
+registration, not a claim that the platform cannot support OAuth. Registration
+must use the normal supported OAuth path; IDs cannot stand in for callback or
+audience, and no placeholder values are approved.
+
+The original activation checklist is retained, with these exact open facts:
+
+| Item | Reused fact | Required binding before activation |
+| --- | --- | --- |
+| Runtime | UK systemd239; old host Python3.6.8/SQLite3.26.0; fixed P2 container3.11.2 above | Host candidate executable/venv, architecture/glibc and locked wheel compatibility; domestic interpreter/systemd facts; no host upgrade or P2 repurposing implied |
+| Ports and network | UK127.0.0.1:18769/mcp and domestic127.0.0.1:18770 are fixed candidate listeners | Existing occupancy/binding evidence for those two ports, actual UK outbound source; old28443 SSH forward is unrelated; template allow8.208.119.115 is not proven egress |
+| TLS | Proposed cloud-auth.wenwenwenyiyiyi.work and /etc/xuanjun-cloud-oauth/tls-approved.conf | Non-secret certificate reference, domain coverage, expiry/renewal owner and exact Nginx include; website TLS does not establish this subdomain |
+| Identity | GitHub callback design /github/callback; current ChatGPT registration auth=None | Real App callback registration, exact ChatGPT OAuth callback, common protected-resource audience, subject/recipient/project map and protected config SHA |
+| Catalog and roots | #6329200842/#6329032582; catalog6919B SHA62b1eef3a48b004c2b426cfff1ee7489af0eecaecdc80d4953479b7b581f2689; selected_members=[]; CANDIDATE_BLOCKED_NOT_DISPATCHABLE | Approved source_root_ref/recipient_root_ref, selection, original SUCCESS/fetch_approved_object/InvokeId and recipient binding; no OS-result or fixture substitution |
+| Mount visibility | Candidate resource unit ProtectHome=yes, ProtectSystem=strict, empty CapabilityBoundingSet and explicit credential denials remain unchanged | For each approved resolved root: ancestry, UID/GID/mode, mount visibility and read/traverse access under the exact unit restrictions; /home,/root,/run/user are hidden, /var/lib is outside ProtectHome but access is still not proven |
+
+The historical B5 source snapshot under
+/var/lib/xuanjun-p2-isolated-test/b5-source-snapshot-20261020/uid1002 is outside
+ProtectHome's hidden trees. Its historical hashes do not grant transport or
+prove current visibility. Empty capabilities also mean root cannot be assumed
+to bypass ordinary file permissions. No actual catalog roots are approved yet;
+therefore no root is marked readable merely because it is outside /home.
+If an approved root conflicts with sandbox visibility, propose only a precisely
+scoped read-only mapping with its own reviewed configuration; do not delete
+ProtectHome or open an ancestor tree to make it run. No such mapping is
+implemented or authorized by this document.
+
+Original B5 budget16MiB remains; the Node126595440byte overage is not waived or
+split into small requests. Website fixed20-item inputs/source references and
+host mapping remain as recorded in #6329032582/#6320420824, not guessed.
+
+All observations in Work's receipt are historical reads, not fresh server
+checks. This round performs no server commands, deployment, account/App/secret
+creation, network changes, tool refresh or permission edits. The table is the
+single concentrated fact/activation delta, not a request for blanket approval.
