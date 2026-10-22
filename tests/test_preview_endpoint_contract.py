@@ -149,7 +149,8 @@ class EndpointContract(unittest.TestCase):
 
     def test_workflow_uses_one_profile_and_retains_manifest_gate(self):
         workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
-        self.assertIn('COMMUNITY_PREVIEW_PROFILE: legacy',workflow)
+        self.assertEqual(workflow.count('COMMUNITY_PREVIEW_PROFILE: uk-path-candidate'),1)
+        self.assertNotIn('COMMUNITY_PREVIEW_PROFILE: legacy',workflow)
         self.assertIn('COMMUNITY_PREVIEW_READINESS_RECEIPT:',workflow)
         job_config=workflow.split('  mini-preview:\n',1)[1].split('    steps:',1)[0]
         self.assertNotIn('runner.temp',job_config)

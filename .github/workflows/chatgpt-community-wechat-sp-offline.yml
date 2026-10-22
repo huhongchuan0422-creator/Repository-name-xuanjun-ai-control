@@ -376,7 +376,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
     env:
-      COMMUNITY_PREVIEW_PROFILE: legacy
+      COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
     steps:
       - name: Verify existing domestic upload runner before loading credentials
         shell: bash
