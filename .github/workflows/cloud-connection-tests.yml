@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: python:3.11.6-bookworm
+      image: python:3.11.6-bookworm@sha256:ba7a7ac30c38e119c4304f98ef0e188f90f4f67a958bb6899da9defb99bfb471
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,10 +28,11 @@ jobs:
           test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
           python -c 'import sys; assert sys.version_info[:3] == (3,11,6); print(sys.version)'
           python -m venv /tmp/oauth-py3116
-          /tmp/oauth-py3116/bin/python -m pip download --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.lock --dest /tmp/approved-wheels
-          /tmp/oauth-py3116/bin/python -m pip install --no-index --find-links=/tmp/approved-wheels --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.lock
+          /tmp/oauth-py3116/bin/python -m pip download --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.cp3116.lock --dest /tmp/approved-wheels
+          /tmp/oauth-py3116/bin/python -m pip install --no-index --find-links=/tmp/approved-wheels --require-hashes --only-binary=:all: -r deployment/cloud-connection/oauth/requirements.cp3116.lock
           /tmp/oauth-py3116/bin/python -m pip check
           /tmp/oauth-py3116/bin/python -I -B tests/oauth/record_py3116_wheels.py deployment/cloud-connection/oauth/requirements.lock /tmp/approved-wheels py3116-evidence
+          cmp py3116-evidence/requirements.cp3116.lock deployment/cloud-connection/oauth/requirements.cp3116.lock
       - name: Exact-version OAuth HTTP and persistence isolation compatibility
         run: |
           /tmp/oauth-py3116/bin/python -m unittest discover -s tests/oauth -p 'test_*.py' -v

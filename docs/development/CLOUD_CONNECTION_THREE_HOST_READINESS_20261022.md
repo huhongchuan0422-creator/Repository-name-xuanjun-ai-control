@@ -83,7 +83,7 @@ still require affected-scope review, not an automatic runtime substitution.
 
 | Host | Inherited facts and preparation | Gate for its own acceptance |
 | --- | --- | --- |
-| Domestic minimal authority | Fixed host iZvt5t8tlrm8oiZ / cn-shanghai /3a22c458934142eea89ec6e3bf481a57; original machine role and read-only observations; issued cloud-auth certificate/bootstrap; Python/RPM facts above | Adopt exact runtime after compatibility/review; authorize actual account/config/DB/service changes and still-uncreated App/client secrets; limited TLS/peer evidence, original permit/Owner confirmation and real login/refresh/revoke/restart; introspect stays deny until source proof |
+| Domestic minimal authority | Fixed host iZvt5t8tlrm8oiZ / cn-shanghai /3a22c458934142eea89ec6e3bf481a57; original machine role and read-only observations; issued cloud-auth certificate/bootstrap; Python/RPM facts above | Adopt exact runtime after compatibility/review and concentrated confirmation of this changed binding; reuse applicable original S3/S4 Owner confirmation rather than re-requesting unchanged scope. Actual account/config/DB/service/App/secret creation still not executed; normal safety controls and separate real consent apply. Limited TLS/peer and real login/refresh/revoke/restart evidence required; introspect stays deny until source proof |
 | UK resource | iZd7oeikknn1z21sq6ji6zZ /eu-west-1 /40dfc6a47d5e4363b9da7d0d6ab01cb1; successful3.12.15 runtime,18 deps and23-file release #6332421572 reused | Depends only on minimal domestic authority and its TLS/peer/client bindings, not all domestic business completion. New independent tunnel/App and actual OAuth consent/identity tests remain separate; preserve old connection and successful install |
 | Korea business | iZmj7a5kwr75qc1tul4kf9Z /ap-northeast-2 /09207081a09a466aa0079b07b5e3e7ca; existing role/host/OS-file SHA/standing-executor acceptance inherited | Business catalog/root_ref, fixed operation, original project request/selected Manifest/budget and recipient mapping must be bound; no new Korea service, runtime, port or deployment guessed/started. Its acceptance can proceed as soon as its own complete binding exists |
 
@@ -107,3 +107,50 @@ catalog. Node126595440B cannot be split to evade the budget. Do not install P2.
 No three-host barrier: each host records SOURCE, HOSTED, LIVE and remaining gates
 separately. This preparation does not assert that credentials, App, deployment,
 project roots or newly registered operations already exist.
+
+## Current domestic business evidence refreshed without host actions
+
+Read original PR122 #6332566743/#6332849185/#6332867335/#6332903687:
+- Static brand remains caaac435134a71e0809969a3e85956ee75fb287c,
+  Tree2349553c7e00d2c979965ad001c8f327e04d576e,1241-member original TAR
+  d4b6ae55a6c9c2b88918e1cd4cba2af072dd5cd717efa697b83120bbec3bca46.
+  Original uploaded ZIP independent byte verification is PENDING, not assumed.
+- Customer FULL is4dc5e349243d5fd277807c0c023281118d6df9d6,
+  Tree66b45dc175afa7ecf4347afcbec49455dd4d91c8,
+  Hosted39721345909/navigation39721345923 SUCCESS; Artifact12401945057.
+  Its API digest is not an independent ZIP byte check. LOGIN_ONLY is not FULL.
+- SHOWCASE brand-only technical increment #6332903687 passed within scope;
+  actual trust/policy observation, release and production remain separate gates.
+- Fixed static20-item probe and the two-file SHOWCASE trust probe have exact
+  original candidates, but their live execution must use applicable existing
+  authorization or the original exact-range confirmation. They are not silently
+  executed by this runtime task. FULL customer metadata needs its separately
+  fixed approved object/field list; no new include scan or arbitrary namespace.
+
+This separates current asset readiness from transport and new OAuth deployment.
+It does not make domestic customer FULL a prerequisite for minimal shared
+identity authority or UK resource authentication acceptance.
+
+## Exact upstream3.11.6 test and frozen selection
+
+Resolution commit787286ca7b590068b328e996500260a821511bb2,
+Run39725084091/job119647031445:18 packages installed with original hash lock,
+pip check PASS,29 OAuth/HTTP PASS,195 source cases discovered:187 PASS/8 SKIP.
+This is additional runtime coverage of existing tests, not224 new cases.
+The final workflow pins official image digest
+python:3.11.6-bookworm@sha256:ba7a7ac30c38e119c4304f98ef0e188f90f4f67a958bb6899da9defb99bfb471
+and requires the generated selection to byte-match requirements.cp3116.lock,
+SHA256 d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71.
+All18 selected wheels total6731878 bytes and their SHA/tag/Requires-Python are
+recorded in domestic-py3116-compatibility.json from the actual CI log.
+The inherited master requirements.lock SHA remains
+a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4.
+
+Selected native wheels: cffi cp311/manylinux2_17, charset-normalizer and
+MarkupSafe cp311/manylinux2_17/2_28, cryptography cp311-abi3/manylinux2_34.
+Their platform tag floors fit x86_64/glibc2.38; this is a tag comparison,
+not a domestic import or sandbox execution result. Other14 wheels are portable.
+Test image reports glibc2.36/OpenSSL3.0.11/SQLite3.40.1; domestic inherited
+versions are2.38/3.0.12/3.42.0, so exact vendor linked-library/live tests remain
+NOT_EXECUTED. Do not replace either host's runtime without applicable review
+and explicit adoption of this changed binding.

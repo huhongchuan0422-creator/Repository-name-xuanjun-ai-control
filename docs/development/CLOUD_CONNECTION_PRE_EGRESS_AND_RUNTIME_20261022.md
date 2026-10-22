@@ -99,5 +99,9 @@ results, then explicitly update the runtime binding/deployment and rollback plan
 No silent downgrade, system-Python upgrade, shared environment edits or reuse of
 an old permit under a new runtime. UNKNOWN remains HOLD.
 
-Current alternative status: COMPATIBILITY_NOT_RUN / NOT_ADOPTED. The two GitHub
-network timeouts are retained; no repeated same download or production changes.
+Current alternative status: EXACT_UPSTREAM_3116_COMPATIBILITY_PASS / NOT_ADOPTED.
+Run39725084091/job119647031445 actually installed the18 exact wheels and passed
+29 HTTP plus187 source/persistence cases (8 Nginx skips); final frozen selection
+and vendor/live boundaries are in CLOUD_CONNECTION_THREE_HOST_READINESS_20261022.md.
+The two GitHub network timeouts are retained; no repeated same download or
+production changes.

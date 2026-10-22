@@ -8,6 +8,12 @@
       "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244"
     },
     {
+      "bytes": 6843,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
+      "sha256": "2ce00bd99e35f8d3496fd1cae457df9841d136188a7fd014e06d62c17b818e6c"
+    },
+    {
       "bytes": 462,
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
@@ -42,6 +48,12 @@
       "mode": "0644",
       "path": "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
       "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef"
+    },
+    {
+      "bytes": 1795,
+      "mode": "0644",
+      "path": "deployment/cloud-connection/oauth/requirements.cp3116.lock",
+      "sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71"
     },
     {
       "bytes": 5158,

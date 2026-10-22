@@ -146,7 +146,9 @@
         "docs/development/CLOUD_CONNECTION_PRE_EGRESS_AND_RUNTIME_20261022.md",
         "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
         "tests/oauth/record_py3116_wheels.py",
-        "docs/development/CLOUD_CONNECTION_THREE_HOST_READINESS_20261022.md"
+        "docs/development/CLOUD_CONNECTION_THREE_HOST_READINESS_20261022.md",
+        "deployment/cloud-connection/oauth/requirements.cp3116.lock",
+        "deployment/cloud-connection/oauth/domestic-py3116-compatibility.json"
       ]
     }
   ]
