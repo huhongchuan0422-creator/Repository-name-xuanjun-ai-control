@@ -47,6 +47,16 @@ class SecureSQLiteJobStore:
                 UNIQUE(tenant_key, idem_key)
             )""")
             db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_tenant ON ocr_jobs(tenant_key)")
+            db.execute("CREATE TABLE IF NOT EXISTS ocr_key_check(check_value TEXT NOT NULL)")
+            expected = self._index("encryption-key-check-v1")
+            row = db.execute("SELECT check_value FROM ocr_key_check LIMIT 1").fetchone()
+            if row is None:
+                db.execute("INSERT INTO ocr_key_check VALUES(?)", (expected,))
+            elif not hmac.compare_digest(row["check_value"], expected):
+                raise RuntimeError("OCR_ENCRYPTION_KEY_MISMATCH")
+            db.execute("""CREATE TABLE IF NOT EXISTS ocr_audit(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, job_key TEXT NOT NULL,
+                event TEXT NOT NULL, time_unix INTEGER NOT NULL DEFAULT (unixepoch()))""")
 
 
     def recover_interrupted(self):
@@ -108,6 +118,7 @@ class SecureSQLiteJobStore:
                    "contract_version": "1.0.0"}
             db.execute("INSERT INTO ocr_jobs(job_id,tenant_key,subject_key,idem_key,payload_hash,state,ciphertext) VALUES(?,?,?,?,?,?,?)",
                        (job["job_id"], tenant_key, subject_key, idem_key, payload_hash, "queued", self._seal(job)))
+            db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job["job_id"]), "created"))
             db.execute("COMMIT")
             return job
 
@@ -136,6 +147,7 @@ class SecureSQLiteJobStore:
                 return None
             db.execute("UPDATE ocr_jobs SET ciphertext=?,state=?,updated_unix=unixepoch() WHERE job_id=?",
                        (self._seal(job), job["status"], job_id))
+            db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job_id), "updated"))
             db.execute("COMMIT")
             return job
 
@@ -179,5 +191,19 @@ class SecureSQLiteJobStore:
             db.execute("BEGIN IMMEDIATE")
             changed = db.execute("DELETE FROM ocr_jobs WHERE job_id=? AND tenant_key=?",
                                  (job_id, self._index(tenant_id))).rowcount
+            if changed:
+                db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job_id), "deleted"))
             db.execute("COMMIT")
         return changed == 1
+
+    def purge_before(self, cutoff_unix: int) -> int:
+        """Retention deletion by last update; never returns sensitive field values."""
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            rows = db.execute("SELECT job_id FROM ocr_jobs WHERE updated_unix < ?", (cutoff_unix,)).fetchall()
+            for row in rows:
+                db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)",
+                           (self._index(row["job_id"]), "retention_deleted"))
+            db.execute("DELETE FROM ocr_jobs WHERE updated_unix < ?", (cutoff_unix,))
+            db.execute("COMMIT")
+            return len(rows)
