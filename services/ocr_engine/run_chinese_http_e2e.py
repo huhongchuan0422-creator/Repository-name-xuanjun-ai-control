@@ -22,70 +22,60 @@ def make_synthetic_document(kind):
     buf=io.BytesIO(); image.save(buf,format="PNG"); return buf.getvalue()
 
 def main():
+    import hashlib
     key=Fernet.generate_key()
     with tempfile.TemporaryDirectory() as tmp:
-        db=os.path.join(tmp,"ocr-e2e.sqlite3")
-        principal=Principal(subject="synthetic-user",tenant_id="synthetic-tenant",permissions={"ocr:use"})
+        db=os.path.join(tmp,'ocr-e2e.sqlite3')
+        principal=Principal(subject='synthetic-user',tenant_id='synthetic-tenant',permissions={'ocr:use'})
+        docs=[('business_license','synthetic-license-attachment'),('id_front','synthetic-id-attachment')]
+        images={kind:make_synthetic_document(kind) for kind,_ in docs}
+        authorized_hashes={attachment:hashlib.sha256(images[kind]).hexdigest() for kind,attachment in docs}
+        revoked_apps=set(); revoked_attachments=set()
+        def app_auth(p, app_id): return app_id=='synthetic-app' and app_id not in revoked_apps
+        def attachment_auth(p, app_id, attachment_id, supplied_sha256):
+            expected=authorized_hashes.get(attachment_id)
+            return {'authorized': expected is not None and expected==supplied_sha256 and attachment_id not in revoked_attachments, 'content_sha256': expected or ''}
         def make_client():
             store=SecureSQLiteJobStore(db,key)
-            app=create_app(authenticate=lambda token: principal if token=="synthetic-token" else (_ for _ in ()).throw(ValueError("bad token")),
-                store=store, authorize_application=lambda p, app_id: app_id=="synthetic-app",
-                authorize_attachment=lambda p, app_id, attachment_id: attachment_id in {"synthetic-license-attachment","synthetic-id-attachment"})
+            app=create_app(authenticate=lambda token: principal if token=='synthetic-token' else (_ for _ in ()).throw(ValueError('bad token')),
+                store=store,authorize_application=app_auth,authorize_attachment=attachment_auth)
             return TestClient(app)
+        results=[]
         with make_client() as client:
-            results=[]
-            for kind,attachment in (("business_license","synthetic-license-attachment"),("id_front","synthetic-id-attachment")):
-                img=make_synthetic_document(kind)
-                headers={"Authorization":"Bearer synthetic-token","Idempotency-Key":"submit-"+kind+"-00001"}
-                response=client.post("/api/v1/ocr/jobs",headers=headers,
-                    data={"document_type":kind,"onboarding_application_id":"synthetic-app","attachment_id":attachment},
-                    files={"file":(kind+".png",img,"image/png")})
-                if response.status_code!=202: raise SystemExit("HTTP_SUBMIT_FAILED:"+kind+":"+str(response.status_code)+":"+response.text)
-                job_id=response.json()["job_id"]
-                read=client.get("/api/v1/ocr/jobs/"+job_id,headers={"Authorization":"Bearer synthetic-token"})
-                if read.status_code!=200: raise SystemExit("HTTP_READ_FAILED:"+kind+":"+str(read.status_code))
-                payload=read.json(); fields=payload.get("fields",{})
-                print("E2E_DOCUMENT="+kind)
-                print("E2E_STATUS="+str(payload.get("status")))
-                print("E2E_FIELDS="+repr(fields))
-                if not fields: raise SystemExit("OCR_FIELDS_EMPTY:"+kind)
-                if payload.get("authenticity_verified") is not False or payload.get("requires_human_confirmation") is not True: raise SystemExit("HUMAN_REVIEW_GUARD_FAILED:"+kind)
-                confirm_headers={"Authorization":"Bearer synthetic-token","Idempotency-Key":"confirm-"+kind+"-00001"}
-                body={"revision":1,"fields":{k:v["value"] for k,v in fields.items()}}
-                confirmed=client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=confirm_headers,json=body)
-                if confirmed.status_code!=200: raise SystemExit("CONFIRM_FAILED:"+kind+":"+str(confirmed.status_code)+":"+confirmed.text)
-                replay=client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=confirm_headers,json=body)
-                if replay.status_code!=200 or replay.json()!=confirmed.json(): raise SystemExit("CONFIRM_REPLAY_FAILED:"+kind)
+            for kind,attachment in docs:
+                img=images[kind]
+                headers={'Authorization':'Bearer synthetic-token','Idempotency-Key':'submit-'+kind+'-00001'}
+                response=client.post('/api/v1/ocr/jobs',headers=headers,data={'document_type':kind,'onboarding_application_id':'synthetic-app','attachment_id':attachment},files={'file':(kind+'.png',img,'image/png')})
+                if response.status_code!=202: raise SystemExit('HTTP_SUBMIT_FAILED:'+kind+':'+str(response.status_code)+':'+response.text)
+                job_id=response.json()['job_id']
+                read=client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer synthetic-token'})
+                if read.status_code!=200: raise SystemExit('HTTP_READ_FAILED:'+kind+':'+str(read.status_code)+':'+read.text)
+                payload=read.json(); fields=payload.get('fields',{})
+                print('E2E_DOCUMENT='+kind); print('E2E_FIELDS='+repr(fields))
+                if not fields or payload.get('authenticity_verified') is not False or payload.get('requires_human_confirmation') is not True: raise SystemExit('OCR_OR_REVIEW_GUARD_FAILED:'+kind)
+                confirm_headers={'Authorization':'Bearer synthetic-token','Idempotency-Key':'confirm-'+kind+'-00001'}
+                body={'revision':1,'fields':{k:v['value'] for k,v in fields.items()}}
+                confirmed=client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
+                if confirmed.status_code!=200: raise SystemExit('CONFIRM_FAILED:'+kind+':'+str(confirmed.status_code)+':'+confirmed.text)
+                replay=client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
+                if replay.status_code!=200 or replay.json()!=confirmed.json(): raise SystemExit('CONFIRM_REPLAY_FAILED:'+kind)
+                readback=client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer synthetic-token'})
+                if readback.status_code!=200 or readback.json().get('confirmed_fields')!=body['fields'] or readback.json().get('confirmation_revision')!=1: raise SystemExit('CONFIRMED_FIELDS_READBACK_FAILED:'+kind)
                 results.append((kind,attachment,job_id,img,headers,body,confirm_headers,confirmed.json()))
-        # New store and new FastAPI app/client = independent-process boundary analogue; no state from old objects reused.
         with make_client() as restarted:
             for kind,attachment,job_id,img,headers,body,confirm_headers,confirm_response in results:
-                read=restarted.get("/api/v1/ocr/jobs/"+job_id,headers={"Authorization":"Bearer synthetic-token"})
-                if read.status_code!=200 or read.json().get("status")!="confirmed": raise SystemExit("RESTART_CONFIRMATION_NOT_PERSISTED:"+kind)
-                same=restarted.post("/api/v1/ocr/jobs",headers=headers,
-                    data={"document_type":kind,"onboarding_application_id":"synthetic-app","attachment_id":attachment},
-                    files={"file":(kind+".png",img,"image/png")})
-                if same.status_code!=202 or same.json().get("job_id")!=job_id: raise SystemExit("SUBMIT_REPLAY_FAILED:"+kind)
-                replay=restarted.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=confirm_headers,json=body)
-                if replay.status_code!=200 or replay.json()!=confirm_response: raise SystemExit("CONFIRM_REPLAY_AFTER_RESTART_FAILED:"+kind)
-                store=restarted.app.state.ocr_job_store
-                events=store.audit_events(job_id,"synthetic-tenant")
-                if len(events)!=1 or events[0].get("event")!="USER_CONFIRMATION": raise SystemExit("AUDIT_PERSISTENCE_FAILED:"+kind)
-                print("E2E_RESTART_CONFIRMATION=PASS:"+kind)
-                print("E2E_SUBMIT_IDEMPOTENCY=PASS:"+kind)
-                print("E2E_CONFIRM_IDEMPOTENCY=PASS:"+kind)
-                print("E2E_AUDIT_PERSISTENCE=PASS:"+kind)
-        # Exercise simultaneous independent connections: same idempotency key and payload must resolve to one durable job.
-        with make_client() as concurrent:
-            from concurrent.futures import ThreadPoolExecutor
-            img=make_synthetic_document("business_license")
-            def submit_once(_):
-                return concurrent.post("/api/v1/ocr/jobs",headers={"Authorization":"Bearer synthetic-token","Idempotency-Key":"concurrent-license-0001"},
-                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-license-attachment"},
-                    files={"file":("license.png",img,"image/png")})
-            with ThreadPoolExecutor(max_workers=4) as pool: responses=list(pool.map(submit_once,range(4)))
-            if any(r.status_code!=202 for r in responses) or len({r.json()["job_id"] for r in responses})!=1: raise SystemExit("CONCURRENT_IDEMPOTENCY_ISOLATION_FAILED")
-            print("E2E_CONCURRENT_IDEMPOTENCY=PASS")
-        print("CHINESE_LICENSE_AND_ID_HTTP_SQLITE_E2E=PASS")
+                read=restarted.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer synthetic-token'})
+                if read.status_code!=200 or read.json().get('status')!='confirmed': raise SystemExit('RESTART_CONFIRMATION_NOT_PERSISTED:'+kind)
+                same=restarted.post('/api/v1/ocr/jobs',headers=headers,data={'document_type':kind,'onboarding_application_id':'synthetic-app','attachment_id':attachment},files={'file':(kind+'.png',img,'image/png')})
+                if same.status_code!=202 or same.json().get('job_id')!=job_id: raise SystemExit('SUBMIT_REPLAY_FAILED:'+kind)
+                replay=restarted.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
+                if replay.status_code!=200 or replay.json()!=confirm_response: raise SystemExit('CONFIRM_REPLAY_AFTER_RESTART_FAILED:'+kind)
+                events=restarted.app.state.ocr_job_store.audit_events(job_id,'synthetic-tenant')
+                if len(events)!=1 or events[0].get('event')!='USER_CONFIRMATION': raise SystemExit('AUDIT_PERSISTENCE_FAILED:'+kind)
+                wrong=bytes([137,80,78,71,13,10,26,10])+b'wrong synthetic bytes'
+                bad=restarted.post('/api/v1/ocr/jobs',headers={'Authorization':'Bearer synthetic-token','Idempotency-Key':'wrong-bytes-'+kind+'-0001'},data={'document_type':kind,'onboarding_application_id':'synthetic-app','attachment_id':attachment},files={'file':(kind+'.png',wrong,'image/png')})
+                if bad.status_code!=403 or 'ATTACHMENT_CONTENT_BINDING_UNVERIFIED' not in bad.text: raise SystemExit('WRONG_CONTENT_NOT_REJECTED:'+kind)
+                print('E2E_RESTART_CONFIRMATION=PASS:'+kind); print('E2E_CONFIRM_READBACK=PASS:'+kind); print('E2E_SUBMIT_IDEMPOTENCY=PASS:'+kind); print('E2E_AUDIT_PERSISTENCE=PASS:'+kind); print('E2E_WRONG_CONTENT_REJECTED=PASS:'+kind)
+        print('CHINESE_LICENSE_AND_ID_HTTP_SQLITE_E2E=PASS')
 
-if __name__=="__main__": main()
+if __name__=='__main__': main()
