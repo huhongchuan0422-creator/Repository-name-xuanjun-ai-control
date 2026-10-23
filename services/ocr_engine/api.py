@@ -12,8 +12,10 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 try:
     from .ocr_core import run_local_ocr
+    from .secure_store import SecureSQLiteJobStore
 except ImportError:
     from ocr_core import run_local_ocr
+    from secure_store import SecureSQLiteJobStore
 
 MAX_BYTES = 8 * 1024 * 1024
 ALLOWED_HINTS = {"business_license", "id_front"}
@@ -124,7 +126,10 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         db_path = os.environ.get("OCR_SQLITE_PATH", "")
         if not db_path:
             raise RuntimeError("OCR_SQLITE_PATH_REQUIRED")
-        jobs = SQLiteJobStore(db_path)
+        raw_key = os.environ.get("OCR_ENCRYPTION_KEY", "")
+        if not raw_key:
+            raise RuntimeError("OCR_ENCRYPTION_KEY_REQUIRED")
+        jobs = SecureSQLiteJobStore(db_path, raw_key.encode("ascii"))
     else:
         jobs = store
     def principal(auth_header: Optional[str]) -> Principal:
@@ -154,12 +159,19 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=413, detail="IMAGE_SIZE_LIMIT")
         import hashlib
         digest = hashlib.sha256(data).hexdigest()
-        job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
+        try:
+            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key) if isinstance(jobs, SecureSQLiteJobStore) else jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
         if job["document_type"] != document_type:
             raise HTTPException(status_code=409, detail="DOCUMENT_TYPE_CONFLICT")
         if job["status"] != "queued":
             return {"job_id": job["job_id"], "status": job["status"], "contract_version": "1.0.0"}
-        jobs.update(job["job_id"], status="processing")
+        if isinstance(jobs, SecureSQLiteJobStore):
+            if not jobs.claim(job["job_id"]):
+                raise HTTPException(status_code=409, detail="OCR_JOB_ALREADY_CLAIMED")
+        else:
+            jobs.update(job["job_id"], status="processing")
         try:
             result = infer(data, document_type, max_bytes=MAX_BYTES)
             jobs.update(job["job_id"], status="needs_review", fields=result["fields"],
