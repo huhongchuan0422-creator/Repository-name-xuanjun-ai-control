@@ -32,3 +32,59 @@ provider and recipient binding; exact artifact QA/Security/Release; timer
 activation and independent timer/process liveness; live 5/10/15 faults;
 outbox delivery/unknown effects; reboot/power-loss and dashboard live bridge.
 Local and hosted fake-ledger tests are source evidence only.
+
+## Contract 6134558596: existing ExecutionLedger adapter
+
+`canonical_inventory_page(db, now, after_id=None, limit=100)` reads the existing
+`tasks(id,kind,state,depends,lease_owner,lease_until,fence,checkpoint,updated)`
+schema in a caller-owned consistent read transaction. It never opens/creates a
+database or modifies tables. The existing canonical owner must validate the
+activation binding before and after this observation and retain the transaction
+across pagination. The standalone schema-v2 tick above is NOT a valid substitute.
+
+It includes tasks without supervised_runs, reads bounded existing delivery
+metadata without draining it, preserves dead letters and identifies stale-fence
+notifications. It uses persisted progress/result deadlines, not task.updated.
+Raw checkpoints/spec prompts are never exported. Missing attempt/lease IDs and
+entry authentication remain UNKNOWN/unproven, rather than invented labels.
+
+Decisions are proposals only. `CAPABILITY_UNAVAILABLE` remains until the existing
+ExecutionSupervisor operations bind expected spec/run/session/fence/epoch and
+checkpoint inside the same canonical transaction. A read-then-boolean callback
+cannot authorize resume or notify: stale observations must not affect a new run.
+This interface delta is proposed on PR17 comment6134594691 for the shared owner;
+Dots does not modify execution_ledger.py, P2 controller or install manifests.
+
+Source/CI checks are separate from UK activation and 5/10/15 fault acceptance.
+
+## Amendments 6134634728 and 6134670620: bounded lineage and policy
+
+The adapter now accepts optional activation_binding, ledger_identity and exact
+task_id parameters. Pagination and exact-task lookup are mutually exclusive.
+Activation includes ledger UUID, generation, epoch, instance and canonical path;
+file identity must come from the admitted caller, not submitted task metadata.
+Checkpoint content stays private; only its normalized hash and strictly formatted
+native attempt/lease identifiers are exposed. Unknown identifiers stay UNKNOWN.
+Stopped native runs and terminal tasks without continuation/ACK evidence remain
+visible; an observed terminal result never proves successor admission.
+
+assert_inventory_lineage compares an observation only. It grants no authority.
+The proposed shared-owner patch and hash-bound test excerpts are in
+evidence/dots-task23-canonical-20261013/. P2 owns integration into its existing
+execution_supervision.py, transaction pinning, imports and package manifest.
+No shared production source is modified here. Its proposed notice operation
+re-reads exact lineage in the admitted transaction and uses existing events and
+delivery rows; duplicate notices preserve dead-letter state. No resume or
+external delivery is implemented by this notice proposal.
+
+receiver_continuation_policy defaults to CAPABILITY_UNAVAILABLE with no fallback
+for every callable model route, including Work, Codex, agents, CLI/app-server and
+paid APIs. It never dispatches. Listed mechanical routes still require the
+existing reviewed mechanical executor. WORK/CHATGPT/DOTS are entry labels, not
+permission to invoke those models. Native-chat quota attribution is UNKNOWN.
+Policy fixtures do not establish integrated runtime enforcement:
+POLICY_RECORDED / ENFORCEMENT_NOT_VERIFIED.
+
+The CI evidence suite uses disposable SQLite fixtures, not the UK ledger.
+Real activation, receiver ACK, 5/10/15 fault acceptance and independent review
+remain required separately.
