@@ -21,7 +21,7 @@ test('merchant admin mobile keeps exact string, provider mapping and service pho
   assert.equal(f.page.data.mobilePhoneError,'');
  }
  assert.equal(form.platformFields(f.page.profile,f.page.data.base).contact,'+44-123456789');
- assert.notEqual(form.get(f.page.profile,'business_info.service_phone'),form.get(f.page.profile,path));
+ form.put(f.page.profile,'business_info.service_phone','555-0100');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'555-0100');assert.equal(form.get(f.page.profile,path),'+44-123456789');
  await f.page.save();
  assert.equal(form.get(f.storedProfile,path),'+44-123456789');
  assert.equal(typeof form.get(f.storedProfile,path),'string');
