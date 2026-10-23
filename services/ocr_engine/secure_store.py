@@ -47,6 +47,15 @@ class SecureSQLiteJobStore:
                 UNIQUE(tenant_key, idem_key)
             )""")
             db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_tenant ON ocr_jobs(tenant_key)")
+            db.execute("""CREATE TABLE IF NOT EXISTS ocr_confirm_idempotency(
+                tenant_key TEXT NOT NULL, job_id TEXT NOT NULL, idem_key TEXT NOT NULL,
+                payload_hash TEXT NOT NULL, response_ciphertext BLOB NOT NULL,
+                PRIMARY KEY(tenant_key, job_id, idem_key))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS ocr_audit(
+                audit_id TEXT PRIMARY KEY, tenant_key TEXT NOT NULL, job_id TEXT NOT NULL,
+                event_type TEXT NOT NULL, event_ciphertext BLOB NOT NULL,
+                created_unix INTEGER NOT NULL DEFAULT (unixepoch()))""")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_audit_job ON ocr_audit(tenant_key, job_id)")
             db.execute("CREATE TABLE IF NOT EXISTS ocr_key_check(check_value TEXT NOT NULL)")
             expected = self._index("encryption-key-check-v1")
             row = db.execute("SELECT check_value FROM ocr_key_check LIMIT 1").fetchone()
@@ -174,17 +183,55 @@ class SecureSQLiteJobStore:
         if self._modify(job_id, None, action) is None:
             raise KeyError("OCR_JOB_NOT_FOUND")
 
-    def confirm(self, job_id: str, tenant_id: str, revision: int, fields: dict):
-        def action(job):
+    def confirm(self, job_id: str, tenant_id: str, revision: int, fields: dict, idempotency_key: str = ""):
+        if not idempotency_key:
+            raise ValueError("OCR_CONFIRM_IDEMPOTENCY_REQUIRED")
+        tenant_key = self._index(tenant_id)
+        idem_key = self._index(tenant_id + "/" + idempotency_key)
+        payload_hash = self._index(json.dumps({"revision": revision, "fields": fields}, ensure_ascii=False, sort_keys=True))
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            replay = db.execute("SELECT payload_hash,response_ciphertext FROM ocr_confirm_idempotency WHERE tenant_key=? AND job_id=? AND idem_key=?",
+                                (tenant_key, job_id, idem_key)).fetchone()
+            if replay:
+                if not hmac.compare_digest(replay["payload_hash"], payload_hash):
+                    db.execute("ROLLBACK")
+                    raise ValueError("OCR_CONFIRM_IDEMPOTENCY_CONFLICT")
+                result = self._open(replay["response_ciphertext"])
+                db.execute("COMMIT")
+                return result
+            row = db.execute("SELECT ciphertext,state FROM ocr_jobs WHERE job_id=? AND tenant_key=?",
+                             (job_id, tenant_key)).fetchone()
+            if not row:
+                db.execute("ROLLBACK")
+                return None
+            job = self._open(row["ciphertext"])
             if job["status"] not in {"needs_review", "confirmed"}:
+                db.execute("ROLLBACK")
                 raise ValueError("OCR_JOB_NOT_READY")
             if revision <= job.get("confirmation_revision", 0):
+                db.execute("ROLLBACK")
                 raise ValueError("STALE_CONFIRMATION_REVISION")
             job["confirmed_fields"] = dict(fields)
             job["confirmation_revision"] = revision
             job["status"] = "confirmed"
+            db.execute("UPDATE ocr_jobs SET ciphertext=?,state=?,updated_unix=unixepoch() WHERE job_id=? AND tenant_key=?",
+                       (self._seal(job), "confirmed", job_id, tenant_key))
+            response = {"job_id": job_id, "status": "confirmed", "revision": revision, "recorded": True}
+            db.execute("INSERT INTO ocr_confirm_idempotency VALUES(?,?,?,?,?)",
+                       (tenant_key, job_id, idem_key, payload_hash, self._seal(response)))
+            audit = {"event": "USER_CONFIRMATION", "job_id": job_id, "revision": revision,
+                     "fields": dict(fields), "subject_key": job.get("subject")}
+            db.execute("INSERT INTO ocr_audit(audit_id,tenant_key,job_id,event_type,event_ciphertext) VALUES(?,?,?,?,?)",
+                       (str(uuid.uuid4()), tenant_key, job_id, "USER_CONFIRMATION", self._seal(audit)))
+            db.execute("COMMIT")
             return job
-        return self._modify(job_id, tenant_id, action)
+
+    def audit_events(self, job_id: str, tenant_id: str) -> list[dict]:
+        with self._connect() as db:
+            rows = db.execute("SELECT event_ciphertext FROM ocr_audit WHERE job_id=? AND tenant_key=? ORDER BY created_unix,audit_id",
+                              (job_id, self._index(tenant_id))).fetchall()
+        return [self._open(row["event_ciphertext"]) for row in rows]
 
     def delete(self, job_id: str, tenant_id: str) -> bool:
         with self._connect() as db:
