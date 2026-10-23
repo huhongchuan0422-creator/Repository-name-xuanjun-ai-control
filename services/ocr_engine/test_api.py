@@ -32,12 +32,14 @@ class ApiTests(unittest.TestCase):
         self.expected_sha = hashlib.sha256(self.image).hexdigest()
         self.revoked_apps = set()
         self.revoked_attachments = set()
+        self.current_revision = "synthetic-revision-1"
         def attachment_resolver(p, app, attachment, content_sha, document_type, expected_application_revision=None):
             valid = (app == "synthetic-app" and attachment == "synthetic-attachment" and
                      content_sha == self.expected_sha and attachment not in self.revoked_attachments and
-                     document_type == "business_license" and expected_application_revision in (None, "synthetic-revision-1"))
+                     document_type == "business_license" and
+                     (expected_application_revision is None or str(expected_application_revision) == self.current_revision))
             return {"authorized": valid, "content_sha256": self.expected_sha,
-                    "document_type": "business_license", "application_revision": "synthetic-revision-1"}
+                    "document_type": "business_license", "application_revision": self.current_revision}
         self.attachment_resolver = attachment_resolver
         from cryptography.fernet import Fernet
         self._tmp = tempfile.TemporaryDirectory()
@@ -164,6 +166,19 @@ class ApiTests(unittest.TestCase):
             files={'file':('synthetic.jpg',wrong,'image/jpeg')})
         self.assertEqual(r.status_code,403,r.text)
         self.assertIn('ATTACHMENT_CONTENT_BINDING_UNVERIFIED',r.text)
+    def test_document_type_mismatch_rejected_even_when_sha_matches(self):
+        r=self.client.post('/api/v1/ocr/jobs',headers={**self.headers,'Idempotency-Key':'type-mismatch-key-01'},
+            data={'document_type':'id_front','onboarding_application_id':'synthetic-app','attachment_id':'synthetic-attachment'},
+            files={'file':('synthetic.jpg',self.image,'image/jpeg')})
+        self.assertEqual(r.status_code,403,r.text)
+        self.assertIn('ATTACHMENT_CONTENT_BINDING_UNVERIFIED',r.text)
+    def test_application_revision_change_denies_get_confirm_delete(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        self.current_revision='synthetic-revision-2'
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revision-change-confirm-001'}
+        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
+        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
     def test_confirmed_fields_and_revision_read_back(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         confirm_headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'readback-confirm-key-001'}
