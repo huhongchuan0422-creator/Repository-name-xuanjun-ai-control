@@ -1,6 +1,7 @@
 """Bounded upgrade state-machine tests; no host commands, identities or secrets."""
 import copy
 import hashlib
+import re
 import io
 import subprocess
 import unittest
@@ -21,12 +22,32 @@ def info(image=u.OLD_IMAGE,cid=u.OLD_ID,running=True):
         'log':{'Type':'json-file','Config':{'max-size':'10m','max-file':'2'}},
         'mounts':[{'Type':'bind','Source':p,'Destination':p,'RW':rw} for p,rw in [(u.ROOT+'/config',False),(u.ROOT+'/data',True),(u.RUN,True)]]}
 
+def legacy_onboarding_asset():
+    """Rebuild immutable 2330 role-page bytes; never compare its pin to current onboarding."""
+    raw=(Path(__file__).parent/'fixtures'/'community_preview_2330_onboarding.html').read_text()
+    prefix='/community-preview'
+    raw=re.sub(r'((?:href|src)=["\\'])(/(?:merchant|community)/[^"\\']+)',lambda m:m[1]+prefix+m[2],raw)
+    pages={
+        '/merchant/workbench':('workbench.html','商家工作台'),
+        '/community/portal':('communities.html','社区管理'),
+        '/merchant/review':('onboarding.html','平台入驻审核'),
+        '/merchant/join':('onboarding.html','商家入驻'),
+    }
+    nav='<nav aria-label="角色入口">'+''.join('<a href="'+prefix+p+'">'+title+'</a> ' for p,(_,title) in pages.items())+'</nav>'
+    panel='<section id="community-session" aria-label="原平台登录"><p>工作人员使用本社区原账户登录；普通用户继续使用小程序微信登录，无需邮箱。</p><form><label>原账户邮箱<input name="email" type="email" autocomplete="username" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">登录</button></form><label>已授权工作区<select aria-label="已授权工作区"></select></label><button type="button" data-logout>退出登录</button><p role="status">请登录本社区原账户。</p></section>'
+    raw=raw.replace('<body>','<body>'+nav+panel,1)
+    raw=raw.replace('</body>','<script src="'+prefix+'/community/web-session.js" defer></script></body>',1)
+    return raw.encode()
+
+
 class UpgradeBoundary(unittest.TestCase):
     def test_fixed_source_fragment_image_and_original_role_assets(self):
         self.assertEqual(u.FRAGMENT,(Path(__file__).resolve().parents[1]/'deploy/community-preview/nginx-uk-path-candidate.conf').read_bytes())
         from scripts.community_web_entries import asset
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
-        for path,digest in u.ASSET_HASHES.items():self.assertEqual(digest,hashlib.sha256(asset(path)[0]).hexdigest())
+        for path,digest in u.ASSET_HASHES.items():
+            raw=legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else asset(path)[0]
+            self.assertEqual(digest,hashlib.sha256(raw).hexdigest(),path)
         self.assertEqual(u.SOURCE,'2330dd55c07f58d7f45a7c4510a9761d0d4735d6')
     def test_only_existing_bounded_container_and_mounts_are_admitted(self):
         u.validate(info(),u.OLD_IMAGE,u.OLD_ID)
@@ -207,7 +228,8 @@ class PublicRealHTTP(unittest.TestCase):
             def assert_origin(url):
                 if not url.startswith('https://uk.wenwenwenyiyiyi.work/community-preview/'):raise AssertionError(url)
         try:
-            with patch.object(u,'build_opener',return_value=LocalTransport()),patch.object(u.time,'sleep'),redirect_stdout(io.StringIO()):u.public_ready()
+            current_hashes={path:hashlib.sha256(asset(path)[0]).hexdigest() for path in u.ASSET_HASHES}
+            with patch.object(u,'ASSET_HASHES',current_hashes),patch.object(u,'build_opener',return_value=LocalTransport()),patch.object(u.time,'sleep'),redirect_stdout(io.StringIO()):u.public_ready()
             self.assertEqual(len(requests),8)
             self.assertEqual(requests[:2],['/community-preview/merchant/workbench']*2)
             self.assertEqual(set(requests[1:]),{'/community-preview'+p for p in list(u.ASSET_HASHES)+['/community/health','/community/entrypoints']})
