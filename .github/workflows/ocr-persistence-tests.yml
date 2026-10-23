@@ -4,6 +4,10 @@ on:
     paths:
       - 'services/ocr_engine/secure_store.py'
       - 'services/ocr_engine/test_secure_store.py'
+      - 'services/ocr_engine/test_model_distribution.py'
+      - 'services/ocr_engine/model_manifest.json'
+      - 'services/ocr_engine/model_distribution/**'
+      - 'services/ocr_engine/README.md'
       - '.github/workflows/ocr-persistence-tests.yml'
 permissions:
   contents: read
@@ -20,3 +24,5 @@ jobs:
         run: python -m pip install cryptography==46.0.3
       - name: Run encrypted SQLite and independent process restart tests
         run: python -m unittest discover -s services/ocr_engine -p 'test_secure_store.py' -v
+      - name: Verify model license and attribution bundle
+        run: python -m unittest services.ocr_engine.test_model_distribution -v
