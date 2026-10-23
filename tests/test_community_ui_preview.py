@@ -744,6 +744,28 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+    def test_material_removal_failure_retains_saved_record_until_successful_retry(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            upload=page.locator('[data-material-kind="business_license"]')
+            upload.set_input_files({'name':'retained-license.png','mimeType':'image/png','buffer':b'\x89PNG\r\n\x1a\n'})
+            label=upload.locator('xpath=ancestor::label')
+            expect(label).to_contain_text('retained-license.png')
+            page.evaluate("() => { Storage.prototype.setItem=function(){throw Error('simulated storage failure')}; }")
+            page.locator('[data-material-remove="business_license"]').click()
+            expect(page.locator('#feedback')).to_contain_text('无法保存草稿')
+            expect(page.locator('#feedback')).not_to_contain_text('已移除')
+            expect(label).to_contain_text('retained-license.png')
+            page.reload();expect(label).to_contain_text('retained-license.png')
+            page.locator('[data-material-remove="business_license"]').click()
+            expect(page.locator('#feedback')).to_contain_text('已移除')
+            expect(label).not_to_contain_text('retained-license.png')
+            page.reload();expect(label).not_to_contain_text('retained-license.png')
+            expect(page.locator('[data-material-remove="business_license"]')).to_be_disabled()
+        finally:
+            page.close()
+
     def test_contact_review_links_and_failed_save_stay_with_current_draft(self):
         page=self.browser.new_page(viewport={'width':390,'height':844})
         try:
@@ -758,7 +780,7 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('li').filter(has_text='超级管理员手机').locator('a')).to_have_attribute('href','#/admission/admission-start/edit')
             expect(page.locator('li').filter(has_text='法人/经营者身份证人像面').locator('a')).to_have_attribute('href','#/admission/admission-start/edit')
             page.goto(self.url+'#/admission/admission-start/edit')
-            page.evaluate("Storage.prototype.setItem=function(){throw Error('simulated storage failure')}")
+            page.evaluate("() => { Storage.prototype.setItem=function(){throw Error('simulated storage failure')}; }")
             page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
             self.assertTrue(page.url.endswith('/admission-start/edit'))
             expect(page.locator('#feedback')).to_contain_text('无法保存草稿')
