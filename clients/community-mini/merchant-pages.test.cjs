@@ -27,6 +27,34 @@ test('merchant admin mobile keeps exact string, provider mapping and service pho
  assert.equal(typeof form.get(f.storedProfile,path),'string');
  assert.equal(f.calls.find(c=>c.p.operation==='wechat_save').p.params.profile.contact_info.mobile_phone,'+44-123456789');
 });
+test('other bank branch group accepts either field, refreshes on bank changes and preserves draft values',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2});
+ const input=(path,value)=>f.page.input({currentTarget:{dataset:{path}},detail:{value}});
+ input('bank_account_info.account_bank','Other Bank');assert.equal(f.page.data.bankBranchGroupHint,'');
+ input('bank_account_info.account_bank','其他银行');
+ assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+ assert.ok(f.page.data.fields.some(x=>x.path==='bank_account_info.bank_branch_id'));
+ assert.ok(f.page.data.fields.some(x=>x.path==='bank_account_info.bank_name'));
+ await f.page.save();assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+ input('bank_account_info.bank_branch_id','001234567890');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项（已满足）');
+ assert.equal(form.get(f.page.profile,'bank_account_info.bank_name')||'','');
+ input('bank_account_info.bank_branch_id','');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+ input('bank_account_info.bank_name','Fixture Branch Bank');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项（已满足）');
+ input('bank_account_info.bank_name','');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+ input('bank_account_info.account_bank','Fixture Bank');assert.equal(f.page.data.bankBranchGroupHint,'');
+ input('bank_account_info.account_bank','其他银行');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+ input('bank_account_info.bank_name','Fixture Branch Bank');
+ f.failNext('wechat_save',new Error('BANK_BRANCH_TEST_REJECTED'));await f.page.save();
+ assert.equal(form.get(f.page.profile,'bank_account_info.bank_name'),'Fixture Branch Bank');
+ assert.ok(!/保存成功/.test(f.page.data.status));
+ await f.page.save();
+ assert.equal(form.get(f.storedProfile,'bank_account_info.bank_name'),'Fixture Branch Bank');
+ assert.equal(form.get(f.storedProfile,'bank_account_info.bank_branch_id')||'','');
+ assert.equal(form.get(f.page.profile,'bank_account_info.bank_name'),'Fixture Branch Bank');
+ f.page.setData({step:1});f.page.refresh();f.page.setData({step:2});f.page.refresh();
+ assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项（已满足）');
+ input('bank_account_info.bank_name','');assert.equal(f.page.data.bankBranchGroupHint,'支行信息：联行号或支行全称至少填写一项 *');
+});
 test('merchant mobile rejects malformed values locally, preserves legacy overlength and clears errors on correction',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.profile={contact_info:{mobile_phone:'123456789012345678901'}};
  f.page.setData({step:1});f.page.refresh();

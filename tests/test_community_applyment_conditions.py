@@ -52,6 +52,15 @@ class ConditionalFields(unittest.TestCase):
         p['subject_info']['ubo_info_list'][1]['ubo_id_doc_number']='TEST-5678'
         validate(p,'ENTERPRISE',NOW)
 
+    def test_other_bank_requires_either_branch_id_or_branch_name_not_both(self):
+        p=profile();bank=p['bank_account_info'];bank['account_bank']='其他银行'
+        with self.assertRaisesRegex(ValueError,'OFFICIAL_BANK_BRANCH_REQUIRED'):
+            validate(p,'ENTERPRISE',NOW)
+        bank['bank_branch_id']='001234567890'
+        validate(p,'ENTERPRISE',NOW)
+        bank.pop('bank_branch_id')
+        bank['bank_name']='Fixture Branch Bank'
+        validate(p,'ENTERPRISE',NOW)
     def test_expired_period_other_bank_store_scenes_and_activity_rates(self):
         for path,value in [('expiry','2021-01-01'),('bank','其他银行'),('scene','SALES_SCENES_MP'),('activity','fixture')]:
             p=profile()
