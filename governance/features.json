@@ -121,7 +121,7 @@
           "New OCR executable and test source paths are explicitly registered in feature governance",
           "Local inference requires pinned RapidOCR and ONNX Runtime dependencies and pre-staged model assets; no runtime download",
           "Unsupported document types fail explicitly and all returned fields require human confirmation",
-          "Image guards, parser tests and offline inference tests distinguish mocked parser tests from actual model execution",
+          "Tests explicitly distinguish parser/input-guard coverage from real offline model inference; no real-inference claim without staged model files and a successful image test",
           "No authenticity claim, customer document upload, paid API use or production deployment"
         ],
         "tests": [
