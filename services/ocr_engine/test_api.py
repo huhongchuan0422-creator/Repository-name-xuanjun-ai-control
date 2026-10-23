@@ -155,6 +155,30 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
         self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"fields":{"company_name":"x"}}).status_code,403)
         self.assertEqual(self.client.delete("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
+    def test_confirmed_fields_and_revision_read_back(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        confirm_headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'readback-confirm-key-001'}
+        body={'revision':1,'fields':{'company_name':'Human confirmed synthetic'}}
+        confirmed=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
+        self.assertEqual(confirmed.status_code,200,confirmed.text)
+        read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(read.status_code,200,read.text)
+        self.assertEqual(read.json().get('confirmed_fields'),body['fields'])
+        self.assertEqual(read.json().get('confirmation_revision'),1)
+    def test_application_revocation_denies_get_confirm_delete(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        self.revoked_apps.add('synthetic-app')
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revoke-app-confirm-001'}
+        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
+        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+    def test_attachment_revocation_denies_get_confirm_delete(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        self.revoked_attachments.add('synthetic-attachment')
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revoke-att-confirm-001'}
+        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
+        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
