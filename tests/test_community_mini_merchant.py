@@ -207,3 +207,19 @@ class CashierMaterialJourney(unittest.TestCase):
             self.app=http('remove_material',dict(application=application,revision=self.app['revision'],kind='cashier_photo',expected_wechat_version=0))
             self.assertNotIn('cashier_photo',http('read',dict(application=application))['materials'])
         finally:server.server_close()
+    def test_cashier_replace_full_shared_array_preserves_four_other_entries(self):
+        self.upload_cashier();others=['other-'+str(i) for i in range(4)];self.draft_profile(others)
+        self.admit_media('cashier-a')
+        self.op('wechat_cashier_link',application=self.app['application'],expected_version=1,media_id='cashier-a')
+        self.admit_media('cashier-b')
+        record=self.op('wechat_cashier_link',application=self.app['application'],expected_version=2,media_id='cashier-b')
+        self.assertEqual(record['profile']['addition_info']['business_addition_pics'],others+['cashier-b'])
+        self.assertNotIn('cashier-a',record['profile']['addition_info']['business_addition_pics'])
+    def test_cashier_failed_replacement_rolls_back_managed_unlink(self):
+        self.upload_cashier();self.draft_profile(['other']);self.admit_media('cashier')
+        record=self.op('wechat_cashier_link',application=self.app['application'],expected_version=1,media_id='cashier')
+        self.fx.center.scanner=lambda raw:False
+        with self.assertRaisesRegex(PermissionError,'SCAN_NOT_CLEAN'):self.upload_cashier(b'\x89PNG\r\n\x1a\nrejected replacement')
+        self.assertEqual(self.op('wechat_read',application=self.app['application']),record)
+        self.assertEqual(self.op('read',application=self.app['application'])['revision'],self.app['revision'])
+        self.assertEqual(self.fx.center.check_integrity()['integrity'],'PASS')

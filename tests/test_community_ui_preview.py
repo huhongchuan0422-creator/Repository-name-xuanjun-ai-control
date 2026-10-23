@@ -910,7 +910,9 @@ class ClickThrough(unittest.TestCase):
                     # UI context; all are explicitly synthetic local drafts.
                     seed=dict(drafts={},saved={},scenario='sample',options=dict(entity='ENTERPRISE',contact='SUPER',doc='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' if 'id_doc_info' in r['id'] else 'IDENTIFICATION_TYPE_IDCARD',scene='both',ubos='1'),application={'subject_info.ubo_info_list.0.ubo_id_doc_type':'IDENTIFICATION_TYPE_OVERSEA_PASSPORT'})
                     page.evaluate('(seed)=>localStorage.setItem("community-ui-preview:v1",JSON.stringify(seed))',seed)
-                    page.goto(self.url+'index.html'+expected)
+                    # A hash-only goto retains the previous page's JS state;
+                    # use a distinct document URL to load this route's conditions.
+                    page.goto(self.url+'index.html?route_render='+str(n)+'-'+str(width)+expected)
                     expect(page.locator('main h1').first).to_be_visible()
                     self.assertEqual(page.evaluate('location.hash'),expected)
                     self.assertNotIn('未找到',page.locator('#view').inner_text())

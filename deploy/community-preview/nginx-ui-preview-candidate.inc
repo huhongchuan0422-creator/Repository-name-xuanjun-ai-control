@@ -1,5 +1,5 @@
 # CANDIDATE ONLY. Additional isolated GET assets; not installed by this change.
-location ~ ^/community-preview/community/ui-preview/(index\.html|sources\.js|preview\.js|preview\.css|original\.css)?$ {
+location ~ ^/community-preview/community/ui-preview/(index\.html|route-gallery\.html|sources\.js|preview\.js|preview\.css|original\.css)?$ {
     rewrite ^/community-preview(/community/ui-preview/.*)$ $1 break;
     proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
     proxy_http_version 1.1;
