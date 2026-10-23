@@ -6,7 +6,7 @@ This notice accompanies the pinned ONNX model files listed in `../model_manifest
 
 The following artifacts are covered by RapidOCR's fixed model notice at:
 https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md
-Git blob SHA-256-independent Git object ID: `3f66af490abe83df801bfb8d1ea80eed7b0048ae`.
+Git blob ID: `3f66af490abe83df801bfb8d1ea80eed7b0048ae`.
 
 - `PP-OCRv6_det_small.onnx` — derived from PaddlePaddle `PP-OCRv6_small_det`; SHA-256 `090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f`.
 - `PP-OCRv6_rec_small.onnx` — derived from PaddlePaddle `PP-OCRv6_small_rec`; SHA-256 `6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884`.
