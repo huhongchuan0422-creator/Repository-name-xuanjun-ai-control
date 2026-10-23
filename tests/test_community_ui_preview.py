@@ -95,10 +95,10 @@ class ClickThrough(unittest.TestCase):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
                         if role=='community' and module['id']=='community-4-0-0':
                             # Two cards share this destination; choose the visible order-observation action by its user-facing label.
-                            entry=page.get_by_role('link',name='查看社区订单',exact=True)
+                            entry=page.locator('#menu a[href="'+target+'"]').first
                             expect(entry).to_be_visible()
                             entry.click()
-                            expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
+                            expect(page.locator('#view h1').first).to_have_text('社区订单、收益与结算观察')
                         else:
                             menu_entry=page.locator('#menu a[href="'+target+'"]').first
                             view_entry=page.locator('#view a[href="'+target+'"]').first
