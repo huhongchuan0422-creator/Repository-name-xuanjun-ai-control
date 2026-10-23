@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import unittest
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parent
 MANIFEST=ROOT/"model_manifest.json"
 NOTICE=ROOT/"model_distribution"/"NOTICE.md"
 LICENSE=ROOT/"model_distribution"/"LICENSE-2.0.txt"
