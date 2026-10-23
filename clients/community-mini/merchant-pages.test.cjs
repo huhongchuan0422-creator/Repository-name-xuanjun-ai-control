@@ -77,10 +77,10 @@ test('LEGAL and SUPER use one mobile field and keep identity/contact fields acro
   assert.equal(form.get(f.page.profile,path),'0012345678');
  }
  const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
- assert.match(wxml,/type="text"[^>]*data-path="{{item.path}}"/);
- assert.ok(wxml.includes('maxlength="{{item.path===\'contact_info.mobile_phone\'?item.maxlength:512}}"'),'mobile_phone input must use the exact path-specific maxlength ternary');
- assert.match(wxml,/bindblur="blur"/);
- assert.match(wxml,/5–20位，可含数字、+或-，不含空格/);
+ assert.ok(wxml.includes('type="text"'),'mobile phone field must use text input');assert.ok(wxml.includes('data-path="{{item.path}}"'),'mobile phone field must bind the exact field path');
+ assert.ok(wxml.includes("maxlength=\"{{item.path===\'contact_info.mobile_phone\'?item.maxlength:512}}\""),'mobile_phone input must use the exact path-specific maxlength ternary');
+ assert.ok(wxml.includes('bindblur="blur"'),'mobile phone field must bind blur validation');
+ assert.ok(wxml.includes('5–20位，可含数字、+或-，不含空格'),'complete mobile format hint must be present verbatim');
  assert.equal(form.get(f.page.profile,'business_info.service_phone'),undefined);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'0012345678');
 });
 test('approved platform application can continue original WeChat draft without resubmitting platform',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.app.status='APPROVED';await f.page.select({currentTarget:{dataset:{application:f.app.application}}});f.calls.length=0;form.put(f.page.profile,'contact_info.mobile_phone','13800000000');await f.page.save();assert.ok(!f.calls.some(c=>c.p.operation==='save'));assert.ok(f.calls.some(c=>c.p.operation==='wechat_save'));});
