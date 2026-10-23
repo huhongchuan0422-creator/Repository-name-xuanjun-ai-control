@@ -22,6 +22,9 @@ class Principal(BaseModel):
     tenant_id: str
     permissions: set[str] = Field(default_factory=set)
 Authenticator = Callable[[str], Principal]
+class Confirmation(BaseModel):
+    revision: int = Field(ge=1)
+    fields: dict[str, str]
 class JobStore:
     """In-memory test adapter. Never use as production persistence."""
     def __init__(self):
@@ -167,9 +170,6 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not job:
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "document_sha256", "confirmed_fields", "confirmation_revision"}}
-    class Confirmation(BaseModel):
-        revision: int = Field(ge=1)
-        fields: dict[str, str]
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
     def confirm(job_id: str, body: Confirmation, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
