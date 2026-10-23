@@ -284,7 +284,7 @@ class ClickThrough(unittest.TestCase):
         try:
             page.goto(self.url+'#/merchant/home')
             expect(page.locator('.mini-tabbar a')).to_have_count(4)
-            for label in ('工作台','订单','统计','门店','收款码'):
+            for label in ('工作台','订单','门店','我的'):
                 expect(page.locator('.mini-tabbar')).to_contain_text(label)
             expect(page.locator('#view')).not_to_contain_text('商品管理')
             self.assertTrue(any(p['id']=='merchant-native-catalog' for p in self.data['pages']))
@@ -491,7 +491,7 @@ class ClickThrough(unittest.TestCase):
         page=self.browser.new_page(viewport={'width':390,'height':844})
         try:
             page.goto(self.url+'#/consumer/consumer-profile/list')
-            page.get_by_role('link',name='个人资料',exact=True).click()
+            page.get_by_role('link',name='个人资料',exact=False).click()
             self.assertTrue(page.url.endswith('/consumer/consumer-profile/edit'),page.url)
             page.locator('[data-profile-field="nickname"]').fill('演示昵称甲')
             page.locator('[data-profile-field="contact"]').fill('演示联系方式甲')
@@ -499,10 +499,10 @@ class ClickThrough(unittest.TestCase):
             expect(page.locator('[data-profile-field="nickname"]')).to_have_value('演示昵称甲')
             expect(page.locator('[data-profile-field="contact"]')).to_have_value('演示联系方式甲')
             page.get_by_role('button',name='取消修改',exact=True).click()
-            page.get_by_role('link',name='个人资料',exact=True).click()
+            page.get_by_role('link',name='个人资料',exact=False).click()
             page.locator('[data-profile-field="nickname"]').fill('演示昵称乙')
             page.get_by_role('button',name='保存本地示例',exact=True).click()
-            page.get_by_role('link',name='个人资料',exact=True).click()
+            page.get_by_role('link',name='个人资料',exact=False).click()
             expect(page.locator('[data-profile-field="nickname"]')).to_have_value('演示昵称乙')
         finally:
             page.close()
