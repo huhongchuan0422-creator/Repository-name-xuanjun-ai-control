@@ -559,4 +559,38 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+
+    def test_community_four_objects_have_distinct_read_only_routes(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/community/home')
+            page.get_by_role('link',name='查看社区商家成员',exact=True).click()
+            expect(page.locator('#view h1').first).to_have_text('社区商家成员')
+            expect(page.locator('#view')).to_contain_text('kind=MERCHANT')
+            expect(page.locator('#view')).to_contain_text('非微信进件列表')
+            page.get_by_role('link',name='查看成员详情',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('社区商家成员详情')
+            page.get_by_role('link',name='返回社区商家成员列表',exact=True).click()
+            expect(page.locator('#view h1').first).to_have_text('社区商家成员')
+            page.goto(self.url+'#/community/community-orders/list')
+            expect(page.locator('#view')).to_contain_text('EXAMPLE-COMM-001')
+            page.get_by_role('link',name='查看订单详情',exact=True).click()
+            for field in ('merchant_id','store_id','支付核验','PENDING'):
+                expect(page.locator('#view')).to_contain_text(field)
+            page.get_by_role('link',name='返回社区订单列表',exact=True).click()
+            page.goto(self.url+'#/community/community-splits/list')
+            expect(page.locator('#view')).to_contain_text('UNCONFIRMED')
+            expect(page.locator('#view')).to_contain_text('CURRENT_PAGE_ONLY')
+            page.get_by_role('link',name='查看快照详情',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('不等于消费者退款')
+            page.goto(self.url+'#/community/community-refunds/list')
+            expect(page.locator('#view')).to_contain_text('无独立社区退款API')
+            self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
+            page.get_by_role('link',name='查看退款状态说明',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('只读投影')
+            self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
+        finally:
+            page.close()
+
+
 if __name__=='__main__':unittest.main()
