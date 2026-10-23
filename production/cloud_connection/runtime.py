@@ -193,7 +193,7 @@ class Loop:
 
 def code_pin(directory):
     records = []
-    for name in ('queue.py', 'worker.py', 'runtime.py', 'private_transfer.py', 'credential_lifecycle.py', 'fixed_actions.py', 'pr122_baseline_collector.py'):
+    for name in ('queue.py', 'worker.py', 'runtime.py', 'private_transfer.py', 'credential_lifecycle.py', 'fixed_actions.py', 'pr122_baseline_collector.py', 'archive_reader.py', 'material_custody.py'):
         raw = (Path(directory) / name).read_bytes()
         records.append([name, hashlib.sha256(raw).hexdigest()])
     return hashlib.sha256(canonical(records).encode()).hexdigest()

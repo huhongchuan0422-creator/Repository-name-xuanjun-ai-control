@@ -23,7 +23,7 @@ FILE_TOOL = {'name':'read_project_chunk',
 
 
 def create_resource_app(authenticator, backend_factory, catalogs, audience,
-                        enabled=False, clock=time.time):
+                        enabled=False, clock=time.time, custodies=None):
     if enabled is not True:
         raise Hold('OAUTH_HTTP_DISABLED')
     u = urlsplit(audience)
@@ -92,7 +92,7 @@ def create_resource_app(authenticator, backend_factory, catalogs, audience,
                     authenticator.authenticate(header,'project.files.read',entry[0].value['project'],int(clock()))
                     backend=backend_factory()
                     try:
-                        resource=OAuthProjectResource(backend.db,catalogs,authenticator,True,clock)
+                        resource=OAuthProjectResource(backend.db,catalogs,authenticator,True,clock,custodies)
                         value=resource.read(header,args,int(clock()))
                         result={'content':[{'type':'text','text':json.dumps(value,sort_keys=True)}],
                                 'structuredContent':value,'isError':False}

@@ -85,7 +85,8 @@ def load_app(kind,path,expected_sha):
         if not github_secret:raise Hold('OAUTH_GITHUB_SECRET')
         return create_app(config['settings'],connect,secret,github_secret,True)
     if os.geteuid()!=0:raise Hold('OAUTH_EXISTING_PRIVATE_READER_ROOT')
-    if set(config)!={'schema','enabled','hostname','settings','client_secret_ref','catalogs'}:
+    fields={'schema','enabled','hostname','settings','client_secret_ref','catalogs'}
+    if set(config) not in (fields, fields | {'custodies'}):
         raise Hold('OAUTH_CONFIG_FIELDS')
     settings=config['settings']
     if set(settings)!={'issuer','endpoint','client_id','audience','subjects'}:raise Hold('OAUTH_RESOURCE_SETTINGS')
@@ -102,7 +103,15 @@ def load_app(kind,path,expected_sha):
             if type(root) is not list or len(root)!=2 or type(root[0]) is not str or type(root[1]) is not int:
                 raise Hold('OAUTH_ROOT_BINDING')
         catalogs[catalog.sha]=(catalog,roots)
-    return create_resource_app(auth,lambda:PrivateMcp('/var/lib/xuanjun-cloud-connection'),catalogs,settings['audience'],True)
+    custodies=config.get('custodies')
+    if 'custodies' in config:
+        if type(custodies) is not dict or set(custodies)!=set(catalogs):raise Hold('CUSTODY_CATALOG_BINDING')
+        for entry in custodies.values():
+            if (type(entry) is not list or len(entry)!=2 or type(entry[0]) is not str
+                    or not entry[0].startswith('/var/lib/xuanjun-cloud-connection/')
+                    or os.path.normpath(entry[0])!=entry[0] or type(entry[1]) is not int or entry[1]!=0):
+                raise Hold('CUSTODY_ROOT_SCOPE')
+    return create_resource_app(auth,lambda:PrivateMcp('/var/lib/xuanjun-cloud-connection'),catalogs,settings['audience'],True,custodies=custodies)
 
 
 def main():

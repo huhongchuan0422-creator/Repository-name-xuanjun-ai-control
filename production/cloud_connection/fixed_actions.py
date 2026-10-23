@@ -114,8 +114,9 @@ class ApprovedObjectsPolicy:
               and hashlib.sha256(raw_binding).hexdigest() == approved_binding_sha,
               'APPROVED_OBJECT_HOST_BINDING')
         b = strict(raw_binding)
-        check(type(b) is dict and set(b) == {'schema', 'catalog', 'catalog_sha256',
-              'policy', 'roots', 'recipient_id', 'requests', 'execution_user', 'execution_uid', 'reader_sha256'},
+        fields = {'schema', 'catalog', 'catalog_sha256', 'policy', 'roots', 'recipient_id',
+                  'requests', 'execution_user', 'execution_uid', 'reader_sha256'}
+        check(type(b) is dict and (set(b) == fields or set(b) == fields | {'archives', 'archive_reader_sha256'}),
               'APPROVED_OBJECT_FIELDS')
         check(type(b['schema']) is int and b['schema'] == 1, 'APPROVED_OBJECT_SCHEMA')
         policy = b['policy']
@@ -142,6 +143,15 @@ class ApprovedObjectsPolicy:
               and all(type(v) is str and TOKEN.fullmatch(v) and v != SEALED for v in requests.values())
               and len(set(requests.values())) == len(requests), 'APPROVED_OBJECT_SINGLE_REQUEST')
         check(type(b['reader_sha256']) is str and SHA.fullmatch(b['reader_sha256']), 'APPROVED_OBJECT_READER_PIN')
+        if 'archives' in b:
+            from .archive_reader import validate_archive
+            check(type(b['archives']) is dict and len(b['archives']) == 1
+                  and set(b['archives']) <= set(roots)
+                  and type(b['archive_reader_sha256']) is str and SHA.fullmatch(b['archive_reader_sha256']), 'APPROVED_ARCHIVES')
+            check(sum(x['root_ref'] in b['archives'] for x in catalog.objects.values()) <= 5, 'APPROVED_ARCHIVE_MEMBER_COUNT')
+            for ref, plan in b['archives'].items():
+                validate_archive(plan)
+                check(plan['identity'][3] == roots[ref][1], 'APPROVED_ARCHIVE_OWNER')
         self.binding, self.sha, self.catalog = b, approved_binding_sha, catalog
 
     def request_object(self, request):
@@ -162,39 +172,70 @@ class ApprovedObjectsPolicy:
         check(type(actor) is int and actor == 332398908, 'APPROVED_OBJECT_ACTOR')
         item = self.request_object(request)
         self.catalog.object(item['ref'], self.binding['recipient_id'], now)
-        check(request['expires_unix'] <= self.catalog.value['valid_until'], 'APPROVED_OBJECT_EXPIRY')
+        check(type(request['expires_unix']) is int and now < request['expires_unix'] <= self.catalog.value['valid_until'], 'APPROVED_OBJECT_EXPIRY')
+
+    def reader_source(self, archive=False):
+        import ast
+        from pathlib import Path
+        from . import private_transfer as transfer
+        from . import archive_reader
+        code = ''
+        modules = [(transfer, 'reader_sha256', ('check', 'stamp', 'directory') if archive else ('check', 'stamp', 'directory', 'read_object'))]
+        if archive:
+            modules.append((archive_reader, 'archive_reader_sha256', ('validate_archive', 'ArchiveView', '_read_archive', 'read_archive_member_metadata')))
+        for module, pin, names in modules:
+            raw = Path(module.__file__).with_suffix('.py').read_bytes()
+            check(hashlib.sha256(raw).hexdigest() == self.binding[pin], 'APPROVED_OBJECT_READER_PIN')
+            text = raw.decode('utf-8'); nodes = ast.parse(text).body; lines = text.splitlines(True)
+            for name in names:
+                matches = [(i, n) for i, n in enumerate(nodes) if isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.name == name]
+                check(len(matches) == 1, 'APPROVED_OBJECT_READER_SOURCE')
+                i, node = matches[0]
+                end = nodes[i + 1].lineno - 1 if i + 1 < len(nodes) else len(lines)
+                code += ''.join(lines[node.lineno - 1:end]) + '\n'
+        return code
+
+    def read_source(self, item):
+        from .private_transfer import read_object
+        from .archive_reader import read_archive_member
+        check(item == self.catalog.objects.get(item.get('ref')), 'APPROVED_OBJECT_ITEM')
+        plan = self.binding.get('archives', {}).get(item['root_ref'])
+        self.reader_source(plan is not None)
+        root, owner = self.binding['roots'][item['root_ref']]
+        return read_archive_member(root, owner, item, plan) if plan is not None else read_object(root, owner, item)
+
+    def read_archive_group(self, items):
+        from .archive_reader import read_archive_members
+        check(type(items) is list and 0 < len(items) <= 5, 'APPROVED_ARCHIVE_GROUP')
+        ref = items[0]['root_ref']
+        check(all(x == self.catalog.objects.get(x.get('ref')) and x['root_ref'] == ref for x in items), 'APPROVED_ARCHIVE_GROUP')
+        plan = self.binding.get('archives', {}).get(ref)
+        check(plan is not None, 'APPROVED_ARCHIVE_GROUP')
+        self.reader_source(True)
+        root, owner = self.binding['roots'][ref]
+        return read_archive_members(root, owner, items, plan)
 
     def command(self, request):
         # Reuse the existing descriptor reader verbatim, rather than introduce
         # a second path walker. Its code is already included in runtime.code_pin.
-        import ast
-        from pathlib import Path
-        from . import private_transfer as transfer
         from .worker import HOSTS
         item = self.request_object(request)
         root, owner = self.binding['roots'][item['root_ref']]
-        code = 'import os,stat,time,hashlib,json\nclass Hold(Exception): pass\nCHUNK=65536\n'
-        raw = Path(transfer.__file__).with_suffix('.py').read_bytes()
-        check(hashlib.sha256(raw).hexdigest() == self.binding['reader_sha256'], 'APPROVED_OBJECT_READER_PIN')
-        text = raw.decode('utf-8')
-        nodes = ast.parse(text).body
-        lines = text.splitlines(True)
-        for name in ('check', 'stamp', 'directory', 'read_object'):
-            matches = [(i, n) for i, n in enumerate(nodes) if isinstance(n, ast.FunctionDef) and n.name == name]
-            check(len(matches) == 1, 'APPROVED_OBJECT_READER_SOURCE')
-            i, node = matches[0]
-            end = nodes[i + 1].lineno - 1 if i + 1 < len(nodes) else len(lines)
-            code += ''.join(lines[node.lineno - 1:end]) + '\n'
+        plan = self.binding.get('archives', {}).get(item['root_ref'])
+        code = 'import os,stat,time,hashlib,json,tarfile\nclass Hold(Exception): pass\nCHUNK=65536\n'
+        code += self.reader_source(plan is not None)
+        read_call = ('read_archive_member_metadata(%r,%r,%r,%r)' % (root, owner, item, plan)
+                     if plan is not None else 'read_object(%r,%r,%r)' % (root, owner, item))
         nonce = hashlib.sha256(canonical(request).encode()).hexdigest()
         body = ('check(os.uname().nodename==%r and os.geteuid()==%r,"REMOTE_IDENTITY")\n'
                  'check(%r<=int(time.time())<%r,"APPROVED_OBJECT_EXPIRED_BEFORE_READ")\n'
-                 'data=read_object(%r,%r,%r)\n'
+                 'data=%s\n'
                  'check(int(time.time())<%r,"APPROVED_OBJECT_EXPIRED_AFTER_READ")\n'
                  'print(json.dumps(dict(hostname=os.uname().nodename,uid=os.geteuid(),nonce=%r,'
                  'manifest_sha256=%r,object_ref=%r,recipient_id=%r,bytes=len(data),'
                  'sha256=hashlib.sha256(data).hexdigest())))\n') % (
                      HOSTS['uk'], self.binding['execution_uid'], self.catalog.value['valid_from'],
-                     min(request['expires_unix'], self.catalog.value['valid_until']), root, owner, item,
+                     min(request['expires_unix'], self.catalog.value['valid_until']), read_call,
                      min(request['expires_unix'], self.catalog.value['valid_until']), nonce, self.catalog.sha, item['ref'], self.binding['recipient_id'])
         import textwrap
         code += 'try:\n' + textwrap.indent(body, '    ') + 'except BaseException:\n    raise SystemExit(2)\n'

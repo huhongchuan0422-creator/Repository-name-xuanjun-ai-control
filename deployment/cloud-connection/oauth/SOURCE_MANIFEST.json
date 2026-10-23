@@ -104,16 +104,22 @@
       "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752"
     },
     {
+      "path": "production/cloud_connection/archive_reader.py",
+      "mode": "0644",
+      "bytes": 7707,
+      "sha256": "184180a9030d6557380408e8f575d61ea429e3aa6f7038cde744f16aca467f1b"
+    },
+    {
       "bytes": 6064,
       "mode": "0644",
       "path": "production/cloud_connection/credential_lifecycle.py",
       "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620"
     },
     {
-      "bytes": 15968,
+      "bytes": 18639,
       "mode": "0644",
       "path": "production/cloud_connection/fixed_actions.py",
-      "sha256": "babca3f40ab375300edd1ea0aab9d9a351cc337d92efaebb0ea52955ec9aeee4"
+      "sha256": "c9e96b3cc0895211aaa4d8ba690447ec5072a03654e1b8964e8e917459d28437"
     },
     {
       "bytes": 5503,
@@ -122,28 +128,34 @@
       "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6"
     },
     {
+      "path": "production/cloud_connection/material_custody.py",
+      "mode": "0644",
+      "bytes": 9525,
+      "sha256": "a5ebcd971334ff2965d022d5040a72d7125adc64694a8b0183a4034364cf5352"
+    },
+    {
       "bytes": 22586,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_authority.py",
       "sha256": "70b48cfdb0ef554d353a5edb3df128840a6ab596424efbde3112dff0209c3834"
     },
     {
-      "bytes": 6813,
+      "bytes": 7428,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_entrypoint.py",
-      "sha256": "ad9370e9eba305577e221f78d5150898bf329cfa228f160681e4d21a099d61ba"
+      "sha256": "66b5c98d8e7e25ea6c6d95385e6e1c6737aa8357fdf1973054f9c3cd0fa37498"
     },
     {
-      "bytes": 7570,
+      "bytes": 7596,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_http.py",
-      "sha256": "330af26d1ce1e55d43d5b62edaae5f900e7326ed57d9c6e784728d5bac7209d3"
+      "sha256": "ecfec4a91fb38e94e7bbc5720e47ce7b45cfebe9e33fd689b6a482f782c9398b"
     },
     {
-      "bytes": 10069,
+      "bytes": 10629,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_resource.py",
-      "sha256": "95c95038ccfdb5cc29eb55a5cc5a08ba1af803ab8b342fc9cec38faa5910e70f"
+      "sha256": "a9f0266066b43b05adde0a4850a1f38001ee4c535356321cbcd24d31b5804ea0"
     },
     {
       "bytes": 12809,
@@ -170,10 +182,10 @@
       "sha256": "e0715af15e176ba6816fe45ec7215e7fefff208aeb2696ab1a6366bea2dfcd5c"
     },
     {
-      "bytes": 14369,
+      "bytes": 14413,
       "mode": "0644",
       "path": "production/cloud_connection/runtime.py",
-      "sha256": "d810c5733ebf484b81333fde6ddf12f249f947a13fe2df803b5cd8b7f062c582"
+      "sha256": "daafcd2dca1fcc673f241a37fd11b749ff65fae2f22d3e737c2e5ece74242b8e"
     },
     {
       "bytes": 14424,

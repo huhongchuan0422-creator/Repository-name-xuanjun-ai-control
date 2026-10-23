@@ -182,7 +182,8 @@ class OAuthProjectResource:
     The HTTP host must pass the actual Authorization header. This class is not
     registered by the installed stdio launcher and remains disabled by default.
     """
-    def __init__(self, db, catalogs, authenticator, enabled=False, clock=time.time):
+    def __init__(self, db, catalogs, authenticator, enabled=False, clock=time.time, custodies=None):
+        self.custodies = custodies
         self.db, self.catalogs = db, dict(catalogs)
         self.authenticator, self.enabled = authenticator, enabled
         self.clock = clock
@@ -203,5 +204,12 @@ class OAuthProjectResource:
         current = self.clock()
         if not math.isfinite(current) or current < now:
             raise Hold('OAUTH_CLOCK')
+        if self.custodies is not None:
+            from .material_custody import read_received_chunk
+            if type(self.custodies) is not dict or set(self.custodies) != set(self.catalogs):
+                raise Hold('CUSTODY_CATALOG_BINDING')
+            root, owner = self.custodies[digest]
+            return read_received_chunk(self.db, catalog, root, owner, arguments['request_id'],
+                                       arguments['object_ref'], recipient, arguments['offset'], int(current), True)
         return ExistingProjectFiles(self.db, {digest: (catalog, roots)},
                                     lambda: recipient, True).read(arguments, int(current))

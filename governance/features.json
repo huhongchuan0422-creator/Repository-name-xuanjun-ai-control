@@ -198,6 +198,46 @@
         "deployment/cloud-connection/oauth/SOURCE_MANIFEST.json",
         "docs/development/CLOUD_CONNECTION_APPROVED_OBJECTS_20261023.md"
       ]
+    },
+    {
+      "feature_id": "CLOUD_CONNECTION_MATERIAL_CUSTODY",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/CLOUD_CONNECTION_MATERIAL_CUSTODY_20261023.md",
+        "section": "2."
+      },
+      "development": {
+        "document": "docs/development/CLOUD_CONNECTION_MATERIAL_CUSTODY_20261023.md",
+        "section": "4.",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "Default-off fixed archive and regular source custody, no live enrollment",
+          "Original real job and Receiver proof required; UNKNOWN never redispatched",
+          "Resource only reads completed custody with existing OAuth scope/recipient gates"
+        ],
+        "tests": [
+          "tests/test_cloud_connection_material_custody.py",
+          "tests/oauth/test_material_custody_http.py"
+        ]
+      },
+      "reuse": [
+        "Original Queue, Receiver and MCP envelope; no new transport"
+      ],
+      "paths": [
+        "production/cloud_connection/archive_reader.py",
+        "production/cloud_connection/material_custody.py",
+        "production/cloud_connection/fixed_actions.py",
+        "production/cloud_connection/runtime.py",
+        "production/cloud_connection/oauth_resource.py",
+        "production/cloud_connection/oauth_http.py",
+        "production/cloud_connection/oauth_entrypoint.py",
+        "tests/test_cloud_connection_material_custody.py",
+        "tests/oauth/test_material_custody_http.py",
+        "deployment/cloud-connection/oauth/SOURCE_MANIFEST.json",
+        "docs/development/CLOUD_CONNECTION_MATERIAL_CUSTODY_20261023.md"
+      ]
     }
   ]
 }
