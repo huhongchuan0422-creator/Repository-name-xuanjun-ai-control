@@ -51,6 +51,9 @@ class SecureSQLiteJobStore:
                 tenant_key TEXT NOT NULL, job_id TEXT NOT NULL, idem_key TEXT NOT NULL,
                 payload_hash TEXT NOT NULL, response_ciphertext BLOB NOT NULL,
                 PRIMARY KEY(tenant_key, job_id, idem_key))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS ocr_rate_window(
+                tenant_key TEXT NOT NULL, window_start INTEGER NOT NULL, hits INTEGER NOT NULL,
+                PRIMARY KEY(tenant_key, window_start))""")
             db.execute("""CREATE TABLE IF NOT EXISTS ocr_audit(
                 audit_id TEXT PRIMARY KEY, tenant_key TEXT NOT NULL, job_id TEXT NOT NULL,
                 event_type TEXT NOT NULL, event_ciphertext BLOB NOT NULL,
@@ -100,6 +103,21 @@ class SecureSQLiteJobStore:
             return json.loads(self.cipher.decrypt(data))
         except (InvalidToken, ValueError, UnicodeDecodeError) as exc:
             raise RuntimeError("OCR_ENCRYPTED_JOB_UNREADABLE") from exc
+
+    def check_rate(self, tenant_id: str, limit: int = 30, window_seconds: int = 60) -> bool:
+        if limit <= 0 or window_seconds <= 0:
+            raise ValueError("OCR_INVALID_RATE_POLICY")
+        import time
+        window = (int(time.time()) // window_seconds) * window_seconds
+        tenant = self._index(tenant_id)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("INSERT OR IGNORE INTO ocr_rate_window VALUES(?,?,0)", (tenant, window))
+            changed = db.execute("UPDATE ocr_rate_window SET hits=hits+1 WHERE tenant_key=? AND window_start=? AND hits<?",
+                                 (tenant, window, limit)).rowcount
+            db.execute("DELETE FROM ocr_rate_window WHERE window_start<?", (window - 2*window_seconds,))
+            db.execute("COMMIT")
+            return changed == 1
 
     def create(self, tenant_id: str, subject: str, onboarding_id: str,
                doc_type: str, digest: str, idempotency_key: str = "") -> dict:
