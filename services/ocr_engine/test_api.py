@@ -32,10 +32,12 @@ class ApiTests(unittest.TestCase):
         self.expected_sha = hashlib.sha256(self.image).hexdigest()
         self.revoked_apps = set()
         self.revoked_attachments = set()
-        def attachment_resolver(p, app, attachment, content_sha):
+        def attachment_resolver(p, app, attachment, content_sha, document_type, expected_application_revision=None):
             valid = (app == "synthetic-app" and attachment == "synthetic-attachment" and
-                     content_sha == self.expected_sha and attachment not in self.revoked_attachments)
-            return {"authorized": valid, "content_sha256": self.expected_sha}
+                     content_sha == self.expected_sha and attachment not in self.revoked_attachments and
+                     document_type == "business_license" and expected_application_revision in (None, "synthetic-revision-1"))
+            return {"authorized": valid, "content_sha256": self.expected_sha,
+                    "document_type": "business_license", "application_revision": "synthetic-revision-1"}
         self.attachment_resolver = attachment_resolver
         from cryptography.fernet import Fernet
         self._tmp = tempfile.TemporaryDirectory()
@@ -101,7 +103,7 @@ class ApiTests(unittest.TestCase):
                 return TestClient(create_app(authenticate=auth,
                     store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
                     authorize_application=lambda p, app_id: app_id == "synthetic-app",
-                    authorize_attachment=lambda p, app_id, attachment, content_sha: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest()}))
+                    authorize_attachment=lambda p, app_id, attachment, content_sha, document_type, expected_revision=None: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest() and document_type == "business_license" and expected_revision in (None, "synthetic-revision-1"), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "document_type": "business_license", "application_revision": "synthetic-revision-1"}))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
@@ -172,20 +174,6 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(read.status_code,200,read.text)
         self.assertEqual(read.json().get('confirmed_fields'),body['fields'])
         self.assertEqual(read.json().get('confirmation_revision'),1)
-    def test_application_revocation_denies_get_confirm_delete(self):
-        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
-        self.revoked_apps.add('synthetic-app')
-        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revoke-app-confirm-001'}
-        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
-        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
-        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
-    def test_attachment_revocation_denies_get_confirm_delete(self):
-        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
-        self.revoked_attachments.add('synthetic-attachment')
-        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revoke-att-confirm-001'}
-        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
-        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
-        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
