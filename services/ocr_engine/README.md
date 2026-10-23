@@ -26,12 +26,12 @@ Construct `create_app(authenticate=..., authorize_application=..., authorize_att
 - Use `SecureSQLiteJobStore`; `JobStore` and `SQLiteJobStore` are test-only adapters, not production stores.
 - Submission idempotency is durable, tenant-scoped and binds actor/application/attachment/document type/content hash. Same key + same payload replays the same job; same key + different payload conflicts.
 - Confirmation is transactionally idempotent; same key/payload replays the same response; changed payload conflicts. Confirmation revision is monotonic and confirmed values cannot be overwritten by OCR retry.
-- Sensitive payloads are encrypted with an external Fernet key; raw image bytes are not stored. Audit confirmation events are encrypted. Key custody/rotation, backup, deletion/retention and operational monitoring require deployment review.
+- Production candidate uses SecureSQLiteJobStore: sensitive job and confirmation payloads are encrypted with an externally supplied Fernet key; raw image bytes are not stored. Confirmation audit details are encrypted. The legacy SQLiteJobStore in api.py stores plaintext JSON and is test-only; never use it for customer data. Key custody/rotation, backup, deletion/retention and operational monitoring require deployment review.
 - Restart tests create a fresh store and HTTP app over the same DB. Crash recovery must only run under exclusive lifecycle control; never let a second live worker mark another worker's job failed.
 
 ## Verification evidence
 - Hosted Run 40007712096 passed after fixing test request fields. Reuse its verified model SHA/inference results.
-- New expanded Chinese HTTP E2E adds a generated Chinese synthetic business license and synthetic ID front, confirmation replay, a fresh store/app restart, durable audit verification and concurrent duplicate submission. Its result must be taken from its own latest Hosted run; source code alone is not proof.
+- Hosted Run 40008433722 executed real Chinese synthetic business-license and ID-front images through OCR, HTTP submit/read/confirm, same-process fresh-store/fresh-app reconstruction, durable audit checks and concurrent duplicate submission. It did NOT prove a separate OS-process restart. A separate-process SQLite confirmation/audit/idempotency test was added in test_secure_store.py at Commit 9d4fe688abf186abea8106d9b28915eceffd09a2; its dedicated Hosted execution remains pending.
 - Never use real identity documents for CI. No paid OCR API or server deployment.
 
 ## Model provenance / licensing
