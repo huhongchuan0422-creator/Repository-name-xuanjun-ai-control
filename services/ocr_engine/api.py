@@ -156,10 +156,6 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=400, detail="UNSUPPORTED_DOCUMENT_TYPE")
         if not onboarding_application_id.strip() or not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_REQUEST")
-        if authorize_application is None or not authorize_application(p, onboarding_application_id):
-            raise HTTPException(status_code=403, detail="APPLICATION_OWNERSHIP_UNVERIFIED")
-        if not attachment_id.strip() or authorize_attachment is None or not authorize_attachment(p, onboarding_application_id, attachment_id):
-            raise HTTPException(status_code=403, detail="ATTACHMENT_OWNERSHIP_UNVERIFIED")
         if isinstance(jobs, SecureSQLiteJobStore) and not jobs.check_rate(p.tenant_id):
             raise HTTPException(status_code=429, detail="OCR_TENANT_RATE_LIMIT")
         data = await file.read(MAX_BYTES + 1)
@@ -167,6 +163,17 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=413, detail="IMAGE_SIZE_LIMIT")
         import hashlib
         digest = hashlib.sha256(data).hexdigest()
+        if authorize_application is None or not authorize_application(p, onboarding_application_id):
+            raise HTTPException(status_code=403, detail="APPLICATION_OWNERSHIP_UNVERIFIED")
+        # A trusted attachment resolver must compare the submitted bytes with the authorized
+        # server-side object. A boolean "ID is allowed" callback is insufficient.
+        try:
+            binding = (authorize_attachment(p, onboarding_application_id, attachment_id, digest)
+                       if authorize_attachment is not None and attachment_id.strip() else None)
+        except Exception:
+            binding = None
+        if not isinstance(binding, dict) or binding.get("authorized") is not True or binding.get("content_sha256") != digest:
+            raise HTTPException(status_code=403, detail="ATTACHMENT_CONTENT_BINDING_UNVERIFIED")
         try:
             job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id) if isinstance(jobs, SecureSQLiteJobStore) else jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
         except ValueError as exc:
@@ -189,19 +196,33 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code])
         final = jobs.get(job["job_id"], p.tenant_id)
         return {"job_id": final["job_id"], "status": final["status"], "contract_version": final["contract_version"]}
+    def reauthorize_existing_job(p: Principal, job: dict) -> None:
+        if authorize_application is None or not authorize_application(p, job["onboarding_application_id"]):
+            raise HTTPException(status_code=403, detail="APPLICATION_AUTHORIZATION_REVOKED")
+        try:
+            binding = (authorize_attachment(p, job["onboarding_application_id"], job.get("attachment_id", ""),
+                                            job["document_sha256"])
+                       if authorize_attachment is not None else None)
+        except Exception:
+            binding = None
+        if not isinstance(binding, dict) or binding.get("authorized") is not True or binding.get("content_sha256") != job["document_sha256"]:
+            raise HTTPException(status_code=403, detail="ATTACHMENT_AUTHORIZATION_REVOKED")
+
     @app.get("/api/v1/ocr/jobs/{job_id}")
     def get_job(job_id: str, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
         job = jobs.get(job_id, p.tenant_id)
         if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
-        return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "document_sha256", "confirmed_fields", "confirmation_revision"}}
+        reauthorize_existing_job(p, job)
+        return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256"}}
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
     def confirm(job_id: str, body: Confirmation, idempotency_key: str = Header(..., alias="Idempotency-Key"), authorization: Optional[str] = Header(None)):
         p = principal(authorization)
         existing = jobs.get(job_id, p.tenant_id)
         if not existing or (existing["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        reauthorize_existing_job(p, existing)
         if existing["status"] not in {"needs_review", "confirmed"}:
             raise HTTPException(status_code=409, detail="JOB_NOT_READY_FOR_CONFIRMATION")
         if (not body.fields or len(body.fields) > 12 or
@@ -227,6 +248,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         job = jobs.get(job_id, p.tenant_id)
         if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        reauthorize_existing_job(p, job)
         if not isinstance(jobs, SecureSQLiteJobStore):
             raise HTTPException(status_code=501, detail="OCR_DELETE_REQUIRES_DURABLE_STORE")
         if not jobs.delete(job_id, p.tenant_id):
