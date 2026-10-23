@@ -155,6 +155,13 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
         self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"fields":{"company_name":"x"}}).status_code,403)
         self.assertEqual(self.client.delete("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
+    def test_valid_attachment_id_with_different_bytes_is_denied(self):
+        wrong = bytes([255,216,255]) + b'different image bytes'
+        r = self.client.post('/api/v1/ocr/jobs',headers={**self.headers,'Idempotency-Key':'content-mismatch-key-01'},
+            data={'document_type':'business_license','onboarding_application_id':'synthetic-app','attachment_id':'synthetic-attachment'},
+            files={'file':('synthetic.jpg',wrong,'image/jpeg')})
+        self.assertEqual(r.status_code,403,r.text)
+        self.assertIn('ATTACHMENT_CONTENT_BINDING_UNVERIFIED',r.text)
     def test_confirmed_fields_and_revision_read_back(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         confirm_headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'readback-confirm-key-001'}
