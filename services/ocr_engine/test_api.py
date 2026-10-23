@@ -1,6 +1,7 @@
 """HTTP contract and tenant-isolation tests; inference is explicitly injected, never mocked as proof of OCR."""
 import io
 import os
+import hashlib
 import tempfile
 import unittest
 from fastapi.testclient import TestClient
@@ -25,9 +26,18 @@ def inference_fixture(image, document_type, max_bytes):
             "requires_human_confirmation": True, "authenticity_verified": False}
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        self.image = bytes([255,216,255]) + b"synthetic"
+        self.expected_sha = hashlib.sha256(self.image).hexdigest()
+        self.revoked_apps = set()
+        self.revoked_attachments = set()
+        def attachment_resolver(p, app, attachment, content_sha):
+            valid = (app == "synthetic-app" and attachment == "synthetic-attachment" and
+                     content_sha == self.expected_sha and attachment not in self.revoked_attachments)
+            return {"authorized": valid, "content_sha256": self.expected_sha}
+        self.attachment_resolver = attachment_resolver
         self.client = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture,
-            authorize_application=lambda p, app: app == "synthetic-app",
-            authorize_attachment=lambda p, app, attachment: app == "synthetic-app" and attachment == "synthetic-attachment"))
+            authorize_application=lambda p, app: app == "synthetic-app" and app not in self.revoked_apps,
+            authorize_attachment=attachment_resolver))
         self.headers = {"Authorization":"Bearer tenant-a-token", "Idempotency-Key":"0123456789abcdef"}
     def submit(self):
         return self.client.post("/api/v1/ocr/jobs", headers=self.headers,
@@ -86,7 +96,7 @@ class ApiTests(unittest.TestCase):
                 return TestClient(create_app(authenticate=auth,
                     store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
                     authorize_application=lambda p, app_id: app_id == "synthetic-app",
-                    authorize_attachment=lambda p, app_id, attachment: attachment == "synthetic-attachment"))
+                    authorize_attachment=lambda p, app_id, attachment, content_sha: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest()}))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
@@ -105,7 +115,7 @@ class ApiTests(unittest.TestCase):
                 conflict = client2.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
                     files={"file":("synthetic.jpg", bytes([255,216,255])+b"DIFFERENT", "image/jpeg")})
-                self.assertEqual(conflict.status_code,409)
+                self.assertEqual(conflict.status_code,403)
                 denied = client2.get("/api/v1/ocr/jobs/"+job_id,headers={"Authorization":"Bearer tenant-b-token"})
                 self.assertEqual(denied.status_code,404)
     def test_secure_mode_requires_encryption_key(self):
