@@ -1,28 +1,44 @@
-# 玄钧AI新 OCR Gateway — isolated development candidate
+# 玄钧AI新 OCR Gateway — development handoff
 
-## Verified evidence
-- GitHub-hosted Run 40000857097: dependencies installed, three official pinned ONNX models rehashed SHA256 OK, **real RapidOCR** successfully read one generated in-memory synthetic English image; 12 module tests and 8 governance OCR tests passed. This is **not** Chinese ID/license image accuracy validation.
-- GitHub-hosted run 40001530594 covers later persistence/ownership hardening and must be separately checked; do not reuse the prior green as the current verdict.
-- Source license: RapidOCR v3.9.2 LICENSE (Apache-2.0) inspected. MODEL_LICENSES.md under the same tag was NOT_FOUND. Model-weight redistribution/commercial bundling requires separate license verification.
+## Supported first-release document types
+- `business_license`: local RapidOCR inference plus heuristic field extraction.
+- `id_front`: local RapidOCR inference plus heuristic field extraction.
+- `id_back`, bank card, food/business permits: not supported until separately implemented/tested.
+- Storefront, interior and cashier photographs are not OCR document types and must be rejected.
 
-## HTTP interface
-See `docs/development/XUANJUN_OCR_API_V1_20261024.yaml`. Available **code** exposes:
-- POST `/api/v1/ocr/jobs`: image + onboarding id + supported doc type + idempotency header
-- GET `/api/v1/ocr/jobs/{job_id}`: only owner or tenant OCR admin may see result
-- POST `/api/v1/ocr/jobs/{job_id}/confirm`: user-reviewed fields, monotonically increasing revision
+## HTTP contract
+See `docs/development/XUANJUN_OCR_API_V1_20261024.yaml`.
+- `POST /api/v1/ocr/jobs`: multipart `file`, `document_type`, `onboarding_application_id`, `attachment_id`; `Idempotency-Key` header.
+- `GET /api/v1/ocr/jobs/{job_id}`: same tenant and original subject, or explicit `ocr:admin`.
+- `POST /api/v1/ocr/jobs/{job_id}/confirm`: JSON `revision`, `fields`; mandatory `Idempotency-Key`.
+- Every recognized field is a suggestion. User confirmation is mandatory; `authenticity_verified=false` always.
 
-Supported parsers: `business_license`, `id_front`. Others explicitly fail, including storefront/interior/cashier photographs. `authenticity_verified` always false. OCR output is suggestion only.
+## Identity / ownership injection contract (not connected to production)
+Construct `create_app(authenticate=..., authorize_application=..., authorize_attachment=..., store=...)`.
+- `authenticate(bearer_token) -> Principal(subject, tenant_id, permissions)` must call the existing trusted identity/token verifier. Default is fail-closed (401); no test token belongs in production.
+- `authorize_application(principal, onboarding_application_id) -> bool` must check the existing application belongs to the principal/tenant and that their role can submit it.
+- `authorize_attachment(principal, onboarding_application_id, attachment_id) -> bool` must verify the attachment record belongs to that application and tenant, is an approved upload object, and is readable by this actor. Check server-side object metadata; never trust client-supplied IDs alone.
+- Missing callbacks reject submission (403). Do not create a new customer identity, tenant mapping, attachment store, or fake success callback to bypass existing community onboarding.
+- These callbacks are interfaces only. Real community identity/application/attachment callbacks have **not** been injected or verified. Do not connect real user documents until the owning community writer supplies and verifies those bindings.
 
-## Fail-closed initialization
-Application must inject its **existing real** bearer token verifier (`authenticate`) and onboarding ownership callback (`authorize_application`). The default verifier denies all; without ownership callback submission responds 403. Production-like initialization with no explicit store requires absolute `OCR_SQLITE_PATH`; absent path raises `OCR_SQLITE_PATH_REQUIRED`. An explicitly injected `JobStore` is **test-only in-memory**.
-No listener or customer identity provider was deployed/configured.
+## Persistence and replay
+- Default app construction requires explicit absolute `OCR_SQLITE_PATH` and externally supplied `OCR_ENCRYPTION_KEY`; missing values fail closed.
+- Use `SecureSQLiteJobStore`; `JobStore` and `SQLiteJobStore` are test-only adapters, not production stores.
+- Submission idempotency is durable, tenant-scoped and binds actor/application/attachment/document type/content hash. Same key + same payload replays the same job; same key + different payload conflicts.
+- Confirmation is transactionally idempotent; same key/payload replays the same response; changed payload conflicts. Confirmation revision is monotonic and confirmed values cannot be overwritten by OCR retry.
+- Sensitive payloads are encrypted with an external Fernet key; raw image bytes are not stored. Audit confirmation events are encrypted. Key custody/rotation, backup, deletion/retention and operational monitoring require deployment review.
+- Restart tests create a fresh store and HTTP app over the same DB. Crash recovery must only run under exclusive lifecycle control; never let a second live worker mark another worker's job failed.
 
-## Known blockers for production
-- SQLite currently stores suggested and confirmed personal data in plaintext. Requires encrypted storage/key management and retention/deletion implementation **before actual customer material**.
-- Idempotency-Key length validated but full key-binding/replay conflict semantics are incomplete. Implement atomic idempotency contract and cross-process safety.
-- SQLite schema is local prototype, lacks migration, multi-worker lease/recovery, persistent audit and full HTTP restart/concurrency E2E.
-- Upload magic/size and core decode/pixel checks exist, but gateway needs complete image safety, scheduling, timeout and rate limiting.
-- User-confirmation flow must be integrated by the original community W4 writer; OCR author must not modify W4 source.
-- Model license notifications/redistribution status unresolved. Do not package model weights commercially.
+## Verification evidence
+- Hosted Run 40007712096 passed after fixing test request fields. Reuse its verified model SHA/inference results.
+- New expanded Chinese HTTP E2E adds a generated Chinese synthetic business license and synthetic ID front, confirmation replay, a fresh store/app restart, durable audit verification and concurrent duplicate submission. Its result must be taken from its own latest Hosted run; source code alone is not proof.
+- Never use real identity documents for CI. No paid OCR API or server deployment.
 
-No real IDs, licenses, paid APIs, new credentials, production server or self-hosted Runner have been used.
+## Model provenance / licensing
+RapidOCR v3.9.2 source LICENSE is Apache-2.0. Three ONNX file SHA-256 values are pinned in `model_manifest.json` and were rehashed successfully in hosted CI. The expected upstream `MODEL_LICENSES.md` path returned 404 during review. Therefore the **weight-specific license/redistribution rights remain unresolved**; do not assume source-code Apache license proves model-weight commercial redistribution rights. Commercial bundling is HOLD until an authoritative version-specific license/notice is obtained.
+
+## Remaining external gates
+1. Real existing identity/token verifier and application + attachment ownership callbacks, supplied by the owning community integration writer.
+2. Model-weight redistribution license evidence.
+3. Deployment-specific key custody/rotation, backup, retention/deletion, monitoring and load/rate/timeout settings.
+4. Production deployment is not authorized by this document or a green Hosted run.
