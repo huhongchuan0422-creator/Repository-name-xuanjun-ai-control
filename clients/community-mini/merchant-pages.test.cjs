@@ -17,6 +17,15 @@ test('native home/recommendations/profile tabs and entry navigation stay in the 
  const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(join.includes('index===fieldCursor')&&join.includes('下一项资料'));
  for(const label of ['商家入驻与进度','商家工作台','门店与订单'])assert.ok(profile.includes(label),label);
 });
+test('dirty admission draft requires explicit save-or-stay before navigation',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.baseInput({currentTarget:{dataset:{key:'store_name'}},detail:{value:'Unsaved Shop'}});
+ f.page.navigateSection({currentTarget:{dataset:{section:'orders'}}});
+ assert.equal(f.page.data.leavePrompt,true);assert.equal(f.page.data.leaveTarget,'orders');assert.equal(f.page.data.dirty,true);
+ assert.equal(f.page.data.base.store_name,'Unsaved Shop');
+ f.page.cancelLeave();assert.equal(f.page.data.leavePrompt,false);assert.equal(f.page.data.dirty,true);
+ assert.equal(f.calls.some(c=>c.p.operation==='save'),false);
+});
 test('merchant entry is in existing display and same app routes, no second appid',()=>{const pages=JSON.parse(fs.readFileSync(__dirname+'/app.json')).pages;for(const p of ['merchant','merchant-join'])assert.ok(pages.includes('pages/'+p+'/index'));assert.match(fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8'),/bindtap="openMerchantJoin"/);});
 test('join four stages save one shared profile and refresh original application',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});form.put(f.page.profile,'subject_info.business_license_info.merchant_name','Fixture Company');form.put(f.page.profile,'contact_info.mobile_phone','13800000000');await f.page.next();assert.equal(f.page.data.step,1);const save=f.calls.find(c=>c.p.operation==='save');assert.equal(save.p.params.fields.legal_name,'Fixture Company');assert.equal(save.p.params.fields.contact,'13800000000');const provider=f.calls.find(c=>c.p.operation==='wechat_save');assert.equal(provider.p.params.application,f.app.application);f.page.back();assert.equal(f.page.data.step,0);assert.ok(f.calls.some(c=>c.p.operation==='read'));assert.ok(!f.calls.some(c=>['wechat_execute','wechat_query'].includes(c.p.operation)));});
 test('conditional document and delegated fields and single UBO editor',()=>{const o={entity:'SOLE_PROPRIETOR',contact:'LEGAL',doc:'IDENTIFICATION_TYPE_IDCARD',scene:'mini',ubos:0};const rows=form.rows({},o,0);assert.ok(rows.every(r=>!r.path.includes('.id_doc_info.')&&!r.path.includes('ubo_info_list')));assert.ok(form.rows({},o,1).every(r=>!r.path.includes('contact_id_number')));const changed=form.rows({}, {...o,entity:'ENTERPRISE',doc:'IDENTIFICATION_TYPE_OVERSEA_PASSPORT',ubos:2,uboIndex:1},0);assert.ok(changed.some(r=>r.path.includes('.ubo_info_list.1.')));assert.ok(changed.every(r=>!r.path.includes('.ubo_info_list.0.')));assert.ok(changed.every(r=>!r.path.includes('.id_card_info.')));});
