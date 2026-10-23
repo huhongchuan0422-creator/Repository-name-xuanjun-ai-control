@@ -25,7 +25,8 @@ def inference_fixture(image, document_type, max_bytes):
             "requires_human_confirmation": True, "authenticity_verified": False}
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture))
+        self.client = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture,
+            authorize_application=lambda p, app: app == "synthetic-app"))
         self.headers = {"Authorization":"Bearer tenant-a-token", "Idempotency-Key":"0123456789abcdef"}
     def submit(self):
         return self.client.post("/api/v1/ocr/jobs", headers=self.headers,
@@ -60,6 +61,17 @@ class ApiTests(unittest.TestCase):
             store2 = SQLiteJobStore(path)
             self.assertEqual(store2.get(job["job_id"], "tenant-a")["status"], "needs_review")
             self.assertIsNone(store2.get(job["job_id"], "tenant-b"))
+    def test_ownership_callback_required(self):
+        c = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture))
+        r = c.post("/api/v1/ocr/jobs", headers=self.headers,
+            data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+            files={"file":("synthetic.jpg", bytes([255,216,255])+b"synthetic", "image/jpeg")})
+        self.assertEqual(r.status_code, 403)
+    def test_missing_persistent_store_denied(self):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"OCR_SQLITE_PATH": ""}):
+            with self.assertRaisesRegex(RuntimeError, "OCR_SQLITE_PATH_REQUIRED"):
+                create_app(authenticate=auth, infer=inference_fixture)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
