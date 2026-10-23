@@ -12,6 +12,8 @@ Bootstrap an isolated compliance tool branch from main; verify deterministic neg
 
 A valid registry entry passes; missing design, stage, criteria, test file, or verified/deployed evidence fails. The workflow runs on every pull request and main push; preserve a stable status-check context and use existing GitHub Actions. Required status check becomes enforceable only after a successful bootstrap and a separate branch protection setting by an administrator.
 
+Acceptance test references retain the existing `tests/` layout and explicitly support the project's colocated Node tests: direct `clients/community-mini/<name>.test.cjs` files (names contain letters, digits, underscores or hyphens) and `scripts/community_mini_key.test.cjs`. This does not admit arbitrary files under `clients/` or `scripts/`. Every reference must be a canonical repository-relative path with no empty, dot, parent or backslash components, resolve inside the repository (including symlinks), and point to an existing file. Registry references and the added-code ownership gate remain unchanged. This validates a test reference, not execution or test success.
+
 ### 4 Rollout and rollback
 
 Release isolated code and registry first, then confirm a normal PR run. Record workflow ID, tested SHA, success/failure evidence, and administrator's branch protection setting. On false blocks, fix in a new PR; do not disable safety gates silently. A GitHub CI success does not imply server synchronization.

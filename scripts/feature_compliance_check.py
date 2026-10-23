@@ -12,6 +12,20 @@ REQUIRED = ("feature_id", "design", "development", "acceptance", "reuse", "statu
 CODE_ROOTS = ("scripts/", "tests/", "apps/", "src/", "services/")
 CODE_SUFFIXES = (".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java")
 BOOTSTRAP_EXEMPT = frozenset(("scripts/feature_compliance_check.py", "tests/test_feature_compliance_check.py"))
+
+def valid_test_reference(root, reference):
+    """Allow established test layouts, never arbitrary source or escaped paths."""
+    if not isinstance(reference, str) or "\\" in reference:
+        return False
+    parts = reference.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return False
+    supported = (reference.startswith("tests/") or
+                 (len(parts) == 3 and parts[:2] == ["clients", "community-mini"]
+                  and re.fullmatch(r"[A-Za-z0-9_-]+\.test\.cjs", parts[-1]) is not None) or
+                 reference == "scripts/community_mini_key.test.cjs")
+    return supported and (root / reference).resolve().is_relative_to(root.resolve())
+
 def validate(root, manifest):
     errors = []
     registry = json.loads((root / manifest).read_text(encoding="utf-8"))
@@ -61,7 +75,7 @@ def validate(root, manifest):
         if not isinstance(criteria, list) or not criteria or any(not isinstance(x, str) or not x.strip() for x in criteria):
             errors.append(fid + ": MISSING_ACCEPTANCE_CRITERIA")
         tests = acceptance.get("tests")
-        if not isinstance(tests, list) or not tests or any(not isinstance(x, str) or not x.startswith("tests/") for x in tests):
+        if not isinstance(tests, list) or not tests or any(not valid_test_reference(root, x) for x in tests):
             errors.append(fid + ": MISSING_TEST_REFERENCES")
         elif any(not (root / p).is_file() for p in tests):
             errors.append(fid + ": ACCEPTANCE_TEST_NOT_FOUND")
