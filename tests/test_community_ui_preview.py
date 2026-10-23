@@ -5,6 +5,17 @@ from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 from pathlib import Path
 from scripts.community_ui_preview_build import build,main,BASE,ROOT
 class SourceBoundary(unittest.TestCase):
+    def test_scene_photos_do_not_inherit_ocr_prompt(self):
+        script=(BASE/'ui-preview/preview.js').read_text()
+        stage=script.split('function stage(p)',1)[1].split('function attachBeneficiary',1)[0]
+        self.assertIn("x.id==='admission-business_info-'?'':",stage)
+        self.assertIn('识别未接通',stage)
+        native=(ROOT/'clients/community-mini/pages/merchant-join/index.wxml').read_text()
+        photo=native.split('线下实际经营场景照片',1)[1].split('小程序服务截图',1)[0]
+        self.assertNotIn('OCR未接通',photo)
+        self.assertIn('场景照片无需OCR',photo)
+        self.assertIn('识别：未接通',native)
+
     def test_generated_inputs_and_scoped_fields(self):
         data=build()
         self.assertEqual((BASE/'ui-preview/sources.js').read_text(),'window.COMMUNITY_UI_PREVIEW='+json.dumps(data,ensure_ascii=False).replace('</','<\\/')+';\n')
