@@ -95,7 +95,7 @@ class ClickThrough(unittest.TestCase):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
                         if role=='community' and module['id']=='community-4-0-0':
                             # Two cards share this destination; choose the visible order-observation action by its user-facing label.
-                            entry=page.locator('#menu a[href="'+target+'"]').first
+                            entry=page.locator('#view a[href="'+target+'"]').first
                             expect(entry).to_be_visible()
                             entry.click()
                             expect(page.locator('#view h1').first).to_have_text('社区订单、收益与结算观察')
@@ -112,7 +112,7 @@ class ClickThrough(unittest.TestCase):
                                 next_step.click()
                             else:
                                 self.fail('No visible user-facing entry for '+role+'/'+module['id']+' at '+str(width)+'px')
-                            expect(page.locator('#view h1').first).to_have_text(module['title'])
+                            expect(page.locator('#view h1').first).to_have_text('申请资料核对' if module['id']=='admission-result' else module['title'])
                         if role=='community' and module['id']=='community-4-0-0':
                             page.get_by_role('button',name='查看查询状态',exact=True).first.click()
                             expect(page.locator('#community-query-status')).to_contain_text('未返回或伪造订单记录')
@@ -301,10 +301,10 @@ class ClickThrough(unittest.TestCase):
             page.get_by_label('查看身份',exact=True).select_option('community')
             for title in ('社区运营总览','社区商家成员','社区订单','分账明细','退款'):
                 expect(page.locator('#view')).to_contain_text(title)
-            expect(page.locator('#view')).to_contain_text('未就绪')
+            expect(page.locator('#view')).to_contain_text('隔离合成投影')
             page.screenshot(path=str(self.out/'role-community-phone.png'),full_page=True)
-            page.get_by_role('link',name='打开订单观察',exact=True).click()
-            expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
+            page.locator('#view a[href="#/community/community-4-0-0/list"]').click()
+            expect(page.locator('#view h1').first).to_have_text('社区订单、收益与结算观察')
             page.get_by_role('button',name='查看查询状态',exact=True).first.click()
             expect(page.locator('#community-query-status')).to_contain_text('未返回或伪造订单记录')
             page.goto(self.url+'#/community/home')
@@ -588,7 +588,7 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='查看快照详情',exact=True).click()
             expect(page.locator('#view')).to_contain_text('不等于消费者退款')
             page.goto(self.url+'#/community/community-refunds/list')
-            expect(page.locator('#view')).to_contain_text('无独立社区退款API')
+            expect(page.locator('#view')).to_contain_text('不存在独立社区退款API')
             self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
             page.get_by_role('link',name='查看退款状态说明',exact=True).click()
             expect(page.locator('#view')).to_contain_text('只读投影')
@@ -664,7 +664,9 @@ class ClickThrough(unittest.TestCase):
                 identity.locator('summary').click()
             before_doc_scroll=page.evaluate('window.scrollY')
             page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
-            expect(identity).to_have_attribute('open','')
+            other_identity=page.locator('.admission-data-card').filter(has_text='其他法人证件').first
+            expect(other_identity).to_have_attribute('open','')
+            expect(page.locator('[data-option="doc"]')).to_be_focused()
             expect(page.locator('[data-path="subject_info.business_license_info.license_number"]')).to_have_value('DEMO-123')
             self.assertLessEqual(abs(page.evaluate('window.scrollY')-before_doc_scroll),1)
             page.goto(self.url+'#/admission/admission-business/edit')
