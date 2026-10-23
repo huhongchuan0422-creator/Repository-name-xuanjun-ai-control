@@ -33,6 +33,48 @@ class GovernanceTests(unittest.TestCase):
  def test_missing_test_file(self):
     self.feature["acceptance"]["tests"]=["tests/absent.py"]
     self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+ def test_existing_node_test_layouts(self):
+    references=["clients/community-mini/client.test.cjs",
+                "clients/community-mini/session.test.cjs",
+                "scripts/community_mini_key.test.cjs"]
+    for reference in references:
+        path=self.root/reference
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text("require('node:test');\n")
+    self.feature["acceptance"]["tests"]=["tests/test_feature.py"]+references
+    self.assertEqual(self.check(),[])
+ def test_missing_node_test_still_fails(self):
+    for reference in ["clients/community-mini/absent.test.cjs", "scripts/community_mini_key.test.cjs"]:
+        with self.subTest(reference=reference):
+            self.feature["acceptance"]["tests"]=[reference]
+            self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+ def test_reference_layout_remains_restricted(self):
+    for reference in ["clients/community-mini/client.js", "scripts/feature_compliance_check.py",
+                      "scripts/other.test.cjs", "clients/other/client.test.cjs",
+                      "clients/community-mini/nested/client.test.cjs"]:
+        with self.subTest(reference=reference):
+            path=self.root/reference
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text("pass\n")
+            self.feature["acceptance"]["tests"]=[reference]
+            self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+ def test_noncanonical_and_invalid_test_references_fail(self):
+    for reference in [None, 1, "", "/tests/test_feature.py", "tests/../docs/development/spec.md",
+                      "tests/./test_feature.py", "tests//test_feature.py", "tests\\test_feature.py"]:
+        with self.subTest(reference=reference):
+            self.feature["acceptance"]["tests"]=[reference]
+            self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+ def test_external_symlink_test_reference_fails(self):
+    with tempfile.TemporaryDirectory() as external:
+        target=Path(external)/"outside.py"
+        target.write_text("pass\n")
+        (self.root/"tests/test_external.py").symlink_to(target)
+        self.feature["acceptance"]["tests"]=["tests/test_external.py"]
+        self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+ def test_directory_is_not_a_test_file(self):
+    self.feature["acceptance"]["tests"]=["tests/directory.py"]
+    (self.root/"tests/directory.py").mkdir()
+    self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
  def test_premature_deployment(self):
     self.feature["status"]="DEPLOYED"
     self.assertIn("EXAMPLE_FEATURE: DEPLOYED_WITHOUT_RECEIPT",self.check())
