@@ -20,6 +20,9 @@ Page({
  clearCode(){if(this.codeFile){wx.getFileSystemManager().unlink({filePath:this.codeFile,fail(){}});this.codeFile=null;}},
  back(){this.setData({view:'home',detail:null,editor:null});},
  join(){wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(this.scene)});},
+ goHome(){wx.switchTab({url:'/pages/home/index'});},
+ goRecommendations(){getApp().globalData.checkoutMode='recommendations';wx.switchTab({url:'/pages/checkout/index'});},
+ goProfile(){wx.switchTab({url:'/pages/profile/index'});},
  customerSessionRevoked(){this.clearCode();if(this.session)this.session.clear();this.setData({workspaces:[],workspace:'',orders:[],summary:null,detail:null,settings:null,codePath:'',codeReady:false,editor:null,permissions:{},pending:false,status:'登录已退出，请重新进入'});},
  onUnload(){this.dead=true;this.clearCode();if(this.session)this.session.clear();}
 });
