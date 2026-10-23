@@ -23,6 +23,16 @@ def validate_archive(plan):
           and type(plan['max_read_bytes']) is int and 1024 <= plan['max_read_bytes'] <= 32 * 1024 * 1024, 'ARCHIVE_BUDGET')
 
 
+def historical_member_boundary(plan, items):
+    """Exact retained snapshot only; metadata does not claim whole SHA proof."""
+    known = 'dist/server-active-work-Bhfd47cA.mjs:150:eff213117811b9237933a2148524605d0acd5f397a0344b78f48de07d51599b4 dist/server-shutdown.runtime.js:56:d479328d6a6d9a59cae80ae11bf91fb37ef193ad3bb75afb9ff5d6f7f78e5ece dist/server-startup-config-helpers-U6xkM_57.mjs:137:05234c987220249a923175b49d20d7edc5f49c091272fbdca2a2f151e9aae765 dist/server-startup-early-BLUjqlAE.mjs:4816:1d457bf7c8373bc3f37acaa9039b588efa4e24a46d9d3d15751d88d84fa3b551 dist/server-startup-post-attach-CsYAFanV.mjs:53969:b62aa11d48ecedddf1b606f33114cdde8faf7fc193305eafddb918427024de22'
+    return (plan['filename'] == 'source-tree.tar.pending'
+            and plan['sha256'] == 'e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485'
+            and plan['identity'][3] == 1002 and plan['identity'][6] == 559237632
+            and plan['member_prefix'] == 'home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+            and all(('%s:%d:%s' % (x['relative_path'],x['bytes'],x['sha256'])) in known.split() for x in items))
+
+
 class ArchiveView:
     """Every parser read/seek is bounded before allocation or disk access."""
     def __init__(self, fd, size, budget, deadline):
@@ -56,6 +66,7 @@ def _read_archive(root, owner, items, plan, verify_whole):
           and len({x['relative_path'] for x in items}) == len(items)
           and all(type(x['bytes']) is int and 0 <= x['bytes'] <= 53969 for x in items)
           and sum(x['bytes'] for x in items) <= 93592, 'ARCHIVE_MEMBER_BOUND')
+    boundary_eof = historical_member_boundary(plan, items)
     wanted = {plan['member_prefix'] + x['relative_path']: x for x in items}
     paths = {name[2:] if name.startswith('./') else name for name in wanted}
     rootfd = directory(root, owner)
@@ -78,6 +89,10 @@ def _read_archive(root, owner, items, plan, verify_whole):
         with tarfile.open(fileobj=view, mode='r:') as archive:
             while True:
                 next_header = archive.offset
+                # Fixed historical prefix: complete member boundary only.
+                if boundary_eof and count > 0 and next_header == view.size:
+                    view.seek(next_header)
+                    break
                 member = archive.next()
                 if member is None:
                     # next() may consume a malformed header before returning

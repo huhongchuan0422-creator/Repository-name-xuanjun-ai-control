@@ -106,8 +106,8 @@
     {
       "path": "production/cloud_connection/archive_reader.py",
       "mode": "0644",
-      "bytes": 7792,
-      "sha256": "b60bb808a81be479b686d6a40fc195a51a88f23963b80339568004798cc748ba"
+      "bytes": 9230,
+      "sha256": "39f9aae289f4e7ef64d9579a7f11338bd46382f8906899c503901f778f911ddf"
     },
     {
       "bytes": 6064,
@@ -116,10 +116,10 @@
       "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620"
     },
     {
-      "bytes": 18639,
+      "bytes": 18669,
       "mode": "0644",
       "path": "production/cloud_connection/fixed_actions.py",
-      "sha256": "c9e96b3cc0895211aaa4d8ba690447ec5072a03654e1b8964e8e917459d28437"
+      "sha256": "75fe7d4c2d24f125485ced1f2663171d22c92715241373b799a135fd0b3438f0"
     },
     {
       "bytes": 5503,

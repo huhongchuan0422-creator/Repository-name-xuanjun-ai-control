@@ -182,7 +182,7 @@ class ApprovedObjectsPolicy:
         code = ''
         modules = [(transfer, 'reader_sha256', ('check', 'stamp', 'directory') if archive else ('check', 'stamp', 'directory', 'read_object'))]
         if archive:
-            modules.append((archive_reader, 'archive_reader_sha256', ('validate_archive', 'ArchiveView', '_read_archive', 'read_archive_member_metadata')))
+            modules.append((archive_reader, 'archive_reader_sha256', ('validate_archive', 'historical_member_boundary', 'ArchiveView', '_read_archive', 'read_archive_member_metadata')))
         for module, pin, names in modules:
             raw = Path(module.__file__).with_suffix('.py').read_bytes()
             check(hashlib.sha256(raw).hexdigest() == self.binding[pin], 'APPROVED_OBJECT_READER_PIN')
