@@ -284,6 +284,8 @@
   function refreshConditions(){
     refreshLicense();
     const contactType=controlValue('contact_info.contact_type')||(current?.delegated?'SUPER':'LEGAL');
+    const contactLabels={'contact_info.contact_name':contactType==='SUPER'?'超级管理员姓名':'法人/经营者姓名','contact_info.mobile_phone':contactType==='SUPER'?'超级管理员手机':'法人/经营者联系电话','contact_info.contact_email':contactType==='SUPER'?'超级管理员邮箱':'法人/经营者邮箱'};
+    for(const [path,labelText] of Object.entries(contactLabels)){const input=wechatControls.get(path),label=input?.parentNode,textNode=label?.firstChild;if(textNode&&textNode.nodeType===3)textNode.textContent=labelText;}
     const docType=controlValue('subject_info.identity_info.id_doc_type')||current?.identity_type||'IDENTIFICATION_TYPE_IDCARD';
     for(const [path,input]of wechatControls)if(input.type!=='hidden'){
       if(path.startsWith('contact_info.contact_')&&!['contact_info.contact_type','contact_info.contact_name','contact_info.contact_email'].includes(path))input.parentNode.hidden=contactType!=='SUPER';
