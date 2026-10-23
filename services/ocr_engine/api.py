@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Callable, Optional
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
-from .ocr_core import run_local_ocr
+try:
+    from .ocr_core import run_local_ocr
+except ImportError:
+    from ocr_core import run_local_ocr
 
 MAX_BYTES = 8 * 1024 * 1024
 ALLOWED_HINTS = {"business_license", "id_front"}
