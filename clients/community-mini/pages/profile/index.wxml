@@ -10,11 +10,18 @@
     <button bindtap="logout" disabled="{{pending}}">退出登录</button>
   </view>
   <view class="card" wx:if="{{authenticated&&loaded}}">
-    <view class="row"><text class="title">本人通知</text><button size="mini" bindtap="loadNotices" loading="{{noticePending}}" disabled="{{noticePending}}">刷新</button></view>
+    <view class="row"><text class="title">本人通知</text><button size="mini" bindtap="loadNotices" loading="{{noticePending}}" disabled="{{noticePending||noticeDetailOpen}}">刷新</button></view>
     <text class="description">{{noticeStatus}}</text>
-    <text wx:if="{{!noticesLoaded&&!noticePending}}">尚未读取本人通知。</text>
-    <view wx:for="{{notices}}" wx:key="id" class="notice-row"><text>{{item.read?'已读':'未读'}} · {{item.message}}</text><button wx:if="{{!item.read}}" size="mini" data-id="{{item.id}}" bindtap="markNoticeRead" disabled="{{noticePending}}">标记已读</button></view>
-    <text wx:if="{{noticesLoaded&&!notices.length}}">暂无本人通知。</text>
-    <button wx:if="{{noticesMore}}" bindtap="loadNotices" data-more="true" disabled="{{noticePending}}">加载更多通知</button>
+    <view wx:if="{{!noticeDetailOpen}}">
+      <text wx:if="{{!noticesLoaded&&!noticePending}}">尚未读取本人通知。</text>
+      <view wx:for="{{notices}}" wx:key="id" class="notice-row"><text>{{item.read?'已读':'未读'}} · {{item.message}}</text><button size="mini" data-id="{{item.id}}" bindtap="openNotice" disabled="{{noticePending}}">查看详情</button></view>
+      <text wx:if="{{noticesLoaded&&!notices.length}}">暂无本人通知。</text>
+      <button wx:if="{{noticesMore}}" bindtap="loadNotices" data-more="true" disabled="{{noticePending}}">加载更多通知</button>
+    </view>
+    <view wx:if="{{noticeDetailOpen&&selectedNotice}}">
+      <button size="mini" bindtap="backNoticeList" disabled="{{noticePending}}">返回通知列表</button>
+      <text>通知详情 · {{selectedNotice.read?'已读':'未读'}</text><text>{{selectedNotice.message}}</text>
+      <button wx:if="{{!selectedNotice.read}}" data-id="{{selectedNotice.id}}" bindtap="markNoticeRead" loading="{{noticePending}}" disabled="{{noticePending}}">标记已读</button>
+    </view>
   </view>
 </view>

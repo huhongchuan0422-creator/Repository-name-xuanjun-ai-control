@@ -24,8 +24,9 @@ test('profile exposes only current-session notices and confirms read acknowledge
  const {page,calls}=fixture();page._dead=false;page._sceneStale=false;page._authEpoch=auth.current();page.scene='shop1';
  await page.loginAndLoad();await new Promise(resolve=>setImmediate(resolve));
  assert.equal(page.data.authenticated,true);assert.equal(page.data.notices.length,1);assert.equal(page.data.notices[0].message,'审核资料有更新');assert.equal(page.data.notices[0].read,false);
+ page.openNotice({currentTarget:{dataset:{id}}});assert.equal(page.data.noticeDetailOpen,true);assert.equal(page.data.selectedNotice.id,id);
  await page.markNoticeRead({currentTarget:{dataset:{id}}});
- assert.equal(page.data.notices[0].read,true);assert.equal(calls.filter(x=>x.operation==='notices').length,1);assert.equal(calls.at(-1).operation,'notice_read');
+ assert.equal(page.data.notices[0].read,true);assert.equal(page.data.selectedNotice.read,true);page.backNoticeList();assert.equal(page.data.noticeDetailOpen,false);assert.equal(page.data.selectedNotice,null);assert.equal(calls.filter(x=>x.operation==='notices').length,1);assert.equal(calls.at(-1).operation,'notice_read');
  page.customerSessionRevoked('退出测试');assert.deepEqual(page.data.notices,[]);assert.equal(page.data.noticesLoaded,false);
 });
 test('profile notices reject malformed records without exposing another payload',async()=>{

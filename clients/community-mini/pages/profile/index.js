@@ -1,7 +1,7 @@
 const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
-  data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:''},
+  data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店');}},
   onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.clearPrivate('缺少门店场景，无法读取本人资料');return;}this.loginAndLoad();},
   onUnload(){this._dead=true;this._noticeRequest=null;if(this.session)this.session.clear();},
@@ -21,7 +21,7 @@ Page({
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{if(this.session)this.session.clear();this.session=null;this.clearPrivate(customerError(e));}}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
-  clearPrivate(status){this._noticeRequest=null;this.setData({authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',status});},
+  clearPrivate(status){this._noticeRequest=null;this.setData({authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false,status});},
   validateProfile(r){
     if(!r||typeof r.user_id!=='string'||typeof r.project_customer_id!=='string'||typeof r.nickname!=='string'||typeof r.contact!=='string'||!Number.isSafeInteger(r.version)||r.version<0)throw Error('本人资料返回无效');
     return r;
@@ -48,11 +48,13 @@ Page({
     }catch(e){if(this.noticeCurrent(request)){const denied=e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED';this.setData({...(denied?{notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false}:{}),noticeStatus:denied?'通知访问被拒绝或会话已过期，请重新登录':e.message});}}
     finally{if(this.noticeCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
   },
+  openNotice(e){const id=e.currentTarget.dataset.id;const notice=this.data.notices.find(x=>x.id===id);if(!notice)return;this.setData({selectedNotice:notice,noticeDetailOpen:true});},
+  backNoticeList(){this.setData({selectedNotice:null,noticeDetailOpen:false});},
   async markNoticeRead(e){
     if(this._dead||!this.data.authenticated||!this.session||this.data.noticePending)return;
     const id=e.currentTarget.dataset.id,n=this.data.notices.find(x=>x.id===id);if(!n||n.read||typeof id!=='string'||!/^[0-9a-f]{64}$/.test(id))return;
     const request={epoch:this._authEpoch,attempt:this._loginAttempt,session:this.session,scene:this.scene,after:''};this._noticeRequest=request;this.setData({noticePending:true,noticeStatus:''});
-    try{const r=await request.session.commerce(request.scene,'notice_read',{notice_id:id});if(!this.noticeCurrent(request))return;if(!r||r.id!==id||r.read!==true)throw Error('通知已读状态未确认');this.setData({notices:this.data.notices.map(x=>x.id===id?{...x,read:true}:x)});}
+    try{const r=await request.session.commerce(request.scene,'notice_read',{notice_id:id});if(!this.noticeCurrent(request))return;if(!r||r.id!==id||r.read!==true)throw Error('通知已读状态未确认');const updated=this.data.notices.map(x=>x.id===id?{...x,read:true}:x);this.setData({notices:updated,selectedNotice:this.data.selectedNotice&&this.data.selectedNotice.id===id?{...this.data.selectedNotice,read:true}:this.data.selectedNotice});}
     catch(err){if(this.noticeCurrent(request)){const denied=err.code==='ACCESS_DENIED'||err.message==='SESSION_EXPIRED';this.setData({...(denied?{notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false}:{}),noticeStatus:denied?'通知访问被拒绝或会话已过期，请重新登录':err.message});}}
     finally{if(this.noticeCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
   },
