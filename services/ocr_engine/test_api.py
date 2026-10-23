@@ -26,14 +26,15 @@ def inference_fixture(image, document_type, max_bytes):
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture,
-            authorize_application=lambda p, app: app == "synthetic-app"))
+            authorize_application=lambda p, app: app == "synthetic-app",
+            authorize_attachment=lambda p, app, attachment: app == "synthetic-app" and attachment == "synthetic-attachment"))
         self.headers = {"Authorization":"Bearer tenant-a-token", "Idempotency-Key":"0123456789abcdef"}
     def submit(self):
         return self.client.post("/api/v1/ocr/jobs", headers=self.headers,
-            data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+            data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
             files={"file":("synthetic.jpg", b"\xff\xd8\xffsynthetic", "image/jpeg")})
     def test_missing_auth_denied(self):
-        r=self.client.post("/api/v1/ocr/jobs", headers={"Idempotency-Key":"0123456789abcdef"}, data={"document_type":"business_license","onboarding_application_id":"x"},
+        r=self.client.post("/api/v1/ocr/jobs", headers={"Idempotency-Key":"0123456789abcdef"}, data={"document_type":"business_license","onboarding_application_id":"x","attachment_id":"synthetic-attachment"},
                            files={"file":("x.jpg",b"abc","image/jpeg")})
         self.assertEqual(r.status_code,401)
     def test_submit_and_get_result(self):
@@ -84,7 +85,8 @@ class ApiTests(unittest.TestCase):
             def app():
                 return TestClient(create_app(authenticate=auth,
                     store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
-                    authorize_application=lambda p, app_id: app_id == "synthetic-app"))
+                    authorize_application=lambda p, app_id: app_id == "synthetic-app",
+                    authorize_attachment=lambda p, app_id, attachment: attachment == "synthetic-attachment"))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
