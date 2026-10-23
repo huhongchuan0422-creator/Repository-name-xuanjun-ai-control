@@ -1,28 +1,28 @@
-# 玄钧AI新 OCR Engine — first isolated implementation
+# 玄钧AI新 OCR Gateway — isolated development candidate
 
-**State:** local adapter and governance-registered contract tests exist. HTTP gateway is specified but not implemented. No real-model inference has been verified; not deployed or connected to merchant onboarding.
+## Verified evidence
+- GitHub-hosted Run 40000857097: dependencies installed, three official pinned ONNX models rehashed SHA256 OK, **real RapidOCR** successfully read one generated in-memory synthetic English image; 12 module tests and 8 governance OCR tests passed. This is **not** Chinese ID/license image accuracy validation.
+- GitHub-hosted run 40001530594 covers later persistence/ownership hardening and must be separately checked; do not reuse the prior green as the current verdict.
+- Source license: RapidOCR v3.9.2 LICENSE (Apache-2.0) inspected. MODEL_LICENSES.md under the same tag was NOT_FOUND. Model-weight redistribution/commercial bundling requires separate license verification.
 
-## Engine / reproducibility
-- RapidOCR 3.10.0 + ONNX Runtime CPU 1.31.0, pinned in requirements.txt.
-- Upstream: https://github.com/RapidAI/RapidOCR
-- Model files are not committed. Stage the approved three model files through an authorized offline supply path and independently record their source, license and SHA256.
-- The adapter requires absolute paths OCR_DET_MODEL_PATH, OCR_CLS_MODEL_PATH, OCR_REC_MODEL_PATH, plus OCR_MODEL_SHA256 JSON such as {"det":"<64 lowercase hex>","cls":"<64 lowercase hex>","rec":"<64 lowercase hex>"}. Placeholder hashes are invalid. The code verifies each file before constructing RapidOCR and never intentionally downloads models at runtime.
-- Python 3.11+ isolated environment only. Do not run package/model downloads on production hosts.
+## HTTP interface
+See `docs/development/XUANJUN_OCR_API_V1_20261024.yaml`. Available **code** exposes:
+- POST `/api/v1/ocr/jobs`: image + onboarding id + supported doc type + idempotency header
+- GET `/api/v1/ocr/jobs/{job_id}`: only owner or tenant OCR admin may see result
+- POST `/api/v1/ocr/jobs/{job_id}/confirm`: user-reviewed fields, monotonically increasing revision
 
-## Contract
-OpenAPI contract: docs/development/XUANJUN_OCR_API_V1_20261024.yaml.
-It defines POST /ocr/jobs, GET /ocr/jobs/{job_id}, and POST /ocr/jobs/{job_id}/confirm; these are contract definitions, not live HTTP endpoints. Authentication, tenant/attachment authorization, queue, persistent jobs, throttling, encrypted storage, retention, audit and confirmation persistence remain to be implemented before exposing an endpoint.
+Supported parsers: `business_license`, `id_front`. Others explicitly fail, including storefront/interior/cashier photographs. `authenticity_verified` always false. OCR output is suggestion only.
 
-## Supported extractor scope
-- Implemented heuristics: business_license, id_front.
-- Explicitly unsupported until dedicated parser/tests exist: id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, cashier_photo. Unsupported types fail closed; storefront/interior/cashier photos are not OCR materials.
-- All recognized values are suggestions with confidence and review flag. User confirmation is mandatory. authenticity_verified is always false.
+## Fail-closed initialization
+Application must inject its **existing real** bearer token verifier (`authenticate`) and onboarding ownership callback (`authorize_application`). The default verifier denies all; without ownership callback submission responds 403. Production-like initialization with no explicit store requires absolute `OCR_SQLITE_PATH`; absent path raises `OCR_SQLITE_PATH_REQUIRED`. An explicitly injected `JobStore` is **test-only in-memory**.
+No listener or customer identity provider was deployed/configured.
 
-## Tests / evidence
-```bash
-python3 -m unittest discover -s services/ocr_engine -p 'test_*.py'
-python3 -m unittest discover -s tests -p 'test_ocr_core.py'
-```
-These tests exercise synthetic parser fixtures, output normalization, unsupported-type handling and fail-closed local-model configuration. They do not prove real image recognition. Actual offline inference remains BLOCKED until approved model files are staged with verified SHA256 and a non-sensitive synthetic image test is executed in an isolated environment.
+## Known blockers for production
+- SQLite currently stores suggested and confirmed personal data in plaintext. Requires encrypted storage/key management and retention/deletion implementation **before actual customer material**.
+- Idempotency-Key length validated but full key-binding/replay conflict semantics are incomplete. Implement atomic idempotency contract and cross-process safety.
+- SQLite schema is local prototype, lacks migration, multi-worker lease/recovery, persistent audit and full HTTP restart/concurrency E2E.
+- Upload magic/size and core decode/pixel checks exist, but gateway needs complete image safety, scheduling, timeout and rate limiting.
+- User-confirmation flow must be integrated by the original community W4 writer; OCR author must not modify W4 source.
+- Model license notifications/redistribution status unresolved. Do not package model weights commercially.
 
-No real identity or merchant documents, paid API, credentials, production server or onboarding source files are used.
+No real IDs, licenses, paid APIs, new credentials, production server or self-hosted Runner have been used.
