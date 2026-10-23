@@ -795,6 +795,42 @@ class ClickThrough(unittest.TestCase):
         finally:
             page.close()
 
+    def test_admission_switching_retains_legal_super_and_mixed_document_materials(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            page.locator('[data-stage-card="admission-contact-core"] summary').click()
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            expect(page.locator('[data-stage-card="admission-contact-core"]')).to_contain_text('超级管理员资料')
+            page.locator('[data-option="contact"]').select_option('LEGAL')
+            expect(page.locator('[data-stage-card="admission-contact-core"]')).to_contain_text('法人/经营者联系资料')
+            page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            page.locator('[data-path="subject_info.identity_info.id_doc_info.id_doc_name"]').fill('LEGAL-PASSPORT-KEEP')
+            page.locator('[data-material-kind="identity_front"]').set_input_files({'name':'legal-front.png','mimeType':'image/png','buffer':b'\\x89PNG\\r\\n\\x1a\\n'})
+            page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_IDCARD')
+            expect(page.locator('[data-path="subject_info.identity_info.id_card_info.id_card_name"]')).to_have_count(1)
+            page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            expect(page.locator('[data-path="subject_info.identity_info.id_doc_info.id_doc_name"]')).to_have_value('LEGAL-PASSPORT-KEEP')
+            expect(page.locator('[data-material-kind="identity_front"]').locator('xpath=ancestor::label')).to_contain_text('legal-front.png')
+            page.locator('[data-stage-card="admission-contact-core"] summary').click()
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            page.goto(self.url+'#/admission/admission-business/edit/admission-contact-super')
+            page.locator('[data-path="contact_info.contact_id_doc_type"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            page.locator('[data-path="contact_info.contact_id_number"]').fill('SUPER-PASSPORT-KEEP')
+            page.locator('[data-material-kind="operator_identity"]').set_input_files({'name':'operator-front.png','mimeType':'image/png','buffer':b'\\x89PNG\\r\\n\\x1a\\n'})
+            page.locator('[data-path="contact_info.contact_id_doc_type"]').select_option('IDENTIFICATION_TYPE_IDCARD')
+            expect(page.locator('[data-material-kind="operator_identity_back"]')).to_have_count(1)
+            page.locator('[data-path="contact_info.contact_id_doc_type"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            page.goto(self.url+'#/admission/admission-start/edit')
+            page.locator('[data-stage-card="admission-contact-core"] summary').click()
+            page.locator('[data-option="contact"]').select_option('LEGAL')
+            page.locator('[data-option="contact"]').select_option('SUPER')
+            page.goto(self.url+'#/admission/admission-business/edit/admission-contact-super')
+            expect(page.locator('[data-path="contact_info.contact_id_number"]')).to_have_value('SUPER-PASSPORT-KEEP')
+            expect(page.locator('[data-material-kind="operator_identity"]').locator('xpath=ancestor::label')).to_contain_text('operator-front.png')
+        finally:
+            page.close()
+
     def test_admission_contact_groups_and_customer_copy(self):
         source=(BASE/'ui-preview/preview.js').read_text()
         self.assertIn("admission-contact-core",source)

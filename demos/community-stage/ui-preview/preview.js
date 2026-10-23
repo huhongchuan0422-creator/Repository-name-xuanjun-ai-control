@@ -21,11 +21,11 @@ function contactFieldsPage(mode){
  });
  if(mode==='core')for(const label of tpl.content.querySelectorAll('label')){
   const path=label.querySelector('input,select,textarea')?.dataset.path||'';
-  if(path==='contact_info.contact_name')label.firstChild.textContent=state.options.contact==='SUPER'?'经办人姓名':'法人/经营者姓名';
-  if(path==='contact_info.mobile_phone')label.firstChild.textContent=state.options.contact==='SUPER'?'经办人手机':'法人/经营者联系电话';
-  if(path==='contact_info.contact_email')label.firstChild.textContent=state.options.contact==='SUPER'?'经办人邮箱':'法人/经营者邮箱';
+  if(path==='contact_info.contact_name')label.firstChild.textContent=state.options.contact==='SUPER'?'超级管理员姓名':'法人/经营者姓名';
+  if(path==='contact_info.mobile_phone')label.firstChild.textContent=state.options.contact==='SUPER'?'超级管理员手机':'法人/经营者联系电话';
+  if(path==='contact_info.contact_email')label.firstChild.textContent=state.options.contact==='SUPER'?'超级管理员邮箱':'法人/经营者邮箱';
  }
- return {...original,id:mode==='core'?'admission-contact-core':'admission-contact-super',title:mode==='core'?'法人/经营者联系资料':'经办人补充资料',stage:mode==='core'?'admission-start':'admission-business',html:tpl.innerHTML};
+ return {...original,id:mode==='core'?'admission-contact-core':'admission-contact-super',title:mode==='core'?(state.options.contact==='SUPER'?'超级管理员资料':'法人/经营者联系资料'):'经办人证件与授权资料',stage:mode==='core'?'admission-start':'admission-business',html:tpl.innerHTML};
 }
 const stageIds=['admission-start','admission-business','admission-settlement','admission-result'];
 const miniPages={'consumer-orders':{id:'consumer-orders',role:'consumer',title:'我的订单',html:''},'consumer-profile':{id:'consumer-profile',role:'consumer',title:'我的',html:''},'consumer-recommendations':{id:'consumer-recommendations',role:'consumer',title:'平台推荐店铺',html:''}};const communityPages={'community-merchants':{id:'community-merchants',role:'community',title:'社区商家成员',html:''},'community-orders':{id:'community-orders',role:'community',title:'社区归属订单',html:''},'community-splits':{id:'community-splits',role:'community',title:'分账快照',html:''},'community-refunds':{id:'community-refunds',role:'community',title:'退款观察',html:''}};const platformOrders={id:'platform-orders',role:'platform',title:'订单管理',html:''};const pagesFor=role=>role==='admission'?stageIds.map(id=>data.pages.find(p=>p.id===id)):role==='consumer'?[data.pages.find(p=>p.role==='consumer'&&p.id==='consumer-stores'),miniPages['consumer-orders'],miniPages['consumer-profile']].filter(Boolean):role==='platform'?[platformOrders,...data.pages.filter(p=>p.role===role&&applicable(p))]:role==='community'?[...data.pages.filter(p=>p.role===role&&applicable(p)),...Object.values(communityPages)]:data.pages.filter(p=>p.role===role&&applicable(p)&&!(role==='merchant'&&p.id==='merchant-native-catalog'));
