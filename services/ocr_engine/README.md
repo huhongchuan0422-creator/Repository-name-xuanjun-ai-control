@@ -43,5 +43,12 @@ RapidOCR v3.9.2 source LICENSE and the fixed model-specific notice at https://gi
 3. Deployment-specific key custody/rotation, backup, retention/deletion, monitoring and load/rate/timeout settings.
 4. Production deployment is not authorized by this document or a green Hosted run.
 
-## Integration contract gaps — HOLD
-The current attachment callback signature is `(principal, onboarding_application_id, attachment_id, content_sha256) -> {authorized: bool, content_sha256: str}`. It binds the bytes to a server-resolved original object hash, but does not yet bind `document_type` or an application revision/version. The current application callback returns only a boolean and does not pin a revision. Until those fields are added to durable job metadata and rechecked on GET/confirm/delete, replacement/revision-race protection is **HOLD**. The community integration owner must provide the actual trusted resolver and revision contract; this OCR branch must not invent or impersonate it.
+## Trusted source binding contract — production HOLD
+The required resolver signature is `authorize_attachment(principal, application_id, attachment_id, content_sha256, document_type, expected_application_revision=None) -> {authorized, content_sha256, document_type, application_revision}`.
+- On new submission, `expected_application_revision=None`; the resolver must query the owning service for the authoritative current revision. Never accept a revision supplied by the client.
+- The response must prove `authorized is true`, and return the exact submitted content SHA, exact requested supported document type, and a non-empty authoritative application revision.
+- `SecureSQLiteJobStore` persists attachment ID, document type, application revision and content SHA inside the encrypted job and binds all four into the durable idempotency fingerprint. Same key with a changed tuple conflicts.
+- On GET/confirm/DELETE, the stored revision and document type are passed back to the resolver. Current authorization, content SHA, document type and application revision must all match. Missing legacy revision/binding metadata fails closed; no default revision is inferred.
+- The `application_revision` returned by this resolver is the source application's version, distinct from `confirmation_revision`, which versions the user's reviewed fields.
+- The OCR tests use synthetic resolvers with a pre-registered synthetic-image SHA and mutable synthetic revision. These are test fixtures only, not production identity or ownership proofs.
+- The community integration owner must supply the actual trusted token verifier, application authorization and attachment resolver. Until then, production remains **HOLD**; no identity mapping or `ocr:use` permission is fabricated.
