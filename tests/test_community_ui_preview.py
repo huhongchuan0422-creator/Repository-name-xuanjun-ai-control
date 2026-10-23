@@ -237,6 +237,7 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
             expect(page.locator('#view h1').first).to_have_text('办理人与经营场景')
             page.locator('[data-option="contact"]').select_option('SUPER')
+            page.locator('.admission-data-card').filter(has_text='经营场景').locator('summary').click()
             page.locator('[data-option="scene"]').select_option('both')
             page.get_by_role('link',name='保存草稿并下一步',exact=True).click()
             page.get_by_role('link',name='上一步',exact=True).click()
@@ -411,6 +412,7 @@ class ClickThrough(unittest.TestCase):
             if operator_doc.count():
                 operator_doc.select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
                 expect(page.locator('input[data-material-kind="operator_identity_back"]')).to_have_count(0)
+            page.locator('.admission-data-card').filter(has_text='经营场景').locator('summary').click()
             page.locator('[data-option="scene"]').select_option('both')
             expect(page.locator('input[data-material-kind="storefront_photo"]')).to_be_visible()
             expect(page.locator('input[data-material-kind="interior_photo"]')).to_be_visible()
