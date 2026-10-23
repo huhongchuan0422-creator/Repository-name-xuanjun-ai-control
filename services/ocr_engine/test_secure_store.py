@@ -54,11 +54,11 @@ class SecureStoreTests(unittest.TestCase):
         job=self.create()
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review")
-        self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human verified text"})
+        self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human verified text"},"confirm-key-original-01")
         with self.assertRaisesRegex(ValueError,"OCR_CONFIRMED_IMMUTABLE"):
             self.store.update(job["job_id"],status="needs_review")
         with self.assertRaisesRegex(ValueError,"STALE_CONFIRMATION_REVISION"):
-            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"})
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-overwrite-01")
         self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human verified text")
     def test_confirmation_idempotency_and_encrypted_audit(self):
         job=self.create()
