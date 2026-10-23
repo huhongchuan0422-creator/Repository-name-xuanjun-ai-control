@@ -50,7 +50,7 @@ class ClickThrough(unittest.TestCase):
         self.metrics.append(dict(page=name,**m))
         page.screenshot(path=str(self.out/(str(width)+'-'+name+'.png')),full_page=True)
     def test_every_module_three_viewports_click_return_refresh(self):
-        for width,height in ((1440,1000),(390,844),(320,740)):
+        for width,height in ((1440,1000),(430,932),(390,844),(320,740)):
             context=self.browser.new_context(viewport={'width':width,'height':height})
             page=context.new_page();page.set_default_timeout(5000);requests=[];errors=[]
             page.on('request',lambda r:requests.append((r.method,r.url)))
@@ -95,7 +95,7 @@ class ClickThrough(unittest.TestCase):
                         target='#/'+role+'/'+module['id']+('/edit' if role=='admission' else '/list')
                         if role=='community' and module['id']=='community-4-0-0':
                             # Two cards share this destination; choose the visible order-observation action by its user-facing label.
-                            entry=page.get_by_role('link',name='打开订单观察',exact=True)
+                            entry=page.get_by_role('link',name='查看社区订单',exact=True)
                             expect(entry).to_be_visible()
                             entry.click()
                             expect(page.locator('#view h1').first).to_have_text('订单、分账与退款观察')
@@ -299,7 +299,7 @@ class ClickThrough(unittest.TestCase):
             expect(page).to_have_url(__import__('re').compile(r'#/merchant/merchant-native-orders/list$'))
             expect(page.locator('.mini-tabbar a')).to_have_count(4)
             page.get_by_label('查看身份',exact=True).select_option('community')
-            for title in ('社区运营总览','已入驻商家','社区订单','分账明细','退款'):
+            for title in ('社区运营总览','社区商家成员','社区订单','分账明细','退款'):
                 expect(page.locator('#view')).to_contain_text(title)
             expect(page.locator('#view')).to_contain_text('未就绪')
             page.screenshot(path=str(self.out/'role-community-phone.png'),full_page=True)
@@ -347,7 +347,7 @@ class ClickThrough(unittest.TestCase):
                 page.get_by_label('查看终端',exact=True).select_option('phone')
                 self.assert_layout(page,width,'role-platform-phone-'+str(width))
                 cards=page.locator('.platform-dashboard .dashboard-card.is-unready')
-                self.assertGreaterEqual(cards.count(),5)
+                self.assertEqual({cards.nth(i).locator('b').inner_text() for i in range(cards.count())},{'支付管理','退款管理','分账明细','对账管理'})
                 for i in range(cards.count()):
                     card=cards.nth(i)
                     badge=card.locator('.not-ready')
@@ -494,7 +494,7 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='返回平台推荐列表',exact=True).click()
             expect(page.locator('#view')).to_contain_text('平台推荐店铺')
             page.get_by_role('link',name='我的',exact=True).click()
-            page.get_by_role('link',name='推荐关系',exact=True).click()
+            page.locator('a[href="#/consumer/consumer-referrals/list"]').click()
             expect(page.locator('#view')).to_contain_text('绑定推荐人')
             expect(page.locator('#view')).to_contain_text('推荐人关系')
         finally:
@@ -571,7 +571,7 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='查看社区商家成员',exact=True).click()
             expect(page.locator('#view h1').first).to_have_text('社区商家成员')
             expect(page.locator('#view')).to_contain_text('kind=MERCHANT')
-            expect(page.locator('#view')).to_contain_text('非微信进件列表')
+            expect(page.locator('#view')).to_contain_text('这不是微信进件列表')
             page.get_by_role('link',name='查看成员详情',exact=True).click()
             expect(page.locator('#view')).to_contain_text('社区商家成员详情')
             page.get_by_role('link',name='返回社区商家成员列表',exact=True).click()
@@ -656,15 +656,18 @@ class ClickThrough(unittest.TestCase):
         try:
             page.goto(self.url+'#/admission/admission-start/edit')
             subject=page.locator('.admission-data-card').filter(has_text='经营主体').first
-            subject.locator('summary').click()
+            if await subject.get_attribute('open') is None:
+                await subject.locator('summary').click()
             subject.locator('input[data-path="subject_info.business_license_info.license_number"]').fill('DEMO-123')
             identity=page.locator('.admission-data-card').filter(has_text='法人身份证').first
-            identity.locator('summary').click()
+            if await identity.get_attribute('open') is None:
+                await identity.locator('summary').click()
             page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
             expect(identity).to_have_attribute('open','')
             expect(page.locator('[data-path="subject_info.business_license_info.license_number"]')).to_have_value('DEMO-123')
             scene=page.locator('.admission-data-card').filter(has_text='经营场景').first
-            scene.locator('summary').click()
+            if await scene.get_attribute('open') is None:
+                await scene.locator('summary').click()
             page.locator('[data-option="scene"]').select_option('both')
             expect(scene).to_have_attribute('open','')
             expect(page.locator('[data-option="scene"]')).to_be_focused()
