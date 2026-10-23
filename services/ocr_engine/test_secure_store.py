@@ -45,6 +45,8 @@ class SecureStoreTests(unittest.TestCase):
     def test_crash_recovery_and_no_automatic_replay(self):
         job=self.create(); self.assertTrue(self.store.claim(job["job_id"]))
         reboot=SecureSQLiteJobStore(self.path,self.key)
+        self.assertEqual(reboot.get(job["job_id"],"tenant-a")["status"],"processing")
+        reboot.recover_interrupted()
         self.assertEqual(reboot.get(job["job_id"],"tenant-a")["status"],"failed")
         self.assertEqual(reboot.get(job["job_id"],"tenant-a")["error_code"],"OCR_INTERRUPTED")
         self.assertFalse(reboot.claim(job["job_id"]))
