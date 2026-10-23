@@ -168,14 +168,20 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         # A trusted attachment resolver must compare the submitted bytes with the authorized
         # server-side object. A boolean "ID is allowed" callback is insufficient.
         try:
-            binding = (authorize_attachment(p, onboarding_application_id, attachment_id, digest)
+            binding = (authorize_attachment(p, onboarding_application_id, attachment_id, digest, document_type, None)
                        if authorize_attachment is not None and attachment_id.strip() else None)
         except Exception:
             binding = None
-        if not isinstance(binding, dict) or binding.get("authorized") is not True or binding.get("content_sha256") != digest:
+        if (not isinstance(binding, dict) or binding.get("authorized") is not True or
+                binding.get("content_sha256") != digest or binding.get("document_type") != document_type or
+                not isinstance(binding.get("application_revision"), (str, int)) or
+                isinstance(binding.get("application_revision"), bool) or str(binding.get("application_revision")).strip() == ""):
             raise HTTPException(status_code=403, detail="ATTACHMENT_CONTENT_BINDING_UNVERIFIED")
+        application_revision = str(binding["application_revision"])
+        if not isinstance(jobs, SecureSQLiteJobStore):
+            raise HTTPException(status_code=501, detail="OCR_REQUIRES_SECURE_DURABLE_STORE")
         try:
-            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id) if isinstance(jobs, SecureSQLiteJobStore) else jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
+            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id, application_revision)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         if job["document_type"] != document_type:
@@ -199,13 +205,20 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
     def reauthorize_existing_job(p: Principal, job: dict) -> None:
         if authorize_application is None or not authorize_application(p, job["onboarding_application_id"]):
             raise HTTPException(status_code=403, detail="APPLICATION_AUTHORIZATION_REVOKED")
+        # Old records without a trusted application revision fail closed; never invent revision 0.
+        expected_revision = job.get("application_revision")
+        if not expected_revision or not job.get("attachment_id") or not job.get("document_type"):
+            raise HTTPException(status_code=403, detail="ATTACHMENT_BINDING_METADATA_MISSING")
         try:
-            binding = (authorize_attachment(p, job["onboarding_application_id"], job.get("attachment_id", ""),
-                                            job["document_sha256"])
+            binding = (authorize_attachment(p, job["onboarding_application_id"], job["attachment_id"],
+                                            job["document_sha256"], job["document_type"], expected_revision)
                        if authorize_attachment is not None else None)
         except Exception:
             binding = None
-        if not isinstance(binding, dict) or binding.get("authorized") is not True or binding.get("content_sha256") != job["document_sha256"]:
+        if (not isinstance(binding, dict) or binding.get("authorized") is not True or
+                binding.get("content_sha256") != job["document_sha256"] or
+                binding.get("document_type") != job["document_type"] or
+                str(binding.get("application_revision", "")) != str(expected_revision)):
             raise HTTPException(status_code=403, detail="ATTACHMENT_AUTHORIZATION_REVOKED")
 
     @app.get("/api/v1/ocr/jobs/{job_id}")
