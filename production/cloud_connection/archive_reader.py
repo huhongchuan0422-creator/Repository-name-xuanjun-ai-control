@@ -18,7 +18,7 @@ def validate_archive(plan):
     check(type(ident) is list and len(ident) == 9 and all(type(x) is int and x >= 0 for x in ident)
           and stat.S_ISREG(ident[2]) and not ident[2] & 0o022 and ident[5] == 1
           and 1024 <= ident[6] <= 600 * 1024 * 1024, 'ARCHIVE_IDENTITY')
-    check(plan['member_prefix'] in ('', './') and type(plan['member_prefix']) is str, 'ARCHIVE_PREFIX')
+    check(plan['member_prefix'] in ('', './', 'home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/') and type(plan['member_prefix']) is str, 'ARCHIVE_PREFIX')
     check(type(plan['max_headers']) is int and 0 < plan['max_headers'] <= 65536
           and type(plan['max_read_bytes']) is int and 1024 <= plan['max_read_bytes'] <= 32 * 1024 * 1024, 'ARCHIVE_BUDGET')
 
@@ -57,7 +57,7 @@ def _read_archive(root, owner, items, plan, verify_whole):
           and all(type(x['bytes']) is int and 0 <= x['bytes'] <= 53969 for x in items)
           and sum(x['bytes'] for x in items) <= 93592, 'ARCHIVE_MEMBER_BOUND')
     wanted = {plan['member_prefix'] + x['relative_path']: x for x in items}
-    paths = {x['relative_path'] for x in items}
+    paths = {name[2:] if name.startswith('./') else name for name in wanted}
     rootfd = directory(root, owner)
     fd = None
     try:
@@ -100,7 +100,7 @@ def _read_archive(root, owner, items, plan, verify_whole):
                 check(key not in seen, 'ARCHIVE_DUPLICATE_NAME')
                 seen.add(key)
                 if key in paths:
-                    check(name == plan['member_prefix'] + key, 'ARCHIVE_MEMBER_ALIAS')
+                    check(name in wanted, 'ARCHIVE_MEMBER_ALIAS')
                 if name not in wanted: continue
                 item = wanted[name]
                 check(item['ref'] not in selected, 'ARCHIVE_DUPLICATE_MEMBER')

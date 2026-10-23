@@ -75,7 +75,7 @@ class CustodyTests(original.ApprovedObjectTests):
             with self.assertRaises(Hold):ingest_approved_batch(self.q.db,self.policy,self.dest,self.owner,NOW,True,lambda:next(ticks))
             accept.assert_not_called()
         self.assertEqual(list(Path(self.dest).iterdir()),[])
-    def prepare_five(self):
+    def prepare_five(self, prefix=''):
         from production.cloud_connection.queue import canonical
         from production.cloud_connection.worker import execute_ready, HOSTS
         archive=Path(self.root,'group.tar');self.group_data={};items=[]
@@ -83,12 +83,12 @@ class CustodyTests(original.ApprovedObjectTests):
             for n in range(5):
                 ref='fixture-object-%d'%n;data=('inert member %d'%n).encode();self.group_data[ref]=data
                 item=dict(ref=ref,root_ref='fixture-root',relative_path='dist/member%d.mjs'%n,bytes=len(data),sha256=hashlib.sha256(data).hexdigest());items.append(item)
-                info=tarfile.TarInfo(item['relative_path']);info.size=len(data);tar.addfile(info,io.BytesIO(data))
+                info=tarfile.TarInfo(prefix+item['relative_path']);info.size=len(data);tar.addfile(info,io.BytesIO(data))
         os.chmod(str(archive),0o600)
         self.binding['catalog']['objects']=items
         self.binding['catalog_sha256']=hashlib.sha256(canonical(self.binding['catalog']).encode()).hexdigest()
         self.binding['requests']={x['ref']:'fixture-request-%d'%n for n,x in enumerate(items)}
-        self.binding['archives']={'fixture-root':dict(filename='group.tar',identity=list(stamp(archive.stat())),member_prefix='',max_headers=100,max_read_bytes=1048576,sha256=hashlib.sha256(archive.read_bytes()).hexdigest())}
+        self.binding['archives']={'fixture-root':dict(filename='group.tar',identity=list(stamp(archive.stat())),member_prefix=prefix,max_headers=100,max_read_bytes=1048576,sha256=hashlib.sha256(archive.read_bytes()).hexdigest())}
         self.binding['archive_reader_sha256']=hashlib.sha256(Path('production/cloud_connection/archive_reader.py').read_bytes()).hexdigest()
         self.policy=self.make_policy();self.q.approved_objects=self.policy
         real_pread=os.pread;full=[]
@@ -109,6 +109,16 @@ class CustodyTests(original.ApprovedObjectTests):
             query_existing(self.q,Cloud(),request['request_id'],lambda *a:self.fail('sink'))
         self.assertEqual(full,[]) # member proof never claims an entire archive hash
         return archive,observe,full
+    def test_original_snapshot_prefix_full_five_member_chain(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        archive,observe,full=self.prepare_five(prefix)
+        with patch('os.pread',side_effect=observe):result=self.ingest()
+        self.assertEqual(len(full),1);self.assertEqual(result['objects'],5)
+        self.q.db.execute('PRAGMA query_only=ON')
+        for n in range(5):
+            ref='fixture-object-%d'%n
+            out=read_received_chunk(self.q.db,self.policy.catalog,self.dest,self.owner,'fixture-request-%d'%n,ref,'fixture-reader',0,NOW,True)
+            self.assertEqual(base64.b64decode(out['data']),self.group_data[ref])
     def test_five_group_one_full_hash_and_exact_delivery(self):
         archive,observe,full=self.prepare_five()
         with patch('os.pread',side_effect=observe):result=self.ingest()
@@ -268,6 +278,22 @@ class ArchiveTests(unittest.TestCase):
     def read(self, plan): return read_archive_member(self.root,self.owner,self.item,plan)
     def test_exact_member(self): self.assertEqual(self.read(self.archive()),self.raw)
     def test_exact_dot_prefix(self): self.assertEqual(self.read(self.archive(prefix='./')),self.raw)
+    def test_original_snapshot_prefix(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        self.assertEqual(self.read(self.archive(prefix=prefix)),self.raw)
+    def test_original_prefix_alias_or_duplicate_rejected(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        target=prefix+'dist/fixed.mjs'
+        for names in [['./'+target],[target,'./'+target],[target,target]]:
+            with self.subTest(names=names),self.assertRaises(Hold):self.read(self.archive(names=names,prefix=prefix))
+    def test_original_prefix_links_rejected(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        for kind in [tarfile.SYMTYPE,tarfile.LNKTYPE]:
+            with self.subTest(kind=kind),self.assertRaises(Hold):self.read(self.archive(prefix=prefix,kind=kind))
+    def test_other_prefixes_not_enrolled(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        for wrong in ['/'+prefix,'./'+prefix,prefix+'../',prefix.replace('xuanjun_dev','other'),prefix.replace('v24.21.0','v24.22.0')]:
+            with self.subTest(prefix=wrong),self.assertRaises(Hold):self.read(self.archive(prefix=wrong))
     def test_duplicate_or_alias_or_traversal(self):
         for names in [['dist/fixed.mjs','dist/fixed.mjs'],['./dist/fixed.mjs'],['../bad','dist/fixed.mjs']]:
             with self.subTest(names=names),self.assertRaises(Hold): self.read(self.archive(names))

@@ -106,8 +106,8 @@
     {
       "path": "production/cloud_connection/archive_reader.py",
       "mode": "0644",
-      "bytes": 7707,
-      "sha256": "184180a9030d6557380408e8f575d61ea429e3aa6f7038cde744f16aca467f1b"
+      "bytes": 7792,
+      "sha256": "b60bb808a81be479b686d6a40fc195a51a88f23963b80339568004798cc748ba"
     },
     {
       "bytes": 6064,
