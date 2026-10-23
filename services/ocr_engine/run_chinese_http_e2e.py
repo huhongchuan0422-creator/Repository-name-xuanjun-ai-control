@@ -38,11 +38,12 @@ def main():
         store = SecureSQLiteJobStore(db, key)
         principal = Principal(subject="synthetic-user", tenant_id="synthetic-tenant", permissions={"ocr:use"})
         app = create_app(authenticate=lambda token: principal if token == "synthetic-token" else (_ for _ in ()).throw(ValueError("bad token")),
-                         store=store, authorize_application=lambda p, application_id: application_id == "synthetic-app")
+                         store=store, authorize_application=lambda p, application_id: application_id == "synthetic-app",
+                         authorize_attachment=lambda p, application_id, attachment_id: attachment_id == "synthetic-attachment")
         client = TestClient(app)
         headers = {"Authorization":"Bearer synthetic-token", "Idempotency-Key":"chinese-e2e-submit-0001"}
         response = client.post("/api/v1/ocr/jobs", headers=headers,
-            data={"document_type":"business_license", "onboarding_application_id":"synthetic-app"},
+            data={"document_type":"business_license", "onboarding_application_id":"synthetic-app", "attachment_id":"synthetic-attachment"},
             files={"file":("synthetic-license.png", img, "image/png")})
         if response.status_code != 202:
             raise SystemExit("HTTP_SUBMIT_FAILED:" + str(response.status_code) + ":" + response.text)
