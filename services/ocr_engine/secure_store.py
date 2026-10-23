@@ -123,13 +123,13 @@ class SecureSQLiteJobStore:
             return changed == 1
 
     def create(self, tenant_id: str, subject: str, onboarding_id: str,
-               doc_type: str, digest: str, idempotency_key: str = "") -> dict:
+               doc_type: str, digest: str, idempotency_key: str = "", attachment_id: str = "") -> dict:
         if not idempotency_key:
             raise ValueError("OCR_IDEMPOTENCY_REQUIRED")
         tenant_key = self._index(tenant_id)
         subject_key = self._index(tenant_id + "/" + subject)
         idem_key = self._index(tenant_id + "/" + idempotency_key)
-        payload_hash = self._index("/".join((tenant_id, subject, onboarding_id, doc_type, digest)))
+        payload_hash = self._index("/".join((tenant_id, subject, onboarding_id, attachment_id, doc_type, digest)))
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT payload_hash, ciphertext FROM ocr_jobs WHERE tenant_key=? AND idem_key=?",
@@ -142,7 +142,7 @@ class SecureSQLiteJobStore:
                 db.execute("COMMIT")
                 return payload
             job = {"job_id": str(uuid.uuid4()), "tenant_id": tenant_id, "subject": subject,
-                   "onboarding_application_id": onboarding_id, "document_type": doc_type,
+                   "onboarding_application_id": onboarding_id, "attachment_id": attachment_id, "document_type": doc_type,
                    "document_sha256": digest, "status": "queued", "fields": {},
                    "requires_human_confirmation": True, "authenticity_verified": False,
                    "contract_version": "1.0.0"}
