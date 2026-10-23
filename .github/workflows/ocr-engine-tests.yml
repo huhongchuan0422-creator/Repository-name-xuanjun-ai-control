@@ -42,6 +42,12 @@ jobs:
           echo "OCR_REC_MODEL_PATH=$d/rec.onnx" >> "$GITHUB_ENV"
           echo "OCR_CLS_MODEL_PATH=$d/cls.onnx" >> "$GITHUB_ENV"
           echo "OCR_MODEL_SHA256={\"det\":\"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f\",\"rec\":\"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884\",\"cls\":\"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c\"}" >> "$GITHUB_ENV"
+      - name: Install CJK font on GitHub-hosted runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Execute Chinese synthetic image to HTTP and encrypted SQLite end-to-end
+        run: python -m services.ocr_engine.run_chinese_http_e2e
       - name: Execute real local OCR inference on generated synthetic image
         run: python -m services.ocr_engine.run_synthetic_inference
       - name: Run parser and input-guard tests
