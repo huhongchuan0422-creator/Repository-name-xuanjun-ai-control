@@ -125,7 +125,7 @@ class ClickThrough(unittest.TestCase):
                             page.locator('.edit-preview').click()
                         expect(page).to_have_url(__import__('re').compile('/edit$'))
                         self.assert_layout(page,width,module['id']+'-edit')
-                        page.reload();expect(page.locator('#view h1').first).to_have_text(module['title'])
+                        page.reload();expect(page.locator('#view h1').first).to_have_text('申请资料核对' if module['id']=='admission-result' else module['title'])
                         page.locator('#demo-save').click()
                         if role!='admission':
                             expect(page).to_have_url(__import__('re').compile('/list$'))
@@ -318,7 +318,14 @@ class ClickThrough(unittest.TestCase):
             page.get_by_label('查看身份',exact=True).select_option('platform')
             for title in ('订单与交易','入驻与商家','用户与社区','权限、通知与日志'):
                 expect(page.locator('#view')).to_contain_text(title)
-            expect(page.locator('#view')).to_contain_text('原模块入口当前预览未就绪')
+            unready=page.locator('.platform-dashboard .dashboard-card.is-unready')
+            self.assertEqual({unready.nth(i).locator('b').inner_text() for i in range(unready.count())},{'支付管理','退款管理','分账明细','对账管理'})
+            for i in range(unready.count()):
+                expect(unready.nth(i).locator('.not-ready')).to_have_text('未就绪')
+            ready=page.locator('.platform-dashboard .dashboard-card:not(.is-unready) b')
+            self.assertEqual({ready.nth(i).inner_text() for i in range(ready.count())},{'订单管理','商家入驻审核','平台审核','平台商家管理','用户管理','社区管理','社区分账接收关系','平台运营查询','权限配置','通知与日志'})
+            for title in ('用户管理','社区管理','商家入驻审核','平台审核','权限配置','通知与日志'):
+                expect(page.locator('.platform-dashboard .dashboard-card:not(.is-unready)').filter(has_text=title).first).to_be_visible()
             page.screenshot(path=str(self.out/'role-platform-phone.png'),full_page=True)
             page.get_by_role('link',name='进入订单管理',exact=True).click()
             expect(page.locator('#view h1').first).to_have_text('订单管理')
@@ -588,10 +595,14 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='查看快照详情',exact=True).click()
             expect(page.locator('#view')).to_contain_text('不等于消费者退款')
             page.goto(self.url+'#/community/community-refunds/list')
-            expect(page.locator('#view')).to_contain_text('不存在独立社区退款API')
+            expect(page.locator('#view')).to_contain_text('社区角色没有独立退款API。本页只说明可复用原订单REFUNDED状态/汇总字段；示例不是实际退款记录，不提供退款操作。')
             self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
             page.get_by_role('link',name='查看退款状态说明',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('不存在独立社区退款API；真实退款详情未接入')
+            expect(page.locator('#view')).to_contain_text('REFUNDED（仅示例字段投影）')
             expect(page.locator('#view')).to_contain_text('只读投影')
+            page.get_by_role('link',name='返回退款观察',exact=True).click()
+            expect(page.locator('#view h1').first).to_have_text('退款观察')
             self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
         finally:
             page.close()
