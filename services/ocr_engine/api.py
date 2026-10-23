@@ -189,15 +189,20 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "document_sha256", "confirmed_fields", "confirmation_revision"}}
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
-    def confirm(job_id: str, body: Confirmation, authorization: Optional[str] = Header(None)):
+    def confirm(job_id: str, body: Confirmation, idempotency_key: str = Header(..., alias="Idempotency-Key"), authorization: Optional[str] = Header(None)):
         p = principal(authorization)
         existing = jobs.get(job_id, p.tenant_id)
         if not existing or (existing["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         if existing["status"] not in {"needs_review", "confirmed"}:
             raise HTTPException(status_code=409, detail="JOB_NOT_READY_FOR_CONFIRMATION")
+        if not (16 <= len(idempotency_key) <= 128):
+            raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
         try:
-            job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields)
+            if isinstance(jobs, SecureSQLiteJobStore):
+                job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields, idempotency_key)
+            else:
+                job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         if not job:
