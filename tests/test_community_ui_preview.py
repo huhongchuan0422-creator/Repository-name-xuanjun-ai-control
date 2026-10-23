@@ -593,4 +593,23 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+
+    def test_platform_read_only_assets_are_linked_without_granting_write_actions(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/platform/home')
+            page.get_by_role('link',name='用户管理',exact=False).click()
+            expect(page.locator('#view h1').first).to_have_text('平台运营查询')
+            page.goto(self.url+'#/platform/home')
+            page.get_by_role('link',name='社区管理',exact=False).click()
+            expect(page.locator('#view h1').first).to_have_text('平台审核')
+            page.goto(self.url+'#/platform/home')
+            expect(page.locator('#view')).to_contain_text('缺少本角色可验证的数据绑定/权限来源')
+            expect(page.locator('#view')).to_contain_text('支付管理')
+            expect(page.locator('#view')).to_contain_text('退款管理')
+            self.assertEqual(page.get_by_role('button',name='退款',exact=True).count(),0)
+        finally:
+            page.close()
+
+
 if __name__=='__main__':unittest.main()
