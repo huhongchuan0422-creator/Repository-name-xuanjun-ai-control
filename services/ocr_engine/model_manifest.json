@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "engine": {
+    "name": "RapidOCR",
+    "version": "3.10.0",
+    "source": "https://github.com/RapidAI/RapidOCR",
+    "source_license": "Apache-2.0",
+    "source_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/main/LICENSE"
+  },
+  "model_set": {
+    "name": "RapidAI/RapidOCR PP-OCRv6 small ONNX + PP-OCRv4 textline orientation classifier",
+    "source_revision": "v3.9.2",
+    "source_manifest": "https://github.com/RapidAI/RapidOCR/blob/main/python/rapidocr/default_models.yaml",
+    "model_license_notes": "The RapidOCR upstream README and MODEL_LICENSES.md describe the applicable upstream weights as Apache-2.0; retain upstream notices and verify exact version-specific MODEL_LICENSES.md before redistribution.",
+    "model_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/main/MODEL_LICENSES.md",
+    "files": {
+      "det": {
+        "filename": "PP-OCRv6_det_small.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx",
+        "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+      },
+      "rec": {
+        "filename": "PP-OCRv6_rec_small.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx",
+        "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+      },
+      "cls": {
+        "filename": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+      }
+    }
+  },
+  "verification": {
+    "source_hashes_published_upstream": true,
+    "bytes_downloaded_and_rehashed_in_this_environment": false,
+    "actual_inference_verified": false,
+    "blocker": "The current execution container has no DNS/network access; pip installation and model retrieval failed. Do not mark OCR inference passed until hashes are recomputed from downloaded bytes and a synthetic image runs offline."
+  }
+}
