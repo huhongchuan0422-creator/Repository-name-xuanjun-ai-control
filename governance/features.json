@@ -103,6 +103,40 @@
         "scripts/p2_uk_readonly_diagnostic.py",
         "tests/test_p2_uk_readonly_diagnostic.py"
       ]
+    },
+    {
+      "feature_id": "XUANJUN_OCR_LOCAL_DOCUMENT_EXTRACTION",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/XUANJUN_SELF_HOSTED_OCR_ARCHITECTURE_V1_20261024.md",
+        "section": "1. 决策与边界"
+      },
+      "development": {
+        "document": "docs/development/XUANJUN_SELF_HOSTED_OCR_ARCHITECTURE_V1_20261024.md",
+        "section": "7. 实施顺序与唯一 Writer",
+        "phase": 3
+      },
+      "acceptance": {
+        "criteria": [
+          "New OCR executable and test source paths are explicitly registered in feature governance",
+          "Local inference requires pinned RapidOCR and ONNX Runtime dependencies and pre-staged model assets; no runtime download",
+          "Unsupported document types fail explicitly and all returned fields require human confirmation",
+          "Image guards, parser tests and offline inference tests distinguish mocked parser tests from actual model execution",
+          "No authenticity claim, customer document upload, paid API use or production deployment"
+        ],
+        "tests": [
+          "tests/test_ocr_core.py"
+        ]
+      },
+      "reuse": [
+        "RapidOCR upstream https://github.com/RapidAI/RapidOCR",
+        "Existing community onboarding fields and Issue #76 ownership boundary",
+        "Standard-library unittest and existing feature compliance gate"
+      ],
+      "paths": [
+        "services/ocr_engine/*.py",
+        "tests/test_ocr_core.py"
+      ]
     }
   ]
 }
