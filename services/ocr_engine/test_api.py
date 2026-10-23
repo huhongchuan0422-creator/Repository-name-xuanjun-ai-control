@@ -2,7 +2,10 @@
 import io
 import unittest
 from fastapi.testclient import TestClient
-from .api import create_app, Principal, JobStore
+try:
+    from .api import create_app, Principal, JobStore
+except ImportError:
+    from api import create_app, Principal, JobStore
 
 TOKEN_TENANTS = {
     "tenant-a-token": Principal(subject="user-a", tenant_id="tenant-a", permissions={"ocr:use"}),
