@@ -656,17 +656,17 @@ class ClickThrough(unittest.TestCase):
         try:
             page.goto(self.url+'#/admission/admission-start/edit')
             subject=page.locator('.admission-data-card').filter(has_text='经营主体').first
-            if await subject.get_attribute('open') is None:
+            if subject.get_attribute('open') is None:
                 await subject.locator('summary').click()
             subject.locator('input[data-path="subject_info.business_license_info.license_number"]').fill('DEMO-123')
             identity=page.locator('.admission-data-card').filter(has_text='法人身份证').first
-            if await identity.get_attribute('open') is None:
+            if identity.get_attribute('open') is None:
                 await identity.locator('summary').click()
             page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
             expect(identity).to_have_attribute('open','')
             expect(page.locator('[data-path="subject_info.business_license_info.license_number"]')).to_have_value('DEMO-123')
             scene=page.locator('.admission-data-card').filter(has_text='经营场景').first
-            if await scene.get_attribute('open') is None:
+            if scene.get_attribute('open') is None:
                 await scene.locator('summary').click()
             page.locator('[data-option="scene"]').select_option('both')
             expect(scene).to_have_attribute('open','')
