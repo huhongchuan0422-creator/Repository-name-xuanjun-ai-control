@@ -55,10 +55,13 @@ class SecureSQLiteJobStore:
                 tenant_key TEXT NOT NULL, window_start INTEGER NOT NULL, hits INTEGER NOT NULL,
                 PRIMARY KEY(tenant_key, window_start))""")
             db.execute("""CREATE TABLE IF NOT EXISTS ocr_audit(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, job_key TEXT NOT NULL,
+                event TEXT NOT NULL, time_unix INTEGER NOT NULL DEFAULT (unixepoch()))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS ocr_audit_details(
                 audit_id TEXT PRIMARY KEY, tenant_key TEXT NOT NULL, job_id TEXT NOT NULL,
                 event_type TEXT NOT NULL, event_ciphertext BLOB NOT NULL,
                 created_unix INTEGER NOT NULL DEFAULT (unixepoch()))""")
-            db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_audit_job ON ocr_audit(tenant_key, job_id)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_audit_job ON ocr_audit_details(tenant_key, job_id)")
             db.execute("CREATE TABLE IF NOT EXISTS ocr_key_check(check_value TEXT NOT NULL)")
             expected = self._index("encryption-key-check-v1")
             row = db.execute("SELECT check_value FROM ocr_key_check LIMIT 1").fetchone()
@@ -240,14 +243,15 @@ class SecureSQLiteJobStore:
                        (tenant_key, job_id, idem_key, payload_hash, self._seal(response)))
             audit = {"event": "USER_CONFIRMATION", "job_id": job_id, "revision": revision,
                      "fields": dict(fields), "subject_key": job.get("subject")}
-            db.execute("INSERT INTO ocr_audit(audit_id,tenant_key,job_id,event_type,event_ciphertext) VALUES(?,?,?,?,?)",
+            db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job_id), "confirmed"))
+            db.execute("INSERT INTO ocr_audit_details(audit_id,tenant_key,job_id,event_type,event_ciphertext) VALUES(?,?,?,?,?)",
                        (str(uuid.uuid4()), tenant_key, job_id, "USER_CONFIRMATION", self._seal(audit)))
             db.execute("COMMIT")
             return job
 
     def audit_events(self, job_id: str, tenant_id: str) -> list[dict]:
         with self._connect() as db:
-            rows = db.execute("SELECT event_ciphertext FROM ocr_audit WHERE job_id=? AND tenant_key=? ORDER BY created_unix,audit_id",
+            rows = db.execute("SELECT event_ciphertext FROM ocr_audit_details WHERE job_id=? AND tenant_key=? ORDER BY created_unix,audit_id",
                               (job_id, self._index(tenant_id))).fetchall()
         return [self._open(row["event_ciphertext"]) for row in rows]
 
