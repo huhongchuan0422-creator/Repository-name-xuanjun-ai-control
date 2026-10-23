@@ -880,4 +880,71 @@ class ClickThrough(unittest.TestCase):
         self.assertNotIn("复用",source)
         self.assertIn("未提交 / 未核验",source)
 
+
+    def test_exact_66_design_routes_phone_pc_render_and_entry_mapping(self):
+        """New renders, exact URL/mode/conditions and screenshot hashes, not page counts."""
+        import re,hashlib,subprocess
+        gallery=(BASE/'ui-preview/route-gallery.html').read_text()
+        main=json.loads(re.search(r'const mainRoutes=(.*?);',gallery).group(1))
+        sub=json.loads(re.search(r'const subRoutes=(.*?);',gallery).group(1))
+        routes=[dict(role=r,id=i,mode='edit' if r=='admission' else 'list',kind='main') for r,i,_ in main]
+        routes += [dict(role=r,id=i,mode=m,kind='sub') for r,i,m in sub]
+        self.assertEqual((len(main),len(sub)),(34,32))
+        # Snapshot pre-existing images first; those without route provenance are
+        # explicitly unproven, never retroactively relabelled as exact coverage.
+        inherited=[dict(file=f.name,sha256=hashlib.sha256(f.read_bytes()).hexdigest(),route_provenance='UNPROVEN_LEGACY_TEST_CONTEXT') for f in sorted(self.out.glob('*.png'))]
+        evidence=[]
+        try:
+            for width,height in ((390,844),(1440,1000)):
+                context=self.browser.new_context(viewport={'width':width,'height':height})
+                page=context.new_page();page.set_default_timeout(5000)
+                errors=[];page.on('pageerror',lambda err:errors.append(str(err)))
+                page.goto(self.url+'route-gallery.html')
+                entries=page.locator('#route-index a')
+                self.assertEqual(entries.count(),66)
+                urls=[entries.nth(n).get_attribute('href') for n in range(66)]
+                for n,r in enumerate(routes):
+                    expected='#/'+r['role']+'/'+r['id']+('' if r['id']=='home' else '/'+r['mode'])
+                    self.assertEqual(urls[n],'./index.html'+expected)
+                    # Conditional passport/UBO routes need their own applicable
+                    # UI context; all are explicitly synthetic local drafts.
+                    seed=dict(drafts={},saved={},scenario='sample',options=dict(entity='ENTERPRISE',contact='SUPER',doc='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' if 'id_doc_info' in r['id'] else 'IDENTIFICATION_TYPE_IDCARD',scene='both',ubos='1'),application={'subject_info.ubo_info_list.0.ubo_id_doc_type':'IDENTIFICATION_TYPE_OVERSEA_PASSPORT'})
+                    page.evaluate('(seed)=>localStorage.setItem("community-ui-preview:v1",JSON.stringify(seed))',seed)
+                    page.goto(self.url+'index.html'+expected)
+                    expect(page.locator('main h1').first).to_be_visible()
+                    self.assertEqual(page.evaluate('location.hash'),expected)
+                    self.assertNotIn('未找到',page.locator('#view').inner_text())
+                    name=f'route-{n+1:02d}-{width}.png';path=self.out/name
+                    page.screenshot(path=str(path),full_page=True)
+                    self.assertGreater(path.stat().st_size,1000)
+                    # Return via a real existing role entry, then re-open the
+                    # exact route. This asserts navigation, not business writes.
+                    page.locator('#role').select_option(r['role'])
+                    expect(page.locator('main h1').first).to_be_visible()
+                    page.goto(self.url+'index.html'+expected)
+                    expect(page.locator('main h1').first).to_be_visible()
+                    evidence.append(dict(r,index=n+1,width=width,height=height,route=expected,entry=urls[n],conditions=seed['options'],file=name,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),render='PASS',navigation='PASS',function_acceptance='NOT_CLAIMED'))
+                self.assertEqual(errors,[])
+                context.close()
+        finally:
+            (self.out/'route-render-manifest.json').write_text(json.dumps(dict(source_commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),source_tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),design_routes=66,expected_renders=132,completed_renders=len(evidence),routes=evidence,prior_image_inventory=inherited),ensure_ascii=False,indent=2))
+        self.assertEqual(len(evidence),132)
+
+    def test_cashier_local_preview_select_replace_remove_reload_not_server_success(self):
+        context=self.browser.new_context(viewport={'width':390,'height':844})
+        page=context.new_page();page.goto(self.url)
+        page.evaluate('''() => localStorage.setItem('community-ui-preview:v1',JSON.stringify({drafts:{},saved:{},scenario:'sample',options:{entity:'ENTERPRISE',contact:'LEGAL',doc:'IDENTIFICATION_TYPE_IDCARD',scene:'both',ubos:'legal_only'}}))''')
+        page.goto(self.url+'index.html#/admission/admission-business/edit')
+        field=page.locator('[data-material-kind="cashier_photo"]')
+        expect(field).to_be_enabled()
+        field.set_input_files(dict(name='cashier-synthetic.png',mimeType='image/png',buffer=b'\x89PNG\r\n\x1a\nsynthetic'))
+        expect(field.locator('..').locator('.material-capacity')).to_contain_text('1/1')
+        page.reload();expect(page.locator('[data-material-kind="cashier_photo"]').locator('..')).to_contain_text('cashier-synthetic.png')
+        page.locator('[data-material-kind="cashier_photo"]').set_input_files(dict(name='replacement.png',mimeType='image/png',buffer=b'\x89PNG\r\n\x1a\nreplacement'))
+        page.locator('[data-material-remove="cashier_photo"]').click();page.reload()
+        expect(page.locator('[data-material-kind="cashier_photo"]').locator('..').locator('.material-capacity')).to_contain_text('0/1')
+        expect(page.locator('[data-material-kind="cashier_photo"]').locator('..')).not_to_contain_text('replacement.png')
+        page.screenshot(path=str(self.out/'cashier-local-only-390.png'),full_page=True)
+        context.close()
+
 if __name__=='__main__':unittest.main()

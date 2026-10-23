@@ -43,3 +43,29 @@ https://pay.wechatpay.cn/doc/v3/partner/4012719997
 2026-10-22读取的页面标示更新时间2025-03-26。对应原 `community_wechat_applyment.py`、`community_applyment_conditions.py`。当前行业/银行目录及微信实际审核仍具权威性，预览不查询真实银行或行业接口、不扩大主体类型、不替换验证器。
 
 附件选择仅记录隔离文件名、大小和版本示例，不上传或读取正文；PDF/PNG/JPEG、5MB边界保留。正式附件私有下载和历史能力没有改动，本地投影不能冒充真实材料已提交。
+
+## Issue76 cashier optional material and exact route evidence closeout
+
+The optional `cashier_photo` uses the existing encrypted/scanned original application
+upload and revision contract; it is never in BASE or required materials. Replacement
+and `remove_material(application,revision,kind,expected_wechat_version)` clear only the
+trusted cashier slot association in the same transaction and preserve all objects,
+versions and review history. Removal is limited to cashier, owner and editable state.
+
+`wechat_cashier_link(application,expected_version,media_id)` accepts only an existing
+admitted media record for the current application's current cashier SHA. It modifies
+only its server-managed `cashier_media_id` entry in
+`addition_info.business_addition_pics`, preserving other entries and the shared limit
+of five. Unknown bindings, stale versions, full arrays and read-only review states
+reject without overwriting. This does not open real WeChat media/submission gates.
+
+Native upload/replace/delete/read use the real original contract. HTML remains an
+isolated local selection/name/size demonstration, and must never label local selection
+as server upload. All three scene photographs bypass OCR; document OCR remains pending.
+
+The original static allowlist now includes the existing route-gallery. The scoped
+browser test clicks/renders the 34 main and 32 sub design routes at 390 and 1440,
+records exact URL/mode/conditions, source Commit/Tree, screenshot hashes and navigation
+in `ui-evidence/route-render-manifest.json`. It also inventories prior test images
+without inventing missing provenance. These are projection renders, not acceptance of
+66 live functions. Old screenshots remain tied to their original SHA.

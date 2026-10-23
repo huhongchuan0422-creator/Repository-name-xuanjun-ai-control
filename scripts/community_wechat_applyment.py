@@ -166,6 +166,7 @@ class WechatApplyment:
         required={'contact_info','subject_info','business_info','settlement_info','bank_account_info'}
         if type(profile) is not dict or not required.issubset(profile) or set(profile)-required-{'addition_info'} or any(type(profile[k]) is not dict for k in profile):raise ValueError('OFFICIAL_APPLYMENT_SECTIONS_REQUIRED')
         if len(canonical(profile))>100000:raise ValueError('APPLYMENT_PROFILE_TOO_LARGE')
+        self.cashier_values(profile)
         subject=profile['subject_info']
         expected='SUBJECT_TYPE_ENTERPRISE' if entity=='ENTERPRISE' else 'SUBJECT_TYPE_INDIVIDUAL'
         if subject.get('subject_type')!=expected:raise ValueError('OFFICIAL_SUBJECT_TYPE_MISMATCH')
@@ -227,7 +228,7 @@ class WechatApplyment:
         c=self.center;uid=c.session(session,csrf);op,p=body['operation'],body['params']
         fields={'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
             'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
-            'wechat_media':{'application','kind'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'}}
+            'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'}}
         if type(op) is not str or op not in fields or set(p)!=fields[op]:raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
@@ -396,9 +397,29 @@ class WechatApplyment:
             if self.onboarding._load(application,uid,reviewer)[2]['status']=='WITHDRAWN':
                 raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
             if self._read(application)!=record:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
-            if op=='wechat_save':
+            if op=='wechat_cashier_link':
+                if platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('CASHIER_DRAFT_REQUIRED')
+                material=meta['materials'].get('cashier_photo')
+                media=p['media_id']
+                if (type(media) is not str or not media or not material
+                        or material['expires_at'] is not None and material['expires_at']<=c.now()
+                        or media not in self.cashier_media_ids(application,material['sha256'])):
+                    raise PermissionError('CURRENT_CASHIER_MEDIA_REQUIRED')
+                result=json.loads(json.dumps(record))
+                values=self.cashier_values(result['profile'])
+                previous=result.get('cashier_media_id')
+                self.check_cashier_binding(application,values,previous)
+                if previous:values.remove(previous)
+                if media in values:raise ValueError('CASHIER_MEDIA_BINDING_UNKNOWN')
+                if len(values)>=5:raise ValueError('BUSINESS_ADDITION_PICS_LIMIT')
+                values.append(media)
+                result['profile'].setdefault('addition_info',{})['business_addition_pics']=values
+                result.update(cashier_media_id=media,version=version+1,state='DRAFT')
+            elif op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                values=self.cashier_values(p['profile'])
+                self.check_cashier_binding(application,values,(record or {}).get('cashier_media_id'))
                 from scripts.community_merchant_onboarding import profile_scenes
                 profile_scenes(p['profile'])  # Validate any declared scenes before storing this draft.
                 from scripts.community_merchant_onboarding import shared_application_fields
@@ -421,6 +442,43 @@ class WechatApplyment:
                 result=dict(record,version=version+1,state=p['decision'],opinion=p['opinion'],reviewer=uid)
             self._save(application,owner,result);c.audit(application,uid,'WECHAT_'+op.upper(),str(result['version']))
         return result
+    @staticmethod
+    def cashier_values(profile):
+        addition=profile.get('addition_info',{})
+        if type(addition) is not dict:raise ValueError('INVALID_ADDITION_INFO')
+        values=addition.get('business_addition_pics',[])
+        if (type(values) is not list or len(values)>5
+                or any(type(v) is not str or not 1<=len(v)<=1024 for v in values)
+                or len(set(values))!=len(values)):
+            raise ValueError('INVALID_BUSINESS_ADDITION_PICS')
+        return list(values)
+    def cashier_media_ids(self,application,sha=None):
+        values=set();c=self.center
+        for key,payload in c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)):
+            value=json.loads(c.decrypt(payload,'wechat-media:'+key))
+            if value.get('kind')=='cashier_photo' and (sha is None or value.get('sha256')==sha):values.add(value['media_id'])
+        return values
+    def check_cashier_binding(self,application,values,previous):
+        # Unknown legacy entries are retained; known cashier entries may only
+        # be changed via the managed operation, never a wholesale profile save.
+        if (previous is not None and (type(previous) is not str or values.count(previous)!=1)
+                or set(values)&self.cashier_media_ids(application)-({previous} if previous else set())):
+            raise ValueError('CASHIER_MEDIA_BINDING_UNKNOWN')
+    def clear_cashier_media(self,application,owner):
+        c=self.center
+        if not c.db.in_transaction:raise ValueError('ORIGINAL_ONBOARDING_TRANSACTION_REQUIRED')
+        record=self._read(application)
+        if record is None:return
+        if record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('CASHIER_DRAFT_REQUIRED')
+        result=json.loads(json.dumps(record));values=self.cashier_values(result.get('profile',{}))
+        previous=result.get('cashier_media_id');self.check_cashier_binding(application,values,previous)
+        if previous:
+            values.remove(previous)
+            if values:result['profile']['addition_info']['business_addition_pics']=values
+            else:result['profile']['addition_info'].pop('business_addition_pics',None)
+            result.pop('cashier_media_id');result['version']+=1
+            self._save(application,owner,result)
+            c.audit(application,owner,'WECHAT_CASHIER_UNLINKED',str(result['version']))
     def media(self,uid,owner,application,meta,kind,reauthorize):
         if not self.enabled:raise PermissionError('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
         if type(kind) is not str or kind not in meta['materials']:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_REQUIRED')

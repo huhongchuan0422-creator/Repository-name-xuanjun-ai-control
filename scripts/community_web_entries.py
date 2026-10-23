@@ -24,7 +24,7 @@ ASSETS={
 # Isolated static projection; these bytes never receive a session panel or API JS.
 UI_ASSETS={'/community/ui-preview/':('ui-preview/index.html','text/html; charset=utf-8')}
 UI_ASSETS.update({'/community/ui-preview/'+name:('ui-preview/'+name,mime) for name,mime in [
- ('index.html','text/html; charset=utf-8'),('sources.js','application/javascript; charset=utf-8'),
+ ('index.html','text/html; charset=utf-8'),('route-gallery.html','text/html; charset=utf-8'),('sources.js','application/javascript; charset=utf-8'),
  ('preview.js','application/javascript; charset=utf-8'),('preview.css','text/css; charset=utf-8'),('original.css','text/css; charset=utf-8')]})
 
 def entries(projects=()):

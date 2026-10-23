@@ -108,3 +108,102 @@ class SharedProfileAndSigning(unittest.TestCase):
             with self.assertRaises(ValueError):official_signing_url(value)
 
 if __name__=='__main__':unittest.main()
+
+class CashierMaterialJourney(unittest.TestCase):
+    call=SameMiniMerchant.call
+    draft=SameMiniMerchant.draft
+    tearDown=SameMiniMerchant.tearDown
+    # Reuse original identity, Center, tenant/scene and encrypted onboarding.
+    # Synthetic admitted media records below are not provider upload evidence.
+    def setUp(self):
+        SameMiniMerchant.setUp(self)
+        from scripts.community_wechat_applyment import WechatApplyment
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        self.fx.center.scanner=lambda raw:True
+        self.onboarding.wechat_applyment=WechatApplyment(self.onboarding,PartnerOrderReader.__new__(PartnerOrderReader))
+        self.app=self.draft()
+    def op(self,name,**params):
+        return self.call('onboarding',dict(operation=name,params=params))
+    def upload_cashier(self,raw=b'\x89PNG\r\n\x1a\nsynthetic cashier'):
+        import base64
+        self.app=self.op('upload',application=self.app['application'],revision=self.app['revision'],kind='cashier_photo',content_base64=base64.b64encode(raw).decode(),expires_at=None)
+        return self.app
+    def draft_profile(self,values):
+        return self.op('wechat_save',application=self.app['application'],expected_version=0,profile={'addition_info':{'business_addition_pics':values}})
+    def admit_media(self,media):
+        import hashlib
+        from scripts.pr122_customer_core import canonical
+        c=self.fx.center;application=self.app['application']
+        _,meta,_=self.onboarding._load(application,self.fx.uid1)
+        sha=meta['materials']['cashier_photo']['sha256'];key=hashlib.sha256((application+media).encode()).hexdigest()
+        with c.tx():c.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_MEDIA',?,?,?,?,1)",(key,self.fx.uid1,application,c.encrypt(canonical(dict(kind='cashier_photo',sha256=sha,media_id=media)),'wechat-media:'+key)))
+    def test_cashier_optional_upload_replace_delete_read_history_and_revoked_media(self):
+        self.assertNotIn('cashier_photo',self.app['required_materials'])
+        self.assertIn('cashier_photo',self.op('catalog')['optional_materials'])
+        self.upload_cashier();self.draft_profile(['legacy-other'])
+        self.admit_media('cashier-one')
+        linked=self.op('wechat_cashier_link',application=self.app['application'],expected_version=1,media_id='cashier-one')
+        self.assertEqual(linked['profile']['addition_info']['business_addition_pics'],['legacy-other','cashier-one'])
+        self.upload_cashier(b'\x89PNG\r\n\x1a\nreplacement')
+        record=self.op('wechat_read',application=self.app['application'])
+        self.assertEqual(record['profile']['addition_info']['business_addition_pics'],['legacy-other'])
+        self.assertNotIn('cashier_media_id',record)
+        with self.assertRaisesRegex(PermissionError,'CURRENT_CASHIER_MEDIA_REQUIRED'):
+            self.op('wechat_cashier_link',application=self.app['application'],expected_version=record['version'],media_id='cashier-one')
+        self.admit_media('cashier-two')
+        linked=self.op('wechat_cashier_link',application=self.app['application'],expected_version=record['version'],media_id='cashier-two')
+        before=self.fx.center.db.execute('SELECT count(*) FROM objects').fetchone()[0]
+        self.app=self.op('remove_material',application=self.app['application'],revision=self.app['revision'],kind='cashier_photo',expected_wechat_version=linked['version'])
+        self.assertNotIn('cashier_photo',self.op('read',application=self.app['application'])['materials'])
+        record=self.op('wechat_read',application=self.app['application'])
+        self.assertEqual(record['profile']['addition_info']['business_addition_pics'],['legacy-other'])
+        self.assertEqual(self.fx.center.db.execute('SELECT count(*) FROM objects').fetchone()[0],before)
+        history=self.op('history',application=self.app['application'],after_revision=0)
+        self.assertIn('REMOVE_MATERIAL',str(history))
+    def test_cashier_full_array_unknown_binding_stale_versions_and_cross_tenant_denied(self):
+        self.upload_cashier();record=self.draft_profile(['other-'+str(i) for i in range(5)])
+        self.admit_media('cashier')
+        with self.assertRaisesRegex(ValueError,'BUSINESS_ADDITION_PICS_LIMIT'):
+            self.op('wechat_cashier_link',application=self.app['application'],expected_version=1,media_id='cashier')
+        self.assertEqual(self.op('wechat_read',application=self.app['application']),record)
+        for revision,version in [(self.app['revision']-1,1),(self.app['revision'],0)]:
+            with self.assertRaises(ValueError):self.op('remove_material',application=self.app['application'],revision=revision,kind='cashier_photo',expected_wechat_version=version)
+        other=self.fx.token('cashier-other','openid2')
+        for operation,params in [('read',dict(application=self.app['application'])),('remove_material',dict(application=self.app['application'],revision=self.app['revision'],kind='cashier_photo',expected_wechat_version=1)),('wechat_cashier_link',dict(application=self.app['application'],expected_version=1,media_id='cashier'))]:
+            with self.assertRaises(PermissionError):self.call('onboarding',dict(operation=operation,params=params),other)
+        with self.assertRaises(PermissionError):self.service.dispatch(self.token,'unknown',dict(operation='onboarding',params=dict(operation='read',params=dict(application=self.app['application']))))
+        # Reject a legacy cashier reference without a trusted slot binding.
+        service=self.onboarding.wechat_applyment
+        with self.fx.center.tx():service._save(self.app['application'],self.fx.uid1,dict(record,profile={'addition_info':{'business_addition_pics':['cashier','other']}}))
+        with self.assertRaisesRegex(ValueError,'CASHIER_MEDIA_BINDING_UNKNOWN'):self.upload_cashier()
+        self.assertIn('cashier_photo',self.op('read',application=self.app['application'])['materials'])
+    def test_cashier_generic_save_cannot_remove_managed_slot_or_exceed_five(self):
+        self.upload_cashier();self.draft_profile(['other']);self.admit_media('cashier')
+        record=self.op('wechat_cashier_link',application=self.app['application'],expected_version=1,media_id='cashier')
+        for values in [['other'],['other','cashier']+['extra'+str(i) for i in range(4)]]:
+            with self.assertRaises(ValueError):self.op('wechat_save',application=self.app['application'],expected_version=2,profile={'addition_info':{'business_addition_pics':values}})
+        self.assertEqual(self.op('wechat_read',application=self.app['application']),record)
+        # Review state blocks both replacement and deletion, preserving objects.
+        with self.fx.center.tx():self.onboarding.wechat_applyment._save(self.app['application'],self.fx.uid1,dict(record,state='PENDING_INTERNAL_REVIEW'))
+        with self.assertRaisesRegex(PermissionError,'CASHIER_DRAFT_REQUIRED'):self.upload_cashier()
+        with self.assertRaisesRegex(PermissionError,'CASHIER_DRAFT_REQUIRED'):self.op('remove_material',application=self.app['application'],revision=self.app['revision'],kind='cashier_photo',expected_wechat_version=2)
+    def test_cashier_actual_http_upload_replace_remove_and_read(self):
+        import base64,json,threading,urllib.request
+        from scripts.community_mini_http import serve
+        server=serve(self.fx.gateway,onboarding=self.onboarding,operations=self.operations)
+        def http(operation,params):
+            body=json.dumps(dict(operation='onboarding',params=dict(operation=operation,params=params))).encode()
+            request=urllib.request.Request('http://127.0.0.1:'+str(server.server_port)+'/mini/merchant',data=body,headers={'Content-Type':'application/json','X-Community-Session':self.token,'X-Community-Scene':'shop1'})
+            from concurrent.futures import ThreadPoolExecutor
+            def client():
+                with urllib.request.urlopen(request,timeout=3) as response:return json.load(response)['result']
+            with ThreadPoolExecutor(1) as pool:
+                future=pool.submit(client);server.handle_request();return future.result()
+        try:
+            application=self.app['application']
+            for suffix in ('first','replacement'):
+                self.app=http('upload',dict(application=application,revision=self.app['revision'],kind='cashier_photo',content_base64=base64.b64encode(('\x89PNG\r\n\x1a\n'+suffix).encode('latin1')).decode(),expires_at=None))
+                self.assertTrue(http('read',dict(application=application))['materials']['cashier_photo']['uploaded'])
+            self.app=http('remove_material',dict(application=application,revision=self.app['revision'],kind='cashier_photo',expected_wechat_version=0))
+            self.assertNotIn('cashier_photo',http('read',dict(application=application))['materials'])
+        finally:server.server_close()

@@ -6,8 +6,8 @@ live workspace grants and matching scene/store; consumers never inherit them.
 from scripts.community_mini_center_identity import CenterIdentity
 from scripts.community_merchant_onboarding import MerchantOnboarding
 
-APPLICANT={'catalog','mine','read','save','upload','submit','withdraw','history',
-           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media'}
+APPLICANT={'catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
+           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link'}
 WRITES={'community.profile','community.item'}
 READS={'community.orders','community.summary','community.orders_page',
        'community.order_detail','community.merchant_settings','community.ads',

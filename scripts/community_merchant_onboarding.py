@@ -16,7 +16,7 @@ from scripts import community_onboarding_offline as workflow
 MATERIALS={
     'business_license':'营业执照', 'identity_front':'经营者/法定代表人证件正面',
     'identity_back':'经营者/法定代表人证件反面', 'storefront_photo':'门店门头照片',
-    'interior_photo':'门店经营场所照片', 'settlement_proof':'结算账户证明',
+    'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人身份证明',
     'industry_permit':'行业经营许可（按经营类目）',
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
@@ -95,7 +95,7 @@ class MerchantOnboarding:
                 'industry_permit_required_for':['FOOD'],'operator_materials_when_delegated':True,
                 'sales_scenes':[MINI_SCENE,STORE_SCENE],
                 'default_sales_scenes':[MINI_SCENE],
-                'optional_materials':['settlement_proof','operator_authorization'],
+                'optional_materials':['settlement_proof','operator_authorization','cashier_photo'],
                 'scope':'同一申请资料按微信主体与经营场景复用，平台仅核原项目门店归属',
                 'payment_enabled':False}
     def _encode(self,value,aad):return base64.b64encode(self.center.encrypt(canonical(value),aad)).decode()
@@ -178,6 +178,7 @@ class MerchantOnboarding:
         uid=c.session(session,csrf)
         schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
+                 'remove_material':{'application','revision','kind','expected_wechat_version'},
                  'submit':{'application','revision'},'withdraw':{'application','revision'},'review_list':set(),
                  'read':{'application'},'review_read':{'application'},
                  'history':{'application','after_revision'},'review_history':{'application','after_revision'},
@@ -268,6 +269,8 @@ class MerchantOnboarding:
                 if data['status'] not in ('DRAFT','CORRECTION_REQUIRED') or data['revision']!=params['revision']:raise ValueError('STATE_OR_REVISION_CONFLICT')
                 kind=params['kind'];expires=params['expires_at']
                 if type(kind) is not str or kind not in MATERIALS or expires is not None and (type(expires) is not int or expires<=c.now()):raise ValueError('INVALID_MATERIAL')
+                if kind=='cashier_photo' and self.wechat_applyment is not None:
+                    self.wechat_applyment.clear_cashier_media(application,owner)
                 value=params['content_base64']
                 if type(value) is not str or len(value)>6_666_668:raise ValueError('FILE_LIMIT')
                 raw=base64.b64decode(value,validate=True)
@@ -293,6 +296,23 @@ class MerchantOnboarding:
                 revision=data['revision']+1
                 c.db.execute("UPDATE onboarding SET revision=?,status='DRAFT' WHERE tenant=? AND application=?",(revision,uid,application))
                 workflow._append(c.db,uid,application,revision,uid,'UPLOAD',{'kind':kind,'sha256':sha})
+                self._meta(application,uid,meta)
+            elif op=='remove_material':
+                # Only this new optional slot; never delete objects or immutable versions.
+                if params['kind']!='cashier_photo':raise ValueError('CASHIER_MATERIAL_ONLY')
+                if data['status'] not in ('DRAFT','CORRECTION_REQUIRED') or data['revision']!=params['revision']:raise ValueError('STATE_OR_REVISION_CONFLICT')
+                if self.wechat_applyment is not None:
+                    record=self.wechat_applyment._read(application)
+                    version=record['version'] if record else 0
+                    if type(params['expected_wechat_version']) is not int or params['expected_wechat_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
+                    self.wechat_applyment.clear_cashier_media(application,owner)
+                elif type(params['expected_wechat_version']) is not int or params['expected_wechat_version']!=0:
+                    raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
+                if 'cashier_photo' not in meta['materials']:raise ValueError('MATERIAL_NOT_FOUND')
+                meta['materials'].pop('cashier_photo');meta.setdefault('reviews',{}).pop('cashier_photo',None)
+                revision=data['revision']+1
+                c.db.execute("UPDATE onboarding SET revision=?,status='DRAFT' WHERE tenant=? AND application=?",(revision,uid,application))
+                workflow._append(c.db,uid,application,revision,uid,'REMOVE_MATERIAL',{'kind':'cashier_photo'})
                 self._meta(application,uid,meta)
             elif op=='review_material':
                 kind=params['kind'];decision=params['decision'];note=safe_text(params['note'],80)

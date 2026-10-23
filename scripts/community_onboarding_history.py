@@ -10,9 +10,9 @@ from scripts.pr122_customer_core import canonical
 
 ITEM='COMMUNITY_ONBOARDING_HISTORY_V1'
 KIND='ONBOARDING_EVENT'
-OPERATION={'SAVE_DRAFT':'SAVE','UPLOAD':'UPLOAD','SUBMIT':'SUBMIT','REVIEW_MATERIAL':'REVIEW_MATERIAL',
+OPERATION={'SAVE_DRAFT':'SAVE','UPLOAD':'UPLOAD','REMOVE_MATERIAL':'REMOVE_MATERIAL','SUBMIT':'SUBMIT','REVIEW_MATERIAL':'REVIEW_MATERIAL',
            'WITHDRAW':'WITHDRAW','BEGIN_REVIEW':'REVIEW','CORRECTION':'REVIEW','REJECT':'REVIEW','REOPEN':'REVIEW','APPROVE':'REVIEW'}
-STATUS={'SAVE_DRAFT':'DRAFT','UPLOAD':'DRAFT','SUBMIT':'SUBMITTED','REVIEW_MATERIAL':'IN_REVIEW',
+STATUS={'SAVE_DRAFT':'DRAFT','UPLOAD':'DRAFT','REMOVE_MATERIAL':'DRAFT','SUBMIT':'SUBMITTED','REVIEW_MATERIAL':'IN_REVIEW',
         'WITHDRAW':'WITHDRAWN','BEGIN_REVIEW':'IN_REVIEW','CORRECTION':'CORRECTION_REQUIRED','REJECT':'REJECTED','REOPEN':'CORRECTION_REQUIRED','APPROVE':'APPROVED'}
 
 
@@ -59,7 +59,7 @@ def append(service, application, owner, actor, operation, params, before, meta, 
         status_before=None if before is None else before['status'],status_after=STATUS[event[1]],
         note=params.get('note','') if operation in ('review','review_material') else '',
         decision=params.get('decision') if operation=='review_material' else None,
-        material_kind=params.get('kind') if operation in ('upload','review_material') else None,
+        material_kind=params.get('kind') if operation in ('upload','remove_material','review_material') else None,
         materials=materials)
     version='v_'+secrets.token_hex(16)
     c.db.execute('INSERT INTO versions VALUES(?,?,?,?,?,?,?,?,?)',
