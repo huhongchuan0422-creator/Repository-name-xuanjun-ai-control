@@ -949,4 +949,18 @@ class ClickThrough(unittest.TestCase):
         page.screenshot(path=str(self.out/'cashier-local-only-390.png'),full_page=True)
         context.close()
 
+    def test_recommendation_text_cta_stays_horizontal_at_phone_and_pc_widths(self):
+        for width in (320,390,1440):
+            context=self.browser.new_context(viewport={'width':width,'height':844})
+            page=context.new_page();page.goto(self.url+'index.html#/consumer/consumer-recommendations/list')
+            button=page.locator('.recommendation-card>b')
+            expect(button).to_have_text('查看介绍 ›')
+            box=button.bounding_box();self.assertGreaterEqual(box['width'],60);self.assertLess(box['height'],32)
+            self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),width+1)
+            page.locator('.recommendation-card').click()
+            expect(page).to_have_url(__import__('re').compile(r'#/consumer/consumer-recommendations/detail$'))
+            expect(page.locator('main h1').first).to_have_text('店铺介绍')
+            page.screenshot(path=str(self.out/('recommendation-cta-'+str(width)+'.png')),full_page=True)
+            context.close()
+
 if __name__=='__main__':unittest.main()
