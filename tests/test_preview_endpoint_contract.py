@@ -213,5 +213,78 @@ class EndpointContract(unittest.TestCase):
         self.assertIn("pagePath:'pages/home/index',searchQuery:''",preview)
 
 
+
+class HostedEvidence(unittest.TestCase):
+    """Execute the actual workflow validator offline; no success claims for WeChat."""
+    def setUp(self):
+        import textwrap
+        workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
+        code=textwrap.dedent(workflow.split("python - <<'EVIDENCE'\n",1)[1].split('          EVIDENCE',1)[0])
+        self.ns={'__name__':'offline_contract_fixture'}
+        exec(compile(code,'actual-workflow-evidence-block','exec'),self.ns)
+        self.workflow=workflow
+        repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+        branch='feature/chatgpt-community-wechat-sp-offline-20261017'
+        self.run=dict(id=101,head_sha=HEAD,head_branch=branch,path='.github/workflows/chatgpt-community-wechat-sp-offline.yml',
+            event='push',status='completed',conclusion='success',repository={'full_name':repo},head_repository={'full_name':repo})
+        self.jobs=dict(total_count=1,jobs=[dict(id=202,name='test',status='completed',conclusion='success',
+            steps=[dict(name='Preview entry evidence affected scope (offline only)',status='completed',conclusion='success')])])
+        self.artifacts=dict(total_count=1,artifacts=[dict(id=303,name='community-phase-integration-evidence',expired=False,
+            expires_at='2030-01-01T00:00:00Z',size_in_bytes=1000,digest='sha256:'+'a'*64,
+            workflow_run=dict(id=101,head_sha=HEAD,head_branch=branch,repository_id=1413132159,head_repository_id=1413132159))])
+    def validate(self,**kw):
+        args=dict(run=self.run,jobs=self.jobs,artifacts=self.artifacts,head=HEAD,evidence_id=101,current_id=102,now=1000)
+        args.update(kw)
+        return self.ns['validate'](**args)
+    def test_success_reuses_test_evidence_but_does_not_claim_artifact_bytes_downloaded(self):
+        result=self.validate()
+        self.assertEqual(result['head_sha'],HEAD)
+        self.assertEqual(result['artifact']['id'],303)
+        self.assertFalse(result['artifact_bytes_reverified'])
+        self.assertEqual(result['source_package'],'REBUILD_FROM_CURRENT_EXACT_CHECKOUT')
+    def test_wrong_sha_branch_workflow_event_repo_or_incomplete_run_denied(self):
+        for patch in ({'head_sha':'b'*40},{'head_branch':'main'},{'path':'other.yml'},{'event':'workflow_dispatch'},
+                      {'status':'in_progress'},{'conclusion':'failure'},{'id':999},
+                      {'repository':{'full_name':'other/repo'}},{'head_repository':{'full_name':'other/repo'}}):
+            with self.subTest(patch=patch),self.assertRaises(ValueError):self.validate(run=dict(self.run,**patch))
+    def test_missing_skipped_failed_or_unrelated_test_step_cannot_replace_test_gate(self):
+        import copy
+        for patch in ({'conclusion':'skipped'},{'status':'in_progress'},{'name':'other-scope'}):
+            data=copy.deepcopy(self.jobs);data['jobs'][0]['steps'][0].update(patch)
+            with self.subTest(patch=patch),self.assertRaises(ValueError):self.validate(jobs=data)
+        with self.assertRaises(ValueError):self.validate(jobs={'jobs':[],'total_count':0})
+    def test_artifact_expiry_digest_missing_or_foreign_binding_denied(self):
+        import copy
+        for patch in ({'expired':True},{'expires_at':'1970-01-01T00:01:00Z'},
+                      {'digest':'unknown'},{'size_in_bytes':0},{'workflow_run':{'id':101,'head_sha':'b'*40}},
+                      {'name':'other-source'}):
+            data=copy.deepcopy(self.artifacts);data['artifacts'][0].update(patch)
+            with self.subTest(patch=patch),self.assertRaises(ValueError):self.validate(artifacts=data)
+    def test_current_run_duplicate_artifact_and_pagination_unknown_denied(self):
+        with self.assertRaises(ValueError):self.validate(current_id=101)
+        with self.assertRaises(ValueError):self.validate(jobs=dict(self.jobs,total_count=101))
+        with self.assertRaises(ValueError):self.validate(artifacts=dict(self.artifacts,total_count=101))
+        with self.assertRaises(ValueError):self.validate(artifacts=dict(self.artifacts,artifacts=self.artifacts['artifacts']*2))
+    def test_manual_enabled_reuses_gate_instead_of_full_old_regression(self):
+        full=self.workflow.split('      - name: Complete Phase1 and Phase2 source regression',1)[1].split('        run:',1)[0]
+        self.assertIn("!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled)",full)
+        self.assertIn("inputs.preview_evidence_run_id",self.workflow)
+        self.assertIn('  mini-sdk:\n',self.workflow)
+        sdk=self.workflow.split('  mini-sdk:\n',1)[1].split('    steps:',1)[0]
+        self.assertIn('needs: test',sdk)
+        preview=self.workflow.split('  mini-preview:\n',1)[1].split('    steps:',1)[0]
+        self.assertIn('needs: [test, mini-sdk]',preview)
+        self.assertIn('contents: read',self.workflow)
+        self.assertNotIn('actions: write',self.workflow)
+        self.assertNotIn('actions: read',self.workflow)
+    def test_read_is_fixed_public_github_only_without_token_or_dispatch(self):
+        import inspect
+        # AST/function code, not a request to the live provider.
+        names=set(self.ns['read'].__code__.co_names)
+        self.assertIn('build_opener',names)
+        self.assertNotIn('environ',names)
+        self.assertIn('https://api.github.com/repos/',str(self.ns['read'].__code__.co_consts))
+        self.assertNotIn('Authorization',str(self.ns['read'].__code__.co_consts))
+
 if __name__=='__main__':
     unittest.main()

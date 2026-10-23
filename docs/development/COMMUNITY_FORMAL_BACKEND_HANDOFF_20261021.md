@@ -386,3 +386,10 @@ HttpOnly cookie 不能只靠页面 generation 保护：同源浏览器标签页�
 仅新增影响的 Hosted scope：[preview-version-scope]。运行 health 来源/依赖、readiness、实际 ZIP prepare/预览拒绝与入口/工作流条件测试；UI 投影没有变化，66路由与截图/业务/OCR来源复用。prepared 工程为本次 Commit 生成，附完整逐文件 SHA 清单、源工程/生成 app hash，upload_performed=false；不预填远端 SHA 或 readiness PASS。
 
 后续真实现场一次性核齐：①当前实际后端 image/OCI/source revision 与 health 版本来源；②与候选两 SHA 同版（或另交明确版本对的已验兼容关系，本版未支持）；③固定 HTTPS/合法域名及既有登录/scene 授权的当前回执；④原 workflow 正常可触发入口与 Owner 单独核定的本次预览动作。然后才可取得准确 SHA 的 preview/receipt/二维码及真机证据。不能重跑旧2330固定升级器覆盖未知新版本，不能因本轮缺现场回执推断域名/通道/已部署服务有故障。
+
+
+### 原预览入口注册与手动同SHA测试证据复用后继
+
+125原候选及37Python+6Node结果复用；新增后继只改原workflow/门禁定向测试及只读材料，未变原生27文件。main最小原路径注册PR与原社区业务分支分开，不整合业务长分支、不合并。原分支新增preview_evidence_run_id，手动明确开启时先读取固定公开GitHub API元数据：原repo/原分支/原workflow、同SHA已完成成功push run、test实际适用步骤成功、同run同SHA未过期source artifact及digest；未知/失败拒绝。保留test job作为SDK/preview前置，当前源包仍从准确checkout重新确定性构建；复用的是已有测试回执，未声称下载校验旧artifact字节，不增加actions权限或Secret访问。普通push和默认关闭的dispatch仍走原适用测试，只有明确开启且证据过门禁的手动路径免重复完整业务回归。
+
+根独审现场范围见 `docs/development/COMMUNITY_PREVIEW_VERSION_READONLY_REVIEW_20261024.md`。原UK2330成功/回滚引用保留，当前现场未查询，不调用旧固定升级器。
