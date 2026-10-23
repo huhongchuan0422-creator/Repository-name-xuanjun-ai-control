@@ -27,8 +27,8 @@ test('merchant admin mobile keeps exact string, provider mapping and service pho
  assert.equal(typeof form.get(f.storedProfile,path),'string');
  assert.equal(f.calls.find(c=>c.p.operation==='wechat_save').p.params.profile.contact_info.mobile_phone,'+44-123456789');
 });
-test('merchant mobile rejects malformed values locally, preserves legacy overlength and clears errors on correction',()=>{
- const f=fixture('merchant-join');f.page.profile={contact_info:{mobile_phone:'123456789012345678901'}};
+test('merchant mobile rejects malformed values locally, preserves legacy overlength and clears errors on correction',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.profile={contact_info:{mobile_phone:'123456789012345678901'}};
  f.page.setData({step:1});f.page.refresh();
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'123456789012345678901');
  assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,21);
@@ -78,7 +78,7 @@ test('LEGAL and SUPER use one mobile field and keep identity/contact fields acro
  }
  const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
  assert.match(wxml,/type="text"[^>]*data-path="{{item.path}}"/);
- assert.match(wxml,/maxlength="{{item.path==='contact_info.mobile_phone'?item.maxlength:512}}"/);
+ assert.ok(wxml.includes('maxlength="{{item.path===\'contact_info.mobile_phone\'?item.maxlength:512}}"'),'mobile_phone input must use the exact path-specific maxlength ternary');
  assert.match(wxml,/bindblur="blur"/);
  assert.match(wxml,/5–20位，可含数字、+或-，不含空格/);
  assert.equal(form.get(f.page.profile,'business_info.service_phone'),undefined);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'0012345678');
