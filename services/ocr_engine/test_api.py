@@ -179,6 +179,19 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
         self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
         self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+    def test_legacy_job_missing_application_revision_fails_closed(self):
+        from cryptography.fernet import Fernet
+        store = self.client.app.state.ocr_job_store
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        # Simulate a legacy encrypted row written before application_revision existed.
+        with store._connect() as db:
+            row=db.execute('SELECT ciphertext FROM ocr_jobs WHERE job_id=?',(job_id,)).fetchone()
+            payload=store._open(row['ciphertext'])
+            payload.pop('application_revision',None)
+            db.execute('UPDATE ocr_jobs SET ciphertext=? WHERE job_id=?',(store._seal(payload),job_id))
+        read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(read.status_code,403,read.text)
+        self.assertIn('ATTACHMENT_BINDING_METADATA_MISSING',read.text)
     def test_confirmed_fields_and_revision_read_back(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         confirm_headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'readback-confirm-key-001'}
