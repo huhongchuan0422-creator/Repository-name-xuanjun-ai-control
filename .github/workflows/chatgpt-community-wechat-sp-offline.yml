@@ -1,0 +1,73 @@
+name: Community WeChat SP Offline Gate
+# Default-branch registration only. Selecting the original community branch uses
+# its reviewed workflow and existing WECHAT_MINIPROGRAM_APPID / PRIVATE_KEY refs.
+# No community business source, SDK, secrets or self-hosted jobs are copied here.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/chatgpt-community-wechat-sp-offline.yml
+      - tests/test_community_preview_entry_registration.py
+      - governance/features.json
+      - docs/development/FEATURE_COMPLIANCE_GATE_20261015.md
+  workflow_dispatch:
+    inputs:
+      preview_enabled:
+        description: 'Explicitly run existing development preview upload (default off)'
+        type: boolean
+        default: false
+      preview_source_sha:
+        description: 'Exact selected branch HEAD (40 lowercase hex); required for preview'
+        type: string
+        default: ''
+      preview_target:
+        description: 'Existing fixed preview target'
+        type: choice
+        options: [uk-path-candidate]
+        default: uk-path-candidate
+      preview_evidence_run_id:
+        description: 'Successful push Hosted evidence run for the exact selected SHA'
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  preview-entry-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Registration positive and negative cases only
+        run: python -B -m unittest discover -s tests -p test_community_preview_entry_registration.py -v
+      - name: Validate selected original preview reference (registration only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+          PREVIEW_SOURCE_SHA: ${{ inputs.preview_source_sha }}
+          PREVIEW_TARGET: ${{ inputs.preview_target }}
+          PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+          RUN_SHA: ${{ github.sha }}
+          RUN_REF: ${{ github.ref }}
+          RUN_REPOSITORY: ${{ github.repository }}
+        run: |
+          python - <<'REGISTRATION'
+          import os,re
+          enabled=os.environ.get('PREVIEW_ENABLED','false')
+          if enabled not in ('true','false',''):raise SystemExit('INVALID_PREVIEW_SWITCH')
+          if enabled!='true':
+              print('PREVIEW_DISABLED_NO_UPLOAD')
+              raise SystemExit(0)
+          head=os.environ.get('RUN_SHA','')
+          if (os.environ.get('RUN_REPOSITORY')!='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+                  or os.environ.get('RUN_REF')!='refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017'
+                  or not re.fullmatch('[0-9a-f]{40}',head)
+                  or os.environ.get('PREVIEW_SOURCE_SHA')!=head
+                  or os.environ.get('PREVIEW_TARGET')!='uk-path-candidate'
+                  or not re.fullmatch('[1-9][0-9]{0,19}',os.environ.get('PREVIEW_EVIDENCE_RUN_ID',''))):
+              raise SystemExit('EXACT_ORIGINAL_BRANCH_SHA_TARGET_EVIDENCE_REQUIRED')
+          print('REGISTRATION_ONLY_NO_UPLOAD_SELECT_ORIGINAL_BRANCH_WORKFLOW')
+          REGISTRATION
