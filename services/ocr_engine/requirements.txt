@@ -1,3 +1,8 @@
-# Runtime used for the local CPU adapter. Install only in an isolated build environment.
+# Pin OCR inference runtime. Install only in an isolated development environment.
 rapidocr==3.10.0
 onnxruntime==1.31.0
+fastapi==0.115.12
+python-multipart==0.0.20
+uvicorn==0.34.0
+opencv-python-headless==4.11.0.86
+numpy==2.2.4
