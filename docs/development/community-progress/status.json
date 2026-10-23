@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-10-23T14:25:01.768829+00:00",
+  "checked_at": "2026-10-23T18:34:03.584678+00:00",
   "branch": "feature/chatgpt-community-wechat-sp-offline-20261017",
-  "head_sha": "402f4efd73eb9b39cc2cf7b215941b8de9519c45",
+  "head_sha": "84392980bf05740aa6b82c41d9384aaf59007eb1",
   "current_module": "最终候选需求交叉追踪与外部接线证据核对（阶段仍为PARTIAL）",
   "phases": {
     "1": {
@@ -13,23 +13,23 @@
       "remaining": 7
     }
   },
-  "last_code_sha": "402f4efd73eb9b39cc2cf7b215941b8de9519c45",
-  "last_code_at": "2026-10-23T13:57:46Z",
-  "status": "无提交进展",
+  "last_code_sha": "d062a5ef44de024c4181a6193b6c71a251dc6714",
+  "last_code_at": "2026-10-23T18:24:36Z",
+  "status": "最近20分钟有代码提交",
   "ci": [
     {
-      "id": 39965590904,
+      "id": 40003047886,
+      "name": "Community WeChat SP Offline Gate",
+      "status": "in_progress",
+      "conclusion": null,
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/40003047886"
+    },
+    {
+      "id": 40003048029,
       "name": "Community isolated UI preview scoped gate",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39965590904"
-    },
-    {
-      "id": 39965590892,
-      "name": "Community WeChat SP Offline Gate",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39965590892"
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/40003048029"
     }
   ],
   "ci_status": "SEE_RUN_RESULTS",
