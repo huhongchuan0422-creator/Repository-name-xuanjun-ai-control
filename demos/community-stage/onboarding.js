@@ -275,7 +275,7 @@
   function refreshLicense(){
     const inline=$('licenseInline'),entity=$('entity_type'),entityLabel=entity.closest?entity.closest('label'):entity.parentNode;
     if(entityLabel?.parentNode)entityLabel.parentNode.insertBefore(inline,entityLabel.nextSibling);
-    inline.hidden=reviewMode||$('entity_type').value!=='ENTERPRISE';
+    inline.hidden=reviewMode;
     $('saveLicense').disabled=busy||!current||current.status==='WITHDRAWN';
     $('licenseFields').querySelectorAll('input').forEach(input=>input.disabled=busy||current?.status==='WITHDRAWN');
     if(!current)$('licenseUpload').textContent='保存申请草稿后可在此上传营业执照。';
