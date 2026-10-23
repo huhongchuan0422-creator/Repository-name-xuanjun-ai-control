@@ -48,7 +48,12 @@ class SecureSQLiteJobStore:
             )""")
             db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_tenant ON ocr_jobs(tenant_key)")
             # Requests are synchronous: never resubmit after a worker crash with no retained image.
-            db.execute("UPDATE ocr_jobs SET state='failed_interrupted' WHERE state='processing'")
+            for row in db.execute("SELECT job_id,ciphertext FROM ocr_jobs WHERE state='processing'").fetchall():
+                payload = self._open(row["ciphertext"])
+                payload["status"] = "failed"
+                payload["error_code"] = "OCR_INTERRUPTED"
+                db.execute("UPDATE ocr_jobs SET state=?, ciphertext=? WHERE job_id=?",
+                           ("failed", self._seal(payload), row["job_id"]))
 
     def _connect(self):
         db = sqlite3.connect(self.db_path, timeout=10, isolation_level=None)
