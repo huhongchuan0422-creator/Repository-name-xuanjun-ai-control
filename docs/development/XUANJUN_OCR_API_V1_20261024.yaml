@@ -100,10 +100,8 @@ paths:
                   requires_human_confirmation: {type: boolean, const: true}
                   authenticity_verified: {type: boolean, const: false}
         '401': {description: Missing or invalid authentication}
-        '403': {description: Tenant or job authorization denied}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
         '404': {description: Job not found or not visible to this subject}
-        '403': {description: Current application or attachment authorization revoked}
-  /ocr/jobs/{job_id}:
     delete:
       operationId: deleteOcrJob
       summary: Delete OCR job payload
