@@ -87,8 +87,8 @@ def build():
         if title=='经营场景':fields.extend([('business_info.sales_info.biz_store_info.'+f,t) for f,t in [('biz_store_name','线下门店名称'),('biz_address_code','线下门店地区代码'),('biz_store_address','线下门店详细地址')]])
         body=''.join('<label>'+escape(label)+'<input data-path="'+key+'" maxlength="512" autocomplete="off"'+field_attrs(key)+'></label>' for key,label in fields)
         pages.append({'id':'admission-'+prefix.replace('.','-'),'role':'admission','title':title,'html':body,'source':'onboarding.js','kind':'step'})
-    body=''.join('<label>'+title+'<input data-path="subject_info.ubo_info_list.{index}.'+field+'" maxlength="512" required aria-required="true"></label>' for field,title in [('ubo_id_doc_type','证件类型'),('ubo_id_doc_name','姓名'),('ubo_id_doc_number','证件号'),('ubo_id_doc_address','住址'),('ubo_period_begin','有效期开始'),('ubo_period_end','有效期结束或长期')])
-    pages.append({'id':'admission-beneficiary','role':'admission','title':'其他受益人资料','html':body,'source':'onboarding.js','kind':'step'})
+    body='<p>按官方适用条件填写完整受益人名单，含适用法人；只有明确符合条件时才可省略名单。</p>'+''.join('<label>'+title+'<input data-path="subject_info.ubo_info_list.{index}.'+field+'" maxlength="512" required aria-required="true"></label>' for field,title in [('ubo_id_doc_type','证件类型'),('ubo_id_doc_name','姓名'),('ubo_id_doc_number','证件号'),('ubo_id_doc_address','住址'),('ubo_period_begin','有效期开始'),('ubo_period_end','有效期结束或长期')])
+    pages.append({'id':'admission-beneficiary','role':'admission','title':'最终受益人资料','html':body,'source':'onboarding.js','kind':'step'})
     pages.insert(next(i for i,p in enumerate(pages) if p['role']=='admission')+1,{'id':'admission-materials','role':'admission','title':'资料清单与版本','html':'','source':'onboarding.html','kind':'materials'})
     pages.append({'id':'admission-result','role':'admission','title':'申请状态与补件','html':'','source':'onboarding.html','kind':'result'})
     # Four primary stages, with applicable field editors as subordinate views.

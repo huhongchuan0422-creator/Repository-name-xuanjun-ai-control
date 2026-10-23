@@ -650,4 +650,58 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+
+    def test_admission_condition_change_preserves_open_group_and_draft(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            subject=page.locator('.admission-data-card').filter(has_text='经营主体').first
+            subject.locator('summary').click()
+            subject.locator('input[data-path="subject_info.business_license_info.license_number"]').fill('DEMO-123')
+            identity=page.locator('.admission-data-card').filter(has_text='法人身份证').first
+            identity.locator('summary').click()
+            page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
+            expect(identity).to_have_attribute('open','')
+            expect(page.locator('[data-path="subject_info.business_license_info.license_number"]')).to_have_value('DEMO-123')
+            scene=page.locator('.admission-data-card').filter(has_text='经营场景').first
+            scene.locator('summary').click()
+            page.locator('[data-option="scene"]').select_option('both')
+            expect(scene).to_have_attribute('open','')
+            expect(page.locator('[data-option="scene"]')).to_be_focused()
+        finally:
+            page.close()
+
+    def test_admission_task_continue_review_and_all_status_states(self):
+        page=self.browser.new_page(viewport={'width':320,'height':740})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            page.locator('.admission-data-card').first.locator('[data-stage-continue]').click()
+            expect(page.locator('.admission-data-card').nth(1)).to_have_attribute('open','')
+            page.locator('.admission-data-card').nth(1).locator('[data-stage-review]').click()
+            expect(page.locator('#view h1').first).to_have_text('申请资料核对')
+            expect(page.locator('#view')).to_contain_text('返回对应资料组修改')
+            for scenario,label in (('loading','正在加载'),('empty','暂无记录'),('error','暂时无法加载'),('expired','会话已失效'),('no_permission','暂无此页面权限'),('unconnected','尚未连接业务数据')):
+                page.get_by_label('示例状态',exact=True).select_option(scenario)
+                expect(page.locator('#view')).to_contain_text(label)
+                expect(page.locator('#view')).not_to_contain_text('EXAMPLE-COMM-001')
+            page.get_by_label('示例状态',exact=True).select_option('sample')
+        finally:
+            page.close()
+
+    def test_material_validation_error_is_local_and_old_record_is_retained(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-start/edit')
+            upload=page.locator('input[data-material-kind="business_license"]').first
+            valid=self.out/'valid-material.png';valid.write_bytes(b'\x89PNG\r\n\x1a\n')
+            upload.set_input_files(str(valid))
+            expect(upload.locator('xpath=ancestor::label')).to_contain_text('valid-material.png')
+            invalid=self.out/'invalid-material.txt';invalid.write_text('not an image')
+            upload.set_input_files(str(invalid))
+            expect(upload.locator('xpath=ancestor::label')).to_contain_text('仅支持PDF')
+            expect(upload.locator('xpath=ancestor::label')).to_contain_text('valid-material.png')
+        finally:
+            page.close()
+
+
 if __name__=='__main__':unittest.main()
