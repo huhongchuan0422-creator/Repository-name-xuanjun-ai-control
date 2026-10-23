@@ -221,5 +221,16 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not job:
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         return {"job_id": job_id, "status": job["status"], "revision": body.revision, "recorded": True}
+    @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
+    def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
+        p = principal(authorization)
+        job = jobs.get(job_id, p.tenant_id)
+        if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        if not isinstance(jobs, SecureSQLiteJobStore):
+            raise HTTPException(status_code=501, detail="OCR_DELETE_REQUIRES_DURABLE_STORE")
+        if not jobs.delete(job_id, p.tenant_id):
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        return None
     app.state.ocr_job_store = jobs
     return app
