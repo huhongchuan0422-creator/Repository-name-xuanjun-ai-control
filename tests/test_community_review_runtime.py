@@ -24,24 +24,37 @@ class IntegratedReview(unittest.TestCase):
   self.addCleanup(context.close);return page
  def ready(self,page):
   page.goto(self.url);page.locator('body[data-review-ready="true"]').wait_for();expect(page.locator('#native')).to_contain_text('客户身份已验证')
+ def visible_field(self,page,selector,label,max_steps=24):
+  target=page.locator(selector)
+  for attempt in range(max_steps+1):
+   if target.count() and target.is_visible():return target
+   if attempt==max_steps:break
+   before_cursor=page.evaluate('window.reviewPage.data.fieldCursor')
+   before=page.locator('#native [data-path]:visible').first.get_attribute('data-path') if page.locator('#native [data-path]:visible').count() else None
+   next_field=page.get_by_role('button',name='下一项资料',exact=True)
+   expect(next_field).to_be_visible()
+   next_field.click()
+   after_cursor=page.evaluate('window.reviewPage.data.fieldCursor')
+   self.assertNotEqual(after_cursor,before_cursor,f'{label}: field cursor did not advance')
+   visible=page.locator('#native [data-path]:visible')
+   after=visible.first.get_attribute('data-path') if visible.count() else None
+   self.assertNotEqual(after,before,f'{label}: visible field did not advance')
+  raise AssertionError(f'{label}: target field not visible after {max_steps} bounded advances')
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
   page=self.page();errors=[];requests=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:requests.append(r.url))
   self.ready(page);page.locator('#apply').click();expect(page.locator('#native')).to_contain_text('选择原申请继续办理')
   page.locator('input[data-key="store_name"]').fill('同版本测试门店')
   page.locator('input[data-key="address"]').fill('隔离演示地址')
-  merchant_name=page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')
-  for _ in range(24):
-   if await merchant_name.count() and await merchant_name.is_visible():break
-   next_field=page.get_by_role('button',name='下一项资料',exact=True)
-   expect(next_field).to_be_visible()
-   next_field.click()
-  expect(merchant_name).to_be_visible()
+  merchant_name=self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','stage0 merchant_name')
   merchant_name.fill('同版本测试主体')
   page.get_by_role('button',name='保存并下一步',exact=True).click();expect(page.locator('#native')).to_contain_text('2 / 4')
-  page.locator('input[data-path="contact_info.mobile_phone"]').fill('13800000000')
+  mobile=self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','stage1 mobile_phone')
+  mobile.fill('13800000000')
   page.get_by_role('button',name='保存并下一步',exact=True).click();expect(page.locator('#native')).to_contain_text('3 / 4')
   application=page.evaluate('window.reviewPage.data.application.application')
-  page.get_by_role('button',name='上一步',exact=True).click();expect(page.locator('input[data-path="contact_info.mobile_phone"]')).to_have_value('13800000000')
+  page.get_by_role('button',name='上一步',exact=True).click();expect(page.locator('#native')).to_contain_text('2 / 4')
+  mobile_after_back=self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','stage2 back to stage1 mobile_phone')
+  expect(mobile_after_back).to_have_value('13800000000')
   page.reload();page.get_by_role('button',name='同版本测试门店 · DRAFT',exact=True).click();expect(page.locator('input[data-key="store_name"]')).to_have_value('同版本测试门店')
   self.assertEqual(page.evaluate('window.reviewPage.data.application.application'),application)
   page.screenshot(path=str(self.out/'native-same-application.png'),full_page=True)
