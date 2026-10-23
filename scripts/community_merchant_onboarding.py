@@ -166,7 +166,7 @@ class MerchantOnboarding:
             opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
             opening_workspaces=workspaces,
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',payment_enabled=False)
-    def dispatch(self,session,csrf,body):
+    def dispatch(self,session,csrf,body,*,source_origin=None):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
             raise ValueError('INVALID_ONBOARDING_REQUEST')
         op,params=body['operation'],body['params'];c=self.center
@@ -224,6 +224,14 @@ class MerchantOnboarding:
         if op=='save' and application is None:
             application='ma_'+secrets.token_hex(16);owner=uid
             meta={'entity_type':params['entity_type'],'category':params['category'],'delegated':params['delegated'],'materials':{}}
+            # Trusted Python composition only; never a body-supplied scope.
+            if source_origin is not None:
+                if (type(source_origin) is not dict or set(source_origin)!={'project','scene','scope'}
+                        or any(type(source_origin[k]) is not str or not source_origin[k] for k in ('project','scene'))):
+                    raise ValueError('EXACT_APPLICATION_ORIGIN_REQUIRED')
+                from scripts.community_merchant_contract import scope
+                scope(source_origin['scope'])
+                meta['ocr_origin']=json.loads(canonical(source_origin))
             data=None
         else:owner,meta,data=self._load(application,uid,op in ('review','review_material') or op=='download' and uid in self.reviewers)
         if op=='download':

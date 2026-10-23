@@ -1,0 +1,33 @@
+# Issue76: community-side OCR source contract
+
+This is source preparation, not deployed authentication, OCR inference, HTTP integration, official device acceptance or merchant approval. The only OCR API inspected is PR139 commits `5b6a46a743852dac9c25090e428a2b71e3e0ad9b` and `837f72487ea9ae8e5f39f18b3adce4ded48b3019`. Both API files have SHA256 `4d674ee22d66df2d92b21a955109c91dc946f993fb5406ced913fb27e7a6c757`. No OCR source is copied, changed or substituted here.
+
+## Existing authoritative chain
+
+| Value | Original server authority / function |
+| --- | --- |
+| Login subject | `CenterIdentity.merchant_context(token, scene)` -> `_resolve` -> `Center.session`; current `WECHAT_MINI_SESSION` and `WECHAT_MINI` links, project/registration permission, current epoch and maintenance gate. `uid` is the subject; no client-supplied user or verified flag. |
+| Business tenant/project/store | Registered scene -> original Principal -> runtime binding scope; `_resolve` checks project tenant against Principal tenant. Never use the onboarding table's `tenant` column as business tenant: that existing column is applicant UID. |
+| Application owner | `MerchantOnboarding._load(application, uid)`: active `COMMUNITY_ONBOARDING` link, owner UID, encrypted metadata, original workflow application. |
+| Application origin | New applications created through `MiniMerchant.dispatch` save a server-derived `ocr_origin` in the existing encrypted metadata and original save transaction. Contains project, scene, business tenant/merchant/store scope. Client body schemas do not accept it; subsequent saves do not replace it. No new table, grant or credential. Old/web-created applications without origin are refused for OCR; no historical attribution is guessed or migrated. |
+| Attachment | Current metadata material kind -> `object_id`; original `objects.project` must equal the application, scan CLEAN, stored SHA must equal metadata SHA, expiration checked. Replaced historical objects are not treated as current attachments. |
+| File bytes and SHA | Decrypt original private encrypted object using `object:<application>:<object_id>` AAD; check exact length and recompute SHA256 against database + metadata. No browser-selected file or uploaded OCR multipart digest is taken as application authority. |
+
+## Community preparation implemented
+
+`MiniMerchant.ocr_source(token, scene, application, kind)` is a **protected Python-only method**. It is not added to client operation allowlists or HTTP routes. It revalidates original identity, immutable application origin, current owner, scanned object and decrypted bytes, then checks identity/scope/application revision/material state again before returning. It returns `subject`, business `tenant_id`, `project`, `scene`, `scope`, `onboarding_application_id`, `application_revision`, `attachment_id`, `document_sha256`, OCR `document_type`, MIME and raw `data` for the trusted caller only. Never log or serialize this result to a public response. There is no OCR network call or claim of OCR success.
+
+Supported mappings: `business_license` -> `business_license`; `identity_front` with original `IDENTIFICATION_TYPE_IDCARD` -> `id_front`. Existing PDF uploads remain preserved but OCR source preparation refuses them as `OCR_IMAGE_REQUIRED`; no conversion engine is invented. Storefront/interior/cashier photographs, back sides, passports and unsupported kinds are refused. The original material upload workflow is unchanged apart from storing new application provenance.
+
+## Mapping to actual OCR callbacks and remaining hard gaps
+
+- `authenticate(token) -> OCR Principal`: host composition must resolve the **original** token with a server-selected registered scene and map the returned UID/business tenant to the actual OCR Principal. It must revalidate each request, including session/provider/project revocation. No OCR `ocr:use`/`ocr:admin` grant is created here; the actual admitted permission mapping is still absent. Do not forward app secrets or mint a second token.
+- `authorize_application(p, application_id)`: compare actual authenticated subject/business tenant and use current `_load` plus immutable `ocr_origin`; do not merely compare UID or accept the caller's tenant. A request-bound trusted composition needs the original session and scene to call `ocr_source`. That composition is **not installed**, and application ownership is not established by injecting a permissive callback.
+- `authorize_attachment(p, application_id, attachment_id)`: current object ID can be bound to `ocr_source`. But the inspected OCR callback is invoked **before** reading multipart bytes, accepts only three arguments, and does not receive document type, expected SHA, bytes or application revision. Its boolean result is not compared with the later SHA computed from multipart bytes. This cannot prove that the submitted OCR bytes are the original authorized attachment. A trusted community sender can use exactly the prepared bytes, but this does not fix the gateway's acceptance contract for other callers.
+- Actual OCR GET/confirm/delete paths check authenticated tenant and job subject/admin but do not invoke application/attachment callbacks. A still-valid login alone cannot attest application-specific revocation, replacement or permission on those paths. Current GET also filters confirmed fields/revision. Record these actual API gaps; do not assume the rejected API/YAML changes landed.
+
+Required OCR handoff before enabling any HTTP connection: an accepted contract for binding actual incoming bytes + document type + application revision to the authoritative attachment, and live application/attachment authorization on job reads/confirmation/deletion. Runtime host composition and permission admission must also be explicit. Missing contract/source keeps OCR integration HOLD; no workaround endpoint is added to community.
+
+## Evidence and limits
+
+Focused tests use the actual original Center/session/application/scanned encrypted-object code with synthetic provider/material fixtures. They cover subject/tenant source, another owner/tenant, cross-application object, current replacement and wrong SHA, revoked provider/session, missing legacy origin, client-origin injection, scene photos and PDF rejection. They are community authorization/source tests, **not** actual OCR HTTP or real-document inference. Existing business/UI/66-route evidence is reused; no official preview/upload, credentials, deployment, payment or production operation is performed.

@@ -62,7 +62,7 @@ class MiniMerchant:
         if op=='onboarding':
             if set(p)!={'operation','params'} or type(p['operation']) is not str or p['operation'] not in APPLICANT:
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
-            return self.onboarding.dispatch(token,csrf,p)
+            return self.onboarding.dispatch(token,csrf,p,source_origin=self._ocr_origin(scene,pid,principal))
         if op in ('read','write'):
             if set(p)!={'workspace','operation','params'} or type(p['operation']) is not str or p['operation'] not in (READS if op=='read' else WRITES) or type(p['workspace']) is not str:
                 raise PermissionError('MERCHANT_READ_OPERATION_REQUIRED')
@@ -70,3 +70,50 @@ class MiniMerchant:
             if op=='write' and grant['role']!='MERCHANT_ADMIN':raise PermissionError('MERCHANT_ADMIN_REQUIRED')
             return self.operations.dispatch(token,csrf,p)
         raise PermissionError('MINI_MERCHANT_OPERATION_DENIED')
+
+    def _ocr_origin(self,scene,project,principal):
+        return {'project':project,'scene':scene,'scope':dict(self.identity.runtime.bindings[principal])}
+
+    def ocr_source(self,token,scene,application,kind):
+        """Protected Python-only preparation; no OCR/network call or HTTP exposure.
+
+        Original mini identity + current applicant ownership + immutable origin
+        + current scanned object + decrypted bytes are all rechecked. Legacy
+        applications without origin require separate authoritative admission.
+        """
+        import hashlib
+        from scripts.pr122_customer_core import private_path
+        uid,pid,csrf,principal=self.context(token,scene)
+        origin=self._ocr_origin(scene,pid,principal)
+        owner,meta,data=self.onboarding._load(application,uid)
+        if meta.get('ocr_origin')!=origin:
+            raise PermissionError('OCR_APPLICATION_ORIGIN_UNVERIFIED')
+        hints={'business_license':'business_license','identity_front':'id_front'}
+        if kind not in hints or (kind=='identity_front' and meta.get('identity_type')!='IDENTIFICATION_TYPE_IDCARD'):
+            raise PermissionError('OCR_DOCUMENT_NOT_SUPPORTED')
+        material=meta['materials'].get(kind)
+        if material is None:raise PermissionError('OCR_ATTACHMENT_REQUIRED')
+        if material['expires_at'] is not None and material['expires_at']<=self.identity.center.now():
+            raise PermissionError('OCR_ATTACHMENT_EXPIRED')
+        c=self.identity.center
+        row=c.db.execute('SELECT sha,size,mime,scan FROM objects WHERE id=? AND project=?',
+                         (material['object_id'],application)).fetchone()
+        if row is None or row['scan']!='CLEAN' or row['sha']!=material['sha256']:
+            raise PermissionError('OCR_ATTACHMENT_INTEGRITY')
+        raw=c.decrypt(private_path(c.objects/material['object_id']).read_bytes(),
+                      'object:'+application+':'+material['object_id'])
+        if not 1<=len(raw)<=5_000_000 or len(raw)!=row['size'] or hashlib.sha256(raw).hexdigest()!=row['sha']:
+            raise PermissionError('OCR_ATTACHMENT_INTEGRITY')
+        if row['mime'] not in ('image/png','image/jpeg'):
+            raise PermissionError('OCR_IMAGE_REQUIRED')
+        # Do not return bytes after a session/scope/application replacement.
+        current=self.context(token,scene)
+        _,latest,version=self.onboarding._load(application,uid)
+        if (current!=(uid,pid,csrf,principal) or self._ocr_origin(scene,pid,principal)!=origin
+                or latest!=meta or version['revision']!=data['revision']):
+            raise PermissionError('OCR_SOURCE_CHANGED')
+        return {'subject':owner,'tenant_id':origin['scope']['tenant_id'],
+                'project':pid,'scene':scene,'scope':origin['scope'],
+                'onboarding_application_id':application,'application_revision':data['revision'],
+                'attachment_id':material['object_id'],'document_sha256':row['sha'],
+                'document_type':hints[kind],'mime':row['mime'],'data':raw}

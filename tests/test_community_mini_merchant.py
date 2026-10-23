@@ -223,3 +223,80 @@ class CashierMaterialJourney(unittest.TestCase):
         self.assertEqual(self.op('wechat_read',application=self.app['application']),record)
         self.assertEqual(self.op('read',application=self.app['application'])['revision'],self.app['revision'])
         self.assertEqual(self.fx.center.check_integrity()['integrity'],'PASS')
+
+class OcrSourceBoundary(unittest.TestCase):
+    setUp=SameMiniMerchant.setUp
+    tearDown=SameMiniMerchant.tearDown
+    call=SameMiniMerchant.call
+    draft=SameMiniMerchant.draft
+    def material(self,app=None,kind='business_license',raw=b'\x89PNG\r\n\x1a\nSynthetic document, not a real credential'):
+        import base64
+        self.fx.center.scanner=lambda data:True
+        app=app or self.draft()
+        return self.call('onboarding',{'operation':'upload','params':{
+            'application':app['application'],'revision':app['revision'],'kind':kind,
+            'content_base64':base64.b64encode(raw).decode(),'expires_at':None}})
+    def test_original_identity_application_and_encrypted_bytes_supply_source(self):
+        import hashlib
+        app=self.material()
+        source=self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        self.assertEqual(source['subject'],self.fx.uid1)
+        self.assertEqual(source['tenant_id'],self.fx.stage.customer.tenant_id)
+        self.assertEqual(source['project'],'project1')
+        self.assertEqual(source['document_sha256'],hashlib.sha256(source['data']).hexdigest())
+        self.assertEqual(source['document_type'],'business_license')
+        self.assertFalse(self.fx.center.db.in_transaction)
+    def test_other_owner_and_tenant_scope_cannot_reuse_application(self):
+        app=self.material()
+        other=self.fx.token('othercode','openid2')
+        with self.assertRaises(PermissionError):
+            self.service.ocr_source(other,'shop1',app['application'],'business_license')
+        principal=self.fx.stage.customer
+        original=self.fx.identity.runtime.bindings[principal]
+        self.fx.identity.runtime.bindings[principal]={**original,'tenant_id':'other_tenant'}
+        with self.assertRaisesRegex(PermissionError,'ORIGIN_UNVERIFIED'):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+    def test_object_sha_mismatch_and_replacement_do_not_reuse_source(self):
+        app=self.material()
+        before=self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        app=self.material(app,raw=b'\x89PNG\r\n\x1a\nSynthetic replacement')
+        after=self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        self.assertNotEqual(before['attachment_id'],after['attachment_id'])
+        self.assertNotEqual(before['document_sha256'],after['document_sha256'])
+        self.fx.center.db.execute('UPDATE objects SET sha=? WHERE id=?',('0'*64,after['attachment_id']))
+        with self.assertRaisesRegex(PermissionError,'ATTACHMENT_INTEGRITY'):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+    def test_revoked_session_and_provider_binding_fail(self):
+        app=self.material()
+        self.fx.center.db.execute("UPDATE links SET active=0 WHERE channel='WECHAT_MINI' AND user_id=?",(self.fx.uid1,))
+        with self.assertRaises(PermissionError):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        self.fx.center.logout(self.token)
+        with self.assertRaises(PermissionError):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+    def test_legacy_origin_and_client_injected_origin_fail_closed(self):
+        app=self.material()
+        _,meta,_=self.onboarding._load(app['application'],self.fx.uid1)
+        meta.pop('ocr_origin')
+        with self.fx.center.tx():self.onboarding._meta(app['application'],self.fx.uid1,meta)
+        with self.assertRaisesRegex(PermissionError,'ORIGIN_UNVERIFIED'):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        with self.assertRaises(ValueError):
+            self.call('onboarding',{'operation':'save','params':{'ocr_origin':{},'application':None}})
+    def test_scene_photos_and_non_image_documents_never_enter_ocr(self):
+        app=self.material()
+        for kind in ('storefront_photo','interior_photo','cashier_photo'):
+            with self.subTest(kind=kind),self.assertRaisesRegex(PermissionError,'DOCUMENT_NOT_SUPPORTED'):
+                self.service.ocr_source(self.token,'shop1',app['application'],kind)
+        app=self.material(app,raw=b'%PDF-Synthetic existing supported upload')
+        with self.assertRaisesRegex(PermissionError,'IMAGE_REQUIRED'):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+
+    def test_attachment_from_another_application_is_denied(self):
+        first=self.material();second=self.material()
+        _,second_meta,_=self.onboarding._load(second['application'],self.fx.uid1)
+        _,first_meta,_=self.onboarding._load(first['application'],self.fx.uid1)
+        first_meta['materials']['business_license']=second_meta['materials']['business_license']
+        with self.fx.center.tx():self.onboarding._meta(first['application'],self.fx.uid1,first_meta)
+        with self.assertRaisesRegex(PermissionError,'ATTACHMENT_INTEGRITY'):
+            self.service.ocr_source(self.token,'shop1',first['application'],'business_license')
