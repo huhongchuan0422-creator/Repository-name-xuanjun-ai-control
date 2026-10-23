@@ -99,6 +99,20 @@ class SecureStoreTests(unittest.TestCase):
         self.assertIn("retention_deleted", events)
         with open(self.path, "rb") as stream:
             self.assertNotIn(b"tenant-a", stream.read())
+    def test_independent_instances_concurrent_same_key_same_job(self):
+        from concurrent.futures import ThreadPoolExecutor
+        barrier = threading.Barrier(8)
+        def create_once(_):
+            store = SecureSQLiteJobStore(self.path, self.key)
+            barrier.wait()
+            return store.create("tenant-a", "user-a", "app-a", "business_license", "c"*64, "concurrent-key-0001")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            jobs = list(pool.map(create_once, range(8)))
+        self.assertEqual(len({job["job_id"] for job in jobs}), 1)
+    def test_attachment_changes_idempotency_fingerprint(self):
+        first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a")
+        with self.assertRaisesRegex(ValueError, "OCR_IDEMPOTENCY_CONFLICT"):
+            self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-b")
     def test_reject_wrong_key(self):
         job=self.create()
         with self.assertRaisesRegex(RuntimeError, "OCR_ENCRYPTION_KEY_MISMATCH"):
