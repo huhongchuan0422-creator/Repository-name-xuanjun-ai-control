@@ -66,7 +66,7 @@ class IntegratedReview(unittest.TestCase):
  def test_native_home_store_navigation_uses_registered_pages(self):
   page=self.page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   self.ready(page)
-  page.get_by_role('button',name='查看门店介绍',exact=True).click()
+  page.get_by_role('button',name='查看门店介绍 ›',exact=True).click()
   expect(page).to_have_url(__import__('re').compile(r'view=store-detail&scene=shop1$'))
   expect(page.locator('#native')).to_contain_text('门店资料来源待接入')
   page.get_by_role('button',name='返回推荐店铺',exact=True).click()
@@ -77,8 +77,13 @@ class IntegratedReview(unittest.TestCase):
   expect(page.locator('#native')).to_contain_text('查看门店介绍')
   self.assertEqual(errors,[])
  def test_actual_web_license_inline_saves_and_uploads_same_application(self):
-  from scripts.community_review_runtime import ReviewRuntime
-  page=self.page();page.add_init_script(ReviewRuntime.frame_script('merchant','onboarding.html'))
+  page=self.page();page.add_init_script("""window.addEventListener('load',async()=>{
+    const response=await fetch('/review/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'merchant'})});
+    const context=await response.json();if(!response.ok||context.isolated!==true)throw Error('ISOLATED_SESSION_REQUIRED');
+    const originalFetch=window.fetch.bind(window),session=context.result;
+    window.fetch=(url,options={})=>originalFetch(url,{...options,headers:{...options.headers,'X-Center-Session':session.token,'X-CSRF-Token':session.csrf}});
+    await window.configureCommunityOnboarding({csrf:session.csrf});document.body.dataset.reviewReady='true';
+  });""")
   page.goto(self.url+'/merchant/join');page.locator('body[data-review-ready="true"]').wait_for()
   page.locator('#newApplication').click();page.locator('#entity_type').select_option('ENTERPRISE')
   license_name=page.locator('[data-path="subject_info.business_license_info.merchant_name"]')
