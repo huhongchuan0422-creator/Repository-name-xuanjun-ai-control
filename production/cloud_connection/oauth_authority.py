@@ -434,7 +434,14 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
                     or redirect_uri not in settings['redirect_uris']): abort(403)
             g.consent_form_source = consent_form_source(redirect_uri)
             from markupsafe import escape
+            # Display only this server-stored request, never consent query inputs.
+            # Missing/empty scope is explicit; do not invent a default permission.
+            details = ''.join('<dt>' + label + '</dt><dd data-consent-field="' + key + '">' +
+                              str(escape(params.get(key) or '(not explicitly requested)')) + '</dd>'
+                              for key, label in (('client_id', 'Client'),
+                                                 ('resource', 'Resource'), ('scope', 'Requested scope')))
             return ('<form method="post"><p>Allow read-only project connection access?</p>'
+                    '<dl>' + details + '</dl>'
                     '<input type="hidden" name="csrf" value="'+str(escape(session['csrf']))+'">'
                     '<button name="approve" value="yes">Allow</button></form>')
         if (set(request.form) != {'csrf','approve'} or request.form['approve'] != 'yes'
