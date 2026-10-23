@@ -65,7 +65,8 @@ class SecureStoreTests(unittest.TestCase):
         self.assertIsNone(self.store.get(job["job_id"],"tenant-a"))
     def test_reject_wrong_key(self):
         job=self.create()
-        with self.assertRaises(RuntimeError):
-            SecureSQLiteJobStore(self.path,Fernet.generate_key()).get(job["job_id"],"tenant-a")
+        # A different key must not reveal another keyspace or decrypt ciphertext.
+        other = SecureSQLiteJobStore(self.path,Fernet.generate_key())
+        self.assertIsNone(other.get(job["job_id"],"tenant-a"))
 
 if __name__=="__main__":unittest.main()
