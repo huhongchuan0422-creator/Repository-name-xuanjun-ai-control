@@ -14,6 +14,8 @@ import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch, Mock
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 import test_community_mini_center_identity as fixture
 from scripts.community_platform_host import PlatformHost, _configuration, _require_nonroot, main
 from scripts.community_persistent_runtime import PersistentRuntime
@@ -52,6 +54,18 @@ class FormalHost(unittest.TestCase):
                 project_roles=['OWNER'],principal='merchant')},reviewers={self.fx.uid2:'project1'},
             socket_path=str(self.root/'community.sock'),https_origin=config['https_origin'],
             nginx_uid=max(1,os.geteuid()),nginx_gid=os.getegid())
+        # Synthetic RSA fixture uses the actual PartnerOrderReader validation path.
+        private=rsa.generate_private_key(public_exponent=65537,key_size=2048)
+        private_pem=private.private_bytes(serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode('ascii')
+        public_pem=private.public_key().public_bytes(serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo).decode('ascii')
+        self.reader_path=self.write('reader.json',dict(sp_mchid='1900000000',
+            merchant_serial='ABCD1234',private_key_pem=private_pem,
+            public_key_id='PUB_KEY_ID_TEST',public_key_pem=public_pem))
+        self.reader_valid_private=private_pem
+        self.reader_valid_public=public_pem
+        self.plan['provider_reader_config']=str(self.reader_path)
         self.key_material=dict(active_key='testkey',keys={'testkey':base64.b64encode(b'k'*32).decode()})
         self.wechat=dict(appid=self.fx.identity.appid,app_secret='a'*32)
         self.plan_path=self.write('host.json',self.plan)
@@ -73,6 +87,11 @@ class FormalHost(unittest.TestCase):
             self.assertIs(app.identity.runtime,host.persistence.runtime)
             self.assertIs(app.gateway.commerce,app.commerce)
             self.assertIs(app.operations.onboarding,app.onboarding)
+            from scripts.community_wechat_sp_readonly import PartnerOrderReader
+            self.assertIsInstance(app.onboarding.wechat_applyment.reader,PartnerOrderReader)
+            self.assertFalse(app.onboarding.wechat_applyment.enabled)
+            self.assertIs(app.onboarding.wechat_applyment.onboarding,app.onboarding)
+
             self.assertIsNone(getattr(app.gateway,'payments',None))
             self.assertIsNone(host.persistence.runtime.demo.qr_key)
             web=host.center.login('one@example.org','FixturePassword123!')
@@ -109,6 +128,34 @@ class FormalHost(unittest.TestCase):
             from scripts.community_mini_login import LoginUnavailable
             with self.assertRaises(LoginUnavailable):host.application.gateway.login({'code':'unknown_native'})
             self.assertEqual(host.center.db.execute('SELECT count(*) FROM accounts').fetchone()[0],before)
+    def test_provider_reader_fail_closed_and_does_not_use_mock_or_enable_submission(self):
+        # Omitted or invalid protected Reader references cannot start the
+        # privileged onboarding composition, even if the operator has grants.
+        for issue in ('missing_ref','relative_ref','extra_key','world_readable','bad_rsa'):
+            with self.subTest(issue=issue):
+                plan=copy.deepcopy(self.plan)
+                reader=json.loads(self.reader_path.read_text())
+                original_mode=self.reader_path.stat().st_mode
+                if issue=='missing_ref':plan.pop('provider_reader_config')
+                elif issue=='relative_ref':plan['provider_reader_config']='reader.json'
+                elif issue=='extra_key':reader['test_only']='forbidden'
+                elif issue=='world_readable':self.reader_path.chmod(0o644)
+                else:reader['private_key_pem']='not a real RSA private key'
+                self.write('host.json',plan)
+                if issue in ('extra_key','bad_rsa'):self.write('reader.json',reader)
+                try:
+                    with self.assertRaises((ValueError,PermissionError)):
+                        self.open()
+                finally:
+                    self.write('host.json',self.plan)
+                    self.reader_path.chmod(0o600)
+                    if issue in ('extra_key','bad_rsa'):
+                        self.write('reader.json',dict(sp_mchid='1900000000',
+                            merchant_serial='ABCD1234',
+                            private_key_pem=self.reader_valid_private,
+                            public_key_id='PUB_KEY_ID_TEST',
+                            public_key_pem=self.reader_valid_public))
+
     def test_bad_appid_private_input_or_missing_center_fail_before_store_open(self):
         for kind in ('appid','permission','missing_center'):
             with self.subTest(kind=kind):
