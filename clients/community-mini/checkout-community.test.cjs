@@ -5,9 +5,9 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 function page(failProducts=false,receipt=null){
  let definition;const calls=[];
- const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='project_checklist')return {items:[{id:'material1',title:'准备证件',instructions:'根据原项目私有材料要求准备',submission_type:'SECRETREF',state:'PARTIAL',required:true,revision:1}]};if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='project_messages')return {records:[{id:'m_fixture',body:'历史反馈',status:'ARCHIVED',channel:'WEB',created:100}],has_more:false,next_cursor:null,source:'ORIGINAL_CENTER_ARCHIVE',provider_reply_verified:false};if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
+ const session={login:async()=>{},clear:()=>{},transport:async()=>{},payment:async()=>{},commerce:async(scene,operation,params)=>{calls.push({scene,operation,params});if(operation==='products'){if(failProducts)throw Error('暂停交易');return {products:[]};}if(operation==='orders')return {records:[{reference:'owner-order-1',user_id:'user-fixture',order:{state:'PENDING',amount_minor:120,currency:'CNY'}}],has_more:false,next_cursor:null};if(operation==='purchase_read')return {reference:params.reference,user_id:'user-fixture',amount_minor:120,currency:'CNY',order:{state:'PENDING',amount_minor:120,currency:'CNY'},lines:[{item_id:'item-1',name:'原快照商品',revision:1,quantity:1,unit_minor:120,subtotal_minor:120}],fulfillment_state:'PENDING',fulfillment_revision:1,completion_note:''};if(operation==='project_checklist')return {items:[{id:'material1',title:'准备证件',instructions:'根据原项目私有材料要求准备',submission_type:'SECRETREF',state:'PARTIAL',required:true,revision:1}]};if(operation==='receipt_ad'){if(typeof receipt==='function')return receipt(scene,params);return {payment_success_verified:false,creative:null};}if(operation==='project_messages')return {records:[{id:'m_fixture',body:'历史反馈',status:'ARCHIVED',channel:'WEB',created:100}],has_more:false,next_cursor:null,source:'ORIGINAL_CENTER_ARCHIVE',provider_reply_verified:false};if(operation==='communities')return {records:[{id:'co_fixture',name:'fixture'}],has_more:false,next_cursor:null};return {community_id:'co_fixture',active:true};}};
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:value=>{definition=value;},require:path=>path==='../../customer-auth'?auth:path==='../../client'?{makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})}:path==='../../payment'?{createPaymentFlow:()=>({reset(){}})}:{parseScene:o=>o.scene,createSession:()=>session},getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid',commerce:true,payments:true}}),wx:{}});
- const result={...definition,data:{...definition.data},setData(values){Object.assign(this.data,values);}};
+ const result={...definition,data:{...definition.data},setData(values,callback){Object.assign(this.data,values);if(typeof callback==='function')callback();}};
  return {result,calls};
 }
 test('paused storefront keeps original order recovery and after-sales available',async()=>{
@@ -122,4 +122,20 @@ test('requirement picker locks original reference type and rejects document subs
  assert.match(result.data.status,/私有文件上传/);
  result.selectProjectRequirement({currentTarget:{dataset:{item:'oauth1',revision:1}}});
  assert.equal(result.data.projectReferenceRevision,2);
+});
+
+test('本人订单选择自动打开原快照详情并返回本人列表，不触发购买',async()=>{
+ const {result,calls}=page();await result.onLoad({scene:'shop1'});
+ result.setData({commerceEnabled:true,userId:'user-fixture',sessionReady:true,orders:[{reference:'owner-order-1',user_id:'user-fixture',order:{state:'PENDING',amount_minor:120,currency:'CNY'}}]});
+ result.selectOrder({currentTarget:{dataset:{reference:'owner-order-1'}}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(result.data.orderDetails.reference,'owner-order-1');
+ assert.equal(result.data.orderDetails.lines[0].name,'原快照商品');
+ assert.equal(calls.at(-1).operation,'purchase_read');
+ assert.equal(calls.at(-1).params.reference,'owner-order-1');
+ result.backToOrderList();
+ assert.equal(result.data.orderDetails,null);
+ assert.equal(result.data.reference,'');
+ assert.equal(result.data.orders.length,1);
+ assert.equal(calls.filter(c=>c.operation==='purchase').length,0);
 });
