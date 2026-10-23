@@ -1,11 +1,13 @@
 """HTTP contract and tenant-isolation tests; inference is explicitly injected, never mocked as proof of OCR."""
 import io
+import os
+import tempfile
 import unittest
 from fastapi.testclient import TestClient
 try:
-    from .api import create_app, Principal, JobStore
+    from .api import create_app, Principal, JobStore, SQLiteJobStore
 except ImportError:
-    from api import create_app, Principal, JobStore
+    from api import create_app, Principal, JobStore, SQLiteJobStore
 
 TOKEN_TENANTS = {
     "tenant-a-token": Principal(subject="user-a", tenant_id="tenant-a", permissions={"ocr:use"}),
@@ -49,6 +51,15 @@ class ApiTests(unittest.TestCase):
             data={"document_type":"storefront_photo","onboarding_application_id":"synthetic-app"},
             files={"file":("store.jpg",b"\xff\xd8\xffsynthetic","image/jpeg")})
         self.assertEqual(r.status_code,400)
+    def test_sqlite_persistence_survives_store_recreation_and_isolates_tenant(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = os.path.join(temp, "jobs.sqlite3")
+            store1 = SQLiteJobStore(path)
+            job = store1.create("tenant-a", "user-a", "app-1", "business_license", "a" * 64)
+            store1.update(job["job_id"], status="needs_review", fields={"company_name": {"value": "SYNTHETIC"}})
+            store2 = SQLiteJobStore(path)
+            self.assertEqual(store2.get(job["job_id"], "tenant-a")["status"], "needs_review")
+            self.assertIsNone(store2.get(job["job_id"], "tenant-b"))
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
