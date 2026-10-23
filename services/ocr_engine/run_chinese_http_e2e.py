@@ -32,9 +32,12 @@ def main():
         authorized_hashes={attachment:hashlib.sha256(images[kind]).hexdigest() for kind,attachment in docs}
         revoked_apps=set(); revoked_attachments=set()
         def app_auth(p, app_id): return app_id=='synthetic-app' and app_id not in revoked_apps
-        def attachment_auth(p, app_id, attachment_id, supplied_sha256):
+        def attachment_auth(p, app_id, attachment_id, supplied_sha256, document_type, expected_application_revision=None):
             expected=authorized_hashes.get(attachment_id)
-            return {'authorized': expected is not None and expected==supplied_sha256 and attachment_id not in revoked_attachments, 'content_sha256': expected or ''}
+            kind=next((kind for kind,att in docs if att==attachment_id), None)
+            revision='synthetic-app-revision-1'
+            if expected_application_revision is not None and str(expected_application_revision)!=revision: revision='synthetic-app-revision-2'
+            return {'authorized': expected is not None and expected==supplied_sha256 and attachment_id not in revoked_attachments and kind==document_type and revision=='synthetic-app-revision-1', 'content_sha256': expected or '', 'document_type':kind, 'application_revision':revision}
         def make_client():
             store=SecureSQLiteJobStore(db,key)
             app=create_app(authenticate=lambda token: principal if token=='synthetic-token' else (_ for _ in ()).throw(ValueError('bad token')),
