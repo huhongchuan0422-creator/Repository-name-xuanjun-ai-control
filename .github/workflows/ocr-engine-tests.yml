@@ -4,6 +4,11 @@ on:
     paths:
       - 'services/ocr_engine/ocr_core.py'
       - 'services/ocr_engine/api.py'
+      - 'services/ocr_engine/test_api.py'
+      - 'services/ocr_engine/test_model_distribution.py'
+      - 'services/ocr_engine/model_distribution/**'
+      - 'services/ocr_engine/README.md'
+      - 'docs/development/XUANJUN_OCR_API_V1_20261024.yaml'
       - 'services/ocr_engine/run_chinese_http_e2e.py'
       - 'services/ocr_engine/run_synthetic_inference.py'
       - 'services/ocr_engine/requirements.txt'
