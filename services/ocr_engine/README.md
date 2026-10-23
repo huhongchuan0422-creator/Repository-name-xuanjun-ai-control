@@ -42,3 +42,6 @@ RapidOCR v3.9.2 source LICENSE and the fixed model-specific notice at https://gi
 2. Release artifact packaging verification: confirm the actual distributable archive includes model_manifest.json, model_distribution/LICENSE-2.0.txt, model_distribution/NOTICE.md and any applicable upstream NOTICE; source-level license rights for the three pinned files are already verified.
 3. Deployment-specific key custody/rotation, backup, retention/deletion, monitoring and load/rate/timeout settings.
 4. Production deployment is not authorized by this document or a green Hosted run.
+
+## Integration contract gaps — HOLD
+The current attachment callback signature is `(principal, onboarding_application_id, attachment_id, content_sha256) -> {authorized: bool, content_sha256: str}`. It binds the bytes to a server-resolved original object hash, but does not yet bind `document_type` or an application revision/version. The current application callback returns only a boolean and does not pin a revision. Until those fields are added to durable job metadata and rechecked on GET/confirm/delete, replacement/revision-race protection is **HOLD**. The community integration owner must provide the actual trusted resolver and revision contract; this OCR branch must not invent or impersonate it.
