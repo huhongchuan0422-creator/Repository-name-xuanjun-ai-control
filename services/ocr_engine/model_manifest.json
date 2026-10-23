@@ -11,7 +11,7 @@
     "name": "RapidAI/RapidOCR PP-OCRv6 small ONNX + PP-OCRv4 textline orientation classifier",
     "source_revision": "v3.9.2",
     "source_manifest": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/python/rapidocr/default_models.yaml",
-    "model_license_notes": "RapidOCR README states applicable upstream models are distributed under Apache-2.0, but the referenced MODEL_LICENSES.md could not be resolved in the inspected repository path and upstream issue #739 tracks model notice/licensing documentation for v3.10.0. Treat code license and model-weight notice as separate. Commercial redistribution/repackaging remains HOLD until the exact tagged notice is verified.",
+    "model_license_notes": "Authoritative fixed upstream notice verified at https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md (Git blob SHA 3f66af490abe83df801bfb8d1ea80eed7b0048ae). Sections 4-7 state covered Section 6 artifacts are Apache-2.0, commercial use is not restricted, converted artifacts use same terms, and redistribution must include Apache-2.0 license, applicable copyright/attribution notices, prominent notices for modified files, and applicable upstream NOTICE contents. The three Section 6 hashes match this manifest exactly. Commercial license-source uncertainty is resolved for these listed artifacts; release packaging compliance remains pending until the required notice/license bundle is assembled and verified.",
     "model_license_evidence": [
       "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/README.md",
       "https://github.com/RapidAI/RapidOCR/discussions/736",
@@ -36,9 +36,23 @@
     }
   },
   "verification": {
-    "source_hashes_published_upstream": true,
-    "bytes_downloaded_and_rehashed_in_this_environment": false,
-    "actual_inference_verified": false,
-    "blocker": "No actual model bytes have been downloaded and rehashed here; source manifest publishes the hashes. Run the new GitHub-hosted OCR workflow to verify code tests. Model download and synthetic-image offline inference remain unverified."
-  }
+    "source_notice_verified": true,
+    "source_notice_git_blob_sha": "3f66af490abe83df801bfb8d1ea80eed7b0048ae",
+    "published_hashes_match_manifest": true,
+    "bytes_downloaded_and_rehashed_in_github_hosted_run_40007712096": true,
+    "real_english_synthetic_inference_verified_in_run_40007712096": true,
+    "chinese_license_http_sqlite_chain_verified_in_run_40007712096": true,
+    "chinese_license_and_id_front_extended_e2e_run_40008456567": "FAILURE_BEFORE_FINAL_E2E_VERDICT; font install remained in progress when last observed",
+    "chinese_license_and_id_front_extended_e2e_latest_run": "40008456567",
+    "commercial_use_source_basis": "UPSTREAM_NOTICE_VERIFIED_FOR_SECTION_6_ARTIFACTS",
+    "release_notice_bundle": "PENDING",
+    "actual_id_front_chinese_e2e": "NOT_YET_VERIFIED"
+  },
+  "model_license_evidence": [
+    "https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md",
+    "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx",
+    "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx",
+    "https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE",
+    "https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/model_list.md"
+  ]
 }
