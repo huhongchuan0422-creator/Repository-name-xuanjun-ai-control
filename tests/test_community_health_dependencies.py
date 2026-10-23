@@ -2,6 +2,8 @@
 import concurrent.futures
 import http.client
 import json
+import os
+from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +12,7 @@ import test_community_mini_center_identity as fixture
 from scripts.community_mini_application import MiniApplication
 from scripts.community_mini_center_identity import CenterIdentity
 from scripts.community_mini_http import serve
+from scripts.community_mini_http import runtime_version
 from scripts.community_mini_login import MiniGateway
 from scripts.community_saas_modules import connect as module_connect
 from scripts.community_stage_runtime import StageRuntime
@@ -59,6 +62,35 @@ class HealthDependencies(unittest.TestCase):
         self.assertEqual(result,dict(status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False))
         self.assertEqual(headers['Cache-Control'],'no-store')
         self.assertEqual([db.total_changes for db in databases],before)
+
+    def test_health_reports_running_build_stamp_not_request_or_changed_environment(self):
+        root=Path(self.tmp.name);(root/'scripts').mkdir()
+        stamp=root/'COMMUNITY_SOURCE_SHA';stamp.write_text('a'*40+'\n')
+        with patch('scripts.community_mini_http.__file__',str(root/'scripts/community_mini_http.py')), \
+             patch.dict(os.environ,COMMUNITY_SOURCE_SHA='a'*40):
+            server=serve(self.app.gateway)
+        try:
+            # The composition retains its build identity; later env changes or
+            # request headers cannot claim another running image revision.
+            with patch.dict(os.environ,COMMUNITY_SOURCE_SHA='b'*40):
+                status,health,_=self.get(server)
+            self.assertEqual(status,200)
+            self.assertEqual(health['runtime_source_sha'],'a'*40)
+            self.assertEqual(health['version_source'],'IMAGE_BUILD_STAMP')
+            self.assertIsInstance(health['observed_at'],int)
+            self.assertFalse(health['production_acceptance'])
+        finally:server.server_close()
+
+    def test_build_stamp_missing_malformed_or_env_mismatch_cannot_claim_runtime_sha(self):
+        root=Path(self.tmp.name);stamp=root/'COMMUNITY_SOURCE_SHA'
+        with patch('scripts.community_mini_http.__file__',str(root/'scripts/community_mini_http.py')), \
+             patch.dict(os.environ,COMMUNITY_SOURCE_SHA='a'*40):
+            self.assertIsNone(runtime_version())
+            for data in ('bad','b'*40):
+                stamp.write_text(data);self.assertIsNone(runtime_version())
+            stamp.write_text('a'*40);self.assertEqual(runtime_version(),'a'*40)
+            stamp.unlink();stamp.symlink_to(root/'missing')
+            self.assertIsNone(runtime_version())
 
     def test_closed_orders_is_unavailable(self):self.closed('orders')
     def test_closed_merchants_is_unavailable(self):self.closed('merchants')

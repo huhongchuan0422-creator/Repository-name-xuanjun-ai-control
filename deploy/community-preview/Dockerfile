@@ -10,7 +10,7 @@ COPY scripts/ /app/scripts/
 COPY demos/community-stage/ /app/demos/community-stage/
 ARG SOURCE_SHA
 ENV COMMUNITY_SOURCE_SHA=$SOURCE_SHA
-RUN python -c "import re; assert re.fullmatch('[0-9a-f]{40}', '$SOURCE_SHA')" && mkdir -p /home/community && chown 10001:1008 /home/community && chmod 0700 /home/community
+RUN python -c "import re; assert re.fullmatch('[0-9a-f]{40}', '$SOURCE_SHA')" && printf '%s\n' "$SOURCE_SHA" > /app/COMMUNITY_SOURCE_SHA && chmod 0444 /app/COMMUNITY_SOURCE_SHA && mkdir -p /home/community && chown 10001:1008 /home/community && chmod 0700 /home/community
 LABEL org.opencontainers.image.revision=$SOURCE_SHA
 USER 10001:1008
 

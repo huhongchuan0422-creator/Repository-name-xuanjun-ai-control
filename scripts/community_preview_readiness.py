@@ -2,7 +2,7 @@
 
 This proves connectivity only, not real login, merchant admission or acceptance.
 """
-import json, os, time
+import json, os, re, time
 from pathlib import Path
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -32,7 +32,9 @@ def check(open_url=None, profile=None):
                 customer_acceptance=False,payment_enabled=False)
     try:
         target=target_for(profile if profile is not None else os.environ.get('COMMUNITY_PREVIEW_PROFILE','legacy'))
-        report.update(target,source_sha=os.environ.get('GITHUB_SHA'),observed_at=int(time.time()))
+        head=os.environ.get('GITHUB_SHA')
+        report.update(target,frontend_source_sha=head,compatibility='UNVERIFIED')
+        if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
             report['http_status']=response.status
@@ -44,6 +46,15 @@ def check(open_url=None, profile=None):
             if (type(value) is not dict or value.get('status')!='READY'
                     or value.get('scope')!='PROCESS_AND_DATABASE_CONNECTIVITY'
                     or value.get('production_acceptance') is not False):return report
+            # Only the responding runtime supplies the backend SHA. This version
+            # admits exact source equality; no unreviewed cross-version pair.
+            backend=value.get('runtime_source_sha')
+            report['backend_source_sha']=backend if type(backend) is str and re.fullmatch('[0-9a-f]{40}',backend) else None
+            now=int(time.time());observed=value.get('observed_at')
+            if (report['backend_source_sha']!=head or value.get('version_source')!='IMAGE_BUILD_STAMP'
+                    or type(observed) is not int or observed>now+30 or now-observed>600):return report
+            report.update(observed_at=now,backend_observed_at=observed,
+                          backend_version_source='IMAGE_BUILD_STAMP',compatibility='EXACT_SOURCE_MATCH')
             report['status']='BACKEND_HEALTH_VERIFIED'
     except Exception:
         # Never print remote content, exception text or credentials.

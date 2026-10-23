@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 import zipfile
 from email.message import Message
 from scripts.community_stage_package import build
@@ -18,9 +19,13 @@ HEAD = 'a' * 40
 
 
 class EndpointContract(unittest.TestCase):
+    def setUp(self):
+        env=patch.dict(os.environ,GITHUB_SHA=HEAD);env.start();self.addCleanup(env.stop)
+
     def response(self, url):
         body = io.BytesIO(json.dumps(dict(status='READY',
-            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False)).encode())
+            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+            runtime_source_sha=HEAD,version_source='IMAGE_BUILD_STAMP',observed_at=int(time.time()))).encode())
         body.status=200
         body.headers=Message()
         body.headers['Content-Type']='application/json'
@@ -79,7 +84,9 @@ class EndpointContract(unittest.TestCase):
                 self.assertIn("baseUrl: '"+target['baseUrl']+"'",(out/'app.js').read_text())
                 proof=root/'health.json'
                 report=dict(target,status='BACKEND_HEALTH_VERIFIED',http_status=200,login_verified=False,
-                    customer_acceptance=False,payment_enabled=False,source_sha=HEAD,observed_at=int(time.time()))
+                    customer_acceptance=False,payment_enabled=False,frontend_source_sha=HEAD,backend_source_sha=HEAD,
+                    backend_version_source='IMAGE_BUILD_STAMP',compatibility='EXACT_SOURCE_MATCH',
+                    backend_observed_at=int(time.time()),observed_at=int(time.time()))
                 proof.write_text(json.dumps(report))
                 env.update(COMMUNITY_MINI_PROJECT_PATH=str(out),COMMUNITY_PREVIEW_OUTPUT=str(root/'receipt'),
                     COMMUNITY_PREVIEW_READINESS_RECEIPT=str(proof))
@@ -94,8 +101,13 @@ class EndpointContract(unittest.TestCase):
                         env=env,capture_output=True,text=True,timeout=15)
                 valid=upload()
                 self.assertEqual(valid.returncode,2,valid.stdout+valid.stderr)
-                self.assertEqual(json.loads((root/'receipt-1/receipt.json').read_text())['status'],'UPLOAD_KEY_NOT_AVAILABLE')
-                for patch in ({'profile':'unknown'},{'source_sha':'b'*40},{'observed_at':0},
+                upload_receipt=json.loads((root/'receipt-1/receipt.json').read_text())
+                self.assertEqual(upload_receipt['status'],'UPLOAD_KEY_NOT_AVAILABLE')
+                self.assertEqual(upload_receipt['frontend_source_sha'],HEAD)
+                self.assertEqual(upload_receipt['backend_source_sha'],HEAD)
+                self.assertIsNone(upload_receipt['scene'])
+                self.assertEqual(upload_receipt['search_query'],'')
+                for patch in ({'profile':'unknown'},{'backend_source_sha':'b'*40},{'observed_at':0},
                               {'baseUrl':target['baseUrl']+'/wrong'},{'status':'BACKEND_NOT_READY'}):
                     proof.write_text(json.dumps(dict(report,**patch)))
                     self.assertEqual(upload().returncode,4)
@@ -157,6 +169,48 @@ class EndpointContract(unittest.TestCase):
         self.assertIn("hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]",workflow)
         self.assertIn("'deploy/community-preview/endpoint-profiles.json'",workflow)
         self.assertIn('stat.S_ISREG(item.external_attr >> 16)',workflow)
+
+    def test_existing_manual_preview_is_default_off_exact_head_and_fixed_target(self):
+        workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
+        dispatch=workflow.split('  workflow_dispatch:\n',1)[1].split('permissions:',1)[0]
+        self.assertIn("preview_enabled:",dispatch)
+        self.assertIn('type: boolean\n        default: false',dispatch)
+        self.assertIn('options: [uk-path-candidate]',dispatch)
+        sdk=workflow.split('  mini-sdk:\n',1)[1].splitlines()[0].strip().removeprefix('if: ')
+        preview=workflow.split('  mini-preview:\n',1)[1].splitlines()[0].strip().removeprefix('if: ')
+        self.assertEqual(sdk,preview)
+        branch='refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017'
+        contexts=[]
+        def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message=''):
+            contexts.append(dict(expected=expected,github=dict(event_name=event,sha=HEAD,ref=ref,
+                event=dict(head_commit=dict(message=message))),inputs=dict(preview_enabled=enabled,
+                preview_source_sha=sha,preview_target=target)))
+        case(False);case(False,enabled=True,sha='b'*40)
+        case(False,enabled=True,target='legacy');case(False,enabled=True,ref='refs/heads/main')
+        case(True,enabled=True);case(False,event='push')
+        case(True,event='push',message='original [mini-preview] request')
+        # Evaluate the actual job expression offline, not a copied policy helper.
+        program="""const p=JSON.parse(process.argv[1]);
+        const run=new Function('github','inputs','contains','return ('+p.expression+')');
+        for(const c of p.contexts){const value=run(c.github,c.inputs,(s,t)=>String(s||'').includes(t));
+          if(value!==c.expected)throw Error('PREVIEW_TRIGGER_POLICY_MISMATCH');}
+        """
+        result=subprocess.run(['node','-e',program,json.dumps(dict(expression=sdk,contexts=contexts))],
+            capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('miniprogram-ci@2.1.31',workflow)
+        self.assertIn('runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]',workflow)
+        self.assertIn("test \"$(id -un)\" = githubrunner",workflow)
+
+    def test_original_image_binds_env_and_stamp_to_same_build_revision(self):
+        docker=(ROOT/'deploy/community-preview/Dockerfile').read_text()
+        self.assertIn('ENV COMMUNITY_SOURCE_SHA=$SOURCE_SHA',docker)
+        self.assertIn('"$SOURCE_SHA" > /app/COMMUNITY_SOURCE_SHA',docker)
+        self.assertIn('chmod 0444 /app/COMMUNITY_SOURCE_SHA',docker)
+        self.assertIn('LABEL org.opencontainers.image.revision=$SOURCE_SHA',docker)
+        preview=(ROOT/'scripts/community_mini_preview.cjs').read_text()
+        self.assertNotIn('scene=shop1',preview)
+        self.assertIn("pagePath:'pages/home/index',searchQuery:''",preview)
 
 
 if __name__=='__main__':

@@ -4,6 +4,9 @@ A deployment must terminate trusted HTTPS separately and supply admitted Identit
 No direct callback, payment submission or root/host operation exists here.
 """
 import json
+import os
+import re
+from pathlib import Path
 import math
 import socket
 import time
@@ -11,8 +14,24 @@ from http.server import BaseHTTPRequestHandler,HTTPServer
 from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
 
+def runtime_version():
+    """Image-build stamp, never a request header or the preview caller's SHA.
+
+    Old/bare runtimes remain health-checkable but cannot claim version binding.
+    The deployment owner still verifies the image digest/OCI revision separately.
+    """
+    try:
+        stamp = Path(__file__).resolve().parents[1] / 'COMMUNITY_SOURCE_SHA'
+        if stamp.is_symlink() or not stamp.is_file():return None
+        value = stamp.read_text().strip()
+        if not re.fullmatch('[0-9a-f]{40}', value):return None
+        if os.environ.get('COMMUNITY_SOURCE_SHA') != value:return None
+        return value
+    except (OSError, UnicodeError):return None
+
 
 def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,merchant_bills=None,communities=None,commerce=None,notifications=None):
+    source_sha = runtime_version()  # immutable for this running composition
     # Remember admitted dependencies so a lost SaaS backend cannot silently
     # turn a previously full composition into a healthy community-only one.
     saas_required=(getattr(getattr(gateway,'runtime',None),'saas',None) is not None
@@ -103,7 +122,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     for db in {id(db):db for db in databases}.values():
                         db.execute('SELECT 1').fetchone()
                 except Exception:return self.answer(503,{'status':'UNAVAILABLE'})
-                return self.answer(503 if maintenance else 200,{'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False})
+                health={'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False}
+                if source_sha is not None:
+                    health.update(runtime_source_sha=source_sha,version_source='IMAGE_BUILD_STAMP',
+                                  observed_at=int(time.time()))
+                return self.answer(503 if maintenance else 200,health)
             if proxy_origin=='https://uk.wenwenwenyiyiyi.work':
                 from scripts.community_web_entries import asset,entries
                 if self.path=='/community/entrypoints':return self.answer(200,entries(value['project'] for value in gateway.identity.scenes.values()))

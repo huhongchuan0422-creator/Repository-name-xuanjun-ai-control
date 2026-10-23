@@ -366,3 +366,23 @@ HttpOnly cookie 不能只靠页面 generation 保护：同源浏览器标签页�
 本地Chromium已复现BroadcastChannel构造失败会中断引导、旧CSRF未清理。运行代码仅将协调能力初始化改为检查locks.request并捕获构造异常；不具备API或构造失败仍清旧CSRF、关闭业务展示且零会话变更请求，不降级并发协议。缺locks/缺BroadcastChannel/构造失败三种真实浏览器负例本地通过；原失败日志保留，不将其称为已证实现场越权。
 
 消费者微信登录、原Center会话/授权、Nginx候选、数据和密钥均未修改。现场限定替换授权沿Owner刚确认范围继承，不扩大到真实角色、身份或资金变更；源码补验完成后须绑定最终运行制品，旧541f工具引用不可冒充新候选已发布。英国实际版本及角色准入仍单列，不以本段或CI代替客户验收。
+
+
+## Issue76 新版官方预览候选：真实版本来源与默认关闭入口
+
+本增量基于 cb9b36b1cbfa56ea10475c93bf5dd95e65881588；仅候选准备，不执行国内 Runner、上传、部署或旧升级器。原 UK #6333101186 的 2330dd55 部署成功及回滚历史保留，当前现场版本未在本轮读取，不能说未部署。
+
+| 链路 | 实际来源与准入 |
+| --- | --- |
+| 后端构建版本 | 原 Docker SOURCE_SHA 同时写 COMMUNITY_SOURCE_SHA 环境、OCI revision 和 /app/COMMUNITY_SOURCE_SHA 只读构建戳；原非 root 运行身份保留。health 在组合创建时比对构建戳与环境，缺失/错值不输出版本声明，进程/DB health 语义不扩大。受保护部署仍需核实际 image digest/OCI revision；此戳不是远程证明或独立签名。 |
+| 远端 health | 固定 uk-path-candidate HTTPS GET，返回 runtime_source_sha、version_source=IMAGE_BUILD_STAMP 和服务端 observed_at。请求头、调用方 GITHUB_SHA 都不作为后端版本来源。 |
+| readiness | 分别记录 frontend_source_sha 与远端 backend_source_sha；本版只验 EXACT_SOURCE_MATCH。异版两 SHA 可记录但 compatibility=UNVERIFIED，不能自行推断兼容；旧后端无版本字段不能通过新版预览门禁，也不等于服务未部署。 |
+| 新鲜度 | HTTP 200、固定原 URL/MIME/体积、READY 与原 DB scope 全保留；在读完响应后核服务端时间，预览前再核本地观察与服务端时间，最大600秒、最多30秒未来偏差。缺失/错误/过期均不能 PASS。 |
+| 原生入口 | shop1 是原固定历史样例，非当前已核授权证明。prepare/preview 改为 pages/home/index，空 searchQuery、scene=null，复用 d062 已有“从商家二维码/服务入口进入”引导；不新建商家/账号/授权，不自动选择门店。实际业务进入继续用原受保护 scene 绑定。 |
+| 原官方通道 | miniprogram-ci@2.1.31、国内 xuanjun-domestic-ops、非 root githubrunner、Runner 自带 Node20、原 AppID 与 Secrets 引用不变；仍仅 ci.preview，无 ci.upload/审核/发布。历史最近成功 Run39575914417/Job119144501233/Artifact12334622602 仅覆盖 7551681a，不覆盖本候选。 |
+
+原同一 workflow 手动入口新增 preview_enabled=false（默认不执行 SDK/预览）、preview_source_sha=''、preview_target 固定 uk-path-candidate。只有明确开启、选择原社区分支、输入 SHA 等于该 run 的 github.sha、同一固定目标才准入 mini-sdk/mini-preview；test 前置和国内原身份/manifest/readiness 门禁保留。原 push 的 [mini-preview] 行为保留，本次提交不含该触发标记；未 dispatch。默认关闭不等于不运行 Hosted 原测试。本轮原 GitHub fetch_file 读取 main 上该 workflow 精确路径返回404 NOT_FOUND；本轮不修改 main。默认分支注册仍需 root 核定正常最小 PR，不以准备好原分支 YAML 宣称已经可点击运行，也不用 dummy push 偷触发。
+
+仅新增影响的 Hosted scope：[preview-version-scope]。运行 health 来源/依赖、readiness、实际 ZIP prepare/预览拒绝与入口/工作流条件测试；UI 投影没有变化，66路由与截图/业务/OCR来源复用。prepared 工程为本次 Commit 生成，附完整逐文件 SHA 清单、源工程/生成 app hash，upload_performed=false；不预填远端 SHA 或 readiness PASS。
+
+后续真实现场一次性核齐：①当前实际后端 image/OCI/source revision 与 health 版本来源；②与候选两 SHA 同版（或另交明确版本对的已验兼容关系，本版未支持）；③固定 HTTPS/合法域名及既有登录/scene 授权的当前回执；④原 workflow 正常可触发入口与 Owner 单独核定的本次预览动作。然后才可取得准确 SHA 的 preview/receipt/二维码及真机证据。不能重跑旧2330固定升级器覆盖未知新版本，不能因本轮缺现场回执推断域名/通道/已部署服务有故障。

@@ -1,5 +1,5 @@
 name: Community WeChat SP Offline Gate
-# Authorized one-time development preview trigger for Issue76; behavior unchanged.
+# Existing preview channel; manual upload stays opt-in and exact-head/target bound.
 on:
   push:
     branches:
@@ -18,6 +18,20 @@ on:
       - tests/test_community_wechat_sp_split_projection.py
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
+    inputs:
+      preview_enabled:
+        description: 'Explicitly run existing development preview upload (default off)'
+        type: boolean
+        default: false
+      preview_source_sha:
+        description: 'Exact selected branch HEAD (40 lowercase hex); required for preview'
+        type: string
+        default: ''
+      preview_target:
+        description: 'Existing fixed preview target'
+        type: choice
+        options: [uk-path-candidate]
+        default: uk-path-candidate
 permissions:
   contents: read
 jobs:
@@ -35,12 +49,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install exact browser test runner
-        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
+        if: "!contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           python -m pip install playwright==1.55.0 cryptography==50.0.2
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
-        if: "!contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
+        if: "!contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
@@ -49,6 +63,16 @@ jobs:
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
+      - name: Preview version and entry affected scope (no provider or host I/O)
+        if: contains(github.event.head_commit.message, '[preview-version-scope]') || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled)
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_preview_readiness.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_health_dependencies.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_preview_endpoint_contract.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'preview_preparation_test.py' -v 2>&1 | tee -a community-tests.log
+          node --test tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
       - name: Preview endpoint affected scope (unchanged 1821 results reused)
         if: contains(github.event.head_commit.message, '[preview-endpoint-scope]')
         env:
@@ -408,7 +432,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: contains(github.event.head_commit.message, '[mini-preview]')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -432,7 +456,7 @@ jobs:
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
-    if: contains(github.event.head_commit.message, '[mini-preview]')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12

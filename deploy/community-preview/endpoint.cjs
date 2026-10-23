@@ -53,7 +53,10 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000)){
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||
     report.login_verified!==false||report.customer_acceptance!==false||report.payment_enabled!==false||
-    !/^[a-f0-9]{40}$/.test(head||'')||report.source_sha!==head||
+    !/^[a-f0-9]{40}$/.test(head||'')||report.frontend_source_sha!==head||report.backend_source_sha!==head||
+    report.backend_version_source!=='IMAGE_BUILD_STAMP'||report.compatibility!=='EXACT_SOURCE_MATCH'||
+    !Number.isSafeInteger(now)||!Number.isSafeInteger(report.backend_observed_at)||
+    report.backend_observed_at>now+30||now-report.backend_observed_at>600||
     !Number.isSafeInteger(report.observed_at)||report.observed_at>now+30||now-report.observed_at>600)
   throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
 }

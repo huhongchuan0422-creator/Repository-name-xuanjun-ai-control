@@ -15,27 +15,33 @@ async function main(){
  const appSource=fs.readFileSync(path.join(projectPath,'app.js'),'utf8');
  const connected=process.env.COMMUNITY_MINI_PROJECT_PATH;
  if(!connected)throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
- let target=null;
+ let target=null,readiness=null;
  if(connected){
   const {endpoint,verifyReadiness,verifySource}=require('../deploy/community-preview/endpoint.cjs');
   target=endpoint();
   const prepared=JSON.parse(fs.readFileSync(path.join(projectPath,'CONNECTED_PREVIEW_RECEIPT.json'),'utf8'));
   if(prepared.baseUrl!==target.baseUrl||prepared.profile!==target.profile||prepared.origin!==target.origin||
      prepared.connected_app_sha256!==crypto.createHash('sha256').update(appSource).digest('hex')||
-     prepared.appid!==config.appid||prepared.scene!=='shop1'||prepared.commerce!==true||prepared.payments!==false||
+     prepared.appid!==config.appid||prepared.scene!==null||prepared.entry_page!=='pages/home/index'||
+     prepared.search_query!==''||prepared.entry_mode!=='EXISTING_SCENELESS_GUIDANCE'||
+     prepared.frontend_source_sha!==process.env.GITHUB_SHA||prepared.commerce!==true||prepared.payments!==false||
      !appSource.includes("baseUrl: '"+target.baseUrl+"'")||
      !appSource.includes("payments: false")||!appSource.includes("commerce: true"))
    throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
   const proof=process.env.COMMUNITY_PREVIEW_READINESS_RECEIPT;
   if(!proof)throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
-  verifyReadiness(JSON.parse(fs.readFileSync(proof,'utf8')),target,process.env.GITHUB_SHA);
+  readiness=JSON.parse(fs.readFileSync(proof,'utf8'));
+  verifyReadiness(readiness,target,process.env.GITHUB_SHA);
   verifySource(projectPath,prepared.prepared_files);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
    public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
    backend_origin:target?target.origin:null,backend_base_url:target?target.baseUrl:null,
-   entry_page:'pages/home/index',scene:'shop1',source_hashes:{},status:'NOT_RUN'};
+   entry_page:'pages/home/index',scene:null,search_query:'',entry_mode:'EXISTING_SCENELESS_GUIDANCE',
+   frontend_source_sha:process.env.GITHUB_SHA||null,
+   backend_source_sha:readiness?readiness.backend_source_sha:null,
+   compatibility:'EXACT_SOURCE_MATCH',source_hashes:{},status:'NOT_RUN'};
  function source(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   const file=path.join(dir,entry.name);if(entry.isSymbolicLink())throw Error('SYMLINK_SOURCE_DENIED');
   if(entry.isDirectory())source(file);else if(!file.endsWith('.test.cjs'))receipt.source_hashes[path.relative(projectPath,file)]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -58,7 +64,7 @@ async function main(){
   await ci.preview({project,desc:'Community phase integration '+String(receipt.head).slice(0,12),
     setting:{es6:true,es7:true,minify:true},robot:1,threads:1,
     qrcodeFormat:'image',qrcodeOutputDest:path.join(destination,'preview.png'),
-    pagePath:'pages/home/index',searchQuery:'scene=shop1',onProgressUpdate:()=>{}});
+    pagePath:'pages/home/index',searchQuery:'',onProgressUpdate:()=>{}});
   if(!fs.existsSync(path.join(destination,'preview.png')))throw Error('PREVIEW_QR_MISSING');
   receipt.status='DEVELOPMENT_PREVIEW_UPLOADED';
  }catch(e){

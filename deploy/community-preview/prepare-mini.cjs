@@ -34,7 +34,8 @@ const replacement="App({\n  globalData: {baseUrl: '"+HOST+"', token: '', mode: '
 const updated=original.replace(needle,replacement);
 const receipt={
  status:'CONNECTED_PREVIEW_SOURCE_PREPARED_NOT_UPLOADED',
- ...target,commerce:true,payments:false,scene:'shop1',
+ ...target,commerce:true,payments:false,scene:null,entry_page:'pages/home/index',search_query:'',
+ entry_mode:'EXISTING_SCENELESS_GUIDANCE',frontend_source_sha:process.env.GITHUB_SHA||null,
  appid:config.appid,
  source_app_sha256:crypto.createHash('sha256').update(original).digest('hex'),
  connected_app_sha256:crypto.createHash('sha256').update(updated).digest('hex'),

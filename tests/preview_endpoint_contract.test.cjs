@@ -60,9 +60,12 @@ test('only exact UK prefix is admitted, malformed roots and alternate paths deni
 test('health proof is bound to exact target, source and freshness; UNKNOWN never qualifies',()=>{
  const target=endpoint('uk-path-candidate'),head='a'.repeat(40);
  const report={...target,status:'BACKEND_HEALTH_VERIFIED',http_status:200,login_verified:false,customer_acceptance:false,
-  payment_enabled:false,source_sha:head,observed_at:100};
+  payment_enabled:false,frontend_source_sha:head,backend_source_sha:head,backend_version_source:'IMAGE_BUILD_STAMP',
+  compatibility:'EXACT_SOURCE_MATCH',backend_observed_at:100,observed_at:100};
  verifyReadiness(report,target,head,100);
- for(const patch of [{...endpoint('legacy')},{status:'BACKEND_NOT_READY'}, {http_status:503}, {source_sha:'b'.repeat(40)},
+ for(const patch of [{...endpoint('legacy')},{status:'BACKEND_NOT_READY'}, {http_status:503}, {frontend_source_sha:'b'.repeat(40)}, {backend_source_sha:'b'.repeat(40)},
+  {backend_source_sha:null},{backend_version_source:'CLIENT_ENV'},{compatibility:'UNVERIFIED'},
+  {backend_observed_at:701},{backend_observed_at:-501},
   {observed_at:701},{observed_at:-501},{login_verified:true},{customer_acceptance:true},{payment_enabled:true}]){
   assert.throws(()=>verifyReadiness({...report,...patch},target,head,100),/MATCHING_FRESH_BACKEND_READINESS_REQUIRED/);
  }
