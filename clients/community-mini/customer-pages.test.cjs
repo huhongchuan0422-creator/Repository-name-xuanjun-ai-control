@@ -45,7 +45,7 @@ test('app routes customer home/profile while preserving checkout route and check
   const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
   const script=fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8');
   assert.match(checkout,/bindtap="openCustomerHome"/);
-  assert.match(script,/pages\/home\/index\?scene=/);
+  assert.ok(script.includes("getApp().globalData.scene=this.scene;wx.switchTab({url:'/pages/home/index'});"));
   assert.match(fs.readFileSync(__dirname+'/app.js','utf8'),/baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false/);
 });
 
