@@ -72,6 +72,47 @@ class ApiTests(unittest.TestCase):
         with patch.dict(os.environ, {"OCR_SQLITE_PATH": ""}):
             with self.assertRaisesRegex(RuntimeError, "OCR_SQLITE_PATH_REQUIRED"):
                 create_app(authenticate=auth, infer=inference_fixture)
+    def test_http_encrypted_restart_replay_and_tenant_ownership(self):
+        from cryptography.fernet import Fernet
+        try:
+            from .secure_store import SecureSQLiteJobStore
+        except ImportError:
+            from secure_store import SecureSQLiteJobStore
+        with tempfile.TemporaryDirectory() as temp:
+            path = os.path.join(temp, "secure-jobs.sqlite")
+            key = Fernet.generate_key()
+            def app():
+                return TestClient(create_app(authenticate=auth,
+                    store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
+                    authorize_application=lambda p, app_id: app_id == "synthetic-app"))
+            with app() as client1:
+                first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
+                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+                    files={"file":("synthetic.jpg", bytes([255,216,255])+b"synthetic", "image/jpeg")})
+                self.assertEqual(first.status_code, 202, first.text)
+                job_id = first.json()["job_id"]
+            with app() as client2:
+                read = client2.get("/api/v1/ocr/jobs/"+job_id, headers={"Authorization":"Bearer tenant-a-token"})
+                self.assertEqual(read.status_code, 200)
+                self.assertEqual(read.json()["fields"]["company_name"]["value"], "SYNTHETIC ONLY")
+                replay = client2.post("/api/v1/ocr/jobs", headers=self.headers,
+                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+                    files={"file":("synthetic.jpg", bytes([255,216,255])+b"synthetic", "image/jpeg")})
+                self.assertEqual(replay.status_code, 202)
+                self.assertEqual(replay.json()["job_id"],job_id)
+                conflict = client2.post("/api/v1/ocr/jobs", headers=self.headers,
+                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+                    files={"file":("synthetic.jpg", bytes([255,216,255])+b"DIFFERENT", "image/jpeg")})
+                self.assertEqual(conflict.status_code,409)
+                denied = client2.get("/api/v1/ocr/jobs/"+job_id,headers={"Authorization":"Bearer tenant-b-token"})
+                self.assertEqual(denied.status_code,404)
+    def test_secure_mode_requires_encryption_key(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.dict(os.environ, {"OCR_SQLITE_PATH":os.path.join(temp,"jobs.db"),
+                                         "OCR_ENCRYPTION_KEY":""}):
+                with self.assertRaisesRegex(RuntimeError,"OCR_ENCRYPTION_KEY_REQUIRED"):
+                    create_app(authenticate=auth, infer=inference_fixture)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
