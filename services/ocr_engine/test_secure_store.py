@@ -65,10 +65,20 @@ class SecureStoreTests(unittest.TestCase):
         self.assertFalse(self.store.delete(job["job_id"],"tenant-b"))
         self.assertTrue(self.store.delete(job["job_id"],"tenant-a"))
         self.assertIsNone(self.store.get(job["job_id"],"tenant-a"))
+    def test_retention_purge_and_non_sensitive_audit(self):
+        job = self.create()
+        import time
+        count = self.store.purge_before(int(time.time()) + 60)
+        self.assertEqual(count, 1)
+        self.assertIsNone(self.store.get(job["job_id"], "tenant-a"))
+        with sqlite3.connect(self.path) as db:
+            events = [r[0] for r in db.execute("SELECT event FROM ocr_audit")]
+        self.assertIn("created", events)
+        self.assertIn("retention_deleted", events)
+        self.assertNotIn(b"tenant-a", open(self.path, "rb").read())
     def test_reject_wrong_key(self):
         job=self.create()
-        # A different key must not reveal another keyspace or decrypt ciphertext.
-        other = SecureSQLiteJobStore(self.path,Fernet.generate_key())
-        self.assertIsNone(other.get(job["job_id"],"tenant-a"))
+        with self.assertRaisesRegex(RuntimeError, "OCR_ENCRYPTION_KEY_MISMATCH"):
+            SecureSQLiteJobStore(self.path,Fernet.generate_key())
 
 if __name__=="__main__":unittest.main()
