@@ -301,6 +301,16 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
                 and 'consent_form_source' in g):
             form_action += ' ' + g.consent_form_source
         response.headers['Content-Security-Policy'] = "default-src 'none'; form-action " + form_action + "; frame-ancestors 'none'"
+        # Fixed phase labels only, never exception text or authentication data.
+        if (request.method == 'GET' and request.path == '/github/callback'
+                and response.status_code == 401
+                and g.get('oauth_callback_stage') in (
+                    'FLOW_VALID', 'TOKEN_EXCHANGE', 'USER_HTTP', 'USER_SHAPE',
+                    'SUBJECT_ALLOWED', 'DEADLINE', 'FLOW_BIND')):
+            response.headers['X-Xuanjun-OAuth-Stage'] = g.oauth_callback_stage
+            if response.mimetype == 'text/html':
+                response.set_data(response.get_data() +
+                    ('<p>OAuth stage: ' + g.oauth_callback_stage + '</p>\n').encode('ascii'))
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 
@@ -378,25 +388,32 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
 
     @app.get('/github/callback')
     def callback():
+        g.oauth_callback_stage = 'FLOW_VALID'
         original = flow()
         if not callback_slots.acquire(blocking=False):
             return jsonify(error='temporarily_unavailable'),503
         g.github_deadline=time.monotonic()+5
         g.github_network=network
         try:
+            g.oauth_callback_stage = 'TOKEN_EXCHANGE'
             token = github.authorize_access_token()
+            g.oauth_callback_stage = 'USER_HTTP'
             response = github.get('user', token=token, allow_redirects=False)
             if response.status_code != 200: abort(401)
+            g.oauth_callback_stage = 'USER_SHAPE'
             user = response.json()
             if type(user) is not dict or type(user.get('id')) is not int: abort(401)
             sub = 'github:' + str(user['id'])
+            g.oauth_callback_stage = 'SUBJECT_ALLOWED'
             if subject(sub) is None: abort(403)
+            g.oauth_callback_stage = 'DEADLINE'
             if time.monotonic()>=g.github_deadline:raise Hold('GITHUB_TOTAL_DEADLINE')
         except Exception:
             abort(401)
         finally:
             g.pop('github_deadline',None);g.pop('github_network',None)
             callback_slots.release()
+        g.oauth_callback_stage = 'FLOW_BIND'
         def bind():
             cursor = db().execute('UPDATE oauth_flows SET sub=? WHERE sid_hash=? AND used=0 AND sub IS NULL AND expires>?',
                                   (sub, original['sid_hash'], now()))

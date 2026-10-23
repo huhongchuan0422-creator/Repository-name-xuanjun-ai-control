@@ -1,7 +1,7 @@
 name: Cloud connection candidate tests
 on:
   push:
-    branches: [feature/cloud-connection-continuation-20261021]
+    branches: [feature/cloud-connection-continuation-20261021, feature/cloud-oauth-diagnostic-23b-20261023]
     paths:
       - production/cloud_connection/**
       - tests/test_cloud_connection*.py
