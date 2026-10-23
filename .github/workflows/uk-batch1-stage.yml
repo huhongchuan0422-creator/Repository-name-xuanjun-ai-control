@@ -1,0 +1,36 @@
+name: UK Batch1 Source Staging
+on:
+  push:
+    branches:
+      - feature/issue13-github-consumer-20261011
+    paths:
+      - '.github/workflows/uk-batch1-stage.yml'
+      - 'stage1/uk_batch1_identity_prepare.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage-on-uk:
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: UK host pin and stage pinned source for Owner manual deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(hostname -s)" = "iZd7oeikknn1z21sq6ji6zZ"
+          test "$GITHUB_REPOSITORY" = "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
+          STAGE="/tmp/xuanjun-uk-batch1-${GITHUB_SHA}"
+          umask 022
+          mkdir -p "$STAGE"
+          cp stage1/uk_batch1_identity_prepare.py stage1/owner_approval_dispatch.py stage1/owner_notification_outbox.py stage1/uk_owner_notify_worker.py stage1/telegram_owner_transport.py stage1/telegram_owner_request_registry.py stage1/uk_owner_callback_core.py "$STAGE/"
+          cp stage1/test_owner_approval_dispatch.py stage1/test_owner_notification_outbox.py stage1/test_uk_owner_notify_worker.py stage1/test_telegram_owner_transport.py stage1/test_telegram_owner_request_registry.py stage1/test_uk_owner_callback_core.py "$STAGE/"
+          printf '%s\n' "$GITHUB_SHA" > "$STAGE/SOURCE_COMMIT"
+          python3 -m py_compile "$STAGE"/*.py
+          (cd "$STAGE"; python3 -m unittest -q test_owner_approval_dispatch test_owner_notification_outbox test_uk_owner_notify_worker test_telegram_owner_transport test_telegram_owner_request_registry test_uk_owner_callback_core)
+          chmod -R a+rX "$STAGE"
+          echo "UK_BATCH1_STAGE_PASS=$STAGE"
+          echo "UK_BATCH1_DEPLOYMENT=OWNER_MANUAL_REQUIRED"

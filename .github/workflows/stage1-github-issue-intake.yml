@@ -1,0 +1,22 @@
+name: Stage1 GitHub Issue Intake
+on:
+  pull_request:
+    paths:
+      - 'stage1/github_issue_consumer.py'
+      - 'stage1/test_github_issue_consumer.py'
+      - '.github/workflows/stage1-github-issue-intake.yml'
+permissions:
+  contents: read
+jobs:
+  test-intake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and test (Python 3.12 CI; UK Python 3.6 acceptance still required)
+        run: |
+          python -m py_compile stage1/github_issue_consumer.py stage1/test_github_issue_consumer.py
+          cd stage1
+          python -m unittest -v test_github_issue_consumer
