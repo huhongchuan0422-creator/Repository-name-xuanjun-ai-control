@@ -7,8 +7,10 @@ import unittest
 from fastapi.testclient import TestClient
 try:
     from .api import create_app, Principal, JobStore, SQLiteJobStore
+    from .secure_store import SecureSQLiteJobStore
 except ImportError:
     from api import create_app, Principal, JobStore, SQLiteJobStore
+    from secure_store import SecureSQLiteJobStore
 
 TOKEN_TENANTS = {
     "tenant-a-token": Principal(subject="user-a", tenant_id="tenant-a", permissions={"ocr:use"}),
@@ -35,7 +37,10 @@ class ApiTests(unittest.TestCase):
                      content_sha == self.expected_sha and attachment not in self.revoked_attachments)
             return {"authorized": valid, "content_sha256": self.expected_sha}
         self.attachment_resolver = attachment_resolver
-        self.client = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture,
+        from cryptography.fernet import Fernet
+        self._tmp = tempfile.TemporaryDirectory()
+        store = SecureSQLiteJobStore(os.path.join(self._tmp.name, "api-tests.sqlite3"), Fernet.generate_key())
+        self.client = TestClient(create_app(authenticate=auth, store=store, infer=inference_fixture,
             authorize_application=lambda p, app: app == "synthetic-app" and app not in self.revoked_apps,
             authorize_attachment=attachment_resolver))
         self.headers = {"Authorization":"Bearer tenant-a-token", "Idempotency-Key":"0123456789abcdef"}
