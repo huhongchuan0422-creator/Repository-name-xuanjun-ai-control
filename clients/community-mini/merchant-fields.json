@@ -1,45 +1,5 @@
 [
   {
-    "path": "contact_info.contact_type",
-    "label": "管理员类型：LEGAL 法人 / SUPER 经办人",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_id_doc_type",
-    "label": "经办人证件类型（官方枚举）",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_id_number",
-    "label": "经办人证件号码",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_period_begin",
-    "label": "经办人证件有效期开始",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_period_end",
-    "label": "经办人证件有效期结束或长期",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_name",
-    "label": "超级管理员姓名",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.mobile_phone",
-    "label": "超级管理员手机",
-    "stage": 1
-  },
-  {
-    "path": "contact_info.contact_email",
-    "label": "超级管理员邮箱",
-    "stage": 1
-  },
-  {
     "path": "subject_info.business_license_info.license_number",
     "label": "统一社会信用代码或注册号",
     "stage": 0
@@ -123,6 +83,46 @@
     "path": "subject_info.identity_info.id_doc_info.doc_period_end",
     "label": "其他证件有效期结束或长期",
     "stage": 0
+  },
+  {
+    "path": "contact_info.contact_type",
+    "label": "管理员类型：LEGAL 法人 / SUPER 经办人",
+    "stage": 0
+  },
+  {
+    "path": "contact_info.contact_name",
+    "label": "超级管理员姓名",
+    "stage": 0
+  },
+  {
+    "path": "contact_info.mobile_phone",
+    "label": "超级管理员手机",
+    "stage": 0
+  },
+  {
+    "path": "contact_info.contact_email",
+    "label": "超级管理员邮箱",
+    "stage": 0
+  },
+  {
+    "path": "contact_info.contact_id_doc_type",
+    "label": "经办人证件类型（官方枚举）",
+    "stage": 1
+  },
+  {
+    "path": "contact_info.contact_id_number",
+    "label": "经办人证件号码",
+    "stage": 1
+  },
+  {
+    "path": "contact_info.contact_period_begin",
+    "label": "经办人证件有效期开始",
+    "stage": 1
+  },
+  {
+    "path": "contact_info.contact_period_end",
+    "label": "经办人证件有效期结束或长期",
+    "stage": 1
   },
   {
     "path": "business_info.merchant_shortname",

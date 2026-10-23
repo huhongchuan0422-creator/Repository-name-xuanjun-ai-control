@@ -6,6 +6,15 @@ const session={clear(){},login:async()=>{},async merchant(scene,op,p){calls.push
  if(p.operation==='mine')return {applications:[]};if(p.operation==='catalog')return {materials:[{id:'business_license',title:'营业执照'}]};if(p.operation==='read'||p.operation==='save')return structuredClone(app);if(p.operation==='wechat_read')return {version:1,profile:structuredClone(storedProfile)};if(p.operation==='wechat_save'){storedProfile=structuredClone(p.params.profile);return {version:2,profile:structuredClone(storedProfile)};}throw Error('unplanned');}};
 vm.runInNewContext(fs.readFileSync(__dirname+'/pages/'+name+'/index.js','utf8'),{Page:p=>definition=p,wx:{navigateTo(){}},getApp:()=>({globalData:{baseUrl:'https://fixture.invalid'}}),require:p=>p==='../../session'?{parseScene:()=> 'shop1',createSession:()=>session,customerError:()=> 'error'}:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:require(p),encodeURIComponent});
 const page={...definition,data:structuredClone(definition.data),setData(p){Object.assign(this.data,p);}};return {page,calls,app,hold(p){pending=p;},failNext(operation,error){failure={operation,error};},get storedProfile(){return storedProfile;}};}
+test('new admission defaults to LEGAL and places business-license fields and upload on the first screen',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ assert.equal(f.page.data.options.contact,'LEGAL');
+ assert.ok(f.page.data.fields.some(x=>x.path==='subject_info.business_license_info.merchant_name'));
+ assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.mobile_phone'));
+ assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_email'));
+ assert.ok(f.page.data.licenseMaterial);
+ assert.match(fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8'),/营业执照资料/);
+});
 test('native home/recommendations/profile tabs and entry navigation stay in the same five-page app',()=>{
  const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
  assert.equal(app.tabBar,undefined);
