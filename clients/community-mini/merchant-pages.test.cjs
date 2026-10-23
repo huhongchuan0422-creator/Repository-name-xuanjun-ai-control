@@ -178,15 +178,15 @@ test('LEGAL and SUPER use one mobile field and keep identity/contact fields acro
 });
 test('approved platform application can continue original WeChat draft without resubmitting platform',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.app.status='APPROVED';await f.page.select({currentTarget:{dataset:{application:f.app.application}}});f.calls.length=0;form.put(f.page.profile,'contact_info.mobile_phone','13800000000');await f.page.save();assert.ok(!f.calls.some(c=>c.p.operation==='save'));assert.ok(f.calls.some(c=>c.p.operation==='wechat_save'));});
 
-test('business license upload stays adjacent to every active business-license field',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const i=f.page.data.fields.findIndex(x=>x.path==='subject_info.business_license_info.merchant_name');assert.ok(i>=0);f.page.setData({fieldCursor:i,cursorPath:'subject_info.business_license_info.merchant_name'});f.page.refresh();assert.equal(f.page.data.fields[f.page.data.fieldCursor].path,'subject_info.business_license_info.merchant_name');assert.equal(f.page.data.showLicenseUpload,true);f.page.setData({options:{...f.page.data.options,entity:'SOLE_PROPRIETOR'},fieldCursor:i,cursorPath:'subject_info.business_license_info.merchant_name'});f.page.refresh();assert.equal(f.page.data.showLicenseUpload,true,'required license available for sole proprietor');f.page.setData({options:{...f.page.data.options,entity:'ENTERPRISE'}});f.page.refresh();const j=f.page.data.fields.findIndex(x=>x.path==='contact_info.mobile_phone');assert.ok(j>=0);f.page.setData({fieldCursor:j,cursorPath:'contact_info.mobile_phone'});f.page.refresh();assert.equal(f.page.data.showLicenseUpload,false);});
+test('business license upload stays adjacent to every active business-license field',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const i=f.page.data.fields.findIndex(x=>x.path==='subject_info.business_license_info.merchant_name');assert.ok(i>=0);f.page.setData({fieldCursor:i,cursorPath:'subject_info.business_license_info.merchant_name'});f.page.refresh();assert.equal(f.page.data.fields[f.page.data.fieldCursor].path,'subject_info.business_license_info.merchant_name');assert.equal(f.page.data.showLicenseUpload,true);f.page.setData({options:{...f.page.data.options,entity:'SOLE_PROPRIETOR'},fieldCursor:i,cursorPath:'subject_info.business_license_info.merchant_name'});f.page.refresh();assert.equal(f.page.data.showLicenseUpload,true,'required license available for sole proprietor');f.page.setData({options:{...f.page.data.options,entity:'ENTERPRISE'}});f.page.refresh();const j=f.page.data.fields.findIndex(x=>x.path==='contact_info.mobile_phone');assert.ok(j>=0);f.page.setData({fieldCursor:j,cursorPath:'contact_info.mobile_phone'});f.page.refresh();assert.equal(f.page.data.showLicenseUpload,true,'license upload remains immediately visible, independent of field cursor');});
 test('native field cursor refreshes license upload and preserves adjacent identity material paths',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  f.page.setData({catalog:[...f.page.data.catalog,...['identity_front','identity_back','operator_identity','operator_identity_back'].map(id=>({id,title:id}))]});f.page.refresh();
- assert.equal(f.page.data.showLicenseUpload,f.page.data.fields[f.page.data.fieldCursor].path.startsWith('subject_info.business_license_info.'));
+ assert.equal(f.page.data.showLicenseUpload,true,'license upload remains visible on stage zero');
  for(let i=0;i<5;i++)f.page.nextField();
  assert.equal(f.page.data.fields[f.page.data.fieldCursor].path,'subject_info.business_license_info.period_end');
  assert.equal(f.page.data.showLicenseUpload,true);
- f.page.nextField();assert.equal(f.page.data.showLicenseUpload,f.page.data.fields[f.page.data.fieldCursor].path.startsWith('subject_info.business_license_info.'));
+ f.page.nextField();assert.equal(f.page.data.showLicenseUpload,true,'license upload remains visible on stage zero');
  assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['identity_front','identity_back']);
  f.page.previousField();assert.equal(f.page.data.showLicenseUpload,true);
  f.page.setData({step:1,cursorPath:'',fieldCursor:0,options:{...f.page.data.options,contact:'SUPER'}});f.page.refresh();
@@ -202,4 +202,23 @@ test('saved SUPER administrator remains SUPER when reopening its original applic
  assert.equal(f.page.data.options.contact,'SUPER');
  assert.equal(f.page.data.application.application,f.app.application);
  assert.equal(form.get(f.page.profile,'contact_info.contact_type'),'SUPER');
+});
+
+test('selection immediately reveals document uploads above editable text with OCR explicitly unavailable',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ const license=wxml.indexOf('营业执照资料'),adjacent=wxml.indexOf('本组证件材料'),field=wxml.indexOf('第{{fieldCursor+1}}项');
+ assert.ok(license>=0&&adjacent>license&&field>adjacent,'upload cards precede editable fields');
+ assert.match(wxml,/识别：未接通/);
+ assert.equal(f.page.data.showLicenseUpload,true);
+ f.page.setData({options:{...f.page.data.options,entity:'SOLE_PROPRIETOR'}});f.page.refresh();
+ assert.equal(f.page.data.showLicenseUpload,true);
+ const catalog=[...f.page.data.catalog,...['identity_front','identity_back','operator_identity','operator_identity_back'].map(id=>({id,title:id}))];
+ f.page.setData({catalog});f.page.refresh();
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['identity_front','identity_back']);
+ f.page.setData({options:{...f.page.data.options,doc:'IDENTIFICATION_TYPE_OVERSEA_PASSPORT'}});f.page.refresh();
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['identity_front']);
+ f.page.setData({step:1,options:{...f.page.data.options,contact:'SUPER'}});f.page.refresh();
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['operator_identity','operator_identity_back']);
+ assert.equal(f.calls.some(c=>c.p.operation==='wechat_execute'),false);
 });
