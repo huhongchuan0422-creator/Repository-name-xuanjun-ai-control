@@ -638,6 +638,22 @@ class ClickThrough(unittest.TestCase):
                 expect(page.locator('.mini-tabbar a')).to_have_count(4)
                 for label in ('首页','推荐','订单','我的'):
                     expect(page.locator('.mini-tabbar')).to_contain_text(label)
+                page.goto(self.url+'#/platform/home')
+                self.assert_layout(page,width,'owner-platform-home')
+                expect(page.locator('#view')).to_contain_text('订单与交易')
+                expect(page.locator('#view')).to_contain_text('权限、通知与日志')
+                grid=page.locator('.platform-dashboard .dashboard-grid').first
+                self.assertEqual(page.locator('.platform-dashboard .dashboard-grid').first.evaluate("e=>getComputedStyle(e).gridTemplateColumns.split(' ').length"),1)
+                for group in ('订单与交易','入驻与商家','用户与社区','权限、通知与日志'):
+                    expect(page.locator('.platform-dashboard')).to_contain_text(group)
+                page.screenshot(path=str(self.out+f'/role-platform-home-{width}.png'),full_page=True)
+                page.goto(self.url+'#/platform/platform-orders/list')
+                expect(page.locator('.platform-orders h1')).to_have_text('订单管理')
+                expect(page.locator('#platform-order-status')).to_be_visible()
+                expect(page.locator('.platform-order-row').first).to_be_visible()
+                viewport=page.locator('.platform-orders h1').evaluate("e=>({top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom})")
+                self.assertLess(viewport['top'],height)
+                page.screenshot(path=str(self.out+f'/role-platform-orders-{width}.png'),full_page=True)
                 page.goto(self.url+'#/merchant/home')
                 self.assert_layout(page,width,'owner-merchant-home')
                 expect(page.locator('.mini-tabbar a')).to_have_count(4)
