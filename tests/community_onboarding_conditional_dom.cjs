@@ -43,6 +43,7 @@ const save=async()=>{nodes.wechatProfile.onsubmit({preventDefault(){}});await fl
   nodes.materials.children.find(e=>e.dataset.kind==='ubo_4_back').children.find(e=>e.textContent==='资料通过').click();await flush();
   assert.equal(app.materials.ubo_4_back.review,'ACCEPTED');console.log('conditional reviewer PASS');return;
  }
+ assert.equal(nodes.licenseInline.hidden,false,'enterprise license section visible on initial application');nodes.entity_type.value='SOLE_PROPRIETOR';nodes.entity_type.listeners.change?.();assert.equal(nodes.licenseInline.hidden,true,'license section hidden for non-enterprise');nodes.entity_type.value='ENTERPRISE';nodes.entity_type.listeners.change?.();assert.equal(nodes.licenseInline.hidden,false,'license section restored for enterprise');
  assert(!rows().includes('operator_identity_back'));edit('contact_info.contact_type','SUPER');edit('contact_info.contact_id_doc_type','IDENTIFICATION_TYPE_IDCARD');assert(rows().includes('operator_identity_back'));
  edit('contact_info.contact_id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');assert(!rows().includes('operator_identity_back'));
  for(let i=0;i<4;i++){edit('subject_info.ubo_info_list.'+i+'.ubo_id_doc_type','IDENTIFICATION_TYPE_IDCARD');assert(rows().includes('ubo_'+(i+1)+'_front'));assert(rows().includes('ubo_'+(i+1)+'_back'));}
