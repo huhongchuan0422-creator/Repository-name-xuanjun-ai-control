@@ -14,6 +14,7 @@ test('native home/recommendations/profile tabs and entry navigation stay in the 
  const profile=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
  for(const label of ['查看门店介绍','浏览推荐店铺','商家入驻与进度','商家工作台'])assert.ok(home.includes(label),label);
  assert.ok(checkout.includes('推荐店铺')&&checkout.includes('示例门店 A')&&checkout.includes('返回推荐店铺'));
+ const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(join.includes('index===fieldCursor')&&join.includes('下一项资料'));
  for(const label of ['商家入驻与进度','商家工作台','门店与订单'])assert.ok(profile.includes(label),label);
 });
 test('merchant entry is in existing display and same app routes, no second appid',()=>{const pages=JSON.parse(fs.readFileSync(__dirname+'/app.json')).pages;for(const p of ['merchant','merchant-join'])assert.ok(pages.includes('pages/'+p+'/index'));assert.match(fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8'),/bindtap="openMerchantJoin"/);});
