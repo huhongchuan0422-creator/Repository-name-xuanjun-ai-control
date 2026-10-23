@@ -49,7 +49,7 @@ paths:
                 required: [job_id, status, contract_version]
                 properties:
                   job_id: {type: string}
-                  status: {type: string, enum: [queued]}
+                  status: {type: string, enum: [queued, processing, needs_review, failed]}
                   contract_version: {type: string, const: '1.0.0'}
         '400': {description: Invalid image, unsupported type, or invalid request}
         '401': {description: Missing or invalid authentication}
