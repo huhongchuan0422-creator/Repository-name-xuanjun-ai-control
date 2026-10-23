@@ -123,7 +123,7 @@ class SQLiteJobStore:
             db.execute("UPDATE ocr_jobs SET status=?, payload_json=? WHERE job_id=? AND tenant_id=?",
                        (job["status"], json.dumps(job), job_id, tenant_id))
             return job
-def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None) -> FastAPI:
+def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
     if store is None:
@@ -148,7 +148,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         return p
     @app.post("/api/v1/ocr/jobs", status_code=202)
     async def submit(file: UploadFile = File(...), document_type: str = Form(...),
-                     onboarding_application_id: str = Form(...),
+                     onboarding_application_id: str = Form(...), attachment_id: str = Form(...),
                      idempotency_key: str = Header(..., alias="Idempotency-Key"),
                      authorization: Optional[str] = Header(None)):
         p = principal(authorization)
@@ -158,6 +158,8 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=400, detail="INVALID_REQUEST")
         if authorize_application is None or not authorize_application(p, onboarding_application_id):
             raise HTTPException(status_code=403, detail="APPLICATION_OWNERSHIP_UNVERIFIED")
+        if not attachment_id.strip() or authorize_attachment is None or not authorize_attachment(p, onboarding_application_id, attachment_id):
+            raise HTTPException(status_code=403, detail="ATTACHMENT_OWNERSHIP_UNVERIFIED")
         if isinstance(jobs, SecureSQLiteJobStore) and not jobs.check_rate(p.tenant_id):
             raise HTTPException(status_code=429, detail="OCR_TENANT_RATE_LIMIT")
         data = await file.read(MAX_BYTES + 1)
@@ -166,7 +168,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         import hashlib
         digest = hashlib.sha256(data).hexdigest()
         try:
-            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key) if isinstance(jobs, SecureSQLiteJobStore) else jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
+            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id) if isinstance(jobs, SecureSQLiteJobStore) else jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         if job["document_type"] != document_type:
