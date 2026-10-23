@@ -19,6 +19,10 @@ except ImportError:
 
 MAX_BYTES = 8 * 1024 * 1024
 ALLOWED_HINTS = {"business_license", "id_front"}
+CONFIRM_KEYS = {
+    "business_license": {"company_name", "credit_code", "legal_representative", "registered_address", "business_scope"},
+    "id_front": {"id_name", "id_number", "registered_address"},
+}
 class Principal(BaseModel):
     subject: str
     tenant_id: str
@@ -196,6 +200,11 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         if existing["status"] not in {"needs_review", "confirmed"}:
             raise HTTPException(status_code=409, detail="JOB_NOT_READY_FOR_CONFIRMATION")
+        if (not body.fields or len(body.fields) > 12 or
+                not set(body.fields).issubset(CONFIRM_KEYS[existing["document_type"]]) or
+                any(len(value) > (2048 if key == "business_scope" else 256)
+                    for key, value in body.fields.items())):
+            raise HTTPException(status_code=400, detail="OCR_CONFIRM_FIELDS_INVALID")
         if not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
         try:
