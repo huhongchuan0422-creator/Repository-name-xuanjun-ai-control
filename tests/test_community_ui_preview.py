@@ -474,7 +474,7 @@ class ClickThrough(unittest.TestCase):
             page.get_by_role('link',name='推荐',exact=True).click()
             self.assertTrue(page.url.endswith('/consumer/consumer-recommendations/list'),page.url)
             expect(page.locator('#view')).to_contain_text('平台推荐店铺')
-            expect(page.locator('#view')).to_contain_text('尚未接入平台推荐数据来源')
+            expect(page.locator('#view')).to_contain_text('尚未接入平台推荐来源')
             page.get_by_role('link',name='查看介绍',exact=False).click()
             self.assertTrue(page.url.endswith('/consumer/consumer-recommendations/detail'),page.url)
             expect(page.locator('#view')).to_contain_text('不代表平台已实际推荐')
