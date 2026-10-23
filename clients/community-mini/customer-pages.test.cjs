@@ -18,6 +18,7 @@ function environment(baseUrl='https://fixture.invalid'){
       const op=o.data&&o.data.operation;
       if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
         user_id:'user1',project_customer_id:'customer1',nickname:'',contact:'',version:0}}});
+      if(op==='commerce.notices')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],has_more:false,next_cursor:null}}});
       if(op==='commerce.profile_update')return o.success({statusCode:200,data:{payment_enabled:false,result:{
         user_id:'user1',project_customer_id:'customer1',nickname:o.data.params.nickname,contact:o.data.params.contact,version:1}}});
       o.fail({errMsg:'unexpected'});
@@ -48,7 +49,7 @@ test('native bottom navigation is fixed, safe-area aware, and reserves content s
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
  assert.match(checkout,/disabled="{{pending\|\|!sessionReady}}"/);
  assert.match(checkout,/orderDetails&&!detailsCollapsed/);
- assert.match(checkout,/返回订单列表/);assert.match(checkout,/重新显示所选订单详情/);
+ assert.match(checkout,/返回本人订单列表/);assert.match(checkout,/bindtap="backToOrderList"/);assert.match(checkout,/bindtap="selectOrder"/);assert.match(checkout,/orderDetails\.lines/);
 });
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
   const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
@@ -85,8 +86,10 @@ test('profile read and update reuse commerce profile APIs without fabricated fie
   h.page.input({currentTarget:{dataset:{field:'contact'}},detail:{value:'alice@example.org'}});
   await h.page.save();
   const business=h.calls.filter(x=>x.data&&x.data.operation);
-  assert.deepEqual(business.map(x=>x.data.operation),['commerce.profile_read','commerce.profile_update']);
-  assert.equal(JSON.stringify(business[1].data.params),JSON.stringify({nickname:'Alice',contact:'alice@example.org',expected_version:0}));
+  assert.deepEqual(business.map(x=>x.data.operation),['commerce.profile_read','commerce.notices','commerce.profile_update']);
+  assert.deepEqual(JSON.parse(JSON.stringify(business[1].data.params)),{after_id:''});
+  assert.equal(JSON.stringify(business[2].data.params),JSON.stringify({nickname:'Alice',contact:'alice@example.org',expected_version:0}));
+  assert.equal(h.page.data.noticesLoaded,true);
   assert.equal(h.page.data.version,1);
 });
 

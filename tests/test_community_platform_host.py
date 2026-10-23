@@ -105,6 +105,43 @@ class FormalHost(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 app.gateway.dispatch(token,dict(scene='shop1',operation='community.storefront',params={}))
         self.assertIsNone(host.center);self.assertIsNone(host.persistence)
+    def test_real_reader_same_application_save_read_and_reviewer_readback(self):
+        """Use the formal host and actual Reader type; no provider request."""
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        with self.open() as host:
+            app=host.application
+            onboarding=app.onboarding
+            self.assertIs(app.operations.onboarding,onboarding)
+            self.assertIsInstance(onboarding.wechat_applyment.reader,PartnerOrderReader)
+            self.assertFalse(onboarding.wechat_applyment.enabled)
+            host.center.db.execute("UPDATE members SET role='REVIEWER' WHERE user_id=?",(self.fx.uid2,))
+            with patch.object(onboarding.wechat_applyment.reader,'_fetch',side_effect=AssertionError('PROVIDER_IO_FORBIDDEN')) as provider:
+                applicant=host.center.login('one@example.org','FixturePassword123!')
+                reviewer=host.center.login('two@example.org','FixturePassword123!')
+                def call(web,op,params):
+                    return onboarding.dispatch(web['token'],web['csrf'],dict(operation=op,params=params))
+                fields=dict(legal_name='Fixture Legal Name',store_name='Fixture Store',
+                            address='Fixture Address',contact='Fixture Contact')
+                saved=call(applicant,'save',dict(application=None,revision=0,fields=fields,
+                        entity_type='ENTERPRISE',category='GENERAL',delegated=False))
+                application=saved['application'];revision=saved['revision']
+                self.assertEqual(saved['fields']['legal_name'],fields['legal_name'])
+                self.assertEqual(call(applicant,'read',dict(application=application))['application'],application)
+                reviewed=call(reviewer,'review_read',dict(application=application))
+                self.assertEqual(reviewed['application'],application)
+                self.assertEqual(reviewed['revision'],revision)
+                self.assertEqual(reviewed['fields']['store_name'],fields['store_name'])
+                self.assertEqual(reviewed['wechat_submerchant_state'],'NOT_VERIFIED')
+                self.assertFalse(reviewed['payment_enabled'])
+                with self.assertRaises(PermissionError):
+                    call(reviewer,'save',dict(application=application,revision=revision,fields=fields,
+                         entity_type='ENTERPRISE',category='GENERAL',delegated=False))
+                with self.assertRaises(PermissionError):
+                    call(applicant,'review_read',dict(application=application))
+                self.assertEqual(host.center.db.execute(
+                    "SELECT count(*) FROM onboarding WHERE application=?",(application,)).fetchone()[0],1)
+                provider.assert_not_called()
+
     def test_protected_community_grants_use_same_center_and_commerce(self):
         self.plan['community_grants']={'community':dict(user_id=self.fx.uid1,project='project1',tenant='tenant1',role='COMMUNITY_ADMIN')}
         self.write('host.json',self.plan)
