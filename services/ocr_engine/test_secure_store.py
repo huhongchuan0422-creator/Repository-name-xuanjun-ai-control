@@ -60,6 +60,21 @@ class SecureStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"STALE_CONFIRMATION_REVISION"):
             self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"})
         self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human verified text")
+    def test_confirmation_idempotency_and_encrypted_audit(self):
+        job=self.create()
+        self.store.claim(job["job_id"])
+        self.store.update(job["job_id"],status="needs_review",fields={})
+        first=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001")
+        replay=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001")
+        self.assertEqual(first["job_id"],replay["job_id"])
+        self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human confirmed")
+        events=self.store.audit_events(job["job_id"],"tenant-a")
+        self.assertEqual(len(events),1)
+        self.assertEqual(events[0]["event"],"USER_CONFIRMATION")
+        with self.assertRaisesRegex(ValueError,"OCR_CONFIRM_IDEMPOTENCY_CONFLICT"):
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"different"},"confirm-key-00001")
+        with self.assertRaisesRegex(ValueError,"STALE_CONFIRMATION_REVISION"):
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-00002")
     def test_delete_tenant_scoped(self):
         job=self.create()
         self.assertFalse(self.store.delete(job["job_id"],"tenant-b"))
