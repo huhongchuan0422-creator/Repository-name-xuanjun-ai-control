@@ -535,7 +535,8 @@ Page({
     } catch(error) {if(current())this.setData({refundRecoveryStatus:error.message});}
     finally {if(this._refundRecoveryRequest===request&&!this._pageUnloaded&&this._pageGeneration===request.generation){this._refundRecoveryRequest=null;this.setData({refundRecoveryPending:false});}}
   },
-  selectOrder(e) {if(this.data.pending)return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.currentTarget.dataset.reference,refundApplication:'',afterAd:'',afterAdVerified:false});},
+  selectOrder(e) {if(this.data.pending)return;const reference=e.currentTarget.dataset.reference;if(typeof reference!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(reference))return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference,refundApplication:'',afterAd:'',afterAdVerified:false},()=>this.loadOrderDetails());},
+  backToOrderList(){this.resetOrderDetails();this.setData({reference:'',refundApplication:'',refundAmount:'',refundReason:'',status:'已返回本人订单列表'});},
   inputRefund(e) {
     if(this.data.pending&&!this.cancelConsumerRead('refund'))return;
     const field=e.currentTarget.dataset.field;
