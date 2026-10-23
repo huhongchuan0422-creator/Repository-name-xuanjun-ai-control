@@ -21,7 +21,7 @@ It defines POST /ocr/jobs, GET /ocr/jobs/{job_id}, and POST /ocr/jobs/{job_id}/c
 ## Tests / evidence
 ```bash
 python3 -m unittest discover -s services/ocr_engine -p 'test_*.py'
-python3 -m unittest tests.test_ocr_core
+python3 -m unittest discover -s tests -p 'test_ocr_core.py'
 ```
 These tests exercise synthetic parser fixtures, output normalization, unsupported-type handling and fail-closed local-model configuration. They do not prove real image recognition. Actual offline inference remains BLOCKED until approved model files are staged with verified SHA256 and a non-sensitive synthetic image test is executed in an isolated environment.
 
