@@ -139,10 +139,14 @@ class ExpiryLoopContactTests(unittest.TestCase):
 
     def test_code_pin_binds_imported_candidate_dependencies(self):
         root=Path(self.tmp.name)/'code'; root.mkdir()
-        names=('queue.py','worker.py','runtime.py','private_transfer.py','credential_lifecycle.py','fixed_actions.py','pr122_baseline_collector.py')
+        names=('queue.py','worker.py','runtime.py','private_transfer.py','credential_lifecycle.py','fixed_actions.py','pr122_baseline_collector.py','archive_reader.py','material_custody.py')
         for name in names: (root/name).write_bytes(b'fixture')
         first=code_pin(root)
         (root/'credential_lifecycle.py').write_bytes(b'changed')
         self.assertNotEqual(first,code_pin(root))
+        for name in ('archive_reader.py','material_custody.py'):
+            before=code_pin(root)
+            (root/name).write_bytes(b'changed')
+            self.assertNotEqual(before,code_pin(root))
         (root/'private_transfer.py').unlink()
         with self.assertRaises(FileNotFoundError): code_pin(root)
