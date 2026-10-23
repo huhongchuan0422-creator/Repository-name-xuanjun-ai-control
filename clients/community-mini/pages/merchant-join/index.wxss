@@ -1,1 +1,5 @@
 label,text{display:block;overflow-wrap:anywhere}label{margin:24rpx 0}picker{padding:24rpx;background:#edf4ef}button{margin:16rpx 0}
+
+.scene-photo-card{display:block;margin:18rpx 0;padding:22rpx;border:2rpx solid #dce5de;border-radius:16rpx;background:#f8faf8;box-sizing:border-box}
+.scene-photo-card>text{display:block;line-height:1.5;margin-bottom:14rpx;overflow-wrap:anywhere}
+.scene-photo-card>button{display:block;max-width:100%;margin:12rpx 0;white-space:normal}
