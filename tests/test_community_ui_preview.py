@@ -612,4 +612,38 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+
+    def test_owner_responsive_320_390_430_and_real_pc_roles(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            for width,height in ((320,740),(390,844),(430,900)):
+                page.set_viewport_size({'width':width,'height':height})
+                page.goto(self.url+'#/consumer/home')
+                self.assert_layout(page,width,'owner-consumer-home')
+                expect(page.locator('.mini-tabbar a')).to_have_count(4)
+                for label in ('首页','推荐','订单','我的'):
+                    expect(page.locator('.mini-tabbar')).to_contain_text(label)
+                page.goto(self.url+'#/merchant/home')
+                self.assert_layout(page,width,'owner-merchant-home')
+                expect(page.locator('.mini-tabbar a')).to_have_count(4)
+                for label in ('工作台','订单','门店','我的'):
+                    expect(page.locator('.mini-tabbar')).to_contain_text(label)
+                expect(page.locator('#view')).to_contain_text('收款统计')
+                expect(page.locator('#view')).to_contain_text('收款码与保存')
+                page.goto(self.url+'#/consumer/consumer-profile/edit')
+                page.locator('#profile-cancel').scroll_into_view_if_needed()
+                geom=page.locator('#profile-cancel').evaluate("""e=>({buttonBottom:e.getBoundingClientRect().bottom,navTop:document.querySelector('.mini-tabbar').getBoundingClientRect().top,scroll:document.documentElement.scrollWidth,width:innerWidth})""")
+                self.assertLessEqual(geom['buttonBottom'],geom['navTop']+1,geom)
+                self.assertLessEqual(geom['scroll'],width+1,geom)
+            page.set_viewport_size({'width':1440,'height':1000})
+            page.goto(self.url+'#/community/home')
+            self.assert_layout(page,1440,'owner-community-pc')
+            page.goto(self.url+'#/platform/home')
+            self.assert_layout(page,1440,'owner-platform-pc')
+            expect(page.locator('#view')).to_contain_text('订单与交易')
+            expect(page.locator('#view')).to_contain_text('权限、通知与日志')
+        finally:
+            page.close()
+
+
 if __name__=='__main__':unittest.main()
