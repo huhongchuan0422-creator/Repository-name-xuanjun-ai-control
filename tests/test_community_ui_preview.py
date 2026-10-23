@@ -662,15 +662,20 @@ class ClickThrough(unittest.TestCase):
             identity=page.locator('.admission-data-card').filter(has_text='法人身份证').first
             if identity.get_attribute('open') is None:
                 identity.locator('summary').click()
+            before_doc_scroll=page.evaluate('window.scrollY')
             page.locator('[data-option="doc"]').select_option('IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
             expect(identity).to_have_attribute('open','')
             expect(page.locator('[data-path="subject_info.business_license_info.license_number"]')).to_have_value('DEMO-123')
+            self.assertLessEqual(abs(page.evaluate('window.scrollY')-before_doc_scroll),1)
+            page.goto(self.url+'#/admission/admission-business/edit')
             scene=page.locator('.admission-data-card').filter(has_text='经营场景').first
             if scene.get_attribute('open') is None:
                 scene.locator('summary').click()
+            before_scene_scroll=page.evaluate('window.scrollY')
             page.locator('[data-option="scene"]').select_option('both')
             expect(scene).to_have_attribute('open','')
             expect(page.locator('[data-option="scene"]')).to_be_focused()
+            self.assertLessEqual(abs(page.evaluate('window.scrollY')-before_scene_scroll),1)
         finally:
             page.close()
 
