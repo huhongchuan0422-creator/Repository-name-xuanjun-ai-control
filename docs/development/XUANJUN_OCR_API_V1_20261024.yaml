@@ -50,7 +50,7 @@ paths:
                 required: [job_id, status, contract_version]
                 properties:
                   job_id: {type: string}
-                  status: {type: string, enum: [queued, processing, needs_review, failed]}
+                  status: {type: string, enum: [queued, processing, needs_review, failed, confirmed]}
                   contract_version: {type: string, const: '1.0.0'}
         '400': {description: Invalid image, unsupported type, or invalid request}
         '401': {description: Missing or invalid authentication}
@@ -151,9 +151,8 @@ paths:
         '200': {description: User-confirmed fields recorded and audited}
         '400': {description: Invalid schema or stale revision}
         '401': {description: Missing or invalid authentication}
-        '403': {description: Tenant or job authorization denied}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
         '409': {description: Conflicting confirmation revision or idempotency payload}
-        '403': {description: Current application or attachment authorization revoked}
 components:
   securitySchemes:
     bearerAuth:
