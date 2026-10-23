@@ -113,6 +113,34 @@ class SecureStoreTests(unittest.TestCase):
         first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a")
         with self.assertRaisesRegex(ValueError, "OCR_IDEMPOTENCY_CONFLICT"):
             self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-b")
+    def test_confirmation_audit_and_idempotency_survive_independent_process(self):
+        import json, subprocess, sys
+        job=self.create(idem="process-restart-job-0001",digest="e"*64)
+        self.store.claim(job["job_id"])
+        self.store.update(job["job_id"],status="needs_review",fields={"company_name":{"value":"synthetic only"}})
+        fields={"company_name":"synthetic confirmed"}
+        self.store.confirm(job["job_id"],"tenant-a",1,fields,"process-confirm-key-0001")
+        child = r'''
+import json, os
+from services.ocr_engine.secure_store import SecureSQLiteJobStore
+s=SecureSQLiteJobStore(os.environ['OCR_TEST_DB'],os.environ['OCR_TEST_KEY'].encode('ascii'))
+j=s.get(os.environ['OCR_TEST_JOB'],'tenant-a')
+assert j and j['status']=='confirmed', 'PROCESS_RESTART_CONFIRMATION_MISSING'
+assert j['confirmed_fields']=={'company_name':'synthetic confirmed'}, 'PROCESS_RESTART_CONFIRMED_FIELDS_MISSING'
+events=s.audit_events(os.environ['OCR_TEST_JOB'],'tenant-a')
+assert len(events)==1 and events[0].get('event')=='USER_CONFIRMATION', 'PROCESS_RESTART_AUDIT_MISSING'
+r=s.confirm(os.environ['OCR_TEST_JOB'],'tenant-a',1,{'company_name':'synthetic confirmed'},'process-confirm-key-0001')
+assert r.get('recorded') is True and r.get('status')=='confirmed', 'PROCESS_RESTART_IDEMPOTENT_REPLAY_FAILED'
+print('INDEPENDENT_PROCESS_RESTART=PASS')
+print('CONFIRMED_SQLITE_STATE=PASS')
+print('ENCRYPTED_AUDIT_PERSISTENCE=PASS')
+print('CONFIRM_IDEMPOTENCY_REPLAY=PASS')
+'''
+        env=dict(os.environ, OCR_TEST_DB=self.path, OCR_TEST_KEY=self.key.decode('ascii'), OCR_TEST_JOB=job["job_id"])
+        result=subprocess.run([sys.executable,"-c",child],env=env,capture_output=True,text=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("INDEPENDENT_PROCESS_RESTART=PASS",result.stdout)
+        self.assertIn("CONFIRM_IDEMPOTENCY_REPLAY=PASS",result.stdout)
     def test_reject_wrong_key(self):
         job=self.create()
         with self.assertRaisesRegex(RuntimeError, "OCR_ENCRYPTION_KEY_MISMATCH"):
