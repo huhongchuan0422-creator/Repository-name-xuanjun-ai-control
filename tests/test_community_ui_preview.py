@@ -741,4 +741,13 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+    def test_admission_contact_groups_and_customer_copy(self):
+        source=(BASE/'ui-preview/preview.js').read_text()
+        self.assertIn("admission-contact-core",source)
+        self.assertIn("admission-contact-super",source)
+        self.assertIn("business_license",source)
+        self.assertIn("结算与资料",source)
+        self.assertNotIn("复用",source)
+        self.assertIn("未提交 / 未核验",source)
+
 if __name__=='__main__':unittest.main()
