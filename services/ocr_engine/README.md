@@ -39,6 +39,6 @@ RapidOCR v3.9.2 source LICENSE and the fixed model-specific notice at https://gi
 
 ## Remaining external gates
 1. Real existing identity/token verifier and application + attachment ownership callbacks, supplied by the owning community integration writer.
-2. Model-weight redistribution license evidence.
+2. Release artifact packaging verification: confirm the actual distributable archive includes model_manifest.json, model_distribution/LICENSE-2.0.txt, model_distribution/NOTICE.md and any applicable upstream NOTICE; source-level license rights for the three pinned files are already verified.
 3. Deployment-specific key custody/rotation, backup, retention/deletion, monitoring and load/rate/timeout settings.
 4. Production deployment is not authorized by this document or a green Hosted run.
