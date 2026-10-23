@@ -26,6 +26,24 @@ jobs:
           cache-dependency-path: services/ocr_engine/requirements.txt
       - name: Install pinned OCR and API dependencies
         run: python -m pip install -r services/ocr_engine/requirements.txt
+      - name: Fetch pinned official model files and verify published SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/ocr-models"
+          mkdir -p "$d"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx" -o "$d/det.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx" -o "$d/rec.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx" -o "$d/cls.onnx"
+          echo "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f  $d/det.onnx" | sha256sum -c -
+          echo "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884  $d/rec.onnx" | sha256sum -c -
+          echo "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c  $d/cls.onnx" | sha256sum -c -
+          echo "OCR_DET_MODEL_PATH=$d/det.onnx" >> "$GITHUB_ENV"
+          echo "OCR_REC_MODEL_PATH=$d/rec.onnx" >> "$GITHUB_ENV"
+          echo "OCR_CLS_MODEL_PATH=$d/cls.onnx" >> "$GITHUB_ENV"
+          echo "OCR_MODEL_SHA256={\"det\":\"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f\",\"rec\":\"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884\",\"cls\":\"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c\"}" >> "$GITHUB_ENV"
+      - name: Execute real local OCR inference on generated synthetic image
+        run: python -m services.ocr_engine.run_synthetic_inference
       - name: Run parser and input-guard tests
         run: python -m unittest discover -s services/ocr_engine -p 'test_*.py' -v
       - name: Run governance-registered OCR tests
