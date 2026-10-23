@@ -19,7 +19,7 @@ class SecureStoreTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
     def create(self, idem="0123456789abcdef", digest="a"*64):
-        return self.store.create("tenant-a", "user-a", "app-a", "business_license", digest, idem)
+        return self.store.create("tenant-a", "user-a", "app-a", "business_license", digest, idem, "synthetic-attachment", "synthetic-revision-1")
     def test_encrypted_and_restart_read(self):
         job=self.create()
         self.store.claim(job["job_id"])
@@ -105,14 +105,14 @@ class SecureStoreTests(unittest.TestCase):
         def create_once(_):
             store = SecureSQLiteJobStore(self.path, self.key)
             barrier.wait()
-            return store.create("tenant-a", "user-a", "app-a", "business_license", "c"*64, "concurrent-key-0001")
+            return store.create("tenant-a", "user-a", "app-a", "business_license", "c"*64, "concurrent-key-0001", "synthetic-attachment", "synthetic-revision-1")
         with ThreadPoolExecutor(max_workers=8) as pool:
             jobs = list(pool.map(create_once, range(8)))
         self.assertEqual(len({job["job_id"] for job in jobs}), 1)
     def test_attachment_changes_idempotency_fingerprint(self):
-        first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a")
+        first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a", "synthetic-revision-1")
         with self.assertRaisesRegex(ValueError, "OCR_IDEMPOTENCY_CONFLICT"):
-            self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-b")
+            self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-b", "synthetic-revision-1")
     def test_confirmation_audit_and_idempotency_survive_independent_process(self):
         import json, subprocess, sys
         job=self.create(idem="process-restart-job-0001",digest="e"*64)
