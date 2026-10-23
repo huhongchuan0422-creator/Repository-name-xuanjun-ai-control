@@ -1,0 +1,145 @@
+openapi: 3.1.0
+info:
+  title: Xuanjun OCR Gateway
+  version: 1.0.0
+  description: >
+    Contract only. No public listener or production endpoint is deployed yet.
+    OCR suggestions never establish document authenticity and must be confirmed by a user.
+servers:
+  - url: https://{configured-host}/api/v1
+    variables:
+      configured-host:
+        default: ocr.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /ocr/jobs:
+    post:
+      operationId: createOcrJob
+      summary: Submit one authorized document image for OCR
+      description: >
+        Requires existing user identity, tenant ownership, onboarding attachment authorization,
+        upload malware/image validation, and an idempotency key. No image may be sent to a cloud
+        provider unless separately enabled with explicit authorization and a configured cost limit.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, document_type, onboarding_application_id]
+              properties:
+                file: {type: string, format: binary}
+                document_type:
+                  type: string
+                  enum: [business_license, id_front, id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, cashier_photo]
+                onboarding_application_id: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        '202':
+          description: Accepted for processing; this does not imply recognition succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, status, contract_version]
+                properties:
+                  job_id: {type: string}
+                  status: {type: string, enum: [queued]}
+                  contract_version: {type: string, const: '1.0.0'}
+        '400': {description: Invalid image, unsupported type, or invalid request}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant or attachment authorization denied}
+        '413': {description: Image exceeds configured size or pixel limits}
+        '429': {description: Rate limit exceeded}
+  /ocr/jobs/{job_id}:
+    get:
+      operationId: getOcrJob
+      summary: Read processing state and field suggestions
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: Current job state; fields are suggestions only.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, status, contract_version, requires_human_confirmation, authenticity_verified]
+                properties:
+                  job_id: {type: string}
+                  status: {type: string, enum: [queued, processing, succeeded, needs_review, failed]}
+                  contract_version: {type: string, const: '1.0.0'}
+                  document_type: {type: string}
+                  engine: {type: string}
+                  model_version: {type: string}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant or job authorization denied}
+        '404': {description: Job not found}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant or job authorization denied}
+        '409': {description: Conflicting confirmation revision}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: NOT_IMPLEMENTED
+  model-inference: NOT_VERIFIED
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - id_back, bank_card, food_business_license and other_permit remain unsupported until dedicated extractors and tests exist.
+    - All outputs are suggestions and never prove identity or authenticity.
