@@ -8,9 +8,9 @@
   <view class="card status-card" aria-live="polite">
     <view class="status-heading"><view class="status-dot {{authenticated?'is-ready':''}}"></view><text>{{pending?'正在连接':(authenticated?'已登录':'暂未登录')}}</text></view>
     <text class="description">{{status}}</text>
-    <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'重新登录'}}</button>
+    <button class="primary" wx:if="{{!authenticated&&!needsScene}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'重新登录'}}</button>
   </view>
-  <view class="card">
+  <view class="card" wx:if="{{!needsScene}}">
     <text class="section-title">门店介绍（示例）</text><text>示例门店 A</text>
     <text class="hint">资料来源待接入；商家资质未核验，不代表真实推荐或已开通服务。</text>
     <button class="service-link" bindtap="openStorefront">查看门店介绍 ›</button>
@@ -18,12 +18,15 @@
     <button class="service-link" bindtap="openMerchantJoin">商家入驻与进度 ›</button>
     <button class="service-link" bindtap="openMerchant">商家工作台 ›</button>
   </view>
-  <view class="card">
+  <view class="card" wx:if="{{!needsScene}}">
     <text class="section-title">我的服务</text>
     <button class="service-link" bindtap="openProfile" disabled="{{!authenticated||pending}}"><text>个人资料</text><text class="muted">管理昵称与联系方式 ›</text></button>
     <button class="service-link" bindtap="openCheckout" disabled="{{!authenticated||pending}}"><text>门店与订单</text><text class="muted">浏览服务与查看订单 ›</text></button>
     <text wx:if="{{!authenticated}}" class="hint">完成登录后可使用以上服务</text>
   </view>
   <button wx:if="{{authenticated}}" class="secondary" bindtap="logout" disabled="{{pending}}">退出登录</button>
+  <view class="card" wx:if="{{needsScene}}"><text class="section-title">欢迎使用社区服务</text><text class="hint">请在微信中扫描商家提供的门店二维码，或从原门店服务链接进入。尚未选择门店，不会读取个人资料或自动关联门店。</text></view>
+  <button class="secondary" bindtap="openPrivacy">隐私保护指引</button>
+  <text class="hint" aria-live="polite">{{privacyStatus}}</text>
   <text class="footer">开发预览 · 支付尚未开放</text>
 </view>

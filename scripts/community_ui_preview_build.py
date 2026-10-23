@@ -108,7 +108,7 @@ def build():
     for f in ['onboarding.html','onboarding.js']:
         sources[f]=hashlib.sha256((BASE/f).read_bytes()).hexdigest()
     document_types={x.attrs['value']:x.text() for select in on.find('select') if select.attrs.get('id')=='identity_type' for x in select.find('option')}
-    for f in ('app.json','session.js','merchant-form.js','merchant-fields.json','pages/merchant/index.js','pages/merchant/index.wxml','pages/merchant-join/index.js','pages/merchant-join/index.wxml'):
+    for f in ('app.json','session.js','merchant-form.js','merchant-fields.json','pages/home/index.js','pages/home/index.wxml','pages/merchant/index.js','pages/merchant/index.wxml','pages/merchant-join/index.js','pages/merchant-join/index.wxml'):
         sources['clients/community-mini/'+f]=hashlib.sha256((ROOT/'clients/community-mini'/f).read_bytes()).hexdigest()
     return {'documentTypes':document_types,'schema':1,'isolated':True,'sources':sources,'roles':{'merchant':'商家小程序','community':'社区管理','platform':'平台管理','admission':'商家入驻（同一小程序）','consumer':'用户小程序'},'pages':pages}
 def main():

@@ -321,3 +321,30 @@ test('consumer store page excludes internal delivery forms and preserves communi
  assert.equal(JSON.parse(fs.readFileSync(__dirname+'/pages/checkout/index.json','utf8')).navigationBarTitleText,'门店与订单');
  assert.ok(!JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8')).window.navigationBarTitleText.includes('模拟'));
 });
+
+
+test('ordinary home launch offers guidance without login, sample store or retry loop',()=>{
+ const h=loadPage('pages/home/index.js');h.page.onLoad({});
+ assert.equal(h.page.data.needsScene,true);assert.equal(h.calls.length,0);
+ assert.equal(h.config.scene,undefined);assert.equal(h.page.scene,null);
+ const wxml=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
+ assert.match(wxml,/!authenticated&&!needsScene/);assert.match(wxml,/尚未选择门店/);
+ assert.match(wxml,/wx:if="{{!needsScene}}"/);
+});
+test('valid home scene retains original login and invalid explicit scene never inherits a store',async()=>{
+ const valid=loadPage('pages/home/index.js');valid.page.onLoad({scene:'shop1'});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(valid.page.data.needsScene,false);assert.equal(valid.page.data.authenticated,true);
+ const invalid=loadPage('pages/home/index.js');invalid.config.scene='shop1';
+ invalid.page.onLoad({scene:'../bad'});
+ assert.equal(invalid.page.data.needsScene,true);assert.equal(invalid.calls.length,0);
+});
+test('privacy entry invokes only platform contract and handles absent, failed and late callbacks',()=>{
+ const h=loadPage('pages/home/index.js');h.page.openPrivacy();
+ assert.match(h.page.data.privacyStatus,/暂时无法打开/);
+ let options;h.wx.openPrivacyContract=o=>{options=o;};h.page.openPrivacy();
+ assert.equal(h.page.data.privacyStatus,'');assert.equal(h.calls.length,0);
+ options.fail();assert.match(h.page.data.privacyStatus,/暂时无法打开/);
+ h.page.openPrivacy();h.page.onUnload();options.fail();assert.equal(h.page.data.privacyStatus,'');
+ assert.equal(h.page.data.authenticated,false);
+});
