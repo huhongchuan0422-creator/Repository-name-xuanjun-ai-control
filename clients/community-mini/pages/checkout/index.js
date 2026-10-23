@@ -59,7 +59,7 @@ Page({
       projectTitle:'',projectRole:'',projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',
       projectFeedback:'',projectReference:'',projectReferenceItem:'',projectReferenceRevision:0,projectState:'',pending:false,status});
   },
-  openCustomerHome(){if(!this.scene){this.setData({status:'缺少门店场景，无法进入客户中心'});return;}wx.navigateTo({url:'/pages/home/index?scene='+encodeURIComponent(this.scene)});},
+  openCustomerHome(){if(!this.scene){this.setData({status:'缺少门店场景，无法进入客户中心'});return;}getApp().globalData.scene=this.scene;wx.switchTab({url:'/pages/home/index'});},
   quantity(e) {const id=e.currentTarget.dataset.id;const quantity=Number(e.detail.value);if(!Number.isSafeInteger(quantity)||quantity<0||quantity>10000)return;this.setData({products:this.data.products.map(p=>p.item_id===id?{...p,quantity}:p)});},
   inputProfile(e) {const field=e.currentTarget.dataset.field;if(['nickname','profileContact','referralCode'].includes(field))this.setData({[field]:e.detail.value});},
   inputProject(e) {this.setData({projectFeedback:e.detail.value});},
