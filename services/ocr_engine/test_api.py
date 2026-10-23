@@ -50,7 +50,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(other.status_code,404)
     def test_unsupported_material_rejected(self):
         r=self.client.post("/api/v1/ocr/jobs",headers=self.headers,
-            data={"document_type":"storefront_photo","onboarding_application_id":"synthetic-app"},
+            data={"document_type":"storefront_photo","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
             files={"file":("store.jpg",b"\xff\xd8\xffsynthetic","image/jpeg")})
         self.assertEqual(r.status_code,400)
     def test_sqlite_persistence_survives_store_recreation_and_isolates_tenant(self):
@@ -65,7 +65,7 @@ class ApiTests(unittest.TestCase):
     def test_ownership_callback_required(self):
         c = TestClient(create_app(authenticate=auth, store=JobStore(), infer=inference_fixture))
         r = c.post("/api/v1/ocr/jobs", headers=self.headers,
-            data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+            data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
             files={"file":("synthetic.jpg", bytes([255,216,255])+b"synthetic", "image/jpeg")})
         self.assertEqual(r.status_code, 403)
     def test_missing_persistent_store_denied(self):
@@ -89,7 +89,7 @@ class ApiTests(unittest.TestCase):
                     authorize_attachment=lambda p, app_id, attachment: attachment == "synthetic-attachment"))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
-                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
                     files={"file":("synthetic.jpg", bytes([255,216,255])+b"synthetic", "image/jpeg")})
                 self.assertEqual(first.status_code, 202, first.text)
                 job_id = first.json()["job_id"]
@@ -103,7 +103,7 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(replay.status_code, 202)
                 self.assertEqual(replay.json()["job_id"],job_id)
                 conflict = client2.post("/api/v1/ocr/jobs", headers=self.headers,
-                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
+                    data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
                     files={"file":("synthetic.jpg", bytes([255,216,255])+b"DIFFERENT", "image/jpeg")})
                 self.assertEqual(conflict.status_code,409)
                 denied = client2.get("/api/v1/ocr/jobs/"+job_id,headers={"Authorization":"Bearer tenant-b-token"})
@@ -125,5 +125,5 @@ class ApiTests(unittest.TestCase):
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
         payload={"revision":1,"fields":{"company_name":"Human confirmed"}}
         self.assertEqual(self.client.post(url,headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"confirm-key-00001"},json=payload).status_code,200)
-        self.assertEqual(self.client.post(url,headers={"Authorization":"Bearer tenant-a-token"},json=payload).status_code,409)
+        self.assertEqual(self.client.post(url,headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"confirm-key-00002"},json=payload).status_code,409)
 if __name__ == "__main__": unittest.main()
