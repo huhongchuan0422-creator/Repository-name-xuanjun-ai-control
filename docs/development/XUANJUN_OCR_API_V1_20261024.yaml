@@ -107,9 +107,10 @@ paths:
       summary: Delete OCR job payload
       description: >
         Rechecks current application and attachment authorization. Deletes encrypted job
-        payload and confirmed fields, while retaining a non-sensitive audit tombstone and
-        confirmation idempotency response records. This endpoint does not promise complete
-        erasure from backups or external retention layers.
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
       parameters:
         - in: path
           name: job_id
