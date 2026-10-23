@@ -219,7 +219,11 @@ def execute_ready(queue, cloud, request_id, now):
     request = queue.begin_dispatch(request_id, now)
     try:
         # The database dispatch intent commits BEFORE this network side effect.
-        if request['operation'] == 'project_fixed_action':
+        if request['operation'] == 'fetch_approved_object':
+            if queue.approved_objects is None:
+                raise Hold('APPROVED_OBJECT_NOT_ENROLLED')
+            command = queue.approved_objects.command(request)
+        elif request['operation'] == 'project_fixed_action':
             if queue.project_actions is None:
                 raise Hold('PROJECT_ACTION_NOT_ENROLLED')
             command = queue.project_actions.command(request)
@@ -245,8 +249,14 @@ def query_existing(queue, cloud, request_id, file_sink):
     if not status['invoke_id']:
         queue.unknown(request_id)
         raise Hold('NO_INVOKE_UNKNOWN_NO_DISPATCH')
+    if request['operation'] == 'fetch_approved_object' and queue.approved_objects is None:
+        raise Hold('APPROVED_OBJECT_NOT_ENROLLED')
     response = cloud.call(request['target'], 'DescribeInvocationResult', {'InvokeId': status['invoke_id']})
-    if request['operation'] == 'project_fixed_action':
+    if request['operation'] == 'fetch_approved_object':
+        if queue.approved_objects is None:
+            raise Hold('APPROVED_OBJECT_NOT_ENROLLED')
+        receipt, data = queue.approved_objects.result(request, status['invoke_id'], response)
+    elif request['operation'] == 'project_fixed_action':
         if queue.project_actions is None:
             raise Hold('PROJECT_ACTION_NOT_ENROLLED')
         receipt, data = queue.project_actions.result(request, status['invoke_id'], response)

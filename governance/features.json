@@ -163,6 +163,41 @@
         ".github/workflows/cloud-connection-tests.yml",
         "docs/development/CLOUD_CONNECTION_CONSENT_CSP_20261023.md"
       ]
+    },
+    {
+      "feature_id": "CLOUD_CONNECTION_APPROVED_OBJECT_QUEUE",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/CLOUD_CONNECTION_APPROVED_OBJECTS_20261023.md",
+        "section": "2."
+      },
+      "development": {
+        "document": "docs/development/CLOUD_CONNECTION_APPROVED_OBJECTS_20261023.md",
+        "section": "4.",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "Default-off protected binding; bounded inert objects; no production approval or body in cloud output",
+          "Real InvokeId and strict successful metadata checks feed original immutable queue; unknown never redispatched",
+          "Existing private_transfer identity/catalog/root/budget/SHA and receiver gates remain unchanged"
+        ],
+        "tests": [
+          "tests/test_cloud_connection_approved_objects.py"
+        ]
+      },
+      "reuse": [
+        "Original Queue/worker and private_transfer/Receiver; original cloud invocation protocol"
+      ],
+      "paths": [
+        "production/cloud_connection/queue.py",
+        "production/cloud_connection/worker.py",
+        "production/cloud_connection/runtime.py",
+        "production/cloud_connection/fixed_actions.py",
+        "tests/test_cloud_connection_approved_objects.py",
+        "deployment/cloud-connection/oauth/SOURCE_MANIFEST.json",
+        "docs/development/CLOUD_CONNECTION_APPROVED_OBJECTS_20261023.md"
+      ]
     }
   ]
 }

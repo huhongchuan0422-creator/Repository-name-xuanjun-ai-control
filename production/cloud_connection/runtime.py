@@ -223,6 +223,19 @@ def optional_hooks(config, source_directory):
     return expiry, actions
 
 
+def approved_object_hook(config):
+    """Absent by default. Only protected host config enrolls this operation."""
+    if 'approved_objects' not in config:
+        return None
+    entry = config['approved_objects']
+    if (type(entry) is not dict or set(entry) != {'metadata_ref', 'metadata_sha256'}
+            or entry['metadata_ref'] != '/etc/xuanjun-cloud-executor/approved-objects-binding.json'):
+        raise Hold('APPROVED_OBJECT_HOST_SCOPE')
+    from .fixed_actions import ApprovedObjectsPolicy
+    raw = protected_read(entry['metadata_ref'], 16384)
+    return ApprovedObjectsPolicy(raw, entry['metadata_sha256'])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True)
@@ -234,7 +247,7 @@ def main():
         raise Hold('ENROLLED_ROOT_SERVICE_ONLY')
     fields = {'executor_sha256', 'allowed_actor_ids', 'github_token_ref', 'github_token_owner',
               'credentials_ref', 'state_root', 'poll_seconds'}
-    if (not fields <= set(config) or set(config) - fields - {'expiry_watch', 'website_baseline'}
+    if (not fields <= set(config) or set(config) - fields - {'expiry_watch', 'website_baseline', 'approved_objects'}
             or code_pin(Path(__file__).parent) != config['executor_sha256']):
         raise Hold('HOST_CONFIG_OR_CODE_PIN')
     if (config['allowed_actor_ids'] != [332398908] or config['github_token_owner'] != 1003
@@ -244,6 +257,7 @@ def main():
             or type(config['poll_seconds']) is not int or not 15 <= config['poll_seconds'] <= 300):
         raise Hold('HOST_ENROLLMENT_SCOPE')
     expiry_watch, project_actions = optional_hooks(config, Path(__file__).parent)
+    approved_objects = approved_object_hook(config)
     root = config['state_root']
     store = PrivateStore(root + '/private-results')
     lockfd = os.open(root + '/worker.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -251,7 +265,7 @@ def main():
     if not stat.S_ISREG(ls.st_mode) or ls.st_uid != 0 or ls.st_nlink != 1 or stat.S_IMODE(ls.st_mode) != 0o600:
         raise Hold('LOCK_METADATA')
     fcntl.flock(lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    q = Queue(root + '/queue.sqlite', config['executor_sha256'], config['allowed_actor_ids'], project_actions=project_actions)
+    q = Queue(root + '/queue.sqlite', config['executor_sha256'], config['allowed_actor_ids'], project_actions=project_actions, approved_objects=approved_objects)
     network = Network()
     loop = Loop(q, Github(config['github_token_ref'], network, config['github_token_owner']),
                 Cloud(config['credentials_ref'], network), store, expiry_watch=expiry_watch)

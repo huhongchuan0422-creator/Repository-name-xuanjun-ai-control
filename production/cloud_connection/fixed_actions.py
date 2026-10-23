@@ -96,3 +96,145 @@ class WebsiteBaselinePolicy:
         return {'state':'SUCCESS' if success else 'FAILED','invoke_id':invoke,'target':request['target'],
                 'action_binding_sha256':self.sha,'collector_sha256':COLLECTOR_SHA,
                 'bytes':len(data),'sha256':v['sha256'],'business_acceptance':'NOT_GRANTED'},data
+
+
+class ApprovedObjectsPolicy:
+    """Default-off, bounded analysis objects; no catalog approval or root creation.
+
+    A root-owned, hash-pinned host binding supplies every value. There is one
+    immutable request ID per object; callers cannot choose paths or recipients.
+    Only metadata leaves the cloud command. Bodies use the original transfer.
+    """
+    def __init__(self, raw_binding, approved_binding_sha):
+        import os
+        import re
+        from .private_transfer import Catalog
+        check(type(raw_binding) is bytes and len(raw_binding) <= 16384
+              and type(approved_binding_sha) is str and SHA.fullmatch(approved_binding_sha)
+              and hashlib.sha256(raw_binding).hexdigest() == approved_binding_sha,
+              'APPROVED_OBJECT_HOST_BINDING')
+        b = strict(raw_binding)
+        check(type(b) is dict and set(b) == {'schema', 'catalog', 'catalog_sha256',
+              'policy', 'roots', 'recipient_id', 'requests', 'execution_user', 'execution_uid', 'reader_sha256'},
+              'APPROVED_OBJECT_FIELDS')
+        check(type(b['schema']) is int and b['schema'] == 1, 'APPROVED_OBJECT_SCHEMA')
+        policy = b['policy']
+        check(type(policy) is dict
+              and type(policy.get('max_objects')) is int and 0 < policy['max_objects'] <= 19
+              and type(policy.get('max_total_bytes')) is int and 0 < policy['max_total_bytes'] <= 93592
+              and type(policy.get('max_object_bytes')) is int and 0 < policy['max_object_bytes'] <= 53969,
+              'APPROVED_OBJECT_ANALYSIS_BUDGET')
+        catalog = Catalog(canonical(b['catalog']).encode(), b['catalog_sha256'], policy)
+        check(catalog.value['target'] == 'uk' and catalog.value['recipients'] == [b['recipient_id']]
+              and policy['recipients'] == [b['recipient_id']], 'APPROVED_OBJECT_RECIPIENT')
+        roots = b['roots']
+        check(type(roots) is dict and set(roots) == set(policy['root_refs'])
+              and set(roots) == {x['root_ref'] for x in catalog.objects.values()}, 'APPROVED_OBJECT_ROOTS')
+        for root in roots.values():
+            check(type(root) is list and len(root) == 2 and type(root[0]) is str
+                  and root[0].startswith('/') and os.path.normpath(root[0]) == root[0]
+                  and root[0] != '/' and type(root[1]) is int and root[1] >= 0,
+                  'APPROVED_OBJECT_ROOT')
+        check(type(b['execution_user']) is str and re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}', b['execution_user'])
+              and type(b['execution_uid']) is int and b['execution_uid'] >= 0, 'APPROVED_OBJECT_EXECUTION_IDENTITY')
+        requests = b['requests']
+        check(type(requests) is dict and set(requests) == set(catalog.objects)
+              and all(type(v) is str and TOKEN.fullmatch(v) and v != SEALED for v in requests.values())
+              and len(set(requests.values())) == len(requests), 'APPROVED_OBJECT_SINGLE_REQUEST')
+        check(type(b['reader_sha256']) is str and SHA.fullmatch(b['reader_sha256']), 'APPROVED_OBJECT_READER_PIN')
+        self.binding, self.sha, self.catalog = b, approved_binding_sha, catalog
+
+    def request_object(self, request):
+        b, c = self.binding, self.catalog
+        args = request.get('arguments')
+        check(type(args) is dict and set(args) == {'manifest_sha256', 'object_ref', 'recipient_id'},
+              'APPROVED_OBJECT_ARGUMENTS')
+        ref = args['object_ref']
+        check(type(ref) is str and ref in c.objects and args['manifest_sha256'] == c.sha
+              and args['recipient_id'] == b['recipient_id']
+              and request.get('request_id') == b['requests'][ref]
+              and request.get('project') == c.value['project'] and request.get('target') == 'uk'
+              and request.get('operation') == 'fetch_approved_object'
+              and request.get('executor_sha256') == c.value['executor_sha256'], 'APPROVED_OBJECT_SCOPE')
+        return c.objects[ref]
+
+    def validate(self, request, actor, now):
+        check(type(actor) is int and actor == 332398908, 'APPROVED_OBJECT_ACTOR')
+        item = self.request_object(request)
+        self.catalog.object(item['ref'], self.binding['recipient_id'], now)
+        check(request['expires_unix'] <= self.catalog.value['valid_until'], 'APPROVED_OBJECT_EXPIRY')
+
+    def command(self, request):
+        # Reuse the existing descriptor reader verbatim, rather than introduce
+        # a second path walker. Its code is already included in runtime.code_pin.
+        import ast
+        from pathlib import Path
+        from . import private_transfer as transfer
+        from .worker import HOSTS
+        item = self.request_object(request)
+        root, owner = self.binding['roots'][item['root_ref']]
+        code = 'import os,stat,time,hashlib,json\nclass Hold(Exception): pass\nCHUNK=65536\n'
+        raw = Path(transfer.__file__).with_suffix('.py').read_bytes()
+        check(hashlib.sha256(raw).hexdigest() == self.binding['reader_sha256'], 'APPROVED_OBJECT_READER_PIN')
+        text = raw.decode('utf-8')
+        nodes = ast.parse(text).body
+        lines = text.splitlines(True)
+        for name in ('check', 'stamp', 'directory', 'read_object'):
+            matches = [(i, n) for i, n in enumerate(nodes) if isinstance(n, ast.FunctionDef) and n.name == name]
+            check(len(matches) == 1, 'APPROVED_OBJECT_READER_SOURCE')
+            i, node = matches[0]
+            end = nodes[i + 1].lineno - 1 if i + 1 < len(nodes) else len(lines)
+            code += ''.join(lines[node.lineno - 1:end]) + '\n'
+        nonce = hashlib.sha256(canonical(request).encode()).hexdigest()
+        body = ('check(os.uname().nodename==%r and os.geteuid()==%r,"REMOTE_IDENTITY")\n'
+                 'check(%r<=int(time.time())<%r,"APPROVED_OBJECT_EXPIRED_BEFORE_READ")\n'
+                 'data=read_object(%r,%r,%r)\n'
+                 'check(int(time.time())<%r,"APPROVED_OBJECT_EXPIRED_AFTER_READ")\n'
+                 'print(json.dumps(dict(hostname=os.uname().nodename,uid=os.geteuid(),nonce=%r,'
+                 'manifest_sha256=%r,object_ref=%r,recipient_id=%r,bytes=len(data),'
+                 'sha256=hashlib.sha256(data).hexdigest())))\n') % (
+                     HOSTS['uk'], self.binding['execution_uid'], self.catalog.value['valid_from'],
+                     min(request['expires_unix'], self.catalog.value['valid_until']), root, owner, item,
+                     min(request['expires_unix'], self.catalog.value['valid_until']), nonce, self.catalog.sha, item['ref'], self.binding['recipient_id'])
+        import textwrap
+        code += 'try:\n' + textwrap.indent(body, '    ') + 'except BaseException:\n    raise SystemExit(2)\n'
+        command = '/usr/bin/python3 -I -B -S -c ' + shlex.quote(code)
+        check(len(base64.b64encode(command.encode())) <= 16384, 'SWAS_COMMAND_BOUND')
+        return {'CommandContent': command, 'Type': 'RunShellScript',
+                'WorkingUser': self.binding['execution_user'], 'WorkingDir': '/',
+                'Timeout': 45, 'Name': 'xuanjun-approved-object-metadata'}
+
+    def result(self, request, invoke, response):
+        from .worker import HOSTS
+        item = self.request_object(request)
+        check(type(invoke) is str and TOKEN.fullmatch(invoke), 'APPROVED_OBJECT_INVOKE')
+        check(type(response) is dict and type(response.get('InvocationResult')) is dict, 'RESULT_FORMAT')
+        row = response['InvocationResult']
+        check(row.get('InvokeId') == invoke and row.get('InstanceId') == TARGETS['uk'][2], 'RESULT_TARGET')
+        status = row.get('InvocationStatus')
+        if status in ('Pending', 'Running', 'Stopping'):
+            return None, None
+        exit_code = row.get('ExitCode')
+        check(type(exit_code) is int and -2147483648 <= exit_code <= 2147483647, 'APPROVED_OBJECT_EXIT_CODE')
+        if status != 'Success' or exit_code != 0:
+            return {'state': 'FAILED', 'invoke_id': invoke, 'exit_code': exit_code}, None
+        raw = row.get('Output')
+        check(type(raw) is str and len(raw.encode()) <= 8192, 'APPROVED_OBJECT_OUTPUT_BOUND')
+        try:
+            text = raw if raw.lstrip().startswith('{') else base64.b64decode(raw, validate=True).decode('utf-8')
+        except (ValueError, UnicodeError):
+            raise Hold('APPROVED_OBJECT_OUTPUT_FORMAT') from None
+        v = strict(text.encode())
+        expected = {'hostname': HOSTS['uk'], 'uid': self.binding['execution_uid'],
+                    'nonce': hashlib.sha256(canonical(request).encode()).hexdigest(),
+                    'manifest_sha256': self.catalog.sha, 'object_ref': item['ref'],
+                    'recipient_id': self.binding['recipient_id'], 'bytes': item['bytes'], 'sha256': item['sha256']}
+        check(type(v) is dict and set(v) == set(expected)
+              and type(v.get('uid')) is int and type(v.get('bytes')) is int
+              and v == expected, 'APPROVED_OBJECT_RESULT_BINDING')
+        # This is derived exclusively from an observed successful invocation;
+        # no body or synthetic file_ref is inserted in the original queue.
+        return {'state': 'SUCCESS', 'invoke_id': invoke, 'target': 'uk',
+                'manifest_sha256': self.catalog.sha, 'object_ref': item['ref'],
+                'recipient_id': self.binding['recipient_id'], 'bytes': item['bytes'],
+                'sha256': item['sha256'], 'action_binding_sha256': self.sha}, None

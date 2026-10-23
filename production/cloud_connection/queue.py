@@ -49,7 +49,7 @@ def decode(raw):
         raise Hold('REQUEST_JSON') from exc
 
 
-def validate(request, actor_id, allowed_actors, executor_sha256, now, project_actions=None):
+def validate(request, actor_id, allowed_actors, executor_sha256, now, project_actions=None, approved_objects=None):
     if type(actor_id) is not int or actor_id not in allowed_actors:
         raise Hold('UNTRUSTED_SUBMITTER')
     if type(request) is not dict or set(request) != FIELDS:
@@ -73,6 +73,9 @@ def validate(request, actor_id, allowed_actors, executor_sha256, now, project_ac
         expected = {}
     elif request['operation'] == 'fetch_os_release':
         expected = {'path': '/etc/os-release', 'max_bytes': 65536}
+    elif request['operation'] == 'fetch_approved_object' and approved_objects is not None:
+        approved_objects.validate(request, actor_id, now)
+        return
     elif request['operation'] == 'project_fixed_action' and project_actions is not None:
         project_actions.validate(request, actor_id, now)
         return
@@ -84,8 +87,9 @@ def validate(request, actor_id, allowed_actors, executor_sha256, now, project_ac
 
 class Queue:
     """Host-private SQLite file; not an AuthorityStore or an installation quota."""
-    def __init__(self, path, executor_sha256, allowed_actors, project_actions=None):
+    def __init__(self, path, executor_sha256, allowed_actors, project_actions=None, approved_objects=None):
         self.project_actions = project_actions
+        self.approved_objects = approved_objects
         self.executor_sha256 = executor_sha256
         self.allowed_actors = frozenset(allowed_actors)
         self.db = sqlite3.connect(path, timeout=0, isolation_level=None)
@@ -118,7 +122,7 @@ class Queue:
     def submit(self, raw, authenticated_actor_id, now):
         request = decode(raw)
         validate(request, authenticated_actor_id, self.allowed_actors,
-                 self.executor_sha256, now, self.project_actions)
+                 self.executor_sha256, now, self.project_actions, self.approved_objects)
         body = canonical(request)
         digest = hashlib.sha256(body.encode()).hexdigest()
         self.db.execute('BEGIN IMMEDIATE')
@@ -149,7 +153,7 @@ class Queue:
             if row is None or row[2] != 'READY':
                 raise Hold('NOT_READY_QUERY_EXISTING_ONLY')
             request = decode(row[0])
-            validate(request, row[1], self.allowed_actors, self.executor_sha256, now, self.project_actions)
+            validate(request, row[1], self.allowed_actors, self.executor_sha256, now, self.project_actions, self.approved_objects)
             self.db.execute("UPDATE connection_jobs SET state='DISPATCHING' WHERE request_id=?",
                             (request_id,))
             self.db.execute('COMMIT')
