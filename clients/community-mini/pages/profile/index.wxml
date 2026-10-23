@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page"><view class="xj-nav" style="display:flex;gap:4rpx;margin-bottom:16rpx;"><button style="flex:1;font-size:24rpx;" data-section="home" bindtap="navigateSection">首页</button><button style="flex:1;font-size:24rpx;" data-section="recommendations" bindtap="navigateSection">推荐</button><button style="flex:1;font-size:24rpx;" data-section="orders" bindtap="navigateSection">订单</button><button style="flex:1;font-size:24rpx;" data-section="profile" bindtap="navigateSection">我的</button></view>
   <view class="hero"><text class="eyebrow">MY ACCOUNT</text><text class="title">个人资料</text><text class="subtitle">管理你的昵称与联系方式</text></view>
   <view class="card"><text class="description">{{status}}</text><button bindtap="openJoin">商家入驻与进度</button><button bindtap="openMerchant">商家工作台</button><button bindtap="openOrders">门店与订单</button>
   <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">重新登录</button></view>

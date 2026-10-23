@@ -8,7 +8,7 @@ vm.runInNewContext(fs.readFileSync(__dirname+'/pages/'+name+'/index.js','utf8'),
 const page={...definition,data:structuredClone(definition.data),setData(p){Object.assign(this.data,p);}};return {page,calls,app,hold(p){pending=p;},failNext(operation,error){failure={operation,error};},get storedProfile(){return storedProfile;}};}
 test('native home/recommendations/profile tabs and entry navigation stay in the same five-page app',()=>{
  const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
- assert.deepEqual(app.tabBar.list.map(x=>x.pagePath),['pages/home/index','pages/checkout/index','pages/profile/index']);
+ assert.equal(app.tabBar,undefined);
  const home=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
  const profile=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');

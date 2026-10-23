@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page"><view class="xj-nav" style="display:flex;gap:4rpx;margin-bottom:16rpx;"><button style="flex:1;font-size:24rpx;" data-section="home" bindtap="navigateSection">首页</button><button style="flex:1;font-size:24rpx;" data-section="recommendations" bindtap="navigateSection">推荐</button><button style="flex:1;font-size:24rpx;" data-section="orders" bindtap="navigateSection">订单</button><button style="flex:1;font-size:24rpx;" data-section="profile" bindtap="navigateSection">我的</button></view>
   <view class="brand">玄钧AI新 <text class="badge">开发预览</text></view>
   <view class="hero">
     <text class="eyebrow">COMMUNITY SERVICE</text>

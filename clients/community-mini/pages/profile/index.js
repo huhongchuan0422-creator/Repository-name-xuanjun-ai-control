@@ -34,7 +34,8 @@ Page({
   retryLogin(){return this.loginAndLoad();},
   openJoin(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(s)});},
   openMerchant(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(s)});},
-  openOrders(){getApp().globalData.checkoutMode='orders';wx.switchTab({url:'/pages/checkout/index'});},
+navigateSection(e){const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;const urls={home:'/pages/home/index',recommendations:'/pages/checkout/index?view=recommendations',orders:'/pages/checkout/index?view=orders',profile:'/pages/profile/index'};const url=urls[section];if(url)wx.navigateTo({url:url+(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene)});},
+  openOrders(){this.navigateSection({currentTarget:{dataset:{section:'orders'}}});},
   input(e){const f=e.currentTarget.dataset.field;if(f==='nickname'||f==='contact')this.setData({[f]:e.detail.value});},
   async save(){
     if(this.data.pending||!this.data.authenticated||!this.data.loaded||!this.session)return;
