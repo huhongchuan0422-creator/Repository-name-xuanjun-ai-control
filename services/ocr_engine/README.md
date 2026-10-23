@@ -35,7 +35,7 @@ Construct `create_app(authenticate=..., authorize_application=..., authorize_att
 - Never use real identity documents for CI. No paid OCR API or server deployment.
 
 ## Model provenance / licensing
-RapidOCR v3.9.2 source LICENSE is Apache-2.0. Three ONNX file SHA-256 values are pinned in `model_manifest.json` and were rehashed successfully in hosted CI. The expected upstream `MODEL_LICENSES.md` path returned 404 during review. Therefore the **weight-specific license/redistribution rights remain unresolved**; do not assume source-code Apache license proves model-weight commercial redistribution rights. Commercial bundling is HOLD until an authoritative version-specific license/notice is obtained.
+RapidOCR v3.9.2 source LICENSE and the fixed model-specific notice at https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md (Git blob 3f66af490abe83df801bfb8d1ea80eed7b0048ae) have been inspected. Sections 4–7 cover the exact three pinned artifacts in model_manifest.json, permit commercial use under Apache-2.0, and require license, attribution/copyright, modification notices, and any applicable NOTICE contents to accompany redistribution. The three hashes match the notice exactly and were rehashed in Hosted Run 40007712096. Source-level rights are now **VERIFIED for the listed artifacts**; release-bundle compliance remains pending until LICENSE-2.0.txt and this attribution notice are included in and checked against the actual distributable archive.
 
 ## Remaining external gates
 1. Real existing identity/token verifier and application + attachment ownership callbacks, supplied by the owning community integration writer.
