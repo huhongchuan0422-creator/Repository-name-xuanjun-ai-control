@@ -94,10 +94,19 @@ class IntegratedReview(unittest.TestCase):
   expect(license_name).to_have_value('就地执照测试主体')
   application=page.locator('#applicationVersion').inner_text().split(' · ')[0]
   page.locator('#saveLicense').click();expect(page.locator('#wechatState')).to_contain_text('version')
-  page.locator('#wechatRead').click();expect(license_name).to_have_value('就地执照测试主体')
+  with page.expect_response(lambda r:r.url.endswith('/merchant/onboarding') and r.request.post_data_json.get('operation')=='wechat_read') as read_reply:
+   page.locator('#wechatRead').click()
+  self.assertEqual(read_reply.value.status,200)
+  self.assertEqual(read_reply.value.json()['result']['profile']['subject_info']['business_license_info']['merchant_name'],'就地执照测试主体')
+  expect(page.locator('#wechatRead')).to_be_enabled();expect(license_name).to_have_value('就地执照测试主体')
   row=page.locator('#licenseUpload [data-kind="business_license"]');expect(row).to_be_visible()
   row.locator('input[type="file"]').set_input_files({'name':'license.pdf','mimeType':'application/pdf','buffer':b'%PDF-synthetic license'})
-  row.get_by_role('button',name='上传资料',exact=True).click();expect(row).to_contain_text('已上传')
+  self.assertEqual(row.locator('input[type="file"]').evaluate('e=>e.files.length'),1)
+  with page.expect_response(lambda r:r.url.endswith('/merchant/onboarding') and r.request.post_data_json.get('operation')=='upload') as upload_reply:
+   row.get_by_role('button',name='上传资料',exact=True).click()
+  self.assertEqual(upload_reply.value.status,200,upload_reply.value.text())
+  self.assertIn('business_license',upload_reply.value.json()['result']['materials'])
+  expect(row).to_contain_text('已上传')
   self.assertTrue(page.locator('#applicationVersion').inner_text().startswith(application))
   page.screenshot(path=str(self.out/'web-inline-license-same-application.png'),full_page=True)
  def test_community_and_platform_operate_same_original_directory(self):
