@@ -34,7 +34,7 @@ class OcrContractTests(unittest.TestCase):
         env = {k: "" for k in ("OCR_DET_MODEL_PATH", "OCR_CLS_MODEL_PATH", "OCR_REC_MODEL_PATH", "OCR_MODEL_SHA256")}
         with patch.dict(os.environ, env, clear=False):
             with self.assertRaisesRegex(RuntimeError, "OCR_MODEL_SHA256_REQUIRED"):
-                run_local_ocr(b"\\xff\\xd8\\xffsynthetic", "business_license")
+                run_local_ocr(bytes([255, 216, 255]) + b"synthetic", "business_license")
 
     def test_id_back_and_bank_card_not_claimed_as_supported(self):
         for document_type in ("id_back", "bank_card", "storefront_photo", "interior_photo", "cashier_photo"):
