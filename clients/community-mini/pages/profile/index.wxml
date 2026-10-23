@@ -9,4 +9,12 @@
     <button class="primary" bindtap="save" loading="{{pending}}" disabled="{{pending}}">保存资料</button>
     <button bindtap="logout" disabled="{{pending}}">退出登录</button>
   </view>
+  <view class="card" wx:if="{{authenticated&&loaded}}">
+    <view class="row"><text class="title">本人通知</text><button size="mini" bindtap="loadNotices" loading="{{noticePending}}" disabled="{{noticePending}}">刷新</button></view>
+    <text class="description">{{noticeStatus}}</text>
+    <text wx:if="{{!noticesLoaded&&!noticePending}}">尚未读取本人通知。</text>
+    <view wx:for="{{notices}}" wx:key="id" class="notice-row"><text>{{item.read?'已读':'未读'}} · {{item.message}}</text><button wx:if="{{!item.read}}" size="mini" data-id="{{item.id}}" bindtap="markNoticeRead" disabled="{{noticePending}}">标记已读</button></view>
+    <text wx:if="{{noticesLoaded&&!notices.length}}">暂无本人通知。</text>
+    <button wx:if="{{noticesMore}}" bindtap="loadNotices" data-more="true" disabled="{{noticePending}}">加载更多通知</button>
+  </view>
 </view>
