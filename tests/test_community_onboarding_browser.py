@@ -108,7 +108,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     open_page(page,'/merchant/join',fx.applicant['csrf'])
                     for key,value in fx.fields.items():page.locator('#'+key).fill(value)
                     page.locator('#saveDraft').click();expect(page.locator('#status')).to_contain_text('草稿已保存')
-                    for kind in [row.get_attribute('data-kind') for row in page.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:upload(kind,b'%PDF-synthetic '+kind.encode())
+                    for kind in [row.get_attribute('data-kind') for row in page.locator('#materials .material, #licenseUpload .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:upload(kind,b'%PDF-synthetic '+kind.encode())
                     original_id=application(page);submitted_from=revision(page)
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     submitted_revision=revision(page);self.assertGreater(submitted_revision,submitted_from)
@@ -318,7 +318,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                         with page.expect_response(lambda response:response.url.endswith('/merchant/onboarding')):
                             row.get_by_role('button',name='上传资料',exact=True).click()
                         expect(row.locator('p')).to_contain_text('已上传')
-                    for kind in [row.get_attribute('data-kind') for row in page.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:upload(kind)
+                    for kind in [row.get_attribute('data-kind') for row in page.locator('#materials .material, #licenseUpload .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:upload(kind)
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     open_page(admin,'/merchant/review',fx.reviewer['csrf'])
                     admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')

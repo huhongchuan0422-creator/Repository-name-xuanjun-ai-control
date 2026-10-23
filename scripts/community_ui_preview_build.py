@@ -97,7 +97,7 @@ def build():
         if page['role']!='admission' or page['id']=='admission-result':continue
         page['kind']='admission-field'
         page['stage']='admission-start' if page['id'].startswith('admission-basic') or 'business_license' in page['id'] or 'identity_info' in page['id'] or page['id']=='admission-beneficiary' else 'admission-settlement' if 'bank_account' in page['id'] or 'settlement_info' in page['id'] or page['id']=='admission-materials' else 'admission-business'
-    pages.extend([{'id':key,'role':'admission','title':title,'html':'','source':'onboarding.html/onboarding.js','kind':'stage'} for key,title in [('admission-start','主体与门店'),('admission-business','办理人与经营场景'),('admission-settlement','结算与资料复用')]])
+    pages.extend([{'id':key,'role':'admission','title':title,'html':'','source':'onboarding.html/onboarding.js','kind':'stage'} for key,title in [('admission-start','主体与门店'),('admission-business','办理人与经营场景'),('admission-settlement','结算与资料')]])
     next(p for p in pages if p['id']=='admission-result')['kind']='stage'
     pages.append({'id':'platform-admission','role':'platform','title':'商家入驻审核','html':'','source':'onboarding.html','kind':'review'})
     consumer_specs=[('home','首页与我的服务',[]),('stores','门店与服务',[]),('orders','我的订单',[]),('profile','个人资料',['昵称','联系方式']),('communities','社区与归属',['社区编号','社区推广码']),('referrals','推荐关系',['推荐码']),('notices','我的通知',[]),('basket','商品篮子',['商品数量']),('refunds','退款申请',['退款申请编号','申请退款金额（分）','退款原因']),('payment','支付与订单恢复',['订单编号'])]

@@ -53,7 +53,7 @@
 |商家入驻（同一小程序）|申请状态与补件|`#/admission/admission-result/edit` → 演示保存返回 `admission-result`；仅适用分支可见|onboarding.html|
 |商家入驻（同一小程序）|主体与门店|`#/admission/admission-start/edit` → 演示保存返回 `admission-start`；仅适用分支可见|onboarding.html/onboarding.js|
 |商家入驻（同一小程序）|办理人与经营场景|`#/admission/admission-business/edit` → 演示保存返回 `admission-business`；仅适用分支可见|onboarding.html/onboarding.js|
-|商家入驻（同一小程序）|结算与资料复用|`#/admission/admission-settlement/edit` → 演示保存返回 `admission-settlement`；仅适用分支可见|onboarding.html/onboarding.js|
+|商家入驻（同一小程序）|结算与资料|`#/admission/admission-settlement/edit` → 演示保存返回 `admission-settlement`；仅适用分支可见|onboarding.html/onboarding.js|
 |平台管理|商家入驻审核|`#/platform/platform-admission/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|onboarding.html|
 |用户小程序|首页与我的服务|`#/consumer/consumer-home/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|clients/community-mini/pages/home/index.wxml|
 |用户小程序|门店与服务|`#/consumer/consumer-stores/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|clients/community-mini/pages/checkout/index.wxml|

@@ -21,10 +21,10 @@ Page({
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
   retryLogin(){return this.login();},
-navigateSection(e){if(this._sceneStale){this.setData({status:'授权场景已切换，请从对应门店重新进入'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;const urls={home:'/pages/home/index',recommendations:'/pages/checkout/index?view=recommendations',orders:'/pages/checkout/index?view=orders',profile:'/pages/profile/index'};const url=urls[section];if(url)wx.navigateTo({url:url+(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene)});},
+navigateSection(e){if(this._sceneStale){this.setData({status:'授权场景已切换，请从对应门店重新进入'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;const urls={home:'/pages/home/index',recommendations:'/pages/checkout/index?view=recommendations','store-detail':'/pages/checkout/index?view=store-detail',orders:'/pages/checkout/index?view=orders',profile:'/pages/profile/index'};const url=urls[section];if(url)wx.navigateTo({url:url+(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene)});},
   openProfile(){this.navigateSection({currentTarget:{dataset:{section:'profile'}}});},
   openCheckout(){this.navigateSection({currentTarget:{dataset:{section:'orders'}}});},
-  openStorefront(){getApp().globalData.checkoutMode='store-detail';wx.switchTab({url:'/pages/checkout/index'});},
+  openStorefront(){this.navigateSection({currentTarget:{dataset:{section:'store-detail'}}});},
   openRecommendations(){this.navigateSection({currentTarget:{dataset:{section:'recommendations'}}});},
   openMerchantJoin(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(s)});},
   openMerchant(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(s)});},

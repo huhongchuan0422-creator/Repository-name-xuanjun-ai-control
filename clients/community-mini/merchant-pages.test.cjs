@@ -122,7 +122,7 @@ test('other bank branch group accepts either field, refreshes on bank changes an
 });
 test('merchant mobile rejects malformed values locally, preserves legacy overlength and clears errors on correction',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.profile={contact_info:{mobile_phone:'123456789012345678901'}};
- f.page.setData({step:1});f.page.refresh();
+ f.page.setData({step:0});f.page.refresh();
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'123456789012345678901');
  assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,21);
  assert.notEqual(f.page.data.mobilePhoneError,'');
@@ -162,7 +162,7 @@ test('LEGAL and SUPER use one mobile field and keep identity/contact fields acro
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  const path='contact_info.mobile_phone';f.page.input({currentTarget:{dataset:{path}},detail:{value:'0012345678'}});
  for(const contact of ['LEGAL','SUPER']){
-  f.page.setData({options:{...f.page.data.options,contact},step:1});f.page.refresh();
+  f.page.setData({options:{...f.page.data.options,contact},step:0});f.page.refresh();
   assert.equal(f.page.data.fields.filter(x=>x.path===path).length,1);
   assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_name'));
   assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_email'));
@@ -177,3 +177,28 @@ test('LEGAL and SUPER use one mobile field and keep identity/contact fields acro
  assert.equal(form.get(f.page.profile,'business_info.service_phone'),undefined);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'0012345678');
 });
 test('approved platform application can continue original WeChat draft without resubmitting platform',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.app.status='APPROVED';await f.page.select({currentTarget:{dataset:{application:f.app.application}}});f.calls.length=0;form.put(f.page.profile,'contact_info.mobile_phone','13800000000');await f.page.save();assert.ok(!f.calls.some(c=>c.p.operation==='save'));assert.ok(f.calls.some(c=>c.p.operation==='wechat_save'));});
+
+test('native field cursor refreshes license upload and preserves adjacent identity material paths',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.setData({catalog:[...f.page.data.catalog,...['identity_front','identity_back','operator_identity','operator_identity_back'].map(id=>({id,title:id}))]});f.page.refresh();
+ assert.equal(f.page.data.showLicenseUpload,false);
+ for(let i=0;i<5;i++)f.page.nextField();
+ assert.equal(f.page.data.fields[f.page.data.fieldCursor].path,'subject_info.business_license_info.period_end');
+ assert.equal(f.page.data.showLicenseUpload,true);
+ f.page.nextField();assert.equal(f.page.data.showLicenseUpload,false);
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['identity_front','identity_back']);
+ f.page.previousField();assert.equal(f.page.data.showLicenseUpload,true);
+ f.page.setData({step:1,cursorPath:'',fieldCursor:0,options:{...f.page.data.options,contact:'SUPER'}});f.page.refresh();
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['operator_identity','operator_identity_back']);
+ const index=f.page.data.fields.findIndex(x=>x.path==='contact_info.contact_id_doc_type');
+ f.page.choice({currentTarget:{dataset:{index}},detail:{value:1}});
+ assert.deepEqual(Array.from(f.page.data.adjacentMaterials,m=>m.id),['operator_identity']);
+ assert.equal(f.page.materialProfilePath('operator_identity'),'contact_info.contact_id_doc_copy');
+});
+test('saved SUPER administrator remains SUPER when reopening its original application',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.setData({options:{...f.page.data.options,contact:'SUPER'}});await f.page.save();
+ assert.equal(f.page.data.options.contact,'SUPER');
+ assert.equal(f.page.data.application.application,f.app.application);
+ assert.equal(form.get(f.page.profile,'contact_info.contact_type'),'SUPER');
+});
