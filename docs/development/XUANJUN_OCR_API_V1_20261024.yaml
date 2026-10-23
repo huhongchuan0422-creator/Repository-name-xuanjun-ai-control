@@ -37,7 +37,7 @@ paths:
                 file: {type: string, format: binary}
                 document_type:
                   type: string
-                  enum: [business_license, id_front, id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, cashier_photo]
+                  enum: [business_license, id_front]
                 onboarding_application_id: {type: string, minLength: 1, maxLength: 128}
                 attachment_id: {type: string, minLength: 1, maxLength: 128}
       responses:
@@ -68,7 +68,7 @@ paths:
           schema: {type: string}
       responses:
         '200':
-          description: Current job state; fields are suggestions only.
+          description: Current job state; fields are suggestions only. Returns confirmed_fields and confirmation_revision after user confirmation; current application and attachment authorization must be rechecked before returning any job.
           content:
             application/json:
               schema:
@@ -81,6 +81,10 @@ paths:
                   document_type: {type: string}
                   engine: {type: string}
                   model_version: {type: string}
+                  confirmed_fields:
+                    type: object
+                    additionalProperties: {type: string}
+                  confirmation_revision: {type: integer, minimum: 1}
                   fields:
                     type: object
                     additionalProperties:
@@ -97,12 +101,32 @@ paths:
                   authenticity_verified: {type: boolean, const: false}
         '401': {description: Missing or invalid authentication}
         '403': {description: Tenant or job authorization denied}
-        '404': {description: Job not found}
+        '404': {description: Job not found or not visible to this subject}
+        '403': {description: Current application or attachment authorization revoked}
+  /ocr/jobs/{job_id}:
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization. Deletes encrypted job
+        payload and confirmed fields, while retaining a non-sensitive audit tombstone and
+        confirmation idempotency response records. This endpoint does not promise complete
+        erasure from backups or external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
   /ocr/jobs/{job_id}/confirm:
     post:
       operationId: confirmOcrFields
       summary: Store user-reviewed field values
-      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values.
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID and content SHA-256 before accepting confirmation.
       parameters:
         - in: path
           name: job_id
@@ -129,7 +153,8 @@ paths:
         '400': {description: Invalid schema or stale revision}
         '401': {description: Missing or invalid authentication}
         '403': {description: Tenant or job authorization denied}
-        '409': {description: Conflicting confirmation revision}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+        '403': {description: Current application or attachment authorization revoked}
 components:
   securitySchemes:
     bearerAuth:
@@ -138,9 +163,9 @@ components:
       bearerFormat: JWT
 x-implementation-status:
   gateway: PROTOTYPE_NOT_PRODUCTION_READY
-  model-inference: VERIFIED_ON_SYNTHETIC_ENGLISH_AND_PENDING_CHINESE_E2E
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
   deployment: NOT_DEPLOYED
   notes:
     - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
-    - id_back, bank_card, food_business_license and other_permit remain unsupported until dedicated extractors and tests exist.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
     - All outputs are suggestions and never prove identity or authenticity.
