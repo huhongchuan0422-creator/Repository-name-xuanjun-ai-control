@@ -113,6 +113,11 @@ class ApiTests(unittest.TestCase):
                                          "OCR_ENCRYPTION_KEY":""}):
                 with self.assertRaisesRegex(RuntimeError,"OCR_ENCRYPTION_KEY_REQUIRED"):
                     create_app(authenticate=auth, infer=inference_fixture)
+    def test_confirmation_rejects_extra_fields_and_oversize_values(self):
+        r=self.submit(); url="/api/v1/ocr/jobs/"+r.json()["job_id"]+"/confirm"
+        headers={"Authorization":"Bearer tenant-a-token"}
+        self.assertEqual(self.client.post(url, headers=headers, json={"revision":1, "fields":{"authenticity_verified":"true"}}).status_code,400)
+        self.assertEqual(self.client.post(url, headers=headers, json={"revision":1, "fields":{"company_name":"x"*257}}).status_code,400)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
