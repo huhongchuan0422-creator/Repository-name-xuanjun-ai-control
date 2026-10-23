@@ -40,6 +40,8 @@ test('admission save keeps the current material cursor and sync is not mislabele
  assert.match(script,/const savedPosition=\{step:this\.data\.step,fieldCursor:this\.data\.fieldCursor,cursorPath:this\.data\.cursorPath,materialCursor:this\.data\.materialCursor\}/);
  assert.match(script,/this\.setData\(savedPosition\);this\.refresh\(\)/);
  assert.ok(script.includes('尚未提交微信'));
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.ok(wxml.includes('原申请已上传'));assert.ok(wxml.includes('待关联微信草稿'));assert.ok(wxml.includes('已关联微信草稿'));
 });
 test('merchant uses original summary/orders and hides late data after unload',async()=>{const f=fixture('merchant');await f.page.onLoad({scene:'shop1'});await f.page.open({currentTarget:{dataset:{view:'orders'}}});assert.equal(f.calls.at(-1).p.operation,'community.orders');let done;f.hold(new Promise(r=>done=r));const loading=f.page.open({currentTarget:{dataset:{view:'summary'}}});f.page.onUnload();done({order_total_minor:999});await loading;assert.equal(f.page.data.summary,null);});
 test('revocation clears private application, fields and material metadata',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});await f.page.select({currentTarget:{dataset:{application:f.app.application}}});f.page.customerSessionRevoked();assert.equal(f.page.data.application,null);assert.equal(f.page.data.fields.length,0);assert.equal(f.page.data.materials.length,0);assert.equal(Object.keys(f.page.profile).length,0);});
