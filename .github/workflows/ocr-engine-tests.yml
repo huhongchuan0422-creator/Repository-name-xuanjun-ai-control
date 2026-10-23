@@ -2,9 +2,13 @@ name: OCR Engine Tests
 on:
   pull_request:
     paths:
-      - 'services/ocr_engine/**'
+      - 'services/ocr_engine/ocr_core.py'
+      - 'services/ocr_engine/api.py'
+      - 'services/ocr_engine/run_chinese_http_e2e.py'
+      - 'services/ocr_engine/run_synthetic_inference.py'
+      - 'services/ocr_engine/requirements.txt'
+      - 'services/ocr_engine/model_manifest.json'
       - 'tests/test_ocr_core.py'
-      - '.github/workflows/ocr-engine-tests.yml'
   push:
     branches: [main]
     paths:
