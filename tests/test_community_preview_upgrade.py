@@ -26,7 +26,7 @@ def legacy_onboarding_asset():
     """Rebuild immutable 2330 role-page bytes; never compare its pin to current onboarding."""
     raw=(Path(__file__).parent/'fixtures'/'community_preview_2330_onboarding.html').read_text()
     prefix='/community-preview'
-    raw=re.sub(r'((?:href|src)=["\\'])(/(?:merchant|community)/[^"\\']+)',lambda m:m[1]+prefix+m[2],raw)
+    raw=re.sub(r"""((?:href|src)=[\"'])(/(?:merchant|community)/[^\"']+)""",lambda m:m[1]+prefix+m[2],raw)
     pages={
         '/merchant/workbench':('workbench.html','商家工作台'),
         '/community/portal':('communities.html','社区管理'),
