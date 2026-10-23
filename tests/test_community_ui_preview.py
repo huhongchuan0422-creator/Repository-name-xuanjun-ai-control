@@ -528,4 +528,26 @@ class ClickThrough(unittest.TestCase):
             page.close()
 
 
+
+    def test_admission_mobile_phone_has_tel_format_validation_and_draft_remains_allowed(self):
+        page=self.browser.new_page(viewport={'width':390,'height':844})
+        try:
+            page.goto(self.url+'#/admission/admission-business/edit')
+            phone=page.locator('input[data-path="contact_info.mobile_phone"]')
+            expect(phone).to_be_visible()
+            expect(phone).to_have_attribute('type','tel')
+            expect(phone).to_have_attribute('inputmode','tel')
+            self.assertEqual(phone.get_attribute('maxlength'),'20')
+            expect(phone).to_have_attribute('aria-required','true')
+            phone.fill('12 34')
+            expect(phone).to_have_attribute('aria-invalid','true')
+            expect(phone.locator('xpath=ancestor::label')).to_contain_text('不含空格')
+            phone.fill('+12345')
+            expect(phone).to_have_attribute('aria-invalid','false')
+            page.get_by_role('button',name='演示保存并返回',exact=True).click()
+            expect(page.locator('#view')).to_contain_text('办理人与经营场景')
+        finally:
+            page.close()
+
+
 if __name__=='__main__':unittest.main()
