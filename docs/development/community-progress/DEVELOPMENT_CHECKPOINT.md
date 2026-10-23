@@ -480,3 +480,22 @@ Remaining items are evidence/admission gates, or authoritative-contract gaps tha
 
 These external items do not justify inventing parallel local identity, Finance or provider rules.
 
+# 2026-10-24 public mini-program release readiness (Issue76)
+
+This checkpoint supersedes older completion wording below for the current release scope; all historical evidence remains preserved. Source baseline: `c06d051606795178265a2d2e6a611a77320d46f3`, tree `b68219f500d9287195b98f6037e840ec15527153`. No release, device or production acceptance is claimed.
+
+| Release node | Current evidence / remaining work |
+| --- | --- |
+| 1. Freeze candidate and complete review | Reuse af5f8602 Scoped39998680930/SP39998681125 SUCCESS and 66-route rendering evidence. c06d0516 changes governance only; 16 local governance tests and the real registry pass. Governance Hosted remains NOT_RUN because the existing workflow only triggers for PR/main and the original branch has no open PR. Do not create a broad historical PR or change workflow scope implicitly. |
+| 2. Account and privacy readiness | Current WeChat account authentication, actual service categories, mini-program filing, privacy declarations and reviewer access are UNKNOWN; obtain existing console evidence. No native privacy-policy entry or explicit privacy authorization handler was found in the mini-program JS/WXML scan; check the actual APIs and platform privacy configuration before selecting the necessary implementation. Website filing is not proof of mini-program filing. |
+| 3. Existing backend and identity wiring | Repository app.js defaults to an empty baseUrl. Existing preview preparation can inject configuration; that is not a release-ready backend receipt. Confirm the original HTTPS backend, allowed domains, persistent platform identity/store/scene mapping and original login chain. Existing docs record missing runtime evidence; no server/DNS/permission changes are authorized here. |
+| 4. Entry and device acceptance | app.json has five native page entries; 66 HTML design routes are not 66 native pages. The home page requires scene and refuses a scene-less launch. Validate both ordinary WeChat launch and original store-scene entry against the intended product behavior, plus login/logout, onboarding draft/material/review readback and role isolation on actual devices. Browser screenshots do not satisfy this node. No new role or default store may be invented. |
+| 5. Upload candidate and submit review | After nodes 1–4 pass, bind the exact native package, version notes, privacy declarations and reviewer path to one commit. Development upload and review submission remain NOT_EXECUTED and outside current authorization. Do not use the historical shop1 preview query as an unverified public-review identity. |
+| 6. Review result and release | Read the real platform review result, address any actual rejection, then publish the accepted exact version and verify the public entry. Review approval and release are separate receipts. Neither is executed or scheduled here. |
+
+Release scope remains onboarding/profile/workbench and the agreed community/platform entries. Orders and notifications are deferred; no product launch or real payments. `payments=false`, `submission_enabled=false`, `Finance=UNCONFIRMED`. Real merchant applyment, signing, payment and profit sharing require separate acceptance and are not mini-program code-review success.
+
+OCR stays with the original PR139 writer (read head `29354ed23f981d929db47a080950664873749b4f` on this check); its head alone does not establish inference acceptance. Connect only the established structured-document contract when accepted; storefront/interior/cashier photos never require OCR. OCR pending does not block unrelated release preparation.
+
+Immediate independent work completed: latest-head/tracked-worktree check, exact CI reuse check, original backend/entry/privacy source-gap scan and this release-node mapping. External execution remains blocked by missing existing console/backend/device receipts and the explicit no-upload/no-server boundary. Do not report ongoing background work after this turn ends.
+
