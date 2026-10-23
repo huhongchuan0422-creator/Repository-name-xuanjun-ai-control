@@ -2,7 +2,7 @@ const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
   data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:''},
-  onLoad(options){this._dead=false;this._authEpoch=auth.current();try{this.scene=parseScene(options);}catch(e){this.scene=null;this.clearPrivate('缺少门店场景，无法读取本人资料');return;}this.loginAndLoad();},
+  onLoad(options){this._dead=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.clearPrivate('缺少门店场景，无法读取本人资料');return;}this.loginAndLoad();},
   onUnload(){this._dead=true;if(this.session)this.session.clear();},
   async loginAndLoad(){
     if(this.data.pending)return;
@@ -32,6 +32,9 @@ Page({
     this.setData({loaded:true,version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'本人资料已读取'});
   },
   retryLogin(){return this.loginAndLoad();},
+  openJoin(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(s)});},
+  openMerchant(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(s)});},
+  openOrders(){getApp().globalData.checkoutMode='orders';wx.switchTab({url:'/pages/checkout/index'});},
   input(e){const f=e.currentTarget.dataset.field;if(f==='nickname'||f==='contact')this.setData({[f]:e.detail.value});},
   async save(){
     if(this.data.pending||!this.data.authenticated||!this.data.loaded||!this.session)return;

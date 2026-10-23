@@ -2,7 +2,7 @@ const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
   data:{scene:'',status:'未连接业务后端',authenticated:false,pending:false},
-  onLoad(options){this._dead=false;this._authEpoch=auth.current();try{this.scene=parseScene(options);this.setData({scene:this.scene});}catch(e){this.scene=null;this.setData({authenticated:false,status:'缺少门店场景，无法登录客户中心'});return;}this.login();},
+  onLoad(options){this._dead=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});getApp().globalData.scene=this.scene;this.setData({scene:this.scene});}catch(e){this.scene=null;this.setData({authenticated:false,status:'缺少门店场景，无法登录客户中心'});return;}this.login();},
   onUnload(){this._dead=true;if(this.session)this.session.clear();},
   async login(){
     if(this.data.pending)return;
@@ -21,7 +21,11 @@ Page({
   },
   retryLogin(){return this.login();},
   openProfile(){if(!this.data.authenticated||!this.scene){this.setData({status:'请先完成登录'});return;}wx.navigateTo({url:'/pages/profile/index?scene='+encodeURIComponent(this.scene)});},
-  openCheckout(){if(!this.scene){this.setData({status:'缺少门店场景'});return;}wx.navigateTo({url:'/pages/checkout/index?scene='+encodeURIComponent(this.scene)});},
+  openCheckout(){getApp().globalData.checkoutMode='orders';wx.switchTab({url:'/pages/checkout/index'});},
+  openStorefront(){getApp().globalData.checkoutMode='store-detail';wx.switchTab({url:'/pages/checkout/index'});},
+  openRecommendations(){getApp().globalData.checkoutMode='recommendations';wx.switchTab({url:'/pages/checkout/index'});},
+  openMerchantJoin(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(s)});},
+  openMerchant(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(s)});},
   customerSessionRevoked(status='登录已退出，请重新登录'){this._loginAttempt=(this._loginAttempt||0)+1;if(this.session)this.session.clear();this.session=null;if(!this._dead)this.setData({authenticated:false,pending:false,status});},
   async logout(){
     if(this.data.pending)return;this.setData({pending:true});

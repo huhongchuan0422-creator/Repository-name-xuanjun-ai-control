@@ -11,6 +11,14 @@
     <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'重新登录'}}</button>
   </view>
   <view class="card">
+    <text class="section-title">门店介绍（示例）</text><text>示例门店 A</text>
+    <text class="hint">资料来源待接入；商家资质未核验，不代表真实推荐或已开通服务。</text>
+    <button class="service-link" bindtap="openStorefront">查看门店介绍 ›</button>
+    <button class="service-link" bindtap="openRecommendations">浏览推荐店铺 ›</button>
+    <button class="service-link" bindtap="openMerchantJoin">商家入驻与进度 ›</button>
+    <button class="service-link" bindtap="openMerchant">商家工作台 ›</button>
+  </view>
+  <view class="card">
     <text class="section-title">我的服务</text>
     <button class="service-link" bindtap="openProfile" disabled="{{!authenticated||pending}}"><text>个人资料</text><text class="muted">管理昵称与联系方式 ›</text></button>
     <button class="service-link" bindtap="openCheckout" disabled="{{!authenticated||pending}}"><text>门店与订单</text><text class="muted">浏览服务与查看订单 ›</text></button>

@@ -3,9 +3,13 @@ const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 const auth=require('../../customer-auth');
 Page({
-  data: {communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'正在连接门店服务', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {viewMode:'recommendations',selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'正在连接门店服务', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   openMerchantJoin(){if(this.scene)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(this.scene)});},
   openMerchant(){if(this.scene)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(this.scene)});},
+  onShow(){const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';this.setData({viewMode:mode||'recommendations',selectedRecommendation:null});},
+  openRecommendation(){this.setData({viewMode:'store-detail',selectedRecommendation:{name:'示例门店 A',description:'平台推荐数据源待接入；此为展示样例，不代表真实推荐、资质或排名。'}});},
+  backRecommendations(){this.setData({viewMode:'recommendations',selectedRecommendation:null});},
+  openOrders(){this.setData({viewMode:'orders'});},
   async onLoad(options) {
     this._pageUnloaded=false;this._authEpoch=auth.current();this._consumerRequest=null;this._productRequest=null;this._projectMessagesContext=null;
     this.setData({projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:''});
@@ -18,8 +22,8 @@ Page({
     try {
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
-        const scene = parseScene(options);
-        this.scene=scene;
+        const scene = parseScene(options&&options.scene?options:{scene:config.scene});
+        this.scene=scene;config.scene=scene;
         if(typeof options.promotion==='string'&&/^cp_[0-9a-f]{32}$/.test(options.promotion))this.setData({promotionCode:options.promotion});
         this.session = createSession(wx,config.baseUrl);
         await this.session.login();
