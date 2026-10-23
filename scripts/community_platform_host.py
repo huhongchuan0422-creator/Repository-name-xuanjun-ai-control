@@ -21,6 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
+OPTIONAL_FIELDS = {'registration_scenes','community_grants','provider_reader_config'}
 
 
 def _require_nonroot():
@@ -29,7 +30,7 @@ def _require_nonroot():
 
 
 def _configuration(plan, key_material, wechat):
-    if type(plan) is not dict or not FIELDS <= set(plan) <= FIELDS|{'registration_scenes','community_grants'} or type(plan['version']) is not int or plan['version'] != 1:
+    if type(plan) is not dict or not FIELDS <= set(plan) <= FIELDS|OPTIONAL_FIELDS or type(plan['version']) is not int or plan['version'] != 1:
         raise ValueError('EXACT_PLATFORM_HOST_PLAN_REQUIRED')
     if (type(key_material) is not dict or set(key_material) != {'active_key','keys'}
             or type(key_material['active_key']) is not str
@@ -52,6 +53,13 @@ def _configuration(plan, key_material, wechat):
         raise ValueError('EXACT_WECHAT_SECRET_INPUT_REQUIRED')
     from scripts.community_mini_login import WechatCodeClient
     WechatCodeClient(wechat['appid'], wechat['app_secret'])  # Validate; no provider IO.
+    if 'provider_reader_config' in plan:
+        ref = plan['provider_reader_config']
+        if (type(ref) is not str or not Path(ref).is_absolute()
+                or str(Path(ref)) != ref or '..' in Path(ref).parts):
+            raise ValueError('PROTECTED_PROVIDER_READER_CONFIG_REF_REQUIRED')
+    if plan['reviewers'] and 'provider_reader_config' not in plan:
+        raise PermissionError('PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING')
     if type(plan['principals']) is not dict or not plan['principals'] or type(plan['bindings']) is not dict or set(plan['bindings']) != set(plan['principals']):
         raise ValueError('EXACT_SERVER_PRINCIPAL_BINDINGS_REQUIRED')
     principals = {}
@@ -74,6 +82,24 @@ def _configuration(plan, key_material, wechat):
         if type(plan[name]) is not int or plan[name] < (1 if name == 'nginx_uid' else 0):
             raise ValueError('PINNED_PROXY_IDENTITY_REQUIRED')
     return keys, principals, bindings, operations
+
+
+def _open_provider_reader(protected_path, clock):
+    """Construct the original verified RSA Reader from an existing protected file.
+
+    Never accepts an HTTP-supplied config, mock transport or relaxed Reader type.
+    Credentials do not enter the platform plan, env, CLI arguments or logs.
+    """
+    from scripts.community_wechat_sp_readonly import PartnerOrderReader
+    config = load_protected(protected_path)
+    required = {'sp_mchid','merchant_serial','private_key_pem',
+                'public_key_id','public_key_pem'}
+    if (type(config) is not dict or set(config) != required
+            or any(type(config[name]) is not str for name in required)):
+        raise ValueError('EXACT_PROTECTED_PROVIDER_READER_CONFIG_REQUIRED')
+    return PartnerOrderReader(config['sp_mchid'],config['merchant_serial'],
+        config['private_key_pem'].encode('ascii'),
+        config['public_key_id'],config['public_key_pem'].encode('ascii'),clock)
 
 
 class PlatformHost:
@@ -131,6 +157,8 @@ class PlatformHost:
                 owner.application.identity.configure_registration(plan['registration_scenes'])
             if plan['reviewers']:
                 owner.application.configure_onboarding(plan['reviewers'])
+                reader = _open_provider_reader(plan['provider_reader_config'], owner.center.now)
+                owner.application.configure_wechat_applyment(reader,submission_enabled=False)
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
             if plan.get('community_grants'):
                 owner.application.configure_communities(plan['community_grants'])
