@@ -24,11 +24,18 @@ class SecureStoreTests(unittest.TestCase):
         job=self.create()
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review",fields={"company_name":{"value":"synthetic secret marker"}})
-        raw=open(self.path,"rb").read()
+        with open(self.path,"rb") as stream:
+            raw=stream.read()
         self.assertNotIn(b"synthetic secret marker",raw)
         second=SecureSQLiteJobStore(self.path,self.key)
         self.assertEqual(second.get(job["job_id"],"tenant-a")["fields"]["company_name"]["value"],"synthetic secret marker")
         self.assertIsNone(second.get(job["job_id"],"tenant-b"))
+    def test_durable_rate_limit_across_instances(self):
+        self.assertTrue(self.store.check_rate("tenant-a", limit=2))
+        restarted = SecureSQLiteJobStore(self.path, self.key)
+        self.assertTrue(restarted.check_rate("tenant-a", limit=2))
+        self.assertFalse(self.store.check_rate("tenant-a", limit=2))
+        self.assertTrue(self.store.check_rate("tenant-b", limit=2))
     def test_idempotency_and_payload_conflict(self):
         first=self.create()
         self.assertEqual(first["job_id"],self.create()["job_id"])
@@ -90,7 +97,8 @@ class SecureStoreTests(unittest.TestCase):
             events = [r[0] for r in db.execute("SELECT event FROM ocr_audit")]
         self.assertIn("created", events)
         self.assertIn("retention_deleted", events)
-        self.assertNotIn(b"tenant-a", open(self.path, "rb").read())
+        with open(self.path, "rb") as stream:
+            self.assertNotIn(b"tenant-a", stream.read())
     def test_reject_wrong_key(self):
         job=self.create()
         with self.assertRaisesRegex(RuntimeError, "OCR_ENCRYPTION_KEY_MISMATCH"):
