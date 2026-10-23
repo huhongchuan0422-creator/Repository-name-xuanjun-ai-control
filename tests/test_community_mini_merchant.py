@@ -300,3 +300,74 @@ class OcrSourceBoundary(unittest.TestCase):
         with self.fx.center.tx():self.onboarding._meta(first['application'],self.fx.uid1,first_meta)
         with self.assertRaisesRegex(PermissionError,'ATTACHMENT_INTEGRITY'):
             self.service.ocr_source(self.token,'shop1',first['application'],'business_license')
+
+class OcrSourceReadRace(unittest.TestCase):
+    setUp=SameMiniMerchant.setUp
+    tearDown=SameMiniMerchant.tearDown
+    call=SameMiniMerchant.call
+    draft=SameMiniMerchant.draft
+    material=OcrSourceBoundary.material
+    def during_decrypt(self,app,change,kind='business_license'):
+        from unittest.mock import patch
+        c=self.fx.center
+        _,meta,_=self.onboarding._load(app['application'],self.fx.uid1)
+        oid=meta['materials'][kind]['object_id']
+        original=c.decrypt
+        invoked=[]
+        def decrypt(raw,aad):
+            result=original(raw,aad)
+            if aad=='object:'+app['application']+':'+oid and not invoked:
+                invoked.append(True)
+                change(oid)
+            return result
+        with patch.object(c,'decrypt',side_effect=decrypt):
+            with self.assertRaises(PermissionError):
+                self.service.ocr_source(self.token,'shop1',app['application'],kind)
+        self.assertEqual(invoked,[True])
+    def test_current_object_fields_cannot_change_during_read(self):
+        changes={'id':'o_other','project':'ma_other','scan':'BLOCKED','mime':'image/jpeg',
+                 'size':999,'sha':'0'*64,'version':'v_other','key_id':'other-key'}
+        for column,value in changes.items():
+            with self.subTest(column=column):
+                app=self.material()
+                self.during_decrypt(app,lambda oid:self.fx.center.db.execute(
+                    'UPDATE objects SET '+column+'=? WHERE id=?',(value,oid)))
+    def test_object_deletion_during_read_is_denied(self):
+        app=self.material()
+        self.during_decrypt(app,lambda oid:self.fx.center.db.execute('DELETE FROM objects WHERE id=?',(oid,)))
+    def test_clock_crossing_material_expiration_during_read_is_denied(self):
+        app=self.material()
+        _,meta,_=self.onboarding._load(app['application'],self.fx.uid1)
+        meta['materials']['business_license']['expires_at']=self.fx.center.now()+1
+        with self.fx.center.tx():self.onboarding._meta(app['application'],self.fx.uid1,meta)
+        def advance(oid):self.fx.stage.now+=2
+        self.during_decrypt(app,advance)
+    def test_session_and_provider_revocation_during_read_are_denied(self):
+        app=self.material()
+        self.during_decrypt(app,lambda oid:self.fx.center.logout(self.token))
+    def test_provider_binding_revocation_during_read_is_denied(self):
+        app=self.material()
+        self.during_decrypt(app,lambda oid:self.fx.center.db.execute(
+            "UPDATE links SET active=0 WHERE channel='WECHAT_MINI' AND user_id=?",(self.fx.uid1,)))
+    def test_application_revision_change_during_read_is_denied(self):
+        app=self.material()
+        self.during_decrypt(app,lambda oid:self.fx.center.db.execute(
+            'UPDATE onboarding SET revision=revision+1 WHERE application=?',(app['application'],)))
+    def test_application_revocation_during_read_is_denied(self):
+        app=self.material()
+        self.during_decrypt(app,lambda oid:self.fx.center.db.execute(
+            "UPDATE links SET active=0 WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=?",(app['application'],)))
+    def test_application_material_replacement_during_read_is_denied(self):
+        app=self.material()
+        def replace(oid):
+            _,meta,_=self.onboarding._load(app['application'],self.fx.uid1)
+            meta['materials']['business_license']['object_id']='o_replaced'
+            with self.fx.center.tx():self.onboarding._meta(app['application'],self.fx.uid1,meta)
+        self.during_decrypt(app,replace)
+    def test_identity_front_returns_verified_original_bytes(self):
+        import hashlib
+        app=self.material(kind='identity_front')
+        result=self.service.ocr_source(self.token,'shop1',app['application'],'identity_front')
+        self.assertEqual(result['document_type'],'id_front')
+        self.assertEqual(result['document_sha256'],hashlib.sha256(result['data']).hexdigest())
+        self.assertEqual(result['mime'],'image/png')

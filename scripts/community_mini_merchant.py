@@ -96,7 +96,7 @@ class MiniMerchant:
         if material['expires_at'] is not None and material['expires_at']<=self.identity.center.now():
             raise PermissionError('OCR_ATTACHMENT_EXPIRED')
         c=self.identity.center
-        row=c.db.execute('SELECT sha,size,mime,scan FROM objects WHERE id=? AND project=?',
+        row=c.db.execute('SELECT id,version,project,mime,size,sha,scan,key_id FROM objects WHERE id=? AND project=?',
                          (material['object_id'],application)).fetchone()
         if row is None or row['scan']!='CLEAN' or row['sha']!=material['sha256']:
             raise PermissionError('OCR_ATTACHMENT_INTEGRITY')
@@ -112,6 +112,21 @@ class MiniMerchant:
         if (current!=(uid,pid,csrf,principal) or self._ocr_origin(scene,pid,principal)!=origin
                 or latest!=meta or version['revision']!=data['revision']):
             raise PermissionError('OCR_SOURCE_CHANGED')
+        # Re-read the authoritative object after decrypt and all identity/draft
+        # callbacks. The first row is only a read-start snapshot, not a permit.
+        current_object=c.db.execute(
+            'SELECT id,version,project,mime,size,sha,scan,key_id FROM objects WHERE id=? AND project=?',
+            (material['object_id'],application)).fetchone()
+        if (current_object is None or tuple(current_object)!=tuple(row)
+                or current_object['scan']!='CLEAN'
+                or current_object['mime'] not in ('image/png','image/jpeg')
+                or current_object['size']!=len(raw)
+                or current_object['sha']!=material['sha256']
+                or current_object['sha']!=hashlib.sha256(raw).hexdigest()):
+            raise PermissionError('OCR_ATTACHMENT_INTEGRITY')
+        # Clock can advance while decrypting/authorizing; use time at release.
+        if material['expires_at'] is not None and material['expires_at']<=c.now():
+            raise PermissionError('OCR_ATTACHMENT_EXPIRED')
         return {'subject':owner,'tenant_id':origin['scope']['tenant_id'],
                 'project':pid,'scene':scene,'scope':origin['scope'],
                 'onboarding_application_id':application,'application_revision':data['revision'],
