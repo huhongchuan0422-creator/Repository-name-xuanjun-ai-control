@@ -19,6 +19,7 @@ Page({
  saveCollectionCode(){if(!this.data.codeReady||!this.codeFile||this.data.pending)return;wx.saveImageToPhotosAlbum({filePath:this.codeFile,success:()=>{if(this.current())this.setData({status:'收款码已保存相册，可打印为收银台牌子'});},fail:()=>{if(this.current())this.setData({status:'未能保存相册；请检查相册权限后再次点击保存'});}});},
  clearCode(){if(this.codeFile){wx.getFileSystemManager().unlink({filePath:this.codeFile,fail(){}});this.codeFile=null;}},
  back(){this.setData({view:'home',detail:null,editor:null});},
+ navigateSection(e){if(this.data.pending){this.setData({status:'当前请求仍在进行，请等待完成后再离开'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;if(section==='recommendations'||section==='orders'){wx.navigateTo({url:'/pages/checkout/index?view='+section+'&scene='+encodeURIComponent(scene)});return;}const url=section==='home'?'/pages/home/index':'/pages/profile/index';wx.navigateTo({url:url+'?scene='+encodeURIComponent(scene)});},
  join(){wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(this.scene)});},
  goHome(){wx.switchTab({url:'/pages/home/index'});},
  goRecommendations(){getApp().globalData.checkoutMode='recommendations';wx.switchTab({url:'/pages/checkout/index'});},
