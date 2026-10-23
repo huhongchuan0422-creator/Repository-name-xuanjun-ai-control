@@ -308,6 +308,9 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
                     'FLOW_VALID', 'TOKEN_EXCHANGE', 'USER_HTTP', 'USER_SHAPE',
                     'SUBJECT_ALLOWED', 'DEADLINE', 'FLOW_BIND')):
             response.headers['X-Xuanjun-OAuth-Stage'] = g.oauth_callback_stage
+            if response.mimetype == 'text/html':
+                response.set_data(response.get_data() +
+                    ('<p>OAuth stage: ' + g.oauth_callback_stage + '</p>\n').encode('ascii'))
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 

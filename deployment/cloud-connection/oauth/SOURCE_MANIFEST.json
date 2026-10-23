@@ -134,10 +134,10 @@
       "sha256": "a5ebcd971334ff2965d022d5040a72d7125adc64694a8b0183a4034364cf5352"
     },
     {
-      "bytes": 23415,
+      "bytes": 23614,
       "mode": "0644",
       "path": "production/cloud_connection/oauth_authority.py",
-      "sha256": "3a8aaa5af1880859c701a647942df46bf0a318f89cacd840faedfb0f2322bec2"
+      "sha256": "13424309f48afaaa52cdfad83633d1d4921cc481e9ebdd6081ce7185af031bd4"
     },
     {
       "bytes": 7428,

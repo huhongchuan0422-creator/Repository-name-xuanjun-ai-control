@@ -14,7 +14,7 @@ class Tests(unittest.TestCase):
  def start(self):self.assertEqual(self.c.get('/authorize',query_string=t.args(),base_url=t.ISSUER).status_code,302)
  def call(self):return self.c.get('/github/callback',base_url=t.ISSUER,follow_redirects=False)
  def failed(self,label):
-  r=self.call();self.assertEqual(r.status_code,401);self.assertEqual(r.headers['X-Xuanjun-OAuth-Stage'],label)
+  r=self.call();self.assertEqual(r.status_code,401);self.assertEqual(r.headers['X-Xuanjun-OAuth-Stage'],label);self.assertIn('<p>OAuth stage: '+label+'</p>',r.get_data(as_text=True));self.assertEqual(int(r.headers['Content-Length']),len(r.get_data()))
   self.assertEqual(r.headers['Cache-Control'],'no-store');self.assertEqual(r.headers['Referrer-Policy'],'no-referrer')
   self.assertNotIn('SYNTHETIC',str(r.headers)+r.get_data(as_text=True));self.assertNotIn('sensitive_exception',str(r.headers)+r.get_data(as_text=True))
   self.assertEqual(self.db.execute('SELECT count(*) FROM oauth_codes').fetchone()[0],0)
