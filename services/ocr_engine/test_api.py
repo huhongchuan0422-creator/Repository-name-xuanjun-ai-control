@@ -32,7 +32,7 @@ class ApiTests(unittest.TestCase):
             data={"document_type":"business_license","onboarding_application_id":"synthetic-app"},
             files={"file":("synthetic.jpg", b"\xff\xd8\xffsynthetic", "image/jpeg")})
     def test_missing_auth_denied(self):
-        r=self.client.post("/api/v1/ocr/jobs", data={"document_type":"business_license","onboarding_application_id":"x"},
+        r=self.client.post("/api/v1/ocr/jobs", headers={"Idempotency-Key":"0123456789abcdef"}, data={"document_type":"business_license","onboarding_application_id":"x"},
                            files={"file":("x.jpg",b"abc","image/jpeg")})
         self.assertEqual(r.status_code,401)
     def test_submit_and_get_result(self):
