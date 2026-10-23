@@ -28,6 +28,20 @@ class OcrContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "UNSUPPORTED_IMAGE_MAGIC"):
             run_local_ocr(b"not an image", "business_license")
 
+    def test_missing_local_model_manifest_fails_closed(self):
+        import os
+        from unittest.mock import patch
+        env = {k: "" for k in ("OCR_DET_MODEL_PATH", "OCR_CLS_MODEL_PATH", "OCR_REC_MODEL_PATH", "OCR_MODEL_SHA256")}
+        with patch.dict(os.environ, env, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "OCR_MODEL_SHA256_REQUIRED"):
+                run_local_ocr(b"\\xff\\xd8\\xffsynthetic", "business_license")
+
+    def test_id_back_and_bank_card_not_claimed_as_supported(self):
+        for document_type in ("id_back", "bank_card", "storefront_photo", "interior_photo", "cashier_photo"):
+            with self.subTest(document_type=document_type):
+                with self.assertRaisesRegex(ValueError, "UNSUPPORTED_DOCUMENT_TYPE"):
+                    extract_fields([], document_type)
+
     def test_result_normalization(self):
         self.assertEqual(normalize_lines({"txts": ["名称 演示"], "scores": [0.8]})[0]["confidence"], 0.8)
 
