@@ -75,7 +75,7 @@ def main():
         if not persisted or persisted.get("status") != "confirmed" or len(audits) != 1:
             raise SystemExit("SQLITE_RESTART_OR_AUDIT_FAILED")
         same_submit = client.post("/api/v1/ocr/jobs", headers=headers,
-            data={"document_type":"business_license", "onboarding_application_id":"synthetic-app"},
+            data={"document_type":"business_license", "onboarding_application_id":"synthetic-app", "attachment_id":"synthetic-attachment"},
             files={"file":("synthetic-license.png", img, "image/png")})
         if same_submit.status_code != 202 or same_submit.json()["job_id"] != job_id:
             raise SystemExit("SUBMIT_IDEMPOTENCY_REPLAY_FAILED")
