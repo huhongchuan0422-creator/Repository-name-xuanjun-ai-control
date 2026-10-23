@@ -482,7 +482,7 @@ Page({
       typeof this.data.reference!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(this.data.reference))return;
     if(this._orderDetailsRequest&&this.orderReadCurrent(this._orderDetailsRequest))return;
     const request=this.orderReadContext();this._orderDetailsRequest=request;
-    this.setData({orderDetails:null,orderDetailsPending:true,orderDetailsStatus:''});
+    this.setData({orderDetails:null,detailsCollapsed:false,orderDetailsPending:true,orderDetailsStatus:''});
     try {
       const r=await request.session.commerce(request.scene,'purchase_read',{reference:request.reference});
       if(this._orderDetailsRequest!==request||!this.orderReadCurrent(request))return;

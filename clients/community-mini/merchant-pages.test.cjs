@@ -47,6 +47,28 @@ test('merchant admin mobile keeps exact string, provider mapping and service pho
  assert.equal(typeof form.get(f.storedProfile,path),'string');
  assert.equal(f.calls.find(c=>c.p.operation==='wechat_save').p.params.profile.contact_info.mobile_phone,'+44-123456789');
 });
+test('reverse navigation from account number returns to the two-field bank branch group',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ form.put(f.page.profile,'bank_account_info.account_bank','其他银行');
+ form.put(f.page.profile,'bank_account_info.bank_branch_id','123456789012');
+ form.put(f.page.profile,'bank_account_info.bank_name','示例支行');
+ form.put(f.page.profile,'bank_account_info.account_number','6222000000000000');
+ f.page.setData({step:2,fieldCursor:0});f.page.refresh();
+ const fields=f.page.data.fields;
+ const branch=fields.findIndex(x=>x.path==='bank_account_info.bank_branch_id');
+ const bankName=fields.findIndex(x=>x.path==='bank_account_info.bank_name');
+ const account=fields.findIndex(x=>x.path==='bank_account_info.account_number');
+ assert.ok(branch>=0&&bankName===branch+1&&account===branch+2);
+ f.page.setData({fieldCursor:account,cursorPath:fields[account].path});f.page.previousField();
+ assert.equal(f.page.data.fieldCursor,branch);
+ assert.equal(f.page.data.fields[f.page.data.fieldCursor].path,'bank_account_info.bank_branch_id');
+});
+test('editing a non-mobile merchant field marks the draft dirty',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.setData({dirty:false});
+ f.page.input({currentTarget:{dataset:{path:'subject_info.business_license_info.merchant_name'}},detail:{value:'主体名称'}});
+ assert.equal(f.page.data.dirty,true);
+});
 test('other bank branch group accepts either field, refreshes on bank changes and preserves draft values',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2});
  const input=(path,value)=>f.page.input({currentTarget:{dataset:{path}},detail:{value}});

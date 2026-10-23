@@ -39,6 +39,17 @@ function loadPage(path,{baseUrl='https://fixture.invalid',env=null}={}){
   return {page,calls:env.calls,nav:env.nav,config:env.config,wx:env.wx,env};
 }
 
+test('native bottom navigation is fixed, safe-area aware, and reserves content space',()=>{
+ for(const page of ['home','checkout','profile','merchant','merchant-join']){
+  const wxml=fs.readFileSync(__dirname+'/pages/'+page+'/index.wxml','utf8');
+  assert.match(wxml,/position:fixed/);assert.match(wxml,/safe-area-inset-bottom/);
+  assert.match(wxml,/padding-bottom:180rpx/);
+ }
+ const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
+ assert.match(checkout,/disabled="{{pending\|\|!sessionReady}}"/);
+ assert.match(checkout,/orderDetails&&!detailsCollapsed/);
+ assert.match(checkout,/返回订单列表/);assert.match(checkout,/重新显示所选订单详情/);
+});
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
   const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
   assert.deepEqual(app.pages,['pages/home/index','pages/profile/index','pages/checkout/index','pages/merchant/index','pages/merchant-join/index']);
