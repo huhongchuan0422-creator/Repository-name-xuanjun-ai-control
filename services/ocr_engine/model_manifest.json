@@ -2,17 +2,21 @@
   "schema_version": 1,
   "engine": {
     "name": "RapidOCR",
-    "version": "3.10.0",
+    "version": "3.9.2",
     "source": "https://github.com/RapidAI/RapidOCR",
     "source_license": "Apache-2.0",
-    "source_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/main/LICENSE"
+    "source_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/LICENSE"
   },
   "model_set": {
     "name": "RapidAI/RapidOCR PP-OCRv6 small ONNX + PP-OCRv4 textline orientation classifier",
     "source_revision": "v3.9.2",
-    "source_manifest": "https://github.com/RapidAI/RapidOCR/blob/main/python/rapidocr/default_models.yaml",
-    "model_license_notes": "The RapidOCR upstream README and MODEL_LICENSES.md describe the applicable upstream weights as Apache-2.0; retain upstream notices and verify exact version-specific MODEL_LICENSES.md before redistribution.",
-    "model_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/main/MODEL_LICENSES.md",
+    "source_manifest": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/python/rapidocr/default_models.yaml",
+    "model_license_notes": "RapidOCR README states applicable upstream models are distributed under Apache-2.0, but the referenced MODEL_LICENSES.md could not be resolved in the inspected repository path and upstream issue #739 tracks model notice/licensing documentation for v3.10.0. Treat code license and model-weight notice as separate. Commercial redistribution/repackaging remains HOLD until the exact tagged notice is verified.",
+    "model_license_evidence": [
+      "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/README.md",
+      "https://github.com/RapidAI/RapidOCR/discussions/736",
+      "https://github.com/RapidAI/RapidOCR/issues/739"
+    ],
     "files": {
       "det": {
         "filename": "PP-OCRv6_det_small.onnx",
@@ -35,6 +39,6 @@
     "source_hashes_published_upstream": true,
     "bytes_downloaded_and_rehashed_in_this_environment": false,
     "actual_inference_verified": false,
-    "blocker": "The current execution container has no DNS/network access; pip installation and model retrieval failed. Do not mark OCR inference passed until hashes are recomputed from downloaded bytes and a synthetic image runs offline."
+    "blocker": "No actual model bytes have been downloaded and rehashed here; source manifest publishes the hashes. Run the new GitHub-hosted OCR workflow to verify code tests. Model download and synthetic-image offline inference remain unverified."
   }
 }
