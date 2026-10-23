@@ -117,12 +117,14 @@ class SQLiteJobStore:
             db.execute("UPDATE ocr_jobs SET status=?, payload_json=? WHERE job_id=? AND tenant_id=?",
                        (job["status"], json.dumps(job), job_id, tenant_id))
             return job
-def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr) -> FastAPI:
+def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
     if store is None:
         db_path = os.environ.get("OCR_SQLITE_PATH", "")
-        jobs = SQLiteJobStore(db_path) if db_path else JobStore()
+        if not db_path:
+            raise RuntimeError("OCR_SQLITE_PATH_REQUIRED")
+        jobs = SQLiteJobStore(db_path)
     else:
         jobs = store
     def principal(auth_header: Optional[str]) -> Principal:
@@ -145,13 +147,17 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=400, detail="UNSUPPORTED_DOCUMENT_TYPE")
         if not onboarding_application_id.strip() or not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_REQUEST")
+        if authorize_application is None or not authorize_application(p, onboarding_application_id):
+            raise HTTPException(status_code=403, detail="APPLICATION_OWNERSHIP_UNVERIFIED")
         data = await file.read(MAX_BYTES + 1)
         if not data or len(data) > MAX_BYTES:
             raise HTTPException(status_code=413, detail="IMAGE_SIZE_LIMIT")
         import hashlib
         digest = hashlib.sha256(data).hexdigest()
         job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest)
-        if job["status"] not in {"queued", "failed"}:
+        if job["document_type"] != document_type:
+            raise HTTPException(status_code=409, detail="DOCUMENT_TYPE_CONFLICT")
+        if job["status"] != "queued":
             return {"job_id": job["job_id"], "status": job["status"], "contract_version": "1.0.0"}
         jobs.update(job["job_id"], status="processing")
         try:
@@ -159,7 +165,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             jobs.update(job["job_id"], status="needs_review", fields=result["fields"],
                         warnings=[], engine="RapidOCR", model_version="runtime-configured")
         except Exception as exc:
-            code = str(exc) if str(exc).isupper() and len(str(exc)) < 80 else "OCR_INFERENCE_FAILED"
+            code = "OCR_INFERENCE_FAILED"
             jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code])
         final = jobs.get(job["job_id"], p.tenant_id)
         return {"job_id": final["job_id"], "status": final["status"], "contract_version": final["contract_version"]}
@@ -167,12 +173,17 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
     def get_job(job_id: str, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
         job = jobs.get(job_id, p.tenant_id)
-        if not job:
+        if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "document_sha256", "confirmed_fields", "confirmation_revision"}}
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
     def confirm(job_id: str, body: Confirmation, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
+        existing = jobs.get(job_id, p.tenant_id)
+        if not existing or (existing["subject"] != p.subject and "ocr:admin" not in p.permissions):
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        if existing["status"] not in {"needs_review", "confirmed"}:
+            raise HTTPException(status_code=409, detail="JOB_NOT_READY_FOR_CONFIRMATION")
         try:
             job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields)
         except ValueError as exc:
