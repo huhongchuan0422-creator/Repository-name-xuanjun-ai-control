@@ -29,7 +29,14 @@ class IntegratedReview(unittest.TestCase):
   self.ready(page);page.locator('#apply').click();expect(page.locator('#native')).to_contain_text('选择原申请继续办理')
   page.locator('input[data-key="store_name"]').fill('同版本测试门店')
   page.locator('input[data-key="address"]').fill('隔离演示地址')
-  page.locator('input[data-path="subject_info.business_license_info.merchant_name"]').fill('同版本测试主体')
+  merchant_name=page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')
+  for _ in range(24):
+   if await merchant_name.count() and await merchant_name.is_visible():break
+   next_field=page.get_by_role('button',name='下一项资料',exact=True)
+   expect(next_field).to_be_visible()
+   next_field.click()
+  expect(merchant_name).to_be_visible()
+  merchant_name.fill('同版本测试主体')
   page.get_by_role('button',name='保存并下一步',exact=True).click();expect(page.locator('#native')).to_contain_text('2 / 4')
   page.locator('input[data-path="contact_info.mobile_phone"]').fill('13800000000')
   page.get_by_role('button',name='保存并下一步',exact=True).click();expect(page.locator('#native')).to_contain_text('3 / 4')
