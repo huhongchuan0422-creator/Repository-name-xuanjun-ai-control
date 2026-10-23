@@ -158,6 +158,8 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=400, detail="INVALID_REQUEST")
         if authorize_application is None or not authorize_application(p, onboarding_application_id):
             raise HTTPException(status_code=403, detail="APPLICATION_OWNERSHIP_UNVERIFIED")
+        if isinstance(jobs, SecureSQLiteJobStore) and not jobs.check_rate(p.tenant_id):
+            raise HTTPException(status_code=429, detail="OCR_TENANT_RATE_LIMIT")
         data = await file.read(MAX_BYTES + 1)
         if not data or len(data) > MAX_BYTES:
             raise HTTPException(status_code=413, detail="IMAGE_SIZE_LIMIT")
