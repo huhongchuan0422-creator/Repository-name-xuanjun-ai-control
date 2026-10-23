@@ -109,6 +109,11 @@ class SecureStoreTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=8) as pool:
             jobs = list(pool.map(create_once, range(8)))
         self.assertEqual(len({job["job_id"] for job in jobs}), 1)
+    def test_same_idempotency_key_changed_application_revision_conflicts(self):
+        first=self.store.create('tenant-a','user-a','app-a','business_license','f'*64,'revision-key-0001','synthetic-attachment','synthetic-revision-1')
+        with self.assertRaisesRegex(ValueError,'OCR_IDEMPOTENCY_CONFLICT'):
+            self.store.create('tenant-a','user-a','app-a','business_license','f'*64,'revision-key-0001','synthetic-attachment','synthetic-revision-2')
+        self.assertEqual(self.store.get(first['job_id'],'tenant-a')['application_revision'],'synthetic-revision-1')
     def test_attachment_changes_idempotency_fingerprint(self):
         first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a", "synthetic-revision-1")
         with self.assertRaisesRegex(ValueError, "OCR_IDEMPOTENCY_CONFLICT"):
