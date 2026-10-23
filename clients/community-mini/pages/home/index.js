@@ -1,7 +1,7 @@
 const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
-  data:{scene:'',status:'未连接业务后端',authenticated:false,pending:false},
+  data:{scene:'',status:'未连接业务后端',authenticated:false,pending:false,activeSection:'home'},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店');}},
   onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});getApp().globalData.scene=this.scene;this.setData({scene:this.scene});}catch(e){this.scene=null;this.setData({authenticated:false,status:'缺少门店场景，无法登录客户中心'});return;}this.login();},
   onUnload(){this._dead=true;if(this.session)this.session.clear();},

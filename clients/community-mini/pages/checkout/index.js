@@ -3,14 +3,16 @@ const {createPaymentFlow}=require('../../payment');
 const {parseScene,createSession} = require('../../session');
 const auth=require('../../customer-auth');
 Page({
-  data: {viewMode:'recommendations',selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'正在连接门店服务', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {viewMode:'recommendations',activeSection:'recommendations',sessionReady:false,detailsCollapsed:false,selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'正在连接门店服务', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   openMerchantJoin(){if(this.scene)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(this.scene)});},
   openMerchant(){if(this.scene)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(this.scene)});},
-  navigateSection(e){if(this._sceneStale){this.setData({status:'授权场景已切换，请重新进入对应门店'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;if(section==='recommendations'){this.setData({viewMode:'recommendations',selectedRecommendation:null});return;}if(section==='orders'){this.setData({viewMode:'orders',selectedRecommendation:null});return;}const url=section==='home'?'/pages/home/index':'/pages/profile/index';wx.navigateTo({url:url+'?scene='+encodeURIComponent(scene)});},
-  onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店');return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?(this.data.selectedRecommendation||{name:'示例门店 A',description:'门店资料来源待接入；商家资质未核验。'}):null;this.setData({viewMode:view,selectedRecommendation});},
-  openRecommendation(){this.setData({viewMode:'store-detail',selectedRecommendation:{name:'示例门店 A',description:'平台推荐数据源待接入；此为展示样例，不代表真实推荐、资质或排名。'}});},
-  backRecommendations(){this.setData({viewMode:'recommendations',selectedRecommendation:null});},
-  openOrders(){this.setData({viewMode:'orders',selectedRecommendation:null});},
+  navigateSection(e){if(this._sceneStale){this.setData({status:'授权场景已切换，请重新进入对应门店'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;if(section==='recommendations'){this.setData({viewMode:'recommendations',activeSection:'recommendations',selectedRecommendation:null});return;}if(section==='orders'){this.setData({viewMode:'orders',activeSection:'orders',selectedRecommendation:null});return;}const url=section==='home'?'/pages/home/index':'/pages/profile/index';wx.navigateTo({url:url+'?scene='+encodeURIComponent(scene)});},
+  onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店');return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?(this.data.selectedRecommendation||{name:'示例门店 A',description:'门店资料来源待接入；商家资质未核验。'}):null;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='profile'?'profile':'recommendations',selectedRecommendation});},
+  openRecommendation(){this.setData({viewMode:'store-detail',activeSection:'recommendations',selectedRecommendation:{name:'示例门店 A',description:'平台推荐数据源待接入；此为展示样例，不代表真实推荐、资质或排名。'}});},
+  backRecommendations(){this.setData({viewMode:'recommendations',activeSection:'recommendations',selectedRecommendation:null});},
+  openOrders(){this.setData({viewMode:'orders',activeSection:'orders',selectedRecommendation:null});},
+  hideOrderDetails(){this.setData({detailsCollapsed:true});},
+  showOrderDetails(){this.setData({detailsCollapsed:false});},
   async onLoad(options) {
     this._sceneStale=false;
     if(options&&['recommendations','orders','store-detail'].includes(options.view)){const view=options.view;this.setData({viewMode:view,selectedRecommendation:view==='store-detail'?{name:'示例门店 A',description:'门店资料来源待接入；商家资质未核验。'}:null});}
@@ -33,6 +35,7 @@ Page({
         if(!current())return;
         if(config.commerce===true){this.setData({commerceEnabled:true,status:'支付尚未开放，可浏览商品和查询订单'});await this.reloadProducts();if(!current())return;}
         this.client = makeClient(body => this.session.transport(scene,body));
+        this.setData({sessionReady:!!this.session&&auth.active(this._authEpoch)});
         if(config.payments===true){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
       } else {
     this.client = makeClient(body => new Promise((resolve,reject) => {
@@ -49,12 +52,12 @@ Page({
       .catch(e=>{if(current())this.setData({status:e.message});});
     } catch(e) {if(current())this.setData({status:e.message});}
   },
-  onUnload() {this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
+  onUnload() {this.setData({sessionReady:false});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();},
   customerSessionRevoked(status='登录已退出，请重新登录'){
     this._pageGeneration=(this._pageGeneration||0)+1;this._consumerRequest=null;this._productRequest=null;this._projectRequest=null;this._noticeRequest=null;this._profileRequest=null;
     if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session)this.session.clear();
     this.session=null;this.client=null;this.paymentFlow=null;
-    if(!this._pageUnloaded)this.setData({commerceEnabled:false,paymentsEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',
+    if(!this._pageUnloaded)this.setData({sessionReady:false,commerceEnabled:false,paymentsEnabled:false,profileVersion:null,nickname:'',profileContact:'',referralCode:'',projectCustomerId:'',userId:'',
       notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',
       orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',
       reference:'',amount:'',afterAd:'',afterAdVerified:false,
@@ -435,7 +438,7 @@ Page({
     this._orderDetailsRequest=null;this._refundRecoveryRequest=null;
     if(this._purchaseRecoveryRequest)this.setData({pending:false});
     this._purchaseRecoveryRequest=null;
-    this.setData({orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',
+    this.setData({orderDetails:null,detailsCollapsed:false,orderDetailsPending:false,orderDetailsStatus:'',
       refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',
       refundApplication:'',refundAmount:'',refundReason:''});
   },

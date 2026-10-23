@@ -5,7 +5,7 @@ const ORDER_STATE_ZH={CREATED:'已创建',PENDING:'待处理',PAID:'已支付（
 function stateLabel(code){return Object.hasOwn(ORDER_STATE_ZH,code)?ORDER_STATE_ZH[code]:'状态待核实';}
 function amountLabel(minor){if(!Number.isSafeInteger(minor))return '金额待核实';const absolute=Math.abs(minor),whole=Math.floor(absolute/100),cents=String(absolute%100).padStart(2,'0');return (minor<0?'-':'')+'¥'+whole+'.'+cents;}
 Page({
- data:{pending:false,status:'',workspaces:[],workspace:'',view:'home',orders:[],summary:null,summaryDisplay:null,detail:null,detailDisplay:null,settings:null,codePath:'',codeReady:false,permissions:{},editor:null},
+ data:{pending:false,status:'',activeSection:'profile',workspaces:[],workspace:'',view:'home',orders:[],summary:null,summaryDisplay:null,detail:null,detailDisplay:null,settings:null,codePath:'',codeReady:false,permissions:{},editor:null},
  async onLoad(options){this.dead=false;this.epoch=auth.current();try{this.scene=parseScene(options);await this.connect();}catch(e){if(this.current())this.setData({status:customerError(e)});}},
  current(){return !this.dead&&auth.active(this.epoch);},
  async connect(){if(this.data.pending)return;this.setData({pending:true,status:'正在读取商家权限'});try{this.session=createSession(wx,getApp().globalData.baseUrl);await this.session.login();const r=await this.session.merchant(this.scene,'workspaces',{});if(!this.current())return;this.setData({workspaces:r.workspaces,workspace:r.workspaces[0]||'',permissions:r.permissions||{},status:r.workspaces.length?'请选择日常服务':'当前账号尚无已开通商家权限，可查看本人入驻进度'});}catch(e){if(this.current())this.setData({status:customerError(e)});}finally{if(this.current())this.setData({pending:false});}},
