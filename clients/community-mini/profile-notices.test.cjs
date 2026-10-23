@@ -27,7 +27,7 @@ test('profile exposes only current-session notices and confirms read acknowledge
  page.openNotice({currentTarget:{dataset:{id}}});assert.equal(page.data.noticeDetailOpen,true);assert.equal(page.data.selectedNotice.id,id);
  await page.markNoticeRead({currentTarget:{dataset:{id}}});
  assert.equal(page.data.notices[0].read,true);assert.equal(page.data.selectedNotice.read,true);page.backNoticeList();assert.equal(page.data.noticeDetailOpen,false);assert.equal(page.data.selectedNotice,null);assert.equal(calls.filter(x=>x.operation==='notices').length,1);assert.equal(calls.at(-1).operation,'notice_read');
- page.customerSessionRevoked('退出测试');assert.deepEqual(page.data.notices,[]);assert.equal(page.data.noticesLoaded,false);
+ page.customerSessionRevoked('退出测试');assert.equal(Array.isArray(page.data.notices),true);assert.equal(page.data.notices.length,0);assert.equal(page.data.noticesLoaded,false);
 });
 test('profile notices reject malformed records without exposing another payload',async()=>{
  const {page}=fixture();page._dead=false;page._authEpoch=auth.current();page._loginAttempt=1;page.scene='shop1';page.session=page.session||null;

@@ -142,6 +142,56 @@ class FormalHost(unittest.TestCase):
                     "SELECT count(*) FROM onboarding WHERE application=?",(application,)).fetchone()[0],1)
                 provider.assert_not_called()
 
+    def test_real_reader_wechat_draft_projects_into_same_platform_application(self):
+        """Original Center + real PartnerOrderReader, never provider IO."""
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        with self.open() as host:
+            onboarding=host.application.onboarding
+            applyment=onboarding.wechat_applyment
+            self.assertIsInstance(applyment.reader,PartnerOrderReader)
+            self.assertFalse(applyment.enabled)
+            host.center.db.execute("UPDATE members SET role='REVIEWER' WHERE user_id=?",(self.fx.uid2,))
+            applicant=host.center.login('one@example.org','FixturePassword123!')
+            reviewer=host.center.login('two@example.org','FixturePassword123!')
+            def call(account,operation,params):
+                return onboarding.dispatch(account['token'],account['csrf'],
+                    dict(operation=operation,params=params))
+            with patch.object(applyment.reader,'_fetch',side_effect=AssertionError('REAL_PROVIDER_IO_FORBIDDEN')) as provider:
+                saved=call(applicant,'save',dict(application=None,revision=0,
+                    fields=dict(legal_name='Initial Applicant',store_name='Original Store',
+                        address='Original Address',contact='Initial Contact'),
+                    entity_type='ENTERPRISE',category='GENERAL',delegated=False))
+                application=saved['application']
+                profile={'subject_info':{'business_license_info':{
+                            'merchant_name':'Wechat Shared Legal'}},
+                         'contact_info':{'mobile_phone':'13800138000'}}
+                draft=call(applicant,'wechat_save',dict(
+                    application=application,expected_version=0,profile=profile))
+                self.assertEqual(draft['version'],1)
+                self.assertEqual(draft['state'],'DRAFT')
+                self.assertEqual(draft['provider_state'],'NOT_SUBMITTED')
+                self.assertEqual(call(applicant,'wechat_read',
+                    dict(application=application))['profile'],profile)
+                platform=call(applicant,'read',dict(application=application))
+                reviewed=call(reviewer,'review_read',dict(application=application))
+                self.assertEqual(platform['application'],application)
+                self.assertEqual(reviewed['application'],application)
+                for view in (platform,reviewed):
+                    self.assertEqual(view['fields']['legal_name'],'Wechat Shared Legal')
+                    self.assertEqual(view['fields']['contact'],'13800138000')
+                    self.assertEqual(view['fields']['store_name'],'Original Store')
+                    self.assertFalse(view['payment_enabled'])
+                    self.assertEqual(view['wechat_submerchant_state'],'NOT_SUBMITTED')
+                with self.assertRaises(PermissionError):
+                    call(applicant,'wechat_review_read',dict(application=application))
+                with self.assertRaises(PermissionError):
+                    call(reviewer,'wechat_save',dict(
+                        application=application,expected_version=1,profile=profile))
+                with self.assertRaises(PermissionError):
+                    call(applicant,'wechat_execute',dict(
+                        application=application,expected_version=1))
+                provider.assert_not_called()
+
     def test_protected_community_grants_use_same_center_and_commerce(self):
         self.plan['community_grants']={'community':dict(user_id=self.fx.uid1,project='project1',tenant='tenant1',role='COMMUNITY_ADMIN')}
         self.write('host.json',self.plan)
