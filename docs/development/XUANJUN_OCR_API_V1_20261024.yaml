@@ -76,7 +76,7 @@ paths:
                 required: [job_id, status, contract_version, requires_human_confirmation, authenticity_verified]
                 properties:
                   job_id: {type: string}
-                  status: {type: string, enum: [queued, processing, succeeded, needs_review, failed]}
+                  status: {type: string, enum: [queued, processing, needs_review, failed, confirmed]}
                   contract_version: {type: string, const: '1.0.0'}
                   document_type: {type: string}
                   engine: {type: string}
