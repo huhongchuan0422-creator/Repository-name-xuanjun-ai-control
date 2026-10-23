@@ -1,0 +1,22 @@
+name: OCR Persistence and Process Restart Tests
+on:
+  pull_request:
+    paths:
+      - 'services/ocr_engine/secure_store.py'
+      - 'services/ocr_engine/test_secure_store.py'
+      - '.github/workflows/ocr-persistence-tests.yml'
+permissions:
+  contents: read
+jobs:
+  persistence-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install persistence test dependency only
+        run: python -m pip install cryptography==46.0.3
+      - name: Run encrypted SQLite and independent process restart tests
+        run: python -m unittest discover -s services/ocr_engine -p 'test_secure_store.py' -v
