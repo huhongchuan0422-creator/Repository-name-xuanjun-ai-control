@@ -188,7 +188,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if (not isinstance(binding, dict) or binding.get("authorized") is not True or
                 binding.get("content_sha256") != digest or binding.get("document_type") != document_type or
                 not _valid_revision(binding.get("application_revision")) or
-                ("provider_version" in binding and not _valid_provider_version(binding.get("provider_version")))):
+                ("provider_version" in binding and binding.get("provider_version") is not None and not _valid_provider_version(binding.get("provider_version")))):
             raise HTTPException(status_code=403, detail="ATTACHMENT_CONTENT_BINDING_UNVERIFIED")
         application_revision = str(binding["application_revision"])
         provider_version = binding.get("provider_version")
@@ -277,7 +277,10 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=409, detail=str(exc))
         if not job:
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
-        return {"job_id": job_id, "status": job["status"], "revision": body.revision, "recorded": True}
+        return {"job_id": job_id, "status": job["status"], "revision": job["confirmation_revision"],
+                "confirmed_fields": job["confirmed_fields"], "confirmed_binding": job.get("confirmed_binding"),
+                "application_revision": job.get("application_revision"),
+                "provider_version": job.get("provider_version"), "recorded": True}
     @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
