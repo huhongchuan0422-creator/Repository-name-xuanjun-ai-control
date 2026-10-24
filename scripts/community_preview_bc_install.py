@@ -4,6 +4,7 @@ Source-only candidate.  No package is installed at import.  The production CLI o
 accepts the frozen carrier bytes and publishes one new fixed directory atomically.
 """
 import argparse
+import ctypes
 import errno
 import hashlib
 import io
@@ -168,13 +169,20 @@ def verify_tree(parent,name,manifest,bodies,root_uid=0):
     try:
         st=os.fstat(root);need(st.st_uid==root_uid and stat.S_IMODE(st.st_mode)==0o700,'FINAL_ROOT_MODE_REQUIRED')
         expected_dirs={'scripts','deploy','deploy/community-preview'}
+        children={'':set(),'scripts':set(),'deploy':set(),'deploy/community-preview':set()}
+        for rel in expected_dirs:
+            parent_rel=rel.rsplit('/',1)[0] if '/' in rel else '';children[parent_rel].add(rel.rsplit('/',1)[-1])
+        for rel in bodies:
+            parent_rel=rel.rsplit('/',1)[0] if '/' in rel else '';children[parent_rel].add(rel.rsplit('/',1)[-1])
+        need(set(os.listdir(root))==children[''],'FINAL_MEMBER_SET_CHANGED')
         for rel in expected_dirs:
             fd=root
             opened=[]
             try:
                 for part in rel.split('/'):
                     child=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd);opened.append(child);fd=child
-                    s=os.fstat(fd);need(s.st_uid==root_uid and stat.S_IMODE(s.st_mode)==0o700,'FINAL_DIRECTORY_REQUIRED')
+                    st_child=os.fstat(fd);need(st_child.st_uid==root_uid and stat.S_IMODE(st_child.st_mode)==0o700,'FINAL_DIRECTORY_REQUIRED')
+                need(set(os.listdir(fd))==children[rel],'FINAL_MEMBER_SET_CHANGED')
             finally:
                 for child in reversed(opened):os.close(child)
         for rel,body in bodies.items():
@@ -192,11 +200,27 @@ def verify_tree(parent,name,manifest,bodies,root_uid=0):
                 for child in reversed(opened):os.close(child)
     finally:os.close(root)
 
+
+def dir_identity(st):
+    return (st.st_dev,st.st_ino,stat.S_IFMT(st.st_mode),st.st_uid,st.st_gid,stat.S_IMODE(st.st_mode))
+
+def publish_noreplace(parent,old,new):
+    libc=ctypes.CDLL(None,use_errno=True)
+    fn=getattr(libc,'renameat2',None)
+    need(fn is not None,'RENAME_NOREPLACE_REQUIRED')
+    fn.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint]
+    fn.restype=ctypes.c_int
+    if fn(parent,old.encode(),parent,new.encode(),1)!=0:
+        error=ctypes.get_errno()
+        if error in (errno.EEXIST,errno.ENOTEMPTY):raise Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS')
+        raise Hold('ATOMIC_NOREPLACE_PUBLISH_REQUIRED')
+
 def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=None):
     manifest,bodies=validate_archive(archive,manifest_raw)
     parent_identity_before=verify_parent(parent_fd,root_uid)
     absent(parent_fd,TARGET);absent(parent_fd,TEMP)
-    os.mkdir(TEMP,0o700,dir_fd=parent_fd)
+    try:os.mkdir(TEMP,0o700,dir_fd=parent_fd)
+    except FileExistsError:raise Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS') from None
     temp=os.open(TEMP,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent_fd)
     try:
         os.fchown(temp,root_uid,root_gid);os.fchmod(temp,0o700);os.fsync(temp);os.fsync(parent_fd)
@@ -204,9 +228,11 @@ def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=Non
         verify_tree(parent_fd,TEMP,manifest,bodies,root_uid)
         need(parent_identity(os.fstat(parent_fd))==parent_identity_before,'INSTALL_PARENT_CHANGED')
         absent(parent_fd,TARGET)
+        need(dir_identity(os.fstat(temp))==dir_identity(os.stat(TEMP,dir_fd=parent_fd,follow_symlinks=False)),'TEMP_PATH_REPLACED')
         if fault is not None:fault('before-publish',TARGET,-1)
-        os.rename(TEMP,TARGET,src_dir_fd=parent_fd,dst_dir_fd=parent_fd)
+        publish_noreplace(parent_fd,TEMP,TARGET)
         os.fsync(parent_fd)
+        need(dir_identity(os.fstat(temp))==dir_identity(os.stat(TARGET,dir_fd=parent_fd,follow_symlinks=False)),'FINAL_PATH_REPLACED')
         verify_tree(parent_fd,TARGET,manifest,bodies,root_uid)
         return {'state':'V2_CARRIER_INSTALLED','install_root':INSTALL_ROOT,'archive_sha256':ARCHIVE_SHA256,
                 'manifest_sha256':MANIFEST_SHA256,'site_executed':False,'bc_executed':False}

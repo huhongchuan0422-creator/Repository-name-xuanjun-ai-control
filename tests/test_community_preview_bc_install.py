@@ -90,6 +90,18 @@ class FixedInstaller(unittest.TestCase):
             if stage=='before-publish':raise RuntimeError('SYNTHETIC_PRE_PUBLISH')
         with self.assertRaisesRegex(RuntimeError,'SYNTHETIC_PRE_PUBLISH'):self.install(fault=fault)
         self.assertFalse((self.root/ins.TARGET).exists());self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
+    def test_target_race_before_publish_is_noreplace_hold(self):
+        def fault(stage,name,index):
+            if stage=='before-publish':
+                target=self.root/ins.TARGET;target.mkdir(mode=0o700);(target/'foreign').write_bytes(b'FOREIGN')
+        with self.assertRaisesRegex(ins.Hold,'TARGET_OR_PARTIAL'):self.install(fault=fault)
+        self.assertEqual((self.root/ins.TARGET/'foreign').read_bytes(),b'FOREIGN');self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
+    def test_extra_member_in_temp_tree_is_rejected_before_publish(self):
+        def fault(stage,name,index):
+            if stage=='after-file' and index==0:
+                p=self.root/ins.TEMP/'rogue';p.write_bytes(b'ROGUE');os.chmod(p,0o600)
+        with self.assertRaisesRegex(ins.Hold,'FINAL_MEMBER_SET_CHANGED'):self.install(fault=fault)
+        self.assertFalse((self.root/ins.TARGET).exists());self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
     def test_hardlinked_or_writable_input_is_rejected_by_cli_reader(self):
         p=self.root/'p.zip';p.write_bytes(self.archive);os.chmod(p,0o600)
         q=self.root/'q.zip';os.link(p,q)

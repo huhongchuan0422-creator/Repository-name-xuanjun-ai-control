@@ -95,7 +95,7 @@ if __name__=='__main__':
     (target/'manifest.json').write_bytes(manifest)
     for name,body in commands.items():(target/(name+'.sh')).write_bytes(body)
     report=dict(candidate_commit=commit_binding(),base_source='2853904258ca036a4abcdc2c829278634c45370b',
-        status='PROPOSAL_NOT_TESTED_NOT_AUTHORIZED',product_source='f13155ed63a3137d41766ee587d9b4b96a81477f',
+        status='SOURCE_CANDIDATE_NOT_SITE_AUTHORIZED',product_source='f13155ed63a3137d41766ee587d9b4b96a81477f',
         archive_bytes=len(archive),archive_sha256=hashlib.sha256(archive).hexdigest(),
         files={name:dict(bytes=len(b),sha256=hashlib.sha256(b).hexdigest()) for name,b in commands.items()},
         install_candidate=dict(site_executed=False,install_executed=False,directory_mode='0700',file_mode='0600',
