@@ -248,10 +248,16 @@ class SecureSQLiteJobStore:
             if job.get("application_revision") is None:
                 db.execute("ROLLBACK")
                 raise ValueError("OCR_APPLICATION_BINDING_MISSING")
-            if seen_application_revision is not None and str(seen_application_revision) != str(job["application_revision"]):
+            if seen_application_revision is None:
+                db.execute("ROLLBACK")
+                raise ValueError("OCR_APPLICATION_REVISION_REQUIRED")
+            if str(seen_application_revision) != str(job["application_revision"]):
                 db.execute("ROLLBACK")
                 raise ValueError("OCR_APPLICATION_REVISION_CONFLICT")
-            if seen_provider_version is not None and str(seen_provider_version) != str(job.get("provider_version")):
+            if job.get("provider_version") is not None and seen_provider_version is None:
+                db.execute("ROLLBACK")
+                raise ValueError("OCR_PROVIDER_VERSION_REQUIRED")
+            if seen_provider_version != job.get("provider_version"):
                 db.execute("ROLLBACK")
                 raise ValueError("OCR_PROVIDER_VERSION_CONFLICT")
             if revision <= job.get("confirmation_revision", 0):
