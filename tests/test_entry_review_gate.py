@@ -231,6 +231,13 @@ class CanonicalCompletionTests(unittest.TestCase):
         self.fence.invalidate_source_resources(self.task,'dev-invalidate')
         return self.s.complete_revocation(self.task)
 
+    def test_final_completion_api_has_no_caller_now_override(self):
+        self.reviewed()
+        self.revoke_complete()
+        with self.assertRaises(TypeError):
+            self.s.complete_development_candidate(
+                self.task,'dev-reviewed-1','dev-complete-now',now=1002)
+
     def test_review_pass_does_not_complete_or_unlock_before_revocation(self):
         result=self.reviewed()
         self.assertEqual(result['canonical_review']['reviewed']['code_commit'],
