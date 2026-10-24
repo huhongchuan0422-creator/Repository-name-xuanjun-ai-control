@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1.7
+ARG OCR_BASE_IMAGE=python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199
+FROM ${OCR_BASE_IMAGE}
+
+ARG OCR_CONTAINER_SOURCE_SHA
+LABEL org.opencontainers.image.title="Xuanjun OCR isolated preview" \
+      org.opencontainers.image.revision="${OCR_CONTAINER_SOURCE_SHA}" \
+      org.xuanjun.ocr.bundle-source="cb28f605291cde6dc48a2d6431166211059dc595"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/opt/ocr-bundle:/opt/ocr-integration \
+    OCR_DET_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_det_small.onnx \
+    OCR_REC_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_rec_small.onnx \
+    OCR_CLS_MODEL_PATH=/opt/ocr-bundle/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx \
+    OCR_MODEL_SHA256={"det":"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f","rec":"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884","cls":"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"} \
+    OCR_INTEGRATION_PATH=/opt/ocr-integration \
+    OCR_PORT=8080
+
+WORKDIR /opt/ocr-bundle
+COPY --chown=0:0 bundle/ /opt/ocr-bundle/
+COPY --chown=0:0 services/ocr_engine/container_entrypoint.py /opt/ocr-bundle/services/ocr_engine/container_entrypoint.py
+COPY --chown=0:0 services/ocr_engine/install_deb_closure.py /usr/local/libexec/install_deb_closure.py
+
+# Every install uses only the previously verified bundle; no apt, pip, or model network access.
+RUN --network=none set -eu; \
+    python -c 'import hashlib,json,pathlib; r=pathlib.Path("/opt/ocr-bundle"); l=json.loads((r/"requirements-lock.json").read_text()); e={x["filename"]:x["sha256"] for x in l["wheels"]}; a={p.name for p in (r/"wheelhouse").glob("*.whl")}; assert a==set(e), "WHEEL_FILE_SET_MISMATCH"; assert all(hashlib.sha256((r/"wheelhouse"/n).read_bytes()).hexdigest()==h for n,h in e.items()), "WHEEL_SHA256_MISMATCH"; m=json.loads((r/"services/ocr_engine/model_manifest.json").read_text()); pins={x["filename"]:x["sha256"] for x in m["model_set"]["files"].values()}; assert all(hashlib.sha256((r/"models"/n).read_bytes()).hexdigest()==h for n,h in pins.items()), "MODEL_SHA256_MISMATCH"'; \
+    mkdir -m 0700 /tmp/ocr-deb-input; \
+    cp /opt/ocr-bundle/system-deb-lock.json /tmp/ocr-deb-input/system-deb-lock.json; \
+    cp /opt/ocr-bundle/system-debs/*.deb /tmp/ocr-deb-input/; \
+    python /usr/local/libexec/install_deb_closure.py /tmp/ocr-deb-input; \
+    rm -rf /tmp/ocr-deb-input; \
+    python -m pip install --no-index --find-links=/opt/ocr-bundle/wheelhouse --no-cache-dir -r /opt/ocr-bundle/requirements.txt; \
+    python -m pip check; \
+    useradd --uid 10001 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin ocr; \
+    mkdir -p /var/lib/xuanjun-ocr; chown 10001:10001 /var/lib/xuanjun-ocr; chmod 0700 /var/lib/xuanjun-ocr
+
+USER 10001:10001
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 CMD ["python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/openapi.json',timeout=2).read(1)"]
+ENTRYPOINT ["python","/opt/ocr-bundle/services/ocr_engine/container_entrypoint.py"]
