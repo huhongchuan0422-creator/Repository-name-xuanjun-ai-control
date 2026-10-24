@@ -211,6 +211,8 @@ class IdentityBoundaryTests(unittest.TestCase):
                               observed_bytes=sample.baselines)
         with boundary.active(), patch.object(os,'uname',
                 return_value=type('Host',(),{'nodename':c53.HOST})()),\
+             patch.object(os,'geteuid',return_value=0),\
+             patch.object(os,'getegid',return_value=0),\
              patch.dict(os.environ,{'SUDO_UID':'1000'}):
             with self.assertRaisesRegex(c53.Hold,'BASELINE_HASH_CHANGED'):
                 backend.get_generator_inputs_verified(self.spec)
