@@ -23,6 +23,10 @@ class CompositionScope(unittest.TestCase):
         self.root=Path(self.tmp.name)
         self.addCleanup(patch.stopall)
         patch.object(c.observation,'ROOT_ANCHOR',self.tmp.name).start()
+        # Only the isolated reference file owner follows the Hosted fixture UID;
+        # production stays fixed root and is asserted below. No OS chown/grant.
+        self.production_reference_uid=c.REFERENCE_UID
+        patch.object(c,'REFERENCE_UID',os.getuid()).start()
         patch.object(c.observation,'ROOT_UID',os.getuid()).start()
         patch.object(c.observation,'PROJECT_UID',os.getuid()).start()
         patch.object(c,'now',return_value=1000).start()
@@ -38,16 +42,10 @@ class CompositionScope(unittest.TestCase):
         self.c=fixture.current();self.info=old.info(self.c['image_id'],self.c['container_id'])
         self.info.update(ports={},published={},devices=[],capadd=[])
         self.readlink=os.readlink
-        patch.object(c.os,'readlink',side_effect=lambda p:self.backup_path if p=='/proc/self/fd/'+str(self.fd) else self.readlink(p)).start()
-        # Duplicated reference capabilities retain same original protected path.
-        self.realdup=os.dup
-        def dup(fd):
-            v=self.realdup(fd)
-            if fd==self.fd:
-                prior=c.os.readlink.side_effect
-                c.os.readlink.side_effect=lambda p:self.backup_path if p=='/proc/self/fd/'+str(v) else prior(p)
-            return v
-        patch.object(c.os,'dup',side_effect=dup).start()
+        # Map only the actual private fixture file path, not reusable fd numbers.
+        backup_fixture_path=str(p)
+        patch.object(c.os,'readlink',side_effect=lambda name:self.backup_path
+            if self.readlink(name)==backup_fixture_path else self.readlink(name)).start()
         patch.object(c,'root_host').start()
         self.checked=Mock()
         def capture(argv,**kw):
@@ -116,7 +114,10 @@ class CompositionScope(unittest.TestCase):
         with patch.object(c.observation,'ROOT_UID',99998):
             with self.assertRaises(Exception):b()
     def test_backup_missing_wrong_mode_replaced_or_body_not_read(self):
+        self.assertEqual(self.production_reference_uid,0)
         self.assertEqual(len(c.backup_reference(self.fd)),64)
+        with patch.object(c,'REFERENCE_UID',99998):
+            with self.assertRaises(c.controller.Hold):c.backup_reference(self.fd)
         p=self.root/self.backup_path.lstrip('/');p.chmod(0o644)
         with self.assertRaises(c.controller.Hold):c.backup_reference(self.fd)
         p.chmod(0o600);q=p.with_name('retained');p.rename(q);p.write_bytes(b'new');p.chmod(0o600)

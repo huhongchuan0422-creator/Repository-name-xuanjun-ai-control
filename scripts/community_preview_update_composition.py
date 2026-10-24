@@ -16,6 +16,7 @@ from scripts import community_preview_release_plan as plan
 from scripts import community_preview_upgrade as original
 from scripts import community_preview_version_inspect as observation
 
+REFERENCE_UID=0  # fixed production root owner; no argument/environment override
 APPROVAL='/opt/xuanjun-community-preview/update-approval.json'  # proposed, never created
 PRODUCT='f13155ed63a3137d41766ee587d9b4b96a81477f'
 CONTROL='a9324156f94040bb6ff0243815bb91abe2f67b2a'
@@ -70,7 +71,7 @@ def backup_reference(fd):
     require(path.startswith('/opt/xuanjun-community-preview/') and not path.endswith(' (deleted)'),
             'ORIGINAL_BACKUP_REFERENCE_SCOPE_REQUIRED')
     before=os.fstat(fd)
-    require(stat.S_ISREG(before.st_mode) and before.st_uid==0 and stat.S_IMODE(before.st_mode)==0o600
+    require(stat.S_ISREG(before.st_mode) and before.st_uid==REFERENCE_UID and stat.S_IMODE(before.st_mode)==0o600
             and before.st_nlink==1 and before.st_size<=65536,'PROTECTED_BACKUP_REFERENCE_REQUIRED')
     value=stable_metadata(path)
     after=os.fstat(fd)
