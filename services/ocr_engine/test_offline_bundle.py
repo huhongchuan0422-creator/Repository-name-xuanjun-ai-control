@@ -95,7 +95,16 @@ class OfflineBundleInputTests(unittest.TestCase):
             model.write_bytes(b"B-after-validate-before-freeze")
             return checked
         try:
-            with mock.patch.object(builder,"validate_inputs",side_effect=validate_then_mutate):
+            with (mock.patch.object(builder,"HERE",self.root/"package"),
+                  mock.patch.object(builder,"MODEL_MANIFEST",self.manifest),
+                  mock.patch.object(builder,"REQUIREMENTS",self.requirements),
+                  mock.patch.object(builder,"LICENSE",self.license),
+                  mock.patch.object(builder,"NOTICE",self.notice),
+                  mock.patch.object(builder,"CONFIG_SCHEMA",self.schema),
+                  mock.patch.object(builder,"validate_inputs",side_effect=validate_then_mutate)):
+                package=self.root/"package"; (package/"model_distribution").mkdir(parents=True,exist_ok=True)
+                for name in ("api.py","ocr_core.py","secure_store.py","startup_selfcheck.py"):
+                    (package/name).write_text("# synthetic "+name)
                 with self.assertRaisesRegex(BundleError,"VALIDATE_FREEZE_SHA256_MISMATCH:models/det.onnx"):
                     builder.build_bundle("linux-x86_64-cp311",self.lock,self.wheels,self.models,output)
         finally:
