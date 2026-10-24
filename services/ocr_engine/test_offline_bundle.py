@@ -140,6 +140,21 @@ class OfflineBundleInputTests(unittest.TestCase):
                 builder.build_bundle('linux-x86_64-cp311',self.lock,self.wheels,self.models,output)
         self.assertTrue(mutated['done'])
         self.assertFalse(output.exists())
+    def test_manual_hosted_build_is_default_closed_and_pinned(self):
+        workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
+        text=workflow.read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:",text)
+        self.assertIn("default: false",text)
+        self.assertIn("inputs.build_enabled == true",text)
+        self.assertIn("refs/heads/docs/self-hosted-ocr-architecture-20261024",text)
+        self.assertIn('test "$INPUT_SOURCE_SHA" = "$GITHUB_SHA"',text)
+        self.assertIn("python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",text)
+        self.assertIn("c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee",text)
+        self.assertIn("permissions:\n      contents: read",text)
+        self.assertNotIn("self-hosted",text)
+        self.assertNotIn("secrets.",text)
+        self.assertIn("docker run --rm --network none --platform linux/amd64",text)
+
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
         with self.assertRaisesRegex(BundleError,"MODEL_NOTICE_MISSING_ATTRIBUTION:det"): self.check()
