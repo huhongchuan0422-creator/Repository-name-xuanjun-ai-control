@@ -10,6 +10,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 HERE=pathlib.Path(__file__).parent
 sys.path.insert(0,str(HERE/'reused-6825'))
@@ -24,6 +25,7 @@ from production.cloud_connection.worker import Github,Cloud,Network
 from pr17_b5_deployment_composition import OriginalComposition
 from pr17_b5_successor_authority import ExistingRequestAuthority
 from pr17_b5_successor_backend import R2HostBackend
+from pr17_b5_successor_fixed_io import FixedR2IO
 import pr17_b5_successor_review as c53
 
 NOW=1000
@@ -145,16 +147,23 @@ class OriginalLifecycle(unittest.TestCase):
                     'body':PREFIX+canonical(request),
                     'created_at':'fixture-time','updated_at':'fixture-time'}
         b.authority.original.publisher=publisher
-        class Legacy:
-            def __init__(self,root):self.root=root
-            def _path(self,path):return self.root/path.rsplit('/',1)[-1]
+        class RecordedFixedIO(FixedR2IO):
+            def __init__(self,spec,root,ids):
+                super().__init__(spec)
+                self.root=root
+                # The disposable policy uses synthetic IDs; the release
+                # constructor above still validates the real fixed spec.
+                self.ids=frozenset(ids)
+            def local(self,path):
+                super()._path(path)
+                return self.root/path.rsplit('/',1)[-1]
             def absent(self,path):
-                if self._path(path).exists():raise AssertionError('REPOST_ATTEMPT')
+                if self.local(path).exists():raise AssertionError('REPOST_ATTEMPT')
             def newfile(self,path,raw):
-                with self._path(path).open('xb') as f:
+                with self.local(path).open('xb') as f:
                     f.write(raw);f.flush();os.fsync(f.fileno())
-            def read(self,path):return self._path(path).read_bytes(),None
-        b.legacy=Legacy(self.journal);b.reserved=True;b.seq=0
+            def read(self,path):return self.local(path).read_bytes(),None
+        b.legacy=RecordedFixedIO(b.spec,self.journal,b.expected_ids);b.reserved=True;b.seq=0
         b.witness_action=lambda:contextlib.nullcontext()  # offline scope only
         b.bundle={'catalog_sha':self.policy.catalog.sha,
                   'requests':self.requests,
@@ -175,7 +184,8 @@ class OriginalLifecycle(unittest.TestCase):
         b.bundle['files']={name:b'' for name in c53.CONFIGS+c53.SLOTS}
         tx=c53.Transaction(b.spec,b.bundle,b)
         tx.stage='WINDOW_ENABLED'
-        self.assertEqual(tx.run_19_after_window()['state'],'INTAKE_SENT_AWAITING_READY')
+        intake=tx.run_19_after_window()
+        self.assertEqual(intake['state'],'INTAKE_SENT_AWAITING_READY',intake)
         self.assertEqual(len(comments),19)
         self.assertEqual(tx.continue_after_original_ready()['state'],
                          'WAIT_ORIGINAL_SUCCESS_NO_REPOST')
@@ -255,6 +265,12 @@ finally:q.close()
         original.attach_after_worker_start(*pair(True))
         self.assertEqual(b.observe_poststart_canonical_readonly(b.bundle)['state'],
                          'SUCCESS_SNAPSHOT_READONLY')
+        import pr17_b5_successor_entry as entry
+        b.recovered_from_protected=True
+        b.authority.runtime_attachment=lambda phase:(original.queue,original.resource)
+        with patch.object(entry,'_recover',return_value=tx):
+            self.assertEqual(entry.dispatch('query')['state'],
+                             'SUCCESS_SNAPSHOT_READONLY')
         original.replace_runtime_phase(*pair(False),'observe','custody')
         # The production pinned archive is 559 MB. This explicit local fixture
         # substitutes only that fixed archive identity, then calls the same
@@ -267,6 +283,9 @@ finally:q.close()
         original.replace_runtime_phase(*pair(True),'custody','observe')
         self.assertEqual(b.observe_poststart_canonical_readonly(b.bundle)['state'],
                          'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY')
+        with patch.object(entry,'_recover',return_value=tx):
+            self.assertEqual(entry.dispatch('recover')['state'],
+                             'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY')
         original.replace_runtime_phase(*pair(False),'observe','custody')
         from successor_analyst_read import receive_all
         with self.assertRaisesRegex(c53.Hold,'B5_HTTP_REQUEST_LOCAL_ONLY'):
