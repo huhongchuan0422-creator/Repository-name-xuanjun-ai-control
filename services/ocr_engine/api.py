@@ -8,7 +8,7 @@ import threading
 import uuid
 from pathlib import Path
 from typing import Callable, Optional
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile, Request
 from pydantic import BaseModel, Field
 try:
     from .ocr_core import run_local_ocr
@@ -31,8 +31,7 @@ Authenticator = Callable[[str], Principal]
 class Confirmation(BaseModel):
     revision: int = Field(ge=1)
     fields: dict[str, str]
-    # Echo the exact versions shown to the human reviewer; these are compared to stored
-    # and freshly resolved authoritative values, never treated as proof by themselves.
+    # Values are checked against the raw JSON before Pydantic can coerce bool/int types.
     application_revision: str | int
     provider_version: str | int | None = None
 class JobStore:
@@ -136,6 +135,26 @@ def _valid_revision(value):
 def _valid_provider_version(value):
     return _valid_revision(value)
 
+def _raw_version_valid(value, optional=False):
+    if value is None:
+        return optional
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        return False
+    return _valid_revision(value)
+
+def _shared_writeback_eligible(job):
+    if job.get("status") != "confirmed" or not isinstance(job.get("confirmation_revision"), int) or isinstance(job.get("confirmation_revision"), bool) or job.get("confirmation_revision", 0) < 1:
+        return False
+    if job.get("provider_version") is None or not job.get("application_revision") or not job.get("attachment_id") or not job.get("document_type") or not job.get("document_sha256"):
+        return False
+    binding = job.get("confirmed_binding")
+    if not isinstance(binding, dict):
+        return False
+    expected = {"application_revision": job.get("application_revision"), "provider_version": job.get("provider_version"),
+                "document_type": job.get("document_type"), "attachment_id": job.get("attachment_id"),
+                "content_sha256": job.get("document_sha256")}
+    return binding == expected and bool(job.get("confirmed_fields"))
+
 def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
@@ -232,8 +251,10 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if (not isinstance(binding, dict) or binding.get("authorized") is not True or
                 binding.get("content_sha256") != job["document_sha256"] or
                 binding.get("document_type") != job["document_type"] or
+                not _valid_revision(binding.get("application_revision")) or
                 str(binding.get("application_revision", "")) != str(expected_revision) or
-                (job.get("provider_version") is not None and binding.get("provider_version") != job.get("provider_version"))):
+                (job.get("provider_version") is not None and
+                 (not _valid_provider_version(binding.get("provider_version")) or binding.get("provider_version") != job.get("provider_version")))):
             raise HTTPException(status_code=403, detail="ATTACHMENT_AUTHORIZATION_REVOKED")
 
     @app.get("/api/v1/ocr/jobs/{job_id}")
@@ -245,11 +266,21 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         reauthorize_existing_job(p, job)
         response = {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256"}}
         response["provider_version"] = job.get("provider_version")
-        response["shared_writeback_eligible"] = bool(job.get("provider_version") is not None and job.get("confirmed_binding"))
+        response["shared_writeback_eligible"] = _shared_writeback_eligible(job)
         return response
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
-    def confirm(job_id: str, body: Confirmation, idempotency_key: str = Header(..., alias="Idempotency-Key"), authorization: Optional[str] = Header(None)):
+    async def confirm(job_id: str, request: Request, idempotency_key: str = Header(..., alias="Idempotency-Key"), authorization: Optional[str] = Header(None)):
         p = principal(authorization)
+        try:
+            raw_body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="OCR_CONFIRM_JSON_INVALID")
+        if not isinstance(raw_body, dict) or "application_revision" not in raw_body or not _raw_version_valid(raw_body.get("application_revision")) or not _raw_version_valid(raw_body.get("provider_version"), optional=True):
+            raise HTTPException(status_code=400, detail="OCR_CONFIRM_BINDING_VERSION_INVALID")
+        try:
+            body = Confirmation.model_validate(raw_body)
+        except Exception:
+            raise HTTPException(status_code=400, detail="OCR_CONFIRM_BODY_INVALID")
         existing = jobs.get(job_id, p.tenant_id)
         if not existing or (existing["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
@@ -264,7 +295,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
         if (not _valid_revision(body.application_revision) or
-                (body.provider_version is not None and not _valid_provider_version(body.provider_version))):
+                (body.provider_version is not None and not _valid_provider_version(body.provider_version)):
             raise HTTPException(status_code=400, detail="OCR_CONFIRM_BINDING_VERSION_INVALID")
         if str(body.application_revision) != str(existing.get("application_revision")):
             raise HTTPException(status_code=409, detail="OCR_APPLICATION_REVISION_CONFLICT")
@@ -289,7 +320,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
                 "confirmed_fields": confirmed_fields, "confirmed_binding": confirmed_binding,
                 "application_revision": application_revision,
                 "provider_version": provider_version,
-                "shared_writeback_eligible": bool(provider_version is not None and confirmed_binding),
+                "shared_writeback_eligible": _shared_writeback_eligible(job),
                 "recorded": True}
     @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
