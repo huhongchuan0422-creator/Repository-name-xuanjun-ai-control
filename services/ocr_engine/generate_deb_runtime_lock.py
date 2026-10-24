@@ -90,7 +90,7 @@ def main():
             stream.write(lock_bytes)
         os.chmod(temp, 0o644)
         os.replace(str(temp), str(out))
-    except Exception:
+    except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
         raise
     print(json.dumps({"status": "LOCKED", "deb_count": len(packages),
