@@ -1,0 +1,162 @@
+{
+  "purpose": "ROOT_REVIEW_CANDIDATE_NOT_SITE_AUTHORIZATION",
+  "format": 1,
+  "base_source": "b78955547519dec34f72788c5cd57d75e5eb4191",
+  "base_tree": "dffcc14ff141f1c226d5ce016d01dbcec2978e2c",
+  "site_executed": false,
+  "product_source": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+  "product_tree": "c31a9b1df006eeacd78ae3f9921073f3fe77d2c3",
+  "control_core": "a9324156f94040bb6ff0243815bb91abe2f67b2a",
+  "https_contract_source": "b78955547519dec34f72788c5cd57d75e5eb4191",
+  "carrier": {
+    "bytes": 111330,
+    "sha256": "aa8afb5c05240e3c4835680e8cec765fa4199f0b7f230e3adaced8bc489397f9",
+    "manifest_sha256": "e780675ef48c4cd077000c943c5ffe57b390277b6246d43939f54590aabd199a",
+    "target": "/opt/xuanjun-community-preview/control-oci2330-v1",
+    "files": {
+      "deploy/community-preview/f131-image-receipt.json": {
+        "bytes": 1356,
+        "mode": "0600",
+        "sha256": "cba144af0ca2f753413f7bdcec92625c370c479c4708b1d4a1db0b35907c8b45",
+        "uid": 0
+      },
+      "loader.py": {
+        "bytes": 5027,
+        "mode": "0600",
+        "sha256": "393b9c3f3e5720a1a9164aaafba0f2198fd5e461c49c4e58859c497ef5100f19",
+        "uid": 0
+      },
+      "scripts/community_preview_release_plan.py": {
+        "bytes": 10370,
+        "mode": "0600",
+        "sha256": "e0870cfaf7f1bb16b8664e644ec616e150b0ada93146a8d955e64c5f3f7ec4b9",
+        "uid": 0
+      },
+      "scripts/community_preview_update_checkpoint.py": {
+        "bytes": 19919,
+        "mode": "0600",
+        "sha256": "a73c1fe8ebb71abaefeb56ca880057e23876b5c005d315e4fb1268d3087064fd",
+        "uid": 0
+      },
+      "scripts/community_preview_update_composition.py": {
+        "bytes": 25262,
+        "mode": "0600",
+        "sha256": "f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1",
+        "uid": 0
+      },
+      "scripts/community_preview_upgrade.py": {
+        "bytes": 25382,
+        "mode": "0600",
+        "sha256": "2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee",
+        "uid": 0
+      },
+      "scripts/community_preview_version_inspect.py": {
+        "bytes": 21615,
+        "mode": "0600",
+        "sha256": "98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3",
+        "uid": 0
+      }
+    }
+  },
+  "image": {
+    "purpose": "ROOT_SCOPE_ACCEPTED_HOSTED_IMAGE_RECEIPT_NOT_SITE_APPROVAL",
+    "product_source_sha": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+    "product_tree": "c31a9b1df006eeacd78ae3f9921073f3fe77d2c3",
+    "build_run_id": 40059478387,
+    "build_job_id": 120769700068,
+    "push_evidence_run_id": 40058542631,
+    "source_artifact": {
+      "id": 12547170894,
+      "bytes": 991730,
+      "outer_sha256": "2a1250b4e8568c317b4d647aee43e351e57e5e690e4aef28a118b63ae839af35",
+      "inner_zip_sha256": "125ec8633e173d582d5ca5cd3dccc21d2d97104723fb61a136911c48e12d47d1"
+    },
+    "image_artifact": {
+      "id": 12546452389,
+      "bytes": 57016858,
+      "outer_sha256": "c902a0663793cb3b99c4c5ab3156d4e9d1054d519d05403347ba20fdebbc061e",
+      "inner_tar_bytes": 57365044,
+      "inner_tar_sha256": "eb7045414ced005a56158ac7eb54519098ec8a9e9da5589f939a0b3717d74875",
+      "expires_at": "2026-10-27T03:44:30Z"
+    },
+    "release_image_id": "sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a",
+    "repo_digest": null,
+    "oci_revision": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+    "stamp_mode": "0444",
+    "user": "10001:1008",
+    "root_verified_layer_hashes": 11,
+    "verify_tests": [
+      10,
+      14,
+      12
+    ],
+    "nonroot_import": "PASS",
+    "root_artifact_review": "SCOPE_PASS",
+    "site_execution_approved": false,
+    "site_executed": false,
+    "ocr_enabled": false
+  },
+  "layer_metadata": {
+    "source": "EXISTING_REVIEWED_ARTIFACT_OFFLINE_METADATA_ONLY",
+    "layers": 11,
+    "layer_tar_bytes": 155941888,
+    "layer_entries": 7690,
+    "payload_bytes": 150394848,
+    "daemon_min_free_bytes": 1541567488,
+    "daemon_min_free_inodes": 30888,
+    "input_min_free_bytes": 1188471912
+  },
+  "files": {
+    "scripts/community_preview_site_prepare.py": {
+      "bytes": 29092,
+      "sha256": "fdffdd9c1b601d6ba17161eb5922d8fea1c893651341d920bcb72378604e0b52"
+    },
+    "deploy/community-preview/prepare-site.sh": {
+      "bytes": 3338,
+      "sha256": "22dfdb5ab8c7fc844bf4c7a23a812f246196292e3071cbe5cea7306c224ea3c8"
+    },
+    "tests/test_community_preview_preparation_steps.py": {
+      "bytes": 17439,
+      "sha256": "a3a0cd3b75866dab533b881c71dae1aa0db2397768aca6dcd53e1820706e200c"
+    },
+    "docs/development/COMMUNITY_SITE_PREPARATION_STEPS_20261024.md": {
+      "bytes": 17610,
+      "sha256": "4c61751cfbdbb93504b11bc17137f6ae1bb0c92e2d26fa7486698f59a85ec12e"
+    },
+    ".github/workflows/chatgpt-community-wechat-sp-offline.yml": {
+      "bytes": 55176,
+      "sha256": "9e9e20bd8fd6d8d67647bc5dcccf4dd45ecaa8e55b305252b4a22677602214ec"
+    },
+    "governance/features.json": {
+      "bytes": 23009,
+      "sha256": "4dcc6335aab6ef59a1b1e0ca7bfbba4b7795d6625611981f0938bc21faa2020d"
+    }
+  },
+  "runtime_targets": {
+    "entry": "/opt/xuanjun-community-preview/site-prepare-v1.py",
+    "input": "/opt/xuanjun-community-preview/image-f131-40059478387",
+    "backup": "/opt/xuanjun-community-preview/backup-2330-to-f131-v1",
+    "permit": "/opt/xuanjun-community-preview/site-prepare-approval.json",
+    "freeze_reference": "/opt/xuanjun-community-preview/writer-freeze-reference.json",
+    "journal_parent": "/opt/xuanjun-community-preview/update-journal",
+    "data": [
+      "/var/lib/xuanjun-community-preview/data",
+      "/var/lib/xuanjun-community-preview/config"
+    ]
+  },
+  "proposed_modes": {
+    "public_source_and_permit_files": "root:root 0600",
+    "new_control_and_backup_directories": "root:root 0700",
+    "snapshot_and_clone_data": "PRESERVE_ORIGINAL_UID_GID_PRIVATE_MODE_UNDER_ROOT_0700_PARENT"
+  },
+  "remaining_site_gates": [
+    "ROOT_REVIEW_AND_OWNER_STAGE_A_APPROVAL",
+    "PROTECTED_INPUTS_AND_ACTUAL_STORAGE_CAPACITY",
+    "OWNER_MAINTENANCE_AND_EXCLUSIVE_WRITER_FREEZE",
+    "REAL_FULL_BACKUP_RESTORE_DOWNGRADE_RESULTS",
+    "LEGACY_ROLLBACK_BACKEND_TIME_LIMITATION_DECISION",
+    "FINAL_600_SECOND_SAME_ATTEMPT_CURRENT_AND_SEPARATE_UPDATE_APPROVAL"
+  ],
+  "ocr_production": "HOLD_DEFAULT_DISABLED",
+  "official_preview": "NOT_EXECUTED_EXACT_SHA_GATE_UNCHANGED"
+}
