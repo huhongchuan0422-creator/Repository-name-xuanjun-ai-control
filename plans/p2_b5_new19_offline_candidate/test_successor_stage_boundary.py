@@ -1,3 +1,4 @@
+import contextlib
 import json
 from pathlib import Path
 import sys
@@ -62,6 +63,47 @@ class StageBoundaryTests(unittest.TestCase):
             lambda *args:self.fail('HTTP files grant borrowed into maintenance'))
         self.backend.verify_window_admission(bundle,self.spec)
         self.assertEqual(called,['owner','ack',('runtime',False),'provider'])
+
+    def test_first_close_stop_unknown_enters_two_service_fail_closed(self):
+        calls=[]
+        class Legacy:
+            def command(self,argv,*args):
+                calls.append(tuple(argv))
+                if argv[1]=='stop' and argv[-1]=='xuanjun-cloud-connection.service' and len(calls)==1:
+                    raise RuntimeError('stop effect unknown')
+                return 0
+        backend=R2HostBackend(legacy_io=Legacy(),spec=self.spec,
+                              source_blobs={},observed_bytes={})
+        backend.job=self.spec['fixed_paths']['job_proposed']
+        backend._receipt=lambda name,*args:{'approved':True,'job':backend.job}
+        with self.assertRaisesRegex(RuntimeError,'stop effect unknown'):
+            backend.close_b5_exposure_success_c53_only()
+        self.assertIn(('/usr/bin/systemctl','stop',
+                       'xuanjun-cloud-connection.service'),calls[1:])
+        self.assertIn(('/usr/bin/systemctl','stop',
+                       'xuanjun-cloud-oauth-resource.service'),calls[1:])
+        self.assertNotEqual(getattr(backend,'stop_outcome',{}).get('state'),
+                            'ALL_STOPPED')
+
+    def test_prestart_restore_branch_requires_scoped_action(self):
+        effects=[]
+        class Backend:
+            def checkpoint(self,phase):effects.append(('checkpoint',phase))
+            def canonical_state_unknown(self):return False
+            def prove_no_new_operations_canonically(self):return True
+            @contextlib.contextmanager
+            def successor_evidence_action(self,kind):
+                self.kind=kind;yield
+            def restore_exact_backups_pre_start_only(self,changed,spec):
+                effects.append(('restore',self.kind,tuple(changed)));return True
+        backend=Backend()
+        candidate=transaction.Transaction(self.spec,self.bundle,backend)
+        candidate.stage='BACKUP';candidate.backup_done=True
+        candidate.worker_start_attempted=False;candidate.worker_stop_attempted=True
+        candidate.changed=['/etc/xuanjun-cloud-executor/connection.json']
+        candidate.fail_closed()
+        self.assertIn(('restore','PRE_START_RESTORE',
+                       ('/etc/xuanjun-cloud-executor/connection.json',)),effects)
 
     def test_successor_factory_type_and_close_sources_fail_closed(self):
         candidate=transaction.Transaction(self.spec,self.bundle,self.backend)
