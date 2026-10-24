@@ -1,4 +1,4 @@
-"""Three native entrants share existing GitHub task; no ledger or model effects."""
+"""Validate native entry receipts and optionally bind source evidence to the existing canonical ledger; never grant authority."""
 import hashlib
 import json
 import os
@@ -229,8 +229,9 @@ def main():
         'https://api.github.com/repos/' + repo + '/issues/17/comments',
         data=json.dumps({
             'body': marker + '\n::SKIP_COMPLETION::\n'
-                    'Mechanical entry receipt only. No writer, stop, handoff, '
-                    'code execution or quota verification.'
+                    'Entry receipt with optional canonical source-evidence binding. '
+                    'No writer authority, stop/handoff proof, code execution, '
+                    'production approval or quota verification.'
         }).encode('utf-8'),
         headers={
             'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
