@@ -78,7 +78,8 @@ jobs:
               accepted={'Complete Phase1 and Phase2 source regression',
                         'Preview version and entry affected scope (no provider or host I/O)',
                         'Preview entry evidence affected scope (offline only)',
-                        'UK read-only inspection candidate affected scope (no site execution)'}
+                        'UK read-only inspection candidate affected scope (no site execution)',
+                        'Original host OCR lifecycle and Mini feedback affected scope'}
               tests=[j for j in jobs.get('jobs',[]) if j.get('name')=='test' and j.get('conclusion')=='success'
                      and j.get('status')=='completed' and any(s.get('name') in accepted
                      and s.get('conclusion')=='success' and s.get('status')=='completed' for s in j.get('steps',[]))]

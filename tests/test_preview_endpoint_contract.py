@@ -277,6 +277,56 @@ class HostedEvidence(unittest.TestCase):
         self.assertIn('contents: read',self.workflow)
         self.assertNotIn('actions: write',self.workflow)
         self.assertNotIn('actions: read',self.workflow)
+    def test_exact_ocr_host_step_success_is_admitted_and_matches_actual_step(self):
+        name='Original host OCR lifecycle and Mini feedback affected scope'
+        self.assertIn('      - name: '+name+'\n',self.workflow)
+        self.jobs['jobs'][0]['steps'][0]['name']=name
+        self.assertEqual(self.validate()['test_job_id'],202)
+        self.assertFalse(self.validate()['artifact_bytes_reverified'])
+
+    def test_accepted_names_are_exactly_the_four_original_scopes_plus_ocr_host(self):
+        import ast,textwrap
+        source=textwrap.dedent(self.workflow.split("python - <<'EVIDENCE'\n",1)[1].split('          EVIDENCE',1)[0])
+        assignments=[node for node in ast.walk(ast.parse(source)) if isinstance(node,ast.Assign)
+                     and any(isinstance(target,ast.Name) and target.id=='accepted' for target in node.targets)]
+        self.assertEqual(len(assignments),1)
+        self.assertEqual(ast.literal_eval(assignments[0].value),{
+            'Complete Phase1 and Phase2 source regression',
+            'Preview version and entry affected scope (no provider or host I/O)',
+            'Preview entry evidence affected scope (offline only)',
+            'UK read-only inspection candidate affected scope (no site execution)',
+            'Original host OCR lifecycle and Mini feedback affected scope'})
+
+    def test_ocr_host_near_names_and_arbitrary_success_are_not_admitted(self):
+        import copy
+        exact='Original host OCR lifecycle and Mini feedback affected scope'
+        for name in (exact+' ',exact+' extra','prefix '+exact,exact.lower(),'OCR','Set up job','success'):
+            data=copy.deepcopy(self.jobs);data['jobs'][0]['steps'][0]['name']=name
+            data['jobs'][0]['steps'].append(dict(name='Upload artifact',status='completed',conclusion='success'))
+            with self.subTest(name=name),self.assertRaisesRegex(ValueError,'SUCCESSFUL_TEST_GATE_REQUIRED'):
+                self.validate(jobs=data)
+
+    def test_ocr_host_requires_completed_successful_step_and_exact_test_job(self):
+        import copy
+        self.jobs['jobs'][0]['steps'][0]['name']='Original host OCR lifecycle and Mini feedback affected scope'
+        for patch in ({'conclusion':'failure'},{'conclusion':'cancelled'},{'conclusion':'skipped'},
+                      {'conclusion':None},{'status':'in_progress'},{'status':'queued'}):
+            data=copy.deepcopy(self.jobs);data['jobs'][0]['steps'][0].update(patch)
+            with self.subTest(step=patch),self.assertRaises(ValueError):self.validate(jobs=data)
+        for patch in ({'name':'other-job'},{'status':'in_progress'},{'conclusion':'failure'},{'conclusion':'cancelled'}):
+            data=copy.deepcopy(self.jobs);data['jobs'][0].update(patch)
+            with self.subTest(job=patch),self.assertRaises(ValueError):self.validate(jobs=data)
+        data=copy.deepcopy(self.jobs);data['jobs']*=2;data['total_count']=2
+        with self.assertRaisesRegex(ValueError,'SUCCESSFUL_TEST_GATE_REQUIRED'):self.validate(jobs=data)
+
+    def test_new_ocr_host_scope_preserves_all_existing_bindings_and_artifact_gates(self):
+        self.jobs['jobs'][0]['steps'][0]['name']='Original host OCR lifecycle and Mini feedback affected scope'
+        # Run the original full negative matrices with this newly accepted scope:
+        # a successful OCR step must never override SHA/repo/event/artifact proof.
+        self.test_wrong_sha_branch_workflow_event_repo_or_incomplete_run_denied()
+        self.test_artifact_expiry_digest_missing_or_foreign_binding_denied()
+        self.test_current_run_duplicate_artifact_and_pagination_unknown_denied()
+
     def test_read_is_fixed_public_github_only_without_token_or_dispatch(self):
         import inspect
         # AST/function code, not a request to the live provider.
