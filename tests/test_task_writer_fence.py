@@ -321,6 +321,42 @@ class WriterFenceTests(unittest.TestCase):
             self.assertEqual(
                 OfflineGitCAS.validate(operation,bad)['outcome'],'CONFLICT')
 
+    def test_kill_restart_preserves_dispatching_as_unresolved(self):
+        ticket=self.claim();operation=self.op()
+        self.fence.prepare(ticket,self.caller(),operation)
+        self.s.begin_dispatch(ticket,self.caller(),'op1',
+                              self.fence.locks.provider_id)
+        self.fence.close();self.s.close()
+        self.s=Supervisor(self.path,lambda:self.now)
+        self.fence=Fence(self.s,self.lock_root)
+        rows=self.s.unresolved_operations('t1')
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['state'],'DISPATCHING')
+        with self.assertRaises(ValueError):
+            self.s.begin_dispatch(ticket,self.caller(),'op1',
+                                  self.fence.locks.provider_id)
+
+    def test_final_receipt_store_same_bytes_idempotent_different_bytes_conflict(self):
+        ticket=self.claim();operation=self.op()
+        self.fence.prepare(ticket,self.caller(),operation)
+        row=self.s.db.execute(
+            "SELECT * FROM writer_operations WHERE operation_id='op1'"
+        ).fetchone()
+        receipt=self.final_receipt(operation)
+        self.s.db.execute('BEGIN IMMEDIATE')
+        with self.s.db:
+            first=self.s._append_receipt_locked(row,'CONFIRMED',receipt,self.now)
+        self.assertFalse(first['duplicate'])
+        self.s.db.execute('BEGIN IMMEDIATE')
+        with self.s.db:
+            second=self.s._append_receipt_locked(row,'CONFIRMED',receipt,self.now)
+        self.assertTrue(second['duplicate'])
+        bad=dict(receipt);bad['operation_marker']='other'
+        self.s.db.execute('BEGIN IMMEDIATE')
+        with self.assertRaises(ValueError):
+            with self.s.db:
+                self.s._append_receipt_locked(row,'CONFIRMED',bad,self.now)
+
     def test_reconcile_unknown_without_redispatch_and_one_final_receipt(self):
         ticket=self.claim();operation=self.op()
         self.fence.prepare(ticket,self.caller(),operation)
@@ -419,6 +455,22 @@ class WriterFenceTests(unittest.TestCase):
         self.fence.drain('t1',controller,0.2)
         self.fence.invalidate_source_resources('t1','inv')
         self.assertEqual(self.s.complete_revocation('t1')['state'],'REVOKED')
+
+    def test_arbitrary_or_missing_field_invalidation_receipt_rejected(self):
+        self.claim()
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
+        self.fence.begin_revocation('t1',controller)
+        self.fence.drain('t1',controller,0.2)
+        with self.assertRaisesRegex(
+                ValueError,'RESOURCE_INVALIDATION_RECEIPT_REQUIRED'):
+            self.s.record_resource_invalidation(
+                't1',{'outcome':'INVALIDATED'})
+        good=self.fence.adapter.invalidation_receipt(
+            self.s,'t1','fake:account/a',self.fence.locks.provider_id,'e0')
+        missing=dict(good);missing.pop('ticket_sha256')
+        with self.assertRaisesRegex(
+                ValueError,'RESOURCE_INVALIDATION_RECEIPT_REQUIRED'):
+            self.s.record_resource_invalidation('t1',missing)
 
     def test_invalidation_receipt_must_bind_old_identity_spec_scope_ticket(self):
         self.claim()
