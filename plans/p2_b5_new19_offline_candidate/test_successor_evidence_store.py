@@ -336,7 +336,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         with self.assertRaisesRegex(Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
             with store.action(self.binding):
                 self.assertEqual(len(store.active_action_fds(self.binding)),2)
-                with patch.object(self.store,'_lease_cursor_held',return_value=False):
+                with patch.object(store,'_lease_cursor_held',return_value=False):
                     with self.assertRaisesRegex(
                             Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
                         store.active_action_fds(self.binding)
