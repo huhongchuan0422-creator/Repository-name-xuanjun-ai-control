@@ -6,6 +6,7 @@ import zipfile
 import os
 import sys
 import subprocess
+import shutil
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
 from services.ocr_engine.build_offline_bundle import validate_deb_cache
@@ -191,7 +192,7 @@ class OfflineBundleInputTests(unittest.TestCase):
 
     def test_deb_lock_generator_reads_real_synthetic_package_and_official_source(self):
         root=self.root/"generated-debs"; root.mkdir()
-        apt=root/"apt-lists"; apt.mkdir()
+        apt=root/"apt-work"; apt.mkdir()
         (apt/"InRelease").write_bytes(b"synthetic apt metadata; not asserting signature")
         source=self.root/"debian.sources"
         source.write_text(chr(10).join(["Types: deb","URIs: https://deb.debian.org/debian","Suites: bookworm bookworm-updates","Components: main",""]))
@@ -299,9 +300,10 @@ class OfflineBundleInputTests(unittest.TestCase):
         expected={v["filename"]:v["sha256"] for v in data["model_set"]["files"].values()}
         self.assertEqual(len(expected),3)
         script=Path(__file__).with_name("write_candidate_input_manifest.py").read_text(encoding="utf-8")
-        self.assertIn("digest == trusted_model_hashes[path.name]",script)
-        self.assertIn('"sha256":digest',script)
-        self.assertIn("downloaded-and-self-hashed-only-not-trusted-by-model-manifest",script)
+        self.assertIn("SOURCE_SHA_MISMATCH_FROZEN_EXPECTED",script)
+        self.assertIn("CANDIDATE_COPY_SHA_MISMATCH",script)
+        self.assertIn("FIXED_MODEL_MANIFEST_SHA256_MATCH",script)
+        self.assertIn("json.loads(manifest.read_bytes().decode",script)
     def test_ldd_nonzero_one_fails_even_without_missing_text(self):
         candidate=self.root/"cv2.abi3.so"; candidate.write_bytes(b"fake ELF placeholder")
         result=subprocess.CompletedProcess(["ldd",str(candidate)],1,"not a dynamic executable\\n","")
@@ -337,13 +339,20 @@ class OfflineBundleInputTests(unittest.TestCase):
         root=self.root/"candidate"; (root/"ocr-deb-cache"/"apt-lists").mkdir(parents=True)
         release=root/"ocr-deb-cache"/"apt-lists"/"debian_dists_bookworm_InRelease"
         release.write_bytes(b"not verified signed metadata")
-        out=root/"ocr-candidate-inputs"/"candidate-input-manifest.json"
+        aptwork=root/"apt-work"; aptwork.mkdir()
+        release=aptwork/"debian_dists_bookworm_InRelease"; release.write_bytes(b"not verified signed metadata")
+        debroot=root/"ocr-deb-cache"; debroot.mkdir()
+        index_dest=debroot/"apt-lists"; index_dest.mkdir()
+        shutil.copyfile(release,index_dest/release.name)
+        lock={"packages":[],"apt_lists":[{"path":release.name,"bytes":release.stat().st_size,"sha256":hashlib.sha256(release.read_bytes()).hexdigest()}]}
+        (debroot/"system-deb-lock.json").write_text(json.dumps(lock))
+        out=root/"ocr-candidate-inputs"/"payload"
         script=Path(__file__).with_name("write_candidate_input_manifest.py")
         env=dict(os.environ,RUNNER_TEMP=str(root),GITHUB_SHA="a"*40,GITHUB_RUN_ID="123")
         subprocess.run([sys.executable,str(script),str(root),str(out)],env=env,check=True,capture_output=True,text=True)
-        manifest=json.loads(out.read_text(encoding="utf-8"))
+        manifest=json.loads((out.parent/"candidate-input-manifest.json").read_text(encoding="utf-8"))
         entry=next(x for x in manifest["files"] if x["path"].endswith("debian_dists_bookworm_InRelease"))
-        self.assertIn("signature-verification-not-independently-proven",entry["provenance"])
+        self.assertIn("FROZEN_APT_INDEX_LOCK",entry["provenance"])
         self.assertNotIn("signature-checked",entry["provenance"])
 
     def test_deb_lock_generator_excludes_apt_lock_partial_and_auxfiles(self):
@@ -364,7 +373,9 @@ class OfflineBundleInputTests(unittest.TestCase):
         lock=json.loads((root/"system-deb-lock.json").read_text())
         names={x["path"] for x in lock["apt_lists"]}
         self.assertEqual(names,{"InRelease"})
-        self.assertFalse((apt/"lock").stat().st_mode & 0o111)
+        self.assertEqual((apt/"InRelease").stat().st_mode & 0o777,0o644)
+        self.assertEqual((root/"apt-lists"/"InRelease").read_bytes(),b"index")
+        self.assertFalse((root/"apt-lists"/"lock").exists())
     def test_candidate_export_copies_only_whitelisted_readable_inputs(self):
         root=self.root/"candidate-root"
         (root/"ocr-deb-cache"/"apt-lists"/"partial").mkdir(parents=True)
@@ -377,11 +388,10 @@ class OfflineBundleInputTests(unittest.TestCase):
         (root/"ocr-deb-cache"/"system-deb-lock.json").write_text(json.dumps(lock_data))
         os.chmod(root/"ocr-deb-cache"/"apt-lists"/"lock",0o000)
         dest=root/"ocr-candidate-inputs"/"payload"
-        manifest=root/"ocr-candidate-inputs"/"candidate-input-manifest.json"
         script=Path(__file__).with_name("write_candidate_input_manifest.py")
         env=dict(os.environ,RUNNER_TEMP=str(root),GITHUB_SHA="a"*40,GITHUB_RUN_ID="123")
         subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,check=True,capture_output=True,text=True)
-        data=json.loads(manifest.read_text())
+        data=json.loads((dest.parent/"candidate-input-manifest.json").read_text())
         paths={x["path"] for x in data["files"]}
         self.assertIn("system-debs/libxcb1.deb",paths)
         self.assertIn("apt-lists/Packages",paths)
