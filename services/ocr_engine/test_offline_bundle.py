@@ -794,6 +794,19 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertTrue(marker_file.exists())
         sys.modules.pop("trusted_ro", None)
 
+    def test_mountinfo_parser_uses_deepest_mount_and_real_ro_option(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_mount_parser_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        root = self.root / "mountpoint with space"; root.mkdir()
+        source = root / "adapter.py"; source.write_text("# fixture")
+        escaped = str(root).replace(chr(92), chr(92)+chr(92)).replace(" ", chr(92)+"040")
+        parent = "20 1 0:1 / / rw,relatime - ext4 /dev/root rw"
+        readonly = parent + chr(10) + "21 20 0:42 / " + escaped + " ro,relatime - tmpfs tmpfs rw"
+        readwrite = parent + chr(10) + "21 20 0:42 / " + escaped + " rw,relatime - tmpfs tmpfs rw"
+        self.assertTrue(module.readonly_mount_for(source, readonly))
+        self.assertFalse(module.readonly_mount_for(source, readwrite))
+        self.assertFalse(module.readonly_mount_for(source, ""))
+
     def test_trusted_binding_rejects_world_writable_root_or_source(self):
         spec = importlib.util.spec_from_file_location("ocr_entrypoint_modes_test", Path(__file__).with_name("container_entrypoint.py"))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
