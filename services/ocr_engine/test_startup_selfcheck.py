@@ -62,6 +62,29 @@ class StartupSelfcheckTests(unittest.TestCase):
         result=self.check()
         self.assertFalse(result["ok"])
         self.assertIn("OCR_MODEL_FILE_UNAVAILABLE:det",result["errors"])
+    def test_world_writable_database_parent_fails_read_only(self):
+        self.db.parent.chmod(0o777)
+        try:
+            result=self.check()
+            self.assertFalse(result['ok'],result)
+            self.assertTrue(any(error.startswith('OCR_DB_PARENT_PERMISSIONS_UNSAFE:') for error in result['errors']),result)
+            self.assertFalse(self.db.exists())
+        finally:
+            self.db.parent.chmod(0o700)
+    def test_symlink_in_database_ancestor_fails_read_only(self):
+        real=self.root/'real-root'; real.mkdir(mode=0o700)
+        link=self.root/'linked-root'; link.symlink_to(real,target_is_directory=True)
+        env=dict(self.env); env['OCR_SQLITE_PATH']=str(link/'data'/'ocr.sqlite3')
+        result=check_environment(env,self.manifest)
+        self.assertFalse(result['ok'],result)
+        self.assertIn('OCR_DB_PATH_SYMLINK',result['errors'])
+        self.assertFalse((real/'data'/'ocr.sqlite3').exists())
+    def test_absent_database_is_not_reported_ready(self):
+        result=self.check()
+        self.assertTrue(result['ok'],result)
+        self.assertEqual(result['database'],'DB_ABSENT_PARENT_CHAIN_VERIFIED_NOT_READY')
+        self.assertNotIn('READY_TO_CREATE_BY_SEPARATE_APPROVED_DEPLOYMENT',result['database'])
+        self.assertFalse(self.db.exists())
     def test_existing_database_with_broad_permissions_fails(self):
         self.db.write_bytes(b"")
         self.db.chmod(0o644)
