@@ -37,3 +37,58 @@ Focused tests use the actual original Center/session/application/scanned encrypt
 The initial object row is a read-start snapshot only. Immediately before returning bytes, after the existing session/scope/application checks, `ocr_source` re-queries the original `objects` row by current object ID and application and compares all eight stored fields: ID, version, project, MIME, size, SHA, scan and key ID. The final row must still be CLEAN, image MIME, current material SHA, exact length and SHA256 of the already-read bytes. The original expiry is rechecked using the current Center clock at release. Missing/deleted/changed objects or expiration deny the source. Application metadata/revision and original session checks remain in place.
 
 An isolated decrypt-time injection against the original method reproduced the reported scan/SHA/expiry defect, plus object deletion/metadata changes. Nine added test methods (including eight individual object-column mutations) now exercise the real original Center and encrypted-object path: scan revocation, deletion, metadata replacement, time crossing expiration, session/provider revocation, application revision/revocation/material replacement, and an `identity_front` positive case. This is controlled synthetic regression evidence, not a live attack or OCR HTTP success. The OCR gateway contract HOLD described above is unchanged.
+
+## Superseding community composition: OCR 2dc5eeb1
+
+The earlier 5b6/837 gap analysis above is historical, not the current API contract.
+The current dependency is exactly `2dc5eeb1d0d1ffb037314a8edcf5c2e16d645a40`, tree
+`2984f51d3ed29b2cc67646b8d885c00a04c12881`. `scripts/community_ocr_dependency.json`
+pins SHA256 of the three unmodified OCR dependency files. `compose()` verifies
+those files and the actual SecureSQLiteJobStore class before creating the app.
+No OCR engine code is copied into community source or edited by this Writer.
+
+| Actual interface | Community source |
+| --- | --- |
+| authenticate(token) | original CenterIdentity.merchant_context, server-selected registered scene; UID→subject, runtime scope.tenant_id→business tenant |
+| authorize_application(p, application) | current Center session/provider/project, original owner-only _load, immutable server-created ocr_origin equality |
+| authorize_attachment(p, application, attachment, sha, type, expected_revision) | MiniMerchant.ocr_source current bytes/scan/MIME/size/expiry/object identity, exact attachment/SHA/type and canonical revision string |
+| business_license | business_license |
+| id_front | identity_front only for IDENTIFICATION_TYPE_IDCARD |
+| scene photos | unsupported; no OCR |
+| GET / confirm / delete | pinned OCR API calls the same current-source resolver with stored expected revision |
+| apply_confirmed(p, job_id) | configured encrypted store only, confirmed subject-owned job, source recheck, fill empty platform fields only, original save revision CAS |
+
+Original Center revisions are positive Python integers, normalized to their
+unpadded decimal string. No UID→tenant fallback, request-created permission,
+legacy revision invention, new grant, token, HTTP route or credential is added.
+Confirmed company_name can fill empty legal_name; registered_address can fill
+empty address for business licenses. Existing manual values are preserved.
+Identity fields have no proven platform destination here and are not auto-written.
+A successful write increments the original application revision, so the old OCR
+job is subsequently rejected by current-source checks.
+
+Original Center SQLite is **same-thread**. `compose` therefore requires a protected
+host `owner_call` dispatcher to the existing owner loop, and every source callback
+checks that it actually runs on the thread where the bridge was composed. No
+`check_same_thread=False`, duplicate Center/DB or guessed production queue is used.
+The composition test pumps that real owner loop while sending actual multipart,
+GET, confirm and delete requests through FastAPI TestClient/ASGI transport. This
+is HTTP contract composition, not a deployed network endpoint or inference proof.
+
+### Actual remaining HOLD
+
+1. Repository search found no existing authoritative `ocr:use` mapping. Production
+   authenticate returns the real subject/tenant with **empty permissions**, so
+   the actual OCR API rejects with OCR_PERMISSION_DENIED. No permission callback
+   is invented. TestAdmission is explicitly test-only and has no production path.
+2. PlatformHost has not yet admitted an OCR service plus its serial owner-loop
+   dispatcher/configured encrypted store. `compose` is protected preparation,
+   not an installed service. Its dependency pin is not a deployment instruction.
+3. Tests inject synthetic inference; real OCR Engine/Persistence evidence at the
+   pinned SHA is reused separately. No real document, engine execution, provider
+   request, official preview or QR code is claimed by these tests.
+
+Only admission/host composition remains blocked by those precise missing proofs;
+the real-source resolver and encrypted HTTP composition can be reviewed now.
+Final official same-version candidate must follow admission resolution; do not
+upload the older 125 candidate as though this connection were installed.

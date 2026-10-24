@@ -29,7 +29,7 @@ permissions:
   contents: read
 jobs:
   click-through:
-    if: "!contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]')"
+    if: "!contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]')"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:

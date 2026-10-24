@@ -87,7 +87,8 @@
           "tests/test_community_original_project_center.py",
           "tests/test_community_finance_record_isolation.py",
           "tests/test_community_integrated_platform_bill_journey.py",
-          "tests/test_community_preview_version_inspect.py"
+          "tests/test_community_preview_version_inspect.py",
+          "tests/test_community_ocr_bridge.py"
         ]
       },
       "reuse": [
@@ -224,7 +225,10 @@
         "demos/community-stage/workbench.html",
         "tests/test_community_workbench_browser.py",
         "scripts/community_preview_version_inspect.py",
-        "tests/test_community_preview_version_inspect.py"
+        "tests/test_community_preview_version_inspect.py",
+        "scripts/community_ocr_bridge.py",
+        "scripts/community_ocr_dependency.json",
+        "tests/test_community_ocr_bridge.py"
       ]
     },
     {
