@@ -40,7 +40,15 @@ b.authority=Authority();b.window_open=False;b.bundle=None
 b.spec=binder.verify_spec_bytes((fixture_root/'SUCCESSOR_SPEC.json').read_bytes())
 b.release_gate=fixture_gate(b.spec,'recover')
 try:
- print(json.dumps(Transaction.recover_intake_readonly(b,bundle),sort_keys=True))
+ observed=Transaction.recover_intake_readonly(b,bundle)
+ if observed['state']=='B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY':
+  # Fixture facts model the separately checked activation marker; this child
+  # tests the phase transition, not the UK protected activation reader.
+  b.recovered_from_protected=True;b.activation_committed=True;b.bundle=bundle
+  tx=object.__new__(Transaction);tx.b=b;tx.bundle=bundle;tx.stage='UNKNOWN'
+  observed['resume']=tx.resume_recovered_b5_http_wait()
+  observed['stage']=tx.stage
+ print(json.dumps(observed,sort_keys=True))
 except BaseException as exc:
  print(json.dumps({'state':'HOLD','code':str(exc)},sort_keys=True));sys.exit(2)
 '''
@@ -150,6 +158,30 @@ os.kill(os.getpid(),signal.SIGKILL)
         self.assertEqual(proc.returncode,0)
         self.assertEqual((result['state'],result['success_count'],result['mutation_allowed']),
                          ('SUCCESS_OBSERVED_READONLY',19,False))
+
+    def test_two_processes_wait_for_b5_http_after_custody_without_replay(self):
+        for r in self.bundle['requests']:
+            rid=self.intent(r);self.write('ready-'+rid,b'1')
+        (self.root/'progress').write_text('19')
+        for number,phase in enumerate(('WAIT_19_SUCCESS','CHECK_19_SUCCESS',
+                         'ONE_CUSTODY','READY_FOR_B5_HTTP_NOT_RECEIVED'),2):
+            self.write('checkpoint-%03d.json'%number,c53.canon({
+                'schema':1,'sequence':number,'phase':phase,
+                'release_commit':c53.COMMIT,'project':c53.PROJ})+b'\n')
+        before={p.name:hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in self.root.iterdir()}
+        first,a=self.child();second,b=self.child()
+        self.assertEqual((first.returncode,second.returncode),(0,0))
+        self.assertEqual(a,b)
+        self.assertEqual((a['state'],a['stage'],a['resume']['mutation_allowed']),
+            ('B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY',
+             'READY_FOR_B5_HTTP_NOT_RECEIVED',False))
+        self.assertEqual(before,{p.name:hashlib.sha256(p.read_bytes()).hexdigest()
+                                 for p in self.root.iterdir()})
+        (self.root/'progress').write_text('18')
+        failed,result=self.child()
+        self.assertEqual((failed.returncode,result['code']),
+                         (2,'RECOVERY_CUSTODY_SUCCESS_CHANGED'))
 
     def test_same_ids_changed_request_rejected(self):
         self.bundle['requests'][0]['arguments']['object_ref']='other'

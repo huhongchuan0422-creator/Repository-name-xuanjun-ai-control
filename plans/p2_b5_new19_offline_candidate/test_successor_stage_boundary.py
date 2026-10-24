@@ -5,17 +5,21 @@ import time
 import unittest
 
 ROOT=Path(__file__).resolve().parent
-sys.path[:0]=[str(ROOT),str(ROOT/'reused-6825'),str(ROOT/'successor_controller')]
+sys.path[:0]=[str(ROOT),str(ROOT/'reused-6825'),
+              str(ROOT/'new19-source'),str(ROOT/'successor_controller')]
 
 import pr17_b5_successor_review as transaction
 import pr17_b5_successor_binder as binder
 from pr17_b5_successor_backend import R2HostBackend
+from pr17_b5_successor_authority import ExistingRequestAuthority
+from pr17_b5_successor_runtime import attachment_for_prepared
 
 
 class StageBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.spec=binder.verify_spec_bytes((ROOT/'SUCCESSOR_SPEC.json').read_bytes())
         self.bundle={'files':{x:b'' for x in transaction.CONFIGS+transaction.SLOTS},
+                     'catalog_sha':'a'*64,
                      'requests':[{'request_id':r} for r in
                                  self.spec['batch']['draft_request_ids']]}
         self.backend=R2HostBackend(legacy_io=object(),spec=self.spec,
@@ -58,6 +62,26 @@ class StageBoundaryTests(unittest.TestCase):
             lambda *args:self.fail('HTTP files grant borrowed into maintenance'))
         self.backend.verify_window_admission(bundle,self.spec)
         self.assertEqual(called,['owner','ack',('runtime',False),'provider'])
+
+    def test_successor_factory_type_and_close_sources_fail_closed(self):
+        candidate=transaction.Transaction(self.spec,self.bundle,self.backend)
+        self.backend.authority=object.__new__(ExistingRequestAuthority)
+        self.backend.authority.original=object()
+        self.assertTrue(callable(attachment_for_prepared(candidate)))
+        self.backend.bundle=self.bundle
+        self.backend.authority.catalog_sha='a'*64
+        self.backend.authority.request_ids=tuple(
+            self.spec['batch']['draft_request_ids'])
+        proof={'state':'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+               'bytes':93592,'objects':19,'close_approval':'NOT_PROVEN',
+               'proof_sha256':'b'*64}
+        with self.assertRaisesRegex(transaction.Hold,
+                                    'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN'):
+            self.backend.verify_b5_http_provenance(proof,self.bundle,self.spec)
+        with self.assertRaisesRegex(transaction.Hold,
+                                    'C53_CLOSE_APPROVAL_SOURCE_UNKNOWN'):
+            self.backend.approve_precise_b5_exposure_close(self.bundle,self.spec)
+        self.assertTrue(callable(self.backend.close_b5_exposure_success_successor_only))
 
 
 if __name__=='__main__':

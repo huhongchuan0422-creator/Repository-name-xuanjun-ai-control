@@ -21,7 +21,7 @@ pin and production reader have not been issued.
 | Maintenance | `successor_controller/pr17_b5_successor_local.py`, `pr17_b5_successor_review.py`, `pr17_b5_successor_runtime.py` | Owner/B5 batch witnesses, original queue, stop, release, start, window, intake and custody are separate checkpoints. No bearer copied to maintenance. |
 | Read | `successor_analyst_read.py` | B5's request-local cloud read validates each original response and whole SHA. A callable fixture proves bytes, not tool provenance or a real files grant. |
 | Close | `pr17_b5_successor_review.py` | Requires a trusted B5 HTTP provenance record and separate precise close approval. These producer interfaces are unbound and remain HOLD. |
-| Recovery | `pr17_b5_successor_backend.py` | Protected intent/SENT observations and the original file-backed Queue in a new process do not repeat POST; uncertain custody and mutations remain HOLD. |
+| Recovery | `pr17_b5_successor_backend.py`, `pr17_b5_successor_review.py` | Protected intent/SENT and original file-backed Queue reconcile in a new process without repeating POST. A completed custody checkpoint restores only the wait for B5 HTTP provenance; unknown custody and mutations remain HOLD. |
 
 No live caller supplies the new gate's independently approved binder digest,
 protected source reader and link observations. The original protected six paths, two

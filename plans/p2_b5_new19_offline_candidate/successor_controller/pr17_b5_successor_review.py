@@ -456,6 +456,26 @@ class Transaction:
         # original Queue receipts and full archive immediately before custody.
         return self.continue_after_original_ready()
 
+    def resume_recovered_b5_http_wait(self):
+        """Restore only the waiting phase; neither custody nor POST is retried.
+
+        The protected checkpoint and original Queue must still agree. A later
+        close requires separate B5 tool provenance and exact close approval.
+        """
+        require(getattr(self.b,'recovered_from_protected',False) is True and
+                self.b.activation_committed is True,
+                'RECOVERY_ACTIVATION_NOT_BOUND')
+        observed=self.recover_intake_readonly(self.b,self.bundle)
+        require(observed.get('state')=='B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY' and
+                observed.get('ready_count')==19 and
+                observed.get('success_count')==19 and
+                observed.get('last_checkpoint')=='READY_FOR_B5_HTTP_NOT_RECEIVED' and
+                observed.get('mutation_allowed') is False,
+                'RECOVERY_B5_HTTP_WAIT_NOT_PROVEN')
+        self.stage='READY_FOR_B5_HTTP_NOT_RECEIVED'
+        return {'state':'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY',
+                'received':0,'expected':19,'mutation_allowed':False}
+
     def continue_after_original_ready(self):
         """Explicit read-only reconciliation; never submits or repeats a POST."""
         require(self.stage in ('INTAKE_SENT_AWAITING_READY','WAIT_19_SUCCESS'),

@@ -213,7 +213,8 @@ class R2HostBackend:
             checkpoints.append(row['phase'])
         c53.require(checkpoints and 'INTAKE_19' in checkpoints and
                     checkpoints[-1] in ('INTAKE_19','INTAKE_SENT_AWAITING_READY',
-                        'WAIT_19_SUCCESS','CHECK_19_SUCCESS','ONE_CUSTODY'),
+                        'WAIT_19_SUCCESS','CHECK_19_SUCCESS','ONE_CUSTODY',
+                        'READY_FOR_B5_HTTP_NOT_RECEIVED'),
                     'RECOVERY_CHECKPOINT_PHASE')
         c53.require(len(checkpoints)<64,'RECOVERY_CHECKPOINT_BOUND')
         self.seq=len(checkpoints)
@@ -254,12 +255,18 @@ class R2HostBackend:
                 ready.append(rid)
             else: pending.append(rid)
         if pending:
+            c53.require(checkpoints[-1]!='READY_FOR_B5_HTTP_NOT_RECEIVED',
+                        'RECOVERY_CUSTODY_CHECKPOINT_CONFLICT')
             return {'state':'UNKNOWN_OR_PENDING_NO_REPOST','ready_count':len(ready),
                     'pending_count':len(pending),'last_checkpoint':checkpoints[-1],
                     'mutation_allowed':False}
         count=self._auth('observe_original_success_progress',ids,bundle['catalog_sha'])
         c53.require(type(count) is int and 0<=count<=19,'RECOVERY_PROGRESS_UNKNOWN')
-        state=('CUSTODY_UNKNOWN_NO_RETRY' if checkpoints[-1]=='ONE_CUSTODY' else
+        if checkpoints[-1]=='READY_FOR_B5_HTTP_NOT_RECEIVED':
+            c53.require(count==19,'RECOVERY_CUSTODY_SUCCESS_CHANGED')
+        state=('B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY' if
+               checkpoints[-1]=='READY_FOR_B5_HTTP_NOT_RECEIVED' else
+               'CUSTODY_UNKNOWN_NO_RETRY' if checkpoints[-1]=='ONE_CUSTODY' else
                'SUCCESS_OBSERVED_READONLY' if count==19 else 'WAIT_ORIGINAL_SUCCESS_NO_REPOST')
         return {'state':state,'ready_count':19,'success_count':count,
                 'last_checkpoint':checkpoints[-1], 'mutation_allowed':False}
