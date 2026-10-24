@@ -11,6 +11,7 @@ on:
       - 'services/ocr_engine/test_offline_bundle.py'
       - 'services/ocr_engine/validate_workflow_syntax.py'
       - 'services/ocr_engine/test_workflow_syntax.py'
+      - 'services/ocr_engine/test_hosted_build_flow.py'
       - 'services/ocr_engine/generate_platform_lock.py'
       - '.github/workflows/ocr-engine-tests.yml'
       - 'services/ocr_engine/deployment_config.schema.json'
@@ -44,3 +45,4 @@ jobs:
           python -m pip install --disable-pip-version-check PyYAML==6.0.2
           python services/ocr_engine/validate_workflow_syntax.py
           python -m unittest services.ocr_engine.test_workflow_syntax -v
+          python -m unittest services.ocr_engine.test_hosted_build_flow -v
