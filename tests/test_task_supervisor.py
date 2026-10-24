@@ -20,8 +20,12 @@ class SupervisorTests(unittest.TestCase):
         self.s = Supervisor(self.path, lambda: self.now)
 
     def tearDown(self):
-        self.s.close()
-        os.unlink(self.path)
+        try:
+            self.s.close()
+        except Exception:
+            pass
+        if os.path.exists(self.path):
+            os.unlink(self.path)
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
@@ -35,6 +39,60 @@ class SupervisorTests(unittest.TestCase):
     def claim(self, task='t1', attempt='a1'):
         self.s.claim(task, attempt, 'developer', 'WORK', 'run1', 'session1',
                      'lease1', 1, 1, now=self.now)
+
+
+    def development_contract(self, task='t1'):
+        return dict(
+            task_id=task,spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            entry='WORK',developer={'issuer':'native','subject':'developer'},
+            allowed_files=['src/f.py'],
+            trusted_reviewers=[
+                {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
+                {'issuer':'native','subject':'security','key_id':'sec',
+                 'role':'SECURITY'}])
+
+    def test_development_contract_is_canonical_idempotent_and_conflicting(self):
+        self.registration()
+        contract=self.development_contract()
+        first=self.s.register_development_contract('t1',contract)
+        second=self.s.register_development_contract('t1',contract)
+        self.assertFalse(first['duplicate']);self.assertTrue(second['duplicate'])
+        changed=dict(contract);changed['target_base_sha']='d'*40
+        with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
+            self.s.register_development_contract('t1',changed)
+
+    def test_failed_development_completion_never_unlocks_dependency(self):
+        self.registration('t1')
+        self.registration('child',['t1'])
+        self.s.register_development_contract(
+            't1',self.development_contract())
+        caller={'caller_id':'writer','run_id':'run1',
+                'session_id':'session1','gateway_id':'gateway1'}
+        self.s.claim_writer('t1','a1','developer','WORK',caller,
+                            'lease1','provider1',['fake:development/source'],
+                            1700)
+        receipt=dict(
+            schema=1,entry='WORK',execution_path='WORK_NATIVE',task_id='t1',
+            spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            code_commit='d'*40,event='CODE_READY',attempt_id='a1',
+            lease_id='lease1',fence=1,epoch=1,caller_id='writer',
+            run_id='run1',session_id='session1',gateway_id='gateway1',
+            lock_provider_id='provider1',source_comment_id=1,
+            status='RECEIPT_VALIDATED_NOT_ADMITTED',
+            native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
+            authority_effect='NONE',
+            required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
+        candidate=self.s.bind_development_candidate(
+            receipt,{'src/f.py':'e'*64})
+        with self.assertRaisesRegex(
+                ValueError,'CANONICAL_DEVELOPMENT_REVIEW_REQUIRED'):
+            self.s.complete_development_candidate(
+                't1','missing-reviewed-event','complete')
+        self.assertNotEqual(self.s._task('t1')['state'],'SUCCESS')
+        self.assertNotIn('child',[x['task_id'] for x in self.s.ready()])
+
 
     def test_ready_fair_scan_and_dependencies(self):
         self.registration('b')
@@ -143,69 +201,178 @@ class SupervisorTests(unittest.TestCase):
         self.assertTrue(replay['duplicate'])
         self.assertEqual(self.s._task('t1')['state'],'READY')
 
-    def test_version_one_database_migrates_and_preserves_task(self):
+    def test_v2_normal_open_is_zero_write_then_explicit_migration(self):
         self.registration()
         self.s.close()
         db=sqlite3.connect(self.path)
         try:
-            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
-            db.execute('PRAGMA user_version=1')
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
             db.commit()
         finally:
             db.close()
+        sidecars=[self.path+x for x in ('-wal','-shm','-journal')]
+        before_stat=os.stat(self.path)
+        with open(self.path,'rb') as stream:
+            before=stream.read()
+        before_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                            if os.path.exists(p) else None) for p in sidecars}
+        with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
+            Supervisor(self.path,lambda:self.now)
+        after_stat=os.stat(self.path)
+        with open(self.path,'rb') as stream:
+            self.assertEqual(before,stream.read())
+        self.assertEqual((before_stat.st_ino,before_stat.st_size,
+                          before_stat.st_mtime_ns),
+                         (after_stat.st_ino,after_stat.st_size,
+                          after_stat.st_mtime_ns))
+        after_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                           if os.path.exists(p) else None) for p in sidecars}
+        self.assertEqual(before_sidecars,after_sidecars)
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
         self.s=Supervisor(self.path,lambda:self.now)
-        columns=[row['name'] for row in
-                 self.s.db.execute('PRAGMA table_info(tasks)')]
-        self.assertIn('recovery_generation',columns)
-        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
-        self.assertEqual([row['task_id'] for row in self.s.ready()],['t1'])
-        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['authority_state'],'NONE')
         self.assertEqual(self.s._task('t1')['state'],'READY')
 
-    def test_migration_interruptions_roll_back_all_schema_and_headers(self):
+    def test_v2_active_attempt_migrates_to_unknown_hold(self):
+        self.registration(); self.claim()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
+            db.commit()
+        finally:
+            db.close()
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
+        self.s=Supervisor(self.path,lambda:self.now)
+        task=self.s._task('t1')
+        self.assertEqual(task['authority_state'],UNKNOWN)
+        self.assertEqual(task['state'],'HOLD')
+
+    def test_v1_normal_open_is_zero_write_hold(self):
         self.registration()
         self.s.close()
         db=sqlite3.connect(self.path)
         try:
-            db.execute('PRAGMA journal_mode=DELETE')
-            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
-            db.execute('PRAGMA application_id=0')
             db.execute('PRAGMA user_version=1')
             db.commit()
         finally:
             db.close()
+        sidecars=[self.path+x for x in ('-wal','-shm','-journal')]
+        before_stat=os.stat(self.path)
+        before_bytes=open(self.path,'rb').read()
+        before_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                            if os.path.exists(p) else None) for p in sidecars}
+        with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
+            Supervisor(self.path,lambda:self.now)
+        after_stat=os.stat(self.path)
+        self.assertEqual(before_bytes,open(self.path,'rb').read())
+        self.assertEqual((before_stat.st_ino,before_stat.st_size,
+                          before_stat.st_mtime_ns),
+                         (after_stat.st_ino,after_stat.st_size,
+                          after_stat.st_mtime_ns))
+        after_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                           if os.path.exists(p) else None) for p in sidecars}
+        self.assertEqual(before_sidecars,after_sidecars)
+        self.s=Supervisor.__new__(Supervisor); self.s.db=None
+
+    def test_v2_migration_failpoints_rollback_and_restart_cleanly(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id','authority_session_id',
+                           'authority_run_id','authority_valid_until',
+                           'authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2');db.commit()
+        finally:
+            db.close()
+        original=open(self.path,'rb').read()
 
         class FailingSupervisor(Supervisor):
-            fail_at = None
-            def _migration_failpoint(self, name):
-                if name == self.fail_at:
-                    raise RuntimeError('injected migration interruption')
+            migration_fail_at=None
 
-        for point in ('after_alter','after_application_id',
-                      'after_user_version'):
-            handle,path=tempfile.mkstemp(); os.close(handle)
+        for point in ('after_task_alter','after_fence_tables',
+                      'after_authority_mapping','after_user_version'):
+            handle,path=tempfile.mkstemp();os.close(handle)
             try:
-                shutil.copyfile(self.path,path)
-                FailingSupervisor.fail_at=point
+                with open(path,'wb') as stream: stream.write(original)
+                FailingSupervisor.migration_fail_at=point
                 with self.assertRaises(RuntimeError):
-                    FailingSupervisor(path,lambda:self.now)
-                check=sqlite3.connect(path)
+                    FailingSupervisor.offline_migrate_v2_to_v3(path)
+                db=sqlite3.connect(path)
                 try:
+                    self.assertEqual(db.execute(
+                        'PRAGMA user_version').fetchone()[0],2)
                     columns=[row[1] for row in
-                             check.execute('PRAGMA table_info(tasks)')]
-                    self.assertNotIn('recovery_generation',columns)
-                    self.assertEqual(check.execute(
-                        'PRAGMA application_id').fetchone()[0],0)
-                    self.assertEqual(check.execute(
-                        'PRAGMA user_version').fetchone()[0],1)
-                    self.assertEqual(check.execute(
-                        'SELECT task_id FROM tasks').fetchone()[0],'t1')
+                             db.execute('PRAGMA table_info(tasks)')]
+                    self.assertNotIn('authority_state',columns)
+                    self.assertIsNone(db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE name='writer_operations'"
+                    ).fetchone())
                 finally:
-                    check.close()
+                    db.close()
+                FailingSupervisor.migration_fail_at=None
+                FailingSupervisor.offline_migrate_v2_to_v3(path)
+                good=Supervisor(path,lambda:self.now);good.close()
             finally:
-                os.unlink(path)
-        self.s=Supervisor(self.path,lambda:self.now)
-        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
+                if os.path.exists(path): os.unlink(path)
+        self.s=Supervisor.__new__(Supervisor); self.s.db=None
+
+    def test_missing_foreign_key_is_rejected(self):
+        path=self.path+'.fk'
+        good=Supervisor(path,lambda:self.now);good.close()
+        db=sqlite3.connect(path)
+        try:
+            db.execute('PRAGMA foreign_keys=OFF')
+            db.execute('ALTER TABLE writer_receipts RENAME TO writer_receipts_old')
+            db.execute('''CREATE TABLE writer_receipts(
+              operation_id TEXT PRIMARY KEY,receipt_json TEXT NOT NULL,
+              receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL)''')
+            db.execute('''INSERT INTO writer_receipts
+              SELECT * FROM writer_receipts_old''')
+            db.execute('DROP TABLE writer_receipts_old')
+            db.commit()
+        finally:
+            db.close()
+        with self.assertRaisesRegex(ValueError,'SUPERVISOR_FOREIGN_KEY_MISMATCH'):
+            Supervisor(path,lambda:self.now)
+        os.unlink(path)
 
     def test_unknown_database_rejected_without_journal_mutation(self):
         handle,path=tempfile.mkstemp(); os.close(handle)
@@ -586,6 +753,21 @@ class SupervisorTests(unittest.TestCase):
         self.s.record('t1','a1','quota','TERMINAL',1002,payload=payload)
         self.assertEqual(self.s._task('t1')['state'],'CAPABILITY_UNAVAILABLE')
         self.assertEqual(len(self.s.due_outbox(1002)),1)
+
+
+def load_tests(loader, tests, pattern):
+    # Stable source-fencing aggregation: both supervisor workflows execute the
+    # dedicated fencing suite at the current HEAD.
+    try:
+        from tests import test_task_writer_fence as fence_tests
+        from tests import test_entry_review_gate as review_tests
+    except ImportError:
+        import test_task_writer_fence as fence_tests
+        import test_entry_review_gate as review_tests
+    tests.addTests(loader.loadTestsFromModule(fence_tests))
+    tests.addTests(loader.loadTestsFromTestCase(
+        review_tests.CanonicalCompletionTests))
+    return tests
 
 
 if __name__ == '__main__':
