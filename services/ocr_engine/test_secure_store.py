@@ -72,7 +72,7 @@ class SecureStoreTests(unittest.TestCase):
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review",fields={})
         first=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001","1",None)
-        replay=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001")
+        replay=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001","1",None)
         self.assertEqual(first["job_id"],replay["job_id"])
         self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human confirmed")
         events=self.store.audit_events(job["job_id"],"tenant-a")
