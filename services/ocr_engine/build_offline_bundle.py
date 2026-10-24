@@ -50,6 +50,9 @@ def validate_deb_cache(deb_cache):
     expected_base = "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199"
     if lock.get("base_image") != expected_base:
         raise BundleError("DEB_LOCK_BASE_IMAGE_MISMATCH")
+    source = lock.get("apt_source")
+    if not isinstance(source,dict) or source.get("path") != "debian.sources" or not isinstance(source.get("content"),str) or hashlib.sha256(source["content"].encode("utf-8")).hexdigest() != source.get("sha256"):
+        raise BundleError("APT_SOURCE_FINGERPRINT_INVALID")
     packages = lock.get("packages")
     if not isinstance(packages, list) or not packages:
         raise BundleError("DEB_LOCK_EMPTY")
@@ -252,6 +255,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
     archive_manifest["notice_file"] = "NOTICE.md"
     archive_manifest["system_deb_lock"] = "system-deb-lock.json" if deb_lock_path else None
+    archive_manifest["system_deb_lock_sha256"] = sha256_file(deb_lock_path) if deb_lock_path else None
     # Freeze only the digests already verified by validate_inputs. Never bless bytes
     # observed after validation as the new source of truth.
     frozen = {
