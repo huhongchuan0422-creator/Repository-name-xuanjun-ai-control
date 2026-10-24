@@ -104,6 +104,7 @@ class WriterFenceTests(unittest.TestCase):
             'new_session_id': 'session2',
             'new_lease_id': 'lease-a2',
             'new_gateway_id': 'gateway2',
+            'new_lock_provider_id': self.fence.locks.provider_id,
             'resource_scope_digest': result['resource_scope_digest'],
             'coverage_digest': result['coverage_digest'],
             'spec_sha256': 'b' * 64,
@@ -174,6 +175,22 @@ class WriterFenceTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.s.prepare_operation(ticket, self.caller(), self.op(),
                                      now=999)
+
+    def test_different_lock_root_cannot_drain_current_generation(self):
+        self.claim()
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
+        self.fence.begin_revocation('t1',controller)
+        other_root=os.path.join(self.directory.name,'other-locks')
+        other=Fence(self.s,other_root)
+        try:
+            with self.assertRaisesRegex(
+                    ValueError,'LOCAL_DRAIN_PROVIDER_MISMATCH'):
+                other.drain('t1',controller,0.2)
+            self.assertIsNone(self.s.db.execute(
+                "SELECT 1 FROM revocation_drains WHERE task_id='t1'"
+            ).fetchone())
+        finally:
+            other.close()
 
     def test_lock_root_mode_symlink_and_path_swap_fail_closed(self):
         self.assertEqual(os.stat(self.lock_root).st_mode & 0o777, 0o700)
