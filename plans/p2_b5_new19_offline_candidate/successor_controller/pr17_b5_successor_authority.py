@@ -404,10 +404,11 @@ class ExistingRequestAuthority:
                     catalog_sha == self.catalog_sha and
                     tuple(request_ids) == self.request_ids,
                     'B5_HTTP_CATALOG_REQUEST_BINDING')
-        # No original provider currently emits a protected authenticated
-        # cloud-tool provenance record that this UK process can consume.
-        # A caller-supplied hash, chat approval, or maintenance witness is not
-        # a substitute for that independent source.
+        # The UK coordinator must inspect the original B5 cloud-tool results
+        # and register their nonsecret references in the fixed protected store.
+        # This is a human witness, not a tool signature or an OAuth grant.
+        # A caller-supplied hash, chat approval or maintenance witness alone
+        # cannot satisfy this independent record.
         store=getattr(self,'evidence_store',None)
         c53.require(store is not None,
                     'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')

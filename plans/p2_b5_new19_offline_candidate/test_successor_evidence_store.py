@@ -77,6 +77,10 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         payload=dict(proof_sha256='b'*64,custody_receipt_sha256='c'*64,
                      rows=rows,subject=SUBJECT,scope='project.files.read',
                      catalog_sha256='a'*64,recipient=RECIPIENT)
+        changed=dict(payload,rows=[dict(r) for r in rows])
+        changed['rows'][0]['object_ref']='b5-material-02'
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_B5_PROVENANCE_ROWS'):
+            self.register('b5_http',changed)
         self.register('b5_http',payload)
         authority=object.__new__(ExistingRequestAuthority)
         authority.evidence_store=self.store

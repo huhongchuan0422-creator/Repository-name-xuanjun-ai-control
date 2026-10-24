@@ -619,7 +619,10 @@ class SuccessorEvidenceStore(WitnessStore):
                           ('request_id','object_ref','invoke_id','result_ref'))
                       for r in rows) and
                   sum(r['bytes'] for r in rows)==93592 and
-                  len({r['result_ref'] for r in rows})==19,
+                  len({r['result_ref'] for r in rows})==19 and
+                  all(r['request_id']==binding['ids'][i] and
+                      r['object_ref']=='b5-material-%02d'%(i+1)
+                      for i,r in enumerate(rows)),
                   'SUCCESSOR_B5_PROVENANCE_ROWS')
         else:
             raise Hold('SUCCESSOR_EVIDENCE_SCOPE')

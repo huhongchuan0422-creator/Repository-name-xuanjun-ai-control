@@ -24,7 +24,7 @@ approval remain mandatory for the original scoped close path.
 | Publish | `successor_controller/pr17_b5_successor_backend.py` | 42 fixed source paths and manifest, no overwrite; six protected config/slot changes remain under the original lock and CAS. |
 | Maintenance | `successor_controller/pr17_b5_successor_local.py`, `pr17_b5_successor_review.py`, `pr17_b5_successor_runtime.py` | Owner/B5 batch witnesses, original queue, stop, release, start, window, intake and custody are separate checkpoints. No bearer copied to maintenance. |
 | Read | `successor_analyst_read.py` | B5's request-local cloud read validates each original response and whole SHA. A callable fixture proves bytes, not tool provenance or a real files grant. |
-| Close | `pr17_b5_successor_review.py` | Requires a trusted B5 HTTP provenance record and separate precise close approval. These producer interfaces are unbound and remain HOLD. |
+| Close | `pr17_b5_successor_review.py` | Fixed UK human-witness consumption and independent precise close scope are coded. No real B5 results or original close decision has been registered; live close remains HOLD. |
 | Recovery | `pr17_b5_successor_backend.py`, `pr17_b5_successor_review.py` | Protected intent/SENT and original file-backed Queue reconcile in a new process without repeating POST. A completed custody checkpoint restores only the wait for B5 HTTP provenance; unknown custody and mutations remain HOLD. |
 
 No live caller supplies the new gate's independently approved binder digest,
