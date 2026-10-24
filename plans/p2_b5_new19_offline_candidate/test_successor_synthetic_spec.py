@@ -298,9 +298,11 @@ class SyntheticSpecTests(unittest.TestCase):
                 generated_roots=(job_root,*release_roots)
                 replace_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]
                     for path in c53.CONFIGS+c53.SLOTS)
+                close_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]+'-close'
+                    for path in c53.CONFIGS)
                 current_stages=tuple(base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
                     for base in c53.BASES)
-                allowed.update(generated_roots+replace_stages+current_stages)
+                allowed.update(generated_roots+replace_stages+close_stages+current_stages)
                 pins={path:(target.stat().st_dev,target.stat().st_ino)
                       for path in files if (target:=root/path.lstrip('/')).exists()}
                 pins[c53.DB]=(spec['observed_baseline']['db']['dev'],
@@ -479,9 +481,11 @@ def child_query(root,action='query',execute_start=None):
         generated_roots=(job,*release_roots)
         replace_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]
             for path in c53.CONFIGS+c53.SLOTS)
+        close_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]+'-close'
+            for path in c53.CONFIGS)
         current_stages=tuple(base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
             for base in c53.BASES)
-        known.update(generated_roots+replace_stages+current_stages)
+        known.update(generated_roots+replace_stages+close_stages+current_stages)
         known.update(job+'/'+name for name in (
             'reservation.json','window-open.json','activation-identity.json',
             'NEW_WORKER_START_ATTEMPT.json'))
@@ -505,10 +509,38 @@ def child_query(root,action='query',execute_start=None):
                 return type('Result',(),{'returncode':0,'stdout':(
                     'ActiveState=active\nSubState=running\nMainPID=123\n'
                     'NRestarts=0\nExecMainStartTimestampMonotonic=4000\n').encode()})()
-            if argv==['/usr/bin/systemctl','is-active','--quiet',
-                      'xuanjun-cloud-connection.service']:
+            if argv[:3]==['/usr/bin/systemctl','is-active','--quiet']:
+                unit=argv[-1]
+                if unit in ('xuanjun-cloud-connection.service',
+                             'xuanjun-cloud-oauth-resource.service'):
+                    return type('Result',(),{'returncode':0,'stdout':b''})()
+            if len(argv)==3 and argv[0]=='/usr/bin/systemctl' and argv[1] in (
+                    'stop','start','restart') and argv[2] in (
+                    'xuanjun-cloud-connection.service',
+                    'xuanjun-cloud-oauth-resource.service'):
                 return type('Result',(),{'returncode':0,'stdout':b''})()
             raise AssertionError('UNRECORDED_CHILD_OS_ACTION')
+        class ResourceResponse:
+            status=200
+            def __init__(self,body):self.body=body
+            def getheader(self,*args):return 'application/json'
+            def read(self,*args):return self.body
+        class RecordedResourceHTTP:
+            def __init__(self,host,port,timeout):
+                if (host,port)!=('127.0.0.1',18769):
+                    raise AssertionError('UNRECORDED_HTTP_TARGET')
+            def request(self,method,path,headers=None):
+                if (method,path)!=('GET','/.well-known/oauth-protected-resource'):
+                    raise AssertionError('UNRECORDED_HTTP_REQUEST')
+            def getresponse(self):
+                raw=(pathlib.Path(root)/c53.CONFIGS[1].lstrip('/')).read_bytes()
+                settings=json.loads(raw)['settings']
+                metadata={'resource':settings['audience'],
+                    'authorization_servers':[settings['issuer']],
+                    'scopes_supported':['connection.status','project.files.read'],
+                    'bearer_methods_supported':['header']}
+                return ResourceResponse(json.dumps(metadata).encode())
+            def close(self):pass
         from production.cloud_connection.worker import Github,PREFIX
         comment_ids=iter(range(10000,10019))
         def recorded_comment(self,suffix,data=None):
@@ -550,6 +582,8 @@ def child_query(root,action='query',execute_start=None):
                 (spec['fixed_paths']['receiver_root'],)).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
+             patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
+                   RecordedResourceHTTP),\
              patch.object(Github,'call',recorded_comment),\
              patch.object(os,'uname',return_value=synthetic),\
              patch.object(os,'geteuid',return_value=0),\
