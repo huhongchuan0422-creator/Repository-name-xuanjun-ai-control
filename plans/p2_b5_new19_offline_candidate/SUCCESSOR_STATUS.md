@@ -10,9 +10,12 @@ authorize this version. `SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json` records
 the source bytes in this candidate. The new release gate checks a separately
 approved binder SHA, all controller source bytes, and both current targets
 again at preflight, publish, start and recover. The external binder data
-points to controller commit `1068f49acf8c6052e3f9774c38fa3585a45dbfce`
+points to controller commit `ff140f5b98446169befe9a14998eb51b2ea7d001`
 and is a source identity candidate only. Its independently protected approval
-pin and production reader have not been issued.
+pin and production reader have not been issued. The factory uses the matching
+successor runtime and Transaction. A recovered custody checkpoint restores
+only the read-only B5 HTTP wait; original tool provenance and separate close
+approval remain mandatory for the original scoped close path.
 
 | Stage | Candidate source | Boundary |
 | --- | --- | --- |
@@ -43,7 +46,7 @@ test or a hash supplied by the caller cannot substitute for either fact.
 
 | Source | Minimum non-secret bound facts | Current consumer and state |
 | --- | --- | --- |
-| Original UK maintenance enrollment and protected file reader | Approved SHA of `EXTERNAL_SUCCESSOR_DEPLOYMENT_BINDER.json`, controller commit, 12 source records, fixed source root, both `current` link identities and both installed 42-file runtime trees, batch/job, validity and revocation. The source file is 1,012 bytes with SHA256 `6408c24bd76492c865b0ac0677877c2748d74095759ea82c1a334f94928ea5e9`. | `ExternalReleaseGate.check` is called at preflight, publish, start and recover. `prepare_local_adapter` and `reconstruct_recovery_candidate` accept only an explicitly supplied gate. No enrolled protected digest/reader currently constructs it; HOLD. |
+| Original UK maintenance enrollment and protected file reader | Approved SHA of `EXTERNAL_SUCCESSOR_DEPLOYMENT_BINDER.json`, controller commit, 12 source records, fixed source root, both `current` link identities and both installed 42-file runtime trees, batch/job, validity and revocation. The source file is 1,011 bytes with SHA256 `31c93ab6f1701cb15dd601d1f8b73e99a5a0cc8745e530688e5cf5042d8f8a3d`. | `ExternalReleaseGate.check` is called at preflight, publish, start and recover. `prepare_local_adapter` and `reconstruct_recovery_candidate` accept only an explicitly supplied gate. No enrolled protected digest/reader currently constructs it; HOLD. |
 | Original UK scoped decision registrar | Independent exact job, batch, attempt, actor, source ID, valid-until and revocation for pre-start restore and post-B5 close, each with its own scope. Maintenance approval alone cannot satisfy either. | `ExistingRequestAuthority.approve_precise_pre_start_restore` and `approve_c53_b5_exposure_close` remain HOLD. |
 | Original B5 request-local cloud tool | Authenticated invocation provenance bound to 19 request IDs, catalog, recipient, original InvokeIds, custody receipt, per-item and total SHA/bytes; active `project.files.read` checked on each call. | `successor_analyst_read.receive_all` verifies response bytes. `verify_b5_http_provenance` refuses the caller-supplied hash and keeps close HOLD until an original authenticated provenance reader exists. |
 | Original UK source custodian | Current A5 archive and L14 installed file identity, path, owner, size and SHA, with no substitution of historical A5 by live L14. | Source freshness before new batch UNKNOWN; neither this repository commit nor a catalog date proves it. |
