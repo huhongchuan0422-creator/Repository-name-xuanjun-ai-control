@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -101,6 +102,12 @@ def main():
             filename = item["filename"]
             if Path(filename).name != filename or not filename.endswith(".deb") or filename in expected_debs:
                 missing.append({"path": filename, "reason": "LOCK_PACKAGE_FILENAME_INVALID_OR_DUPLICATE"})
+                continue
+            pin = item.get("sha256")
+            metadata = [item.get(key) for key in ("package", "version", "architecture")]
+            if not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{64}", pin) is None or not all(
+                    isinstance(value, str) and value and chr(10) not in value for value in metadata):
+                missing.append({"path": "system-debs/" + filename, "reason": "LOCK_PACKAGE_SHA_OR_METADATA_INVALID"})
                 continue
             expected_debs[filename] = item
         actual_debs = {p.name for p in deb_root.glob("*.deb") if p.is_file() and not p.is_symlink()}
