@@ -243,7 +243,10 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         reauthorize_existing_job(p, job)
-        return {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256"}}
+        response = {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256"}}
+        response["provider_version"] = job.get("provider_version")
+        response["shared_writeback_eligible"] = bool(job.get("provider_version") is not None and job.get("confirmed_binding"))
+        return response
     @app.post("/api/v1/ocr/jobs/{job_id}/confirm")
     def confirm(job_id: str, body: Confirmation, idempotency_key: str = Header(..., alias="Idempotency-Key"), authorization: Optional[str] = Header(None)):
         p = principal(authorization)
@@ -280,7 +283,9 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         return {"job_id": job_id, "status": job["status"], "revision": job["confirmation_revision"],
                 "confirmed_fields": job["confirmed_fields"], "confirmed_binding": job.get("confirmed_binding"),
                 "application_revision": job.get("application_revision"),
-                "provider_version": job.get("provider_version"), "recorded": True}
+                "provider_version": job.get("provider_version"),
+                "shared_writeback_eligible": bool(job.get("provider_version") is not None and job.get("confirmed_binding")),
+                "recorded": True}
     @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
         p = principal(authorization)
