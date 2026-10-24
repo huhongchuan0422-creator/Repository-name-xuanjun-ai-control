@@ -129,7 +129,8 @@ jobs:
             -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-deb-cache:/debs" -v "$RUNNER_TEMP/ocr-apt-work:/apt-work" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
-              apt-get update
+              mkdir -p /apt-work/partial /apt-work/auxfiles
+              apt-get update -o Dir::State::Lists=/apt-work
               apt-get install -y --download-only --no-install-recommends -o Dir::State::Lists=/apt-work -o Dir::Cache::archives=/debs libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
               python /src/services/ocr_engine/generate_deb_runtime_lock.py /debs /etc/apt/sources.list.d/debian.sources /apt-work
             '
