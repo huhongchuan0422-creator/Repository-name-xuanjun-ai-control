@@ -335,6 +335,7 @@ def child_query(root,action='query'):
         spec=c53.binder.verify_spec_bytes(f.raw)
         known={entry.ROOT,entry.SOURCE,entry.SPEC,entry.MANIFEST,entry.BINDER,
                c53.DB,c53.LOCK,c53.DB+'-wal',c53.DB+'-shm',c53.DB+'-journal',
+               spec['fixed_paths']['receiver_root'],
                *c53.CONFIGS,*c53.SLOTS,*c53.BASES,
                WitnessStore.__init__.__globals__['ROOT'],
                SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']}
