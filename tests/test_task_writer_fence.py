@@ -258,7 +258,7 @@ class WriterFenceTests(unittest.TestCase):
         barrier=threading.Barrier(2); results=[]
         def worker():
             db=Supervisor(self.path,lambda:1000.0)
-            fence=Fence(db,os.path.join(self.directory.name,'shared-locks'))
+            fence=Fence(db,self.lock_root)
             try:
                 barrier.wait()
                 try:
