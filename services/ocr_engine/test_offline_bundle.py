@@ -396,6 +396,39 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertNotIn("ocr-wheelhouse/**",block)
         self.assertIn("if: always()",block)
 
+    def test_offline_deb_installer_stops_on_unpack_failure_without_configure(self):
+        root=self.root/"offline-debs"; root.mkdir()
+        deb=root/"libxcb1_1.0_amd64.deb"; deb.write_bytes(b"synthetic package bytes")
+        lock={"packages":[{"filename":deb.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(deb.read_bytes()).hexdigest()}]}
+        (root/"system-deb-lock.json").write_text(json.dumps(lock))
+        bindir=self.root/"fake-dpkg-bin"; bindir.mkdir()
+        log=self.root/"dpkg-calls.jsonl"
+        dpkgdeb=bindir/"dpkg-deb"
+        dpkgdeb.write_text(chr(10).join(["#!/usr/bin/env python3","import sys","field=sys.argv[-1]","print({'Package':'libxcb1','Version':'1.0','Architecture':'amd64'}[field])",""]))
+        dpkgdeb.chmod(0o755)
+        dpkg=bindir/"dpkg"
+        dpkg.write_text(chr(10).join(["#!/usr/bin/env python3","import json,os,sys","with open(os.environ['DPKG_LOG'],'a') as f: f.write(json.dumps(sys.argv[1:])+chr(10))","sys.exit(17 if sys.argv[1:2]==['--unpack'] else 0)",""]))
+        dpkg.chmod(0o755)
+        query=bindir/"dpkg-query"
+        query.write_text(chr(10).join(["#!/usr/bin/env python3","import sys","print('libxcb1=1.0')",""]))
+        query.chmod(0o755)
+        env=dict(os.environ,PATH=str(bindir)+os.pathsep+os.environ.get("PATH",""),DPKG_LOG=str(log))
+        script=Path(__file__).with_name("install_deb_closure.py")
+        result=subprocess.run([sys.executable,str(script),str(root)],env=env,text=True,capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+        calls=[json.loads(line) for line in log.read_text().splitlines()]
+        self.assertEqual(calls,[["--unpack",str(deb)]])
+        self.assertNotIn(["--configure","-a"],calls)
+    def test_offline_deb_installer_rejects_tampered_package_before_dpkg(self):
+        root=self.root/"offline-debs-tampered"; root.mkdir()
+        deb=root/"libxcb1.deb"; deb.write_bytes(b"tampered")
+        lock={"packages":[{"filename":deb.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":"0"*64}]}
+        (root/"system-deb-lock.json").write_text(json.dumps(lock))
+        script=Path(__file__).with_name("install_deb_closure.py")
+        result=subprocess.run([sys.executable,str(script),str(root)],text=True,capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("DEB_LOCK_SHA_MISMATCH",result.stderr+result.stdout)
+
     def test_candidate_artifact_is_always_uploaded_but_not_release(self):
         workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
         text=workflow.read_text(encoding="utf-8")
