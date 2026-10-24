@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+import os
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
 from pathlib import Path
@@ -74,6 +75,42 @@ class OfflineBundleInputTests(unittest.TestCase):
         with self.assertRaisesRegex(BundleError,'OUTPUT_MUST_BE_ABSOLUTE_AND_NOT_EXIST'):
             builder.build_bundle('linux-x86_64-cp311',self.lock,self.wheels,self.models,output)
         self.assertEqual(output.read_bytes(),b'preserve-me')
+    def test_output_name_race_fails_without_overwriting_winner(self):
+        temp=self.root/'staged.tmp'; temp.write_bytes(b'our archive')
+        output=self.root/'winner.tar.gz'
+        def race_link(src,dst,follow_symlinks=False):
+            Path(dst).write_bytes(b'concurrent winner')
+            raise FileExistsError(str(dst))
+        with mock.patch.object(builder.os,'link',side_effect=race_link):
+            with self.assertRaisesRegex(BundleError,'OUTPUT_ALREADY_EXISTS_NO_CLOBBER'): builder.publish_no_clobber(temp,output)
+        self.assertEqual(output.read_bytes(),b'concurrent winner')
+        self.assertTrue(temp.exists())
+    def test_archive_member_tampering_between_validation_and_packaging_is_detected(self):
+        package=self.root/'package'; (package/'model_distribution').mkdir(parents=True)
+        for name in ('api.py','ocr_core.py','secure_store.py','startup_selfcheck.py'): (package/name).write_text('# synthetic source '+name)
+        manifest_path=package/'model_manifest.json'; manifest_path.write_text(self.manifest.read_text())
+        req_path=package/'requirements.txt'; req_path.write_text(self.requirements.read_text())
+        license_path=package/'model_distribution'/'LICENSE-2.0.txt'; license_path.write_text(self.license.read_text())
+        notice_path=package/'model_distribution'/'NOTICE.md'; notice_path.write_text(self.notice.read_text())
+        schema_path=package/'deployment_config.schema.json'; schema_path.write_text('{}')
+        output=self.root/'bundle.tar.gz'
+        original_add=builder.tarfile.TarFile.add
+        mutated={'done':False}
+        def mutate_while_adding(archive,name,arcname=None,recursive=True,filter=None):
+            path=Path(name)
+            if arcname=='models/det.onnx' and not mutated['done']:
+                original=path.read_bytes(); path.write_bytes(b'B-after-freeze');
+                try: return original_add(archive,name,arcname=arcname,recursive=recursive,filter=filter)
+                finally: path.write_bytes(original); mutated['done']=True
+            return original_add(archive,name,arcname=arcname,recursive=recursive,filter=filter)
+        with mock.patch.object(builder,'HERE',package), mock.patch.object(builder,'MODEL_MANIFEST',manifest_path),
+             mock.patch.object(builder,'REQUIREMENTS',req_path), mock.patch.object(builder,'LICENSE',license_path),
+             mock.patch.object(builder,'NOTICE',notice_path), mock.patch.object(builder,'CONFIG_SCHEMA',schema_path),
+             mock.patch.object(builder.tarfile.TarFile,'add',new=mutate_while_adding):
+            with self.assertRaisesRegex(BundleError,'ARCHIVE_MEMBER_SHA256_MISMATCH:models/det.onnx'):
+                builder.build_bundle('linux-x86_64-cp311',self.lock,self.wheels,self.models,output)
+        self.assertTrue(mutated['done'])
+        self.assertFalse(output.exists())
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
         with self.assertRaisesRegex(BundleError,"MODEL_NOTICE_MISSING_ATTRIBUTION:det"): self.check()
