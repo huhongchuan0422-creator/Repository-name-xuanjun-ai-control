@@ -162,3 +162,15 @@ class OcrComposition(unittest.TestCase):
         self.assertEqual(current['fields']['address'],'Fixture Address')
         self.assertEqual(current['revision'],self.app['revision']+1)
         self.denied_all(path)
+
+    def test_shared_wechat_draft_writeback_is_not_guessed(self):
+        self.app=self.fx.call('onboarding',{'operation':'save','params':dict(application=self.app['application'],revision=self.app['revision'],entity_type='ENTERPRISE',category='GENERAL',delegated=False,fields=dict(legal_name='',store_name='Fixture Shop',address='Fixture Address',contact='Fixture'))})
+        self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'business_license')
+        path=self.job()
+        self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'fields':{'company_name':'SYNTHETIC ONLY'}}).status_code,200)
+        from scripts.community_wechat_applyment import WechatApplyment
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        self.fx.onboarding.wechat_applyment=WechatApplyment(self.fx.onboarding,PartnerOrderReader.__new__(PartnerOrderReader))
+        with self.assertRaisesRegex(PermissionError,'SHARED_DRAFT_WRITEBACK_VERSION_BINDING'):
+            self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1])
+        self.assertEqual(self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]['fields']['legal_name'],'')

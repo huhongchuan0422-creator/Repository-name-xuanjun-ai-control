@@ -1,5 +1,9 @@
 # Issue76: community-side OCR source contract
 
+Current status: pinned OCR **2dc5eeb1**, real-source HTTP/store composition tested; production admission and host composition remain HOLD. The current mapping and limits are in “Superseding community composition” below. Earlier sections are preserved historical analysis.
+
+## Historical source preparation (5b6/837)
+
 This is source preparation, not deployed authentication, OCR inference, HTTP integration, official device acceptance or merchant approval. The only OCR API inspected is PR139 commits `5b6a46a743852dac9c25090e428a2b71e3e0ad9b` and `837f72487ea9ae8e5f39f18b3adce4ded48b3019`. Both API files have SHA256 `4d674ee22d66df2d92b21a955109c91dc946f993fb5406ced913fb27e7a6c757`. No OCR source is copied, changed or substituted here.
 
 ## Existing authoritative chain
@@ -88,7 +92,16 @@ is HTTP contract composition, not a deployed network endpoint or inference proof
    pinned SHA is reused separately. No real document, engine execution, provider
    request, official preview or QR code is claimed by these tests.
 
-Only admission/host composition remains blocked by those precise missing proofs;
+Admission/host composition and the shared-draft writeback boundary remain HOLD;
 the real-source resolver and encrypted HTTP composition can be reviewed now.
 Final official same-version candidate must follow admission resolution; do not
 upload the older 125 candidate as though this connection were installed.
+
+Writeback compatibility boundary: when original WechatApplyment is configured,
+original save can synchronize names/contacts from its separate provider draft.
+There is no proven dual-version OCR/provider CAS in that path. A would-write
+operation therefore rejects with
+`OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED`; no new provider field or
+revision contract is guessed. Confirmation storage and manual-field preservation
+remain testable independently. Unconfigured original onboarding uses the proven
+application revision CAS for empty-field writeback only.

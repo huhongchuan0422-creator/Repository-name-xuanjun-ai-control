@@ -116,6 +116,10 @@ class CommunityOcrBridge:
                 fields[target] = value
         if all(value == current['fields'][key] for key,value in fields.items()):
             return {'written': False, 'revision': current['revision']}
+        if self.merchant.onboarding.wechat_applyment is not None:
+            # Original save may synchronize provider draft names/contacts. It
+            # has no OCR+provider dual-version CAS; never silently overwrite.
+            raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
         # source() performs one more byte/scan/session read immediately before
         # dispatch. Original save then reloads under BEGIN IMMEDIATE + revision CAS.
         self.authorize_attachment(p, job['onboarding_application_id'], job['attachment_id'],
