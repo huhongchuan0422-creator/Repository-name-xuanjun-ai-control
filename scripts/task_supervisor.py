@@ -554,9 +554,9 @@ class Supervisor(object):
             raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
         return contract
 
-    def register_development_contract(self, task_id, contract, now=None):
+    def register_development_contract(self, task_id, contract):
         contract = self._development_contract_shape(contract)
-        now = self.clock() if now is None else now
+        now = self.clock()
         if not finite(now):
             raise ValueError('FINITE_TIME_REQUIRED')
         body = canonical(contract)
@@ -595,15 +595,14 @@ class Supervisor(object):
             raise ValueError('DEVELOPMENT_CONTRACT_REQUIRED')
         return json.loads(row['payload_json'])
 
-    def bind_development_candidate(self, receipt, file_manifest, now=None):
-        now = self.clock() if now is None else now
-        if not finite(now):
-            raise ValueError('FINITE_TIME_REQUIRED')
+    def bind_development_candidate(self, receipt, file_manifest):
         required = {'schema','entry','execution_path','task_id','spec_sha256',
                     'checkpoint_sha256','target_repository','target_base_sha',
                     'code_commit','event','attempt_id','lease_id','fence',
-                    'epoch','source_comment_id','status','native_identity',
-                    'quota_attribution','authority_effect','required_gate'}
+                    'epoch','caller_id','run_id','session_id','gateway_id',
+                    'lock_provider_id','source_comment_id','status',
+                    'native_identity','quota_attribution','authority_effect',
+                    'required_gate'}
         if (not isinstance(receipt, dict)
                 or not required.issubset(set(receipt))
                 or receipt.get('status') != 'RECEIPT_VALIDATED_NOT_ADMITTED'
@@ -616,9 +615,18 @@ class Supervisor(object):
                        or re.fullmatch(r'[0-9a-f]{64}', value) is None
                        for path, value in file_manifest.items())):
             raise ValueError('EXACT_CANDIDATE_FILE_MANIFEST_REQUIRED')
+        caller = {
+            'caller_id': receipt['caller_id'],
+            'run_id': receipt['run_id'],
+            'session_id': receipt['session_id'],
+            'gateway_id': receipt['gateway_id'],
+        }
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task = self._task(receipt['task_id'])
+            raw_task = self._task(receipt['task_id'])
+            ticket = self._authority_ticket(raw_task)
+            task, now = self._validate_writer_locked(
+                ticket, caller, receipt['lock_provider_id'])
             contract = self.development_contract(receipt['task_id'])
             expected_core = {
                 'task_id': task['task_id'],
@@ -631,9 +639,13 @@ class Supervisor(object):
                 'lease_id': task['lease_id'],
                 'fence': task['fence'],
                 'epoch': task['epoch'],
+                'caller_id': task['authority_caller_id'],
+                'run_id': task['authority_run_id'],
+                'session_id': task['authority_session_id'],
+                'gateway_id': task['authority_gateway_id'],
+                'lock_provider_id': task['authority_lock_provider_id'],
             }
-            if (task['authority_state'] != 'VALID'
-                    or task['state'] not in ACTIVE
+            if (task['state'] not in ACTIVE
                     or task['attempt_id'] == UNKNOWN
                     or any(receipt.get(k) != v
                            for k, v in expected_core.items())):
@@ -683,13 +695,10 @@ class Supervisor(object):
                     'candidate_sha256': candidate_sha,
                     'candidate': candidate}
 
-    def complete_development_candidate(self, task_id, candidate_event_id,
-                                       bundle_sha256, review_record_ids,
-                                       completion_event_id,
-                                       next_action='DEPENDENCIES_RECHECK',
-                                       now=None):
-        now = self.clock() if now is None else now
-        if (not finite(now)
+    def record_development_review(self, task_id, candidate_event_id, files,
+                                  bundle_sha256, review_record_ids,
+                                  reviewed_event_id):
+        if (not isinstance(files, dict) or not files
                 or not isinstance(bundle_sha256, str)
                 or re.fullmatch(r'[0-9a-f]{64}', bundle_sha256) is None
                 or not isinstance(review_record_ids, dict)
@@ -698,24 +707,171 @@ class Supervisor(object):
                        or re.fullmatch(r'[0-9a-f]{64}', value) is None
                        for value in review_record_ids.values())
                 or review_record_ids['QA'] == review_record_ids['SECURITY']
+                or not isinstance(reviewed_event_id, str)
+                or not reviewed_event_id.strip()):
+            raise ValueError('EXACT_DEVELOPMENT_REVIEW_REQUIRED')
+        now = self.clock()
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            candidate_row = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, task['attempt_id'], candidate_event_id)).fetchone()
+            if (candidate_row is None
+                    or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE'):
+                raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
+            candidate = json.loads(candidate_row['payload_json'])
+            contract = self.development_contract(task_id)
+            if (candidate['attempt_id'] != task['attempt_id']
+                    or candidate['lease_id'] != task['lease_id']
+                    or candidate['fence'] != task['fence']
+                    or candidate['epoch'] != task['epoch']
+                    or candidate['contract_sha256'] != hashlib.sha256(
+                        canonical(contract).encode('utf-8')).hexdigest()):
+                raise ValueError('CURRENT_DEVELOPMENT_ATTEMPT_REQUIRED')
+            if set(files) != set(contract['allowed_files']):
+                raise ValueError('EXACT_REVIEW_FILE_SET_REQUIRED')
+            manifest = {}
+            total = 0
+            for path, raw in files.items():
+                if (path not in contract['allowed_files']
+                        or type(raw) is not bytes
+                        or len(raw) > 131072):
+                    raise ValueError('EXACT_REVIEW_BYTES_REQUIRED')
+                total += len(raw)
+                if total > 524288:
+                    raise ValueError('EXACT_REVIEW_BYTES_REQUIRED')
+                text = raw.decode('utf-8', 'strict')
+                if '\x00' in text or '\r' in text:
+                    raise ValueError('EXACT_REVIEW_BYTES_REQUIRED')
+                manifest[path] = hashlib.sha256(raw).hexdigest()
+            exact_manifest = {path: manifest[path] for path in sorted(manifest)}
+            if exact_manifest != candidate['files']:
+                raise ValueError('REVIEW_BYTES_CANDIDATE_MISMATCH')
+            review_contract = dict(contract)
+            review_contract['code_commit'] = candidate['code_commit']
+            binding = {'contract': review_contract, 'files': exact_manifest}
+            recomputed_bundle = hashlib.sha256(
+                canonical(binding).encode('utf-8')).hexdigest()
+            if recomputed_bundle != bundle_sha256:
+                raise ValueError('REVIEW_BUNDLE_CANONICAL_MISMATCH')
+            reviewed = {
+                'schema': 1,
+                'task_id': task_id,
+                'attempt_id': candidate['attempt_id'],
+                'lease_id': candidate['lease_id'],
+                'fence': candidate['fence'],
+                'epoch': candidate['epoch'],
+                'candidate_event_id': candidate_event_id,
+                'candidate_sha256': candidate_row['evidence_ref'],
+                'contract_sha256': candidate['contract_sha256'],
+                'code_commit': candidate['code_commit'],
+                'files': exact_manifest,
+                'bundle_sha256': bundle_sha256,
+                'review_record_ids': {
+                    'QA': review_record_ids['QA'],
+                    'SECURITY': review_record_ids['SECURITY'],
+                },
+            }
+            body = canonical(reviewed)
+            prior = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, task['attempt_id'], reviewed_event_id)).fetchone()
+            if prior is not None:
+                if (prior['kind'] == 'DEVELOPMENT_REVIEWED'
+                        and prior['payload_json'] == body
+                        and prior['evidence_ref'] == bundle_sha256):
+                    return {'duplicate': True,
+                            'reviewed_event_id': reviewed_event_id,
+                            'reviewed': reviewed}
+                raise ValueError('DEVELOPMENT_REVIEW_EVENT_CONFLICT')
+            if task['authority_state'] not in ('VALID','REVOKING'):
+                raise ValueError('DEVELOPMENT_REVIEW_GENERATION_INACTIVE')
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task_id, task['attempt_id'], reviewed_event_id,
+                 'DEVELOPMENT_REVIEWED', now, 'TEST_RUN',
+                 bundle_sha256, body))
+            return {'duplicate': False,
+                    'reviewed_event_id': reviewed_event_id,
+                    'reviewed': reviewed}
+
+    def complete_development_candidate(self, task_id, reviewed_event_id,
+                                       completion_event_id,
+                                       next_action='DEPENDENCIES_RECHECK'):
+        if (not isinstance(reviewed_event_id, str)
+                or not reviewed_event_id.strip()
                 or not isinstance(completion_event_id, str)
                 or not completion_event_id.strip()
                 or not isinstance(next_action, str)
                 or not next_action.strip()):
             raise ValueError('EXACT_DEVELOPMENT_COMPLETION_REQUIRED')
+        now = self.clock()
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
-            prior = self.db.execute('''SELECT * FROM events
+            reviewed_row = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
-              (task_id, task['attempt_id'], completion_event_id)).fetchone()
+              (task_id, task['attempt_id'], reviewed_event_id)).fetchone()
+            if (reviewed_row is None
+                    or reviewed_row['kind'] != 'DEVELOPMENT_REVIEWED'):
+                raise ValueError('CANONICAL_DEVELOPMENT_REVIEW_REQUIRED')
+            reviewed = json.loads(reviewed_row['payload_json'])
             candidate_row = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
-              (task_id, task['attempt_id'], candidate_event_id)).fetchone()
-            if candidate_row is None or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE':
-                raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
+              (task_id, task['attempt_id'],
+               reviewed['candidate_event_id'])).fetchone()
+            if (candidate_row is None
+                    or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE'
+                    or candidate_row['evidence_ref']
+                       != reviewed['candidate_sha256']):
+                raise ValueError('CANONICAL_REVIEW_CANDIDATE_MISMATCH')
             candidate = json.loads(candidate_row['payload_json'])
-            payload = {
+            contract = self.development_contract(task_id)
+            exact = (
+                candidate['attempt_id'] == task['attempt_id']
+                and candidate['lease_id'] == task['lease_id']
+                and candidate['fence'] == task['fence']
+                and candidate['epoch'] == task['epoch']
+                and reviewed['attempt_id'] == task['attempt_id']
+                and reviewed['lease_id'] == task['lease_id']
+                and reviewed['fence'] == task['fence']
+                and reviewed['epoch'] == task['epoch']
+                and reviewed['code_commit'] == candidate['code_commit']
+                and reviewed['files'] == candidate['files']
+                and reviewed['contract_sha256']
+                    == hashlib.sha256(
+                        canonical(contract).encode('utf-8')).hexdigest())
+            if not exact:
+                raise ValueError('CURRENT_DEVELOPMENT_GENERATION_REQUIRED')
+            if (task['authority_state'] != 'REVOKED'
+                    or task['coverage_digest'] in ('', UNKNOWN)
+                    or task['resource_scope_digest'] in ('', UNKNOWN)
+                    or self.unresolved_operations(task_id)):
+                raise ValueError('DEVELOPMENT_REVOCATION_PROOF_REQUIRED')
+            claims = [dict(row) for row in self.db.execute('''SELECT * FROM
+              resource_claims WHERE task_id=? ORDER BY resource_key''',
+              (task_id,))]
+            keys = self._exact_resource_keys(
+                json.loads(task['resource_scope_json']))
+            if ([row['resource_key'] for row in claims] != list(keys)
+                    or any(row['state'] != 'REVOKED' for row in claims)):
+                raise ValueError('DEVELOPMENT_RESOURCE_COVERAGE_REQUIRED')
+            drain = self.db.execute('''SELECT * FROM revocation_drains
+              WHERE task_id=? AND attempt_id=?''',
+              (task_id, task['attempt_id'])).fetchone()
+            invalidations = self.db.execute('''SELECT resource_key FROM
+              resource_invalidation_receipts WHERE task_id=? AND
+              old_attempt_id=? ORDER BY resource_key''',
+              (task_id, task['attempt_id'])).fetchall()
+            if (drain is None
+                    or [row['resource_key'] for row in invalidations]
+                       != list(keys)):
+                raise ValueError('DEVELOPMENT_REVOCATION_PROOF_REQUIRED')
+            completion = {
                 'schema': 1,
                 'state': 'SUCCESS',
                 'task_id': task_id,
@@ -723,53 +879,44 @@ class Supervisor(object):
                 'lease_id': task['lease_id'],
                 'fence': task['fence'],
                 'epoch': task['epoch'],
-                'candidate_event_id': candidate_event_id,
-                'candidate_sha256': candidate_row['evidence_ref'],
-                'code_commit': candidate['code_commit'],
-                'bundle_sha256': bundle_sha256,
-                'review_record_ids': {
-                    'QA': review_record_ids['QA'],
-                    'SECURITY': review_record_ids['SECURITY'],
-                },
-                'writer_stopped': True,
-                'effects_reconciled': True,
+                'reviewed_event_id': reviewed_event_id,
+                'candidate_event_id': reviewed['candidate_event_id'],
+                'candidate_sha256': reviewed['candidate_sha256'],
+                'code_commit': reviewed['code_commit'],
+                'bundle_sha256': reviewed['bundle_sha256'],
+                'review_record_ids': reviewed['review_record_ids'],
+                'authority_state': 'REVOKED',
+                'resource_scope_digest': task['resource_scope_digest'],
+                'coverage_digest': task['coverage_digest'],
                 'next_action': next_action,
             }
-            body = canonical(payload)
+            body = canonical(completion)
+            prior = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, task['attempt_id'], completion_event_id)).fetchone()
             if prior is not None:
                 if (prior['kind'] == 'DEVELOPMENT_COMPLETION'
                         and prior['payload_json'] == body
-                        and prior['evidence_ref'] == bundle_sha256):
+                        and prior['evidence_ref']
+                           == reviewed['bundle_sha256']):
                     return {'duplicate': True, 'state': task['state'],
-                            'completion': payload}
+                            'completion': completion}
                 raise ValueError('DEVELOPMENT_COMPLETION_EVENT_CONFLICT')
-            if (task['state'] not in ACTIVE
-                    or task['authority_state'] != 'VALID'
-                    or candidate['attempt_id'] != task['attempt_id']
-                    or candidate['lease_id'] != task['lease_id']
-                    or candidate['fence'] != task['fence']
-                    or candidate['epoch'] != task['epoch']):
-                raise ValueError('CURRENT_DEVELOPMENT_ATTEMPT_REQUIRED')
-            accepted_at = self.clock()
-            if (not finite(accepted_at) or now < task['last_event_at']
-                    or now > accepted_at + 300):
-                raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')
             self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
                 (task_id, task['attempt_id'], completion_event_id,
                  'DEVELOPMENT_COMPLETION', now, 'TEST_RUN',
-                 bundle_sha256, body))
+                 reviewed['bundle_sha256'], body))
             self._enqueue(task_id, task['attempt_id'], completion_event_id,
-                          payload, now)
+                          completion, now)
             self.db.execute('''UPDATE tasks SET state='SUCCESS',
-              writer_stopped='TRUE',effects_reconciled='TRUE',
               next_action=?,last_event_at=?,updated_at=? WHERE task_id=?
-              AND attempt_id=? AND state IN
-              ('RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')''',
+              AND attempt_id=? AND authority_state='REVOKED'
+              AND state!='SUCCESS' ''',
               (next_action, now, now, task_id, task['attempt_id']))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('DEVELOPMENT_COMPLETION_CAS_FAILED')
             return {'duplicate': False, 'state': 'SUCCESS',
-                    'completion': payload}
+                    'completion': completion}
 
     def claim(self, task_id, attempt_id, owner, entry, run_id, session_id,
               lease_id, fence, epoch, now=None, deadlines=None):
