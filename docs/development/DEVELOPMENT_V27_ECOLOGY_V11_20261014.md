@@ -1642,23 +1642,27 @@ Owner面板显示项目节点、真实进度、任务与Agent状态、人工待�
 
 ### 10.19 唯一Writer强制隔离与断点接管（2026-10-24）
 
-本节只定义现有canonical task_supervisor下的Writer fencing基础安全能力，不建立第二任务中心，也不扩展多角色或多模型调度。完整合同见 `docs/development/TASK_WRITER_FENCING_20261024.md`。
+本节仅定义现有 canonical `task_supervisor` 下的 source-level Writer fencing，不建立第二任务中心，不扩展多角色或多模型调度，也不授予生产凭据、部署权限或生产接管能力。完整合同见 `docs/development/TASK_WRITER_FENCING_20261024.md`。
 
-Writer写资格与页面、执行器和任务状态分开。authority枚举为UNKNOWN、NONE、VALID、REVOKING、REVOKED；READY仅为task状态。初始claim由canonical store执行NONE→VALID并分配max_fence+1/max_epoch+1。接管不存在REVOKED→NONE→VALID抢占窗：必须在一个canonical事务中验证REVOKED、exact receiver ACK、完整resource coverage和保留资源集合，再由store分配max+1并直接转新VALID。旧版active任务迁移只能进入authority UNKNOWN并保持HOLD；UNKNOWN不得直达NONE/VALID，只能经专用可信资源对账入口UNKNOWN→REVOKING后继续完整撤销流程。
+authority 为 UNKNOWN、NONE、VALID、REVOKING、REVOKED；READY 仅为 task 状态。初始 source claim 由 canonical store 执行 NONE→VALID 并唯一分配 max_fence+1/max_epoch+1。接管不经过 REVOKED→NONE/READY 的可抢占窗口：同一 canonical 事务必须重新验证 REVOKED、exact append-once receiver ACK、独立的 resource_scope_digest 与 coverage_digest、完整 resource reservation，再直接分配下一代并转 VALID。旧版 active 迁移一律 UNKNOWN+HOLD；UNKNOWN 只能经可信 source inventory 原子持久 evidence、建立精确 resource reservation 后转 REVOKING，资料不足继续 HOLD。
 
-WriterTicket只是selector及完整性载体，不是身份认证。使用时必须绑定可信caller/run/session/gateway上下文；调用方不得自选高epoch/fence。valid_until使用受信时间且要求now<deadline，检测到时钟回退即HOLD；ticket过期只禁止新提交，不证明旧进程或远端动作已经停止。
+WriterTicket 只是 selector，digest 只校 bytes；可信 caller_id、run、session、gateway 必须与 canonical assignment 全部精确匹配。Writer API 不接受调用方传入 now，时间只取 Supervisor 注入时钟；要求 trusted_now<valid_until，时钟回退即 HOLD。过期仅阻止新提交，不证明进程或远端 effect 已停止。
 
-冲突范围按真实resource_key集合定义，而非只按task_id。不同任务若写同一branch、数据库keyspace、对象或部署资源，也必须互斥。resource set在同一canonical DB事务中按固定顺序完成全量冲突检查和登记，禁止部分占有；锁顺序同样固定以避免死锁。
+resource_key 由可信 source adapter 规范化；空白、control/NUL、空段、dot/dot-dot 与 alias 形式拒绝。不同 task 写同一规范资源同样互斥；完整 resource set 在一个 DB 事务中按固定排序冲突检查并全量登记，禁止部分占有。
 
-最终提交必须使用CommitLease：先取得同一resource set的共享action lock，在锁内重新读取canonical authority、校验ticket/caller/time并CAS operation PREPARED→DISPATCHING，然后持续持锁直到外部effect结果已持久化为CONFIRMED或UNKNOWN。final guard后不得存在未受保护的guard→write窗口。本机flock只标LOCAL_ONLY，不构成分布式或全局隔离；多机、共享token或直连资源必须由唯一gateway、resource-native fence或等价capability isolation约束，否则UNFENCED_PATH_PRESENT并保持PRODUCTION_FENCING_HOLD。
+可信 Fence 实例固定同一 LOCAL_ONLY lock provider/root，单个 CommitLease 或 revoke 调用不得另传 root。锁根使用 canonical path、owner/mode、NOFOLLOW、inode pin 与 path-swap 检查；资源锁固定排序。CommitLease 在共享锁内重新核 authority/caller/time、CAS PREPARED→DISPATCHING，并持续持锁到 effect 结果持久为 CONFIRMED 或 UNKNOWN，消除 admitted source path 的 final-guard→effect 空窗。本机 flock 只代表 LOCAL_ONLY，不能冒充分布式或生产隔离。
 
-撤销固定顺序：VALID→REVOKING先阻断所有新CommitLease和新intent；再取得相同resource set的独占action lock等待旧shared lease结束。等待超时只能返回REVOCATION_NOT_COMPLETED并保持REVOKING，禁止写REVOKED。进程死亡虽会释放本地lock，但远端请求仍可能UNKNOWN，必须继续readback/reconcile。已有operation仅可通过专用可信reconcile入口处理；UNKNOWN禁止直接重新DISPATCHING，但允许追加只读观察证据并CAS到CONFIRMED、NOT_APPLIED或CONFLICT。UNKNOWN观察为append-only evidence，不占最终receipt；每operation最终receipt仅一次，同文幂等、异文冲突。
+撤销固定为 VALID→REVOKING 先阻断新 intent/CommitLease，再由同一 provider 独占 drain；超时保持 REVOKING 并返回 REVOCATION_NOT_COMPLETED，可在同 generation 重入。成功 drain 必须持久 LOCAL_ONLY receipt，并绑定旧 attempt/lease/fence/epoch/ticket/spec/scope/provider。进程退出释放本地锁不代表远端 effect 已知；PREPARED/DISPATCHING/UNKNOWN 必须逐项可信对账。PREPARED 若确认从未 dispatch 只可转 NOT_APPLIED；UNKNOWN 禁止重新 DISPATCHING，但可追加只读 reconcile evidence 后转 CONFIRMED、NOT_APPLIED 或 CONFLICT。
 
-old_fence_invalidated不得作为全局payload bool使用。每个resource_key都要有独立失效receipt，完整coverage digest绑定旧attempt、spec及资源集合。任一UNKNOWN、MISSING或UNFENCED使整个scope HOLD。APPLIED_EXACTLY/CONFIRMED不能仅凭内容相等判定，必须有operation marker或唯一可归因before/after revision链；GitHub离线CAS模型至少绑定repo、branch、base HEAD、tree/blob、marker与readback commit，HEAD冲突不自动换HEAD/rebase。
+final receipt 每 operation 仅一次，同文幂等、异文冲突，并必须与 outcome、operation_id、resource_key、operation_marker 一致。CONFIRMED 还必须证明 before→CAS/effect→after 的可归因链，纯内容相等不算 APPLIED_EXACTLY。源码内提供纯离线 FakeTransactionalSink 与 Git CAS validator；Git 模型绑定 repo/branch/base HEAD/before tree/blob/requested after tree/blob/marker/readback commit，任何 branch/head/tree/blob/marker 冲突均不得自动换 HEAD/rebase。
 
-schema v3的DDL和显式迁移仍由task_supervisor单一拥有；task_writer_fence不建立第二authority数据库。普通open旧v1/v2数据库必须在零持久写入前HOLD_MIGRATION_REQUIRED；本阶段只允许隔离fixture调用显式offline迁移，生产DB迁移另行审批。recovery_generation仍只用于原supervisor/outbox恢复，不作为Writer generation。
+resource invalidation 不能接受任意 `outcome=INVALIDATED` 自述。源码阶段只接受可信 LOCAL_ONLY source adapter 生成的 exact receipt，并绑定 task、旧 attempt/lease/fence/epoch、ticket SHA、spec SHA、scope digest、resource_key、固定 provider 与 evidence。coverage digest 独立于 scope digest，覆盖旧身份/spec/scope、持久 drain receipt 与排序后的各资源 receipt hash；任何 UNKNOWN/MISSING/UNFENCED 均使整个 scope HOLD。
 
-源码阶段必须分别报告FRAMEWORK_INVENTORY_COMPLETE与PRODUCTION_INVENTORY_INCOMPLETE；即使隔离测试全部通过，生产固定为PRODUCTION_FENCING_HOLD，直到真实GitHub App/token隔离、OS/DB/云权限、生产resource inventory和部署逐项批准并取得真实资源侧证据。3/10/30/60分钟仅为PROPOSED_UNADOPTED、DEFAULT_DISABLED协调建议；原5/10/15 supervisor恢复行为保持不变，任何时间阈值都不能自动产生写权。
+receiver ACK 同一旧 generation append-once，同时绑定旧 task/attempt、新 attempt/owner/entry/caller/run/session/lease/gateway、checkpoint/spec、scope digest 与 coverage digest；同文重放幂等，异文禁止覆盖。
+
+schema/DDL/显式 migration 仍只归 `task_supervisor.py`。普通打开 v1/v2 先走 immutable read-only preflight，在任何 RW open、journal mode 或 wal/shm/journal 变化前返回 HOLD_MIGRATION_REQUIRED；offline migration 仅针对隔离 fixture，并须通过多 failpoint 中断回滚/重启测试和 FK/PK/index/unique schema 校验。生产 DB 迁移仍 NOT_EXECUTED。
+
+源码测试通过最多形成 source-framework candidate。FRAMEWORK_INVENTORY 与 PRODUCTION_INVENTORY 分开；本轮 production verdict 固定 HOLD，未知 capability 也 HOLD，任何 caller 自述 inventory_complete/raw_write_capable 均不得升级。真实 GitHub App/token、唯一 gateway、OS/DB/cloud 权限、生产 inventory、生产 migration 与部署全部另批。3/10/30/60 仍为 PROPOSED_UNADOPTED、DEFAULT_DISABLED；原 5/10/15 supervisor 行为不改。
 
 ## 11 方案知识与长期演进
 
