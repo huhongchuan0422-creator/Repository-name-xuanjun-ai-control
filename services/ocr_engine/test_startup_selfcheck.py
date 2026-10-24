@@ -43,7 +43,7 @@ class StartupSelfcheckTests(unittest.TestCase):
         self.env.pop("OCR_ENCRYPTION_KEY")
         result=self.check()
         self.assertFalse(result["ok"])
-        self.assertIn("MISSING_REQUIRED_SETTINGS:OCR_SQLITE_PATH,OCR_ENCRYPTION_KEY,OCR_DET_MODEL_PATH,OCR_REC_MODEL_PATH,OCR_CLS_MODEL_PATH,OCR_MODEL_SHA256", result["errors"])
+        self.assertEqual(result["errors"], ["MISSING_REQUIRED_SETTINGS:OCR_ENCRYPTION_KEY"])
         self.assertFalse(self.db.exists())
     def test_model_hash_mismatch_fails(self):
         self.env["OCR_MODEL_SHA256"]=json.dumps({**self.expected,"det":"0"*64})
