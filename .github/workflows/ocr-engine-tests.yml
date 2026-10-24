@@ -117,7 +117,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           docker run --rm --platform linux/amd64 \
-            -v "$RUNNER_TEMP/ocr-deb-cache:/debs" -v "$RUNNER_TEMP/ocr-deb-cache/apt-lists:/var/lib/apt/lists" \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-deb-cache:/debs" -v "$RUNNER_TEMP/ocr-deb-cache/apt-lists:/var/lib/apt/lists" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               apt-get update
