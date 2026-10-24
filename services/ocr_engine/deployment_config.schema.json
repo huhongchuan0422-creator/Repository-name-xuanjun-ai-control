@@ -59,7 +59,8 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
-      }
+      },
+      "description": "Logical object shape for det/rec/cls SHA-256 pins. The runtime environment variable OCR_MODEL_SHA256 must contain this object serialized as a JSON string; no automatic schema-to-environment loader is implemented."
     },
     "OCR_BINDING_CALLBACKS_READY": {
       "type": "boolean",
