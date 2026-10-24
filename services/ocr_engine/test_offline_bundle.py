@@ -180,8 +180,14 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("xuanjun-ocr-candidate-inputs-not-release-",text)
         self.assertIn("if: always()",text)
         self.assertIn("ocr-deb-cache",text)
-        self.assertIn("apt-get install -y --download-only",text)
         self.assertIn("generate_deb_runtime_lock.py",text)
+        deb_generator=Path(__file__).with_name("generate_deb_runtime_lock.py").read_text(encoding="utf-8")
+        deb_installer=Path(__file__).with_name("install_deb_closure.py").read_text(encoding="utf-8")
+        self.assertIn('apt-get install -y --download-only',text)
+        self.assertIn('subprocess.run(["dpkg","--unpack"]',deb_installer)
+        self.assertIn('subprocess.run(["dpkg","--configure","-a"]',deb_installer)
+        self.assertNotIn("apt-get install",deb_installer)
+        self.assertIn('subprocess.check_output(["dpkg-deb","-f",str(path),field]',deb_generator)
 
     def test_deb_lock_generator_reads_real_synthetic_package_and_official_source(self):
         root=self.root/"generated-debs"; root.mkdir()
