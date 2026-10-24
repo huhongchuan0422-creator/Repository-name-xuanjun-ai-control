@@ -123,49 +123,35 @@ def review_bundle(contract,files,reviews,review_keys=None):
             'authority_effect':'NONE','release_approved':False}
 
 
-def complete_reviewed_candidate(supervisor, contract, files, reviews,
-                                review_keys, candidate_binding,
+def complete_reviewed_candidate(supervisor, task_id, candidate_event_id,
+                                files, reviews, review_keys,
+                                reviewed_event_id):
+    """Record exact independent review evidence for the canonical candidate.
+
+    This never completes the task, releases dependencies, grants production
+    authority, or substitutes caller-provided candidate state.
+    """
+    candidate = supervisor.development_candidate(task_id, candidate_event_id)
+    contract = supervisor.development_contract(task_id)
+    review_contract = dict(contract)
+    review_contract['code_commit'] = candidate['code_commit']
+    result = review_bundle(review_contract, files, reviews, review_keys)
+    if result['state'] != 'ISOLATED_TEST_ELIGIBLE':
+        return dict(result,
+                    canonical_review='HOLD_INDEPENDENT_REVIEW_REQUIRED')
+    reviewed = supervisor.record_development_review(
+        task_id, candidate_event_id, files, result['bundle_sha256'],
+        result['review_record_ids'], reviewed_event_id)
+    return dict(result, canonical_review=reviewed)
+
+
+def finalize_reviewed_candidate(supervisor, task_id, reviewed_event_id,
                                 completion_event_id,
                                 next_action='DEPENDENCIES_RECHECK'):
-    """Verify exact reviews, then atomically complete the canonical task.
-
-    Test/source identities here do not grant production approval; this only
-    converts already-authenticated QA+SECURITY records into canonical task
-    completion evidence.
-    """
-    result = review_bundle(contract, files, reviews, review_keys)
-    if result['state'] != 'ISOLATED_TEST_ELIGIBLE':
-        return dict(result, canonical_completion='HOLD_INDEPENDENT_REVIEW_REQUIRED')
-    canonical_contract = {k:v for k,v in contract.items()
-                          if k != 'code_commit'}
-    if (not isinstance(candidate_binding, dict)
-            or candidate_binding.get('candidate', {}).get('contract_sha256')
-               != digest(canonical(canonical_contract))
-            or candidate_binding.get('candidate', {}).get('task_id')
-               != contract.get('task_id')
-            or candidate_binding.get('candidate', {}).get('code_commit')
-               != contract.get('code_commit')
-            or candidate_binding.get('candidate', {}).get('spec_sha256')
-               != contract.get('spec_sha256')
-            or candidate_binding.get('candidate', {}).get('checkpoint_sha256')
-               != contract.get('checkpoint_sha256')
-            or candidate_binding.get('candidate', {}).get('target_repository')
-               != contract.get('target_repository')
-            or candidate_binding.get('candidate', {}).get('target_base_sha')
-               != contract.get('target_base_sha')
-            or candidate_binding.get('candidate', {}).get('entry')
-               != contract.get('entry')
-            or candidate_binding.get('candidate', {}).get('files')
-               != result.get('binding', {}).get('files')):
-        raise ValueError('REVIEW_CANDIDATE_BINDING_MISMATCH')
-    completion = supervisor.complete_development_candidate(
-        contract['task_id'],
-        candidate_binding['candidate_event_id'],
-        result['bundle_sha256'],
-        result['review_record_ids'],
-        completion_event_id,
+    """Release only after canonical revocation/coverage has completed."""
+    return supervisor.complete_development_candidate(
+        task_id, reviewed_event_id, completion_event_id,
         next_action=next_action)
-    return dict(result, canonical_completion=completion)
 
 
 def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None):
