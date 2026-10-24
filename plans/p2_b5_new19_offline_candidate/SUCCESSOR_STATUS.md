@@ -10,9 +10,10 @@ authorize this version. `SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json` records
 the source bytes in this candidate. The new release gate checks a separately
 approved binder SHA, all controller source bytes, and both current targets
 again at preflight, publish, start and recover. The external binder data
-points to controller commit `ff140f5b98446169befe9a14998eb51b2ea7d001`
+points to controller commit `2875cb3761edcabfac0ca09bef2d3c441ae53521`
 and is a source identity candidate only. Its independently protected approval
-pin and production reader have not been issued. The factory uses the matching
+pin and production reader have not been issued. Default-off protected record
+consumers exist, but no real UK registration has occurred. The factory uses the matching
 successor runtime and Transaction. A recovered custody checkpoint restores
 only the read-only B5 HTTP wait; original tool provenance and separate close
 approval remain mandatory for the original scoped close path.
@@ -51,6 +52,11 @@ test or a hash supplied by the caller cannot substitute for either fact.
 | Original B5 request-local cloud tool and UK coordinator | B5's actual 19 `read_project_chunk` result references, original InvokeIds, per-item SHA/bytes, custody digest, authenticated subject/recipient and `project.files.read` scope; coordinator checks the original results and registers only non-secret metadata. | `successor_analyst_read.receive_all` verifies actual response bytes. A separate fixed `b5_http` UK witness binds its proof digest and 19 rows; `verify_b5_http_provenance` consumes it under the revocation lock before close. This is **human witness custody**, not a tool signature or an automatic authentication chain. Neither B5's real results nor the trusted coordinator registration exists yet; live per-request files grant remains necessary. |
 | Original UK source custodian | Current A5 archive and L14 installed file identity, path, owner, size and SHA, with no substitution of historical A5 by live L14. | Source freshness before new batch UNKNOWN; neither this repository commit nor a catalog date proves it. |
 
+The current controller source commit is
+`2875cb3761edcabfac0ca09bef2d3c441ae53521`, the manifest SHA256 is
+`9d0d615bc4ecd949170f0ce5132070cef3ed82690890d560e8d7cc59593316fa`,
+and the 1,011-byte external binder SHA256 is
+`684e39b01e0248b1f28b64d6dabbf31fcdd0cebda0dbc36bb0518e068369641b`.
 The binder file only describes code identity. Its SHA in this document or a
 test is not a production approval. The normal OAuth tool's definition does
 not prove that 19 SUCCESS jobs, custody, or live files grant exist.

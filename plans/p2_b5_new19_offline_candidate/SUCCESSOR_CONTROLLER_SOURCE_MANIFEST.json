@@ -1,14 +1,14 @@
 {
   "files": [
     {
-      "bytes": 32239,
+      "bytes": 35718,
       "path": "successor_controller/pr17_b5_successor_authority.py",
-      "sha256": "d25c7f8bd7c9bfc487ea09a4eef0a07e184bb2fc580751379e7d475927a832da"
+      "sha256": "21a583b0e2891e19d7277c9b200a1895523bad3cbe723537018ae9f55a1b7f96"
     },
     {
-      "bytes": 79773,
+      "bytes": 80572,
       "path": "successor_controller/pr17_b5_successor_backend.py",
-      "sha256": "feca06a98914438dc474c917ec41709ed35a2af8cd16c5217285e3318566802e"
+      "sha256": "14cb6889cbde5f881ddf82505311efb592a7db888f9115f4faeb27bf74cd62f4"
     },
     {
       "bytes": 3302,
@@ -26,14 +26,14 @@
       "sha256": "2ca630af9e3326c2c02420ddda84039b88f8f25848dc95a30aef0170b0d41e99"
     },
     {
-      "bytes": 7029,
+      "bytes": 9570,
       "path": "successor_controller/pr17_b5_successor_release_gate.py",
-      "sha256": "d56820c53177b939b48458cab89c9c66ff320203cd56cdda098c8c20f7850b90"
+      "sha256": "02e8b90308aaf5e3a11d830f8d970c6797181fc0ec40ec6270ef2fe1209ee920"
     },
     {
-      "bytes": 31903,
+      "bytes": 32760,
       "path": "successor_controller/pr17_b5_successor_review.py",
-      "sha256": "413b44741f85ac73699fc07e1540a2a07a2f902707319c2a792f4f4631f9af5e"
+      "sha256": "54a995b0e0037b033aa859c53e62f8f897d44501b28330a16967f8c49778a459"
     },
     {
       "bytes": 6709,
@@ -41,9 +41,9 @@
       "sha256": "6cb26e1e48a13101916cb71c2783c8a6ccbf518312edb8ae18d7715ec14ea4a2"
     },
     {
-      "bytes": 19053,
+      "bytes": 29839,
       "path": "successor_controller/pr17_b5_successor_witness.py",
-      "sha256": "b5a338a5c294d141be4b661fb8556d8695ecc9c3b3a7b086977d0f5e2df4fa4f"
+      "sha256": "fa98fa7953d979f8a565cc45c81c8cdd3f089d20ae0ea1dec015091251a7808f"
     },
     {
       "bytes": 10389,
