@@ -238,10 +238,17 @@ class CanonicalCompletionTests(unittest.TestCase):
                 self.s,self.contract,changed,reviews,KEYS,
                 self.candidate,'dev-complete-1')
         wrong=dict(self.contract);wrong['code_commit']='9'*40
-        with self.assertRaisesRegex(ValueError,'REVIEW_CANDIDATE_BINDING_MISMATCH'):
+        wrong_sha=gate.review_bundle(wrong,self.files,[])['bundle_sha256']
+        wrong_reviews=[]
+        for p in wrong['trusted_reviewers']:
+            payload=dict(
+                reviewer={k:p[k] for k in ('issuer','subject')},
+                role=p['role'],bundle_sha256=wrong_sha,decision='PASS')
+            wrong_reviews.append(signed(payload,p['key_id']))
+        with self.assertRaisesRegex(
+                ValueError,'REVIEW_CANDIDATE_BINDING_MISMATCH'):
             gate.complete_reviewed_candidate(
-                self.s,wrong,self.files,gate.review_bundle(
-                    wrong,self.files,[]) and [],KEYS,
+                self.s,wrong,self.files,wrong_reviews,KEYS,
                 self.candidate,'dev-complete-2')
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
 
