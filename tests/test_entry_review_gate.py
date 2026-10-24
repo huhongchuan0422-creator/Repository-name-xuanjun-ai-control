@@ -233,114 +233,148 @@ class CanonicalCompletionTests(unittest.TestCase):
         self.fence.invalidate_source_resources(self.task,'dev-invalidate')
         return self.s.complete_revocation(self.task)
 
+    def _run_controlled_review_flow(self, suffix):
+        with tempfile.TemporaryDirectory(prefix='xj-review-candidate-') as temp_root:
+            root=os.path.join(temp_root,'repo')
+            os.mkdir(root)
+            subprocess.check_call(['git','-C',root,'init','-q'])
+            subprocess.check_call(['git','-C',root,'config','user.name','Fixture'])
+            subprocess.check_call(['git','-C',root,'config','user.email',
+                                   'fixture@example.invalid'])
+            subprocess.check_call(['git','-C',root,'remote','add','origin',
+                                   'https://github.com/owner/repo.git'])
+            os.makedirs(os.path.join(root,'src'))
+            for path,raw in self.files.items():
+                with open(os.path.join(root,path),'wb') as stream:
+                    stream.write(raw)
+            subprocess.check_call(
+                ['git','-C',root,'add','src/f.py','src/data.json'])
+            subprocess.check_call(
+                ['git','-C',root,'commit','-q','-m','fixture'])
+            head=subprocess.check_output(
+                ['git','-C',root,'rev-parse','HEAD']).decode().strip()
+
+            task='controlled-review-'+suffix
+            child='controlled-child-'+suffix
+            self.s.register(dict(
+                task_id=task,parent_task_id='parent',stage='dev',
+                owner='developer',entry='CHATGPT',
+                checkpoint_sha256='1'*64,spec_sha256='2'*64,
+                next_action='implement',dependencies=[],
+                completion_conditions=['reviewed-development'],
+                progress_deadline=1900,receipt_deadline=1100,
+                started_deadline=1200,terminal_deadline=3000,
+                handoff_deadline=1800),now=self.now)
+            self.s.register(dict(
+                task_id=child,parent_task_id='parent',stage='next',
+                owner='developer',entry='CHATGPT',
+                checkpoint_sha256='3'*64,spec_sha256='4'*64,
+                next_action='next',dependencies=[task],
+                completion_conditions=['next'],progress_deadline=1900,
+                receipt_deadline=1100,started_deadline=1200,
+                terminal_deadline=3000,handoff_deadline=1800),now=self.now)
+            base=dict(
+                task_id=task,spec_sha256='2'*64,checkpoint_sha256='1'*64,
+                target_repository='owner/repo',target_base_sha='0'*40,
+                entry='CHATGPT',
+                developer={'issuer':'native','subject':'developer'},
+                allowed_files=['src/f.py','src/data.json'],
+                trusted_reviewers=[
+                    {'issuer':'native','subject':'qa','key_id':'qa-key',
+                     'role':'QA'},
+                    {'issuer':'native','subject':'security',
+                     'key_id':'security-key','role':'SECURITY'}])
+            self.s.register_development_contract(task,base)
+            caller={'caller_id':'writer-'+suffix,'run_id':'run-'+suffix,
+                    'session_id':'session-'+suffix,
+                    'gateway_id':'gateway-'+suffix}
+            ticket=self.fence.claim(
+                task,'attempt-'+suffix,'developer','CHATGPT',caller,
+                'lease-'+suffix,['fake:development/controlled-'+suffix],1700)
+            manifest={p:hashlib.sha256(raw).hexdigest()
+                      for p,raw in self.files.items()}
+            intake=dict(
+                schema=1,entry='CHATGPT',execution_path='CHATGPT_NATIVE',
+                task_id=task,spec_sha256='2'*64,checkpoint_sha256='1'*64,
+                target_repository='owner/repo',target_base_sha='0'*40,
+                code_commit=head,event='CODE_READY',
+                attempt_id='attempt-'+suffix,lease_id='lease-'+suffix,
+                fence=ticket['fence'],epoch=ticket['epoch'],
+                caller_id=caller['caller_id'],run_id=caller['run_id'],
+                session_id=caller['session_id'],
+                gateway_id=caller['gateway_id'],
+                lock_provider_id=self.fence.locks.provider_id,
+                source_comment_id=900+len(suffix),
+                status='RECEIPT_VALIDATED_NOT_ADMITTED',
+                native_identity='CLAIMED_NOT_VERIFIED',
+                quota_attribution='UNKNOWN',authority_effect='NONE',
+                required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
+            candidate=self.s.bind_development_candidate(intake,manifest)
+
+            review_contract=dict(base);review_contract['code_commit']=head
+            reviews=[]
+            bundle=gate.review_bundle(
+                review_contract,self.files,[])['bundle_sha256']
+            for p in review_contract['trusted_reviewers']:
+                reviews.append(signed(dict(
+                    reviewer={k:p[k] for k in ('issuer','subject')},
+                    role=p['role'],bundle_sha256=bundle,decision='PASS'),
+                    p['key_id']))
+            handle,request_path=tempfile.mkstemp(
+                dir=temp_root,prefix='review-request-',suffix='.json')
+            os.close(handle)
+            old_env=dict(os.environ)
+            reviewed_event='reviewed-controlled-'+suffix
+            completion_event='complete-controlled-'+suffix
+            try:
+                with open(request_path,'w',encoding='utf-8') as stream:
+                    json.dump(dict(
+                        action='REVIEW',task_id=task,
+                        candidate_event_id=candidate['candidate_event_id'],
+                        reviewed_event_id=reviewed_event,
+                        reviews=reviews),stream)
+                os.environ['XJ_CANONICAL_LEDGER_PATH']=self.path
+                os.environ['XJ_CANDIDATE_ROOT']=root
+                os.environ['XJ_DEVELOPMENT_REVIEW_INPUT']=request_path
+                review_result=gate.controlled_development_action(KEYS)
+                self.assertEqual(
+                    review_result['state'],
+                    'CANONICAL_DEVELOPMENT_REVIEW_RECORDED')
+                self.assertNotIn(
+                    child,[x['task_id'] for x in self.s.ready()])
+
+                controller={'role':'REVOCATION_CONTROLLER',
+                            'caller_id':'owner'}
+                self.fence.begin_revocation(task,controller)
+                self.fence.drain(task,controller,0.2)
+                self.fence.invalidate_source_resources(
+                    task,'controlled-invalidate-'+suffix)
+                self.s.complete_revocation(task)
+
+                with open(request_path,'w',encoding='utf-8') as stream:
+                    json.dump(dict(
+                        action='FINALIZE',task_id=task,
+                        reviewed_event_id=reviewed_event,
+                        completion_event_id=completion_event),stream)
+                final_result=gate.controlled_development_action(KEYS)
+                self.assertEqual(
+                    final_result['state'],
+                    'CANONICAL_DEVELOPMENT_FINALIZED')
+                self.assertIn(child,[x['task_id'] for x in self.s.ready()])
+                return temp_root
+            finally:
+                os.environ.clear();os.environ.update(old_env)
+
     def test_controlled_review_and_finalize_entry_uses_existing_ledger_and_git(self):
-        # Build a separate exact Git candidate because the default fixture uses
-        # synthetic commit text intentionally.
-        root=os.path.join(os.path.dirname(self.path),'review-candidate')
-        os.mkdir(root)
-        subprocess.check_call(['git','-C',root,'init','-q'])
-        subprocess.check_call(['git','-C',root,'config','user.name','Fixture'])
-        subprocess.check_call(['git','-C',root,'config','user.email','fixture@example.invalid'])
-        subprocess.check_call(['git','-C',root,'remote','add','origin',
-                               'https://github.com/owner/repo.git'])
-        os.makedirs(os.path.join(root,'src'))
-        for path,raw in self.files.items():
-            with open(os.path.join(root,path),'wb') as stream: stream.write(raw)
-        subprocess.check_call(['git','-C',root,'add','src/f.py','src/data.json'])
-        subprocess.check_call(['git','-C',root,'commit','-q','-m','fixture'])
-        head=subprocess.check_output(
-            ['git','-C',root,'rev-parse','HEAD']).decode().strip()
+        root=self._run_controlled_review_flow('one')
+        self.assertFalse(os.path.exists(root))
 
-        task='controlled-review'; child='controlled-child'
-        self.s.register(dict(
-            task_id=task,parent_task_id='parent',stage='dev',
-            owner='developer',entry='CHATGPT',checkpoint_sha256='1'*64,
-            spec_sha256='2'*64,next_action='implement',dependencies=[],
-            completion_conditions=['reviewed-development'],
-            progress_deadline=1900,receipt_deadline=1100,
-            started_deadline=1200,terminal_deadline=3000,
-            handoff_deadline=1800),now=self.now)
-        self.s.register(dict(
-            task_id=child,parent_task_id='parent',stage='next',
-            owner='developer',entry='CHATGPT',checkpoint_sha256='3'*64,
-            spec_sha256='4'*64,next_action='next',dependencies=[task],
-            completion_conditions=['next'],progress_deadline=1900,
-            receipt_deadline=1100,started_deadline=1200,
-            terminal_deadline=3000,handoff_deadline=1800),now=self.now)
-        base=dict(
-            task_id=task,spec_sha256='2'*64,checkpoint_sha256='1'*64,
-            target_repository='owner/repo',target_base_sha='0'*40,
-            entry='CHATGPT',
-            developer={'issuer':'native','subject':'developer'},
-            allowed_files=['src/f.py','src/data.json'],
-            trusted_reviewers=[
-                {'issuer':'native','subject':'qa','key_id':'qa-key','role':'QA'},
-                {'issuer':'native','subject':'security','key_id':'security-key',
-                 'role':'SECURITY'}])
-        self.s.register_development_contract(task,base)
-        caller={'caller_id':'writer2','run_id':'run2',
-                'session_id':'session2','gateway_id':'gateway2'}
-        ticket=self.fence.claim(
-            task,'attempt2','developer','CHATGPT',caller,'lease2',
-            ['fake:development/controlled'],1700)
-        manifest={p:hashlib.sha256(raw).hexdigest()
-                  for p,raw in self.files.items()}
-        intake=dict(
-            schema=1,entry='CHATGPT',execution_path='CHATGPT_NATIVE',
-            task_id=task,spec_sha256='2'*64,checkpoint_sha256='1'*64,
-            target_repository='owner/repo',target_base_sha='0'*40,
-            code_commit=head,event='CODE_READY',attempt_id='attempt2',
-            lease_id='lease2',fence=ticket['fence'],epoch=ticket['epoch'],
-            caller_id='writer2',run_id='run2',session_id='session2',
-            gateway_id='gateway2',lock_provider_id=self.fence.locks.provider_id,
-            source_comment_id=999,status='RECEIPT_VALIDATED_NOT_ADMITTED',
-            native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
-            authority_effect='NONE',
-            required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
-        candidate=self.s.bind_development_candidate(intake,manifest)
-
-        review_contract=dict(base);review_contract['code_commit']=head
-        reviews=[]
-        bundle=gate.review_bundle(review_contract,self.files,[])['bundle_sha256']
-        for p in review_contract['trusted_reviewers']:
-            reviews.append(signed(dict(
-                reviewer={k:p[k] for k in ('issuer','subject')},
-                role=p['role'],bundle_sha256=bundle,decision='PASS'),p['key_id']))
-        handle,request_path=tempfile.mkstemp();os.close(handle)
-        old_env=dict(os.environ)
-        try:
-            with open(request_path,'w',encoding='utf-8') as stream:
-                json.dump(dict(
-                    action='REVIEW',task_id=task,
-                    candidate_event_id=candidate['candidate_event_id'],
-                    reviewed_event_id='reviewed-controlled',
-                    reviews=reviews),stream)
-            os.environ['XJ_CANONICAL_LEDGER_PATH']=self.path
-            os.environ['XJ_CANDIDATE_ROOT']=root
-            os.environ['XJ_DEVELOPMENT_REVIEW_INPUT']=request_path
-            review_result=gate.controlled_development_action(KEYS)
-            self.assertEqual(
-                review_result['state'],'CANONICAL_DEVELOPMENT_REVIEW_RECORDED')
-            self.assertNotIn(child,[x['task_id'] for x in self.s.ready()])
-
-            controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
-            self.fence.begin_revocation(task,controller)
-            self.fence.drain(task,controller,0.2)
-            self.fence.invalidate_source_resources(task,'controlled-invalidate')
-            self.s.complete_revocation(task)
-
-            with open(request_path,'w',encoding='utf-8') as stream:
-                json.dump(dict(
-                    action='FINALIZE',task_id=task,
-                    reviewed_event_id='reviewed-controlled',
-                    completion_event_id='complete-controlled'),stream)
-            final_result=gate.controlled_development_action(KEYS)
-            self.assertEqual(
-                final_result['state'],'CANONICAL_DEVELOPMENT_FINALIZED')
-            self.assertIn(child,[x['task_id'] for x in self.s.ready()])
-        finally:
-            os.environ.clear();os.environ.update(old_env)
-            os.unlink(request_path)
+    def test_controlled_review_flow_is_isolated_across_two_same_process_runs(self):
+        first=self._run_controlled_review_flow('first')
+        second=self._run_controlled_review_flow('second')
+        self.assertNotEqual(first,second)
+        self.assertFalse(os.path.exists(first))
+        self.assertFalse(os.path.exists(second))
 
     def test_controlled_development_action_holds_without_existing_inputs(self):
         old_env=dict(os.environ)
