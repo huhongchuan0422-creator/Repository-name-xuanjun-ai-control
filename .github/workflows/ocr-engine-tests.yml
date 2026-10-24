@@ -122,27 +122,7 @@ jobs:
               set -eu
               apt-get update
               apt-get install -y --download-only --no-install-recommends -o Dir::Cache::archives=/debs libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
-              python - <<'PY'
-import hashlib,json,subprocess
-from pathlib import Path
-root=Path("/debs")
-items=[]
-for p in sorted(root.glob("*.deb")):
-    fields=subprocess.check_output(["dpkg-deb","-f",str(p),"Package","Version","Architecture"],text=True).splitlines()
-    if len(fields)!=3: raise SystemExit("DEB_METADATA_INVALID:"+p.name)
-    items.append({"filename":p.name,"package":fields[0],"version":fields[1],"architecture":fields[2],"sha256":hashlib.sha256(p.read_bytes()).hexdigest()})
-if not items: raise SystemExit("DEB_CLOSURE_EMPTY")
-apt_sources=Path("/etc/apt/sources.list.d/debian.sources")
-if not apt_sources.is_file(): raise SystemExit("OFFICIAL_APT_SOURCE_FILE_MISSING")
-source_bytes=apt_sources.read_bytes()
-apt_lists=[]
-for p in sorted(Path("/var/lib/apt/lists").rglob("*")):
-    if p.is_file():
-        apt_lists.append({"path":str(p.relative_to("/var/lib/apt/lists")),"bytes":p.stat().st_size,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()})
-if not apt_lists: raise SystemExit("APT_INDEX_CACHE_EMPTY")
-Path("/debs/system-deb-lock.json").write_text(json.dumps({"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_bytes).hexdigest(),"content":source_bytes.decode("utf-8")},"packages":items,"apt_lists":apt_lists},sort_keys=True,indent=2)+"\\n")
-print(json.dumps({"deb_count":len(items),"packages":[{"package":x["package"],"version":x["version"],"architecture":x["architecture"],"sha256":x["sha256"]} for x in items]},sort_keys=True))
-PY
+              python /src/services/ocr_engine/generate_deb_runtime_lock.py /debs /etc/apt/sources.list.d/debian.sources /var/lib/apt/lists
             '
       - name: Fetch fixed model assets and verify the three published SHA256 pins
         shell: bash
@@ -166,20 +146,10 @@ PY
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               test -f /debs/system-deb-lock.json
-              dpkg -i /debs/*.deb || apt-get install -y --no-download /debs/*.deb
-              dpkg-query -W -f="${Package}=${Version}\\n" libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
+              apt-get install -y --no-download --no-install-recommends /debs/*.deb
+              dpkg-query -W -f="${Package}=${Version}\n" libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
               python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
-              python -m pip check
-              python - <<'PY'
-import importlib.metadata as m
-import cv2,fastapi,uvicorn,onnxruntime,rapidocr,numpy,cryptography
-names=[d.metadata["Name"].lower().replace("_","-") for d in m.distributions()]
-if "opencv-python" not in names or "opencv-python-headless" in names:
-    raise SystemExit("OPENCV_DISTRIBUTION_COLLISION_OR_MISSING")
-print("OPENCV_DISTRIBUTION=opencv-python=="+m.version("opencv-python"))
-print("CV2_IMPORT=PASS:"+str(cv2.__version__))
-print("OFFLINE_IMPORT_CHECK=PASS")
-PY
+              python /src/services/ocr_engine/verify_offline_runtime.py
             '
       - name: Build the verified archive (no service start or inference)
         shell: bash
@@ -214,25 +184,8 @@ PY
         if: always()
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/ocr-candidate-inputs"
-          python - <<'PY'
-import hashlib,json,os
-from pathlib import Path
-root=Path(os.environ["RUNNER_TEMP"])
-items=[]
-for rel in ("ocr-wheelhouse","ocr-model-cache","ocr-deb-cache","ocr-build"):
-    base=root/rel
-    if not base.exists(): continue
-    for path in sorted(base.rglob("*")):
-        if path.is_file() and not path.is_symlink():
-            h=hashlib.sha256()
-            with path.open("rb") as f:
-                for chunk in iter(lambda:f.read(1024*1024),b""): h.update(chunk)
-            items.append({"path":str(path.relative_to(root)),"bytes":path.stat().st_size,"sha256":h.hexdigest()})
-out={"classification":"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE","source_sha":os.environ.get("GITHUB_SHA"),"run_id":os.environ.get("GITHUB_RUN_ID"),"files":items}
-(root/"ocr-candidate-inputs"/"candidate-input-manifest.json").write_text(json.dumps(out,sort_keys=True,indent=2)+"\\n")
-print(json.dumps({"candidate_file_count":len(items),"classification":out["classification"]},sort_keys=True))
-PY
+          set -euo pipefail
+          python services/ocr_engine/write_candidate_input_manifest.py "$RUNNER_TEMP" "$RUNNER_TEMP/ocr-candidate-inputs/candidate-input-manifest.json"
       - name: Upload reusable candidate inputs and their digest manifest (never a success package)
         if: always()
         uses: actions/upload-artifact@v4
@@ -242,7 +195,7 @@ PY
             ${{ runner.temp }}/ocr-wheelhouse/**
             ${{ runner.temp }}/ocr-model-cache/**
             ${{ runner.temp }}/ocr-deb-cache/**
-            ${{ runner.temp }}/ocr-build/requirements-lock-linux-x86_64-cp311.json
+            ${{ runner.temp }}/ocr-build/**
             ${{ runner.temp }}/ocr-candidate-inputs/candidate-input-manifest.json
           if-no-files-found: warn
           retention-days: 14
