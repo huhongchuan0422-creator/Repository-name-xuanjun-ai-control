@@ -30,9 +30,21 @@ def main():
         packages.append({"filename":path.name,"package":fields[0],"version":fields[1],"architecture":fields[2],"sha256":sha(path)})
     if not packages: raise SystemExit("DEB_CLOSURE_EMPTY")
     indexes=[]
+    # Only immutable regular apt index files are lockable inputs. Runtime lock files,
+    # partial downloads, auxfiles, and other mutable apt state are excluded.
     for path in sorted(apt_root.rglob("*")):
-        if path.is_file() and not path.is_symlink():
-            indexes.append({"path":str(path.relative_to(apt_root)),"bytes":path.stat().st_size,"sha256":sha(path)})
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel=path.relative_to(apt_root)
+        if any(part in ("partial","auxfiles") for part in rel.parts) or path.name in ("lock","partial"):
+            continue
+        try:
+            with path.open("rb") as stream:
+                stream.read(1)
+        except OSError:
+            continue
+        indexes.append({"path":str(rel),"bytes":path.stat().st_size,"sha256":sha(path)})
+    if not indexes: raise SystemExit("APT_INDEX_CACHE_EMPTY")
     if not indexes: raise SystemExit("APT_INDEX_CACHE_EMPTY")
     source_bytes=source.read_bytes()
     source_text=source_bytes.decode("utf-8")
