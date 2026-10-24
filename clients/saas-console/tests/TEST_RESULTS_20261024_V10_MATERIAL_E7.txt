@@ -1,0 +1,56 @@
+SaaS MATERIAL SUBMISSION + e7 REAL PYTHON HTTP — 2026-10-24
+
+Frontend parent:
+  10f92cd16771f0dc6f9c3c14943e0204451cc584
+
+Backend artifact:
+  source e7f75975c4ab4eedba68306212a2bac6c067a1c3
+  tree   d001cfd9855ed3a7758f6286db5cae7d45cce403
+  CUSTOMER_MANIFEST files 102/102 hash-verified
+  scope ISOLATED_FIXTURE_NOT_PRODUCTION
+  fixture signer TEST_ONLY
+
+Frontend increment:
+  api.save(project,item,revision,kind,content,expires)
+  ProjectJourney.saveMaterial()
+  checklist PRIVATE_DOCUMENT upload form
+  OWNER/EDITOR only; SUBMITTED/IN_REVIEW not editable
+  PDF/PNG/JPEG accept hint, max 5MB client guard
+  DOCUMENT Base64 only
+  SECRETREF/OAUTH/SERVER_CHALLENGE remain dedicated-entry text; no plaintext credential intake
+
+Exact e7 save request:
+  {project,item,revision,kind:'DOCUMENT',content:<base64>,expires}
+
+Real e7 loopback run:
+  PASS
+  login -> me -> checklist -> save -> checklist refresh
+  -> current preview V1 -> change_context -> change_submit -> changes
+  -> reviewer assess -> change_small_edit -> TEST_ONLY publish-ready
+  -> current preview V2 -> change_updates -> change_retest -> changes
+  -> cross-project 403 -> logout -> me 403
+
+Actual result:
+  save_revision 1
+  V1 66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5
+  V2 ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940
+  retest RETEST_ACCEPTED
+  cross_project_403 true
+  post_logout_403 true
+
+Chinese HTTP error contract verified:
+  403 -> 权限不足、凭据失效或请求不符合要求
+
+Browser:
+  NOT RERUN
+  Chromium direct navigation remains blocked by administrator policy:
+    net::ERR_BLOCKED_BY_ADMINISTRATOR
+  No proxy/setContent/alternate-address/tool workaround is counted as browser verification.
+  Existing 48 screenshots remain UI_ONLY_RENDER only.
+
+Production/Hosted field validation:
+  NOT production
+  NOT real customer data
+  NOT deployment
+  NOT payment
+  NOT formal project acceptance

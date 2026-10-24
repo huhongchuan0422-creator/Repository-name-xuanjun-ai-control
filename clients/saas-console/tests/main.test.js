@@ -86,3 +86,22 @@ test('updates refresh wiring source guard rejects write-context mutation on prev
  const source=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
  assert.match(source,/async function updates\(row,p,oldPage,g\)\{const rc=\{generation:g,project:p\.id,write:false\}/);
 });
+
+test('PRIVATE_DOCUMENT checklist renders upload and saves exact current revision then refreshes',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','csrf');let saveArgs=null,checkCalls=0;
+ const item={id:'license',title:'企业授权',purpose:'核实签约关系',required:true,state:'PARTIAL',revision:0,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[]};
+ const a={id:'A',title:'A',role:'OWNER'};
+ const api=apiBase({
+  checklist:async()=>{checkCalls++;return{requirements_revision:1,overall:'PARTIAL',items:[{...item,revision:checkCalls>1?1:0}]}},
+  save:async(...args)=>{saveArgs=args;return{version:'v1',revision:1,state:'PARTIAL'}}
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const form=find(d.m.get('requirements'),x=>x.tagName==='form'),input=find(form,x=>x.tagName==='input');
+ assert.ok(form);assert.ok(input);assert.equal(input.accept,'.pdf,.png,.jpg,.jpeg');
+ const bytes=Uint8Array.from([0x25,0x50,0x44,0x46,0x2d,0x31,0x2e,0x37]);
+ input.files=[{size:bytes.length,arrayBuffer:async()=>bytes.buffer}];
+ await form.onsubmit({preventDefault(){}});
+ assert.deepEqual(saveArgs,['A','license',0,'DOCUMENT','JVBERi0xLjc=',null]);
+ assert.ok(checkCalls>=2);assert.equal(app.current.id,'A');
+ assert.match(d.m.get('status').textContent,/新版本已保存/);
+});

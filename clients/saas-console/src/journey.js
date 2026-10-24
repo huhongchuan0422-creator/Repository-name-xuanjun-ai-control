@@ -3,6 +3,7 @@ export class ProjectJourney{
  constructor(api,journal){this.api=api;this.journal=journal}
  async projects(){const m=await this.api.me();if(!Array.isArray(m.projects))throw Error('ACCOUNT_ONLY_NO_PROJECT_ACCESS');return m}
  async project(p){const [checklist,previews,changes,messages]=await Promise.all([this.api.checklist(p.id),this.api.previews(p.id),this.api.changes(p.id),this.api.messages(p.id)]);return{project:p,checklist,previews:{...previews,pages:(previews.pages||[]).map(x=>({...x,url:verifiedPreviewUrl(x.url,p.id,x.sha256)}))},changes,messages}}
+ async saveMaterial(p,item,content){if(!['OWNER','EDITOR'].includes(p.role))throw Error('MATERIAL_WRITE_REQUIRED');if(item.submission_type!=='PRIVATE_DOCUMENT')throw Error('PRIVATE_DOCUMENT_REQUIRED');return this.api.save(p.id,item.id,item.revision,'DOCUMENT',content,item.valid_until??null)}
  async feedbackContext(p,page){if(p.role!=='OWNER')throw Error('OWNER_PREVIEW_REQUIRED');return this.api.context(p.id,page.path,page.sha256)}
  async submitLegacy(p,page,text){if(p.role!=='OWNER')throw Error('OWNER_PREVIEW_REQUIRED');return submitLegacy(this.api,this.journal,{project:p.id,page:page.path,version:page.sha256,text,intent:'RECTIFICATION'})}
  async submitCandidate(p,page,text,o){return submitCandidate(this.api,this.journal,{project:p.id,page:page.path,version:page.sha256,text,intent:'RECTIFICATION'},o)}

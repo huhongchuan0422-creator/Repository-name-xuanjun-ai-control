@@ -1,216 +1,84 @@
 #!/usr/bin/env python3
-"""Isolated real-Python-HTTP integration against the exact PR122 backend checkout.
-
-This does NOT use a Node/fetch fake server. It imports Center/App/HTTPServer and
-the repository's signed preview fixtures from XJ_PR122_BACKEND_ROOT, which must
-be checked out exactly at EXPECTED_BACKEND_COMMIT.
+"""SaaS isolated integration against the exact e7 PR122 review-only artifact.
+Synthetic identities only. NOT Hosted/production/customer/payment/deployment evidence.
 """
-import base64
-import hashlib
-import hmac
-import json
-import os
-import subprocess
-import sys
-import unittest
+import base64, hashlib, http.client, json, os, subprocess, sys, time
+from http.cookies import SimpleCookie
 from pathlib import Path
 
-EXPECTED_BACKEND_COMMIT="1b48e5fe8015afd9035ff269f9b432d9a68223b2"
-root_env=os.environ.get("XJ_PR122_BACKEND_ROOT")
-if not root_env:
-    raise SystemExit("HOLD_MISSING_XJ_PR122_BACKEND_ROOT")
-BACKEND_ROOT=Path(root_env).resolve()
-if not (BACKEND_ROOT/".git").exists():
-    raise SystemExit("HOLD_BACKEND_ROOT_NOT_GIT_CHECKOUT")
-head=subprocess.check_output(["git","-C",str(BACKEND_ROOT),"rev-parse","HEAD"],text=True).strip()
-if head!=EXPECTED_BACKEND_COMMIT:
-    raise SystemExit("HOLD_BACKEND_COMMIT_MISMATCH:"+head)
-os.chdir(BACKEND_ROOT)
-sys.path.insert(0,str(BACKEND_ROOT))
+EXPECTED_COMMIT='e7f75975c4ab4eedba68306212a2bac6c067a1c3'
+EXPECTED_TREE='d001cfd9855ed3a7758f6286db5cae7d45cce403'
+HOST='wenwenwenyiyiyi.work'; ORIGIN='https://wenwenwenyiyiyi.work'; COOKIE='__Host-xj_customer'
+root=Path(os.environ.get('XJ_PR122_E7_ROOT','')).resolve()
+if not str(root) or not (root/'CUSTOMER_MANIFEST.json').is_file(): raise SystemExit('HOLD_MISSING_E7_ARTIFACT_ROOT')
+manifest=json.loads((root/'CUSTOMER_MANIFEST.json').read_text())
+if manifest.get('source_commit')!=EXPECTED_COMMIT: raise SystemExit('HOLD_E7_COMMIT_MISMATCH:'+str(manifest.get('source_commit')))
+if manifest.get('source_tree')!=EXPECTED_TREE: raise SystemExit('HOLD_E7_TREE_MISMATCH:'+str(manifest.get('source_tree')))
+files=manifest.get('files') or []
+if len(files)!=102: raise SystemExit('HOLD_E7_MANIFEST_COUNT:'+str(len(files)))
+for rec in files:
+    p=root/rec['path']
+    if not p.is_file(): raise SystemExit('HOLD_E7_FILE_MISSING:'+rec['path'])
+    if hashlib.sha256(p.read_bytes()).hexdigest()!=rec['sha256']: raise SystemExit('HOLD_E7_FILE_HASH:'+rec['path'])
 
-from scripts.pr122_customer_core import canonical,digest
-from scripts.pr122_customer_change_authority import import_snapshot
-from scripts.pr122_customer_changes import Changes
-from scripts.pr122_customer_http import COOKIE
-from tests.test_pr122_customer_http import HttpTests
-from tests.pr122_customer_change_fixture import PAGE_SHA,PAGE_BYTES,snapshot
+proc=subprocess.Popen([sys.executable,'-B','-m','tests.pr122_customer_browser_server'],cwd=root,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
+try:
+    line=proc.stdout.readline().strip()
+    if not line: raise SystemExit('HOLD_E7_FIXTURE_START:'+proc.stderr.read())
+    info=json.loads(line); port=info['port']; control=info['control_port']
+    if info.get('scope')!='ISOLATED_FIXTURE_NOT_PRODUCTION' or info.get('fixture_signer')!='TEST_ONLY': raise SystemExit('HOLD_E7_FIXTURE_SCOPE')
+    def raw(path,body=None,headers=None,method=None,port_override=None):
+        c=http.client.HTTPConnection('127.0.0.1',port_override or port,timeout=10)
+        h={'Host':HOST,**(headers or {})}; data=None
+        if body is not None:
+            data=json.dumps(body,ensure_ascii=False,separators=(',',':')).encode()
+            h={'Origin':ORIGIN,'Content-Type':'application/json','Content-Length':str(len(data)),**h}
+        c.request(method or ('POST' if body is not None else 'GET'),path,data,h); r=c.getresponse(); b=r.read(); out=(r.status,dict(r.getheaders()),b); c.close(); return out
+    def req(path,body=None,headers=None,method=None):
+        s,h,b=raw('/customer/center/'+path,body,headers,method)
+        try:d=json.loads(b) if b else {}
+        except Exception:d={'_raw':b.decode(errors='replace')}
+        return s,h,d
+    def login(who):
+        s,h,d=req('api/login',{'email':who+'@example.com','password':'correct-password-123'}); assert s==200,(s,d)
+        assert 'csrf' in d and 'token' not in d
+        ck=SimpleCookie();ck.load(h['Set-Cookie']);return {'Cookie':COOKIE+'='+ck[COOKIE].value,'X-CSRF-Token':d['csrf']}
 
+    owner=login('owner'); reviewer=login('reviewer'); other=login('other')
+    s,_,me=req('api/me',headers=owner); assert s==200 and [p['id'] for p in me['projects']]==['project-a']
+    s,_,check=req('api/checklist/project-a',headers=owner); assert s==200
+    item=next(x for x in check['items'] if x['submission_type']=='PRIVATE_DOCUMENT')
+    pdf=b'%PDF-1.7\nsynthetic SaaS material\n%%EOF'
+    s,_,saved=req('api/save',{'project':'project-a','item':item['id'],'revision':item['revision'],'kind':'DOCUMENT','content':base64.b64encode(pdf).decode(),'expires':item.get('valid_until')},owner)
+    assert s==200 and saved['revision']==item['revision']+1,(s,saved)
+    s,_,check2=req('api/checklist/project-a',headers=owner); item2=next(x for x in check2['items'] if x['id']==item['id']); assert item2['revision']==saved['revision']
+    s,_,denied=req('api/checklist/project-a',headers=other); assert s==403 and denied['error']=='权限不足、凭据失效或请求不符合要求',(s,denied)
 
-class SaaSRealPythonHTTPIntegration(unittest.TestCase):
-    """Synthetic identity/tenant only; no Hosted/customer/production credentials."""
+    s,_,pre=req('api/previews/project-a',headers=owner); assert s==200 and pre['pages']; page=next((x for x in pre['pages'] if x['path']=='/project/consumer/'),pre['pages'][0]); v1=page['sha256']
+    s,_,_=req('api/change_context',{'project':'project-a','page':page['path'],'version':v1},owner); assert s==200
+    s,_,created=req('api/change_submit',{'project':'project-a','page':page['path'],'version':v1,'text':'将「Welcome」改为「Welcomes」','intent':'RECTIFICATION'},owner); assert s==200; case=created['id']
+    s,_,cases=req('api/changes/project-a',headers=owner); assert s==200 and any(x['id']==case for x in cases['cases'])
 
-    def setUp(self):
-        self.f=HttpTests()
-        self.addCleanup(self.f.doCleanups)
-        self.f.setUp()
+    s,_,rcases=req('api/changes/project-a',headers=reviewer); ce=next(x for x in rcases['cases'] if x['id']==case); rev=ce['events'][-1]['seq']
+    s,_,assessed=req('api/change_assess',{'project':'project-a','case':case,'revision':rev,'category':'IN_SCOPE_SMALL','minutes':1,'lines':[],'evidence':[],'explanation':'单处已授权展示文案小改'},reviewer); assert s==200 and assessed['state']=='FREE_APPROVED'
+    s,_,queued=req('api/change_small_edit',{'project':'project-a','case':case},reviewer); assert s==200; job=queued['id']
+    state=None
+    for _ in range(80):
+        s,_,state=req('api/edit_candidate/project-a/'+job,headers=reviewer); assert s==200
+        if state['state'] in ('CANDIDATE_READY','HOLD_UNKNOWN'): break
+        time.sleep(.05)
+    assert state['state']=='CANDIDATE_READY',state
+    s,_,_=raw('/publish-ready',body={},method='POST',port_override=control); assert s==204
 
-        # Add a second tenant/customer at the canonical project authority layer.
-        p2={**self.f.p,"id":"project-b","tenant":"tenant-b","customer":"customer-b",
-            "owner_email":"other@example.com"}
-        self.f.imported(2,[self.f.p,p2])
+    s,_,pre2=req('api/previews/project-a',headers=owner); page2=next(x for x in pre2['pages'] if x['path']==page['path']); v2=page2['sha256']; assert v2!=v1
+    s,_,updates=req('api/change_updates',{'project':'project-a','page':page['path'],'version':v2},owner); u=next(x for x in updates['updates'] if x['case']==case); assert u['before_sha256']==v1 and u['after_sha256']==v2 and u['state']=='AWAIT_RETEST'
+    s,_,rr=req('api/change_retest',{'project':'project-a','case':case,'revision':u['revision'],'page':page['path'],'version':v2,'delivery_sha256':u['delivery_sha256'],'action':'ACCEPT','reason':'同版隔离复验通过'},owner); assert s==200 and rr['state']=='RETEST_ACCEPTED' and rr['automatic_charge'] is False
+    s,_,final=req('api/changes/project-a',headers=owner); assert next(x for x in final['cases'] if x['id']==case)['events'][-1]['kind']=='RETEST'
 
-        # Install a signed TRUSTED_CUSTOMER_FRONTEND preview snapshot for project-a.
-        envelope=snapshot(self.f,revision=1)
-        entry=envelope["payload"]["previews"][0]
-        entry["manifest"]["execution_scope"]="TRUSTED_CUSTOMER_FRONTEND"
-        entry["manifest_sha256"]=digest(canonical(entry["manifest"]))
-        envelope["signature"]=hmac.new(
-            self.f.auth,canonical(envelope["payload"]),hashlib.sha256
-        ).hexdigest()
-        import_snapshot(self.f.c,envelope,self.f.auth)
-
-    def request_json(self,path,body=None,headers=None,method=None):
-        status,h,raw=self.f.request(path,body,headers,method)
-        data=json.loads(raw) if raw else {}
-        return status,h,data
-
-    def http_login(self):
-        status,h,data=self.request_json(
-            "api/login",{"email":"owner@example.com","password":"correct-password-123"}
-        )
-        self.assertEqual(status,200)
-        self.assertIn("csrf",data)
-        self.assertNotIn("token",data)
-        cookie=h["Set-Cookie"].split(";",1)[0]
-        self.assertTrue(cookie.startswith(COOKIE+"="))
-        return {"Cookie":cookie,"X-CSRF-Token":data["csrf"]}
-
-    def test_customer_journey_real_python_http(self):
-        f=self.f
-        auth=self.http_login()
-
-        status,_,me=self.request_json("api/me",headers=auth)
-        self.assertEqual(status,200)
-        self.assertEqual([p["id"] for p in me["projects"]],["project-a"])
-        self.assertEqual(me["projects"][0]["tenant"],"tenant-a")
-        self.assertEqual(me["projects"][0]["customer"],"customer-a")
-        self.assertEqual(me["projects"][0]["role"],"OWNER")
-
-        self.assertEqual(self.request_json("api/checklist/project-a",headers=auth)[0],200)
-        self.assertEqual(self.request_json("api/checklist/project-b",headers=auth)[0],403)
-
-        status,_,listing=self.request_json("api/previews/project-a",headers=auth)
-        self.assertEqual(status,200)
-        page=next(p for p in listing["pages"] if p["path"]=="/preview/consumer/")
-        self.assertEqual(page["sha256"],PAGE_SHA)
-        self.assertTrue(page["url"].startswith("/customer/center/preview/project-a/"))
-
-        before=f.c.db.execute("SELECT count(*) FROM preview_serves").fetchone()[0]
-        preview_path=page["url"].removeprefix("/customer/center/")
-        status,headers,raw=f.request(preview_path,headers=auth)
-        self.assertEqual(status,200)
-        self.assertIn(b"feedback.js",raw)
-        self.assertIn("frame-ancestors 'none'",headers["Content-Security-Policy"])
-        after=f.c.db.execute("SELECT count(*) FROM preview_serves").fetchone()[0]
-        self.assertEqual(after,before+1)
-
-        status,_,msg=self.request_json(
-            "api/message",{"project":"project-a","body":"SaaS synthetic customer question"},auth
-        )
-        self.assertEqual(status,200)
-        self.assertEqual(msg["status"],"ARCHIVED")
-        status,_,messages=self.request_json("api/messages/project-a",headers=auth)
-        self.assertEqual(status,200)
-        self.assertTrue(any(m["body"]=="SaaS synthetic customer question" for m in messages["messages"]))
-
-        legacy={"project":"project-a","page":"/preview/consumer/","version":PAGE_SHA,
-                "text":"SaaS synthetic feedback","intent":"RECTIFICATION"}
-        status,_,created=self.request_json("api/change_submit",legacy,auth)
-        self.assertEqual(status,200)
-        self.assertEqual(created["state"],"REQUESTED")
-        status,_,cases=self.request_json("api/changes/project-a",headers=auth)
-        self.assertEqual(status,200)
-        match=next(c for c in cases["cases"] if c["id"]==created["id"])
-        self.assertEqual(match["events"][0]["payload"]["request"],"SaaS synthetic feedback")
-        self.assertEqual(match["events"][0]["payload"]["page_sha256"],PAGE_SHA)
-
-        idem={**legacy,"text":"SaaS synthetic idempotent feedback",
-              "idempotency_key":"SaaS_frontend_test_key_001"}
-        s1,_,r1=self.request_json("api/change_submit_idempotent",idem,auth)
-        s2,_,r2=self.request_json("api/change_submit_idempotent",idem,auth)
-        self.assertEqual((s1,s2),(200,200))
-        self.assertEqual((r1["id"],r1["event_id"]),(r2["id"],r2["event_id"]))
-        conflict={**idem,"text":"same key different body"}
-        self.assertEqual(self.request_json("api/change_submit_idempotent",conflict,auth)[0],409)
-
-        other_headers={"Cookie":COOKIE+"="+f.users["other"]["token"],
-                       "X-CSRF-Token":f.users["other"]["csrf"]}
-        self.assertEqual(self.request_json("api/changes/project-a",headers=other_headers)[0],403)
-
-    def test_signed_delivery_current_preview_and_retest_real_python_http(self):
-        f=self.f
-        auth=self.http_login()
-        service=Changes(f.c)
-        path="/project/consumer/"
-
-        body={"project":"project-a","page":path,"version":PAGE_SHA,
-              "text":"move synthetic button","intent":"RECTIFICATION"}
-        status,_,request=self.request_json("api/change_submit",body,auth)
-        self.assertEqual(status,200)
-
-        assessed=service.assess(
-            f.reviewer,"project-a",request["id"],request["revision"],
-            "IN_SCOPE_SMALL",10,[],[],"synthetic free fix"
-        )
-        self.assertEqual(assessed["state"],"FREE_APPROVED")
-        request_sha=service._request_sha(service._events(f.owner,"project-a",request["id"]))
-
-        envelope=snapshot(f,revision=2)
-        data=envelope["payload"]
-        entry=data["previews"][0]
-        new_bytes=(b'<!doctype html><html><meta name="viewport" content="width=device-width,initial-scale=1">'
-                   b'<title>SaaS adjusted private preview</title><body><h1>Adjusted</h1></body></html>')
-        new_sha=digest(new_bytes)
-        entry["manifest"]["execution_scope"]="TRUSTED_CUSTOMER_FRONTEND"
-        entry["manifest"]["pages"]=[{"path":path,"sha256":new_sha}]
-        entry["manifest_sha256"]=digest(canonical(entry["manifest"]))
-        entry["blobs"]={new_sha:base64.b64encode(new_bytes).decode()}
-        delivery={"project":"project-a","case":request["id"],"request_sha256":request_sha,
-                  "page":path,"before_sha256":PAGE_SHA,"after_sha256":new_sha,
-                  "summary":"synthetic delivery","test_report_sha256":"c"*64,
-                  "deployment_receipt_sha256":"d"*64,"published_at":f.now}
-        data["deliveries"]=[delivery]
-        envelope["signature"]=hmac.new(f.auth,canonical(data),hashlib.sha256).hexdigest()
-        import_snapshot(f.c,envelope,f.auth)
-
-        status,_,listing=self.request_json("api/previews/project-a",headers=auth)
-        self.assertEqual(status,200)
-        current=next(p for p in listing["pages"] if p["path"]==path)
-        self.assertEqual(current["sha256"],new_sha)
-
-        preview_path=current["url"].removeprefix("/customer/center/")
-        self.assertEqual(f.request(preview_path,headers=auth)[0],200)
-        served=f.c.db.execute(
-            "SELECT count(*) FROM preview_serves WHERE project=? AND page_sha256=?",
-            ("project-a",new_sha)
-        ).fetchone()[0]
-        self.assertGreaterEqual(served,1)
-
-        status,_,updates=self.request_json(
-            "api/change_updates",{"project":"project-a","page":path,"version":new_sha},auth
-        )
-        self.assertEqual(status,200)
-        self.assertEqual(len(updates["updates"]),1)
-        update=updates["updates"][0]
-        self.assertEqual(update["before_sha256"],PAGE_SHA)
-        self.assertEqual(update["after_sha256"],new_sha)
-        self.assertEqual(update["case"],request["id"])
-        self.assertEqual(update["state"],"AWAIT_RETEST")
-
-        retest={"project":"project-a","case":request["id"],"revision":update["revision"],
-                "page":path,"version":new_sha,"delivery_sha256":update["delivery_sha256"],
-                "action":"ACCEPT","reason":"synthetic retest accepted"}
-        status,_,result=self.request_json("api/change_retest",retest,auth)
-        self.assertEqual(status,200)
-        self.assertEqual(result["state"],"RETEST_ACCEPTED")
-        self.assertFalse(result["automatic_charge"])
-
-        status,_,cases=self.request_json("api/changes/project-a",headers=auth)
-        self.assertEqual(status,200)
-        case=next(c for c in cases["cases"] if c["id"]==request["id"])
-        self.assertEqual(case["events"][-1]["kind"],"RETEST")
-        self.assertEqual(case["events"][-1]["payload"]["state"],"RETEST_ACCEPTED")
-
-
-if __name__=="__main__":
-    unittest.main(verbosity=2)
+    s,_,lo=req('api/logout',{},owner); assert s==200 and lo['logged_out'] is True
+    s,_,lost=req('api/me',headers={'Cookie':owner['Cookie']}); assert s==403 and lost['error']=='权限不足、凭据失效或请求不符合要求'
+    print(json.dumps({'status':'PASS','scope':info['scope'],'source_commit':EXPECTED_COMMIT,'source_tree':EXPECTED_TREE,'manifest_files':102,'save_revision':saved['revision'],'v1':v1,'v2':v2,'retest':rr['state'],'cross_project_403':True,'post_logout_403':True,'browser':'NOT_VERIFIED'},ensure_ascii=False))
+finally:
+    proc.terminate()
+    try:proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:proc.kill()

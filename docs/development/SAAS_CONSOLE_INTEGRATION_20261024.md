@@ -178,3 +178,38 @@ This is non-browser HTTP contract evidence. No browser navigation was retried af
 Frontend regression after the two contrast tests: **32/32 PASS, 0 FAIL**.
 
 Still NOT_VERIFIED/HOLD: browser route/navigation E2E, Hosted TLS/network path, full frozen 276-screen matrix, production deployment, real customer identity/data, payment, and formal whole-project acceptance.
+
+
+## V10 private-material submit + exact e7 Python HTTP integration
+
+The SaaS console now consumes the existing e7 `api/save` contract for checklist items whose `submission_type` is `PRIVATE_DOCUMENT`. No backend interface was added.
+
+Exact request:
+`{project,item,revision,kind:'DOCUMENT',content:<base64>,expires}`.
+
+UI rules mirror the reviewed customer-center contract: only OWNER/EDITOR may upload; SUBMITTED/IN_REVIEW items are not editable; the chooser is limited to PDF/PNG/JPEG and 5MB client-side before the server performs authoritative file-magic, required-format, scan, permission, quota and revision checks. `SECRETREF`, `OAUTH` and `SERVER_CHALLENGE` remain dedicated-provider flows and do not accept plaintext credentials in this console.
+
+The frontend displays the backend response text as supplied. e7 returns generic Chinese HTTP errors for the relevant boundary, including HTTP 403 `权限不足、凭据失效或请求不符合要求`, rather than exposing internal exception codes.
+
+### Exact e7 isolated integration
+
+`clients/saas-console/tests/real_python_backend_integration.py` is now bound to the review-only artifact manifest:
+
+- commit `e7f75975c4ab4eedba68306212a2bac6c067a1c3`
+- tree `d001cfd9855ed3a7758f6286db5cae7d45cce403`
+- exactly 102 manifest members, every SHA256 verified before execution
+- fixture entry `python -B -m tests.pr122_customer_browser_server`
+- required scope `ISOLATED_FIXTURE_NOT_PRODUCTION`
+- required signer marker `TEST_ONLY`
+
+Actual local execution PASS covered login → me → checklist → save → V1 preview → feedback → same-case changes → reviewer assessment/candidate → TEST_ONLY publish → V2 preview → updates/retest → cross-project 403 → logout → me 403.
+
+Observed V1:
+`66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5`
+
+Observed V2:
+`ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940`
+
+The run is real Python `HTTPServer/App/Center/SQLite` against the verified e7 artifact, not the Node stub. It remains isolated fixture evidence, not Hosted production/customer acceptance.
+
+Chromium navigation remains `BLOCKED / NOT_VERIFIED` because direct `page.goto` is administratively rejected with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. This task does not retry through proxy, setContent or alternate browser routing.

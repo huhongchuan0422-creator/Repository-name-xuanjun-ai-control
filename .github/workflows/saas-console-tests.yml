@@ -47,6 +47,8 @@ jobs:
           node --check tests/main.test.js
           node --check tests/prototype-map.test.js
           node --check tests/submission.test.js
+          python3 -m py_compile tests/real_python_backend_integration.py
+          bash -n tests/run_real_python_backend_integration.sh
 
       - name: Run SaaS console tests
         working-directory: clients/saas-console

@@ -12,3 +12,13 @@ test('POST 408/5xx JSON responses are ambiguous while GET remains definite',asyn
   await assert.rejects(post.me(),e=>e.status===status&&e.uncertain===false);
  }
 });
+
+test('material save uses exact e7 fields and preserves Chinese backend error text',async()=>{
+ let body;
+ const api=makeApi(async(u,o)=>{body=JSON.parse(o.body);return{ok:true,status:200,json:async()=>({version:'v1',revision:1,state:'PARTIAL'})}},()=> 'csrf');
+ const r=await api.save('project-a','license',0,'DOCUMENT','JVBERi0xLjc=',null);
+ assert.deepEqual(body,{project:'project-a',item:'license',revision:0,kind:'DOCUMENT',content:'JVBERi0xLjc=',expires:null});
+ assert.equal(r.state,'PARTIAL');
+ const denied=makeApi(async()=>({ok:false,status:403,json:async()=>({error:'权限不足、凭据失效或请求不符合要求'})}),()=> 'csrf');
+ await assert.rejects(denied.save('project-a','license',0,'DOCUMENT','JVBERi0xLjc=',null),e=>e.status===403&&e.message==='权限不足、凭据失效或请求不符合要求');
+});
