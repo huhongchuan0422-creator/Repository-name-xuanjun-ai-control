@@ -131,7 +131,6 @@ PY
             --model-cache "$RUNNER_TEMP/ocr-model-cache" \
             --output "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" \
             --execute-build
-          cp "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" "$RUNNER_TEMP/ocr-build/"
           sha256sum "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" > "$RUNNER_TEMP/ocr-build/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
