@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import zipfile
 import os
+import sys
 import subprocess
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
