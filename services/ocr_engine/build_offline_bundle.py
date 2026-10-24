@@ -38,6 +38,40 @@ def regular_file(path, label):
         raise BundleError(label + "_NOT_REGULAR_FILE")
     return path
 
+def validate_deb_cache(deb_cache):
+    if deb_cache is None:
+        return [], None
+    root = Path(deb_cache)
+    if root.is_symlink() or not root.is_dir():
+        raise BundleError("DEB_CACHE_NOT_DIRECTORY")
+    lock_path = regular_file(root / "system-deb-lock.json", "DEB_LOCK")
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    expected_base = "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199"
+    if lock.get("base_image") != expected_base:
+        raise BundleError("DEB_LOCK_BASE_IMAGE_MISMATCH")
+    packages = lock.get("packages")
+    if not isinstance(packages, list) or not packages:
+        raise BundleError("DEB_LOCK_EMPTY")
+    seen, verified = set(), []
+    for item in packages:
+        if not isinstance(item, dict) or not all(k in item for k in ("filename","package","version","architecture","sha256")):
+            raise BundleError("DEB_LOCK_ENTRY_INVALID")
+        name = item["filename"]
+        if not isinstance(name,str) or Path(name).name != name or not name.endswith(".deb") or name in seen:
+            raise BundleError("DEB_FILENAME_INVALID")
+        seen.add(name)
+        path = regular_file(root/name,"DEB")
+        if sha256_file(path) != item["sha256"]:
+            raise BundleError("DEB_SHA256_MISMATCH:"+name)
+        fields = __import__("subprocess").check_output(["dpkg-deb","-f",str(path),"Package","Version","Architecture"],text=True).splitlines()
+        if fields != [item["package"],item["version"],item["architecture"]]:
+            raise BundleError("DEB_METADATA_MISMATCH:"+name)
+        verified.append((path,"system-debs/"+name))
+    actual = {p.name for p in root.glob("*.deb")}
+    if actual != seen:
+        raise BundleError("DEB_MEMBER_SET_MISMATCH")
+    return verified, lock_path
+
 def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requirements_path=REQUIREMENTS,
                     manifest_path=MODEL_MANIFEST, license_path=LICENSE, notice_path=NOTICE,
                     config_schema_path=CONFIG_SCHEMA):
@@ -180,7 +214,7 @@ def publish_no_clobber(temp_path, output_path):
         raise BundleError("OUTPUT_ALREADY_EXISTS_NO_CLOBBER")
     os.unlink(str(temp_path))
 
-def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path):
+def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path, system_deb_cache=None):
     output = Path(output_path)
     if not output.is_absolute() or output.exists() or output.is_symlink():
         raise BundleError("OUTPUT_MUST_BE_ABSOLUTE_AND_NOT_EXIST")
@@ -191,10 +225,12 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
     checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
                               requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
                               license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
+    verified_debs, deb_lock_path = validate_deb_cache(system_deb_cache)
     archive_manifest = {k:v for k,v in checked.items() if not k.startswith("verified_")}
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
     archive_manifest["notice_file"] = "NOTICE.md"
+    archive_manifest["system_deb_lock"] = "system-deb-lock.json" if deb_lock_path else None
     # Freeze only the digests already verified by validate_inputs. Never bless bytes
     # observed after validation as the new source of truth.
     frozen = {
@@ -209,6 +245,10 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
         frozen["models/" + item["filename"]] = item["sha256"]
     for item in checked["wheels"]:
         frozen["wheelhouse/" + item["filename"]] = item["sha256"]
+    for path, arcname in verified_debs:
+        frozen[arcname] = sha256_file(path)
+    if deb_lock_path:
+        frozen["system-deb-lock.json"] = sha256_file(deb_lock_path)
     # Detect any validate→freeze race before the first archive member is written.
     current_paths = {
         "services/ocr_engine/model_manifest.json": Path(MODEL_MANIFEST),
@@ -223,6 +263,9 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
     }
     current_paths.update({"models/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_models"]})
     current_paths.update({"wheelhouse/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_wheels"]})
+    current_paths.update({arcname:path for path,arcname in verified_debs})
+    if deb_lock_path:
+        current_paths["system-deb-lock.json"] = deb_lock_path
     for arcname, expected_sha in frozen.items():
         path = current_paths[arcname]
         regular_file(path, "BUNDLE_INPUT")
@@ -250,8 +293,10 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 (Path(CONFIG_SCHEMA), "deployment_config.schema.json"),
             ):
                 archive.add(str(path), arcname=arcname, recursive=False)
-            for path, arcname in checked["verified_models"] + checked["verified_wheels"]:
+            for path, arcname in checked["verified_models"] + checked["verified_wheels"] + verified_debs:
                 archive.add(str(path), arcname=arcname, recursive=False)
+            if deb_lock_path:
+                archive.add(str(deb_lock_path), arcname="system-deb-lock.json", recursive=False)
             lock_payload = {
                 "target_platform": checked["target_platform"],
                 "python_implementation": checked["python_implementation"],
@@ -318,6 +363,7 @@ def main(argv=None):
     parser.add_argument("--lock-json", required=True, help="Externally prepared platform-specific lock JSON")
     parser.add_argument("--wheelhouse", required=True, help="Pre-staged wheel directory; no network access")
     parser.add_argument("--model-cache", required=True, help="Pre-staged ONNX model directory; no network access")
+    parser.add_argument("--system-deb-cache", help="Optional pre-staged, SHA-locked Debian runtime dependency closure")
     parser.add_argument("--output", required=True, help="Absolute path to a not-yet-existing archive")
     parser.add_argument("--execute-build", action="store_true", help="Explicitly permit local archive creation")
     args = parser.parse_args(argv)
@@ -325,7 +371,7 @@ def main(argv=None):
         print(json.dumps({"status":"HOLD","reason":"EXPLICIT_BUILD_FLAG_REQUIRED","network":"DISABLED","service_start":"NOT_PERFORMED"}))
         return 3
     try:
-        result = build_bundle(args.target_platform, args.lock_json, args.wheelhouse, args.model_cache, args.output)
+        result = build_bundle(args.target_platform, args.lock_json, args.wheelhouse, args.model_cache, args.output, args.system_deb_cache)
     except (BundleError, OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"status":"HOLD","reason":str(exc),"network":"DISABLED","service_start":"NOT_PERFORMED"}, sort_keys=True))
         return 2
