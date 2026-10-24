@@ -108,20 +108,20 @@
   },
   "files": {
     "scripts/community_preview_site_prepare.py": {
-      "bytes": 29582,
-      "sha256": "6b8c05a01b05b4e8ee1bea06bd3af23f1be90804190504926d7e61057d205932"
+      "bytes": 32470,
+      "sha256": "48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55"
     },
     "deploy/community-preview/prepare-site.sh": {
-      "bytes": 3338,
-      "sha256": "998ad652b039bc96f7a7756ca2fb1fe198e99fec04c443b4556c5bcd03330002"
+      "bytes": 3642,
+      "sha256": "f1af825d4acec6d775956a16a19f5e65b3a58c6aae0e703164f84ee9429ba2c6"
     },
     "tests/test_community_preview_preparation_steps.py": {
-      "bytes": 20376,
-      "sha256": "3356f5547ec347c256ccf49228b679ecb19472bf8fcaa091c28f77a4f4232604"
+      "bytes": 33332,
+      "sha256": "0bacc3d87700a3afecdc3984c60fc64a1ce6361e656f3dabae6fcd8086100533"
     },
     "docs/development/COMMUNITY_SITE_PREPARATION_STEPS_20261024.md": {
-      "bytes": 17610,
-      "sha256": "4c61751cfbdbb93504b11bc17137f6ae1bb0c92e2d26fa7486698f59a85ec12e"
+      "bytes": 20703,
+      "sha256": "2ab58d32a85168f2e92bd8e8d6325808f04317bd811a124abd26046b1f87b5f1"
     },
     ".github/workflows/chatgpt-community-wechat-sp-offline.yml": {
       "bytes": 55176,
@@ -158,5 +158,16 @@
     "FINAL_600_SECOND_SAME_ATTEMPT_CURRENT_AND_SEPARATE_UPDATE_APPROVAL"
   ],
   "ocr_production": "HOLD_DEFAULT_DISABLED",
-  "official_preview": "NOT_EXECUTED_EXACT_SHA_GATE_UNCHANGED"
+  "official_preview": "NOT_EXECUTED_EXACT_SHA_GATE_UNCHANGED",
+  "source_safety_fix": {
+    "base_source": "266d399404ef7db2e014a94dac1be93983827afe",
+    "base_tree": "3b699094fd8ed688152bca6e450b082fe2cffe2b",
+    "scope": "ACTION_ADJACENT_ORIGINAL_AUTHORITY_AND_BOUNDED_OWN_CHILD_CLEANUP",
+    "original_tests": 29,
+    "new_tests": 15,
+    "total_tests": 44,
+    "site_executed": false,
+    "root_review": "PENDING",
+    "daemon_or_clone_cancelled_by_cli_cleanup": false
+  }
 }

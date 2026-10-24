@@ -6,7 +6,7 @@ case "$1" in install|image-load|snapshot|validate-clones) ;; *) exit 2;; esac
 exec /usr/bin/python3 -I -B -S - "$1" "$2" <<'PREPARE'
 import hashlib,json,os,re,stat,sys,time
 BASE='/opt/xuanjun-community-preview'
-EXPECTED='6b8c05a01b05b4e8ee1bea06bd3af23f1be90804190504926d7e61057d205932'
+EXPECTED='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 def need(v):
  if not v:raise SystemExit('HOLD_PROTECTED_BOOTSTRAP')
@@ -39,6 +39,11 @@ try:
       and type(p.get('format')) is int and p['format']==1 and p.get('host')==HOST and p.get('stage')==stage and p.get('entry_sha256')==EXPECTED
       and type(p.get('issued_at')) is int and type(p.get('expires_at')) is int
       and p['issued_at']<=time.time()<=p['expires_at']<=p['issued_at']+600)
+ def gate():
+  need(os.getuid()==0 and os.geteuid()==0 and os.uname().nodename.split('.')[0]==HOST)
+  need(read(base,'site-prepare-approval.json',16384)==raw)
+  need(raw==json.dumps(p,sort_keys=True,separators=(',',':')).encode())
+  now=time.time();need(type(now) in (int,float) and p['issued_at']<=now<=p['expires_at'])
  try:entry=read(base,'site-prepare-v1.py',131072)
  except FileNotFoundError:
   need(stage=='install' and p['all_writers_frozen_evidence_sha256'] is None and p['snapshot_manifest_sha256'] is None)
@@ -47,16 +52,19 @@ try:
    need(stat.S_IMODE(os.fstat(source).st_mode)==0o700)
    entry=read(source,'community_preview_site_prepare.py',131072);need(hashlib.sha256(entry).hexdigest()==EXPECTED)
   finally:os.close(source)
+  gate()
   fd=os.open('site-prepare-v1.py',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=base)
   try:
-   os.fchown(fd,0,0);os.fchmod(fd,0o600);v=memoryview(entry)
-   while v:n=os.write(fd,v);need(n>0);v=v[n:]
-   os.fsync(fd)
+   gate();os.fchown(fd,0,0)
+   gate();os.fchmod(fd,0o600);v=memoryview(entry)
+   while v:
+    gate();n=os.write(fd,v);need(n>0);v=v[n:]
+   gate();os.fsync(fd)
   finally:os.close(fd)
-  os.fsync(base)
+  gate();os.fsync(base)
  need(hashlib.sha256(entry).hexdigest()==EXPECTED)
+ # Recheck after costly reads/installation, directly before the original caller.
+ gate()
+ os.execv('/usr/bin/python3',['/usr/bin/python3','-I','-B','-S',BASE+'/site-prepare-v1.py','--stage',stage,'--approval-sha256',digest])
 finally:os.close(base)
-# Original preparation source guard rechecks exact permit/source/stage and locks
-# the protected entry inode. No untrusted cwd/import path or shell expansion.
-os.execv('/usr/bin/python3',['/usr/bin/python3','-I','-B','-S',BASE+'/site-prepare-v1.py','--stage',stage,'--approval-sha256',digest])
 PREPARE

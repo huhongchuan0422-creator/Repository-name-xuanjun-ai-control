@@ -192,3 +192,38 @@ C：另给600秒same-attempt完整最终tuple后才批准实际更新；先处�
 
 尚缺的是上述真实现场证据/具体授权，不是等待一个不存在的部署自行出现。可以审代码和准备
 A，但没有私有备份实测、daemon实际容量及旧rollback验收决策时不能无条件一次更新。
+
+## 7 266d 独审两项阻断修复（仍仅源码候选）
+
+基线266d399404ef7db2e014a94dac1be93983827afe；原29项、路径/副本/比较及全部原pins保留。
+根的容量阶段跨期和非timeout异常均为本地合成复现，不是UK事故。本次新增15项，合计44项。
+
+许可仍来自原固定root保护文件/既有stage，没有新增权限或凭据。该文件及freeze引用须使用
+原canonical编码 `json.dumps(value,sort_keys=True,separators=(',',':')).encode()`；原字节SHA、
+字段/类型/stage/root/host/source约束不变。authorize在哈希、canonical和受保护读取后再次核
+原ENTRY、许可原字节与权限，最后才取时；snapshot的冻结期限及image原artifact期限也保持。
+
+原文件/目录primitive及私有树复制在紧邻创建、内容写入、元数据及fsync前复核，故容量查询、
+最后space检查、tar写完、intent canonical序列化、intent落盘等耗时点跨期后，下一对应动作
+不执行。tar/intent/load各自独立有界，先前在有效期内产生的部分文件保留，不删现场重试。
+原load后核对及observed发布前的复核保留。薄bootstrap只同步同一ENTRY安装的临近复核及
+精确源码SHA，不新增stage/输入/通道；默认关闭和A/B/C需另批均不变。
+
+两处Popen从返回实例起立即进入try/finally；时钟、轮询、输出读取/解析、普通异常和中断
+均进入同一finish_child。观察退出采用Linux原有waitid(WNOWAIT)，先不回收leader，使本次
+PID/PGID在cleanup前不能被复用；核其仍为本次session leader，只向该group发SIGKILL，
+无论信号/归属核对是否失败都尝试wait(timeout=2)。失去归属时不猜PID/不信号无关group。
+清理失败一律CHILD_CLEANUP_UNKNOWN_NO_RETRY，不返回成功，不泄露底层异常正文。
+spawn前失败没有已知child，不能猜processgroup。原输出/timeout/kill-reap预算保留，
+没有循环清理/重试或新权限。既有Linux Python须支持waitid/WNOWAIT；能力缺失即清理后HOLD，
+不安装/升级解释器。parent在Popen前复核，child在原资源限制设置后、exec前再核同一stage。
+
+新增合成用例覆盖：capacity/space跨期、权限/许可/源码撤销、artifact期限、intent canonical
+耗时、tar/intent完成后跨期、authorize自身读取跨期/权限变化、非canonical拒绝、输出临时文件
+分配跨期零spawn；两种child的普通异常/BaseException、deadline异常、kill/wait/ownership错误、
+成功路径清理失败拒绝、spawn失败不猜组。真实本地合成Python子进程证实回收，另一本窗口
+自建无关Python子进程仍存活；不是Docker/UK执行或生产身份。原29项和新增15项实跑。
+
+SIGKILL/wait只针对本次CLI原processgroup；Docker daemon中的load及clone不会因此保证取消。
+若此前已经合法开始动作，后续跨期或清理失败仍保持UNKNOWN并保留intent/副本，不能声称
+所有执行已停止/允许重试。旧2330无backend time、现场A/B/C未批准、OCR生产权限HOLD不变。

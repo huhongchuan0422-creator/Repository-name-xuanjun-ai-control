@@ -13,7 +13,7 @@ import sqlite3
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from scripts import community_preview_site_prepare as s
 from scripts import community_preview_control_carrier as carrier
 
@@ -52,6 +52,166 @@ class PreparationSteps(unittest.TestCase):
         self.private(s.PERMIT,s.canonical(p))
         with patch.object(s,'__file__',s.ENTRY),patch.object(s.os,'getuid',return_value=0),patch.object(s.os,'geteuid',return_value=0),patch.object(s.os,'uname',return_value=types.SimpleNamespace(nodename=s.HOST)),patch.object(s.time,'time',return_value=101):
             return s.authorize(stage or p['stage'],s.sha(s.canonical(p)))
+    @contextlib.contextmanager
+    def active_image(self):
+        p=self.permit('image-load');clock=[101];privilege=[0]
+        with patch.object(s,'__file__',s.ENTRY),patch.object(s,'_ACTIVE',('image-load',s.sha(s.canonical(p)))),patch.object(s.os,'getuid',return_value=0),patch.object(s.os,'geteuid',side_effect=lambda:privilege[0]),patch.object(s.os,'uname',return_value=types.SimpleNamespace(nodename=s.HOST)),patch.object(s.time,'time',side_effect=lambda:clock[0]):
+            yield clock,privilege,p
+    def test_capacity_crossing_expiry_or_revocation_zero_tar_intent_and_load(self):
+        for failure in ('expiry','privilege','permit','entry'):
+            with self.subTest(failure=failure),self.active_image() as (clock,privilege,p):
+                def slow():
+                    if failure=='expiry':clock[0]=701
+                    elif failure=='privilege':privilege[0]=1
+                    elif failure=='permit':self.private(s.PERMIT,b'{}')
+                    else:self.private(s.ENTRY,b'changed')
+                with patch.object(s,'image_present',return_value=False),patch.object(s,'daemon_capacity',side_effect=slow),patch.object(s,'capture') as run,self.assertRaises(s.Hold):
+                    s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
+                run.assert_not_called()
+                self.assertEqual(list(self.input.iterdir()),[])
+    def test_original_artifact_expiry_during_capacity_zero_write_and_load(self):
+        with self.active_image() as (clock,privilege,p):
+            p.update(issued_at=s.EXPIRES-100,expires_at=s.EXPIRES+500);self.private(s.PERMIT,s.canonical(p));clock[0]=s.EXPIRES-1
+            def slow():clock[0]=s.EXPIRES
+            with patch.object(s,'_ACTIVE',('image-load',s.sha(s.canonical(p)))),patch.object(s,'image_present',return_value=False),patch.object(s,'daemon_capacity',side_effect=slow),patch.object(s,'capture') as run,self.assertRaisesRegex(s.Hold,'F131_ARTIFACT_EXPIRED'):
+                s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
+            run.assert_not_called();self.assertEqual(list(self.input.iterdir()),[])
+    def test_final_space_observation_expiry_zero_tar_and_load(self):
+        with self.active_image() as (clock,privilege,p):
+            def slow(*args):clock[0]=701
+            with patch.object(s,'image_present',return_value=False),patch.object(s,'daemon_capacity'),patch.object(s,'space',side_effect=slow),patch.object(s,'capture') as run,self.assertRaises(s.Hold):
+                s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
+            run.assert_not_called();self.assertEqual(list(self.input.iterdir()),[])
+    def test_intent_canonical_serialization_expiry_zero_intent_and_load(self):
+        original=s.canonical
+        with self.active_image() as (clock,privilege,p):
+            def slow(value):
+                raw=original(value)
+                if type(value) is dict and value.get('image')==s.NEW_IMAGE:clock[0]=701
+                return raw
+            with patch.object(s,'canonical',side_effect=slow),patch.object(s,'image_present',return_value=False),patch.object(s,'daemon_capacity'),patch.object(s,'capture') as run,self.assertRaises(s.Hold):
+                s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
+            self.assertTrue((self.input/'community-backend-image.tar.gz').exists())
+            self.assertFalse((self.input/'image-load-intent.json').exists());run.assert_not_called()
+    def test_tar_or_intent_completion_expiry_stops_next_action(self):
+        original=s.create_file
+        for name in ('community-backend-image.tar.gz','image-load-intent.json'):
+            with self.subTest(name=name),self.active_image() as (clock,privilege,p):
+                def slow(parent,path,*args,**kwargs):
+                    original(parent,path,*args,**kwargs)
+                    if path==name:clock[0]=701
+                with patch.object(s,'create_file',side_effect=slow),patch.object(s,'image_present',return_value=False),patch.object(s,'daemon_capacity'),patch.object(s,'capture') as run,self.assertRaises(s.Hold):
+                    s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
+                run.assert_not_called();self.assertFalse((self.input/'image-load-observed.json').exists())
+                if name=='community-backend-image.tar.gz':self.assertFalse((self.input/'image-load-intent.json').exists())
+            # Separate synthetic attempts, not a production retry/cleanup.
+            for path in self.input.iterdir():path.unlink()
+    def test_authorize_own_entry_read_crossing_or_permission_change_zero_write(self):
+        original=s.read
+        for failure in ('expiry','permit_mode'):
+            with self.subTest(failure=failure),self.active_image() as (clock,privilege,p):
+                def slow(path,*args,**kwargs):
+                    raw=original(path,*args,**kwargs)
+                    if path==s.ENTRY:
+                        if failure=='expiry':clock[0]=701
+                        else:Path(s.PERMIT).chmod(0o644)
+                    return raw
+                fd=os.open(str(self.input),os.O_RDONLY|os.O_DIRECTORY)
+                try:
+                    with patch.object(s,'read',side_effect=slow),self.assertRaises(s.Hold):s.create_file(fd,'never',b'no')
+                    self.assertFalse((self.input/'never').exists())
+                finally:os.close(fd)
+    def test_noncanonical_authority_or_expired_directory_zero_mutation(self):
+        with self.active_image() as (clock,privilege,p):
+            raw=json.dumps(p,indent=2).encode();self.private(s.PERMIT,raw)
+            with patch.object(s,'_ACTIVE',('image-load',s.sha(raw))):
+                fd=os.open(str(self.input),os.O_RDONLY|os.O_DIRECTORY)
+                try:
+                    with self.assertRaisesRegex(s.Hold,'CANONICAL'):s.new_dir(fd,'never')
+                finally:os.close(fd)
+            self.assertFalse((self.input/'never').exists())
+    def test_temp_output_allocation_expiry_zero_child_spawn(self):
+        original=tempfile.TemporaryFile
+        for kind in ('capture','inspect'):
+            with self.subTest(kind=kind),self.active_image() as (clock,privilege,p):
+                def slow(*a,**kw):
+                    file=original(*a,**kw);clock[0]=701;return file
+                with patch.object(tempfile,'TemporaryFile',side_effect=slow),patch.object(s.subprocess,'Popen') as spawn,self.assertRaises(s.Hold):
+                    if kind=='capture':s.capture(['SYNTHETIC-NOT-DOCKER'])
+                    else:s.image_present('fmt',b'expected')
+                spawn.assert_not_called()
+    def child_call(self,kind):
+        if kind=='capture':return s.capture(['SYNTHETIC-NOT-DOCKER'])
+        return s.image_present('fmt',b'expected')
+    def test_both_children_ordinary_and_base_exceptions_always_kill_and_wait(self):
+        for kind in ('capture','inspect'):
+            for error in (RuntimeError('synthetic'),OSError('synthetic'),KeyboardInterrupt(),SystemExit(7)):
+                proc=types.SimpleNamespace(pid=987654321,wait=Mock(return_value=0))
+                with self.subTest(kind=kind,error=type(error).__name__),patch.object(s.subprocess,'Popen',return_value=proc),patch.object(s,'child_status',side_effect=error),patch.object(s.os,'getpgid',return_value=proc.pid),patch.object(s.os,'killpg') as kill:
+                    with self.assertRaises(type(error)):self.child_call(kind)
+                    kill.assert_called_once_with(proc.pid,s.signal.SIGKILL);proc.wait.assert_called_once_with(timeout=2)
+    def test_both_children_deadline_exception_inside_cleanup_boundary(self):
+        for kind in ('capture','inspect'):
+            proc=types.SimpleNamespace(pid=987654321,wait=Mock(return_value=0))
+            with self.subTest(kind=kind),patch.object(s.subprocess,'Popen',return_value=proc),patch.object(s.time,'monotonic',side_effect=OSError('synthetic clock')),patch.object(s.os,'getpgid',return_value=proc.pid),patch.object(s.os,'killpg') as kill:
+                with self.assertRaises(OSError):self.child_call(kind)
+                kill.assert_called_once();proc.wait.assert_called_once_with(timeout=2)
+    def test_both_children_cleanup_errors_hold_and_still_attempt_wait(self):
+        import subprocess
+        for kind in ('capture','inspect'):
+            for failure in ('kill','wait','ownership','getpgid'):
+                proc=types.SimpleNamespace(pid=987654321,wait=Mock(return_value=0))
+                if failure=='wait':proc.wait.side_effect=subprocess.TimeoutExpired('synthetic',2)
+                group=Mock(return_value=proc.pid if failure!='ownership' else proc.pid+1)
+                if failure=='getpgid':group.side_effect=OSError('unknown ownership')
+                with self.subTest(kind=kind,failure=failure),patch.object(s.subprocess,'Popen',return_value=proc),patch.object(s,'child_status',side_effect=RuntimeError('synthetic')),patch.object(s.os,'getpgid',group),patch.object(s.os,'killpg',side_effect=PermissionError('synthetic') if failure=='kill' else None) as kill:
+                    with self.assertRaisesRegex(s.Hold,'CHILD_CLEANUP_UNKNOWN'):self.child_call(kind)
+                    proc.wait.assert_called_once_with(timeout=2)
+                    if failure in ('ownership','getpgid'):kill.assert_not_called()
+                    else:kill.assert_called_once_with(proc.pid,s.signal.SIGKILL)
+    def test_cleanup_failure_suppresses_otherwise_successful_child_result(self):
+        import subprocess
+        for kind in ('capture','inspect'):
+            proc=types.SimpleNamespace(pid=987654321,wait=Mock(side_effect=subprocess.TimeoutExpired('synthetic',2)))
+            status=types.SimpleNamespace(si_code=os.CLD_EXITED,si_status=0)
+            with self.subTest(kind=kind),patch.object(s.subprocess,'Popen',return_value=proc),patch.object(s,'child_status',return_value=status),patch.object(s.os,'getpgid',return_value=proc.pid),patch.object(s.os,'killpg') as kill:
+                with self.assertRaisesRegex(s.Hold,'CHILD_CLEANUP_UNKNOWN'):
+                    if kind=='capture':s.capture(['SYNTHETIC-NOT-DOCKER'])
+                    else:s.image_present('fmt',b'')
+                kill.assert_called_once_with(proc.pid,s.signal.SIGKILL);proc.wait.assert_called_once_with(timeout=2)
+    def test_bootstrap_original_gate_checks_after_its_protected_read(self):
+        # Exact new gate AST, real protected fixture read, synthetic UID/host/
+        # clock only. No bootstrap installation or execv is executed.
+        source=Path('deploy/community-preview/prepare-site.sh').read_text().split("<<'PREPARE'\n",1)[1].rsplit('\nPREPARE',1)[0]
+        tree=ast.parse(source);gate=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='gate')
+        raw=b'{"expires_at":700,"issued_at":100}';p=json.loads(raw);self.private(self.base/'bootstrap-permit',raw)
+        clock=[101]
+        def read(parent,name,limit):
+            value=s.read(str(self.base/'bootstrap-permit'),limit);clock[0]=701;return value
+        def require(value):
+            if not value:raise s.Hold('BOOTSTRAP_GATE')
+        ns=dict(os=types.SimpleNamespace(getuid=lambda:0,geteuid=lambda:0,uname=lambda:types.SimpleNamespace(nodename=s.HOST)),HOST=s.HOST,read=read,base=None,raw=raw,p=p,need=require,json=json,time=types.SimpleNamespace(time=lambda:clock[0]))
+        exec(compile(ast.Module(body=[gate],type_ignores=[]),'<exact-bootstrap-gate>','exec'),ns)
+        with self.assertRaises(s.Hold):ns['gate']()
+    def test_spawn_failure_never_signals_guessed_processgroup(self):
+        for kind in ('capture','inspect'):
+            with self.subTest(kind=kind),patch.object(s.subprocess,'Popen',side_effect=OSError('synthetic spawn')),patch.object(s.os,'getpgid') as group,patch.object(s.os,'killpg') as kill:
+                with self.assertRaises(OSError):self.child_call(kind)
+                group.assert_not_called();kill.assert_not_called()
+    def test_real_owned_local_children_reaped_unrelated_child_survives(self):
+        import subprocess,sys
+        real=subprocess.Popen;unrelated=real([sys.executable,'-c','import time;time.sleep(10)'],start_new_session=True)
+        try:
+            for kind in ('capture','inspect'):
+                children=[]
+                def local_only(args,**kwargs):
+                    child=real([sys.executable,'-c','import time;time.sleep(10)'],**kwargs);children.append(child);return child
+                with self.subTest(kind=kind),patch.object(s.subprocess,'Popen',side_effect=local_only),patch.object(s,'child_status',side_effect=RuntimeError('synthetic after spawn')):
+                    with self.assertRaises(RuntimeError):self.child_call(kind)
+                self.assertIsNotNone(children[0].returncode)
+                with self.assertRaises(ChildProcessError):os.waitpid(children[0].pid,os.WNOHANG)
+                self.assertIsNone(unrelated.poll())
+        finally:unrelated.terminate();unrelated.wait(timeout=2)
     def test_default_disabled_without_files_or_docker(self):
         with patch.object(s,'authorize') as a,patch.object(s,'capture') as c,contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(s.main([]),2);a.assert_not_called();c.assert_not_called()

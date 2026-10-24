@@ -9,6 +9,7 @@ import fcntl
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import resource
@@ -107,19 +108,27 @@ def read(path,limit,*,root=True):
 def create_file(parent,name,raw,uid=None,gid=None,mode=0o600):
     if uid is None:uid=UID
     if gid is None:gid=ROOT_GID
+    checkpoint()
     fd=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=parent)
     try:
-        os.fchown(fd,uid,gid);os.fchmod(fd,mode)
+        checkpoint();os.fchown(fd,uid,gid)
+        checkpoint();os.fchmod(fd,mode)
         view=memoryview(raw)
-        while view:n=os.write(fd,view);need(n>0,'WRITE_FAILED');view=view[n:]
-        os.fsync(fd)
+        while view:
+            checkpoint();n=os.write(fd,view);need(n>0,'WRITE_FAILED');view=view[n:]
+        checkpoint();os.fsync(fd)
     finally:os.close(fd)
-    os.fsync(parent)
+    checkpoint();os.fsync(parent)
 
 def new_dir(parent,name):
-    os.mkdir(name,0o700,dir_fd=parent);os.fsync(parent)
+    checkpoint()
+    os.mkdir(name,0o700,dir_fd=parent)
+    checkpoint();os.fsync(parent)
     fd=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
-    os.fchmod(fd,0o700);os.fchown(fd,UID,ROOT_GID);return fd
+    try:
+        checkpoint();os.fchmod(fd,0o700)
+        checkpoint();os.fchown(fd,UID,ROOT_GID);return fd
+    except BaseException:os.close(fd);raise
 
 def space(fd,required,files):
     s=os.fstatvfs(fd)
@@ -151,24 +160,60 @@ def authorize(stage,digest):
             and type(freeze['issued_at']) is int and type(freeze['expires_at']) is int
             and freeze['issued_at']<=time.time()<=freeze['expires_at']<=freeze['issued_at']+600,'EXACT_REVIEWED_WRITER_FREEZE_REQUIRED')
     if stage=='validate-clones':need(p['snapshot_manifest_sha256'] is not None,'REVIEWED_SNAPSHOT_DIGEST_REQUIRED')
+    # Parsing, hashing and protected reads can themselves cross the deadline or
+    # observe revocation. Rebind original canonical authority before taking the
+    # FINAL clock sample, not the earlier sample preceding these operations.
+    need(raw==canonical(p),'CANONICAL_STAGE_APPROVAL_REQUIRED')
+    need(p['entry_sha256']==sha(read(ENTRY,131072)),'ENTRY_CHANGED')
+    if stage=='snapshot':
+        need(freeze_raw==canonical(freeze) and read(FREEZE,16384)==freeze_raw,'FREEZE_REFERENCE_CHANGED')
+    need(read(PERMIT,16384)==raw,'APPROVAL_CHANGED')
+    need(os.getuid()==0 and os.geteuid()==0 and os.uname().nodename.split('.')[0]==HOST,'EXACT_ROOT_HOST')
+    clock=time.time()
+    need(type(clock) in (int,float) and math.isfinite(clock)
+        and p['issued_at']<=clock<=p['expires_at'],'STAGE_APPROVAL_EXPIRED')
+    if stage=='image-load':need(clock<EXPIRES,'F131_ARTIFACT_EXPIRED')
+    if stage=='snapshot':need(freeze['issued_at']<=clock<=freeze['expires_at'],'EXACT_REVIEWED_WRITER_FREEZE_REQUIRED')
     return p
 
 def child_limits():
     resource.setrlimit(resource.RLIMIT_FSIZE,(16384,16384))
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+    checkpoint()  # inherited fixed stage; after fork setup, before command exec
+
+def child_status(proc):
+    # Observe WITHOUT reaping. The owned session leader (even a zombie) pins its
+    # PID/PGID until final cleanup, preventing a reused unrelated group signal.
+    return os.waitid(os.P_PID,proc.pid,os.WEXITED|os.WNOHANG|os.WNOWAIT)
+
+def finish_child(proc):
+    # Always attempt BOTH owned-group cleanup and bounded leader wait, including
+    # ordinary exceptions/interrupts. Failure never becomes a successful result.
+    failed=False
+    try:
+        if os.getpgid(proc.pid)!=proc.pid:failed=True
+        else:os.killpg(proc.pid,signal.SIGKILL)
+    except BaseException:failed=True
+    try:proc.wait(timeout=2)
+    except BaseException:failed=True
+    if failed:raise Hold('CHILD_CLEANUP_UNKNOWN_NO_RETRY')
 
 def capture(args,timeout=10):
     # No shell; bounded temporary private output, kill/reap whole child group.
     import tempfile
     with tempfile.TemporaryFile() as out:
+        checkpoint()
         proc=subprocess.Popen(args,stdout=out,stderr=subprocess.DEVNULL,start_new_session=True,preexec_fn=child_limits,env={'PATH':'/usr/bin:/bin'})
-        deadline=time.monotonic()+timeout
-        while proc.poll() is None:
-            if time.monotonic()>deadline or os.fstat(out.fileno()).st_size>16384:
-                os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=2);raise Hold('COMMAND_UNKNOWN_NO_RETRY')
-            time.sleep(.025)
-        need(proc.returncode==0 and os.fstat(out.fileno()).st_size<16384,'COMMAND_UNKNOWN_NO_RETRY')
-        out.seek(0);return out.read(16385)
+        try:
+            deadline=time.monotonic()+timeout;status=child_status(proc)
+            while status is None:
+                if time.monotonic()>deadline or os.fstat(out.fileno()).st_size>16384:
+                    raise Hold('COMMAND_UNKNOWN_NO_RETRY')
+                time.sleep(.025);status=child_status(proc)
+            need(status.si_code==os.CLD_EXITED and status.si_status==0
+                and os.fstat(out.fileno()).st_size<16384,'COMMAND_UNKNOWN_NO_RETRY')
+            out.seek(0);return out.read(16385)
+        finally:finish_child(proc)
 
 def component():
     global _COMPONENT
@@ -240,20 +285,24 @@ def image_present(fmt,expected):
     # never by timeout/exit code/unknown output. All stderr stays internal.
     import tempfile
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        checkpoint()
         proc=subprocess.Popen(DOCKER+['image','inspect','--format',fmt,NEW_IMAGE],stdout=out,stderr=err,
             start_new_session=True,preexec_fn=child_limits,env={'PATH':'/usr/bin:/bin'})
-        deadline=time.monotonic()+10
-        while proc.poll() is None:
-            if time.monotonic()>deadline or max(os.fstat(out.fileno()).st_size,os.fstat(err.fileno()).st_size)>4096:
-                os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=2);raise Hold('IMAGE_INVENTORY_UNKNOWN')
-            time.sleep(.025)
-        need(max(os.fstat(out.fileno()).st_size,os.fstat(err.fileno()).st_size)<=4096,'IMAGE_INVENTORY_UNKNOWN')
-        out.seek(0);err.seek(0);a=out.read(4097).strip();b=err.read(4097).strip()
-        if proc.returncode==0:
-            need(a==expected and b==b'','EXISTING_IMAGE_CHANGED');return True
-        errors=[('Error: No such image: '+NEW_IMAGE).encode(),('Error response from daemon: No such image: '+NEW_IMAGE).encode()]
-        need(proc.returncode==1 and a in (b'',b'[]') and b in errors,'IMAGE_INVENTORY_UNKNOWN')
-        return False
+        try:
+            deadline=time.monotonic()+10;status=child_status(proc)
+            while status is None:
+                if time.monotonic()>deadline or max(os.fstat(out.fileno()).st_size,os.fstat(err.fileno()).st_size)>4096:
+                    raise Hold('IMAGE_INVENTORY_UNKNOWN')
+                time.sleep(.025);status=child_status(proc)
+            need(max(os.fstat(out.fileno()).st_size,os.fstat(err.fileno()).st_size)<=4096,'IMAGE_INVENTORY_UNKNOWN')
+            out.seek(0);err.seek(0);a=out.read(4097).strip();b=err.read(4097).strip()
+            if status.si_code==os.CLD_EXITED and status.si_status==0:
+                need(a==expected and b==b'','EXISTING_IMAGE_CHANGED');return True
+            errors=[('Error: No such image: '+NEW_IMAGE).encode(),('Error response from daemon: No such image: '+NEW_IMAGE).encode()]
+            need(status.si_code==os.CLD_EXITED and status.si_status==1
+                and a in (b'',b'[]') and b in errors,'IMAGE_INVENTORY_UNKNOWN')
+            return False
+        finally:finish_child(proc)
 
 def daemon_capacity():
     # Metadata only, original Docker socket. Never list/read Docker data or Env.
@@ -293,12 +342,14 @@ def _load_fixed_archive(body,fmt,expected):
     parent=private_parent(INPUT)
     try:
         existing=image_present(fmt,expected)
-        if existing:return {'stage':'image-load','image':NEW_IMAGE,'existing_exact_image_reused':True,'service_changed':False}
+        if existing:
+            checkpoint();return {'stage':'image-load','image':NEW_IMAGE,'existing_exact_image_reused':True,'service_changed':False}
         checkpoint()
         daemon_capacity();space(parent,2*57365044,64)
         create_file(parent,'community-backend-image.tar.gz',body)
         create_file(parent,'image-load-intent.json',canonical({'image':NEW_IMAGE,'archive_sha256':INNER_SHA}))
         # EXCL intent prevents an uncertain/partial import from being repeated.
+        checkpoint()
         capture(DOCKER+['image','load','--input',INPUT+'/community-backend-image.tar.gz'],timeout=120)
         need(capture(DOCKER+['image','inspect','--format',fmt,NEW_IMAGE]).strip()==expected,'LOADED_IMAGE_UNKNOWN')
         checkpoint()
@@ -342,7 +393,10 @@ def tree(source,destination=None):
                     if dst is not None:out=new_dir(dst,name)
                     result[key]={'type':'directory','uid':s.st_uid,'gid':s.st_gid,'mode':mode}
                     walk(f,out,key+'/',depth+1)
-                    if out is not None:os.fchown(out,s.st_uid,s.st_gid);os.fchmod(out,mode);os.fsync(out)
+                    if out is not None:
+                        checkpoint();os.fchown(out,s.st_uid,s.st_gid)
+                        checkpoint();os.fchmod(out,mode)
+                        checkpoint();os.fsync(out)
                 finally:
                     os.close(f)
                     if out is not None:os.close(out)
@@ -352,23 +406,29 @@ def tree(source,destination=None):
                 f=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=src);out=None
                 try:
                     need(identity(s)==identity(os.fstat(f)),'TREE_CHANGED');h=hashlib.sha256();total=0
-                    if dst is not None:out=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=dst)
+                    if dst is not None:
+                        checkpoint();out=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=dst)
                     while True:
                         need(time.monotonic()-start<120,'TREE_TIMEOUT');b=os.read(f,1048576)
                         if not b:break
                         total+=len(b);need(total<=s.st_size,'TREE_CHANGED');h.update(b)
                         if out is not None:
                             view=memoryview(b)
-                            while view:n=os.write(out,view);need(n>0,'WRITE_FAILED');view=view[n:]
+                            while view:
+                                checkpoint();n=os.write(out,view);need(n>0,'WRITE_FAILED');view=view[n:]
                     need(total==s.st_size and identity(s)==identity(os.fstat(f)),'TREE_CHANGED')
                     result[key]={'type':'file','uid':s.st_uid,'gid':s.st_gid,'mode':mode,'bytes':total,'sha256':h.hexdigest()}
-                    if out is not None:os.fchown(out,s.st_uid,s.st_gid);os.fchmod(out,mode);os.fsync(out)
+                    if out is not None:
+                        checkpoint();os.fchown(out,s.st_uid,s.st_gid)
+                        checkpoint();os.fchmod(out,mode)
+                        checkpoint();os.fsync(out)
                 finally:
                     os.close(f)
                     if out is not None:os.close(out)
             need(identity(s)==identity(os.stat(name,dir_fd=src,follow_symlinks=False)),'TREE_REPLACED')
         need(names==bounded_names(src) and identity(before)==identity(os.fstat(src)),'DIRECTORY_CHANGED')
-        if dst is not None:os.fsync(dst)
+        if dst is not None:
+            checkpoint();os.fsync(dst)
     walk(source,destination,'',0)
     root=os.fstat(source)
     return {'entries':result,'bytes':counter[1],'count':counter[0],
@@ -386,7 +446,10 @@ def copy_roots(src,dst):
                 finally:os.close(parent)
             records[name]=tree(source,target)
             if target is not None:
-                s=os.fstat(source);os.fchown(target,s.st_uid,s.st_gid);os.fchmod(target,stat.S_IMODE(s.st_mode));os.fsync(target)
+                s=os.fstat(source)
+                checkpoint();os.fchown(target,s.st_uid,s.st_gid)
+                checkpoint();os.fchmod(target,stat.S_IMODE(s.st_mode))
+                checkpoint();os.fsync(target)
         finally:
             os.close(source)
             if target is not None:os.close(target)
@@ -451,6 +514,7 @@ def clone_run(name,image):
         '--mount','type=bind,src='+BACKUP+'/'+name+'/data,dst='+DATA+'/data',
         '--mount','type=bind,src='+BACKUP+'/'+name+'/config,dst='+DATA+'/config,readonly',
         '--entrypoint','/usr/local/bin/python',image,'-B','-c',CLONE_CODE]
+    checkpoint()
     return exact_json(capture(args,120))
 
 def validate_clones(permit):
