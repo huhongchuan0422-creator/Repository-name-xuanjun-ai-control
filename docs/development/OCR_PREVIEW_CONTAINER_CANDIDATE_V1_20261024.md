@@ -107,3 +107,15 @@ This revision closes four source-level findings from the independent review:
 Synthetic test coverage added for ENV tokenization/JSON parsing, fixed base and source-SHA gates, absent and ready encrypted DB behavior/key mismatch, symlinked binding source, and wrong callback arity. These are source-level tests and have NOT been executed in this environment.
 
 The formal runtime package remains source cb28f605291cde6dc48a2d6431166211059dc595; the independent container candidate has a different source commit. The package itself is reused without rebuilding. The image build, actual Docker lexer/frontend, read-only rootfs/capability restrictions, mounted integration path, UK network/volume, service lifecycle, Chinese HTTP inference in the container, real authentication/tenant isolation, community backend integration and Mini Program same-version E2E remain NOT_EXECUTED.
+
+## 10. Four-group source patch result
+
+The four review groups are implemented in the current candidate source:
+- Dockerfile ENV carries model pins as one single-quoted JSON value; a synthetic lexer-token/JSON parse test was added. This test has not been run, and actual Dockerfile parser behavior remains unverified without a local BuildKit/Docker environment.
+- The launcher rejects an absent/unready database before app construction. It checks the existing database read-only, validates SQLite integrity and required tables, and verifies the existing database key check using the same HMAC derivation as SecureSQLiteJobStore. It never initializes, migrates or replaces the DB.
+- The trusted adapter must be a non-symlink single-file module beneath an absolute root with no symlink path components or '..' traversal; spec and loaded module origin are checked against the resolved root; preloaded same-name modules and callback signature mismatch are rejected.
+- FROM is a literal pinned digest with no overridable base ARG. OCR_CONTAINER_SOURCE_SHA is required to be lowercase 40-character hex. The floating syntax frontend line is removed; use only a locally available BuildKit built-in frontend and a locally cached pinned base, with no frontend/base pull during the build.
+
+Additional synthetic tests cover missing database preventing app construction, existing protected DB/key binding, wrong key, symlinked module, preloaded module name, bad callback arity, and Docker ENV tokenization. All such tests are currently NOT_EXECUTED because this session has no connected local checkout/test runner and new Hosted dispatch is explicitly prohibited.
+
+Current source binding must be read from the branch ref; this document is not itself an installation authorization. No server/secret/port/volume/real document action has been performed.
