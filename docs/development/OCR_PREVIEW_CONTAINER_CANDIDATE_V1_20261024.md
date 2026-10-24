@@ -84,8 +84,8 @@ Status remains SOURCE_CANDIDATE / NOT_BUILT / NOT_INSTALLED / NOT_STARTED / COMM
 - The Dockerfile expects a directory named bundle/ at repository root, containing the exact inner tar contents from the formal artifact. It verifies wheel set/SHA and all three model SHA values before offline installation; it invokes the audited installer against the locked Debian set, installs only from the wheelhouse with --no-index, and runs pip check. No apt-get, pip network fallback, model download, or inference is part of the image build.
 - Before any build, the operator must securely retrieve artifact 12553737114, verify the ZIP and inner tar hashes stated in Section 1, safely extract the tar into bundle/, and verify offline-bundle-manifest.json. This candidate has not downloaded or extracted those bytes itself.
 - Candidate build invocation after bundle/ is verified and the pinned base image is already locally available:
-  docker build --network=none --build-arg OCR_CONTAINER_SOURCE_SHA=60fb8b677b572bddce78d7c23c5e22502751a368 -f services/ocr_engine/Dockerfile.preview .
-  The build argument above is only the first packaging-source checkpoint and must be replaced with the final candidate commit SHA after these candidate files are committed. Do not run this command as part of this task.
+  docker build --network=none --build-arg OCR_CONTAINER_SOURCE_SHA="$(git rev-parse HEAD)" -f services/ocr_engine/Dockerfile.preview .
+  This command binds the image label to the checked-out candidate commit. Do not run this command as part of this task.
 - The launcher imports a trusted adapter module from the externally mounted /opt/ocr-integration path. It requires callables named authenticate, authorize_application and authorize_attachment. Missing module/callback, missing DB/key/model configuration, bad key format or model SHA mismatch exits before binding a listener. It does not create keys, database files, host directories, or callback behavior.
 - The image creates only its internal /var/lib/xuanjun-ocr directory during image construction, owned by UID/GID 10001. At runtime this path is intended to be replaced by the separately approved persistent mount; runtime root filesystem should be read-only. This is image-source behavior, not a host-side volume creation.
 - This build/source candidate has not been compiled, built, started, or run in Docker. Dockerfile syntax, artifact extraction, offline pip/dpkg, health check, non-root permissions, graceful stop/restart and HTTP contract remain NOT_EXECUTED until a permitted isolated build environment is available.
@@ -94,4 +94,4 @@ Status remains SOURCE_CANDIDATE / NOT_BUILT / NOT_INSTALLED / NOT_STARTED / COMM
 
 - Dockerfile commit: 478fcd02ee6542f9974e2ccfe7c13fd79fbf1946.
 - Launcher commit: 6d0617e8be5e58bc95298adb4c7a3e6e46946fc3.
-- Final candidate HEAD is the commit that adds this document's final source-binding update. Verify branch ref before using any build command.
+- Final candidate HEAD is verified after this document update; use only the exact branch HEAD and verify the formal artifact hashes before any separately approved build.
