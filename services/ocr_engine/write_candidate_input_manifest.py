@@ -47,11 +47,12 @@ def main():
                 add(p, "wheelhouse/" + p.name, "downloaded-from-pypi; locally hashed; not independently pinned")
 
     models = root / "ocr-model-cache"
-    if models.is_dir() and not models.is_symlink():
-        for p in sorted(models.iterdir()):
-            if p.name in MODEL_NAMES:
-                prov = "fixed-model-manifest-sha256" if regular_readable(p) and trusted.get(p.name) == sha(p) else "SHA_NOT_VERIFIED_AGAINST_FIXED_MANIFEST"
-                add(p, "models/" + p.name, prov, required=True)
+    for filename in sorted(MODEL_NAMES):
+        p = models / filename
+        if regular_readable(p) and trusted.get(filename) == sha(p):
+            add(p, "models/" + filename, "FIXED_MODEL_MANIFEST_SHA256_MATCH")
+        else:
+            add(p, "models/" + filename, "MODEL_SHA_NOT_VERIFIED_AGAINST_FIXED_MANIFEST", required=True)
 
     debroot = root / "ocr-deb-cache"
     if debroot.is_dir() and not debroot.is_symlink():
