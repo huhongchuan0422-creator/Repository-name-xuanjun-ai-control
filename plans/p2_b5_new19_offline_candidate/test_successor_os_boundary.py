@@ -52,6 +52,7 @@ class SealedOSBoundary:
         self.pins = {}
         self.sealed_paths = {}
         self.sealed_symlinks = {}
+        self.generated_symlinks = {}
         self.sealed_directories = {}
         for path, identity in pins.items():
             real = self.root/path.lstrip('/')
@@ -59,7 +60,7 @@ class SealedOSBoundary:
             self.pins[(st.st_dev, st.st_ino)] = identity
             self.sealed_paths[(st.st_dev, st.st_ino)] = path
         self._open, self._stat, self._fstat = os.open, os.stat, os.fstat
-        self._readlink = os.readlink
+        self._readlink, self._symlink = os.readlink, os.symlink
         for path in self.directories | self.allowed:
             real = self.root/path.lstrip('/')
             try:
@@ -82,6 +83,14 @@ class SealedOSBoundary:
         # their real lstat identity/type/link-count/target at seal time and only
         # synthesize UK root ownership while every sealed property still
         # matches.  A replacement inode or retargeted link never inherits it.
+        generated = self.generated_symlinks.get((st.st_dev,st.st_ino)) \
+            if not follow_symlinks else None
+        if generated is not None and path in self.allowed:
+            mode,nlink,target = generated
+            real = self.root/path.lstrip('/')
+            if ((st.st_mode,st.st_nlink)==(mode,nlink) and
+                    self._readlink(str(real))==target):
+                return StatView(st,st.st_dev,st.st_ino)
         sealed = self.sealed_symlinks.get(path) if not follow_symlinks else None
         if sealed is not None:
             dev, ino, mode, nlink, target = sealed
@@ -156,6 +165,19 @@ class SealedOSBoundary:
     def fstat(self, fd):
         return self._mapped(self._fstat(fd))
 
+    def symlink(self, target, link_name, target_is_directory=False, *, dir_fd=None):
+        link_name = os.fspath(link_name)
+        logical = (link_name if dir_fd is None and link_name.startswith('/')
+                   else self._relative_logical(link_name,dir_fd))
+        if logical is None or logical not in self.allowed:
+            raise PermissionError('UNLISTED_OS_PATH')
+        actual = (str(self.root/link_name.lstrip('/'))
+                  if dir_fd is None and link_name.startswith('/') else link_name)
+        self._symlink(target,actual,target_is_directory=target_is_directory,dir_fd=dir_fd)
+        st=self._stat(actual,dir_fd=dir_fd,follow_symlinks=False)
+        self.generated_symlinks[(st.st_dev,st.st_ino)] = (
+            st.st_mode,st.st_nlink,os.fspath(target))
+
     def readlink(self, path, *, dir_fd=None):
         path = os.fspath(path)
         if dir_fd is None and path.startswith('/proc/self/fd/'):
@@ -180,7 +202,8 @@ class SealedOSBoundary:
     @contextlib.contextmanager
     def active(self):
         with patch.object(os, 'open', self.open), patch.object(os, 'stat', self.stat), \
-             patch.object(os, 'fstat', self.fstat), patch.object(os, 'readlink', self.readlink):
+             patch.object(os, 'fstat', self.fstat), patch.object(os, 'readlink', self.readlink), \
+             patch.object(os, 'symlink', self.symlink):
             yield
 
 
@@ -277,6 +300,31 @@ class IdentityBoundaryTests(unittest.TestCase):
                 self.assertEqual((replaced.st_uid,replaced.st_gid),real_owner)
                 self.assertEqual(os.readlink('current',dir_fd=parent),
                                  '/opt/xuanjun-fixture/releases/new')
+            finally:os.close(parent)
+
+    def test_boundary_created_symlink_maps_root_but_external_replacement_does_not(self):
+        base='/opt/xuanjun-generated'
+        staged=base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
+        current=base+'/current'
+        real_base=self.root/base.lstrip('/')
+        real_base.mkdir(parents=True,exist_ok=True)
+        boundary=SealedOSBoundary(self.root,[staged,current],{})
+        with boundary.active():
+            parent=os.open(base,os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                os.symlink(base+'/releases/new',os.path.basename(staged),dir_fd=parent)
+                os.replace(os.path.basename(staged),'current',src_dir_fd=parent,dst_dir_fd=parent)
+                created=os.stat('current',dir_fd=parent,follow_symlinks=False)
+                self.assertEqual((created.st_uid,created.st_gid),(0,0))
+            finally:os.close(parent)
+        real_current=real_base/'current'
+        real_current.unlink();real_current.symlink_to(base+'/releases/foreign')
+        real_owner=(real_current.lstat().st_uid,real_current.lstat().st_gid)
+        with boundary.active():
+            parent=os.open(base,os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                replaced=os.stat('current',dir_fd=parent,follow_symlinks=False)
+                self.assertEqual((replaced.st_uid,replaced.st_gid),real_owner)
             finally:os.close(parent)
 
     def test_synthetic_six_bytes_cannot_pass_original_digest_guard(self):
