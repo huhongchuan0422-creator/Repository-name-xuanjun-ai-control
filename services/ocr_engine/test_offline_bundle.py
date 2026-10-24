@@ -162,6 +162,23 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertNotIn("secrets.",text)
         self.assertIn("docker run --rm --network none --platform linux/amd64",text)
 
+    def test_requirements_use_only_one_official_opencv_distribution(self):
+        req=(Path(__file__).with_name("requirements.txt")).read_text(encoding="utf-8")
+        self.assertIn("opencv-python==4.11.0.86",req)
+        self.assertNotIn("opencv-python-headless",req)
+        self.assertEqual(sum(1 for line in req.splitlines() if line.lower().startswith("opencv-python")),1)
+    def test_workflow_captures_hashed_deb_closure_and_failed_candidate_inputs(self):
+        workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
+        text=workflow.read_text(encoding="utf-8")
+        self.assertIn("Resolve official Debian runtime shared-library closure for OpenCV",text)
+        self.assertIn("system-deb-lock.json",text)
+        self.assertIn("--system-deb-cache",text)
+        self.assertIn("xuanjun-ocr-candidate-inputs-not-release-",text)
+        self.assertIn("if: always()",text)
+        self.assertIn("ocr-deb-cache",text)
+        self.assertIn("apt-get install -y --download-only",text)
+        self.assertIn("dpkg-deb",text)
+
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
         with self.assertRaisesRegex(BundleError,"MODEL_NOTICE_MISSING_ATTRIBUTION:det"): self.check()
