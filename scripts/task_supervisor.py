@@ -9,6 +9,7 @@ from __future__ import print_function
 import hashlib
 import json
 import math
+import os
 import re
 import sqlite3
 import time
@@ -84,18 +85,43 @@ class Supervisor(object):
 
     migration_fail_at = None
 
+    @classmethod
+    def _readonly_preflight(cls, path):
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            return
+        uri = 'file:%s?mode=ro&immutable=1' % os.path.abspath(path)
+        db = sqlite3.connect(uri, uri=True, timeout=5)
+        try:
+            app = db.execute('PRAGMA application_id').fetchone()[0]
+            ver = db.execute('PRAGMA user_version').fetchone()[0]
+            tasks = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
+            ).fetchone()
+            any_table = db.execute("""SELECT 1 FROM sqlite_master
+              WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1""").fetchone()
+            if tasks is not None:
+                if app != SUPERVISOR_APPLICATION_ID:
+                    raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
+                if ver in (1, 2):
+                    raise ValueError('HOLD_MIGRATION_REQUIRED')
+                if ver != SUPERVISOR_SCHEMA_VERSION:
+                    raise ValueError('UNSUPPORTED_SUPERVISOR_SCHEMA')
+            elif any_table is not None:
+                raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
+        finally:
+            db.close()
+
     def __init__(self, path, clock=None):
         self.path = path
         self.clock = clock or time.time
-        # IMMEDIATE transactions serialize ledger writers while WAL still
-        # permits observers.  Event + task + outbox updates commit atomically.
+        # Read-only immutable preflight prevents an old WAL-mode v1/v2 ledger
+        # from creating wal/shm/journal sidecars merely because normal runtime
+        # attempted to open it.
+        self._readonly_preflight(path)
         self.db = sqlite3.connect(path, timeout=10, isolation_level='IMMEDIATE')
         self.db.row_factory = sqlite3.Row
         try:
             self.db.execute('PRAGMA foreign_keys=ON')
-            # Existing v1/v2 files are read-preflighted and rejected before
-            # journal-mode or schema mutation.  Explicit offline migration is
-            # a separate call.
             self._schema()
             self.db.execute('PRAGMA journal_mode=WAL')
         except Exception:
