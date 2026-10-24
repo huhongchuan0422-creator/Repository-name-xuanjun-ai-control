@@ -291,8 +291,8 @@
     {
       "bundle_path": "test_runtime_freeze_and_caller.py",
       "release_path": null,
-      "bytes": 3071,
-      "sha256": "5b3afc9e0cdadbfe6c5fece44f1c7c63954dade3dc1d6aa86f8ebecf5a4eb636"
+      "bytes": 3413,
+      "sha256": "8dafb94288cd356132625b8a9b1bba78816d0c3ee071c5cd978d0183abbcc386"
     }
   ],
   "known_hold": "LIVE_WAL_PRECHECK_SHM_READER_MARK_UNDECIDED",

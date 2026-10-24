@@ -32,8 +32,13 @@ class FreezeAndCallerTests(unittest.TestCase):
     def test_external_binder_refuses_uncommitted_or_wrong_head(self):
         with self.assertRaisesRegex(ValueError,'REAL_COMMIT_REQUIRED'):
             freeze.binder('not-a-commit')
-        with self.assertRaisesRegex(ValueError,'WORKTREE_NOT_CLEAN'):
-            freeze.binder('a'*40)
+        with mock.patch.object(freeze,'git',return_value='M changed-source'):
+            with self.assertRaisesRegex(ValueError,'WORKTREE_NOT_CLEAN'):
+                freeze.binder('a'*40)
+        with mock.patch.object(freeze,'git',side_effect=lambda *args:
+                               '' if args[0]=='status' else 'b'*40):
+            with self.assertRaisesRegex(ValueError,'COMMIT_NOT_CURRENT_HEAD'):
+                freeze.binder('a'*40)
 
     def test_original_factory_uses_one_original_network_without_io(self):
         sentinel=object()
