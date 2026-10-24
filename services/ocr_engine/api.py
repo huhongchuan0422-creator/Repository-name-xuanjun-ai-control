@@ -142,22 +142,27 @@ def _raw_version_valid(value, optional=False):
         return False
     return _valid_revision(value)
 
-def _shared_writeback_eligible(job):
-    if job.get("status") != "confirmed" or not isinstance(job.get("confirmation_revision"), int) or isinstance(job.get("confirmation_revision"), bool) or job.get("confirmation_revision", 0) < 1:
+def _shared_writeback_eligible(snapshot):
+    if snapshot.get("status") != "confirmed":
         return False
-    if (job.get("provider_version") is None or not _valid_provider_version(job.get("provider_version")) or
-            not _valid_revision(job.get("application_revision")) or not job.get("attachment_id") or
-            job.get("document_type") not in ALLOWED_HINTS or
-            not isinstance(job.get("document_sha256"), str) or
-            __import__("re").fullmatch(r"[0-9a-f]{64}", job.get("document_sha256", "")) is None):
+    revision = snapshot.get("confirmation_revision", snapshot.get("revision"))
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         return False
-    binding = job.get("confirmed_binding")
+    binding = snapshot.get("confirmed_binding")
     if not isinstance(binding, dict):
         return False
-    expected = {"application_revision": job.get("application_revision"), "provider_version": job.get("provider_version"),
-                "document_type": job.get("document_type"), "attachment_id": job.get("attachment_id"),
-                "content_sha256": job.get("document_sha256")}
-    return binding == expected and isinstance(job.get("confirmed_fields"), dict) and bool(job.get("confirmed_fields"))
+    application_revision = snapshot.get("application_revision", binding.get("application_revision"))
+    provider_version = snapshot.get("provider_version", binding.get("provider_version"))
+    document_type = binding.get("document_type")
+    attachment_id = binding.get("attachment_id")
+    digest = binding.get("content_sha256")
+    if (provider_version is None or not _valid_provider_version(provider_version) or
+            not _valid_revision(application_revision) or not attachment_id or document_type not in ALLOWED_HINTS or
+            not isinstance(digest, str) or __import__("re").fullmatch(r"[0-9a-f]{64}", digest) is None):
+        return False
+    expected = {"application_revision": application_revision, "provider_version": provider_version,
+                "document_type": document_type, "attachment_id": attachment_id, "content_sha256": digest}
+    return binding == expected and isinstance(snapshot.get("confirmed_fields"), dict) and bool(snapshot.get("confirmed_fields"))
 
 def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
@@ -315,21 +320,19 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=409, detail=str(exc))
         if not job:
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
-        # Normalize both first-confirm and idempotent replay responses from the persisted job,
-        # because a replay record intentionally contains only the response snapshot, not DB columns.
-        persisted = jobs.get(job_id, p.tenant_id)
-        if not persisted:
-            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
-        confirmed_revision = persisted.get("confirmation_revision", job.get("revision", body.revision))
-        confirmed_fields = persisted.get("confirmed_fields", job.get("confirmed_fields", body.fields))
-        confirmed_binding = persisted.get("confirmed_binding", job.get("confirmed_binding"))
-        application_revision = persisted.get("application_revision", existing.get("application_revision"))
-        provider_version = persisted.get("provider_version", existing.get("provider_version"))
-        return {"job_id": job_id, "status": persisted["status"], "revision": confirmed_revision,
+        # Preserve the snapshot returned by confirm(): for an idempotency replay it is
+        # the original key's immutable response, not the job's latest mutable confirmation.
+        snapshot = job
+        confirmed_revision = snapshot.get("confirmation_revision", snapshot.get("revision", body.revision))
+        confirmed_fields = snapshot.get("confirmed_fields", body.fields)
+        confirmed_binding = snapshot.get("confirmed_binding")
+        application_revision = snapshot.get("application_revision", existing.get("application_revision"))
+        provider_version = snapshot.get("provider_version", existing.get("provider_version"))
+        return {"job_id": job_id, "status": snapshot["status"], "revision": confirmed_revision,
                 "confirmed_fields": confirmed_fields, "confirmed_binding": confirmed_binding,
                 "application_revision": application_revision,
                 "provider_version": provider_version,
-                "shared_writeback_eligible": _shared_writeback_eligible(persisted),
+                "shared_writeback_eligible": _shared_writeback_eligible(snapshot),
                 "recorded": True}
     @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
