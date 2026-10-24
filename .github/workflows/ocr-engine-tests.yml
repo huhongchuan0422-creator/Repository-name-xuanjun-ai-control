@@ -153,9 +153,39 @@ jobs:
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               test -f /debs/system-deb-lock.json
-              mkdir -p /tmp/ocr-apt-lists
-              cp -a /var/lib/apt/lists/. /tmp/ocr-apt-lists/
-              apt-get -o Dir::State::lists=/tmp/ocr-apt-lists install -y --no-download --no-install-recommends /debs/*.deb
+              python - <<'PY'
+import json,subprocess
+from pathlib import Path
+root=Path("/debs")
+lock=json.loads((root/"system-deb-lock.json").read_text(encoding="utf-8"))
+packages=lock.get("packages")
+if not isinstance(packages,list) or not packages: raise SystemExit("DEB_LOCK_EMPTY")
+expected={}
+for item in packages:
+    name=item["package"]
+    if name in expected: raise SystemExit("DEB_PACKAGE_DUPLICATE:"+name)
+    expected[name]=(item["version"],item["architecture"],item["filename"])
+actual={p.name for p in root.glob("*.deb")}
+if actual!={v[2] for v in expected.values()}: raise SystemExit("DEB_FILE_SET_DIFFERS_FROM_LOCK")
+for name,(version,arch,filename) in expected.items():
+    path=root/filename
+    result=subprocess.run(["dpkg-deb","-f",str(path),"Package"],check=True,text=True,capture_output=True)
+    pkg=result.stdout.strip()
+    result=subprocess.run(["dpkg-deb","-f",str(path),"Version"],check=True,text=True,capture_output=True)
+    ver=result.stdout.strip()
+    result=subprocess.run(["dpkg-deb","-f",str(path),"Architecture"],check=True,text=True,capture_output=True)
+    architecture=result.stdout.strip()
+    if (pkg,ver,architecture)!=(name,version,arch): raise SystemExit("DEB_LOCK_METADATA_MISMATCH:"+filename)
+    import hashlib
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=item["sha256"]: raise SystemExit("DEB_LOCK_SHA_MISMATCH:"+filename)
+# Unpack only the exact hash-locked set, then configure offline. Never use apt/network fallback.
+subprocess.run(["dpkg","--unpack"]+[str(root/v[2]) for v in expected.values()],check=True)
+subprocess.run(["dpkg","--configure","-a"],check=True)
+subprocess.run(["dpkg","--audit"],check=True)
+for name,(version,arch,filename) in expected.items():
+    result=subprocess.run(["dpkg-query","-W","-f="+name+"="+ "${Version}" + chr(10),name],check=True,text=True,capture_output=True)
+    if result.stdout.strip()!=name+"="+version: raise SystemExit("INSTALLED_DEB_VERSION_MISMATCH:"+name)
+PY
               python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
               python /src/services/ocr_engine/verify_offline_runtime.py
             '
