@@ -220,10 +220,12 @@ class IdentityBoundaryTests(unittest.TestCase):
         real.symlink_to('/opt/xuanjun-fixture/releases/new')
         with boundary.active():
             replaced=os.stat(current_path,follow_symlinks=False)
-            self.assertNotEqual((replaced.st_dev,replaced.st_ino),
-                                boundary.sealed_symlinks[current_path][:2])
+            # inode numbers may be reused immediately after unlink; the sealed
+            # target/type/link metadata is therefore part of the identity.
             self.assertEqual((replaced.st_uid,replaced.st_gid),
                              (real.lstat().st_uid,real.lstat().st_gid))
+            self.assertEqual(os.readlink(current_path),
+                             '/opt/xuanjun-fixture/releases/new')
 
     def test_synthetic_six_bytes_cannot_pass_original_digest_guard(self):
         # Device/inode translation never supplies or authenticates file bytes.
