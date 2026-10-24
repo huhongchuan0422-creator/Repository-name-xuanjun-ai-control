@@ -252,6 +252,23 @@ class CanonicalCompletionTests(unittest.TestCase):
                 self.candidate,'dev-complete-2')
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
 
+    def test_review_policy_drift_from_canonical_contract_is_rejected(self):
+        drift=copy.deepcopy(self.contract)
+        drift['developer']={'issuer':'native','subject':'other-developer'}
+        drift_sha=gate.review_bundle(drift,self.files,[])['bundle_sha256']
+        drift_reviews=[]
+        for p in drift['trusted_reviewers']:
+            payload=dict(
+                reviewer={k:p[k] for k in ('issuer','subject')},
+                role=p['role'],bundle_sha256=drift_sha,decision='PASS')
+            drift_reviews.append(signed(payload,p['key_id']))
+        with self.assertRaisesRegex(
+                ValueError,'REVIEW_CANDIDATE_BINDING_MISMATCH'):
+            gate.complete_reviewed_candidate(
+                self.s,drift,self.files,drift_reviews,KEYS,
+                self.candidate,'dev-complete-policy-drift')
+        self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
+
     def test_completion_replay_restart_outbox_and_conflict(self):
         reviews=self.reviews()
         first=gate.complete_reviewed_candidate(
