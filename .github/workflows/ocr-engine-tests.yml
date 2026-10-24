@@ -156,7 +156,6 @@ jobs:
               mkdir -p /tmp/ocr-apt-lists
               cp -a /var/lib/apt/lists/. /tmp/ocr-apt-lists/
               apt-get -o Dir::State::lists=/tmp/ocr-apt-lists install -y --no-download --no-install-recommends /debs/*.deb
-              dpkg-query -W -f="${Package}=${Version}\n" libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
               python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
               python /src/services/ocr_engine/verify_offline_runtime.py
             '
