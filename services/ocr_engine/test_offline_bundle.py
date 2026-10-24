@@ -692,6 +692,10 @@ class OfflineBundleInputTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("ocr_entrypoint_origin_test", Path(__file__).with_name("container_entrypoint.py"))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         root = self.root / "trusted-bindings"; root.mkdir()
+        owner_check = mock.patch.object(module, "_safe_root_owned", return_value=True)
+        mount_check = mock.patch.object(module, "readonly_mount_for", return_value=True)
+        owner_check.start(); mount_check.start()
+        self.addCleanup(owner_check.stop); self.addCleanup(mount_check.stop)
         sys.modules["trusted"] = object()
         try:
             with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_BINDINGS_MODULE_ALREADY_LOADED"):
@@ -737,7 +741,6 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("COLUMN_CONTRACT_MISMATCH", reason)
         bad_unique = self.root / "bad-unique.sqlite3"
-        db = sqlite3.connect(bad_unique)
         store_schema = SecureSQLiteJobStore(str(bad_unique), key)
         db = sqlite3.connect(bad_unique)
         db.execute("DROP INDEX idx_ocr_tenant")
@@ -813,7 +816,15 @@ class OfflineBundleInputTests(unittest.TestCase):
         root = self.root / "mode-bindings"; root.mkdir()
         source = root / "trusted_mode.py"
         source.write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e,f): return {}\n")
+        original_lstat = Path.lstat
+        def root_owned_lstat(path, *args, **kwargs):
+            result = original_lstat(path, *args, **kwargs)
+            values = list(result)
+            values[4] = 0  # Only synthetic uid changes; real mode/type remain checked.
+            return os.stat_result(values)
         root.chmod(0o777)
+        owner_fixture = mock.patch.object(Path, "lstat", root_owned_lstat)
+        owner_fixture.start(); self.addCleanup(owner_fixture.stop)
         with mock.patch.object(module, "readonly_mount_for", return_value=True):
             with self.assertRaisesRegex(RuntimeError, "OCR_INTEGRATION_ROOT_OWNER_OR_MODE_UNSAFE"):
                 module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_mode","OCR_INTEGRATION_PATH":str(root)})
@@ -821,5 +832,71 @@ class OfflineBundleInputTests(unittest.TestCase):
         with mock.patch.object(module, "readonly_mount_for", return_value=True):
             with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_BINDINGS_SOURCE_OWNER_OR_MODE_UNSAFE"):
                 module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_mode","OCR_INTEGRATION_PATH":str(root)})
+
+    def test_preview_schema_rejects_partial_or_external_unique_impostors(self):
+        from services.ocr_engine import container_entrypoint as module
+        from services.ocr_engine.secure_store import SecureSQLiteJobStore
+        from cryptography.fernet import Fernet
+        key = Fernet.generate_key()
+        for partial in (True, False):
+            with self.subTest(partial=partial):
+                path = self.root / ("partial.sqlite3" if partial else "external.sqlite3")
+                SecureSQLiteJobStore(str(path), key)
+                self.assertTrue(module.check_existing_database(str(path), key)[0])
+                with sqlite3.connect(path) as db:
+                    sql = db.execute("SELECT sql FROM sqlite_master WHERE name='ocr_jobs'").fetchone()[0]
+                    db.execute("DROP TABLE ocr_jobs")
+                    db.execute(sql.replace("UNIQUE(tenant_key, idem_key)",
+                                           "CHECK(1) /* UNIQUE(tenant_key, idem_key) */"))
+                    db.execute("CREATE INDEX idx_ocr_tenant ON ocr_jobs(tenant_key)")
+                    db.execute("CREATE UNIQUE INDEX fake_idem ON ocr_jobs(tenant_key,idem_key)" +
+                               (" WHERE state='impossible'" if partial else ""))
+                ok, reason = module.check_existing_database(str(path), key)
+                self.assertFalse(ok)
+                self.assertEqual(reason, "OCR_DATABASE_UNIQUE_CONSTRAINTS_MISMATCH")
+
+    def test_preview_mountinfo_rejects_stacked_or_deeper_rw_mounts(self):
+        from services.ocr_engine import container_entrypoint as module
+        root = self.root / "nested mount"; root.mkdir()
+        source = root / "adapter.py"; source.write_text("# source")
+        escaped = str(root).replace(" ", chr(92) + "040")
+        parent = "20 1 0:1 / / rw - ext4 /dev/root rw"
+        ro = "21 20 0:2 / " + escaped + " ro - tmpfs tmpfs rw"
+        rw = "22 21 0:3 / " + escaped + " rw - tmpfs tmpfs rw"
+        for lines in ((parent, ro, rw), (parent, rw, ro)):
+            self.assertFalse(module.readonly_mount_for(source, chr(10).join(lines)))
+        file_rw = "23 21 0:4 / " + escaped + "/adapter.py rw - tmpfs tmpfs rw"
+        self.assertFalse(module.readonly_mount_for(source, chr(10).join((parent, ro, file_rw))))
+        self.assertTrue(module.readonly_mount_for(source, chr(10).join((parent, ro))))
+        ambiguous = "21 20 0:2 / " + escaped + " rw - tmpfs tmpfs ro"
+        self.assertFalse(module.readonly_mount_for(source, chr(10).join((parent, ambiguous))))
+
+    def test_preview_executes_verified_source_not_timestamp_matched_pyc(self):
+        import py_compile
+        from services.ocr_engine import container_entrypoint as module
+        root = self.root / "pyc-fixture"; root.mkdir()
+        source = root / "review_pyc_adapter.py"
+        marker = self.root / "stale-bytecode-ran"
+        tail = chr(10).join(("", "def authenticate(token): return 'source-result'",
+                             "def authorize_application(a,b): return False",
+                             "def authorize_attachment(a,b,c,d,e,f): return {}",
+                             "SOURCE_FILE = __file__", "SOURCE_NAME = __name__", ""))
+        stale = "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()" + tail
+        clean = "#" + " " * (len(stale) - len(tail) - 1) + tail
+        source.write_text(stale)
+        previous = source.stat()
+        py_compile.compile(str(source), doraise=True)
+        source.write_text(clean)
+        os.utime(source, ns=(previous.st_atime_ns, previous.st_mtime_ns))
+        self.addCleanup(sys.modules.pop, "review_pyc_adapter", None)
+        with mock.patch.object(module, "_safe_root_owned", return_value=True):
+            bindings = module.load_bindings(
+                {"OCR_TRUSTED_BINDINGS_MODULE":"review_pyc_adapter", "OCR_INTEGRATION_PATH":str(root)},
+                mount_checker=lambda *_: True)
+        self.assertFalse(marker.exists())
+        self.assertEqual(bindings["authenticate"]("synthetic"), "source-result")
+        loaded = sys.modules["review_pyc_adapter"]
+        self.assertEqual(Path(loaded.SOURCE_FILE), source)
+        self.assertEqual(loaded.SOURCE_NAME, "review_pyc_adapter")
 
 if __name__=="__main__": unittest.main()
