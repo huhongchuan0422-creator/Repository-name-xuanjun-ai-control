@@ -193,7 +193,8 @@ class SupervisorTests(unittest.TestCase):
             for column in ('last_trusted_time','coverage_digest',
                            'receiver_ack_sha256','receiver_ack_json',
                            'resource_scope_digest','resource_scope_json',
-                           'authority_caller_id','authority_gateway_id',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id',
                            'authority_session_id','authority_run_id',
                            'authority_valid_until','authority_state'):
                 db.execute('ALTER TABLE tasks DROP COLUMN '+column)
