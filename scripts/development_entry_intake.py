@@ -125,104 +125,8 @@ def _git_remote_repository(root):
         ['git','-C',root,'remote','get-url','origin'],
         stderr=subprocess.DEVNULL).decode('utf-8','strict').strip()
     patterns = (
-        r'https://github\.com/([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+?)(?:\.git)?    with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as stream:
-        event = json.load(stream)
-    body = event.get('comment', {}).get('body', '')
-    if 'XJ_DEV_ENTRY ' not in body:
-        return
-    repo = os.environ['GITHUB_REPOSITORY']
-    owner = repo.split('/')[0]
-    # Ignore untrusted sources without posting or replying to arbitrary issues.
-    if (event.get('sender', {}).get('login') != owner
-            or event.get('comment', {}).get('user', {}).get('login') != owner
-            or event.get('issue', {}).get('number') != 17
-            or 'pull_request' not in event.get('issue', {})):
-        return
-    try:
-        receipt = validate_event(event, repo, owner)
-        if receipt['event'] == 'CODE_READY':
-            try:
-                receipt['syntax_gate'] = syntax_receipt(receipt, repo,
-                    os.environ['GITHUB_TOKEN'],
-                    typescript_module=os.environ.get('XJ_TYPESCRIPT_MODULE'))
-            except Exception:
-                # Do not emit server errors, credential values or source snippets.
-                receipt['syntax_gate'] = {'state': 'HOLD_SYNTAX_INTAKE_ERROR',
-                    'authority_effect': 'NONE', 'code_executed': False}
-            try:
-                receipt['canonical_gate'] = bind_from_controlled_environment(receipt)
-            except Exception:
-                receipt['canonical_gate'] = {
-                    'state': 'HOLD_CANONICAL_SOURCE_BINDING_ERROR',
-                    'authority_effect': 'NONE'}
-    except (ValueError, TypeError, KeyError):
-        receipt = dict(status='REJECTED_INVALID_ENTRY_ENVELOPE',
-                       source_comment_id=event['comment']['id'], authority_effect='NONE')
-    marker = '<!-- XJ_DEV_ENTRY_RECEIPT %s -->' % json.dumps(receipt, sort_keys=True)
-    request = urllib.request.Request(
-        'https://api.github.com/repos/' + repo + '/issues/17/comments',
-        data=json.dumps({'body': marker + '\n::SKIP_COMPLETION::\n'
-             'Mechanical entry receipt only. No writer, stop, handoff, code execution or quota verification.'}).encode('utf-8'),
-        headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
-                 'Accept': 'application/vnd.github+json',
-                 'Content-Type': 'application/json', 'User-Agent': 'xuanjun-entry-intake'},
-        method='POST')
-    with urllib.request.urlopen(request, timeout=15) as response:
-        if response.status != 201:
-            raise RuntimeError('RECEIPT_WRITE_FAILED')
-    print(receipt['status'])
-
-
-if __name__ == '__main__':
-    main()
-
-,
-        r'git@github\.com:([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+?)(?:\.git)?    with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as stream:
-        event = json.load(stream)
-    body = event.get('comment', {}).get('body', '')
-    if 'XJ_DEV_ENTRY ' not in body:
-        return
-    repo = os.environ['GITHUB_REPOSITORY']
-    owner = repo.split('/')[0]
-    # Ignore untrusted sources without posting or replying to arbitrary issues.
-    if (event.get('sender', {}).get('login') != owner
-            or event.get('comment', {}).get('user', {}).get('login') != owner
-            or event.get('issue', {}).get('number') != 17
-            or 'pull_request' not in event.get('issue', {})):
-        return
-    try:
-        receipt = validate_event(event, repo, owner)
-        if receipt['event'] == 'CODE_READY':
-            try:
-                receipt['syntax_gate'] = syntax_receipt(receipt, repo,
-                    os.environ['GITHUB_TOKEN'],
-                    typescript_module=os.environ.get('XJ_TYPESCRIPT_MODULE'))
-            except Exception:
-                # Do not emit server errors, credential values or source snippets.
-                receipt['syntax_gate'] = {'state': 'HOLD_SYNTAX_INTAKE_ERROR',
-                    'authority_effect': 'NONE', 'code_executed': False}
-    except (ValueError, TypeError, KeyError):
-        receipt = dict(status='REJECTED_INVALID_ENTRY_ENVELOPE',
-                       source_comment_id=event['comment']['id'], authority_effect='NONE')
-    marker = '<!-- XJ_DEV_ENTRY_RECEIPT %s -->' % json.dumps(receipt, sort_keys=True)
-    request = urllib.request.Request(
-        'https://api.github.com/repos/' + repo + '/issues/17/comments',
-        data=json.dumps({'body': marker + '\n::SKIP_COMPLETION::\n'
-             'Mechanical entry receipt only. No writer, stop, handoff, code execution or quota verification.'}).encode('utf-8'),
-        headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
-                 'Accept': 'application/vnd.github+json',
-                 'Content-Type': 'application/json', 'User-Agent': 'xuanjun-entry-intake'},
-        method='POST')
-    with urllib.request.urlopen(request, timeout=15) as response:
-        if response.status != 201:
-            raise RuntimeError('RECEIPT_WRITE_FAILED')
-    print(receipt['status'])
-
-
-if __name__ == '__main__':
-    main()
-
-,
+        r'https://github\.com/([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$',
+        r'git@github\.com:([A-Za-z0-9_-]+/[A-Za-z0-9_.-]+?)(?:\.git)?$',
     )
     for pattern in patterns:
         match = re.fullmatch(pattern, raw)
@@ -260,12 +164,7 @@ def _controlled_candidate_files(supervisor, receipt, root):
 
 
 def bind_from_controlled_environment(receipt):
-    """Actual source-controlled intake call point.
-
-    No ledger is created here. If an existing canonical DB and exact local Git
-    checkout are not explicitly supplied, the caller receives HOLD with no
-    authority effect.
-    """
+    """Bind from an existing canonical DB plus exact local Git checkout only."""
     ledger = os.environ.get('XJ_CANONICAL_LEDGER_PATH')
     root = os.environ.get('XJ_CANDIDATE_ROOT')
     if not ledger or not root:
@@ -296,7 +195,6 @@ def main():
         return
     repo = os.environ['GITHUB_REPOSITORY']
     owner = repo.split('/')[0]
-    # Ignore untrusted sources without posting or replying to arbitrary issues.
     if (event.get('sender', {}).get('login') != owner
             or event.get('comment', {}).get('user', {}).get('login') != owner
             or event.get('issue', {}).get('number') != 17
@@ -306,24 +204,39 @@ def main():
         receipt = validate_event(event, repo, owner)
         if receipt['event'] == 'CODE_READY':
             try:
-                receipt['syntax_gate'] = syntax_receipt(receipt, repo,
-                    os.environ['GITHUB_TOKEN'],
+                receipt['syntax_gate'] = syntax_receipt(
+                    receipt, repo, os.environ['GITHUB_TOKEN'],
                     typescript_module=os.environ.get('XJ_TYPESCRIPT_MODULE'))
             except Exception:
-                # Do not emit server errors, credential values or source snippets.
-                receipt['syntax_gate'] = {'state': 'HOLD_SYNTAX_INTAKE_ERROR',
-                    'authority_effect': 'NONE', 'code_executed': False}
+                receipt['syntax_gate'] = {
+                    'state': 'HOLD_SYNTAX_INTAKE_ERROR',
+                    'authority_effect': 'NONE',
+                    'code_executed': False}
+            try:
+                receipt['canonical_gate'] = bind_from_controlled_environment(
+                    receipt)
+            except Exception:
+                receipt['canonical_gate'] = {
+                    'state': 'HOLD_CANONICAL_SOURCE_BINDING_ERROR',
+                    'authority_effect': 'NONE'}
     except (ValueError, TypeError, KeyError):
         receipt = dict(status='REJECTED_INVALID_ENTRY_ENVELOPE',
-                       source_comment_id=event['comment']['id'], authority_effect='NONE')
-    marker = '<!-- XJ_DEV_ENTRY_RECEIPT %s -->' % json.dumps(receipt, sort_keys=True)
+                       source_comment_id=event['comment']['id'],
+                       authority_effect='NONE')
+    marker = '<!-- XJ_DEV_ENTRY_RECEIPT %s -->' % json.dumps(
+        receipt, sort_keys=True)
     request = urllib.request.Request(
         'https://api.github.com/repos/' + repo + '/issues/17/comments',
-        data=json.dumps({'body': marker + '\n::SKIP_COMPLETION::\n'
-             'Mechanical entry receipt only. No writer, stop, handoff, code execution or quota verification.'}).encode('utf-8'),
-        headers={'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
-                 'Accept': 'application/vnd.github+json',
-                 'Content-Type': 'application/json', 'User-Agent': 'xuanjun-entry-intake'},
+        data=json.dumps({
+            'body': marker + '\n::SKIP_COMPLETION::\n'
+                    'Mechanical entry receipt only. No writer, stop, handoff, '
+                    'code execution or quota verification.'
+        }).encode('utf-8'),
+        headers={
+            'Authorization': 'Bearer ' + os.environ['GITHUB_TOKEN'],
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'xuanjun-entry-intake'},
         method='POST')
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 201:
@@ -333,4 +246,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
