@@ -44,26 +44,28 @@ def main():
                 add(p,"models/"+p.name,provenance)
     debroot=root/"ocr-deb-cache"
     if debroot.is_dir():
-        for p in sorted(debroot.iterdir()):
-            if p.suffix==".deb": add(p,"system-debs/"+p.name,"APT-resolved; local SHA only until lock/source verified")
         lock=debroot/"system-deb-lock.json"
+        lockdata={}
         if regular_readable(lock):
-            try:
-                lockdata=json.loads(lock.read_text(encoding="utf-8"))
-                for item in lockdata.get("packages",[]):
-                    p=debroot/item["filename"]
-                    if regular_readable(p) and sha(p)==item.get("sha256"):
-                        add(p,"system-debs/"+p.name,"SHA matches generated Debian lock; verify official source/index provenance before reuse")
-                for item in lockdata.get("apt_lists",[]):
-                    rel=Path(item["path"])
-                    if rel.is_absolute() or ".." in rel.parts or any(part in ("partial","auxfiles") for part in rel.parts) or rel.name in ("lock","partial"):
-                        continue
-                    p=debroot/"apt-lists"/rel
-                    if regular_readable(p) and p.stat().st_size==item.get("bytes") and sha(p)==item.get("sha256"):
-                        add(p,"apt-lists/"+str(rel),"SHA matches generated apt index lock; signature provenance not independently asserted")
-                add(lock,"system-deb-lock.json","generated lock; only its exact listed package/index hashes are asserted")
-            except (OSError,ValueError,KeyError,TypeError):
-                pass
+            try: lockdata=json.loads(lock.read_text(encoding="utf-8"))
+            except (OSError,ValueError,TypeError): lockdata={}
+        locked_packages={item.get("filename"):item for item in lockdata.get("packages",[]) if isinstance(item,dict) and isinstance(item.get("filename"),str)}
+        for p in sorted(debroot.iterdir()):
+            if p.suffix==".deb":
+                item=locked_packages.get(p.name)
+                if item and regular_readable(p) and sha(p)==item.get("sha256"):
+                    add(p,"system-debs/"+p.name,"SHA matches generated Debian lock; verify official source/index provenance before reuse")
+                else:
+                    add(p,"system-debs/"+p.name,"APT-resolved candidate; locally hashed only, not validated against lock")
+        if regular_readable(lock) and lockdata:
+            for item in lockdata.get("apt_lists",[]):
+                rel=Path(item["path"])
+                if rel.is_absolute() or ".." in rel.parts or any(part in ("partial","auxfiles") for part in rel.parts) or rel.name in ("lock","partial"):
+                    continue
+                p=debroot/"apt-lists"/rel
+                if regular_readable(p) and p.stat().st_size==item.get("bytes") and sha(p)==item.get("sha256"):
+                    add(p,"apt-lists/"+str(rel),"SHA matches generated apt index lock; signature provenance not independently asserted")
+            add(lock,"system-deb-lock.json","generated lock; only its exact listed package/index hashes are asserted")
     build=root/"ocr-build"
     if build.is_dir():
         for rel in ("requirements-lock-linux-x86_64-cp311.json","SHA256SUMS","xuanjun-ocr-linux-x86_64-cp311.tar.gz"):
