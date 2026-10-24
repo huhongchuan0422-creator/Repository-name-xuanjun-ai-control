@@ -18,6 +18,7 @@ sys.path.insert(0,str(HERE/'new19-source'))
 from production.cloud_connection.fixed_actions import ApprovedObjectsPolicy
 from production.cloud_connection.oauth_resource import OAuthProjectResource
 from production.cloud_connection.private_transfer import stamp
+from production.cloud_connection.private_transfer import directory, Hold as SourceHold
 from production.cloud_connection.queue import Queue,canonical
 from production.cloud_connection.worker import Github,Cloud,Network
 from pr17_b5_deployment_composition import OriginalComposition
@@ -36,8 +37,10 @@ class Auth:
 
 class OriginalLifecycle(unittest.TestCase):
     def setUp(self):
+        # Original descriptor readers reject every world-writable ancestor.
+        # /tmp is not a valid source root even for an isolated CI fixture.
         parent=('/root' if os.geteuid()==0 else
-                os.environ.get('B5_PROTECTED_TEST_PARENT',tempfile.gettempdir()))
+                os.environ.get('B5_PROTECTED_TEST_PARENT',str(pathlib.Path.home())))
         temp=tempfile.TemporaryDirectory(dir=parent);self.addCleanup(temp.cleanup)
         root=pathlib.Path(temp.name)
         self.root=root
@@ -119,6 +122,13 @@ class OriginalLifecycle(unittest.TestCase):
         self.backend.verify_window_admission=lambda *args:None  # explicit offline grant fixture
         self.archive_size=tar.stat().st_size;self.archive_sha=digest
         self.journal=root/'job';self.journal.mkdir(mode=0o700)
+
+    def test_protected_parent_accepts_home_and_rejects_tmp(self):
+        fd=directory(str(self.root/'packages'),os.geteuid())
+        os.close(fd)
+        with tempfile.TemporaryDirectory(dir=tempfile.gettempdir()) as unsafe:
+            with self.assertRaisesRegex(SourceHold,'ROOT_PARENT'):
+                directory(unsafe,os.geteuid())
 
     def test_full_19_original_read_custody_body_chain(self):
         b=self.backend
