@@ -55,13 +55,6 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           : > "$RUNNER_TEMP/ocr-diagnostics/build.log"
-      - name: Validate workflow YAML and all embedded shell blocks
-        shell: bash
-        run: |
-          set -euo pipefail
-          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
-          python -m pip install --disable-pip-version-check PyYAML==6.0.2
-          python services/ocr_engine/validate_workflow_syntax.py
       - name: Validate explicit source, branch and target
         shell: bash
         env:
@@ -79,6 +72,13 @@ jobs:
         with:
           ref: ${{ inputs.source_sha }}
           persist-credentials: false
+      - name: Validate workflow YAML and all embedded shell blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          python -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python services/ocr_engine/validate_workflow_syntax.py
       - name: Pull and verify exact official base image
         shell: bash
         run: |
