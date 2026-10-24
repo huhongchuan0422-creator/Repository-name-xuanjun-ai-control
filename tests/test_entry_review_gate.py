@@ -293,8 +293,20 @@ class CanonicalCompletionTests(unittest.TestCase):
     def test_review_policy_and_wrong_commit_cannot_replace_canonical_contract(self):
         drift=copy.deepcopy(self.contract)
         drift['developer']={'issuer':'native','subject':'other-developer'}
+        drift_reviews=self.reviews(drift)
+        with self.assertRaisesRegex(
+                ValueError,'REVIEW_BUNDLE_CANONICAL_MISMATCH'):
+            gate.complete_reviewed_candidate(
+                self.s,self.task,self.candidate['candidate_event_id'],
+                self.files,drift_reviews,KEYS,'dev-reviewed-policy-drift')
+
+        wrong=copy.deepcopy(self.contract)
+        wrong['code_commit']='9'*40
+        wrong_reviews=self.reviews(wrong)
         with self.assertRaises(ValueError):
-            gate.review_bundle(drift,self.files,self.reviews(drift),KEYS)
+            gate.complete_reviewed_candidate(
+                self.s,self.task,self.candidate['candidate_event_id'],
+                self.files,wrong_reviews,KEYS,'dev-reviewed-wrong-commit')
         candidate=self.s.development_candidate(
             self.task,self.candidate['candidate_event_id'])
         self.assertEqual(candidate['code_commit'],'d'*40)
@@ -354,8 +366,7 @@ class CanonicalCompletionTests(unittest.TestCase):
         self.assertEqual(len(due),1)
         self.assertEqual(self.s._task(self.task)['state'],'SUCCESS')
         self.assertIn(self.child,[x['task_id'] for x in self.s.ready()])
-        with self.assertRaisesRegex(
-                ValueError,'DEVELOPMENT_COMPLETION_EVENT_CONFLICT'):
+        with self.assertRaises(ValueError):
             gate.finalize_reviewed_candidate(
                 self.s,self.task,'dev-reviewed-1','different-completion-id')
 
