@@ -61,17 +61,17 @@ class SecureStoreTests(unittest.TestCase):
         job=self.create()
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review")
-        self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human verified text"},"confirm-key-original-01")
+        self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human verified text"},"confirm-key-original-01","1",None)
         with self.assertRaisesRegex(ValueError,"OCR_CONFIRMED_IMMUTABLE"):
             self.store.update(job["job_id"],status="needs_review")
         with self.assertRaisesRegex(ValueError,"STALE_CONFIRMATION_REVISION"):
-            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-overwrite-01")
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-overwrite-01","1",None)
         self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human verified text")
     def test_confirmation_idempotency_and_encrypted_audit(self):
         job=self.create()
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review",fields={})
-        first=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001")
+        first=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001","1",None)
         replay=self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"human confirmed"},"confirm-key-00001")
         self.assertEqual(first["job_id"],replay["job_id"])
         self.assertEqual(self.store.get(job["job_id"],"tenant-a")["confirmed_fields"]["company_name"],"human confirmed")
@@ -79,9 +79,9 @@ class SecureStoreTests(unittest.TestCase):
         self.assertEqual(len(events),1)
         self.assertEqual(events[0]["event"],"USER_CONFIRMATION")
         with self.assertRaisesRegex(ValueError,"OCR_CONFIRM_IDEMPOTENCY_CONFLICT"):
-            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"different"},"confirm-key-00001")
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"different"},"confirm-key-00001","1",None)
         with self.assertRaisesRegex(ValueError,"STALE_CONFIRMATION_REVISION"):
-            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-00002")
+            self.store.confirm(job["job_id"],"tenant-a",1,{"company_name":"overwrite"},"confirm-key-00002","1",None)
     def test_delete_tenant_scoped(self):
         job=self.create()
         self.assertFalse(self.store.delete(job["job_id"],"tenant-b"))
@@ -124,7 +124,7 @@ class SecureStoreTests(unittest.TestCase):
         self.store.claim(job["job_id"])
         self.store.update(job["job_id"],status="needs_review",fields={"company_name":{"value":"synthetic only"}})
         fields={"company_name":"synthetic confirmed"}
-        self.store.confirm(job["job_id"],"tenant-a",1,fields,"process-confirm-key-0001")
+        self.store.confirm(job["job_id"],"tenant-a",1,fields,"process-confirm-key-0001","1",None)
         child = r'''
 import json, os
 from services.ocr_engine.secure_store import SecureSQLiteJobStore
@@ -134,7 +134,7 @@ assert j and j['status']=='confirmed', 'PROCESS_RESTART_CONFIRMATION_MISSING'
 assert j['confirmed_fields']=={'company_name':'synthetic confirmed'}, 'PROCESS_RESTART_CONFIRMED_FIELDS_MISSING'
 events=s.audit_events(os.environ['OCR_TEST_JOB'],'tenant-a')
 assert len(events)==1 and events[0].get('event')=='USER_CONFIRMATION', 'PROCESS_RESTART_AUDIT_MISSING'
-r=s.confirm(os.environ['OCR_TEST_JOB'],'tenant-a',1,{'company_name':'synthetic confirmed'},'process-confirm-key-0001')
+r=s.confirm(os.environ['OCR_TEST_JOB'],'tenant-a',1,{'company_name':'synthetic confirmed'},'process-confirm-key-0001',j['application_revision'],j.get('provider_version'))
 assert r.get('recorded') is True and r.get('status')=='confirmed', 'PROCESS_RESTART_IDEMPOTENT_REPLAY_FAILED'
 print('INDEPENDENT_PROCESS_RESTART=PASS')
 print('CONFIRMED_SQLITE_STATE=PASS')
