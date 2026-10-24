@@ -20,6 +20,7 @@ from production.cloud_connection.fixed_actions import ApprovedObjectsPolicy
 from production.cloud_connection.oauth_resource import OAuthProjectResource
 from production.cloud_connection.private_transfer import stamp
 from production.cloud_connection.private_transfer import directory, Hold as SourceHold
+from production.cloud_connection.archive_reader import read_archive_members
 from production.cloud_connection.queue import Queue,canonical
 from production.cloud_connection.worker import Github,Cloud,Network
 from pr17_b5_deployment_composition import OriginalComposition
@@ -127,6 +128,123 @@ class OriginalLifecycle(unittest.TestCase):
         self.backend.verify_window_admission=lambda *args:None  # explicit offline grant fixture
         self.archive_size=tar.stat().st_size;self.archive_sha=digest
         self.journal=root/'job';self.journal.mkdir(mode=0o700)
+
+    @staticmethod
+    def _sha_file(path):
+        digest=hashlib.sha256()
+        with path.open('rb') as f:
+            while True:
+                block=f.read(65536)
+                if not block:break
+                digest.update(block)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _write_sparse_gnu_tar(path,members,total_bytes=559237632):
+        """Ordinary GNU tar with a regular zero-filled sparse-on-disk filler."""
+        headers=[]
+        for name,data in members:
+            info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o600
+            info.uid=os.geteuid();info.gid=os.getegid();info.mtime=0
+            header=info.tobuf(format=tarfile.GNU_FORMAT)
+            headers.append((header,data))
+        occupied=sum(len(header)+((len(data)+511)//512)*512
+                     for header,data in headers)
+        filler_header=tarfile.TarInfo('unselected-filler.bin')
+        filler_header.mode=0o600;filler_header.uid=os.geteuid()
+        filler_header.gid=os.getegid();filler_header.mtime=0
+        filler_bytes=total_bytes-occupied-512-1024
+        if filler_bytes<=0 or filler_bytes%512:
+            raise AssertionError('FIXTURE_FILLER_ALIGNMENT')
+        filler_header.size=filler_bytes
+        filler_raw=filler_header.tobuf(format=tarfile.GNU_FORMAT)
+        if len(filler_raw)!=512:
+            raise AssertionError('FIXTURE_FILLER_HEADER')
+        with path.open('xb') as out:
+            for header,data in headers:
+                out.write(header);out.write(data)
+                padding=(-len(data))%512
+                if padding:out.write(b'\\0'*padding)
+            out.write(filler_raw)
+            out.seek(filler_bytes,os.SEEK_CUR)
+            out.write(b'\\0'*1024);out.flush();os.fsync(out.fileno())
+        path.chmod(0o600)
+        if path.stat().st_size!=total_bytes:
+            raise AssertionError('FIXTURE_ARCHIVE_SIZE')
+
+    def _archive_plan(self,root,tar,item_prefix='',sha=None,max_headers=64):
+        return {'filename':tar.name,'identity':list(stamp(tar.stat())),
+            'member_prefix':item_prefix,'max_headers':max_headers,
+            'max_read_bytes':32*1024*1024,
+            'sha256':sha or self._sha_file(tar)}
+
+    def test_full_size_sparse_gnu_tar_whole_hash_and_five_members(self):
+        prefix='home/xuanjun_dev/.openclaw/tools/node-v24.21.0/lib/node_modules/openclaw/'
+        names=['dist/server-active-work-Bhfd47cA.mjs',
+            'dist/server-shutdown.runtime.js',
+            'dist/server-startup-config-helpers-U6xkM_57.mjs',
+            'dist/server-startup-early-BLUjqlAE.mjs',
+            'dist/server-startup-post-attach-CsYAFanV.mjs']
+        sizes=[150,56,137,4816,53969]
+        data=[];items=[];members=[]
+        for i,(name,size) in enumerate(zip(names,sizes),1):
+            seed=hashlib.sha256(('fixture-%d-%s'%(i,name)).encode()).digest()
+            raw=(seed*((size+len(seed)-1)//len(seed)))[:size]
+            data.append(raw);members.append((prefix+name,raw))
+            items.append({'ref':'full-archive-%d'%i,'relative_path':name,
+                'bytes':size,'sha256':hashlib.sha256(raw).hexdigest()})
+        root=self.root/'full-archive';root.mkdir(mode=0o700)
+        tar=root/'source-tree.tar.pending'
+        self._write_sparse_gnu_tar(tar,members)
+        plan=self._archive_plan(root,tar,prefix)
+        selected=read_archive_members(str(root),os.geteuid(),items,plan)
+        self.assertEqual([selected[x['ref']] for x in items],data)
+        self.assertEqual(tar.stat().st_size,559237632)
+        # CI/Linux should preserve the deliberately seek-created filler as a
+        # hole.  The logical bytes are nevertheless all hashed by production.
+        if hasattr(tar.stat(),'st_blocks'):
+            self.assertLess(tar.stat().st_blocks*512,2*1024*1024)
+
+    def test_archive_sha_member_duplicate_and_link_rejections(self):
+        root=self.root/'archive-negatives';root.mkdir(mode=0o700)
+        raw=b'fixture-member-bytes'
+        item={'ref':'neg','relative_path':'wanted.bin','bytes':len(raw),
+              'sha256':hashlib.sha256(raw).hexdigest()}
+        normal=root/'normal.tar'
+        with tarfile.open(str(normal),'w',format=tarfile.GNU_FORMAT) as archive:
+            info=tarfile.TarInfo('wanted.bin');info.size=len(raw);info.mode=0o600
+            archive.addfile(info,io.BytesIO(raw))
+        normal.chmod(0o600)
+        with self.assertRaisesRegex(SourceHold,'ARCHIVE_SHA'):
+            read_archive_members(str(root),os.geteuid(),[item],
+                self._archive_plan(root,normal,sha='0'*64))
+        bad_item=dict(item,sha256='0'*64)
+        with self.assertRaisesRegex(SourceHold,'ARCHIVE_MEMBER_SHA'):
+            read_archive_members(str(root),os.geteuid(),[bad_item],
+                self._archive_plan(root,normal))
+
+        duplicate=root/'duplicate.tar'
+        with tarfile.open(str(duplicate),'w',format=tarfile.GNU_FORMAT) as archive:
+            for _ in range(2):
+                info=tarfile.TarInfo('wanted.bin');info.size=len(raw);info.mode=0o600
+                archive.addfile(info,io.BytesIO(raw))
+        duplicate.chmod(0o600)
+        with self.assertRaisesRegex(SourceHold,'ARCHIVE_DUPLICATE_NAME'):
+            read_archive_members(str(root),os.geteuid(),[item],
+                self._archive_plan(root,duplicate))
+
+        linked=root/'linked.tar'
+        with tarfile.open(str(linked),'w',format=tarfile.GNU_FORMAT) as archive:
+            target=tarfile.TarInfo('target.bin');target.size=len(raw);target.mode=0o600
+            archive.addfile(target,io.BytesIO(raw))
+            link=tarfile.TarInfo('wanted.bin');link.type=tarfile.SYMTYPE
+            link.linkname='target.bin';link.mode=0o600
+            archive.addfile(link)
+        linked.chmod(0o600)
+        link_item=dict(item,bytes=0,sha256=hashlib.sha256(b'').hexdigest())
+        with self.assertRaisesRegex(SourceHold,'ARCHIVE_MEMBER_TYPE_OR_SIZE'):
+            read_archive_members(str(root),os.geteuid(),[link_item],
+                self._archive_plan(root,linked))
 
     def test_protected_parent_accepts_home_and_rejects_tmp(self):
         fd=directory(str(self.root/'packages'),os.geteuid())
