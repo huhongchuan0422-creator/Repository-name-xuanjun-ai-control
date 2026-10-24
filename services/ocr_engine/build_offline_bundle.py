@@ -146,6 +146,13 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
             "license_sha256": sha256_file(Path(license_path)),
             "notice_sha256": sha256_file(Path(notice_path)),
             "config_schema_sha256": sha256_file(Path(config_schema_path)),
+            "requirements_sha256": requirements_sha,
+        },
+        "source_files": {
+            "services/ocr_engine/api.py": sha256_file(HERE / "api.py"),
+            "services/ocr_engine/ocr_core.py": sha256_file(HERE / "ocr_core.py"),
+            "services/ocr_engine/secure_store.py": sha256_file(HERE / "secure_store.py"),
+            "services/ocr_engine/startup_selfcheck.py": sha256_file(HERE / "startup_selfcheck.py"),
         },
     }
 
@@ -172,22 +179,39 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
     archive_manifest["notice_file"] = "NOTICE.md"
-    # Freeze digests before archive creation; verify the actual archive against this snapshot.
-    frozen = {}
-    frozen_sources = [
-        (Path(MODEL_MANIFEST), "services/ocr_engine/model_manifest.json"),
-        (Path(REQUIREMENTS), "requirements.txt"),
-        (Path(LICENSE), "LICENSE-2.0.txt"),
-        (Path(NOTICE), "NOTICE.md"),
-        (Path(CONFIG_SCHEMA), "deployment_config.schema.json"),
-        (HERE / "api.py", "services/ocr_engine/api.py"),
-        (HERE / "ocr_core.py", "services/ocr_engine/ocr_core.py"),
-        (HERE / "secure_store.py", "services/ocr_engine/secure_store.py"),
-        (HERE / "startup_selfcheck.py", "services/ocr_engine/startup_selfcheck.py"),
-    ] + checked["verified_models"] + checked["verified_wheels"]
-    for source_path, arcname in frozen_sources:
-        regular_file(source_path, "BUNDLE_INPUT")
-        frozen[arcname] = sha256_file(Path(source_path))
+    # Freeze only the digests already verified by validate_inputs. Never bless bytes
+    # observed after validation as the new source of truth.
+    frozen = {
+        "services/ocr_engine/model_manifest.json": checked["inputs"]["manifest_sha256"],
+        "requirements.txt": checked["requirements_sha256"],
+        "LICENSE-2.0.txt": checked["inputs"]["license_sha256"],
+        "NOTICE.md": checked["inputs"]["notice_sha256"],
+        "deployment_config.schema.json": checked["inputs"]["config_schema_sha256"],
+        **checked["source_files"],
+    }
+    for item in checked["models"]:
+        frozen["models/" + item["filename"]] = item["sha256"]
+    for item in checked["wheels"]:
+        frozen["wheelhouse/" + item["filename"]] = item["sha256"]
+    # Detect any validate→freeze race before the first archive member is written.
+    current_paths = {
+        "services/ocr_engine/model_manifest.json": Path(MODEL_MANIFEST),
+        "requirements.txt": Path(REQUIREMENTS),
+        "LICENSE-2.0.txt": Path(LICENSE),
+        "NOTICE.md": Path(NOTICE),
+        "deployment_config.schema.json": Path(CONFIG_SCHEMA),
+        "services/ocr_engine/api.py": HERE / "api.py",
+        "services/ocr_engine/ocr_core.py": HERE / "ocr_core.py",
+        "services/ocr_engine/secure_store.py": HERE / "secure_store.py",
+        "services/ocr_engine/startup_selfcheck.py": HERE / "startup_selfcheck.py",
+    }
+    current_paths.update({"models/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_models"]})
+    current_paths.update({"wheelhouse/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_wheels"]})
+    for arcname, expected_sha in frozen.items():
+        path = current_paths[arcname]
+        regular_file(path, "BUNDLE_INPUT")
+        if sha256_file(path) != expected_sha:
+            raise BundleError("VALIDATE_FREEZE_SHA256_MISMATCH:" + arcname)
     with tempfile.NamedTemporaryFile(prefix=".ocr-bundle-", suffix=".tmp", dir=str(output.parent), delete=False) as temp:
         temp_path = Path(temp.name)
     try:
