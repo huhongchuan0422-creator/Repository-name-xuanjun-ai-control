@@ -31,6 +31,7 @@ on:
       - 'services/ocr_engine/verify_offline_runtime.py'
       - 'services/ocr_engine/install_deb_closure.py'
       - 'services/ocr_engine/write_candidate_input_manifest.py'
+      - 'services/ocr_engine/write_candidate_input_manifest.py'
       - 'services/ocr_engine/test_hosted_build_flow.py'
       - 'services/ocr_engine/validate_workflow_syntax.py'
       - 'services/ocr_engine/test_workflow_syntax.py'
@@ -192,17 +193,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python services/ocr_engine/write_candidate_input_manifest.py "$RUNNER_TEMP" "$RUNNER_TEMP/ocr-candidate-inputs/candidate-input-manifest.json"
+          python services/ocr_engine/write_candidate_input_manifest.py "$RUNNER_TEMP" "$RUNNER_TEMP/ocr-candidate-inputs/payload"
       - name: Upload reusable candidate inputs and their digest manifest (never a success package)
         if: always() && steps.source-checkout.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: xuanjun-ocr-candidate-inputs-not-release-${{ github.sha }}-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/ocr-wheelhouse/**
-            ${{ runner.temp }}/ocr-model-cache/**
-            ${{ runner.temp }}/ocr-deb-cache/**
-            ${{ runner.temp }}/ocr-build/**
+            ${{ runner.temp }}/ocr-candidate-inputs/payload/**
             ${{ runner.temp }}/ocr-candidate-inputs/candidate-input-manifest.json
           if-no-files-found: warn
           retention-days: 14
