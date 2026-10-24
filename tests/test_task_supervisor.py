@@ -760,9 +760,13 @@ def load_tests(loader, tests, pattern):
     # dedicated fencing suite at the current HEAD.
     try:
         from tests import test_task_writer_fence as fence_tests
+        from tests import test_entry_review_gate as review_tests
     except ImportError:
         import test_task_writer_fence as fence_tests
+        import test_entry_review_gate as review_tests
     tests.addTests(loader.loadTestsFromModule(fence_tests))
+    tests.addTests(loader.loadTestsFromTestCase(
+        review_tests.CanonicalCompletionTests))
     return tests
 
 
