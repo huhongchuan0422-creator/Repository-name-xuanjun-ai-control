@@ -20,6 +20,20 @@ def read_snapshot(path):
     data = path.read_bytes()
     return data, digest(data)
 
+def write_verified_snapshot(target, data, expected_sha, rel):
+    observed = digest(data)
+    if expected_sha is not None and observed != expected_sha:
+        raise SystemExit("CANDIDATE_SNAPSHOT_SHA_MISMATCH:" + rel)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(data)
+    os.chmod(target, 0o644)
+    copied = target.read_bytes()
+    copied_sha = digest(copied)
+    if copied_sha != observed or (expected_sha is not None and copied_sha != expected_sha):
+        raise SystemExit("CANDIDATE_COPY_SHA_MISMATCH:" + rel)
+    return copied_sha
+
 def main():
     root = Path(sys.argv[1] if len(sys.argv) > 1 else os.environ["RUNNER_TEMP"])
     dest = Path(sys.argv[2] if len(sys.argv) > 2 else root / "ocr-candidate-inputs" / "payload")
@@ -144,14 +158,8 @@ def main():
     entries = []
     for rel, data in sorted(snapshots.items()):
         target = dest / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("xb") as stream:
-            stream.write(data)
-        os.chmod(target, 0o644)
+        observed = write_verified_snapshot(target, data, digest(data), rel)
         copied = target.read_bytes()
-        observed = digest(copied)
-        if observed != digest(data):
-            raise SystemExit("CANDIDATE_COPY_SHA_MISMATCH:" + rel)
         entries.append({"path": rel, "bytes": len(copied), "sha256": observed, "provenance": labels[rel]})
 
     result = {
