@@ -448,4 +448,59 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.notice.write_text("Apache License only")
         with self.assertRaisesRegex(BundleError,"MODEL_NOTICE_MISSING_ATTRIBUTION:det"): self.check()
 
-if __name__=="__main__": unittest.main()
+
+    def test_deb_lock_export_copies_indexes_without_mutating_apt_work_and_excludes_state(self):
+        root=self.root/"locked-debs"; root.mkdir()
+        apt=self.root/"apt-work"; apt.mkdir()
+        (apt/"InRelease").write_bytes(b"synthetic index")
+        (apt/"InRelease").chmod(0o600)
+        (apt/"lock").write_text("mutable lock")
+        (apt/"partial").mkdir(); (apt/"partial"/"download").write_bytes(b"partial")
+        (apt/"auxfiles").mkdir(); (apt/"auxfiles"/"state").write_bytes(b"mutable")
+        source=self.root/"debian.sources"
+        source.write_text(chr(10).join(["Types: deb","URIs: https://deb.debian.org/debian","Suites: bookworm","Components: main",""]))
+        pkgroot=self.root/"generator-package"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: OCR test <test@example.invalid>","Description: synthetic package",""]))
+        deb=root/"libxcb1_1.0_amd64.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(deb)],check=True,capture_output=True,text=True)
+        script=Path(__file__).with_name("generate_deb_runtime_lock.py")
+        subprocess.run([sys.executable,str(script),str(root),str(source),str(apt)],check=True,capture_output=True,text=True)
+        self.assertEqual((apt/"InRelease").stat().st_mode & 0o777,0o600)
+        staged=root/"apt-lists"/"InRelease"
+        self.assertEqual(staged.read_bytes(),b"synthetic index")
+        self.assertEqual(staged.stat().st_mode & 0o777,0o644)
+        lock=json.loads((root/"system-deb-lock.json").read_text())
+        self.assertEqual([x["path"] for x in lock["apt_lists"]],["InRelease"])
+        self.assertFalse((root/"apt-lists"/"lock").exists())
+        self.assertFalse((root/"apt-lists"/"partial").exists())
+        self.assertFalse((root/"apt-lists"/"auxfiles").exists())
+
+    def test_offline_deb_installer_rejects_missing_or_unlocked_package_without_install(self):
+        root=self.root/"installer"; root.mkdir()
+        deb=root/"liba_1_amd64.deb"; deb.write_bytes(b"synthetic deb")
+        lock={"packages":[{"package":"liba","version":"1","architecture":"amd64","filename":deb.name,"sha256":hashlib.sha256(deb.read_bytes()).hexdigest()}]}
+        (root/"system-deb-lock.json").write_text(json.dumps(lock))
+        bindir=self.root/"fake-bin"; bindir.mkdir()
+        calls=self.root/"dpkg-calls.log"
+        fake = chr(10).join(["#!/usr/bin/env python3","import os,sys",
+            "name=os.path.basename(sys.argv[0])",
+            "with open(os.environ['DPKG_CALLS'],'a') as f: f.write(name+' '+repr(sys.argv[1:])+chr(10))",
+            "if name=='dpkg-deb':",
+            " field=sys.argv[-1]",
+            " print({'Package':'liba','Version':'1','Architecture':'amd64'}[field])",
+            "elif name=='dpkg-query': print('liba=1')",
+            ""])
+        for name in ("dpkg-deb","dpkg","dpkg-query"):
+            p=bindir/name; p.write_text(fake); p.chmod(0o755)
+        env=dict(os.environ,PATH=str(bindir)+os.pathsep+os.environ.get("PATH",""),DPKG_CALLS=str(calls))
+        script=Path(__file__).with_name("install_deb_closure.py")
+        result=subprocess.run([sys.executable,str(script),str(root)],env=env,text=True,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("OFFLINE_DEB_CLOSURE_INSTALLED",result.stdout)
+        (root/"libb_1_amd64.deb").write_bytes(b"unlocked")
+        calls.write_text("")
+        result=subprocess.run([sys.executable,str(script),str(root)],env=env,text=True,capture_output=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("DEB_FILE_SET_DIFFERS_FROM_LOCK",result.stderr)
+        self.assertEqual(calls.read_text(),"")
+\nif __name__=="__main__": unittest.main()
