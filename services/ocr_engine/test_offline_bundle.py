@@ -340,6 +340,59 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("signature-verification-not-independently-proven",entry["provenance"])
         self.assertNotIn("signature-checked",entry["provenance"])
 
+    def test_deb_lock_generator_excludes_apt_lock_partial_and_auxfiles(self):
+        root=self.root/"apt-filter"; root.mkdir()
+        apt=root/"apt-lists"; (apt/"partial").mkdir(parents=True); (apt/"auxfiles").mkdir()
+        (apt/"InRelease").write_bytes(b"index")
+        (apt/"lock").write_bytes(b"runtime lock")
+        (apt/"partial"/"download.part").write_bytes(b"partial")
+        (apt/"auxfiles"/"aux").write_bytes(b"aux")
+        pkgroot=self.root/"filter-package"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: Test <test@example.invalid>","Description: synthetic",""]))
+        deb=root/"libxcb1.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(deb)],check=True,capture_output=True,text=True)
+        source=self.root/"debian.sources"
+        source.write_text(chr(10).join(["Types: deb","URIs: https://deb.debian.org/debian","Suites: bookworm","Components: main",""]))
+        script=Path(__file__).with_name("generate_deb_runtime_lock.py")
+        subprocess.run([sys.executable,str(script),str(root),str(source),str(apt)],check=True,capture_output=True,text=True)
+        lock=json.loads((root/"system-deb-lock.json").read_text())
+        names={x["path"] for x in lock["apt_lists"]}
+        self.assertEqual(names,{"InRelease"})
+        self.assertFalse((apt/"lock").stat().st_mode & 0o111)
+    def test_candidate_export_copies_only_whitelisted_readable_inputs(self):
+        root=self.root/"candidate-root"
+        (root/"ocr-deb-cache"/"apt-lists"/"partial").mkdir(parents=True)
+        (root/"ocr-deb-cache"/"apt-lists"/"Packages").write_bytes(b"index")
+        (root/"ocr-deb-cache"/"apt-lists"/"lock").write_bytes(b"lock")
+        (root/"ocr-deb-cache"/"partial.deb.tmp").write_bytes(b"partial")
+        (root/"ocr-deb-cache"/"libxcb1.deb").write_bytes(b"deb")
+        os.chmod(root/"ocr-deb-cache"/"apt-lists"/"lock",0o000)
+        dest=root/"ocr-candidate-inputs"/"payload"
+        manifest=root/"ocr-candidate-inputs"/"candidate-input-manifest.json"
+        script=Path(__file__).with_name("write_candidate_input_manifest.py")
+        env=dict(os.environ,RUNNER_TEMP=str(root),GITHUB_SHA="a"*40,GITHUB_RUN_ID="123")
+        subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,check=True,capture_output=True,text=True)
+        data=json.loads(manifest.read_text())
+        paths={x["path"] for x in data["files"]}
+        self.assertIn("system-debs/libxcb1.deb",paths)
+        self.assertIn("apt-lists/Packages",paths)
+        self.assertNotIn("apt-lists/lock",paths)
+        self.assertNotIn("partial.deb.tmp",json.dumps(data))
+        self.assertEqual(data["classification"],"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE")
+        self.assertTrue((dest/"system-debs/libxcb1.deb").is_file())
+        self.assertTrue((dest/"apt-lists/Packages").is_file())
+    def test_failed_candidate_upload_uses_only_controlled_payload_not_raw_cache(self):
+        workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
+        text=workflow.read_text(encoding="utf-8")
+        start=text.index("Upload reusable candidate inputs and their digest manifest")
+        end=text.index("Upload failure diagnostics",start)
+        block=text[start:end]
+        self.assertIn("ocr-candidate-inputs/payload/**",block)
+        self.assertIn("candidate-input-manifest.json",block)
+        self.assertNotIn("ocr-deb-cache/**",block)
+        self.assertNotIn("ocr-wheelhouse/**",block)
+        self.assertIn("if: always()",block)
+
     def test_candidate_artifact_is_always_uploaded_but_not_release(self):
         workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
         text=workflow.read_text(encoding="utf-8")
