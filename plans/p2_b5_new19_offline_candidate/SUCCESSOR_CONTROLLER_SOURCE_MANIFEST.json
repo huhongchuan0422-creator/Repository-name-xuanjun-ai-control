@@ -26,9 +26,9 @@
       "sha256": "2ca630af9e3326c2c02420ddda84039b88f8f25848dc95a30aef0170b0d41e99"
     },
     {
-      "bytes": 5856,
+      "bytes": 7029,
       "path": "successor_controller/pr17_b5_successor_release_gate.py",
-      "sha256": "8b6aad8ba03a950f08045532da75070d98848cfbb7fa72d081edabc2d15dcb84"
+      "sha256": "d56820c53177b939b48458cab89c9c66ff320203cd56cdda098c8c20f7850b90"
     },
     {
       "bytes": 30792,

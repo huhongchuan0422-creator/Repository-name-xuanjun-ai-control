@@ -38,9 +38,14 @@ def fixture_gate(spec, phase='publish'):
          for base in c53.BASES]
     current=dict(zip(c53.BASES, spec['fixed_paths']['target_release']
                      if phase in ('start','recover') else old))
+    listed=json.loads((ROOT/'SOURCE_MANIFEST.json').read_bytes())
+    runtime={x['release_path']:(ROOT/x['bundle_path']).read_bytes()
+             for x in listed['files'] if x['release_path'] is not None}
+    runtime[c53.binder.MANIFEST_PATH]=(ROOT/'RUNTIME_SOURCE_MANIFEST.json').read_bytes()
     return ExternalReleaseGate(approved_sha256=c53.sha(binder),
         read_binder=lambda:binder, read_manifest=lambda:manifest,
-        read_source=lambda name:sources[name],read_current=lambda:current)
+        read_source=lambda name:sources[name],read_current=lambda:current,
+        read_installed_runtime=lambda base,name:runtime[name])
 
 
 class GateTests(unittest.TestCase):
@@ -51,6 +56,22 @@ class GateTests(unittest.TestCase):
         for phase in ('preflight','publish','start','recover'):
             gate=fixture_gate(self.spec,phase)
             self.assertEqual(gate.check(phase,self.spec),'a'*40)
+
+    def test_repository_binder_matches_actual_frozen_controller_bytes(self):
+        # The digest is computed here only as a fixture. Production must read
+        # its approved digest from a separate protected authority record.
+        raw=(ROOT/'EXTERNAL_SUCCESSOR_DEPLOYMENT_BINDER.json').read_bytes()
+        manifest=(ROOT/'SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json').read_bytes()
+        old={base:base+'/releases/e78bd7749414d1637012f57b65d2019955282fc3'
+             for base in c53.BASES}
+        gate=ExternalReleaseGate(approved_sha256=c53.sha(raw),
+            read_binder=lambda:raw,read_manifest=lambda:manifest,
+            read_source=lambda name:(ROOT/name).read_bytes(),
+            read_current=lambda:old,
+            read_installed_runtime=lambda base,name:(_ for _ in ()).throw(
+                AssertionError('PUBLISH_MUST_NOT_READ_UNPUBLISHED_RUNTIME')))
+        self.assertEqual(gate.check('publish',self.spec),
+                         '277e88648215806b3102d8d3eb7d114b09fbe16e')
 
     def test_binder_wrong_spec_or_current_rejected(self):
         gate=fixture_gate(self.spec,'publish')
@@ -71,6 +92,15 @@ class GateTests(unittest.TestCase):
                                       else original(name))
         with self.assertRaisesRegex(c53.Hold,'EXTERNAL_CONTROLLER_BYTES_CHANGED'):
             gate.check('publish',self.spec)
+
+    def test_changed_installed_runtime_refuses_start(self):
+        gate=fixture_gate(self.spec,'start')
+        original=gate.read_installed_runtime
+        gate.read_installed_runtime=lambda base,name:(original(base,name)+b'altered'
+            if base==c53.BASES[1] and name==self.spec['source']['source_records'][0]['path']
+            else original(base,name))
+        with self.assertRaisesRegex(c53.Hold,'EXTERNAL_INSTALLED_RUNTIME_BYTES_CHANGED'):
+            gate.check('start',self.spec)
 
     def test_start_checks_current_before_command(self):
         class IO:

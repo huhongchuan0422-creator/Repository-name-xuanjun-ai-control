@@ -12,17 +12,19 @@ import pr17_b5_successor_review as c53
 
 class ExternalReleaseGate:
     def __init__(self, *, approved_sha256, read_binder, read_manifest,
-                 read_source, read_current):
+                 read_source, read_current, read_installed_runtime):
         c53.require(type(approved_sha256) is str and
                     re.fullmatch('[0-9a-f]{64}', approved_sha256),
                     'EXTERNAL_BINDER_APPROVED_PIN_UNKNOWN')
-        for reader in (read_binder, read_manifest, read_source, read_current):
+        for reader in (read_binder, read_manifest, read_source, read_current,
+                       read_installed_runtime):
             c53.require(callable(reader), 'EXTERNAL_BINDER_PROTECTED_READER_UNKNOWN')
         self.approved_sha256 = approved_sha256
         self.read_binder = read_binder
         self.read_manifest = read_manifest
         self.read_source = read_source
         self.read_current = read_current
+        self.read_installed_runtime = read_installed_runtime
 
     def check(self, phase, spec):
         c53.require(phase in ('preflight', 'publish', 'start', 'recover'),
@@ -100,4 +102,21 @@ class ExternalReleaseGate:
                           for base in c53.BASES])
         c53.require(all(current[base] == target for base, target in
                         zip(c53.BASES, expected)), 'EXTERNAL_CURRENT_RELEASE_CHANGED')
+        if phase in ('start','recover'):
+            runtime_rows = spec.get('source',{}).get('source_records')
+            c53.require(type(runtime_rows) is list and len(runtime_rows)==42 and
+                        len({r['path'] for r in runtime_rows})==42,
+                        'EXTERNAL_INSTALLED_RUNTIME_SET')
+            for base in c53.BASES:
+                manifest_bytes = self.read_installed_runtime(
+                    base,c53.binder.MANIFEST_PATH)
+                c53.require(type(manifest_bytes) is bytes and
+                            c53.sha(manifest_bytes)==c53.MANIFEST,
+                            'EXTERNAL_INSTALLED_RUNTIME_MANIFEST')
+                for row in runtime_rows:
+                    content=self.read_installed_runtime(base,row['path'])
+                    c53.require(type(content) is bytes and
+                                len(content)==row['bytes'] and
+                                c53.sha(content)==row['sha256'],
+                                'EXTERNAL_INSTALLED_RUNTIME_BYTES_CHANGED')
         return record['controller_commit']
