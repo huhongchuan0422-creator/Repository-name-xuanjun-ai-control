@@ -960,10 +960,9 @@ class Supervisor(object):
                          'operation_marker','attribution'}
         operation = json.loads(row['payload_json'])
         attribution = receipt.get('attribution')
-        git_receipt = (isinstance(attribution, dict)
-                       and attribution.get('kind') == 'GIT_CAS')
+        git_operation = operation.get('operation_kind') == 'GIT_CAS'
         required = set(base_required)
-        if git_receipt:
+        if git_operation:
             required.add('observed_revision')
         if set(receipt) != required or receipt.get('schema') != 1:
             raise ValueError('FINAL_RECEIPT_SCHEMA_REQUIRED')
@@ -980,28 +979,29 @@ class Supervisor(object):
                     or attribution['before'] != operation['expected_before']
                     or attribution['after'] != operation['requested_after']):
                 raise ValueError('CONFIRMED_ATTRIBUTION_REQUIRED')
-            if operation.get('operation_kind') == 'GIT_CAS':
-                observed = receipt.get('observed_revision')
-                if (attribution['kind'] != 'GIT_CAS'
-                        or not isinstance(observed, str)
-                        or re.fullmatch(
-                            r'[0-9a-f]{40}(?:[0-9a-f]{24})?', observed)
-                           is None):
-                    raise ValueError('GIT_OBSERVED_REVISION_REQUIRED')
-            elif 'observed_revision' in receipt:
+            if git_operation and attribution['kind'] != 'GIT_CAS':
+                raise ValueError('GIT_CONFIRMED_ATTRIBUTION_REQUIRED')
+            if not git_operation and 'observed_revision' in receipt:
                 raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         elif outcome == 'NOT_APPLIED':
             if (attribution['kind'] != 'READBACK'
                     or attribution['before'] != operation['expected_before']
                     or attribution['after'] != operation['expected_before']):
                 raise ValueError('NOT_APPLIED_ATTRIBUTION_REQUIRED')
-            if 'observed_revision' in receipt:
+            if not git_operation and 'observed_revision' in receipt:
                 raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         elif outcome == 'CONFLICT':
             if attribution['kind'] != 'READBACK':
                 raise ValueError('CONFLICT_ATTRIBUTION_REQUIRED')
-            if 'observed_revision' in receipt:
+            if not git_operation and 'observed_revision' in receipt:
                 raise ValueError('UNEXPECTED_OBSERVED_REVISION')
+        if git_operation:
+            observed = receipt.get('observed_revision')
+            if (not isinstance(observed, str)
+                    or re.fullmatch(
+                        r'[0-9a-f]{40}(?:[0-9a-f]{24})?', observed)
+                       is None):
+                raise ValueError('GIT_OBSERVED_REVISION_REQUIRED')
         return receipt
 
     def _append_receipt_locked(self, row, outcome, receipt, now):
