@@ -37,6 +37,21 @@ def _safe_atom(value):
             and value not in ('.', '..'))
 
 
+def _safe_segmented(value, exact_parts=None):
+    if not isinstance(value, str) or not value or value != value.strip():
+        return False
+    parts = value.split('/')
+    if exact_parts is not None and len(parts) != exact_parts:
+        return False
+    return bool(parts) and all(_safe_atom(part) for part in parts)
+
+
+def _git_oid(value):
+    return (isinstance(value, str)
+            and re.fullmatch(r'[0-9a-f]{40}(?:[0-9a-f]{24})?', value)
+            is not None)
+
+
 class SourceResourceAdapter(object):
     """Trusted source-test normalization boundary; never a production adapter."""
 
@@ -254,7 +269,12 @@ class OfflineGitCAS(object):
     def operation(operation_id, event_id, resource_key, repo, branch,
                   base_head, before_tree, before_blob, after_tree, after_blob,
                   marker):
-        if not all(_safe_atom(x) for x in (repo, branch)):
+        if (not _safe_segmented(repo, exact_parts=2)
+                or not _safe_segmented(branch)
+                or not all(_git_oid(x) for x in
+                           (base_head, before_tree, before_blob,
+                            after_tree, after_blob))
+                or not _safe_atom(marker)):
             raise ValueError('CANONICAL_GIT_IDENTITY_REQUIRED')
         before = {'repo': repo, 'branch': branch, 'head': base_head,
                   'tree': before_tree, 'blob': before_blob}
@@ -278,6 +298,13 @@ class OfflineGitCAS(object):
             raise ValueError('EXACT_GIT_READBACK_REQUIRED')
         before = operation['expected_before']
         after = operation['requested_after']
+        if (not _safe_segmented(readback['repo'], exact_parts=2)
+                or not _safe_segmented(readback['branch'])
+                or not _git_oid(readback['commit'])
+                or not all(_git_oid(readback[x])
+                           for x in ('parent','tree','blob'))
+                or not _safe_atom(readback['marker'])):
+            raise ValueError('CANONICAL_GIT_READBACK_REQUIRED')
         if (readback['repo'] != before['repo']
                 or readback['branch'] != before['branch']):
             outcome = 'CONFLICT'
@@ -289,10 +316,12 @@ class OfflineGitCAS(object):
             outcome = 'CONFIRMED'
         else:
             outcome = 'CONFLICT'
-        return FakeTransactionalSink.receipt(
+        receipt = FakeTransactionalSink.receipt(
             operation, outcome, before,
             after if outcome == 'CONFIRMED' else readback,
             kind='GIT_CAS' if outcome == 'CONFIRMED' else 'READBACK')
+        receipt['observed_revision'] = readback['commit']
+        return receipt
 
 
 class CommitLease(object):
