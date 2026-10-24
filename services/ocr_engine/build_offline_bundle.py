@@ -373,6 +373,8 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
             manifest_in_archive = json.loads(manifest_member.read().decode("utf-8"))
             if manifest_in_archive.get("target_platform") != target_platform or manifest_in_archive.get("inputs") != checked["inputs"]:
                 raise BundleError("ARCHIVE_MANIFEST_BINDING_MISMATCH")
+            if deb_lock_path and manifest_in_archive.get("system_deb_lock_sha256") != frozen.get("system-deb-lock.json"):
+                raise BundleError("ARCHIVE_DEB_LOCK_BINDING_MISMATCH")
         os.chmod(temp_path, 0o600)
         # Atomic no-clobber publication: link creation fails if another process wins the name.
         publish_no_clobber(temp_path, output)
