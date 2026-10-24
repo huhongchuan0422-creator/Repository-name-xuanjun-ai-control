@@ -24,6 +24,9 @@ on:
       - 'services/ocr_engine/run_synthetic_inference.py'
       - 'services/ocr_engine/requirements.txt'
       - 'services/ocr_engine/model_manifest.json'
+      - 'services/ocr_engine/generate_platform_lock.py'
+      - 'services/ocr_engine/validate_workflow_syntax.py'
+      - 'services/ocr_engine/test_workflow_syntax.py'
       - '.github/workflows/ocr-engine-tests.yml'
       - 'tests/test_ocr_core.py'
   push:
@@ -46,6 +49,12 @@ jobs:
       OCR_BASE_CONFIG_SHA256: c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee
       OCR_TARGET_PLATFORM: linux-x86_64-cp311
     steps:
+      - name: Validate workflow YAML and all embedded shell blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python services/ocr_engine/validate_workflow_syntax.py
       - name: Validate explicit source, branch and target
         shell: bash
         env:
