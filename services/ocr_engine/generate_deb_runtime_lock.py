@@ -37,7 +37,7 @@ def main():
             raise SystemExit("DEB_NOT_REGULAR_FILE:" + path.name)
         fields = [subprocess.check_output(["dpkg-deb", "-f", str(path), field], text=True).strip()
                   for field in ("Package", "Version", "Architecture")]
-        if any(not value or "\\n" in value for value in fields):
+        if any(not value or chr(10) in value for value in fields):
             raise SystemExit("DEB_METADATA_INVALID:" + path.name)
         packages.append({"filename": path.name, "package": fields[0], "version": fields[1],
                          "architecture": fields[2], "sha256": sha(path)})
