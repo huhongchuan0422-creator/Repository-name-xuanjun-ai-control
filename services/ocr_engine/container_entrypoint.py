@@ -102,7 +102,7 @@ def check_existing_database(db_path, key_bytes):
         return False, "OCR_DATABASE_READ_ONLY_CHECK_FAILED"
 
 def _decode_mount_path(value):
-    return value.replace("\\040"," ").replace("\\011","\\t").replace("\\012","\\n").replace("\\134","\\\\")
+    return value.replace("\\040", " ").replace("\\011", chr(9)).replace("\\012", chr(10)).replace("\\134", chr(92))
 
 def readonly_mount_for(path, mountinfo_text=None):
     try:
