@@ -630,4 +630,65 @@ class OfflineBundleInputTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "DEB_LOCK_METADATA_INVALID"):
                 module.main()
 
+
+    def test_preview_dockerfile_pins_base_and_preserves_model_json_env(self):
+        import shlex
+        dockerfile = Path(__file__).with_name("Dockerfile.preview").read_text(encoding="utf-8")
+        lines = dockerfile.splitlines()
+        self.assertEqual(lines[0], "FROM python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199")
+        self.assertFalse(any(line.startswith("ARG OCR_BASE_IMAGE") for line in lines))
+        self.assertFalse(any(line.startswith("# syntax=") for line in lines))
+        env_lines = []
+        collecting = False
+        for line in lines:
+            if line.startswith("ENV "):
+                collecting = True
+                env_lines.append(line[4:])
+            elif collecting and line.startswith("    "):
+                env_lines.append(line.strip())
+            elif collecting:
+                break
+        env_text = " ".join(env_lines).replace("\\\\", "")
+        token = next(item for item in shlex.split(env_text) if item.startswith("OCR_MODEL_SHA256="))
+        parsed = json.loads(token.split("=", 1)[1])
+        self.assertEqual(set(parsed), {"det", "rec", "cls"})
+        self.assertTrue(all(len(value) == 64 and value == value.lower() for value in parsed.values()))
+        self.assertIn('test -n "$OCR_CONTAINER_SOURCE_SHA"', dockerfile)
+        self.assertIn('test "${#OCR_CONTAINER_SOURCE_SHA}" -eq 40', dockerfile)
+        self.assertIn("RUN --network=none", dockerfile)
+
+    def test_preview_entrypoint_rejects_missing_db_and_checks_existing_key_read_only(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_db_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        ok, reason = module.check_existing_database(str(self.root / "absent.sqlite3"), b"synthetic-key")
+        self.assertFalse(ok)
+        self.assertEqual(reason, "OCR_DATABASE_NOT_READY")
+        from cryptography.fernet import Fernet
+        from services.ocr_engine.secure_store import SecureSQLiteJobStore
+        db_path = self.root / "existing.sqlite3"
+        key = Fernet.generate_key()
+        store = SecureSQLiteJobStore(str(db_path), key)
+        ready, reason = module.check_existing_database(str(db_path), key)
+        self.assertTrue(ready, reason)
+        self.assertEqual(reason, "EXISTING_PROTECTED_DATABASE_READY")
+        self.assertEqual(db_path.stat().st_mode & 0o777, 0o600)
+        wrong_key = Fernet.generate_key()
+        ready, reason = module.check_existing_database(str(db_path), wrong_key)
+        self.assertFalse(ready)
+        self.assertEqual(reason, "OCR_DATABASE_KEY_BINDING_MISMATCH")
+
+    def test_preview_entrypoint_rejects_external_module_origin_and_bad_callback_arity(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_origin_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        root = self.root / "trusted-bindings"; root.mkdir()
+        outside = self.root / "outside.py"
+        outside.write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e,f=None): return {}\n")
+        (root / "trusted.py").symlink_to(outside)
+        with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_BINDINGS_SOURCE_NOT_REGULAR"):
+            module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted", "OCR_INTEGRATION_PATH":str(root)})
+        (root / "trusted.py").unlink()
+        (root / "trusted.py").write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e): return {}\n")
+        with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_CALLBACK_SIGNATURE_INVALID:authorize_attachment"):
+            module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted", "OCR_INTEGRATION_PATH":str(root)})
+
 if __name__=="__main__": unittest.main()
