@@ -10,8 +10,9 @@ def main():
     names={d.metadata.get("Name","").lower().replace("_","-") for d in importlib.metadata.distributions()}
     if "opencv-python" not in names or "opencv-python-headless" in names:
         raise SystemExit("OPENCV_DISTRIBUTION_COLLISION_OR_MISSING")
-    candidates=list(Path(cv2.__file__).parent.glob("*.so"))
-    candidates += list(Path(cv2.__file__).parent.glob("cv2*.so"))
+    package_root=Path(cv2.__file__).parent
+    candidates=sorted({p for p in package_root.rglob("*.so") if p.is_file() and not p.is_symlink()} |
+                      {p for p in package_root.rglob("*.so.*") if p.is_file() and not p.is_symlink()})
     if not candidates: raise SystemExit("CV2_SHARED_OBJECT_NOT_FOUND")
     checked=set()
     for shared in candidates:
