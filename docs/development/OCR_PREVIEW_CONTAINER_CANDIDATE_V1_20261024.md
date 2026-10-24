@@ -16,7 +16,7 @@ This candidate does not authorize UK host access, persistent-volume creation, se
 - Owner-side inspection reports 104 entries / 101 content hashes matching; 37 wheels, 46 Debian packages, 6 APT indexes, 3 models. Offline install/import evidence is from the completed run and owner-side verification, not a test executed by this candidate commit.
 - NOT_RELEASE candidate artifact 12553801548 and diagnostics artifact 12553896031 are not substitutes for the formal package.
 
-The formal archive contains runtime sources and offline assets; it does NOT contain a base image, Dockerfile, service installer, production callback adapter, or authorization to start a service. Container packaging/entrypoint in this candidate is separate source and must be bound to its own Git commit. No model or Debian package is re-downloaded or rebuilt.
+The formal archive contains runtime sources and offline assets; it does NOT contain a base image, Dockerfile, service installer, production callback adapter, or authorization to start a service. Container packaging/entrypoint are separate candidate source files: services/ocr_engine/Dockerfile.preview and services/ocr_engine/container_entrypoint.py. Their final source binding is the HEAD recorded below. No model or Debian package is re-downloaded or rebuilt.
 
 ## 2. Runtime candidate
 
@@ -76,3 +76,22 @@ Preparation only; no host actions have been performed. Once separately approved,
 5. Container build/run validation and measured resource envelope: pending an authorized non-production build/test environment; no Docker build or service start performed.
 
 Status remains SOURCE_CANDIDATE / NOT_BUILT / NOT_INSTALLED / NOT_STARTED / COMMUNITY_INTEGRATION_NOT_CONNECTED. A green source CI or artifact build cannot change these statuses.
+## 7. Candidate packaging files and exact offline build contract
+
+- Dockerfile candidate: services/ocr_engine/Dockerfile.preview.
+- Fail-closed launcher candidate: services/ocr_engine/container_entrypoint.py.
+- Debian installer reused from the audited source: services/ocr_engine/install_deb_closure.py.
+- The Dockerfile expects a directory named bundle/ at repository root, containing the exact inner tar contents from the formal artifact. It verifies wheel set/SHA and all three model SHA values before offline installation; it invokes the audited installer against the locked Debian set, installs only from the wheelhouse with --no-index, and runs pip check. No apt-get, pip network fallback, model download, or inference is part of the image build.
+- Before any build, the operator must securely retrieve artifact 12553737114, verify the ZIP and inner tar hashes stated in Section 1, safely extract the tar into bundle/, and verify offline-bundle-manifest.json. This candidate has not downloaded or extracted those bytes itself.
+- Candidate build invocation after bundle/ is verified and the pinned base image is already locally available:
+  docker build --network=none --build-arg OCR_CONTAINER_SOURCE_SHA=60fb8b677b572bddce78d7c23c5e22502751a368 -f services/ocr_engine/Dockerfile.preview .
+  The build argument above is only the first packaging-source checkpoint and must be replaced with the final candidate commit SHA after these candidate files are committed. Do not run this command as part of this task.
+- The launcher imports a trusted adapter module from the externally mounted /opt/ocr-integration path. It requires callables named authenticate, authorize_application and authorize_attachment. Missing module/callback, missing DB/key/model configuration, bad key format or model SHA mismatch exits before binding a listener. It does not create keys, database files, host directories, or callback behavior.
+- The image creates only its internal /var/lib/xuanjun-ocr directory during image construction, owned by UID/GID 10001. At runtime this path is intended to be replaced by the separately approved persistent mount; runtime root filesystem should be read-only. This is image-source behavior, not a host-side volume creation.
+- This build/source candidate has not been compiled, built, started, or run in Docker. Dockerfile syntax, artifact extraction, offline pip/dpkg, health check, non-root permissions, graceful stop/restart and HTTP contract remain NOT_EXECUTED until a permitted isolated build environment is available.
+
+## 8. Current candidate source binding
+
+- Dockerfile commit: 478fcd02ee6542f9974e2ccfe7c13fd79fbf1946.
+- Launcher commit: 6d0617e8be5e58bc95298adb4c7a3e6e46946fc3.
+- Final candidate HEAD is the commit that adds this document's final source-binding update. Verify branch ref before using any build command.
