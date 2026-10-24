@@ -130,8 +130,8 @@ jobs:
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               apt-get update
-              apt-get install -y --download-only --no-install-recommends -o Dir::Cache::archives=/debs libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
-              python /src/services/ocr_engine/generate_deb_runtime_lock.py /debs /etc/apt/sources.list.d/debian.sources /var/lib/apt/lists
+              apt-get install -y --download-only --no-install-recommends -o Dir::State::Lists=/apt-work -o Dir::Cache::archives=/debs libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
+              python /src/services/ocr_engine/generate_deb_runtime_lock.py /debs /etc/apt/sources.list.d/debian.sources /apt-work
             '
       - name: Fetch fixed model assets and verify the three published SHA256 pins
         shell: bash
