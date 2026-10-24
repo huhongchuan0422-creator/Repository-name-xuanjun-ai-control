@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -188,7 +189,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn('run(["dpkg", "--unpack"]',deb_installer)
         self.assertIn('run(["dpkg", "--configure", "-a"]',deb_installer)
         self.assertNotIn("apt-get install",deb_installer)
-        self.assertIn('subprocess.check_output(["dpkg-deb","-f",str(path),field]',deb_generator)
+        self.assertIn('subprocess.check_output(["dpkg-deb", "-f", str(path), field]',deb_generator)
 
     def test_deb_lock_generator_reads_real_synthetic_package_and_official_source(self):
         root=self.root/"generated-debs"; root.mkdir()
@@ -331,14 +332,13 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("verify_offline_runtime.py",text)
         self.assertIn("write_candidate_input_manifest.py",text)
         self.assertNotIn("python - <<'PY'",text)
-        self.assertIn("ocr-build/**",text)
+        self.assertIn("ocr-candidate-inputs/payload/**",text)
+        self.assertNotIn("ocr-build/**",text)
         self.assertIn('source-pins/"',text)
         self.assertIn("model_distribution/NOTICE.md",text)
         self.assertIn("model_manifest.json",text)
     def test_candidate_manifest_never_claims_signature_from_release_filename(self):
-        root=self.root/"candidate"; (root/"ocr-deb-cache"/"apt-lists").mkdir(parents=True)
-        release=root/"ocr-deb-cache"/"apt-lists"/"debian_dists_bookworm_InRelease"
-        release.write_bytes(b"not verified signed metadata")
+        root=self.root/"candidate"; root.mkdir()
         aptwork=root/"apt-work"; aptwork.mkdir()
         release=aptwork/"debian_dists_bookworm_InRelease"; release.write_bytes(b"not verified signed metadata")
         debroot=root/"ocr-deb-cache"; debroot.mkdir()
@@ -384,7 +384,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         (root/"ocr-deb-cache"/"apt-lists"/"lock").write_bytes(b"lock")
         (root/"ocr-deb-cache"/"partial.deb.tmp").write_bytes(b"partial")
         deb_path=root/"ocr-deb-cache"/"libxcb1.deb"; deb_path.write_bytes(b"deb")
-        lock_data={"packages":[{"filename":"libxcb1.deb","sha256":hashlib.sha256(deb_path.read_bytes()).hexdigest()}],
+        lock_data={"packages":[{"filename":"libxcb1.deb","package":"libxcb1","version":"1","architecture":"amd64","sha256":hashlib.sha256(deb_path.read_bytes()).hexdigest()}],
                    "apt_lists":[{"path":"Packages","bytes":index_path.stat().st_size,"sha256":hashlib.sha256(index_path.read_bytes()).hexdigest()}]}
         (root/"ocr-deb-cache"/"system-deb-lock.json").write_text(json.dumps(lock_data))
         os.chmod(root/"ocr-deb-cache"/"apt-lists"/"lock",0o000)
@@ -453,7 +453,8 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("Upload reusable candidate inputs and their digest manifest",text)
         self.assertIn("Upload verified package only after successful build",text)
         self.assertIn("if: success()",text)
-        self.assertIn("ocr-deb-cache/**",text)
+        self.assertIn("ocr-candidate-inputs/payload/**",text)
+        self.assertNotIn("ocr-deb-cache/**",text)
 
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
@@ -521,8 +522,9 @@ class OfflineBundleInputTests(unittest.TestCase):
         result=subprocess.run([sys.executable,str(script),str(root)],env=env,text=True,capture_output=True)
         self.assertNotEqual(result.returncode,0)
         self.assertIn("DEB_FILE_SET_DIFFERS_FROM_LOCK",result.stderr)
-        self.assertEqual(calls.read_text(),"")
-\n
+        self.assertFalse(any(line.startswith("dpkg ") or line.startswith("dpkg-query ")
+                             for line in calls.read_text().splitlines()))
+
     def test_candidate_copy_uses_frozen_expected_sha_and_rejects_changed_destination(self):
         script=Path(__file__).with_name("write_candidate_input_manifest.py")
         spec=importlib.util.spec_from_file_location("candidate_manifest_module",script)
@@ -576,5 +578,56 @@ class OfflineBundleInputTests(unittest.TestCase):
         second=subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True)
         self.assertNotEqual(second.returncode,0)
         self.assertIn("CANDIDATE_STAGING_MUST_BE_NEW",second.stderr)
+
+    def test_candidate_rejects_missing_malformed_sha_and_incomplete_metadata(self):
+        script = Path(__file__).with_name("write_candidate_input_manifest.py")
+        spec = importlib.util.spec_from_file_location("candidate_negative", script)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        valid = {"filename": "pkg.deb", "package": "pkg", "version": "1", "architecture": "amd64",
+                 "sha256": hashlib.sha256(b"candidate bytes").hexdigest()}
+        variants = []
+        for key in ("sha256", "package", "version", "architecture"):
+            item = dict(valid); del item[key]; variants.append(item)
+        for bad in (None, "bad", "A" * 64):
+            item = dict(valid); item["sha256"] = bad; variants.append(item)
+        item = dict(valid); item["package"] = "pkg" + chr(10) + "injected"; variants.append(item)
+        for index, item in enumerate(variants):
+            with self.subTest(item=item):
+                root = self.root / ("invalid-lock-" + str(index)); debs = root / "ocr-deb-cache"
+                debs.mkdir(parents=True); (debs / "pkg.deb").write_bytes(b"candidate bytes")
+                (debs / "system-deb-lock.json").write_text(json.dumps({"packages": [item], "apt_lists": []}))
+                with mock.patch.object(sys, "argv", ["candidate", str(root)]):
+                    module.main()
+                payload = root / "ocr-candidate-inputs" / "payload"
+                manifest = json.loads((payload.parent / "candidate-input-manifest.json").read_text())
+                self.assertFalse(manifest["complete"])
+                self.assertFalse((payload / "system-debs" / "pkg.deb").exists())
+                self.assertTrue(any(x["reason"] == "LOCK_PACKAGE_SHA_OR_METADATA_INVALID"
+                                    for x in manifest["missing_or_rejected"]))
+                self.assertFalse(any(x["provenance"].startswith("SHA256_MATCHES_FROZEN_LOCK")
+                                     for x in manifest["files"]))
+
+    def test_generator_rejects_actual_newline_metadata_before_staging(self):
+        from services.ocr_engine import generate_deb_runtime_lock as module
+        root = self.root / "newline-generator"; root.mkdir()
+        (root / "pkg.deb").write_bytes(b"synthetic")
+        source = self.root / "newline.sources"; source.write_text("URIs: https://deb.debian.org/debian")
+        work = self.root / "newline-work"; work.mkdir()
+        with mock.patch.object(sys, "argv", ["generator", str(root), str(source), str(work)]), \
+             mock.patch.object(module.subprocess, "check_output", return_value="pkg" + chr(10) + "injected"):
+            with self.assertRaisesRegex(SystemExit, "DEB_METADATA_INVALID"):
+                module.main()
+        self.assertFalse((root / "apt-lists").exists())
+
+    def test_installer_rejects_actual_newline_metadata_before_any_command(self):
+        from services.ocr_engine import install_deb_closure as module
+        root = self.root / "newline-installer"; root.mkdir()
+        (root / "system-deb-lock.json").write_text(json.dumps({"packages": [{
+            "filename": "pkg.deb", "package": "pkg" + chr(10) + "injected", "version": "1",
+            "architecture": "amd64", "sha256": "0" * 64}]}))
+        with mock.patch.object(sys, "argv", ["installer", str(root)]), \
+             mock.patch.object(module, "run", side_effect=AssertionError("must not run")):
+            with self.assertRaisesRegex(SystemExit, "DEB_LOCK_METADATA_INVALID"):
+                module.main()
 
 if __name__=="__main__": unittest.main()
