@@ -6,10 +6,14 @@ import unittest
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parent
-sys.path[:0]=[str(ROOT),str(ROOT/'reused-6825'),str(ROOT/'successor_controller')]
+sys.path[:0]=[str(ROOT),str(ROOT/'reused-6825'),str(ROOT/'successor_controller'),
+              str(ROOT/'new19-source')]
 
 import pr17_b5_successor_binder as binder
 import pr17_b5_successor_review as c53
+from pr17_b5_successor_authority import prepare_maintenance_candidate, ExistingRequestAuthority
+from pr17_b5_successor_backend import R2HostBackend
+from pr17_b5_successor_fixed_io import FixedR2IO
 
 
 class SyntheticSixSlotTests(unittest.TestCase):
@@ -65,6 +69,64 @@ class SyntheticSixSlotTests(unittest.TestCase):
         self.source['production/cloud_connection/queue.py']+=b'changed'
         with self.assertRaisesRegex(binder.Hold,'SOURCE_BYTES_CHANGED'):
             self.make()
+
+    def test_actual_preparation_factory_reads_complete_deliverable_without_action(self):
+        # The baseline fingerprint is an explicit fixture. The source loader,
+        # adapter, backend, authority and transaction constructors are real.
+        # No grant, witness, host command, or original HTTP call is fabricated.
+        class RecordedBaselineIO(FixedR2IO):
+            def __init__(self, spec, baselines):
+                super().__init__(spec)
+                self.baselines=baselines
+            def read(self, path):
+                self._path(path)
+                return self.baselines[path], ('fixture',path)
+        def private_bytes(path, limit, contents=False):
+            self.assertIn(path,self.baselines)
+            self.assertLessEqual(len(self.baselines[path]),limit)
+            return self.baselines[path] if contents else ('fixture',path)
+        def fixture_only(*_):
+            env,order=c53.env_read(self.baselines[c53.CONFIGS[2]])
+            return (copy.deepcopy(json.loads(self.baselines[c53.CONFIGS[0]])),
+                    copy.deepcopy(json.loads(self.baselines[c53.CONFIGS[1]])),env,order)
+        with patch.object(c53,'verify_observed_bytes',fixture_only):
+            tx=prepare_maintenance_candidate(
+                spec_raw=(ROOT/'SUCCESSOR_SPEC.json').read_bytes(),
+                source_root=str(ROOT/'new19-source'),
+                legacy_io=RecordedBaselineIO(self.spec,self.baselines),
+                private_bytes=private_bytes,
+                batch_id='c53-recovery-draft',
+                approval_ref='fixture-only',window_start=1792830000,
+                attempt_id='isolated-attempt')
+        self.assertIs(type(tx.b),R2HostBackend)
+        self.assertIs(type(tx.b.authority),ExistingRequestAuthority)
+        self.assertEqual(len(tx.bundle['requests']),19)
+        self.assertEqual(tx.b.source_blobs[binder.MANIFEST_PATH],
+                         (ROOT/'RUNTIME_SOURCE_MANIFEST.json').read_bytes())
+        self.assertFalse(tx.b.reserved)
+        self.assertFalse(tx.b.worker_stopped)
+
+    def test_preparation_factory_rejects_batch_that_changes_fixed_request_ids(self):
+        class RecordedBaselineIO(FixedR2IO):
+            def read(self, path):
+                self._path(path)
+                return self_outer.baselines[path], ('fixture',path)
+        self_outer=self
+        def private_bytes(path, limit, contents=False):
+            return self.baselines[path] if contents else ('fixture',path)
+        def fixture_only(*_):
+            env,order=c53.env_read(self.baselines[c53.CONFIGS[2]])
+            return (copy.deepcopy(json.loads(self.baselines[c53.CONFIGS[0]])),
+                    copy.deepcopy(json.loads(self.baselines[c53.CONFIGS[1]])),env,order)
+        with patch.object(c53,'verify_observed_bytes',fixture_only):
+            with self.assertRaisesRegex(Exception,'ORIGINAL_AUTHORITY_CATALOG_REQUEST_MISMATCH'):
+                prepare_maintenance_candidate(
+                    spec_raw=(ROOT/'SUCCESSOR_SPEC.json').read_bytes(),
+                    source_root=str(ROOT/'new19-source'),
+                    legacy_io=RecordedBaselineIO(self.spec),
+                    private_bytes=private_bytes,
+                    batch_id='different-fixed-batch',approval_ref='fixture-only',
+                    window_start=1792830000,attempt_id='isolated-attempt')
 
 
 if __name__=='__main__':
