@@ -32,7 +32,7 @@ class ApiTests(unittest.TestCase):
         self.expected_sha = hashlib.sha256(self.image).hexdigest()
         self.revoked_apps = set()
         self.revoked_attachments = set()
-        self.current_revision = "synthetic-revision-1"
+        self.current_revision = "1"
         def attachment_resolver(p, app, attachment, content_sha, document_type, expected_application_revision=None):
             valid = (app == "synthetic-app" and attachment == "synthetic-attachment" and
                      content_sha == self.expected_sha and attachment not in self.revoked_attachments and
@@ -105,7 +105,7 @@ class ApiTests(unittest.TestCase):
                 return TestClient(create_app(authenticate=auth,
                     store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
                     authorize_application=lambda p, app_id: app_id == "synthetic-app",
-                    authorize_attachment=lambda p, app_id, attachment, content_sha, document_type, expected_revision=None: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest() and document_type == "business_license" and expected_revision in (None, "synthetic-revision-1"), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "document_type": "business_license", "application_revision": "synthetic-revision-1"}))
+                    authorize_attachment=lambda p, app_id, attachment, content_sha, document_type, expected_revision=None: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest() and document_type == "business_license" and expected_revision in (None, "1"), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "document_type": "business_license", "application_revision": "1"}))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
@@ -174,7 +174,7 @@ class ApiTests(unittest.TestCase):
         self.assertIn('ATTACHMENT_CONTENT_BINDING_UNVERIFIED',r.text)
     def test_application_revision_change_denies_get_confirm_delete(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
-        self.current_revision='synthetic-revision-2'
+        self.current_revision='2'
         headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revision-change-confirm-001'}
         self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
         self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
