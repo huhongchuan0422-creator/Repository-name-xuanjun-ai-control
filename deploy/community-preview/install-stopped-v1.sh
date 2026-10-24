@@ -16,7 +16,7 @@ set +e
 /usr/bin/sudo -n /usr/bin/python3 -I -B -S -c '
 import hashlib,os,stat,sys
 path="/opt/xuanjun-community-preview/install-stopped-v1.py"
-expected="bc4ece1bc6891b770b906dca37304018515495c59c5d3aad8828c0d8ec481260"
+expected="646c7f78e275afe5807d9c0572356607db9dc0ca917f2acb10012e5fc85dd4a7"
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
 try:
  st=os.fstat(fd)

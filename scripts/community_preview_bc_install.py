@@ -35,14 +35,18 @@ class Hold(RuntimeError):
         super().__init__(self.reason)
 
 class PublishedUnknown(Hold):
-    def __init__(self,reason,parent_fsync_completed,temp_identity=None):
+    def __init__(self,reason,parent_fsync_completed,temp_identity=None,temp_identity_sha256=None):
         super().__init__('V2_INSTALL_PUBLISHED_UNKNOWN',True,temp_identity,parent_fsync_completed)
         self.detail=reason if type(reason) is str and reason else 'POST_PUBLISH_UNKNOWN'
+        digest=identity_digest(temp_identity) if temp_identity_sha256 is None else temp_identity_sha256
+        if digest is not None and (type(digest) is not str or re.fullmatch('[0-9a-f]{64}',digest) is None):
+            raise ValueError('TEMP_IDENTITY_DIGEST_REQUIRED')
+        self.temp_identity_sha256=digest
         self.target_published=True
         self.retry_safe=False
     def record(self):
         return {'state':'V2_INSTALL_PUBLISHED_UNKNOWN','reason':self.detail,'publish_attempted':True,
-                'temp_identity_sha256':identity_digest(self.temp_identity),'target_published':True,
+                'temp_identity_sha256':self.temp_identity_sha256,'target_published':True,
                 'retry_safe':False,'parent_fsync_completed':self.parent_fsync_completed,
                 'install_root':INSTALL_ROOT,'archive_sha256':ARCHIVE_SHA256,
                 'manifest_sha256':MANIFEST_SHA256,'site_executed':False,'bc_executed':False}
@@ -311,6 +315,11 @@ SUCCESS_RECEIPT_KEYS={'state','install_root','archive_sha256','manifest_sha256',
                       'temp_identity_sha256','target_published','retry_safe','parent_fsync_completed',
                       'site_executed','bc_executed'}
 
+def hold_record(error):
+    return {'state':'V2_INSTALL_HOLD','reason':str(error),'publish_attempted':error.publish_attempted,
+            'temp_identity_sha256':identity_digest(error.temp_identity),'target_published':False,'retry_safe':False,
+            'parent_fsync_completed':error.parent_fsync_completed,'site_executed':False,'bc_executed':False}
+
 def consume_entry_receipt(child_exit,raw):
     need(type(child_exit) is int and type(raw) is bytes and len(raw)<=4096,'INSTALL_ENTRY_RECEIPT_UNKNOWN')
     need(raw.endswith(b'\n') and raw.count(b'\n')==1,'INSTALL_ENTRY_RECEIPT_UNKNOWN')
@@ -358,7 +367,8 @@ def main(argv=None):
     except BaseException as error:
         if isinstance(pending,PublishedUnknown):pass
         elif result is not None and result.get('target_published') is True:
-            pending=PublishedUnknown('INSTALL_PARENT_CLOSE_UNKNOWN',result.get('parent_fsync_completed') is True)
+            pending=PublishedUnknown('INSTALL_PARENT_CLOSE_UNKNOWN',result.get('parent_fsync_completed') is True,
+                                     temp_identity_sha256=result.get('temp_identity_sha256'))
         elif pending is None:pending=error
     if pending is not None:raise pending
     print(json.dumps(result,sort_keys=True),flush=True)
@@ -370,7 +380,5 @@ if __name__=='__main__':
         print(json.dumps(error.record(),sort_keys=True),flush=True)
         raise SystemExit(2)
     except Hold as error:
-        print(json.dumps({'state':'V2_INSTALL_HOLD','reason':str(error),'publish_attempted':error.publish_attempted,
-                          'temp_identity_sha256':identity_digest(error.temp_identity),'target_published':False,'retry_safe':False,
-                          'parent_fsync_completed':error.parent_fsync_completed,'site_executed':False,'bc_executed':False},sort_keys=True),flush=True)
+        print(json.dumps(hold_record(error),sort_keys=True),flush=True)
         raise SystemExit(2)

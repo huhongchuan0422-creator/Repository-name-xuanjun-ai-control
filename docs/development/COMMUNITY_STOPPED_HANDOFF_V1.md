@@ -196,3 +196,18 @@ Immediately before the single `renameat2(..., RENAME_NOREPLACE)` attempt, the in
 Every `V2_INSTALL_HOLD` is conservatively `retry_safe=false`, including a partial `.installing-*` directory. A published or unprovable result is also never automatically retried or removed. Parent close is attempted once; a close failure after an existing `PublishedUnknown` does not replace the original UNKNOWN, while a close failure after an otherwise successful publish becomes `PublishedUnknown`.
 
 The shell entry consumes the install result separately from B/C. It admits success only for child exit 0 plus exactly one complete newline-terminated JSON success receipt with the exact frozen archive/manifest/install-root fields, `publish_attempted=true`, `target_published=true`, `retry_safe=false` and `parent_fsync_completed=true`. Nonzero exit, missing/truncated/malformed/oversize/multiple receipts become `V2_INSTALL_ENTRY_UNKNOWN` with `inspect_only=true`, `retry_safe=false` and `bc_admitted=false`. There is no automatic install retry and no automatic B/C invocation. SIGKILL/OOM are not promised to emit a receipt; their absent/nonzero result is simply UNKNOWN/inspect-only.
+
+## Final installer receipt binding correction — source only
+
+The reviewed installer SHA256 is `646c7f78e275afe5807d9c0572356607db9dc0ca917f2acb10012e5fc85dd4a7`
+and the reviewed wrapper SHA256 is `c9d7b50c0b491bb960cc4181e7233435590ab7238de20a2f4e2336e7bedf88fc`.
+If a successful install result is converted to `V2_INSTALL_PUBLISHED_UNKNOWN` solely because the final
+install-parent close is unproven, the already verified `temp_identity_sha256` from that success result
+is copied verbatim into the UNKNOWN record. A 64-hex digest is never treated as an identity tuple and
+hashed a second time. The parent descriptor is closed exactly once; an exception after a real close
+remains UNKNOWN and the consumed fd integer is never retried.
+
+`V2_INSTALL_HOLD` output is produced by the installer's production `hold_record()` formatter, including
+`retry_safe=false`. Receipt-consumption tests execute the actual second inline Python parser extracted
+from the reviewed shell itself. Success requires exactly one complete success receipt plus exit 0;
+nonzero, missing, truncated, malformed, multiple or oversized receipt input remains inspect-only UNKNOWN.
