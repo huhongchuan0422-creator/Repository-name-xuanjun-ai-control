@@ -525,25 +525,27 @@ class SuccessorEvidenceStore(WitnessStore):
             check('revoked.json' not in names,
                   'SUCCESSOR_EVIDENCE_REVOKED')
             row, record_sha = self._read(fd, self.NAMES[kind])
-            check(set(row)=={'schema','kind','binding_sha256','source_id',
-                  'source_sha256','witness_identity','witness_method',
-                  'observed_at','payload'} and row['schema']==1 and
-                  row['kind']==kind and row['binding_sha256']==pin and
-                  row['witness_method']=='AUTHENTICATED_UK_WORKBENCH_AND_SUDO' and
-                  type(row['observed_at']) is int and
-                  binding['valid_from'] <= row['observed_at'] < binding['valid_until'] and
-                  type(row['source_id']) is str and TOKEN.fullmatch(row['source_id']) and
-                  type(row['source_sha256']) is str and HEX.fullmatch(row['source_sha256']) and
-                  type(row['witness_identity']) is str and TOKEN.fullmatch(row['witness_identity']) and
-                  type(row['payload']) is dict and
-                  self._now_bound(binding) >= row['observed_at'],
-                  'SUCCESSOR_EVIDENCE_BINDING')
-            self._payload(kind, row['payload'], binding)
+            self._validate_row(row, pin, binding, kind)
             return row, record_sha
         finally:
             if lock is not None:os.close(lock)
             os.close(fd)
 
+    def _validate_row(self, row, pin, binding, kind):
+        check(type(row) is dict and set(row)=={'schema','kind','binding_sha256','source_id',
+              'source_sha256','witness_identity','witness_method',
+              'observed_at','payload'} and row['schema']==1 and
+              row['kind']==kind and row['binding_sha256']==pin and
+              row['witness_method']=='AUTHENTICATED_UK_WORKBENCH_AND_SUDO' and
+              type(row['observed_at']) is int and
+              binding['valid_from'] <= row['observed_at'] < binding['valid_until'] and
+              type(row['source_id']) is str and TOKEN.fullmatch(row['source_id']) and
+              type(row['source_sha256']) is str and HEX.fullmatch(row['source_sha256']) and
+              type(row['witness_identity']) is str and TOKEN.fullmatch(row['witness_identity']) and
+              type(row['payload']) is dict and
+              self._now_bound(binding) >= row['observed_at'],
+              'SUCCESSOR_EVIDENCE_BINDING')
+        self._payload(kind, row['payload'], binding)
     @contextlib.contextmanager
     def action_exact(self, binding, kind):
         """A successful revoke waits for this action; later actions cannot start."""
@@ -558,10 +560,7 @@ class SuccessorEvidenceStore(WitnessStore):
                   'SUCCESSOR_EVIDENCE_PARTIAL_OR_UNKNOWN')
             check('revoked.json' not in names,'SUCCESSOR_EVIDENCE_REVOKED')
             row,_=self._read(fd,self.NAMES[kind])
-            check(row.get('binding_sha256')==pin and row.get('kind')==kind,
-                  'SUCCESSOR_EVIDENCE_BINDING')
-            self._payload(kind,row.get('payload'),binding)
-            self._now_bound(binding)
+            self._validate_row(row,pin,binding,kind)
             yield
         finally:
             if lock is not None:os.close(lock)
@@ -624,6 +623,14 @@ class SuccessorEvidenceStore(WitnessStore):
                       r['object_ref']=='b5-material-%02d'%(i+1)
                       for i,r in enumerate(rows)),
                   'SUCCESSOR_B5_PROVENANCE_ROWS')
+            proof_rows=[{k:r[k] for k in ('request_id','object_ref',
+                         'invoke_id','bytes','sha256')} for r in rows]
+            expected=digest(canonical({'catalog_sha256':binding['catalog_sha256'],
+                    'project':binding['project'],'recipient':binding['recipient'],
+                    'custody_receipt_sha256':payload['custody_receipt_sha256'],
+                    'rows':proof_rows}))
+            check(payload['proof_sha256']==expected,
+                  'SUCCESSOR_B5_PROOF_CHANGED')
         else:
             raise Hold('SUCCESSOR_EVIDENCE_SCOPE')
 

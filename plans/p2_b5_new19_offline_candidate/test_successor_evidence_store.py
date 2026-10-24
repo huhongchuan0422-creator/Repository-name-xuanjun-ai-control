@@ -14,6 +14,7 @@ sys.path[:0]=[str(HERE),str(HERE/'reused-6825'),
 from pr17_b5_successor_witness import (SuccessorEvidenceStore, Hold,
                                         JOB, COMMIT, PROJECT, RECIPIENT, SUBJECT)
 from pr17_b5_successor_authority import ExistingRequestAuthority
+from pr17_b5_successor_backend import R2HostBackend
 import pr17_b5_successor_review as c53
 
 
@@ -65,6 +66,12 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         self.register('B5_EXPOSURE_CLOSE',dict(scope='B5_EXPOSURE_CLOSE',
              job=JOB,decision_id='decision2',approved=True,phase='AFTER_B5_HTTP'))
         self.assertTrue(authority.approve_c53_b5_exposure_close(JOB)['approved'])
+        backend=object.__new__(R2HostBackend)
+        backend.authority=authority;backend.job=JOB
+        self.assertEqual(backend._receipt('approve_precise_pre_start_restore',JOB)
+                         ['scope'],'PRE_START_RESTORE')
+        self.assertEqual(backend._receipt('approve_c53_b5_exposure_close',JOB)
+                         ['scope'],'B5_EXPOSURE_CLOSE')
         self.store.revoke_exact(self.binding,'revoke1')
         with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_REVOKED'):
             authority.approve_c53_b5_exposure_close(JOB)
@@ -74,7 +81,13 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
                    invoke_id='invoke%02d'%i,bytes=4900 if i<18 else 5392,
                    sha256='%064x'%i,result_ref='tool-result-%02d'%i)
               for i,rid in enumerate(self.binding['ids'])]
-        payload=dict(proof_sha256='b'*64,custody_receipt_sha256='c'*64,
+        custody_sha='c'*64
+        proof_sha=c53.sha(c53.canon(dict(catalog_sha256='a'*64,
+            project=PROJECT,recipient=RECIPIENT,
+            custody_receipt_sha256=custody_sha,
+            rows=[{k:r[k] for k in ('request_id','object_ref','invoke_id',
+                                    'bytes','sha256')} for r in rows])))
+        payload=dict(proof_sha256=proof_sha,custody_receipt_sha256=custody_sha,
                      rows=rows,subject=SUBJECT,scope='project.files.read',
                      catalog_sha256='a'*64,recipient=RECIPIENT)
         changed=dict(payload,rows=[dict(r) for r in rows])
@@ -89,7 +102,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         authority.catalog_sha='a'*64
         proof=dict(state='B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
                    bytes=93592,objects=19,close_approval='NOT_PROVEN',
-                   proof_sha256='b'*64)
+                   proof_sha256=proof_sha)
         result=authority.verify_b5_http_provenance(proof,'a'*64,
                                                    tuple(self.binding['ids']))
         self.assertEqual(result['source'],'ORIGINAL_UK_B5_TOOL_HUMAN_WITNESS')
@@ -97,6 +110,30 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         with self.assertRaisesRegex(c53.Hold,'B5_ORIGINAL_TOOL_WITNESS_CHANGED'):
             authority.verify_b5_http_provenance(proof,'a'*64,
                                                 tuple(self.binding['ids']))
+        for key in ('sha256','bytes'):
+            alternate=dict(payload,rows=[dict(r) for r in rows])
+            alternate['rows'][0][key]=('d'*64 if key=='sha256' else 4901)
+            if key=='bytes':alternate['rows'][-1]['bytes']-=1
+            with self.assertRaisesRegex(Hold,'SUCCESSOR_B5_PROOF_CHANGED'):
+                self.store._payload('b5_http',alternate,self.binding)
+        alternate=dict(payload,custody_receipt_sha256='d'*64)
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_B5_PROOF_CHANGED'):
+            self.store._payload('b5_http',alternate,self.binding)
+
+    def test_action_rechecks_complete_row_before_side_effect(self):
+        payload=dict(scope='PRE_START_RESTORE',job=JOB,decision_id='decision1',
+                     approved=True,phase='PRE_START')
+        self.register('PRE_START_RESTORE',payload)
+        path=self.root/'restore.json'
+        row=json.loads(path.read_bytes());row.pop('source_id')
+        path.write_bytes(c53.canon(row)+b'\n')
+        entered=[]
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_BINDING'):
+            with self.store.action_exact(self.binding,'PRE_START_RESTORE'):
+                entered.append('command')
+        self.assertEqual(entered,[])
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_BINDING'):
+            self.store.read_exact(self.binding,'PRE_START_RESTORE')
 
     def test_duplicate_wrong_scope_partial_and_expiry_hold(self):
         restore=dict(scope='PRE_START_RESTORE',job=JOB,decision_id='decision1',

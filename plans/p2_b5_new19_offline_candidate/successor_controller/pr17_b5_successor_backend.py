@@ -154,16 +154,30 @@ class R2HostBackend:
         evidence=self._auth(name,*args)
         expected_source=('ORIGINAL_PROTECTED_OBSERVATION' if name ==
             'verify_fixed_receiver_target_conflicts' else
+            'ORIGINAL_UK_SCOPED_WITNESS' if name in
+            ('approve_precise_pre_start_restore',
+             'approve_c53_b5_exposure_close') else
             'UK_OWNER_WITNESS_SINGLE_BATCH' if name in
             ('verify_owner_maintenance_scope','verify_b5_analyst_ack') else
             'ORIGINAL_ALGORITHM_VERIFIED' if name in
             ('verify_nineteen_original_success_receipts',
              'verify_original_archive_custody','custody_once') else
             'ORIGINAL_AUTHENTICATED_CLIENT')
-        c53.require(type(evidence) is dict and evidence.get('verified') is True
-                    and evidence.get('source')==expected_source
-                    and isinstance(evidence.get('evidence_sha256'),str)
-                    and len(evidence['evidence_sha256'])==64,'AUTH_RECEIPT_UNKNOWN')
+        scoped=name in ('approve_precise_pre_start_restore',
+                        'approve_c53_b5_exposure_close')
+        c53.require(type(evidence) is dict and
+                    evidence.get('source')==expected_source and
+                    ((evidence.get('approved') is True and
+                      evidence.get('job')==self.job and
+                      evidence.get('scope')==('PRE_START_RESTORE' if name ==
+                          'approve_precise_pre_start_restore' else
+                          'B5_EXPOSURE_CLOSE') and
+                      isinstance(evidence.get('record_sha256'),str) and
+                      len(evidence['record_sha256'])==64) if scoped else
+                     (evidence.get('verified') is True and
+                      isinstance(evidence.get('evidence_sha256'),str) and
+                      len(evidence['evidence_sha256'])==64)),
+                    'AUTH_RECEIPT_UNKNOWN')
         return evidence
 
     def checkpoint(self,phase):
