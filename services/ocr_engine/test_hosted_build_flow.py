@@ -23,7 +23,7 @@ class HostedBuildFlowTests(unittest.TestCase):
         self.bin.mkdir()
         self.calls = self.root / "calls.log"
         docker = self.bin / "docker"
-        docker.write_text("#!/usr/bin/env python3\\nimport json,os,sys\\nwith open(os.environ['FAKE_CALL_LOG'],'a',encoding='utf-8') as stream:\\n stream.write(json.dumps(sys.argv[1:])+'\\\\n')\\nargs=sys.argv[1:]\\nif args and args[0]=='pull': sys.exit(int(os.environ.get('FAKE_PULL_EXIT','0')))\\nsys.exit(0)\\n")
+        docker.write_text("#!/usr/bin/env python3\nimport json,os,sys\nwith open(os.environ['FAKE_CALL_LOG'],'a',encoding='utf-8') as stream:\n stream.write(json.dumps(sys.argv[1:])+'\\n')\nargs=sys.argv[1:]\nif args and args[0]=='pull': sys.exit(int(os.environ.get('FAKE_PULL_EXIT','0')))\nsys.exit(0)\n")
         docker.chmod(0o755)
         self.env = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ.get("PATH",""), FAKE_CALL_LOG=str(self.calls),
                         RUNNER_TEMP=str(self.root), GITHUB_WORKSPACE=str(self.root), OCR_BASE_IMAGE="python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
