@@ -145,7 +145,11 @@ def _raw_version_valid(value, optional=False):
 def _shared_writeback_eligible(job):
     if job.get("status") != "confirmed" or not isinstance(job.get("confirmation_revision"), int) or isinstance(job.get("confirmation_revision"), bool) or job.get("confirmation_revision", 0) < 1:
         return False
-    if job.get("provider_version") is None or not job.get("application_revision") or not job.get("attachment_id") or not job.get("document_type") or not job.get("document_sha256"):
+    if (job.get("provider_version") is None or not _valid_provider_version(job.get("provider_version")) or
+            not _valid_revision(job.get("application_revision")) or not job.get("attachment_id") or
+            job.get("document_type") not in ALLOWED_HINTS or
+            not isinstance(job.get("document_sha256"), str) or
+            __import__("re").fullmatch(r"[0-9a-f]{64}", job.get("document_sha256", "")) is None):
         return False
     binding = job.get("confirmed_binding")
     if not isinstance(binding, dict):
@@ -153,7 +157,7 @@ def _shared_writeback_eligible(job):
     expected = {"application_revision": job.get("application_revision"), "provider_version": job.get("provider_version"),
                 "document_type": job.get("document_type"), "attachment_id": job.get("attachment_id"),
                 "content_sha256": job.get("document_sha256")}
-    return binding == expected and bool(job.get("confirmed_fields"))
+    return binding == expected and isinstance(job.get("confirmed_fields"), dict) and bool(job.get("confirmed_fields"))
 
 def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
