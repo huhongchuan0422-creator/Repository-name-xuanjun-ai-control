@@ -49,10 +49,13 @@ def main():
     models = root / "ocr-model-cache"
     for filename in sorted(MODEL_NAMES):
         p = models / filename
-        if regular_readable(p) and trusted.get(filename) == sha(p):
-            add(p, "models/" + filename, "FIXED_MODEL_MANIFEST_SHA256_MATCH")
+        if not regular_readable(p):
+            add(p, "models/" + filename, "MODEL_MISSING_OR_UNREADABLE", required=True)
+        elif trusted.get(filename) != sha(p):
+            add(p, "models/" + filename, "MODEL_SHA_MISMATCH_FIXED_MANIFEST")
+            missing.append({"path": "models/" + filename, "reason": "MODEL_SHA_MISMATCH_FIXED_MANIFEST"})
         else:
-            add(p, "models/" + filename, "MODEL_SHA_NOT_VERIFIED_AGAINST_FIXED_MANIFEST", required=True)
+            add(p, "models/" + filename, "FIXED_MODEL_MANIFEST_SHA256_MATCH")
 
     debroot = root / "ocr-deb-cache"
     if debroot.is_dir() and not debroot.is_symlink():
@@ -74,9 +77,12 @@ def main():
                 missing.append({"path": "system-debs/" + filename, "reason": "LOCKED_DEB_MISSING_UNREADABLE_OR_SHA_MISMATCH"})
         for filename in sorted(actual - set(expected)):
             add(debroot / filename, "unlocked-debs/" + filename, "UNLOCKED_DEB_NOT_INSTALLABLE")
+            missing.append({"path": "system-debs/" + filename, "reason": "UNLOCKED_DEB_EXCLUDED_FROM_EXACT_LOCKED_SET"})
         add(lock, "system-deb-lock.json", "LOCKED_CANDIDATE_INPUT_NOT_RELEASE", required=True)
         apt_root = debroot / "apt-lists"
         apt_entries = lockdata.get("apt_lists", []) if isinstance(lockdata, dict) else []
+        if not apt_entries:
+            missing.append({"path": "apt-lists", "reason": "APT_INDEX_LOCK_EMPTY"})
         apt_expected = set()
         for item in apt_entries:
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):
