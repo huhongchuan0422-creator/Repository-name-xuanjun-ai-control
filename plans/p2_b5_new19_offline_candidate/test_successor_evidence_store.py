@@ -144,7 +144,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         spec=binder.verify_spec_bytes((HERE/'SUCCESSOR_SPEC.json').read_bytes())
         backend=object.__new__(R2HostBackend)
         backend.authority=authority;backend.job=JOB;backend.spec=spec
-        backend.expected_ids=tuple(self.binding['ids'])
+        backend.expected_ids=tuple(self.binding['ids']);backend.reserved=False
         bundle={'catalog_sha':'a'*64,
             'requests':[{'request_id':rid} for rid in self.binding['ids']],
             'files':{p:b'' for p in c53.CONFIGS+c53.SLOTS}}
