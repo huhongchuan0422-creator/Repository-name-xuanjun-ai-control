@@ -382,6 +382,20 @@ class WitnessStore:
                 os.close(lock)
             os.close(fd)
 
+    def active_action_fds(self, binding):
+        """Return the exact descriptors held by the current witness action."""
+        pin=self._binding(binding)
+        leased=getattr(self._lease,'current',None)
+        check(type(leased) is tuple and len(leased)==3 and leased[1]==pin,
+              'WITNESS_ACTION_LEASE_REQUIRED')
+        result=(leased[0],leased[2])
+        for current in result:
+            try:os.fstat(current)
+            except OSError:
+                raise Hold('WITNESS_ACTION_LEASE_FD_UNKNOWN') from None
+        check(result[0]!=result[1],'WITNESS_ACTION_LEASE_FD_DUPLICATE')
+        return result
+
     @contextlib.contextmanager
     def action(self, binding):
         """Serialize one bounded action with revocation's exclusive publish.
@@ -402,7 +416,7 @@ class WitnessStore:
             self._admit_time(binding)
             check(getattr(self._lease, 'current', None) is None,
                   'WITNESS_NESTED_ACTION')
-            self._lease.current = (fd, self._binding(binding))
+            self._lease.current = (fd, self._binding(binding), lock)
             try:
                 yield
             finally:
