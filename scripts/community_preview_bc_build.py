@@ -71,7 +71,8 @@ EXPECTED_SOURCE_FILES={'loader.py','scripts/community_preview_release_plan.py','
  'scripts/community_preview_version_inspect.py','scripts/community_preview_update_checkpoint.py',
  'scripts/community_preview_update_composition.py','scripts/community_preview_site_prepare.py',
  'scripts/community_preview_stopped_handoff.py','deploy/community-preview/f131-image-receipt.json'}
-BUILD_INPUTS={'scripts/community_preview_bc_build.py','scripts/community_preview_bc_loader.py'}
+BUILD_INPUTS={'scripts/community_preview_bc_build.py','scripts/community_preview_bc_loader.py',
+ 'scripts/community_preview_bc_install.py','deploy/community-preview/install-stopped-v1.sh'}
 
 def commit_binding():
     try:
@@ -98,6 +99,9 @@ if __name__=='__main__':
         archive_bytes=len(archive),archive_sha256=hashlib.sha256(archive).hexdigest(),
         files={name:dict(bytes=len(b),sha256=hashlib.sha256(b).hexdigest()) for name,b in commands.items()},
         install_candidate=dict(site_executed=False,install_executed=False,directory_mode='0700',file_mode='0600',
-            no_extractall=True,requires_separate_root_review=True,install_root=h.CONTROL),
+            no_extractall=True,requires_separate_root_review=True,install_root=h.CONTROL,
+            archive_sha256=hashlib.sha256(archive).hexdigest(),manifest_sha256=hashlib.sha256(manifest).hexdigest(),
+            installer_sha256=hashlib.sha256((ROOT/'scripts/community_preview_bc_install.py').read_bytes()).hexdigest(),
+            shell_sha256=hashlib.sha256((ROOT/'deploy/community-preview/install-stopped-v1.sh').read_bytes()).hexdigest()),
         source_manifest_sha256=hashlib.sha256(manifest).hexdigest(),site_executed=False)
     (target/'delivery.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')

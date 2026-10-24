@@ -103,7 +103,8 @@
           "tests/test_community_ocr_shared_composition.py",
           "clients/community-mini/ocr-host-ui.test.cjs",
           "tests/test_community_preview_stage_a.py",
-          "tests/test_community_preview_stopped_handoff.py"
+          "tests/test_community_preview_stopped_handoff.py",
+          "tests/test_community_preview_bc_install.py"
         ]
       },
       "reuse": [
@@ -272,7 +273,10 @@
         "scripts/community_preview_stopped_handoff.py",
         "scripts/community_preview_bc_loader.py",
         "scripts/community_preview_bc_build.py",
+        "scripts/community_preview_bc_install.py",
+        "deploy/community-preview/install-stopped-v1.sh",
         "tests/test_community_preview_stopped_handoff.py",
+        "tests/test_community_preview_bc_install.py",
         "docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md"
       ]
     },

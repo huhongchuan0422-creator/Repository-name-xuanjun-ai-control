@@ -148,3 +148,37 @@ Physical B/C/backup/stop/start/update/WeChat/OCR remain separately unapproved.
 The generated carrier is **not an installer**. Any later separately approved root installer must create the fixed `control-stopped-v1` directory chain as root-owned mode `0700`, create every listed regular file as root-owned single-link mode `0600`, verify the manifest and file hashes before import, and publish atomically. A generic ZIP `extractall` is not an admitted installation path. The existing A `control-oci2330-v1` tree is never overwritten.
 
 The wrapper shell is intentionally login-shell-preserving: its outer shell return code is not acceptance. Acceptance requires both a structured Python `BC_RESULT` record and a matching `SUDO_CHILD_EXIT=0`; the wrapper also emits `BC_OUTER_NOT_ACCEPTANCE` to make this explicit. B/C server installation, snapshot, stop/rename/run/recovery and deployment remain separately authorized现场 actions and are not performed by this source delivery.
+
+
+## Fixed V2 carrier installation entry — source candidate only
+
+The carrier itself remains the independently reviewed frozen bytes: `control-stopped-v1.zip`
+SHA256 `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4` and canonical
+`manifest.json` SHA256 `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
+The installer is an external delivery tool and is not inserted into that carrier ZIP.
+
+`scripts/community_preview_bc_install.py` accepts only those exact package/manifest bytes. It validates
+the complete ZIP member set, duplicate names, traversal/absolute/backslash paths, Unix regular-file
+mode, DEFLATE method, per-file size/hash and the internal manifest before any destination write.
+It publishes only the fixed new `/opt/xuanjun-community-preview/control-stopped-v1` target. Existing
+final target or deterministic `.installing-<archive-prefix>` partial state is HOLD; A's
+`control-oci2330-v1` is never opened for write or removed. Writes are dir-fd relative with NOFOLLOW/
+EXCL, private directories are 0700 and files 0600, all file/directory data is fsynced, the complete
+temporary tree is reverified, and only then is the sibling directory atomically renamed to the final
+name followed by parent fsync and final reread. Generic `extractall` is not used.
+
+Failure before publish leaves no final `control-stopped-v1` success name. A `.installing-*` directory
+may remain as explicit inspection evidence and blocks automatic retry; its inspection/removal is a
+separate future root action, not automatic recovery. Tests use a temporary non-production directory
+and explicit identity fixture only; they are not evidence that root installation occurred.
+
+Future Owner operation material (NOT EXECUTED here), from the reviewed repository root after separately
+placing the exact two frozen input files at protected absolute paths:
+
+```sh
+sh deploy/community-preview/install-stopped-v1.sh /ABS/PATH/control-stopped-v1.zip /ABS/PATH/manifest.json
+```
+
+The shell invokes `sudo -n python3 -I -B -S` and the installer independently requires the fixed UK host,
+root effective identity, original admin sudo environment and matching kernel loginuid. A successful
+install result only establishes carrier bytes at the new V2 path; it does not authorize or execute B/C.

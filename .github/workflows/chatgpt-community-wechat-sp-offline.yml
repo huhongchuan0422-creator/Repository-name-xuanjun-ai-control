@@ -199,8 +199,9 @@ jobs:
           set -o pipefail
           if [ "${{ contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
-            python -B -m py_compile scripts/community_preview_bc_loader.py scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py
-            PYTHONPATH=.:tests python -B -m unittest test_community_preview_stopped_handoff test_community_preview_release_plan test_community_preview_update_checkpoint test_community_preview_update_composition -v 2>&1 | tee community-tests.log
+            python -B -m py_compile scripts/community_preview_bc_loader.py scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py scripts/community_preview_bc_install.py
+            sh -n deploy/community-preview/install-stopped-v1.sh
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_bc_install test_community_preview_stopped_handoff test_community_preview_release_plan test_community_preview_update_checkpoint test_community_preview_update_composition -v 2>&1 | tee community-tests.log
           elif [ "${{ contains(github.event.head_commit.message, '[preview-stage-a-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_stage_a -v 2>&1 | tee community-tests.log
@@ -507,7 +508,10 @@ jobs:
             scripts/community_preview_stopped_handoff.py
             scripts/community_preview_bc_loader.py
             scripts/community_preview_bc_build.py
+            scripts/community_preview_bc_install.py
+            deploy/community-preview/install-stopped-v1.sh
             tests/test_community_preview_stopped_handoff.py
+            tests/test_community_preview_bc_install.py
             docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
           retention-days: 14
