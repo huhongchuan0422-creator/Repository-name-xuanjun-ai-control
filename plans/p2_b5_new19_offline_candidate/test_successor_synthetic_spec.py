@@ -201,6 +201,10 @@ class SyntheticSpecTests(unittest.TestCase):
                 allowed.update((WitnessStore.__init__.__globals__['ROOT'],
                                 SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']))
                 allowed.update(base+'/current' for base in c53.BASES)
+                generated_roots=(spec['fixed_paths']['job_proposed'],
+                    *spec['fixed_paths']['stage_proposed'],
+                    *spec['fixed_paths']['target_release'])
+                allowed.update(generated_roots)
                 pins={path:(target.stat().st_dev,target.stat().st_ino)
                       for path in files if (target:=root/path.lstrip('/')).exists()}
                 pins[c53.DB]=(spec['observed_baseline']['db']['dev'],
@@ -210,7 +214,7 @@ class SyntheticSpecTests(unittest.TestCase):
                 store_roots=(WitnessStore.__init__.__globals__['ROOT'],
                              SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
                 boundary=SealedOSBoundary(root,allowed,pins,
-                                          dynamic_roots=store_roots)
+                    dynamic_roots=store_roots+generated_roots)
                 binding=entry._binding(spec,'c53-recovery-draft','fixture-attempt',
                                        start,bundle['catalog_sha'])
                 record=json.loads(gate.read_binder())

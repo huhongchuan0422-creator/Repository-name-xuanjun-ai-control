@@ -93,15 +93,44 @@ class SealedOSBoundary:
             return StatView(st, st.st_dev, st.st_ino)
         return st
 
+    def _relative_logical(self, path, dir_fd):
+        if dir_fd is None or path.startswith('/'):
+            return None
+        parent_stat = self._fstat(dir_fd)
+        parent = self.sealed_directories.get((parent_stat.st_dev,parent_stat.st_ino))
+        if parent is None:
+            return None
+        logical = parent.rstrip('/')+'/'+path
+        permitted_dynamic = (parent in self.dynamic_roots and
+            '/' not in path and path not in ('','.','..'))
+        if (logical not in self.allowed and logical not in self.directories
+                and not permitted_dynamic):
+            raise PermissionError('UNLISTED_OS_PATH')
+        return logical
+
     def open(self, path, flags, mode=0o777, *, dir_fd=None):
         path = os.fspath(path)
+        logical = None
         if path == '/' and dir_fd is None:
-            return self._open(str(self.root), flags, mode)
+            fd = self._open(str(self.root), flags, mode)
+            st = self._fstat(fd)
+            self.sealed_directories[(st.st_dev,st.st_ino)] = '/'
+            return fd
         if dir_fd is None and path.startswith('/'):
             if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
-            return self._open(str(self.root/path.lstrip('/')), flags, mode)
-        return self._open(path, flags, mode, dir_fd=dir_fd)
+            logical = path
+            path = str(self.root/path.lstrip('/'))
+        else:
+            logical = self._relative_logical(path,dir_fd)
+        fd = self._open(path, flags, mode, dir_fd=dir_fd)
+        if logical is not None:
+            st = self._fstat(fd)
+            if (st.st_mode & 0o170000) == 0o040000:
+                # Learn only an already-admitted fixed/dynamic directory after
+                # a real descriptor open. Renames update the same inode mapping.
+                self.sealed_directories[(st.st_dev,st.st_ino)] = logical
+        return fd
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         path = os.fspath(path)
@@ -110,16 +139,8 @@ class SealedOSBoundary:
             if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             path = str(self.root/path.lstrip('/'))
-        elif dir_fd is not None and not path.startswith('/'):
-            parent = self.sealed_directories.get(
-                (self._fstat(dir_fd).st_dev, self._fstat(dir_fd).st_ino))
-            if parent is not None:
-                logical = parent.rstrip('/')+'/'+path
-                permitted_dynamic = (parent in self.dynamic_roots and
-                    '/' not in path and path not in ('','.','..'))
-                if (logical not in self.allowed and logical not in self.directories
-                        and not permitted_dynamic):
-                    raise PermissionError('UNLISTED_OS_PATH')
+        else:
+            logical = self._relative_logical(path,dir_fd)
         return self._mapped(self._stat(path, dir_fd=dir_fd,
                                        follow_symlinks=follow_symlinks),
                             logical, follow_symlinks)
