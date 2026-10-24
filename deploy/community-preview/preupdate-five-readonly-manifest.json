@@ -1,0 +1,65 @@
+{
+  "purpose": "ROOT_REVIEW_FIVE_FIXED_OBJECT_READONLY_NOT_SITE_APPROVAL",
+  "baseline_composition_sha": "b09b837b338def5db8485bda8c4fa4e98d98139f",
+  "product_sha": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+  "host": "iZd7oeikknn1z21sq6ji6zZ",
+  "reuse_pins": {
+    "scripts/community_preview_version_inspect.py": "98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3",
+    "scripts/community_preview_update_composition.py": "6b2efd8413b1798305dc96f23db9e8e0d1064dde6be8ca66d95ba78419f5a9f5",
+    "scripts/community_preview_upgrade.py": "2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee"
+  },
+  "files": {
+    "scripts/community_preview_preupdate_observe.py": {
+      "bytes": 14176,
+      "mode": "0644",
+      "sha256": "57aa4ee37d2dfdd82948a4396141e111459f4701db770a6fd3f6d2a58a204f61"
+    },
+    "scripts/community_preview_preupdate_bundle.py": {
+      "bytes": 3630,
+      "mode": "0644",
+      "sha256": "2d62f77f5cb5a8c25e2b13608aed785f27b741afca2908e68d396ad3c2a46fef"
+    },
+    "deploy/community-preview/preupdate-five-readonly.py": {
+      "bytes": 42696,
+      "mode": "0644",
+      "sha256": "45ea764e69069297d932f0f9fe0f03e935b6555e4803a6f730233e95e36b2f81"
+    },
+    "deploy/community-preview/preupdate-five-readonly.sh": {
+      "bytes": 43101,
+      "mode": "0644",
+      "sha256": "8937dc61f039ec6d85cffb02e199ba23d00d19719e91339eef8a7a6a8cf1dc93"
+    },
+    "tests/test_community_preview_preupdate_observe.py": {
+      "bytes": 15205,
+      "mode": "0644",
+      "sha256": "6e952ec5398bff9fd269c7bbe42dc45c018cabe5226ebc3099b6ad0a661ba6a8"
+    },
+    "docs/development/COMMUNITY_PREUPDATE_FIVE_READONLY_20261024.md": {
+      "bytes": 10676,
+      "mode": "0644",
+      "sha256": "c1d28de0c1dc6df720f6a384fb422371f7e3c487093e49bffbb66c92f613aeb6"
+    }
+  },
+  "bound": {
+    "total_seconds": 90,
+    "kill_reap_grace_seconds": 2,
+    "json_bytes": 32768,
+    "command_bytes": 32768,
+    "command_seconds": 8,
+    "health_body_bytes": 4096,
+    "health_child_seconds": 10
+  },
+  "no_arguments": true,
+  "site_executed": false,
+  "filesystem_writes": false,
+  "updates_permitted": false,
+  "source_installation_observed": false,
+  "unknown": [
+    "INSTALLED_ROOT_CALLER_PATHS_AND_HASHES",
+    "EXISTING_DATABASE_BACKUP_REFERENCE",
+    "VERIFIED_RESTORE_AND_DOWNGRADE_COMPATIBILITY",
+    "FIFTH_BACKUP_BINDING"
+  ],
+  "action_policy": "ONE_FUTURE_OWNER_APPROVED_READONLY_INVOCATION_ONLY_AFTER_ROOT_REVIEW",
+  "exit_code": 2
+}

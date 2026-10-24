@@ -197,7 +197,9 @@ jobs:
         if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
         run: |
           set -o pipefail
-          if [ "${{ contains(github.event.head_commit.message, '[preview-update-composition-scope]') }}" = true ]; then
+          if [ "${{ contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_preupdate_observe -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-update-composition-scope]') }}" = true ]; then
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_update_composition -v 2>&1 | tee community-tests.log
           elif [ "${{ contains(github.event.head_commit.message, '[preview-update-checkpoint-scope]') }}" = true ]; then
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_update_checkpoint test_community_preview_release_plan -v 2>&1 | tee community-tests.log
@@ -395,6 +397,21 @@ jobs:
             deploy/community-preview/readonly-version-manifest.json
             tests/test_community_preview_version_inspect.py
             docs/development/COMMUNITY_PREVIEW_VERSION_READONLY_REVIEW_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve five-object readonly candidate for root review
+        if: contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-preupdate-five-readonly-candidate
+          path: |
+            scripts/community_preview_preupdate_observe.py
+            scripts/community_preview_preupdate_bundle.py
+            deploy/community-preview/preupdate-five-readonly.py
+            deploy/community-preview/preupdate-five-readonly.sh
+            deploy/community-preview/preupdate-five-readonly-manifest.json
+            tests/test_community_preview_preupdate_observe.py
+            docs/development/COMMUNITY_PREUPDATE_FIVE_READONLY_20261024.md
           if-no-files-found: error
           retention-days: 14
 
