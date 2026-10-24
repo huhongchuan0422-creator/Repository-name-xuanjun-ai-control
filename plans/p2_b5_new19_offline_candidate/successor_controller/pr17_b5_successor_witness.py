@@ -525,6 +525,8 @@ class SuccessorEvidenceStore(WitnessStore):
         self.root, self.clock, self.test_only = root, clock, test_only
         self._last_clock = None
         self._lease = threading.local()
+        self._lease_serial = 0
+        self._lease_serial_guard = threading.Lock()
 
     def _now_bound(self, binding):
         self._binding(binding)
