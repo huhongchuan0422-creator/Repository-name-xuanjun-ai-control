@@ -342,7 +342,8 @@ class WriterFenceTests(unittest.TestCase):
     def test_unknown_observations_append_without_consuming_receipt(self):
         ticket=self.claim();operation=self.op()
         self.fence.prepare(ticket,self.caller(),operation)
-        self.s.begin_dispatch(ticket,self.caller(),'op1')
+        self.s.begin_dispatch(ticket,self.caller(),'op1',
+                              self.fence.locks.provider_id)
         for index in (1,2):
             ctx={'role':'RECONCILER','evidence_id':'unknown-%d'%index,
                  'caller_id':'reader'}
@@ -403,7 +404,8 @@ class WriterFenceTests(unittest.TestCase):
     def test_complete_revocation_cannot_bypass_drain_or_unknown(self):
         ticket=self.claim();operation=self.op()
         self.fence.prepare(ticket,self.caller(),operation)
-        self.s.begin_dispatch(ticket,self.caller(),'op1')
+        self.s.begin_dispatch(ticket,self.caller(),'op1',
+                              self.fence.locks.provider_id)
         controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
         self.fence.begin_revocation('t1',controller)
         with self.assertRaisesRegex(ValueError,'REVOCATION_NOT_COMPLETED'):
