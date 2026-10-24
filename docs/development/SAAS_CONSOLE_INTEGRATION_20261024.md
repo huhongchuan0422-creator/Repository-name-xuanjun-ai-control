@@ -110,3 +110,36 @@ Synthetic-only journey covered by the executable entry:
 Current execution status in this ChatGPT runtime: **NOT_EXECUTED**. The runtime has no mounted checkout of the repository and outbound Git/GitHub clone is unavailable, so the exact 1b48 backend modules and their transitive imports cannot be loaded into local Python. This is an environment/input absence, not a backend PASS/FAIL. The existing V5 Node/fetch/local-HTTP results remain isolated frontend evidence only and are not reclassified as backend connectivity.
 
 Minimum missing local input to execute the test: one filesystem checkout whose HEAD is exactly `1b48e5fe8015afd9035ff269f9b432d9a68223b2`. No credentials, customer data, server access, deployment permission or payment environment is required.
+
+
+## V6 narrow-review corrections
+
+Source parent for this patch: frontend commit `6859130751589ab340ca0664ada509df6b0cc71b`. Existing V5 URL normalization, 69×26 traceability, version/retest binding, mutation cross-project guards and real-backend entry are reused rather than redesigned.
+
+### 403 generation/project probe guard
+
+Project-load 403 no longer clears detail before identity discrimination. Every `handleError` call from a selected project carries `{generation, project, write}`. A 403 performs read-only `GET me`; after that await, it may mutate UI only when the initiating generation/project is still active. A delayed A→`me` result cannot clear or replace B after the user opens B.
+
+### Ambiguous mutation HTTP status
+
+`api.request` now classifies POST HTTP 408 and 5xx responses as `ApiFailure.uncertain=true`, even when the backend returns JSON. GET responses remain definite because they cannot create mutation state. Consequently legacy `change_submit` creates only its scoped UNKNOWN marker on 408/5xx and never blind-resends; candidate idempotent submit retains the existing key for explicit retry rather than generating a new key; logout 408/5xx is reported as unknown rather than successful logout.
+
+### Write-403 / CSRF handling
+
+A write operation 403 followed by successful read-only `/me` proves only that the HttpOnly cookie session still identifies the user; it does not prove the tab-local CSRF remains valid. The console therefore clears `xj_csrf`, refreshes the authorized project list, exposes the login form and requires explicit re-login before more writes. A GET/project-read 403 does not automatically clear CSRF when `/me` still succeeds. No new auth or token-recovery system is introduced.
+
+### Per-delivery retest latch
+
+For one `AWAIT_RETEST` delivery, ACCEPT and FEEDBACK share one in-flight latch. Starting either action disables both controls; any second click while the request is in flight returns without calling the API. This prevents concurrent contradictory RETEST events from the same rendered delivery.
+
+### Tests
+
+V6 frontend/source isolation regression: **29/29 PASS, 0 FAIL**. New targeted coverage includes:
+- A project-load 403 → deferred `/me` → open B → late A `/me` result cannot clear B;
+- active write 403 + valid cookie clears stale CSRF and exposes explicit re-login;
+- POST 408/500/503 are ambiguous while GET remains definite;
+- legacy 503 creates only its scoped UNKNOWN marker;
+- candidate 503 blocks implicit retry and explicit retry reuses the same idempotency key;
+- same delivery ACCEPT/FEEDBACK share one latch and the second click does not issue another API request.
+
+This remains frontend/source isolation evidence. The exact Python backend integration entry bound to `1b48e5fe8015afd9035ff269f9b432d9a68223b2` remains `NOT_EXECUTED` in this runtime because no complete backend checkout exists in `/mnt/data` and outbound GitHub clone is unavailable. Existing Node/local-HTTP PASS results are not counted as real Python backend connectivity.

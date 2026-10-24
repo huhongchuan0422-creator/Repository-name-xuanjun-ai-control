@@ -1,0 +1,72 @@
+
+> test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: same-origin identity/login/logout and csrf
+ok 1 - same-origin identity/login/logout and csrf
+# Subtest: transport ambiguity only for POST
+ok 2 - transport ambiguity only for POST
+# Subtest: preview URL normalizes then requires exact project/key/version and rejects encodings/backslash
+ok 3 - preview URL normalizes then requires exact project/key/version and rejects encodings/backslash
+# Subtest: retest exact 4dc body
+ok 4 - retest exact 4dc body
+# Subtest: POST 408/5xx JSON responses are ambiguous while GET remains definite
+ok 5 - POST 408/5xx JSON responses are ambiguous while GET remains definite
+# Subtest: candidate lost response reuses same key only on explicit retry
+ok 6 - candidate lost response reuses same key only on explicit retry
+# Subtest: candidate same key changed body returns server 409
+ok 7 - candidate same key changed body returns server 409
+# Subtest: candidate unavailable never falls back to legacy
+ok 8 - candidate unavailable never falls back to legacy
+# Subtest: HTTP journey requires authoritative preview to move v1->v2 before page_updates/retest
+ok 9 - HTTP journey requires authoritative preview to move v1->v2 before page_updates/retest
+# Subtest: HTTP rejects cross-project/revoke/expiry/version drift
+ok 10 - HTTP rejects cross-project/revoke/expiry/version drift
+# Subtest: legacy lost response leaves scoped marker; read-only cases recover evidence without resend
+ok 11 - legacy lost response leaves scoped marker; read-only cases recover evidence without resend
+# Subtest: start with valid cookie but no csrf keeps login visible for write recovery
+ok 12 - start with valid cookie but no csrf keeps login visible for write recovery
+# Subtest: project switch clears old DOM and stale rejected load cannot clear new project
+ok 13 - project switch clears old DOM and stale rejected load cannot clear new project
+# Subtest: late Q&A success from A cannot reopen A after switch to B
+ok 14 - late Q&A success from A cannot reopen A after switch to B
+# Subtest: late Q&A 403 from A cannot globally clear B
+ok 15 - late Q&A 403 from A cannot globally clear B
+# Subtest: late feedback success from A cannot reopen A after switch to B
+ok 16 - late feedback success from A cannot reopen A after switch to B
+# Subtest: late retest 403 from A cannot clear B
+ok 17 - late retest 403 from A cannot clear B
+# Subtest: 403 distinguishes invalid session from project denial via read-only me
+ok 18 - 403 distinguishes invalid session from project denial via read-only me
+# Subtest: logout transport unknown never claims successful logout
+ok 19 - logout transport unknown never claims successful logout
+# Subtest: A project 403 waits for me probe; switching to B before probe resolves prevents A from clearing B
+ok 20 - A project 403 waits for me probe; switching to B before probe resolves prevents A from clearing B
+# Subtest: active write 403 with valid cookie clears stale csrf and exposes explicit re-login
+ok 21 - active write 403 with valid cookie clears stale csrf and exposes explicit re-login
+# Subtest: same delivery shares one retest latch across ACCEPT and FEEDBACK
+ok 22 - same delivery shares one retest latch across ACCEPT and FEEDBACK
+# Subtest: fixed traceability CSV hash and every one of 69 rows/26 fields matches source including owner_gap_task
+ok 23 - fixed traceability CSV hash and every one of 69 rows/26 fields matches source including owner_gap_task
+# Subtest: frozen mapping preserves HOLD/no-real-verified and exact key SaaS pages
+ok 24 - frozen mapping preserves HOLD/no-real-verified and exact key SaaS pages
+# Subtest: legacy unknown is scoped and stores no feedback body
+ok 25 - legacy unknown is scoped and stores no feedback body
+# Subtest: scoped unknown A does not block B and explicit clear allows A later new request
+ok 26 - scoped unknown A does not block B and explicit clear allows A later new request
+# Subtest: definite 400/403/409 do not create unknown marker
+ok 27 - definite 400/403/409 do not create unknown marker
+# Subtest: candidate definite failure clears memory slot; unknown explicit retry reuses key
+ok 28 - candidate definite failure clears memory slot; unknown explicit retry reuses key
+# Subtest: legacy backend 503 creates scoped UNKNOWN and candidate 503 retains one key for explicit retry
+ok 29 - legacy backend 503 creates scoped UNKNOWN and candidate 503 retains one key for explicit retry
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 202.811393

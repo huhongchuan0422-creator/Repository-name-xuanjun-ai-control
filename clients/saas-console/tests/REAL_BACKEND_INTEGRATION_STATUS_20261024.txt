@@ -56,3 +56,13 @@ Existing V5 frontend isolation suite:
   24/24 PASS, 0 FAIL
   REUSED ONLY.
   It is NOT counted as proof that the 1b48e5fe Python backend ran or connected.
+
+
+V6 continuation:
+  Frontend/source targeted regression: 29/29 PASS, 0 FAIL.
+  Current runtime filesystem probe:
+    find /mnt/data -type f -name pr122_customer_http.py
+    find /mnt/data -maxdepth 2 -type d -name .git
+  Result: no complete PR122 backend checkout found.
+  Therefore exact Python backend integration remains NOT_EXECUTED.
+  Node fetch/local HTTP tests are not reclassified as Python backend connectivity.
