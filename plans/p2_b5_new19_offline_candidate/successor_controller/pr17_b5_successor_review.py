@@ -267,6 +267,10 @@ class Transaction:
             # Shared action lease serializes admission and the whole bounded
             # call with exclusive revocation. Cleanup stays available.
             with self.b.witness_action():
+                release_lease=getattr(self.b,'successor_release_action',None)
+                if callable(release_lease):
+                    with release_lease():
+                        return action(*args)
                 return action(*args)
         return action(*args)
     def execute(self):

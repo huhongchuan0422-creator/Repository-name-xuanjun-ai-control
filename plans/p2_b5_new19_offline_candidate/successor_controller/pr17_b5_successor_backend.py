@@ -14,6 +14,7 @@ import time
 import hashlib
 import json
 import re
+import contextlib
 import ctypes
 import pr17_b5_successor_binder as binder
 
@@ -132,6 +133,18 @@ class R2HostBackend:
         c53.require(type(self.authority) is ExistingRequestAuthority,
                     'SUCCESSOR_EVIDENCE_AUTHORITY_TYPE')
         return self._auth('successor_evidence_action',kind)
+
+    @contextlib.contextmanager
+    def successor_release_action(self):
+        gate=getattr(self,'release_gate',None)
+        store=getattr(gate,'evidence_store',None)
+        if store is None:
+            # Synthetic offline gates may exercise source bytes directly. The
+            # production authority preflight requires registered enrollment.
+            yield
+        else:
+            with store.action_exact(gate.evidence_binding,'release'):
+                yield
 
     def _receipt(self,name,*args):
         if name in ('verify_owner_maintenance_scope','verify_b5_analyst_ack'):
