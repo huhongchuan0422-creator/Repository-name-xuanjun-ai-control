@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import zipfile
 import os
+import subprocess
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
 from services.ocr_engine.build_offline_bundle import validate_deb_cache
@@ -284,6 +285,9 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("write_candidate_input_manifest.py",text)
         self.assertNotIn("python - <<'PY'",text)
         self.assertIn("ocr-build/**",text)
+        self.assertIn('source-pins/"',text)
+        self.assertIn("model_distribution/NOTICE.md",text)
+        self.assertIn("model_manifest.json",text)
     def test_candidate_artifact_is_always_uploaded_but_not_release(self):
         workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
         text=workflow.read_text(encoding="utf-8")
