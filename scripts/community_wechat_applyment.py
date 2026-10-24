@@ -125,16 +125,18 @@ class WechatApplyment:
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_APPLYMENT',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(application,owner,application,self.center.encrypt(canonical(record),'wechat-applyment:'+application)))
     def fill_confirmed_license_draft(self, session, csrf, application, *,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields):
+                                     confirmed_fields, source_check=None):
         """Host-only empty-field fill, original Center transaction + two CAS.
 
         Caller must supply both versions from an independently bound human
-        confirmation snapshot. OCR jobs currently lack the provider version;
-        this primitive is NOT wired into OCR/HTTP and does not lift bridge HOLD.
+        confirmation snapshot. The protected bridge can supply a source_check
+        that revalidates the persisted confirmation and original attachment
+        inside this transaction. No HTTP writeback entry or OCR grant exists.
         """
         from scripts import community_onboarding_offline as workflow
         from scripts.pr122_customer_core import safe_text
         c=self.center
+        if source_check is not None and not callable(source_check):raise ValueError('HOST_SOURCE_CHECK_REQUIRED')
         if self.onboarding.center is not c or self.onboarding.wechat_applyment is not self:
             raise PermissionError('ORIGINAL_SHARED_DRAFT_REQUIRED')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
@@ -194,11 +196,13 @@ class WechatApplyment:
                 if fields['address']:skipped.append('registered_address')
                 else:fields['address']=address;applied.append('registered_address')
             if not applied:
+                if source_check is not None:source_check(platform['revision'],version)
                 return dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped)
             if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
             # Recheck after decoding/validation and immediately before first write.
             if (c.session(session,csrf)!=uid or self.onboarding._load(application,uid)[2]!=platform
                     or provider()!=record):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
+            if source_check is not None:source_check(platform['revision'],version)
             revision=workflow.save_draft(c.db,owner,application,uid,fields,expected_application_revision,
                 encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
             meta['reviews']={};self.onboarding._meta(application,owner,meta)
@@ -211,6 +215,7 @@ class WechatApplyment:
             if (c.session(session,csrf)!=uid or latest['revision']!=revision or latest['status']!='DRAFT'
                     or latest['fields']!=fields or latest_meta.get('reviews')!={}
                     or provider()!=result):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
+            if source_check is not None:source_check(revision,result['version'])
             return dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped)
 
     def _provider_domain(self,record,*,submission=False):

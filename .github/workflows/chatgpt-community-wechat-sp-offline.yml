@@ -146,16 +146,21 @@ jobs:
           NODE_OPTIONS: --test-reporter=tap
         run: |
           set -o pipefail
-          git fetch --no-tags origin 2dc5eeb1d0d1ffb037314a8edcf5c2e16d645a40
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
           python -m pip install fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 cryptography==50.0.2 playwright==1.55.0
-          PYTHONPATH=.:tests python -B -m unittest test_community_ocr_host test_community_ui_preview.SourceBoundary test_community_platform_host.FormalHost.test_serve_uses_exact_proxy_arguments_and_always_closes test_community_platform_host.FormalHost.test_host_lock_cleanup_on_failed_composition_allows_explicit_reopen -v 2>&1 | tee community-tests.log
-          node --test clients/community-mini/ocr-host-ui.test.cjs clients/community-mini/session.test.cjs clients/community-mini/merchant-pages.test.cjs 2>&1 | tee -a community-tests.log
+          if [ "${{ contains(github.event.head_commit.message, '[shared-ocr-composition-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_shared_composition test_community_ocr_bridge.OcrComposition test_community_ocr_host test_community_ui_preview.SourceBoundary -v 2>&1 | tee community-tests.log
+            node --test clients/community-mini/ocr-host-ui.test.cjs 2>&1 | tee -a community-tests.log
+          else
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_host test_community_ui_preview.SourceBoundary test_community_platform_host.FormalHost.test_serve_uses_exact_proxy_arguments_and_always_closes test_community_platform_host.FormalHost.test_host_lock_cleanup_on_failed_composition_allows_explicit_reopen -v 2>&1 | tee community-tests.log
+            node --test clients/community-mini/ocr-host-ui.test.cjs clients/community-mini/session.test.cjs clients/community-mini/merchant-pages.test.cjs 2>&1 | tee -a community-tests.log
+          fi
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Community OCR source HTTP encrypted-store composition (synthetic only)
         if: contains(github.event.head_commit.message, '[community-ocr-scope]')
         run: |
           set -o pipefail
-          git fetch --no-tags origin 2dc5eeb1d0d1ffb037314a8edcf5c2e16d645a40
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
           python -m pip install fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 cryptography==50.0.2
           PYTHONPATH=.:tests python -B -m unittest test_community_ocr_bridge.OcrComposition test_community_mini_merchant.OcrSourceBoundary test_community_merchant_onboarding -v 2>&1 | tee community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
@@ -169,7 +174,7 @@ jobs:
       - name: Install exact browser test runner
         if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
-          git fetch --no-tags origin 2dc5eeb1d0d1ffb037314a8edcf5c2e16d645a40
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
           python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression

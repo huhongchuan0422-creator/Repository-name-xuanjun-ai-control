@@ -62,7 +62,7 @@ class HostOcr:
             raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         action=params['action'];base={'action','application'}
         extras={'submit':{'document_type','idempotency_key'},'read':{'job_id'},
-                'confirm':{'job_id','revision','fields','idempotency_key'},'delete':{'job_id'}}
+                'confirm':{'job_id','revision','fields','idempotency_key','application_revision','provider_version'},'delete':{'job_id'}}
         if action not in extras or set(params)!=base|extras[action]:raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         p=self.bridge.authenticate(token)
         if not self.bridge.authorize_application(p,params['application']):raise PermissionError('OCR_APPLICATION_DENIED')
@@ -82,7 +82,7 @@ class HostOcr:
             path='/api/v1/ocr/jobs/'+params['job_id'];method={'read':'GET','delete':'DELETE','confirm':'POST'}[action];options={}
             if action=='confirm':
                 path+='/confirm';headers['Idempotency-Key']=params['idempotency_key']
-                options['json']={'revision':params['revision'],'fields':params['fields']}
+                options['json']={key:params[key] for key in ('revision','fields','application_revision','provider_version')}
         async def request():
             import httpx
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app),base_url='http://community-ocr.invalid') as client:

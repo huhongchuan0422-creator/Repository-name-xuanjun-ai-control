@@ -30,6 +30,11 @@ def load_pinned():
             raise AssertionError('PINNED_OCR_HASH_MISMATCH')
         (root/name).write_bytes(raw)
     (root/'__init__.py').write_text('')
+    # Each class owns a fresh temporary dependency root. Do not reuse imported
+    # child modules pointing at a previous class's already removed directory.
+    for name in list(sys.modules):
+        if name=='community_pinned_ocr' or name.startswith('community_pinned_ocr.'):
+            del sys.modules[name]
     spec = importlib.util.spec_from_file_location('community_pinned_ocr',root/'__init__.py',submodule_search_locations=[str(root)])
     package = importlib.util.module_from_spec(spec);sys.modules[spec.name]=package;spec.loader.exec_module(package)
     from community_pinned_ocr import api
@@ -84,7 +89,8 @@ class OcrComposition(unittest.TestCase):
         self.fx=OcrSourceBoundary();self.fx.setUp()
         self.app=self.fx.material();self.raw=b'\x89PNG\r\n\x1a\nSynthetic document, not a real credential'
         self.tmp=tempfile.TemporaryDirectory()
-        self.store=self.api.SecureSQLiteJobStore(str(Path(self.tmp.name)/'ocr.sqlite'),Fernet.generate_key())
+        self.store_key=Fernet.generate_key()
+        self.store=self.api.SecureSQLiteJobStore(str(Path(self.tmp.name)/'ocr.sqlite'),self.store_key)
         self.owner=OriginalOwner()
         self.bridge,closed=compose(self.fx.service,'shop1',self.api,self.store,self.owner,synthetic_inference)
         self.closed=OwnerHttp(TestClient(closed),self.owner)
@@ -101,7 +107,7 @@ class OcrComposition(unittest.TestCase):
         response=self.submit();self.assertEqual(response.status_code,202,response.text)
         return '/api/v1/ocr/jobs/'+response.json()['job_id']
     def denied_all(self,path):
-        for method,kwargs in [('get',{}),('delete',{}),('post',{'json':{'revision':1,'fields':{'company_name':'SYNTHETIC ONLY'}}})]:
+        for method,kwargs in [('get',{}),('delete',{}),('post',{'json':{'revision':1,'application_revision':self.source['application_revision'],'provider_version':self.source.get('wechat_version'),'fields':{'company_name':'SYNTHETIC ONLY'}}})]:
             response=getattr(self.client,method)(path+('/confirm' if method=='post' else ''),headers=self.headers,**kwargs)
             self.assertIn(response.status_code,(401,403),response.text)
     def test_production_permission_remains_closed(self):self.assertEqual(self.submit(self.closed).status_code,403)
@@ -110,9 +116,9 @@ class OcrComposition(unittest.TestCase):
         result=self.client.get(path,headers=self.headers);self.assertEqual(result.status_code,200)
         self.assertEqual(result.json()['application_revision'],str(self.app['revision']))
         self.assertNotIn(b'SYNTHETIC ONLY',(Path(self.tmp.name)/'ocr.sqlite').read_bytes())
-        response=self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'fields':{'company_name':'SYNTHETIC ONLY'}})
+        response=self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'application_revision':self.source['application_revision'],'provider_version':self.source.get('wechat_version'),'fields':{'company_name':'SYNTHETIC ONLY'}})
         self.assertEqual(response.status_code,200,response.text)
-        self.assertFalse(self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1])['written'])
+        self.assertFalse(self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1],expected_confirmation_revision=1)['written'])
         self.assertEqual(self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]['fields']['legal_name'],'Fixture')
     def test_wrong_type_same_sha(self):self.assertEqual(self.submit(document_type='id_front').status_code,403)
     def test_other_application(self):self.assertEqual(self.submit(onboarding_application_id=self.fx.draft()['application']).status_code,403)
@@ -140,9 +146,9 @@ class OcrComposition(unittest.TestCase):
         for value in (True,0,-1,'12',' 12',12.0,None):
             with self.assertRaises(PermissionError):application_revision(value)
     def test_confirmed_writeback_revision_changed(self):
-        path=self.job();self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'fields':{'company_name':'SYNTHETIC ONLY'}}).status_code,200)
+        path=self.job();self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'application_revision':self.source['application_revision'],'provider_version':self.source.get('wechat_version'),'fields':{'company_name':'SYNTHETIC ONLY'}}).status_code,200)
         self.fx.fx.center.db.execute('UPDATE onboarding SET revision=revision+1 WHERE application=?',(self.app['application'],))
-        with self.assertRaises(PermissionError):self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1])
+        with self.assertRaises(PermissionError):self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1],expected_confirmation_revision=1)
 
     def test_identity_front_actual_http_positive(self):
         self.app=self.fx.material(self.app,kind='identity_front')
@@ -154,8 +160,8 @@ class OcrComposition(unittest.TestCase):
         self.app=self.fx.call('onboarding',{'operation':'save','params':dict(application=self.app['application'],revision=self.app['revision'],entity_type='ENTERPRISE',category='GENERAL',delegated=False,fields=dict(legal_name='',store_name='Fixture Shop',address='Fixture Address',contact='Fixture'))})
         self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'business_license')
         path=self.job()
-        self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'fields':{'company_name':'SYNTHETIC ONLY','registered_address':'never overwrite'}}).status_code,200)
-        result=self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1])
+        self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'application_revision':self.source['application_revision'],'provider_version':self.source.get('wechat_version'),'fields':{'company_name':'SYNTHETIC ONLY','registered_address':'never overwrite'}}).status_code,200)
+        result=self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1],expected_confirmation_revision=1)
         self.assertTrue(result['written'])
         current=self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]
         self.assertEqual(current['fields']['legal_name'],'SYNTHETIC ONLY')
@@ -167,10 +173,10 @@ class OcrComposition(unittest.TestCase):
         self.app=self.fx.call('onboarding',{'operation':'save','params':dict(application=self.app['application'],revision=self.app['revision'],entity_type='ENTERPRISE',category='GENERAL',delegated=False,fields=dict(legal_name='',store_name='Fixture Shop',address='Fixture Address',contact='Fixture'))})
         self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'business_license')
         path=self.job()
-        self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'fields':{'company_name':'SYNTHETIC ONLY'}}).status_code,200)
+        self.assertEqual(self.client.post(path+'/confirm',headers=self.headers,json={'revision':1,'application_revision':self.source['application_revision'],'provider_version':self.source.get('wechat_version'),'fields':{'company_name':'SYNTHETIC ONLY'}}).status_code,200)
         from scripts.community_wechat_applyment import WechatApplyment
         from scripts.community_wechat_sp_readonly import PartnerOrderReader
         self.fx.onboarding.wechat_applyment=WechatApplyment(self.fx.onboarding,PartnerOrderReader.__new__(PartnerOrderReader))
         with self.assertRaisesRegex(PermissionError,'SHARED_DRAFT_WRITEBACK_VERSION_BINDING'):
-            self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1])
+            self.bridge.apply_confirmed(self.auth(self.fx.token),path.rsplit('/',1)[1],expected_confirmation_revision=1)
         self.assertEqual(self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]['fields']['legal_name'],'')
