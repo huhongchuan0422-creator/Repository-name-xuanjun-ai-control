@@ -143,3 +143,43 @@ V6 frontend/source isolation regression: **29/29 PASS, 0 FAIL**. New targeted co
 - same delivery ACCEPT/FEEDBACK share one latch and the second click does not issue another API request.
 
 This remains frontend/source isolation evidence. The exact Python backend integration entry bound to `1b48e5fe8015afd9035ff269f9b432d9a68223b2` remains `NOT_EXECUTED` in this runtime because no complete backend checkout exists in `/mnt/data` and outbound GitHub clone is unavailable. Existing Node/local-HTTP PASS results are not counted as real Python backend connectivity.
+
+
+## V7 core browser acceptance with exact e7f artifact
+
+Backend input was taken from GitHub Actions Run `40104761192`, Artifact `12564730638` using the existing GitHub connection. Artifact verification:
+
+- backend source `e7f75975c4ab4eedba68306212a2bac6c067a1c3`
+- backend tree `d001cfd9855ed3a7758f6286db5cae7d45cce403`
+- ZIP SHA256 `06d29ed7bfab4b61f366e0cd239409172267075ab7c8726b5180788d19ae5095`
+- review-only TAR SHA256 `872609867966dd3ffddbb28ab59fb73ba5b26966eb6b8bbf3e14e265403aa148`
+- CUSTOMER_MANIFEST SHA256 `f6fe299464ac6c1b0317ebc7489b1762aaa9acd3547a6a41248d3b05443366d1`
+- manifest closure: 102/102 files verified
+- state: `REVIEW_ONLY_NOT_DEPLOYED`
+
+The corrected fixture startup is `python -B -m tests.pr122_customer_browser_server` from the extracted customer-center root. The artifact's Node browser script could not run in this environment because the Node `playwright` module is absent. Python Playwright and Chromium 144.0.7559.96 are available. Direct Chromium navigation is blocked by host policy (`ERR_BLOCKED_BY_ADMINISTRATOR`), so browser acceptance uses `page.set_content` for the exact current SaaS source and an exposed-binding fetch proxy to the real loopback e7f Python HTTP service. The backend session cookie remains proxy-side; CSRF is handled by the application. This is isolated browser + real Python backend evidence, not Hosted/production/customer-site network E2E.
+
+Four viewports were exercised: 360×844, 390×844, 768×1024, 1440×900. Each viewport produced 12 evidence screenshots (48 total) covering login, project list, project A V1, real private-preview bytes, Q&A readback, feedback + same-case readback, V2 delivery, version retest, project-B isolation, UNKNOWN marker, read-only case reconciliation, and explicit scope-marker clearing. The browser run made 156 actual e7f Python HTTP requests, with 0 console/page errors.
+
+Actual V1 preview SHA256:
+`66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5`
+
+Actual V2 delivery SHA256:
+`ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940`
+
+The first browser pass found two UI defects: stale pre-login error text remained after successful authentication, and mobile controls produced 2–4px horizontal overflow. V7 fixes only those defects: successful `start()` clears stale status text, all controls use border-box sizing, and mobile full-width buttons remove their right margin. Re-run result: 0 horizontal-overflow states, 0 visible buttons below 44px, 0 browser console/page errors.
+
+UNKNOWN recovery was exercised by committing a real `change_submit` to the e7f backend and then returning a simulated 503 only to the browser. The UI did not resend. It performed a real read-only `changes/project-a` reconciliation and only then allowed explicit clearing of that project/page/version marker.
+
+Evidence package SHA256:
+`23bb87df618f8e34bb2f433ff31f4d1bfcd7030a559043370bf6bc473848f430`
+
+Evidence report SHA256:
+`2f02c5a6c3995267be7e40cde8f252b9db2f19f768eff719a2a20ba9aeecf4d3`
+
+Screenshot manifest SHA256:
+`9857fc446ce0ebef1f0dc0287b1e50b5b08fe6da113abc629a48be082ecba107`
+
+Frontend Node regression after the two UI fixes: **30/30 PASS**.
+
+This run does **not** claim the frozen 276-screen matrix, production deployment, real customer identity, real payment, Hosted TLS path, or formal whole-project acceptance. `change_retest` remains version retest only.

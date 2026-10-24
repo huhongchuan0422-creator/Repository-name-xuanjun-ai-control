@@ -1,0 +1,90 @@
+SaaS CORE BROWSER ACCEPTANCE — 2026-10-24
+
+Scope:
+  UI_ONLY_BROWSER + REAL_E7F_PYTHON_HTTP_ISOLATION
+  NOT Hosted, NOT production, NOT real customer data, NOT payment, NOT deployment.
+  Full frozen 276-screen matrix: NOT CLAIMED.
+
+Frontend parent:
+  c86b172179e552e4913ffc8f628ca7b3487bcf80
+
+Backend input:
+  GitHub Run 40104761192
+  Artifact 12564730638
+  source e7f75975c4ab4eedba68306212a2bac6c067a1c3
+  tree d001cfd9855ed3a7758f6286db5cae7d45cce403
+  ZIP sha256 06d29ed7bfab4b61f366e0cd239409172267075ab7c8726b5180788d19ae5095
+  review TAR sha256 872609867966dd3ffddbb28ab59fb73ba5b26966eb6b8bbf3e14e265403aa148
+  CUSTOMER_MANIFEST sha256 f6fe299464ac6c1b0317ebc7489b1762aaa9acd3547a6a41248d3b05443366d1
+  manifest closure 102/102 PASS
+  manifest state REVIEW_ONLY_NOT_DEPLOYED
+
+Browser:
+  Chromium 144.0.7559.96
+  Python Playwright from existing environment.
+  Direct page.goto blocked by administrator policy (ERR_BLOCKED_BY_ADMINISTRATOR).
+  Exact current SaaS source rendered with page.set_content.
+  Browser fetch is exposed-binding proxied to the real loopback e7f Python HTTP service.
+  Session cookie remains proxy-side to preserve HttpOnly behavior.
+  Therefore browser UI + real backend HTTP isolation is PASS; Hosted/browser-network path is NOT_VERIFIED.
+
+Viewports:
+  360x844
+  390x844
+  768x1024
+  1440x900
+
+Evidence:
+  screenshots: 48 (12 per viewport)
+  actual backend HTTP calls: 156
+  console/page errors: 0
+  horizontal overflow states after fix: 0
+  visible buttons under 44px after fix: 0
+
+Journey exercised in every viewport:
+  01 login
+  02 project list
+  03 project-a current V1
+  04 actual backend private preview V1 bytes / served path
+  05 Q&A write + readback
+  06 legacy feedback + same-case readback
+  07 signed V2 delivery + change_updates
+  08 change_retest accepted, explicitly not formal acceptance
+  09 project-b tenant/customer isolation
+  10 UNKNOWN marker after real change_submit committed and browser receives simulated 503
+  11 read-only changes/project-a reconciliation
+  12 explicit scope-marker clear with zero automatic resend
+
+V1:
+  66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5
+
+V2:
+  ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940
+
+Real UI defects found and fixed:
+  1. stale pre-login status remained after successful authentication.
+     Fix: successful start() clears stale status text.
+  2. mobile controls caused 2–4px horizontal overflow.
+     Fix: border-box sizing + mobile full-width buttons remove right margin.
+
+Frontend regression after fixes:
+  node --test tests/*.test.js
+  30/30 PASS, 0 FAIL
+
+Evidence package:
+  xuanjun-saas-core-browser-acceptance-e7f-v7.tar.gz
+  sha256 23bb87df618f8e34bb2f433ff31f4d1bfcd7030a559043370bf6bc473848f430
+
+Evidence report sha256:
+  2f02c5a6c3995267be7e40cde8f252b9db2f19f768eff719a2a20ba9aeecf4d3
+
+Screenshot manifest sha256:
+  9857fc446ce0ebef1f0dc0287b1e50b5b08fe6da113abc629a48be082ecba107
+
+Remaining NOT_VERIFIED/HOLD:
+  Hosted TLS/network path
+  real customer identity/data
+  production deployment
+  real payment
+  formal whole-project acceptance
+  full 276-screen frozen browser matrix

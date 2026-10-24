@@ -51,3 +51,5 @@ test('same delivery shares one retest latch across ACCEPT and FEEDBACK',async()=
  const first=accept.onclick();assert.equal(accept.disabled,true);assert.equal(feedback.disabled,true);await feedback.onclick();assert.equal(retestCalls,1);
  pending.resolve({state:'RETEST_ACCEPTED',automatic_charge:false});await first;assert.equal(retestCalls,1);
 });
+
+test('successful start clears stale signed-out status',async()=>{const d=doc(),s=ss(),api=apiBase({me:async()=>({projects:[{id:'A',title:'A',role:'OWNER'}]})});const app=createConsoleApp({document:d,storage:ss(),session:s,api});d.m.get('status').textContent='登录已失效，请重新登录。';await app.start();assert.equal(d.m.get('status').textContent,'')});

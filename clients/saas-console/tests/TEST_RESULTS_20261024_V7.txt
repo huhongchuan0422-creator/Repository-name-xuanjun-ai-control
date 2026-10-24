@@ -1,0 +1,25 @@
+SaaS FRONTEND V7 REGRESSION — 2026-10-24
+
+Command:
+  node --test tests/*.test.js
+
+Result:
+  tests 30
+  suites 0
+  pass 30
+  fail 0
+  cancelled 0
+  skipped 0
+  todo 0
+
+New targeted regression:
+  successful start clears stale signed-out status
+
+Existing V6 boundaries retained:
+  POST 408/5xx ambiguity
+  project/generation guards
+  write-403 CSRF clearing
+  per-delivery retest latch
+  scoped UNKNOWN recovery
+  exact URL normalization
+  69x26 traceability mapping
