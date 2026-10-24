@@ -90,12 +90,15 @@ class FixedInstaller(unittest.TestCase):
             if stage=='before-publish':raise RuntimeError('SYNTHETIC_PRE_PUBLISH')
         with self.assertRaisesRegex(RuntimeError,'SYNTHETIC_PRE_PUBLISH'):self.install(fault=fault)
         self.assertFalse((self.root/ins.TARGET).exists());self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
-    def test_target_race_before_publish_is_noreplace_hold(self):
+    def test_target_race_before_publish_empty_target_is_noreplace_hold_and_inode_stable(self):
+        seen={}
         def fault(stage,name,index):
             if stage=='before-publish':
-                target=self.root/ins.TARGET;target.mkdir(mode=0o700);(target/'foreign').write_bytes(b'FOREIGN')
+                target=self.root/ins.TARGET;target.mkdir(mode=0o700);seen['inode']=target.stat().st_ino
         with self.assertRaisesRegex(ins.Hold,'TARGET_OR_PARTIAL'):self.install(fault=fault)
-        self.assertEqual((self.root/ins.TARGET/'foreign').read_bytes(),b'FOREIGN');self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
+        target=self.root/ins.TARGET
+        self.assertTrue(target.is_dir());self.assertEqual(list(target.iterdir()),[]);self.assertEqual(target.stat().st_ino,seen['inode'])
+        self.assertTrue((self.root/ins.TEMP).exists());self.assert_a()
     def test_extra_member_in_temp_tree_is_rejected_before_publish(self):
         def fault(stage,name,index):
             if stage=='after-file' and index==0:
@@ -108,13 +111,44 @@ class FixedInstaller(unittest.TestCase):
         with self.assertRaisesRegex(ins.Hold,'PROTECTED_INPUT'):ins.open_input(str(p),ins.MAX_ARCHIVE)
         q.unlink();os.chmod(p,0o622)
         with self.assertRaisesRegex(ins.Hold,'PROTECTED_INPUT'):ins.open_input(str(p),ins.MAX_ARCHIVE)
+    def test_post_publish_failure_is_structured_unknown_not_retryable(self):
+        def fault(stage,name,index):
+            if stage=='after-publish':raise OSError('SYNTHETIC_AFTER_RENAME')
+        with self.assertRaises(ins.PublishedUnknown) as cm:self.install(fault=fault)
+        e=cm.exception;self.assertTrue(e.target_published);self.assertFalse(e.retry_safe);self.assertFalse(e.parent_fsync_completed)
+        self.assertTrue((self.root/ins.TARGET).is_dir());self.assertFalse((self.root/ins.TEMP).exists());self.assert_a()
+    def test_after_parent_fsync_failure_records_completed_fsync_and_keeps_target(self):
+        def fault(stage,name,index):
+            if stage=='after-parent-fsync':raise OSError('SYNTHETIC_AFTER_PARENT_FSYNC')
+        with self.assertRaises(ins.PublishedUnknown) as cm:self.install(fault=fault)
+        e=cm.exception;self.assertTrue(e.target_published);self.assertFalse(e.retry_safe);self.assertTrue(e.parent_fsync_completed)
+        self.assertTrue((self.root/ins.TARGET).is_dir());self.assert_a()
+    def test_post_publish_temp_close_failure_is_structured_unknown(self):
+        real=ins.os.close;target=[None];raised=[False]
+        def close(fd):
+            if target[0] is not None and fd==target[0] and not raised[0]:
+                raised[0]=True;real(fd);raise OSError('SYNTHETIC_TEMP_CLOSE')
+            return real(fd)
+        original_open=ins.os.open
+        def open_spy(path,*args,**kwargs):
+            fd=original_open(path,*args,**kwargs)
+            if path==ins.TEMP and kwargs.get('dir_fd')==self.parent and target[0] is None:target[0]=fd
+            return fd
+        with patch.object(ins.os,'open',side_effect=open_spy),patch.object(ins.os,'close',side_effect=close),self.assertRaises(ins.PublishedUnknown) as cm:
+            self.install()
+        self.assertTrue(cm.exception.target_published);self.assertTrue(cm.exception.parent_fsync_completed);self.assertFalse(cm.exception.retry_safe)
+        self.assertTrue((self.root/ins.TARGET).is_dir());self.assert_a()
     def test_production_identity_is_not_inferred_from_test_fixture(self):
         with patch.object(ins.os,'getuid',return_value=1234),patch.object(ins.os,'geteuid',return_value=1234),self.assertRaisesRegex(ins.Hold,'EXACT_ROOT_HOST'):
             ins.production_identity()
-    def test_source_contains_no_extractall_and_shell_is_fixed_sudo_entry(self):
+    def test_source_contains_no_extractall_and_shell_binds_fixed_verified_installer_bytes(self):
         source=Path(ins.__file__).read_text();self.assertNotIn('extractall(',source)
         shell=(Path(__file__).resolve().parents[1]/'deploy/community-preview/install-stopped-v1.sh').read_text()
-        self.assertIn('/usr/bin/sudo -n /usr/bin/python3 -I -B -S scripts/community_preview_bc_install.py',shell)
+        self.assertIn('/opt/xuanjun-community-preview/install-stopped-v1.py',shell)
+        self.assertIn('e4989f75d7bd1892b78fe131f51d6868910f58d4fa1ae88e7628c112bebca529',shell)
+        self.assertIn('os.O_NOFOLLOW',shell);self.assertIn('st.st_nlink==1',shell);self.assertIn('stat.S_IMODE(st.st_mode)==0o600',shell)
+        self.assertIn('exec(compile(raw,path,"exec"),ns)',shell)
+        self.assertNotIn(' scripts/community_preview_bc_install.py',shell)
         self.assertNotIn('control-oci2330-v1',shell)
 
 if __name__=='__main__':unittest.main()

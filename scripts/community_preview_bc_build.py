@@ -100,8 +100,11 @@ if __name__=='__main__':
         files={name:dict(bytes=len(b),sha256=hashlib.sha256(b).hexdigest()) for name,b in commands.items()},
         install_candidate=dict(site_executed=False,install_executed=False,directory_mode='0700',file_mode='0600',
             no_extractall=True,requires_separate_root_review=True,install_root=h.CONTROL,
+            installer_path='/opt/xuanjun-community-preview/install-stopped-v1.py',
             archive_sha256=hashlib.sha256(archive).hexdigest(),manifest_sha256=hashlib.sha256(manifest).hexdigest(),
             installer_sha256=hashlib.sha256((ROOT/'scripts/community_preview_bc_install.py').read_bytes()).hexdigest(),
-            shell_sha256=hashlib.sha256((ROOT/'deploy/community-preview/install-stopped-v1.sh').read_bytes()).hexdigest()),
+            shell_sha256=hashlib.sha256((ROOT/'deploy/community-preview/install-stopped-v1.sh').read_bytes()).hexdigest(),
+            publish_success_requires=['renameat2_noreplace','parent_fsync','final_identity','final_tree'],
+            published_unknown=dict(target_published=True,retry_safe=False,parent_fsync_completed='boolean')),
         source_manifest_sha256=hashlib.sha256(manifest).hexdigest(),site_executed=False)
     (target/'delivery.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')

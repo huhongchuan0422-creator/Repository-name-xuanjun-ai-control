@@ -182,3 +182,9 @@ sh deploy/community-preview/install-stopped-v1.sh /ABS/PATH/control-stopped-v1.z
 The shell invokes `sudo -n python3 -I -B -S` and the installer independently requires the fixed UK host,
 root effective identity, original admin sudo environment and matching kernel loginuid. A successful
 install result only establishes carrier bytes at the new V2 path; it does not authorize or execute B/C.
+
+## Fixed installer execution binding (source-only, not executed)
+
+The reviewed wrapper never imports the installer from the current working directory. A future separately reviewed Owner preparation must place the exact reviewed installer at fixed `/opt/xuanjun-community-preview/install-stopped-v1.py` as root-owned regular single-link mode `0600`. The wrapper's sudo-side Python bootstrap opens that exact absolute path with `O_NOFOLLOW`, verifies regular/nlink/owner/mode/full identity and the reviewed installer SHA256, reads the bytes through that same verified descriptor, rechecks path identity, and compiles/executes those exact bytes. CWD-relative Python source is not admitted.
+
+Atomic publish records the transition immediately after successful `renameat2(..., RENAME_NOREPLACE)`. Any later parent `fsync`, final path/tree verification, temporary-directory fd close, or install-parent fd close failure is `V2_INSTALL_PUBLISHED_UNKNOWN`: `target_published=true`, `retry_safe=false`, with truthful `parent_fsync_completed`. The installer never auto-removes the published target and never retries the install under that condition. Pre-publish failures keep `target_published=false`; an empty concurrently-created TARGET is still protected by `RENAME_NOREPLACE` and must retain its original inode.
