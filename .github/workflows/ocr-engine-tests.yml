@@ -97,7 +97,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
-          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-build"
+          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-deb-cache" "$RUNNER_TEMP/ocr-build"
           docker run --rm --platform linux/amd64 \
             -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
             -e OCR_BASE_MANIFEST_SHA256=8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 \
@@ -107,6 +107,32 @@ jobs:
               set -eu
               python -m pip download --index-url https://pypi.org/simple --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
               python /src/services/ocr_engine/generate_platform_lock.py /src /wheelhouse /build/requirements-lock-linux-x86_64-cp311.json
+            '
+      - name: Resolve official Debian runtime shared-library closure for OpenCV
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          docker run --rm --platform linux/amd64 \
+            -v "$RUNNER_TEMP/ocr-deb-cache:/debs" \
+            "$OCR_BASE_IMAGE" sh -lc '
+              set -eu
+              apt-get update
+              apt-get install -y --download-only --no-install-recommends -o Dir::Cache::archives=/debs libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
+              python - <<'PY'
+import hashlib,json,subprocess
+from pathlib import Path
+root=Path("/debs")
+items=[]
+for p in sorted(root.glob("*.deb")):
+    fields=subprocess.check_output(["dpkg-deb","-f",str(p),"Package","Version","Architecture"],text=True).splitlines()
+    if len(fields)!=3: raise SystemExit("DEB_METADATA_INVALID:"+p.name)
+    items.append({"filename":p.name,"package":fields[0],"version":fields[1],"architecture":fields[2],"sha256":hashlib.sha256(p.read_bytes()).hexdigest()})
+if not items: raise SystemExit("DEB_CLOSURE_EMPTY")
+Path("/debs/system-deb-lock.json").write_text(json.dumps({"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","packages":items},sort_keys=True,indent=2)+"\\n")
+print(json.dumps({"deb_count":len(items),"packages":[{"package":x["package"],"version":x["version"],"architecture":x["architecture"],"sha256":x["sha256"]} for x in items]},sort_keys=True))
+PY
             '
       - name: Fetch fixed model assets and verify the three published SHA256 pins
         shell: bash
@@ -126,12 +152,24 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           docker run --rm --network none --platform linux/amd64 \
-            -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse:ro" -v "$GITHUB_WORKSPACE:/src:ro" \
+            -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse:ro" -v "$RUNNER_TEMP/ocr-deb-cache:/debs:ro" -v "$GITHUB_WORKSPACE:/src:ro" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
+              test -f /debs/system-deb-lock.json
+              dpkg -i /debs/*.deb || apt-get install -y --no-download /debs/*.deb
+              dpkg-query -W -f="${Package}=${Version}\\n" libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxcb1
               python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
               python -m pip check
-              python -c "import fastapi,uvicorn,onnxruntime,rapidocr,cv2,numpy,cryptography; print(\"OFFLINE_IMPORT_CHECK=PASS\")"
+              python - <<'PY'
+import importlib.metadata as m
+import cv2,fastapi,uvicorn,onnxruntime,rapidocr,numpy,cryptography
+names=[d.metadata["Name"].lower().replace("_","-") for d in m.distributions()]
+if "opencv-python" not in names or "opencv-python-headless" in names:
+    raise SystemExit("OPENCV_DISTRIBUTION_COLLISION_OR_MISSING")
+print("OPENCV_DISTRIBUTION=opencv-python=="+m.version("opencv-python"))
+print("CV2_IMPORT=PASS:"+str(cv2.__version__))
+print("OFFLINE_IMPORT_CHECK=PASS")
+PY
             '
       - name: Build the verified archive (no service start or inference)
         shell: bash
@@ -161,6 +199,42 @@ jobs:
             echo "runtime_probe=NOT_RUN_IN_FAILURE_DIAGNOSTICS; recorded during normal verified-base step only"
           } > "$RUNNER_TEMP/ocr-diagnostics/build-runtime.log"
           find "$RUNNER_TEMP/ocr-build" -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null > "$RUNNER_TEMP/ocr-diagnostics/output-inventory.txt" || true
+      - name: Freeze candidate input inventory for failure reuse (not a release package)
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-candidate-inputs"
+          python - <<'PY'
+import hashlib,json,os
+from pathlib import Path
+root=Path(os.environ["RUNNER_TEMP"])
+items=[]
+for rel in ("ocr-wheelhouse","ocr-model-cache","ocr-deb-cache","ocr-build"):
+    base=root/rel
+    if not base.exists(): continue
+    for path in sorted(base.rglob("*")):
+        if path.is_file() and not path.is_symlink():
+            h=hashlib.sha256()
+            with path.open("rb") as f:
+                for chunk in iter(lambda:f.read(1024*1024),b""): h.update(chunk)
+            items.append({"path":str(path.relative_to(root)),"bytes":path.stat().st_size,"sha256":h.hexdigest()})
+out={"classification":"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE","source_sha":os.environ.get("GITHUB_SHA"),"run_id":os.environ.get("GITHUB_RUN_ID"),"files":items}
+(root/"ocr-candidate-inputs"/"candidate-input-manifest.json").write_text(json.dumps(out,sort_keys=True,indent=2)+"\\n")
+print(json.dumps({"candidate_file_count":len(items),"classification":out["classification"]},sort_keys=True))
+PY
+      - name: Upload reusable candidate inputs and their digest manifest (never a success package)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-ocr-candidate-inputs-not-release-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/ocr-wheelhouse/**
+            ${{ runner.temp }}/ocr-model-cache/**
+            ${{ runner.temp }}/ocr-deb-cache/**
+            ${{ runner.temp }}/ocr-build/requirements-lock-linux-x86_64-cp311.json
+            ${{ runner.temp }}/ocr-candidate-inputs/candidate-input-manifest.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload failure diagnostics (never presented as a successful package)
         if: always()
         uses: actions/upload-artifact@v4
