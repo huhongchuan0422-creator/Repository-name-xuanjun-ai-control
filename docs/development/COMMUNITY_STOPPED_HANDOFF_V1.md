@@ -1,3 +1,20 @@
+# STOPPED_HANDOFF_V1 — current verified source candidate and historical proposal
+
+## Current verified status — 2026-10-25 Beijing
+
+This section is the current delivery entry. The historical proposal text below is preserved verbatim as historical evidence and must not be read as the current test/authorization state.
+
+- Current verified **source candidate**: `1d639347f404f952998b3b414a95e48f66571c3c`
+- Source candidate Tree: `1317d8c7d5b8bce494cd0a52f8eff317c2f984b8`
+- Authoritative Issue76 receipt: `#6388552736`
+- Hosted evidence: Run `40125347707`, **139/139 PASS**, `COMPLIANCE_PASS`
+- Reviewed dedicated artifact: `12572781194`
+- Owner source / isolated-test / review / plan authorization was extended through **2026-10-25 09:00 Beijing time** for this source work.
+- **Server installation, B/C execution, backup, stop/start, deployment and other live-site actions remain NOT AUTHORIZED and NOT EXECUTED.**
+- Later documentation-only commits do not create a new source candidate and must not be described as a new source validation. In particular, this documentation update is separate from the verified source candidate above.
+
+## Historical 285 proposal text — preserved verbatim
+
 # STOPPED_HANDOFF_V1 — proposal, NOT_EXECUTED
 
 Base: 2853904258ca036a4abcdc2c829278634c45370b / cebc6622540458500c6ea6e25f9bb3bd0decf980.
