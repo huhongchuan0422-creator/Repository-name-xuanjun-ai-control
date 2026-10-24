@@ -3,12 +3,15 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-
-import successor_contract as contract
-from successor_source_loader import read_exact_42
+import sys
 
 ROOT = Path(__file__).resolve().parent
 
+import successor_contract as contract
+from successor_source_loader import read_exact_42
+sys.path[:0]=[str(ROOT/'successor_controller'),str(ROOT/'reused-6825')]
+from pr17_b5_successor_loader import read_fixed_local_source
+import pr17_b5_successor_binder as frozen_binder
 
 class ExactSourceTests(unittest.TestCase):
     def setUp(self):
@@ -32,6 +35,19 @@ class ExactSourceTests(unittest.TestCase):
                           (ROOT / 'ORIGINAL_REVIEWED_SPEC.json').read_bytes(),
                           (ROOT / 'EXTERNAL_RELEASE_BINDER.json').read_bytes(),
                           self.manifest, result)
+
+    def test_packaged_new19_tree_is_complete_and_exact(self):
+        # Exercise the actual deliverable path, not just a tree assembled by
+        # the test from other repository paths.
+        result=read_exact_42(str(ROOT/'new19-source'),self.manifest)
+        self.assertEqual(len(result),42)
+        contract.validate((ROOT/'SUCCESSOR_SPEC.json').read_bytes(),
+                          (ROOT/'ORIGINAL_REVIEWED_SPEC.json').read_bytes(),
+                          (ROOT/'EXTERNAL_RELEASE_BINDER.json').read_bytes(),
+                          self.manifest,result)
+        spec=frozen_binder.verify_spec_bytes((ROOT/'SUCCESSOR_SPEC.json').read_bytes())
+        pinned=read_fixed_local_source(spec,str((ROOT/'new19-source').resolve()))
+        self.assertEqual(len(pinned),43)
 
     def test_changed_file_and_symlink_parent_rejected(self):
         target = self.root / 'production/cloud_connection/queue.py'

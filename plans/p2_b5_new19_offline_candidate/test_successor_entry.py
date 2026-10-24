@@ -4,9 +4,13 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parent
 ENTRY=ROOT/'successor_controller/pr17_b5_successor_entry.py'
+sys.path[:0]=[str(ROOT),str(ROOT/'successor_controller'),str(ROOT/'reused-6825')]
+import pr17_b5_successor_entry as entry
+import pr17_b5_successor_review as c53
 
 
 class EntryTests(unittest.TestCase):
@@ -32,6 +36,29 @@ class EntryTests(unittest.TestCase):
             self.assertEqual(result.returncode,2,(action,result.stderr))
             self.assertIn(b'"state": "HOLD"',result.stdout)
             self.assertIn(b'NOT_EXECUTED',result.stdout)
+
+    def test_recovery_routes_actual_observer_states_without_repost(self):
+        called=[]
+        class Transaction:
+            def resume_recovered_custody(self):
+                called.append('custody');return {'state':'CUSTODY_COMPLETE_DELIVERY_NOT_PROVEN'}
+            def resume_recovered_b5_http_wait(self):
+                called.append('wait');return {'state':'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY'}
+        def attempted(_):raise c53.Hold('ENTRY_INTAKE_ALREADY_ATTEMPTED')
+        with patch.object(entry,'_recover',return_value=Transaction()),\
+             patch.object(entry,'_verified_window',side_effect=attempted):
+            import pr17_b5_successor_authority as authority
+            for state,expected in (('SUCCESS_SNAPSHOT_READONLY','custody'),
+                ('B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY','wait')):
+                with patch.object(authority,'inspect_recovered_candidate_readonly',
+                                  return_value={'state':state}):
+                    entry.dispatch('recover')
+                self.assertEqual(called[-1],expected)
+            with patch.object(authority,'inspect_recovered_candidate_readonly',
+                              return_value={'state':'UNKNOWN_OR_PENDING_NO_REPOST'}):
+                self.assertEqual(entry.dispatch('recover')['state'],
+                                 'UNKNOWN_OR_PENDING_NO_REPOST')
+            self.assertEqual(called,['custody','wait'])
 
 
 if __name__=='__main__':

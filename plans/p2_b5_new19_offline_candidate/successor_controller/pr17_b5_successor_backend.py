@@ -339,13 +339,16 @@ class R2HostBackend:
                         actor==332398908 and
                         digest==c53.sha(canonical(expected[rid]).encode()),
                         'POSTSTART_QUEUE_REQUEST_BINDING')
-        complete=(outcome['state']=='SUCCESS_OBSERVED_READONLY' and
-                  len(rows)==19 and
+        complete=(len(rows)==19 and
                   all(state=='SUCCESS' and type(invoke) is str and invoke and
                       type(receipt) is str and receipt
                       for _,_,_,_,state,invoke,receipt in rows))
-        return {'state':'SUCCESS_SNAPSHOT_READONLY' if complete else
-                'UNKNOWN_OR_PENDING_NO_REPOST',
+        state=('SUCCESS_SNAPSHOT_READONLY' if complete and
+               outcome['state']=='SUCCESS_OBSERVED_READONLY' else
+               'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY' if complete and
+               outcome['state']=='B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY' else
+               'UNKNOWN_OR_PENDING_NO_REPOST')
+        return {'state':state,
                 'ready_count':outcome.get('ready_count',0),
                 'success_count':outcome.get('success_count',0),
                 'queue_rows':len(rows),

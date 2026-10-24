@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "enabled": false,
+  "hostname": "iZvt5t8tlrm8oiZ",
+  "database": "/var/lib/xuanjun-cloud-oauth/authority.sqlite",
+  "session_secret_ref": "/etc/xuanjun-cloud-oauth/session.secret",
+  "github_secret_ref": "/etc/xuanjun-cloud-oauth/github.secret",
+  "settings": {
+    "issuer": "https://cloud-auth.wenwenwenyiyiyi.work",
+    "audience": null,
+    "github_client_id": null,
+    "clients": {},
+    "subjects": ["github:332398908", "github:95597695"]
+  }
+}

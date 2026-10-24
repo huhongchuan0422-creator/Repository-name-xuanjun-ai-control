@@ -269,7 +269,7 @@ def dispatch(action, *, batch=None, attempt=None, approval=None, start=None):
     if action == 'recover':
         if observed.get('state') == 'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY':
             return transaction.resume_recovered_b5_http_wait()
-        if observed.get('state') == 'SUCCESS_OBSERVED_READONLY':
+        if observed.get('state') == 'SUCCESS_SNAPSHOT_READONLY':
             return transaction.resume_recovered_custody()
         return observed  # UNKNOWN/PENDING is query-only, never another POST.
     transaction.resume_recovered_b5_http_wait()

@@ -12,6 +12,7 @@ import stat
 import subprocess
 import time
 import re
+import signal
 
 import pr17_b5_successor_review as c53
 
@@ -77,9 +78,12 @@ class FixedR2IO:
         runtime = any(path == root+'/'+name for root in self.stage
                       for name in self.runtime_files)
         temp = any(path == original+'.l2-b5-staged-'+c53.COMMIT[:12] or
-                   path == original+'.l2-b5-staged-'+c53.COMMIT[:12]+'-close'
+                   path == original+'.l2-b5-staged-'+c53.COMMIT[:12]+'-close' or
+                   path == original+'.l2-b5-staged-'+c53.COMMIT[:12]+'-restore'
                    for original in c53.CONFIGS+c53.SLOTS)
         temp = temp or any(path == base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
+                           or path == base+'/current.l2-b5-staged-'+
+                           c53.COMMIT[:12]+'-restore'
                            for base in self.bases)
         allowed = path in self.files or path == self.job or path in self.stage
         allowed = allowed or path in self.target or journal or runtime or temp
@@ -213,12 +217,27 @@ class FixedR2IO:
 
     def check_original_database(self):
         root = self.state_directory()
+        fd = None
         try:
-            st = os.stat('queue.sqlite', dir_fd=root, follow_symlinks=False)
-            self.database_identity(st)
-            c53.require(st.st_size == self.spec['observed_baseline']['db']['bytes'],
-                        'FIXED_IO_DATABASE_SIZE')
+            fd = os.open('queue.sqlite', os.O_RDONLY | os.O_NOFOLLOW |
+                         os.O_NONBLOCK, dir_fd=root)
+            before = os.fstat(fd)
+            self.database_identity(before)
+            header = os.pread(fd, 100, 0)
+            page_size = int.from_bytes(header[16:18], 'big') if len(header) == 100 else 0
+            if page_size == 1:
+                page_size = 65536
+            after = os.fstat(fd)
+            named = os.stat('queue.sqlite', dir_fd=root, follow_symlinks=False)
+            c53.require(header.startswith(b'SQLite format 3\x00') and
+                        page_size in (512,1024,2048,4096,8192,16384,32768,65536) and
+                        before.st_size >= self.spec['observed_baseline']['db']['bytes'] and
+                        before.st_size % page_size == 0 and
+                        _identity(before) == _identity(after) == _identity(named),
+                        'FIXED_IO_DATABASE_CHANGED')
         finally:
+            if fd is not None:
+                os.close(fd)
             os.close(root)
 
     def command(self, argv, timeout, acceptable=(0,)):
@@ -231,7 +250,8 @@ class FixedR2IO:
                        ('restart', resource, 20), ('restart', tunnel, 20),
                        ('stop', tunnel, 60), ('stop', resource, 60))}
         allowed.update({(('/usr/bin/systemctl', 'is-active', '--quiet', name), seconds)
-                        for name, seconds in ((unit, 10), (tunnel, 10))})
+                        for name, seconds in ((unit, 10), (resource, 10),
+                                              (tunnel, 10), (unit, 2))})
         c53.require(type(argv) is list and (tuple(argv), timeout) in allowed and
                     type(acceptable) is tuple and acceptable in ((0,), (3,)) and
                     (acceptable != (3,) or
@@ -247,17 +267,33 @@ class FixedR2IO:
     def stable_unit(self, name):
         c53.require(name == 'xuanjun-cloud-connection.service',
                     'FIXED_IO_UNIT_SCOPE')
-        self.command(['/usr/bin/systemctl','is-active','--quiet',name],10)
-        time.sleep(0.1)
-        self.command(['/usr/bin/systemctl','is-active','--quiet',name],10)
+        deadline = time.monotonic() + 6.0
+        first_active = None
+        while True:
+            c53.require(time.monotonic() < deadline, 'FIXED_IO_STABILITY_DEADLINE')
+            self.command(['/usr/bin/systemctl','is-active','--quiet',name],2)
+            observed = time.monotonic()
+            c53.require(observed < deadline, 'FIXED_IO_STABILITY_DEADLINE')
+            if first_active is None:
+                first_active = observed
+            elif observed - first_active >= 2.0:
+                return True
+            time.sleep(0.25)
 
     def resource_ready(self):
         # The existing resource serves this public metadata on a fixed
         # loopback port.  A live process alone is insufficient: compare the
         # advertised audience and issuer with the protected activated config.
-        from production.cloud_connection.oauth_entrypoint import private_bytes
-        raw = private_bytes(c53.CONFIGS[1], 262144)
+        c53.require(signal.getitimer(signal.ITIMER_REAL) == (0.0,0.0),
+                    'FIXED_IO_EXISTING_DEADLINE')
+        previous = signal.getsignal(signal.SIGALRM)
+        def expired(signum, frame):
+            raise c53.Hold('FIXED_IO_RESOURCE_DEADLINE')
+        signal.signal(signal.SIGALRM, expired)
         try:
+            signal.setitimer(signal.ITIMER_REAL, 3.0)
+            from production.cloud_connection.oauth_entrypoint import private_bytes
+            raw = private_bytes(c53.CONFIGS[1], 262144)
             config = json.loads(raw.decode('utf-8'))
             expected = config['settings']
             c53.require(config['enabled'] is True and
@@ -285,3 +321,6 @@ class FixedR2IO:
                 'FIXED_IO_RESOURCE_BINDING')
         except (OSError, ValueError, KeyError, UnicodeError, TypeError) as exc:
             raise c53.Hold('FIXED_IO_RESOURCE_READINESS_UNKNOWN') from exc
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0.0)
+            signal.signal(signal.SIGALRM, previous)

@@ -107,18 +107,21 @@ class OriginalLifecycle(unittest.TestCase):
             destination_root=str(dest),destination_owner=os.geteuid(),
             authorization_from_request=lambda:'Bearer fixture-only',clock=lambda:NOW,
             request_publisher=lambda request:None,test_only=True)
-        auth=object.__new__(ExistingRequestAuthority)
-        auth.original=original;auth.runtime_attachment=lambda phase:(self.queue,self.resource)
-        auth.catalog_raw=original.catalog_raw;auth.catalog_sha=original.catalog_sha
-        auth.request_ids=original.request_ids
-        auth.authorization_from_request=original.authorization_from_request
-        self.backend=object.__new__(R2HostBackend)
-        self.backend.authority=auth;self.backend.db=None;self.backend.lock_fd=None
+        import pr17_b5_successor_binder as frozen_binder
+        spec=frozen_binder.verify_spec_bytes((HERE/'SUCCESSOR_SPEC.json').read_bytes())
+        auth=ExistingRequestAuthority(authenticator=None,
+            active_resource_reader=lambda:b'{}',expected_resource_raw=b'{}',
+            prepared_settings={},catalog_raw=original.catalog_raw,
+            catalog_sha=original.catalog_sha,request_ids=original.request_ids,
+            authorization_from_request=original.authorization_from_request,
+            original=original,runtime_attachment=lambda phase:(self.queue,self.resource))
+        self.backend=R2HostBackend(legacy_io=object(),spec=spec,
+            source_blobs={},observed_bytes={},authority=auth)
         self.backend.tried_start=True;self.backend.bundle={'catalog_sha':catsha}
         self.backend.activation_committed=True
         self.backend.expected_ids=tuple(requests.values())
         self.backend.job='/opt/xuanjun-cloud-connection/l2-b5-staged-f0fe0d3978b7'
-        self.backend.spec={};self.backend.window_open=True
+        self.backend.window_open=True
         self.backend.verify_window_admission=lambda *args:None  # explicit offline grant fixture
         self.archive_size=tar.stat().st_size;self.archive_sha=digest
         self.journal=root/'job';self.journal.mkdir(mode=0o700)
@@ -169,10 +172,9 @@ class OriginalLifecycle(unittest.TestCase):
             'catalog_sha256':b.bundle['catalog_sha'],
             'window_start':900,'window_end':4500,
             'state':'ACTIVE_NOT_DELIVERED'})+b'\n')
-        tx=c53.Transaction.__new__(c53.Transaction)
-        tx.b=b;tx.spec={'objects':[dict(x) for x in self.policy.catalog.objects.values()]}
-        b.spec=tx.spec
-        tx.bundle=b.bundle;tx.stage='WINDOW_ENABLED';tx.trace=[]
+        b.bundle['files']={name:b'' for name in c53.CONFIGS+c53.SLOTS}
+        tx=c53.Transaction(b.spec,b.bundle,b)
+        tx.stage='WINDOW_ENABLED'
         self.assertEqual(tx.run_19_after_window()['state'],'INTAKE_SENT_AWAITING_READY')
         self.assertEqual(len(comments),19)
         self.assertEqual(tx.continue_after_original_ready()['state'],
@@ -195,7 +197,7 @@ class OriginalLifecycle(unittest.TestCase):
                  'queue':str(self.root/'queue.sqlite'),
                  'receiver':str(self.root/'receiver'),
                  'owner':os.geteuid(),
-                 'bundle':b.bundle}
+                 'bundle':{k:v for k,v in b.bundle.items() if k!='files'}}
         (self.root/'fresh-process.json').write_text(json.dumps(fixture))
         child=r'''import json,pathlib,sys
 root=pathlib.Path(sys.argv[1]);here=pathlib.Path(sys.argv[2])
@@ -232,6 +234,28 @@ finally:q.close()
         self.assertEqual((observed['state'],observed['success_count'],
                           observed['mutation_allowed']),
                          ('SUCCESS_OBSERVED_READONLY',19,False))
+        # The entry's observer must correlate the actual SQLite rows with
+        # protected intent/SENT records before it offers custody continuation.
+        from test_successor_release_gate import fixture_gate
+        import pr17_b5_successor_binder as frozen_binder
+        b.spec=frozen_binder.verify_spec_bytes((HERE/'SUCCESSOR_SPEC.json').read_bytes())
+        b.release_gate=fixture_gate(b.spec,'recover')
+        original=b.authority.original
+        original.release_observer_for_closeout()
+        def pair(readonly):
+            queue=Queue(str(self.root/'queue.sqlite'),'b'*64,[332398908],
+                        approved_objects=self.policy,existing_readonly=readonly,
+                        existing_custody=not readonly)
+            self.addCleanup(queue.close)
+            resource=OAuthProjectResource(queue.db,
+                {self.policy.catalog.sha:(self.policy.catalog,self.policy.binding['roots'])},
+                Auth(),enabled=True,clock=lambda:NOW,
+                custodies={self.policy.catalog.sha:(str(self.root/'receiver'),os.geteuid())})
+            return queue,resource
+        original.attach_after_worker_start(*pair(True))
+        self.assertEqual(b.observe_poststart_canonical_readonly(b.bundle)['state'],
+                         'SUCCESS_SNAPSHOT_READONLY')
+        original.replace_runtime_phase(*pair(False),'observe','custody')
         # The production pinned archive is 559 MB. This explicit local fixture
         # substitutes only that fixed archive identity, then calls the same
         # original whole-hash/member algorithm with its own bounded tar.
@@ -240,6 +264,10 @@ finally:q.close()
         self.assertEqual(tx.continue_after_original_ready()['state'],
                          'CUSTODY_COMPLETE_DELIVERY_NOT_PROVEN')
         self.assertEqual(tx.stage,'READY_FOR_B5_HTTP_NOT_RECEIVED')
+        original.replace_runtime_phase(*pair(True),'custody','observe')
+        self.assertEqual(b.observe_poststart_canonical_readonly(b.bundle)['state'],
+                         'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY')
+        original.replace_runtime_phase(*pair(False),'observe','custody')
         from successor_analyst_read import receive_all
         with self.assertRaisesRegex(c53.Hold,'B5_HTTP_REQUEST_LOCAL_ONLY'):
             tx.receive_and_verify_19()
@@ -254,7 +282,7 @@ finally:q.close()
              catalog_sha=self.policy.catalog.sha,project=PROJECT,
              recipient=RECIPIENT,success_invokes=invokes,
              custody=custody_receipt,
-             read_project_chunk=lambda **args:self.resource.read(
+             read_project_chunk=lambda **args:original.resource.read(
                  'Bearer fixture-only',args,NOW))
         self.assertEqual(result['state'],
              'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING')

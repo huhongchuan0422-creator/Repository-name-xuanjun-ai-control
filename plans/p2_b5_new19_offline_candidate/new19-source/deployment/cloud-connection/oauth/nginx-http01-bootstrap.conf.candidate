@@ -1,0 +1,14 @@
+# Candidate only. Install exclusively before the independent TLS lineage exists.
+# Replace with the final vhost after certificate verification; never load both.
+server {
+    listen 80;
+    server_name cloud-auth.wenwenwenyiyiyi.work;
+    access_log off;
+    error_log /dev/null;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / { return 503; }
+}
