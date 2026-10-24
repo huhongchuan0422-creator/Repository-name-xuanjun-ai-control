@@ -206,7 +206,10 @@ class SyntheticSpecTests(unittest.TestCase):
                                spec['observed_baseline']['db']['ino'])
                 pins[c53.LOCK]=(spec['observed_baseline']['worker_lock']['dev'],
                                  spec['observed_baseline']['worker_lock']['ino'])
-                boundary=SealedOSBoundary(root,allowed,pins)
+                store_roots=(WitnessStore.__init__.__globals__['ROOT'],
+                             SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
+                boundary=SealedOSBoundary(root,allowed,pins,
+                                          dynamic_roots=store_roots)
                 binding=entry._binding(spec,'c53-recovery-draft','fixture-attempt',
                                        start,bundle['catalog_sha'])
                 record=json.loads(gate.read_binder())
@@ -425,7 +428,9 @@ def child_query(root,action='query'):
             if type(path) is str and path.startswith('file:/proc/self/fd/'):
                 return SQLiteBoundary(original_connect(path,*args,**kwargs))
             return original_connect(path,*args,**kwargs)
-        with SealedOSBoundary(root,known,pins).active(),\
+        store_roots=(WitnessStore.__init__.__globals__['ROOT'],
+                     SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
+        with SealedOSBoundary(root,known,pins,dynamic_roots=store_roots).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
              patch.object(Github,'call',recorded_comment),\

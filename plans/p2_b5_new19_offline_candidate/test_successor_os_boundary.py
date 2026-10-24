@@ -36,9 +36,12 @@ class SealedOSBoundary:
     The original fds, flock and SQLite operations run on actual temporary files.
     A newly created inode never inherits a pin from its pathname.
     """
-    def __init__(self, root, allowed, pins):
+    def __init__(self, root, allowed, pins, dynamic_roots=()):
         self.root = pathlib.Path(root)
         self.allowed = frozenset(allowed)
+        self.dynamic_roots = frozenset(dynamic_roots)
+        if not self.dynamic_roots <= self.allowed:
+            raise ValueError('DYNAMIC_ROOT_NOT_ALLOWED')
         self.directories = frozenset({'/'} | {
             str(parent) for path in self.allowed
             for parent in pathlib.PurePosixPath(path).parents})
@@ -112,7 +115,10 @@ class SealedOSBoundary:
                 (self._fstat(dir_fd).st_dev, self._fstat(dir_fd).st_ino))
             if parent is not None:
                 logical = parent.rstrip('/')+'/'+path
-                if logical not in self.allowed and logical not in self.directories:
+                permitted_dynamic = (parent in self.dynamic_roots and
+                    '/' not in path and path not in ('','.','..'))
+                if (logical not in self.allowed and logical not in self.directories
+                        and not permitted_dynamic):
                     raise PermissionError('UNLISTED_OS_PATH')
         return self._mapped(self._stat(path, dir_fd=dir_fd,
                                        follow_symlinks=follow_symlinks),
