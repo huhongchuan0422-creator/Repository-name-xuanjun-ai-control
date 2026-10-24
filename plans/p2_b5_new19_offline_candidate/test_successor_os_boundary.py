@@ -45,6 +45,7 @@ class SealedOSBoundary:
         self.pins = {}
         self.sealed_paths = {}
         self.sealed_symlinks = {}
+        self.sealed_directories = {}
         for path, identity in pins.items():
             real = self.root/path.lstrip('/')
             st = real.lstat()
@@ -52,13 +53,16 @@ class SealedOSBoundary:
             self.sealed_paths[(st.st_dev, st.st_ino)] = path
         self._open, self._stat, self._fstat = os.open, os.stat, os.fstat
         self._readlink = os.readlink
-        for path in self.allowed:
+        for path in self.directories | self.allowed:
             real = self.root/path.lstrip('/')
             try:
                 st = real.lstat()
             except FileNotFoundError:
                 continue
-            if (st.st_mode & 0o170000) == 0o120000:
+            kind = st.st_mode & 0o170000
+            if kind == 0o040000:
+                self.sealed_directories[(st.st_dev, st.st_ino)] = path
+            elif kind == 0o120000 and path in self.allowed:
                 self.sealed_symlinks[path] = (
                     st.st_dev, st.st_ino, st.st_mode, st.st_nlink,
                     self._readlink(str(real)))
@@ -103,6 +107,13 @@ class SealedOSBoundary:
             if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             path = str(self.root/path.lstrip('/'))
+        elif dir_fd is not None and not path.startswith('/'):
+            parent = self.sealed_directories.get(
+                (self._fstat(dir_fd).st_dev, self._fstat(dir_fd).st_ino))
+            if parent is not None:
+                logical = parent.rstrip('/')+'/'+path
+                if logical not in self.allowed and logical not in self.directories:
+                    raise PermissionError('UNLISTED_OS_PATH')
         return self._mapped(self._stat(path, dir_fd=dir_fd,
                                        follow_symlinks=follow_symlinks),
                             logical, follow_symlinks)
@@ -214,18 +225,24 @@ class IdentityBoundaryTests(unittest.TestCase):
         real.symlink_to('/opt/xuanjun-fixture/releases/old')
         boundary=SealedOSBoundary(self.root,[current_path],{})
         with boundary.active():
-            sealed=os.stat(current_path,follow_symlinks=False)
-            self.assertEqual((sealed.st_uid,sealed.st_gid),(0,0))
+            parent=os.open('/opt/xuanjun-fixture',os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                sealed=os.stat('current',dir_fd=parent,follow_symlinks=False)
+                self.assertEqual((sealed.st_uid,sealed.st_gid),(0,0))
+            finally:os.close(parent)
         real.unlink()
         real.symlink_to('/opt/xuanjun-fixture/releases/new')
         with boundary.active():
-            replaced=os.stat(current_path,follow_symlinks=False)
-            # inode numbers may be reused immediately after unlink; the sealed
-            # target/type/link metadata is therefore part of the identity.
-            self.assertEqual((replaced.st_uid,replaced.st_gid),
-                             (real.lstat().st_uid,real.lstat().st_gid))
-            self.assertEqual(os.readlink(current_path),
-                             '/opt/xuanjun-fixture/releases/new')
+            parent=os.open('/opt/xuanjun-fixture',os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                replaced=os.stat('current',dir_fd=parent,follow_symlinks=False)
+                # inode numbers may be reused immediately after unlink; the
+                # sealed target/type/link metadata is part of the identity.
+                self.assertEqual((replaced.st_uid,replaced.st_gid),
+                                 (real.lstat().st_uid,real.lstat().st_gid))
+                self.assertEqual(os.readlink('current',dir_fd=parent),
+                                 '/opt/xuanjun-fixture/releases/new')
+            finally:os.close(parent)
 
     def test_synthetic_six_bytes_cannot_pass_original_digest_guard(self):
         # Device/inode translation never supplies or authenticates file bytes.
