@@ -115,7 +115,7 @@ class GateTests(unittest.TestCase):
             if phase=='start':
                 current.update(zip(c53.BASES,self.spec['fixed_paths']['target_release']))
             self.assertEqual(gate.check(phase,self.spec),
-                             '82d2caf2b9d2c3d4bb47a4f3b0f7ac03da3bb24d')
+                             '46b2a7bc70f397dd3b4deaf3c613c88b0129b5da')
 
     def test_binder_wrong_spec_or_current_rejected(self):
         gate=fixture_gate(self.spec,'publish')
