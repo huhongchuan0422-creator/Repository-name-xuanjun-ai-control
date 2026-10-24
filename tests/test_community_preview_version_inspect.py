@@ -141,6 +141,24 @@ class ReadonlyVersion(unittest.TestCase):
         self.assertEqual(v.health(lambda *a,**k:self.response(good),now=701)['freshness'],'STALE')
         self.assertEqual(call(dict(good,observed_at=131))['freshness'],'FUTURE')
         with self.assertRaises(v.Hold):v.health(lambda *a,**k:self.response(good,'https://other.invalid'),now=100)
+    def test_health_dns_and_http_use_fixed_bounded_process_and_typed_frame(self):
+        good=dict(status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+                  runtime_source_sha='a'*40,version_source='IMAGE_BUILD_STAMP',observed_at=100)
+        frame=json.dumps(dict(http_status=200,body_hex=json.dumps(good).encode().hex()))
+        with patch.object(v,'capture',return_value=frame) as capture:
+            self.assertEqual(v.health(now=100)['runtime_source_sha'],'a'*40)
+        args,kwargs=capture.call_args
+        self.assertEqual(args[0][:5],['/usr/bin/python3','-I','-B','-S','-c'])
+        self.assertEqual(args[0][5],v.HTTP_PROBE)
+        self.assertEqual(kwargs,{'timeout':10,'budget':10000})
+        self.assertIn(v.URL,v.HTTP_PROBE)
+        self.assertNotIn('environ',v.HTTP_PROBE)
+        for bad in (dict(http_status=True,body_hex=''),dict(http_status=200,body_hex={'secret':'SENTINEL'}),
+                    dict(http_status=200,body_hex='a'*8193),dict(http_status=200,body_hex='00',extra='SENTINEL')):
+            with patch.object(v,'capture',return_value=json.dumps(bad)),self.assertRaises(v.Hold):v.health(now=100)
+    def test_network_process_timeout_is_hold_not_fallback_to_local_or_old_sha(self):
+        with patch.object(v,'capture',side_effect=v.Hold('COMMAND_TIMEOUT')):
+            with self.assertRaises(v.Hold):v.health(now=100)
     def test_command_timeout_and_combined_output_cap_kill_and_reap(self):
         spawned=[];real=v.subprocess.Popen
         def spawn(*a,**kw):

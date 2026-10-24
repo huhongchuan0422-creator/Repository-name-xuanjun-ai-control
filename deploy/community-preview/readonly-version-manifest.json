@@ -9,6 +9,7 @@
     "command_combined_output_bytes": 65536,
     "command_seconds": 8,
     "health_bytes": 4096,
+    "health_child_frame_bytes": 10000,
     "health_seconds": 10,
     "json_report_bytes": 16384,
     "kill_and_reap_grace_seconds": 2,
@@ -24,19 +25,19 @@
   "executable_maintenance": false,
   "files": {
     "deploy/community-preview/inspect-version-readonly.sh": {
-      "bytes": 20197,
+      "bytes": 22121,
       "mode": "0644",
-      "sha256": "762d6b4e29baeb64908f403928187109b63c66b3d2ff84ab11b2aeef93a97e33"
+      "sha256": "171c682e92e2c18bb7b3a5fb1414c491e9a93fc72a069112314834135e95ea0f"
     },
     "scripts/community_preview_version_inspect.py": {
-      "bytes": 19691,
+      "bytes": 21615,
       "mode": "0644",
-      "sha256": "eb295126389871d8087a906ffafd3be424b53bc46edebf4d683332a85f2d2765"
+      "sha256": "98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3"
     },
     "tests/test_community_preview_version_inspect.py": {
-      "bytes": 16899,
+      "bytes": 18302,
       "mode": "0644",
-      "sha256": "a1aad1c0fec0de8236ed82af427c8e030fb8edc0ed2330e5c0ed0e3f76f33ece"
+      "sha256": "d3b2ee7ef7992c0669cfd3806038aeee7d50dddd5c2abc18d9477889a36a6600"
     }
   },
   "filesystem_writes": false,

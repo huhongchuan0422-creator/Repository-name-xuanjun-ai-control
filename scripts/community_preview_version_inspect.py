@@ -295,22 +295,58 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def health(open_url=None, now=None):
-    opener = open_url or build_opener(ProxyHandler({}), NoRedirect()).open
+# Parent bounds the entire child lifetime, including DNS and TLS setup. The
+# child frame is never relayed; only the typed parent projection is printed.
+HTTP_PROBE = r"""import json
+from urllib.error import HTTPError
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self,*args,**kwargs):return None
+url='https://uk.wenwenwenyiyiyi.work/community-preview/community/health'
+try:
     try:
-        response = opener(Request(URL, headers={'Accept': 'application/json'}), timeout=10)
+        response=build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,headers={'Accept':'application/json'}),timeout=8)
     except HTTPError as error:
-        if error.code != 503:
-            raise Hold('HEALTH_HTTP')
-        response = error
+        if error.code!=503:raise ValueError()
+        response=error
     with response:
-        http_status = getattr(response, 'status', getattr(response, 'code', None))
-        if http_status not in (200, 503) or response.geturl() != URL or response.headers.get_content_type() != 'application/json':
-            raise Hold('HEALTH_RESPONSE')
-        raw = response.read(4097)
-        if len(raw) > 4096:
-            raise Hold('HEALTH_SIZE')
-        value = exact_json(raw.decode('utf-8'))
+        code=getattr(response,'status',getattr(response,'code',None))
+        if code not in (200,503) or response.geturl()!=url or response.headers.get_content_type()!='application/json':raise ValueError()
+        raw=response.read(4097)
+        if len(raw)>4096:raise ValueError()
+    print(json.dumps({'http_status':code,'body_hex':raw.hex()},sort_keys=True))
+except Exception:
+    raise SystemExit('HEALTH_UNAVAILABLE')
+"""
+
+
+def health(open_url=None, now=None):
+    if open_url is None:
+        frame = exact_json(capture(['/usr/bin/python3', '-I', '-B', '-S', '-c', HTTP_PROBE], timeout=10, budget=10000))
+        if (type(frame) is not dict or set(frame) != {'http_status', 'body_hex'}
+                or type(frame['http_status']) is not int or frame['http_status'] not in (200, 503)
+                or type(frame['body_hex']) is not str or len(frame['body_hex']) > 8192
+                or re.fullmatch('[0-9a-f]*', frame['body_hex']) is None):
+            raise Hold('HEALTH_CHILD_FRAME')
+        http_status = frame['http_status']
+        raw = bytes.fromhex(frame['body_hex'])
+    else:
+        # Controlled response injection for offline tests; main never accepts
+        # an opener, URL or callback from a request, argument or environment.
+        try:
+            response = open_url(Request(URL, headers={'Accept': 'application/json'}), timeout=10)
+        except HTTPError as error:
+            if error.code != 503:
+                raise Hold('HEALTH_HTTP')
+            response = error
+        with response:
+            http_status = getattr(response, 'status', getattr(response, 'code', None))
+            if http_status not in (200, 503) or response.geturl() != URL or response.headers.get_content_type() != 'application/json':
+                raise Hold('HEALTH_RESPONSE')
+            raw = response.read(4097)
+            if len(raw) > 4096:
+                raise Hold('HEALTH_SIZE')
+    value = exact_json(raw.decode('utf-8'))
     if type(value) is not dict:
         raise Hold('HEALTH_OBJECT')
     observed = int(time.time()) if now is None else now

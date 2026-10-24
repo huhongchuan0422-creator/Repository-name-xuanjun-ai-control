@@ -58,6 +58,6 @@
 - 事务JSON必须是对象，重复key/nonfinite拒绝；每个允许字段分别约束SHA/ID正则、固定枚举或精确bool。嵌套dict/list/未知字符串不能原样透传，缺失/错误字段UNKNOWN；实际attempt的old_id/new_image/owner_vhost_sha256/phase也按各自类型投影。
 - 共享 `/etc/nginx/conf.d/xuanjun-p2-owner.conf` 只作为原社区include所属共享vhost文件核元数据和SHA256；不解析/输出P2配置、不读P2运行/服务/数据库/文件，不测试或reload nginx。
 - 当前容器→当前image/OCI→固定public health后，再只读复核当前容器ID/image/running未变。输出snapshot_atomic=false；公共health与OCI关系只是观察，不是前后端同版证明。缺版本/错类型/旧2330health均UNKNOWN；不会补本地SHA。严格EXACT_SOURCE_MATCH预览规则完全未改。
-- main只读候选守卫精确host/root；错误host零采集。每子进程有界流式读双pipe、异常kill进程组且wait回收，总60秒deadline可穿透单项收集。JSON最多16KiB，shell仅追加固定退出码行。exit0仅代表固定观察项已收集；exit2表示部分/未知/边界失败，两者executable均false，均不授权预览/部署。
+- main只读候选守卫精确host/root；错误host零采集。每子进程有界流式读双pipe、异常kill进程组且wait回收；同一固定health GET也放入原Python短命子进程，父进程10秒硬deadline覆盖DNS/TLS/HTTP，不增加URL或通道。内部最多10000字节hex帧由父进程重新做类型投影，绝不原样打印。总60秒deadline可穿透单项收集。JSON最多16KiB，shell仅追加固定退出码行。exit0仅代表固定观察项已收集；exit2表示部分/未知/边界失败，两者executable均false，均不授权预览/部署。
 
 治理合并核验：PR141 HEAD0d8b3747802fab4e0774cd93f46a663a44ec8c82/4files，normal ready→expectedHEAD merge成功，实际main merge ee4462c6cc79a4b032239e03a3703f0bb3a9a4ec / Tree b66ba8371d33e6eaee20f5af9e5890e3795f84aa，未代签approve/未admin或bypass。合后5个适用Hosted均SUCCESS：40042774292/40042774315/40042774319/40042774338/40042774297。原路径进入main仅代表注册源码就位，不代表preview已执行。
