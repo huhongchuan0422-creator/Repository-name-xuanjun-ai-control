@@ -131,6 +131,30 @@ class WriterFenceTests(unittest.TestCase):
             "SELECT state FROM writer_operations WHERE operation_id='op1'"
         ).fetchone()[0], 'CONFIRMED')
 
+    def test_revocation_can_cancel_undispatched_prepared_operation(self):
+        ticket = self.claim()
+        self.s.prepare_operation(ticket, self.caller(), self.operation(),
+                                 now=1001)
+        controller = {'role': 'REVOCATION_CONTROLLER', 'caller_id': 'owner'}
+        self.s.begin_revocation('t1', controller, now=1002)
+        ctx = {'role': 'RECONCILER', 'evidence_id': 'prepared-cancel-1',
+               'caller_id': 'trusted-readback'}
+        result = self.s.reconcile_operation(
+            'op1', ctx, 'NOT_APPLIED',
+            {'dispatch_started': False, 'readback': 'base-unchanged'},
+            receipt={'outcome': 'NOT_APPLIED',
+                     'reason': 'PREPARED_NEVER_DISPATCHED'},
+            now=1003)
+        self.assertEqual(result['state'], 'NOT_APPLIED')
+        self.assertEqual(self.s.unresolved_operations('t1'), [])
+        with self.assertRaisesRegex(
+                ValueError, 'OPERATION_NOT_RECONCILABLE'):
+            self.s.reconcile_operation(
+                'op1', {'role': 'RECONCILER', 'evidence_id': 'again',
+                        'caller_id': 'trusted-readback'},
+                'CONFIRMED', {'readback': 'no'},
+                receipt={'outcome': 'CONFIRMED'}, now=1004)
+
     def test_unknown_can_be_reconciled_without_redispatch(self):
         ticket = self.claim()
         self.s.prepare_operation(ticket, self.caller(), self.operation(),
