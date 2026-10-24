@@ -103,10 +103,13 @@ class OfflineBundleInputTests(unittest.TestCase):
                 try: return original_add(archive,name,arcname=arcname,recursive=recursive,filter=filter)
                 finally: path.write_bytes(original); mutated['done']=True
             return original_add(archive,name,arcname=arcname,recursive=recursive,filter=filter)
-        with mock.patch.object(builder,'HERE',package), mock.patch.object(builder,'MODEL_MANIFEST',manifest_path),
-             mock.patch.object(builder,'REQUIREMENTS',req_path), mock.patch.object(builder,'LICENSE',license_path),
-             mock.patch.object(builder,'NOTICE',notice_path), mock.patch.object(builder,'CONFIG_SCHEMA',schema_path),
-             mock.patch.object(builder.tarfile.TarFile,'add',new=mutate_while_adding):
+        with (mock.patch.object(builder,'HERE',package),
+              mock.patch.object(builder,'MODEL_MANIFEST',manifest_path),
+              mock.patch.object(builder,'REQUIREMENTS',req_path),
+              mock.patch.object(builder,'LICENSE',license_path),
+              mock.patch.object(builder,'NOTICE',notice_path),
+              mock.patch.object(builder,'CONFIG_SCHEMA',schema_path),
+              mock.patch.object(builder.tarfile.TarFile,'add',new=mutate_while_adding)):
             with self.assertRaisesRegex(BundleError,'ARCHIVE_MEMBER_SHA256_MISMATCH:models/det.onnx'):
                 builder.build_bundle('linux-x86_64-cp311',self.lock,self.wheels,self.models,output)
         self.assertTrue(mutated['done'])
