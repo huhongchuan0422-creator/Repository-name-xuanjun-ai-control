@@ -135,3 +135,11 @@ Added source tests:
 - a read-write mount stub prevents module execution, while a read-only stub checks root and source before the fixture executes.
 
 These tests have NOT been executed in this session. No actual Docker mount or UK target was inspected. The runtime mount must be proven read-only from the actual container's mount table during a separately approved field test; a declared read-only setting or synthetic stub is not sufficient.
+
+## 12. Exact schema/mount follow-up revision
+
+The read-only schema validator now compares the six existing tables against the column definitions used by SecureSQLiteJobStore at the immutable cb28 source, including declared type, NOT NULL, primary-key ordinal and default; verifies AUTOINCREMENT on ocr_audit; verifies the declared job UNIQUE(tenant_key, idem_key); checks idx_ocr_tenant and idx_ocr_audit_job exact columns; and verifies the unique indexes for submit idempotency, confirmation idempotency, rate windows and audit details. A correct key-check row and PRAGMA integrity_check no longer make a table-name-only impostor READY.
+
+The integration adapter loader now requires the actual deepest mount entry covering both root and module file to report read-only in /proc/self/mountinfo. Mountinfo escape sequences are decoded; missing/unknown mount state is HOLD. Root and source must be root-owned, non-symlink, expected file/directory types, and not group/world writable. It never changes permissions. Synthetic tests include a real SecureSQLiteJobStore-created database, wrong-column impostor tables, wrong required index, a main-path assertion that create_app is not called on schema failure, writable mode rejection, a read-write mount stub whose module marker must remain absent, a read-only stub whose root/source checks must precede module execution, and parsing of synthetic mountinfo ro/rw flags.
+
+Current tests remain NOT_EXECUTED. This is source-level coverage only; no local runner or authorized Hosted run was available. The actual UK/container mount must still be inspected at runtime. Current candidate HEAD is the exact branch ref, not the immutable formal package source; formal package cb28f605... remains unchanged.
