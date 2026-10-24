@@ -376,6 +376,19 @@ class CanonicalCompletionTests(unittest.TestCase):
         self.assertFalse(os.path.exists(first))
         self.assertFalse(os.path.exists(second))
 
+    def test_duplicate_module_import_keeps_controlled_fixture_isolated(self):
+        module_path=pathlib.Path(__file__).resolve()
+        alias_spec=importlib.util.spec_from_file_location(
+            'test_entry_review_gate_isolated_alias',module_path)
+        alias=importlib.util.module_from_spec(alias_spec)
+        alias_spec.loader.exec_module(alias)
+        case=alias.CanonicalCompletionTests(
+            'test_controlled_review_and_finalize_entry_uses_existing_ledger_and_git')
+        result=unittest.TestResult()
+        case.run(result)
+        self.assertEqual(result.failures,[])
+        self.assertEqual(result.errors,[])
+
     def test_controlled_development_action_holds_without_existing_inputs(self):
         old_env=dict(os.environ)
         try:
