@@ -1,117 +1,100 @@
 # TASK WRITER FENCING V2.1 — 2026-10-24
 
-Status: SOURCE IMPLEMENTATION IN PROGRESS. PRODUCTION_FENCING_HOLD.
+Status: SOURCE IMPLEMENTATION IN DEVELOPMENT. PRODUCTION_FENCING_HOLD.
 
-This module is a safety primitive under the existing canonical task_supervisor.
-It is not a new task center and does not add multi-role or multi-model routing.
+This is a source-safety module under the existing canonical
+`task_supervisor`. It is not a second task center, does not add multi-role or
+multi-model scheduling, and does not grant production credentials, deployment
+permission, resource-native authority, or production takeover.
 
 ## 1. Canonical authority
 
-Authority states are exactly:
+Authority states are:
 
 ```
 UNKNOWN
 NONE -> VALID -> REVOKING -> REVOKED
 ```
 
-READY remains a task state, never an authority state.
+READY is only a task state.
 
-Initial writer admission is NONE -> VALID. The canonical store, not the caller,
-allocates fence=max_fence+1 and epoch=max_epoch+1.
+Initial source claim is NONE -> VALID. The canonical store allocates
+`max_fence+1` and `max_epoch+1`; the caller cannot choose a generation.
 
-Takeover has no REVOKED -> NONE -> VALID gap. One canonical transaction must
-verify REVOKED, the exact stored receiver ACK, complete resource coverage and
-the reserved resource set; the store then allocates max+1 and changes directly
-to VALID.
+Takeover has no REVOKED -> NONE/READY -> VALID gap. One canonical transaction
+must verify REVOKED, the exact append-once receiver ACK, the exact resource
+scope digest, the independent coverage digest and the reserved resource set,
+then allocate max+1 and move directly to new VALID.
 
 Migrated active v2 attempts become authority UNKNOWN and task HOLD. UNKNOWN
-cannot transition directly to NONE or VALID. Only the dedicated trusted
-recovery entry may transition UNKNOWN -> REVOKING after recording recovery
-evidence; normal drain/readback/coverage/ACK/takeover rules then apply.
+cannot move directly to NONE or VALID. A dedicated trusted source-inventory
+recovery path must atomically persist the inventory evidence, reserve the exact
+normalized resource set, record its scope digest and move UNKNOWN -> REVOKING.
+Insufficient or conflicting inventory remains HOLD.
 
-Legacy task claim/HANDOFF records remain coordination evidence only. They are
-not fencing authority and cannot establish production writer isolation.
-
-## 2. Ticket and caller identity
-
-A WriterTicket is a canonical selector containing task, writer scope, attempt,
-lease, fence, epoch, valid_until, checkpoint/spec, assigned run/session,
-gateway and resource set.
-
-A ticket digest proves bytes only. It is not caller authentication. Every
-prepare/dispatch must additionally bind a trusted caller context to the
-assigned run/session/gateway. Reading another writer's ticket does not grant
+Legacy coordination `claim()` and HANDOFF payload booleans are not fencing
 authority.
 
-The caller cannot choose a higher epoch or fence. Allocation is canonical
-max+1 only.
+## 2. Ticket and trusted caller
 
-valid_until uses trusted_now < valid_until. A trusted-clock rollback is HOLD.
-Expiry rejects future commits but does not prove that a process or remote side
-effect stopped.
+WriterTicket is a selector bound to task, attempt, lease, fence, epoch,
+valid_until, checkpoint/spec, caller_id, run, session, gateway and resource
+scope digest/set. A ticket digest proves bytes only.
 
-## 3. Resource scope and conflict registration
+Every writer operation checks the exact trusted caller_id + run + session +
+gateway against canonical assignment. Reading another writer's ticket is not
+authority.
 
-Writer uniqueness is defined over real conflicting resource_key values, not
-only task_id. Different tasks that can mutate the same branch, database
-keyspace, object or deployment resource are conflicting writers.
+Writer APIs do not accept a caller-provided `now`. Time is injected only by
+the Supervisor clock. Validity requires `trusted_now < valid_until`. Clock
+rollback is HOLD. Expiry rejects new commits but does not prove that the old
+process or a remote effect stopped.
 
-A resource set is normalized and sorted. All keys are conflict-checked and
-registered inside the same canonical DB transaction. The operation either
-owns the complete set or owns none; partial acquisition is forbidden.
+## 3. Resource identity and reservation
 
-Cross-process action locks are also acquired in fixed resource-key order to
-avoid lock-order deadlock.
+Conflict is defined by canonical `resource_key`, not only task_id. Different
+tasks writing the same branch, database keyspace, object or deployment target
+must conflict.
 
-If only same-task successor fencing is implemented for a resource type, its
-guarantee must be labelled SAME_TASK_SUCCESSOR_ONLY, not GLOBAL_UNIQUE_WRITER.
+A trusted source adapter normalizes resource keys before canonical storage.
+Whitespace, control/NUL bytes, dot/dot-dot path segments, empty segments and
+alias forms are rejected. The canonical store conflict-checks and reserves the
+entire sorted resource set in one SQLite transaction; partial ownership is
+forbidden.
 
-## 4. CommitLease
+The source adapter and local lock provider are SOURCE/LOCAL_ONLY evidence. They
+do not imply global production isolation.
 
-A final guard followed by an unlocked write still has TOCTOU. A protected
-effect therefore uses a context-managed CommitLease:
+## 4. Fixed Fence and CommitLease
+
+A trusted `Fence` instance owns one pinned LOCAL_ONLY lock provider/root.
+Individual CommitLease/revoke calls cannot choose another root.
+
+The lock root is canonical, private, owner-bound and pinned by inode. Lock
+files use NOFOLLOW, exact owner/mode, nlink=1 and inode recheck. Root path
+replacement or symlink substitution fails closed.
+
+CommitLease sequence:
 
 ```
-acquire sorted shared action locks
-re-read canonical authority while locked
-validate ticket + trusted caller + time
+acquire sorted shared resource locks
+re-read canonical source authority
+validate ticket + caller + trusted clock
 CAS PREPARED -> DISPATCHING
-keep locks held
-perform external effect
+hold the shared lock
+perform source/offline effect
 persist CONFIRMED or UNKNOWN
-release locks
+release shared lock
 ```
 
-The shared lock spans the final canonical check, dispatch and durable outcome.
+Thus no unlocked final-guard -> effect window exists inside the admitted source
+path.
 
-Local flock is LOCAL_ONLY. It does not prove distributed isolation. Multi-host
-or direct-credential writers require a unique admitted gateway,
-resource-native fencing or capability isolation.
+A local flock is never a distributed/global fence. Multi-host or direct-token
+writers require a separately approved unique gateway, resource-native fencing
+or equivalent capability isolation. Production remains HOLD.
 
-## 5. Revocation
-
-Revocation order is fixed:
-
-1. VALID -> REVOKING in canonical state.
-2. REVOKING rejects every new CommitLease/new intent.
-3. Acquire the same resource set exclusively and wait for old shared leases.
-4. Timeout returns REVOCATION_NOT_COMPLETED and remains REVOKING.
-5. Reconcile all old PREPARED/DISPATCHING/UNKNOWN operations.
-6. Obtain a real invalidation receipt for every resource_key.
-7. Compute and persist a coverage digest bound to old attempt/spec/resources.
-8. Only then REVOKING -> REVOKED.
-9. Store exact receiver ACK.
-10. One takeover transaction validates REVOKED+ACK+coverage and changes
-    directly to new VALID while allocating max+1.
-
-A process crash can release a local lock while a remote request remains
-UNKNOWN. Lock release therefore never implies revocation completion.
-
-During REVOKING the old attempt cannot create PROGRESS, TERMINAL, INTENT,
-CommitLease or new effects through the fencing path. Only dedicated readback
-and reconciliation of already-existing operations is admissible.
-
-## 6. Operation state and reconciliation
+## 5. Operation identity, receipts and attribution
 
 Operation identity is immutable:
 
@@ -120,7 +103,7 @@ operation_id UNIQUE
 (task_id, attempt_id, event_id) UNIQUE
 ```
 
-State machine:
+State transitions use CAS:
 
 ```
 PREPARED -> DISPATCHING -> CONFIRMED
@@ -129,95 +112,168 @@ PREPARED -> DISPATCHING -> CONFIRMED
                         -> CONFLICT
 ```
 
-All transitions use CAS.
+During revocation an undispatched PREPARED operation may only reconcile to
+NOT_APPLIED with trusted evidence that dispatch never began.
 
-UNKNOWN is not redispatched. A trusted readback/reconcile path may append
-evidence and CAS UNKNOWN/DISPATCHING to CONFIRMED, NOT_APPLIED or CONFLICT.
-A repeated UNKNOWN observation is append-only evidence and does not consume the
-one final receipt.
+UNKNOWN is not redispatched. Dedicated trusted readback may append evidence and
+CAS DISPATCHING/UNKNOWN to CONFIRMED, NOT_APPLIED or CONFLICT. UNKNOWN
+observations are append-only evidence and do not consume the final receipt.
 
-Final receipt is append-once per operation. Same bytes are idempotent;
-different bytes conflict.
+Each operation has at most one final receipt. Same bytes are idempotent;
+different bytes conflict. Receipt outcome, operation_id, resource_key and
+operation_marker must match the operation.
 
-APPLIED_EXACTLY/CONFIRMED cannot be inferred from equal content alone. It
-requires a resource operation marker or an attributable unique before/after
-revision chain.
+CONFIRMED additionally requires an attributable before -> CAS/effect -> after
+chain. Equal content alone is insufficient.
 
-For GitHub the offline CAS model binds repo, branch, expected base HEAD,
-before tree/blob, requested blob, operation marker and readback commit/parent/
-tree/blob. A changed HEAD is CONFLICT; the fencing layer never auto-rebases,
-auto-merges or silently substitutes a new expected HEAD.
+The pure offline `FakeTransactionalSink` produces attributable FAKE_TXN
+receipts. The pure offline `OfflineGitCAS` validator binds repo, branch,
+base HEAD, before tree/blob, requested after tree/blob, operation marker and
+readback commit parent/tree/blob. It performs no network call and owns no
+credential. A changed branch/head/tree/blob/marker is conflict, never an
+automatic rebase or substituted HEAD.
 
-## 7. Resource invalidation coverage
+## 6. Revocation and drain
 
-old_fence_invalidated is not a global boolean.
+Revocation is re-entrant for the same generation:
 
-Each conflicting resource_key needs its own invalidation receipt. The complete
-sorted receipt set produces a coverage digest bound to old attempt/spec/resource
-scope.
+1. VALID -> REVOKING blocks every new intent and CommitLease.
+2. Acquire the same fixed provider's resource set exclusively.
+3. Timeout returns REVOCATION_NOT_COMPLETED and remains REVOKING.
+4. A successful exclusive drain persists one LOCAL_ONLY drain receipt bound to
+   old attempt/lease/fence/epoch/ticket/spec/scope/provider.
+5. Reconcile every PREPARED/DISPATCHING/UNKNOWN operation.
+6. Obtain one exact source invalidation receipt per resource_key from the same
+   fixed source adapter/provider.
+7. Only after drain + zero unresolved operations + complete resource receipts
+   may canonical authority move REVOKING -> REVOKED.
 
-Any missing, UNKNOWN or UNFENCED resource keeps the entire scope HOLD.
+A crashed process can release a local lock while its remote effect is UNKNOWN;
+therefore lock release alone never completes revocation.
 
-Fake/offline receipts prove SOURCE behavior only and must never be presented as
-production resource receipts.
+During REVOKING an old attempt cannot create new PROGRESS, TERMINAL, INTENT,
+CommitLease or effect through the fenced path. An already DISPATCHING effect
+may only persist its final CONFIRMED/UNKNOWN result. Dedicated reconcile is the
+only recovery path for existing operations.
 
-## 8. Schema and migration ownership
+## 7. Resource invalidation and coverage
 
-task_supervisor.py is the only schema/DDL/migration owner.
-task_writer_fence.py creates no authority database and performs no DDL.
+A resource invalidation receipt is not an arbitrary
+`outcome=INVALIDATED` assertion. In source tests it must be emitted by the
+trusted LOCAL_ONLY source adapter and bind:
 
-Normal opening of an existing v1/v2 ledger returns HOLD_MIGRATION_REQUIRED
-before persistent mutation.
+- task_id;
+- old attempt, lease, fence and epoch;
+- old ticket SHA;
+- spec SHA;
+- canonical resource scope digest;
+- exact resource_key;
+- fixed lock provider;
+- source adapter identity;
+- evidence ID.
 
-offline_migrate_v2_to_v3 is explicit and is used only with isolated fixture
-copies in this source phase. Production database migration requires separate
-approval and is NOT_EXECUTED.
+The canonical store verifies all bindings.
 
-recovery_generation remains supervisor/outbox recovery state; it is not a
+`resource_scope_digest` and `coverage_digest` are independent.
+Coverage binds old identity/spec/scope, the persisted drain receipt and the
+sorted per-resource invalidation receipt hashes.
+
+Missing, UNKNOWN, conflicting or unfenced coverage keeps the whole scope HOLD.
+Fake/source receipts never count as production resource receipts.
+
+## 8. Receiver ACK and gapless takeover
+
+Receiver ACK is exact and append-once per old generation. The ACK binds:
+
+- old task/attempt;
+- new attempt/owner/entry/caller/run/session/lease/gateway;
+- checkpoint/spec;
+- resource_scope_digest;
+- coverage_digest.
+
+Exact replay is idempotent. Different bytes conflict and cannot overwrite the
+stored ACK.
+
+Only a canonical transaction that revalidates REVOKED + exact ACK + both
+digests + all resource claims may assign the next max+1 generation and move
+directly to new VALID.
+
+## 9. Schema, preflight and migration
+
+`task_supervisor.py` is the sole schema/DDL/migration owner.
+`task_writer_fence.py` owns no authority DB and performs no DDL.
+
+Normal runtime opening of an existing v1/v2 ledger first uses immutable
+read-only preflight. It returns `HOLD_MIGRATION_REQUIRED` before any RW open,
+journal-mode change, WAL/SHM/journal creation or task mutation.
+
+Only explicit `offline_migrate_v2_to_v3` is available in this source phase.
+Production migration is NOT_EXECUTED and separately approved.
+
+Migration tests include multiple interruption failpoints. DDL/header/authority
+changes must roll back so a clean restart can migrate the original v2 fixture.
+
+The schema validator checks primary keys, unique keys, required indexes and
+foreign-key topology.
+
+`recovery_generation` remains supervisor/outbox recovery state and is not
 writer authority generation.
 
-## 9. Inventory and verdicts
+## 10. Inventory and production verdict
 
-Source phase distinguishes:
+Source and production inventories are separate:
 
 ```
-FRAMEWORK_INVENTORY_COMPLETE
-PRODUCTION_INVENTORY_INCOMPLETE
-PRODUCTION_FENCING_HOLD
+FRAMEWORK_INVENTORY = SOURCE_ONLY / testable
+PRODUCTION_INVENTORY = INCOMPLETE
+PRODUCTION_FENCING = HOLD
 ```
 
-A shared token, raw client or any write path that bypasses the admitted gateway
-is UNFENCED_PATH_PRESENT and forces production HOLD.
+The production verdict is hard-coded HOLD for this module. Caller booleans such
+as inventory_complete/raw_write_capable cannot upgrade it. Unknown or
+unadmitted capability is also HOLD.
 
-The proposed 3/10/30/60 minute coordination policy is PROPOSED_UNADOPTED and
+Shared production tokens, raw clients or any direct mutation path outside the
+approved gateway remain `UNFENCED_PATH_PRESENT` until separately removed or
+resource-native fenced.
+
+The 3/10/30/60 minute coordination policy remains PROPOSED_UNADOPTED and
 DEFAULT_DISABLED. Existing supervisor 5/10/15 recovery behavior is unchanged.
-No timeout creates writer authority.
+No time threshold creates write authority.
 
-## 10. Source acceptance
+## 11. Source acceptance
 
-Required isolated tests include:
+Both existing supervisor workflows must execute the current dedicated fencing
+suite through the stable `load_tests` aggregation in
+`tests/test_task_supervisor.py`. Historical temporary-bridge runs are not
+current acceptance.
+
+Applicable T01-T34 coverage includes:
 
 - concurrent claim single winner;
-- same resource conflict across different tasks/scopes;
-- atomic resource-set registration;
-- stale/old ticket rejection;
-- stolen ticket caller mismatch;
-- prepare/dispatch epoch or revocation race;
-- CommitLease shared lock spanning dispatch outcome;
-- revocation exclusive wait and timeout;
-- process-loss DISPATCHING/UNKNOWN restart recovery;
-- UNKNOWN readback to final state without redispatch;
-- append-only reconcile observations and one final receipt;
-- operation identity/event collision rejection;
-- clock rollback and expiry fail closed;
-- REVOKING produces zero new effects;
-- per-resource coverage + exact ACK + gapless takeover;
-- v2 normal open zero-write HOLD and explicit fixture migration;
-- active v2 migration -> UNKNOWN/HOLD;
-- equal GitHub content without marker is not CONFIRMED;
-- raw/shared credential bypass produces PRODUCTION_FENCING_HOLD.
+- cross-task same-resource exclusion and multi-resource rollback;
+- caller-only stolen ticket rejection;
+- caller-time override rejection, expiry and clock rollback;
+- fixed lock provider, root replacement/symlink and resource alias negatives;
+- operation identity/idempotency and concurrent duplicate operation;
+- CommitLease final-check/effect lock span;
+- fake transactional sink attribution;
+- offline Git branch/head/tree/blob/marker CAS validation;
+- missing/mismatched receipt rejection;
+- UNKNOWN append-only observations and no replay;
+- PREPARED -> NOT_APPLIED only;
+- revoke shared wait, timeout and same-generation resume;
+- persisted drain requirement before complete;
+- exact resource invalidation binding;
+- scope digest vs coverage digest;
+- ACK exact replay vs conflicting overwrite;
+- UNKNOWN inventory recovery through persisted reservation/evidence;
+- REVOKING zero new effect;
+- v1/v2 zero-write open HOLD;
+- multi-failpoint migration rollback/restart;
+- foreign-key schema corruption rejection;
+- production verdict fixed HOLD.
 
-Passing source tests can establish SOURCE_FRAMEWORK_PASS only.
-Production remains FENCING_HOLD until real gateway/credential/resource fencing,
-production inventory, production DB migration and deployment are independently
-approved and evidenced.
+Source tests may establish a source-framework candidate only. Production
+inventory, real adapters, real credentials, OS/DB/cloud permissions,
+production migration and deployment remain HOLD/NOT_EXECUTED.
