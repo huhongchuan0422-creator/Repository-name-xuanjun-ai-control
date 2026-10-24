@@ -292,8 +292,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
             with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
                 self.assertEqual(len(self.store.active_action_fds(
                     self.binding,('B5_EXPOSURE_CLOSE',))),2)
-                with patch('pr17_b5_successor_witness._shared_flock_held',
-                           return_value=False):
+                with patch.object(self.store,'_lease_cursor_held',return_value=False):
                     with self.assertRaisesRegex(
                             Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
                         self.store.active_action_fds(
@@ -317,8 +316,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
                 with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
                     self.assertEqual(len(self.store.active_action_fds(
                         self.binding,('PRE_START_RESTORE','B5_EXPOSURE_CLOSE'))),4)
-                    with patch('pr17_b5_successor_witness._shared_flock_held',
-                               return_value=False):
+                    with patch.object(self.store,'_lease_cursor_held',return_value=False):
                         with self.assertRaisesRegex(
                                 Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
                             self.store.active_action_fds(
@@ -338,8 +336,7 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         with self.assertRaisesRegex(Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
             with store.action(self.binding):
                 self.assertEqual(len(store.active_action_fds(self.binding)),2)
-                with patch('pr17_b5_successor_witness._shared_flock_held',
-                           return_value=False):
+                with patch.object(self.store,'_lease_cursor_held',return_value=False):
                     with self.assertRaisesRegex(
                             Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
                         store.active_action_fds(self.binding)
