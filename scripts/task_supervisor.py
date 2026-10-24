@@ -1,8 +1,8 @@
-"""Durable, deterministic task supervision for the canonical development ledger.
+"""Durable canonical source authority for supervised development tasks.
 
-This module does not execute workers or grant authority.  It records exact
-attempt evidence, identifies bounded recovery actions, and persists an outbox
-for a separately admitted notifier/provider.
+This ledger can issue and revoke source-level writer authority used by the
+local fencing framework.  It does not grant production credentials,
+resource-native capability, deployment permission, or production takeover.
 """
 from __future__ import print_function
 
@@ -39,8 +39,8 @@ V2_TASK_COLUMNS = (
 TASK_COLUMNS = V2_TASK_COLUMNS + (
     'authority_state', 'authority_valid_until', 'authority_run_id',
     'authority_session_id', 'authority_gateway_id', 'resource_scope_json',
-    'receiver_ack_json', 'receiver_ack_sha256', 'coverage_digest',
-    'last_trusted_time',
+    'receiver_ack_json', 'receiver_ack_sha256', 'resource_scope_digest',
+    'coverage_digest', 'authority_caller_id', 'last_trusted_time',
 )
 PERSISTENT_COLUMNS = {
     'events': ('task_id', 'attempt_id', 'event_id', 'kind',
@@ -63,6 +63,10 @@ PERSISTENT_COLUMNS = {
     'resource_invalidation_receipts': ('task_id', 'old_attempt_id',
                                        'resource_key', 'receipt_json',
                                        'receipt_sha256', 'created_at'),
+    'authority_recovery_evidence': ('task_id', 'attempt_id', 'evidence_id',
+                                    'evidence_json', 'created_at'),
+    'revocation_drains': ('task_id', 'attempt_id', 'provider_id',
+                          'receipt_json', 'receipt_sha256', 'created_at'),
 }
 
 
@@ -85,11 +89,16 @@ class Supervisor(object):
         # permits observers.  Event + task + outbox updates commit atomically.
         self.db = sqlite3.connect(path, timeout=10, isolation_level='IMMEDIATE')
         self.db.row_factory = sqlite3.Row
-        self.db.execute('PRAGMA foreign_keys=ON')
-        # Identity and complete schema are validated before any persistent
-        # journal-mode mutation of an existing file.
-        self._schema()
-        self.db.execute('PRAGMA journal_mode=WAL')
+        try:
+            self.db.execute('PRAGMA foreign_keys=ON')
+            # Existing v1/v2 files are read-preflighted and rejected before
+            # journal-mode or schema mutation.  Explicit offline migration is
+            # a separate call.
+            self._schema()
+            self.db.execute('PRAGMA journal_mode=WAL')
+        except Exception:
+            self.db.close()
+            raise
 
     def close(self):
         self.db.close()
@@ -127,7 +136,11 @@ class Supervisor(object):
                 or primary_key('outbox') != ('outbox_id',)
                 or primary_key('writer_operations') != ('operation_id',)
                 or primary_key('writer_receipts') != ('operation_id',)
-                or primary_key('resource_claims') != ('resource_key',)):
+                or primary_key('resource_claims') != ('resource_key',)
+                or primary_key('authority_recovery_evidence') !=
+                   ('task_id','attempt_id','evidence_id')
+                or primary_key('revocation_drains') !=
+                   ('task_id','attempt_id')):
             raise ValueError('SUPERVISOR_PRIMARY_KEY_MISMATCH')
 
         def unique_sets(table):
@@ -145,6 +158,29 @@ class Supervisor(object):
                 or ('task_id', 'old_attempt_id', 'resource_key')
                    not in unique_sets('resource_invalidation_receipts')):
             raise ValueError('SUPERVISOR_UNIQUE_KEY_MISMATCH')
+        foreign_expected = {
+            'events': ('tasks','task_id','task_id'),
+            'outbox': ('tasks','task_id','task_id'),
+            'writer_operations': ('tasks','task_id','task_id'),
+            'writer_reconcile_evidence':
+                ('writer_operations','operation_id','operation_id'),
+            'writer_receipts':
+                ('writer_operations','operation_id','operation_id'),
+            'resource_claims': ('tasks','task_id','task_id'),
+            'resource_invalidation_receipts':
+                ('tasks','task_id','task_id'),
+            'authority_recovery_evidence':
+                ('tasks','task_id','task_id'),
+            'revocation_drains': ('tasks','task_id','task_id'),
+        }
+        for table, expected in foreign_expected.items():
+            rows = list(self.db.execute(
+                'PRAGMA foreign_key_list("%s")' % table))
+            if len(rows) != 1:
+                raise ValueError('SUPERVISOR_FOREIGN_KEY_MISMATCH')
+            row = rows[0]
+            if (row['table'], row['from'], row['to']) != expected:
+                raise ValueError('SUPERVISOR_FOREIGN_KEY_MISMATCH')
         required_indexes = {
             'task_ready_idx': ('state', 'updated_at', 'task_id'),
             'outbox_due_idx': ('delivered_at', 'next_attempt_at', 'outbox_id'),
@@ -206,7 +242,9 @@ class Supervisor(object):
           resource_scope_json TEXT NOT NULL DEFAULT '[]',
           receiver_ack_json TEXT NOT NULL DEFAULT '{}',
           receiver_ack_sha256 TEXT NOT NULL DEFAULT 'UNKNOWN',
+          resource_scope_digest TEXT NOT NULL DEFAULT 'UNKNOWN',
           coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN',
+          authority_caller_id TEXT NOT NULL DEFAULT 'UNKNOWN',
           last_trusted_time REAL
         )''',
         '''CREATE TABLE IF NOT EXISTS events(
@@ -253,6 +291,16 @@ class Supervisor(object):
           resource_key TEXT NOT NULL,receipt_json TEXT NOT NULL,
           receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL,
           UNIQUE(task_id,old_attempt_id,resource_key),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS authority_recovery_evidence(
+          task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,evidence_id TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,created_at REAL NOT NULL,
+          PRIMARY KEY(task_id,attempt_id,evidence_id),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS revocation_drains(
+          task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,provider_id TEXT NOT NULL,
+          receipt_json TEXT NOT NULL,receipt_sha256 TEXT NOT NULL,
+          created_at REAL NOT NULL,PRIMARY KEY(task_id,attempt_id),
           FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
         '''CREATE INDEX IF NOT EXISTS task_ready_idx
            ON tasks(state,updated_at,task_id)''',
@@ -321,7 +369,9 @@ class Supervisor(object):
                 "resource_scope_json TEXT NOT NULL DEFAULT '[]'",
                 "receiver_ack_json TEXT NOT NULL DEFAULT '{}'",
                 "receiver_ack_sha256 TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "resource_scope_digest TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 "coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "authority_caller_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 'last_trusted_time REAL',
             )
             for definition in additions:
