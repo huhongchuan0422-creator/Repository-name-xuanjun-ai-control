@@ -275,7 +275,13 @@ class SecureSQLiteJobStore:
             job["status"] = "confirmed"
             db.execute("UPDATE ocr_jobs SET ciphertext=?,state=?,updated_unix=unixepoch() WHERE job_id=? AND tenant_key=?",
                        (self._seal(job), "confirmed", job_id, tenant_key))
-            response = {"job_id": job_id, "status": "confirmed", "revision": revision, "recorded": True}
+            response = {"job_id": job_id, "status": "confirmed", "revision": revision,
+                        "confirmed_fields": dict(job["confirmed_fields"]),
+                        "confirmed_binding": dict(job["confirmed_binding"]),
+                        "application_revision": job["application_revision"],
+                        "provider_version": job.get("provider_version"),
+                        "shared_writeback_eligible": bool(job.get("provider_version") is not None),
+                        "recorded": True}
             db.execute("INSERT INTO ocr_confirm_idempotency VALUES(?,?,?,?,?)",
                        (tenant_key, job_id, idem_key, payload_hash, self._seal(response)))
             audit = {"event": "USER_CONFIRMATION", "job_id": job_id, "revision": revision,
