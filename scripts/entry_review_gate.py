@@ -101,7 +101,7 @@ def review_bundle(contract,files,reviews,review_keys=None):
         manifest[path]=digest(raw)
     binding={'contract':contract,'files':manifest}
     bundle_sha=digest(canonical(binding))
-    roles=set();record_ids=set()
+    roles=set();record_ids=set();review_record_ids={}
     if not isinstance(reviews,list) or len(reviews)>2:raise ValueError('BOUNDED_REVIEWS_REQUIRED')
     for record in reviews:
         value=authenticated(record,review_keys)
@@ -112,13 +112,54 @@ def review_bundle(contract,files,reviews,review_keys=None):
                 or value['role'] in roles or record['record_id'] in record_ids
                 or value['bundle_sha256']!=bundle_sha or value['decision']!='PASS'):
             raise ValueError('INDEPENDENT_EXACT_VERSION_REVIEW_REQUIRED')
-        roles.add(value['role']);record_ids.add(record['record_id'])
+        roles.add(value['role']);record_ids.add(record['record_id']);review_record_ids[value['role']]=record['record_id']
     if roles=={'QA','SECURITY'}:
         values=[review_keys[p['key_id']] for p in policies.values()]
         if hmac.compare_digest(values[0],values[1]):
             raise ValueError('DISTINCT_REVIEW_AUTHORITY_KEYS_REQUIRED')
     return {'state':'ISOLATED_TEST_ELIGIBLE' if roles=={'QA','SECURITY'} else 'HOLD_INDEPENDENT_REVIEW_REQUIRED',
-            'bundle_sha256':bundle_sha,'binding':binding,'authority_effect':'NONE','release_approved':False}
+            'bundle_sha256':bundle_sha,'binding':binding,
+            'review_record_ids':review_record_ids,
+            'authority_effect':'NONE','release_approved':False}
+
+
+def complete_reviewed_candidate(supervisor, contract, files, reviews,
+                                review_keys, candidate_binding,
+                                completion_event_id,
+                                next_action='DEPENDENCIES_RECHECK'):
+    """Verify exact reviews, then atomically complete the canonical task.
+
+    Test/source identities here do not grant production approval; this only
+    converts already-authenticated QA+SECURITY records into canonical task
+    completion evidence.
+    """
+    result = review_bundle(contract, files, reviews, review_keys)
+    if result['state'] != 'ISOLATED_TEST_ELIGIBLE':
+        return dict(result, canonical_completion='HOLD_INDEPENDENT_REVIEW_REQUIRED')
+    if (not isinstance(candidate_binding, dict)
+            or candidate_binding.get('candidate', {}).get('task_id')
+               != contract.get('task_id')
+            or candidate_binding.get('candidate', {}).get('code_commit')
+               != contract.get('code_commit')
+            or candidate_binding.get('candidate', {}).get('spec_sha256')
+               != contract.get('spec_sha256')
+            or candidate_binding.get('candidate', {}).get('checkpoint_sha256')
+               != contract.get('checkpoint_sha256')
+            or candidate_binding.get('candidate', {}).get('target_repository')
+               != contract.get('target_repository')
+            or candidate_binding.get('candidate', {}).get('target_base_sha')
+               != contract.get('target_base_sha')
+            or candidate_binding.get('candidate', {}).get('entry')
+               != contract.get('entry')):
+        raise ValueError('REVIEW_CANDIDATE_BINDING_MISMATCH')
+    completion = supervisor.complete_development_candidate(
+        contract['task_id'],
+        candidate_binding['candidate_event_id'],
+        result['bundle_sha256'],
+        result['review_record_ids'],
+        completion_event_id,
+        next_action=next_action)
+    return dict(result, canonical_completion=completion)
 
 
 def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None):
