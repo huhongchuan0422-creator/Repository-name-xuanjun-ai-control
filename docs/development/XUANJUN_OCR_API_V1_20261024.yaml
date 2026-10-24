@@ -126,7 +126,7 @@ paths:
     post:
       operationId: confirmOcrFields
       summary: Store user-reviewed field values
-      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Request must echo the exact application_revision and optional provider_version shown to the reviewer. The server compares both against the stored tuple and re-resolves current authoritative values before confirmation; HTTP body versions are not trusted as proof.
       parameters:
         - in: path
           name: job_id
@@ -142,7 +142,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [revision, fields, application_revision, provider_version]
+              required: [revision, fields, application_revision]
               properties:
                 revision: {type: integer, minimum: 1}
                 application_revision: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
