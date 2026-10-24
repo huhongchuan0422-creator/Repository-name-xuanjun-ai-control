@@ -30,13 +30,21 @@ def image_id(value):
 
 
 def current_identity(value):
+    return _current_identity(value,True)
+
+
+def stopped_identity(value):
+    return _current_identity(value,False)
+
+
+def _current_identity(value,running):
     keys={'container_id','image_id','oci_revision','running','user','observed_at',
           'config_identity_sha256','data_identity_sha256','routing_sha256','isolation_sha256',
           'backup_reference_sha256'}
     require(type(value) is dict and set(value)==keys,'EXACT_CURRENT_METADATA_REQUIRED')
     require(exact_hex(value['container_id'],64) and image_id(value['image_id']),'CURRENT_ID_REQUIRED')
     require(value['oci_revision']==OBSERVED_OCI,'CURRENT_OCI_DIFF_REVIEW_REQUIRED')
-    require(value['running'] is True and value['user']=='10001:1008','ORIGINAL_NONROOT_WRITER_REQUIRED')
+    require(value['running'] is running and value['user']=='10001:1008','ORIGINAL_NONROOT_WRITER_REQUIRED')
     require(type(value['observed_at']) is int and value['observed_at']>0,'OBSERVATION_TIME_REQUIRED')
     for key in keys-{'container_id','image_id','oci_revision','running','user','observed_at'}:
         require(exact_hex(value[key],64),'PROTECTED_REFERENCE_REQUIRED')
@@ -88,8 +96,16 @@ def run_argv(image,source):
 
 
 def prepare(source,current=None,image=None):
+    return _prepare(source,current,image,False)
+
+
+def prepare_stopped(source,current,image):
+    return _prepare(source,current,image,True)
+
+
+def _prepare(source,current,image,stopped):
     source=source_evidence(source)
-    if current is not None:current=current_identity(current)
+    if current is not None:current=stopped_identity(current) if stopped else current_identity(current)
     if image is not None:image=image_evidence(image,source)
     missing=[]
     if current is None:missing.append('EXACT_CURRENT_ID_IMAGE_CONFIG_DATA_ROUTE_ISOLATION_BACKUP_METADATA')
@@ -136,6 +152,10 @@ def prepare(source,current=None,image=None):
         stop_rules=['UNKNOWN_TIMEOUT_OR_MISSING_RECEIPT_INSPECT_SAME_ATTEMPT_ONLY',
             'NO_RETRY_NO_NEW_ATTEMPT_NO_SECOND_WRITER','CHANGED_ID_CONFIG_DATA_ROUTE_OR_BACKUP_STOP',
             'EXISTING_PARTIAL_JOURNAL_STOP','RECOVERY_MUST_NEVER_START_OLD_WHILE_NEW_STOP_IS_UNKNOWN'])
+    if stopped:
+        report.update(handoff_mode='STOPPED_HANDOFF_V1',handoff_version=1)
+        report['attempt']+='-stopped-v1'
+        report['receipt_root']+='-stopped-v1'
     report['plan_sha256']=hashlib.sha256(json.dumps(report,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return report
 

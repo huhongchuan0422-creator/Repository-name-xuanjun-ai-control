@@ -1,0 +1,428 @@
+"""Proposal only: fixed stopped B->C composition; default entry is disabled.
+No stop/start/install/load/backup is performed by import or construction.
+A record is not freeze proof: fresh source/tree/clone reads are mandatory.
+"""
+import fcntl
+import hashlib
+import io
+import contextlib
+import json
+import os
+import pwd
+import select
+import stat
+import threading
+import time
+from scripts import community_preview_site_prepare as s
+from scripts import community_preview_update_composition as c
+from scripts import community_preview_update_checkpoint as u
+from scripts import community_preview_release_plan as p
+
+MODE='STOPPED_HANDOFF_V1'
+CONTROL='/opt/xuanjun-community-preview/control-stopped-v1'
+B_APPROVAL='/opt/xuanjun-community-preview/bc-b-approval.json'
+C_APPROVAL='/opt/xuanjun-community-preview/bc-c-approval.json'
+MANIFEST=CONTROL+'/manifest.json'
+PROOF=s.BACKUP+'/stopped-handoff-v1.json'
+C_ACTIONS=['STOPPED_HANDOFF_RENAME_RUN','KNOWN_FAILURE_SERIAL_RECOVERY','JOURNAL_WRITES']
+CLONES=('restore-old','verify-f131','verify-downgrade')
+
+def need(ok,why):
+    if not ok:raise u.Hold(why)
+def raw(path,limit=65536):
+    # Existing root/nofollow/full parent/identity/mode/nlink/size reader.
+    return s.read(path,limit)
+def document(path,limit=65536):
+    b=raw(path,limit);v=s.exact_json(b)
+    need(b==s.canonical(v),'CANONICAL_DOCUMENT_REQUIRED');return v,b
+def window(v):
+    t=c.now()
+    need(type(v['issued_at']) is int and type(v['expires_at']) is int
+         and v['issued_at']<=t<=v['expires_at']<=v['issued_at']+600,'APPROVAL_EXPIRED')
+def attempt():
+    return 'community-update-'+s.PRODUCT[:12]+'-'+s.OLD_ID[:12]+'-stopped-v1'
+def paths():
+    return {n:s.BACKUP+'/clone-'+n+'.json' for n in CLONES}
+def b_records():
+    names=['B-intent','snapshot-result','snapshot-permit','validate-clones-result','validate-clones-permit']
+    return {name:u.JOURNAL_PARENT+'/'+attempt()+'-'+name+'.json' for name in names}
+def open_private(path):
+    parent=s.directory(os.path.dirname(path))
+    try:
+        fd=os.open(os.path.basename(path),os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+        try:u.protected(fd);return fd
+        except BaseException:os.close(fd);raise
+    finally:os.close(parent)
+def write_private(parent,name,value):
+    # Original EXCL/checkpoint/fchown/fchmod/fsync implementation.
+    s.create_file(parent,name,s.canonical(value))
+def operator():
+    c.root_host();a=pwd.getpwnam('admin')
+    need(a.pw_uid>0 and os.environ.get('SUDO_USER')=='admin'
+         and os.environ.get('SUDO_UID')==str(a.pw_uid)
+         and os.environ.get('SUDO_GID')==str(a.pw_gid),'ORIGINAL_ADMIN_REQUIRED')
+    f=os.open('/proc/'+str(os.getpid())+'/loginuid',os.O_RDONLY|os.O_NOFOLLOW)
+    try:need(os.read(f,32).strip()==str(a.pw_uid).encode(),'KERNEL_LOGINUID_REQUIRED')
+    finally:os.close(f)
+    return a.pw_uid,a.pw_gid
+def acknowledge(action,digest):
+    fd=os.open('/dev/tty',os.O_RDWR|os.O_NOFOLLOW|os.O_NOCTTY)
+    try:
+        need(os.isatty(0) and os.isatty(1) and os.isatty(fd),'DIRECT_TTY_REQUIRED')
+        line=('APPROVE_'+action+' '+digest).encode()
+        os.write(fd,b'Exact separately approved action only; no automatic retry.\n'+line+b'\n')
+        need(select.select([fd],[],[],120)[0]==[fd],'OWNER_CONFIRMATION_TIMEOUT')
+        need(os.read(fd,257) in (line+b'\n',line+b'\r\n'),'EXACT_CONFIRMATION_REQUIRED')
+    finally:os.close(fd)
+
+class Session:
+    """One process/thread and the SAME flock description spans B and C."""
+    def __init__(self):
+        self.parent=None;self.lease=None;self.entry=None;self.backup=None
+        self.journal=None;self.old_checkpoint=None;self.old_clone=None;self.old_component=None
+        self.owner=None;self.thread=threading.get_ident();self.last=None
+        self.braw=None;self.craw=None;self.freeze=None;self.bdone=False
+        self.started=time.monotonic();self.captured={};self.recovering=False
+    def acquire(self,recover=False):
+        self.owner=operator();self.recovering=recover
+        # Parent was installed by A; never mkdir/chmod it.
+        self.parent=s.private_parent(u.JOURNAL_PARENT)
+        self.lease=os.open('community-update.lock',os.O_RDWR|os.O_NOFOLLOW|(0 if recover else os.O_CREAT),0o600,dir_fd=self.parent)
+        u.protected(self.lease);fcntl.flock(self.lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        self.entry=open_private(s.ENTRY);fcntl.flock(self.entry,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        self.old_checkpoint=s.checkpoint;self.old_clone=s.clone_run
+        self.old_component=s._COMPONENT
+        s._COMPONENT=c  # Exact same manifest-verified original readers, no fake Reader.
+        def checkpoint():
+            self.boundary()
+            self.old_checkpoint()
+        s.checkpoint=checkpoint
+        def clone(name,image):
+            self.stopped();v=self.old_clone(name,image);self.stopped()
+            need(name in CLONES and name not in self.captured,'EXACT_SINGLE_CLONE_REQUIRED')
+            row=dict(format=1,attempt=attempt(),name=name,image=image,
+                     code_sha256=s.sha(s.CLONE_CODE.encode()),result=v)
+            fd=s.private_parent(s.BACKUP)
+            try:write_private(fd,'clone-'+name+'.json',row)
+            finally:os.close(fd)
+            self.captured[name]=row
+            return v
+        s.clone_run=clone
+    def pins(self):
+        m,b=document(MANIFEST)
+        need(set(m)=={'format','mode','install_root','files','updates_enabled'}
+             and type(m['format']) is int and m['format']==1 and m['mode']==MODE
+             and m['install_root']==CONTROL and m['updates_enabled'] is False,'EXACT_V2_MANIFEST_REQUIRED')
+        need(type(m['files']) is dict and set(m['files'])==SOURCE_FILES,'EXACT_V2_FILES_REQUIRED')
+        need(s.sha(raw(CONTROL+'/deploy/community-preview/f131-image-receipt.json'))==c.RECEIPT_SHA,'FROZEN_F131_RECEIPT_REQUIRED')
+        for name,meta in m['files'].items():
+            body=raw(CONTROL+'/'+name,131072)
+            need(meta==dict(bytes=len(body),sha256=s.sha(body),uid=0,mode='0600'),'V2_SOURCE_CHANGED')
+        return s.sha(b)
+    def boundary(self):
+        need(threading.get_ident()==self.thread and operator()==self.owner,'OWNER_THREAD_CHANGED')
+        need(time.monotonic()-self.started<=600,'WHOLE_ENTRY_TIME_BUDGET')
+        st=os.stat('community-update.lock',dir_fd=self.parent,follow_symlinks=False)
+        held=os.fstat(self.lease);u.protected(self.lease)
+        need((st.st_dev,st.st_ino)==(held.st_dev,held.st_ino),'CONTINUOUS_LOCK_REPLACED')
+        need(s.identity(os.fstat(self.entry))==s.identity(os.stat(s.ENTRY,follow_symlinks=False)),
+             'CONTINUOUS_ENTRY_LOCK_REPLACED')
+        need(s.sha(raw(s.ENTRY,131072))=='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55',
+             'A_INSTALLED_ENTRY_CHANGED')
+        stamp=self.pins();t=c.now();need(t<s.EXPIRES,'FROZEN_IMAGE_ARTIFACT_EXPIRED')
+        need(self.last is None or t>=self.last,'CLOCK_BACKWARDS');self.last=t
+        if self.braw is not None:need(raw(B_APPROVAL)==self.braw,'B_REFERENCE_REPLACED')
+        if self.craw is not None:
+            v,b=document(C_APPROVAL);need(b==self.craw,'C_APPROVAL_REVOKED');window(v)
+        elif self.braw is not None:
+            v,b=document(B_APPROVAL);need(b==self.braw,'B_APPROVAL_REVOKED');window(v)
+            need(v['carrier_manifest_sha256']==stamp,'B_SOURCE_BINDING_CHANGED')
+        if self.freeze is not None:
+            need(raw(s.FREEZE,16384)==self.freeze,'FREEZE_REPLACED')
+            pre=self.journal is None or self.journal.state['phase'] in ('PREPARED','STOPPED_HANDOFF_ACCEPTED',
+                'OLD_RENAME_INTENT','OLD_RETAINED','NEW_RUN_INTENT')
+            if not self.recovering and pre:window(s.exact_json(self.freeze))
+    def freeze_live(self):
+        f,b=document(s.FREEZE,16384)
+        need(b==self.freeze and set(f)=={'format','host','old_id','old_image','roots','issued_at','expires_at',
+             'all_writers_frozen','owner_review_reference_sha256'} and type(f['format']) is int
+             and f['format']==1 and f['host']==p.HOST and f['old_id']==s.OLD_ID and f['old_image']==s.OLD_IMAGE
+             and f['roots']==[s.DATA+'/data',s.DATA+'/config'] and f['all_writers_frozen'] is True
+             and p.exact_hex(f['owner_review_reference_sha256'],64),'ORIGINAL_FREEZE_EVIDENCE_REQUIRED')
+        window(f)
+    def stopped(self):
+        self.boundary();self.freeze_live();s.stopped();self.boundary()
+    def b_stage(self,stage,snapshot_sha=None):
+        self.stopped();acknowledge(stage.upper().replace('-','_'),s.sha(self.braw));self.stopped()
+        # No overwrite/reuse of an active or unknown stage permission.
+        permit=dict(format=1,host=p.HOST,stage=stage,
+            entry_sha256='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55',
+            issued_at=c.now(),expires_at=min(c.now()+600,self.b['expires_at'],s.exact_json(self.freeze)['expires_at']),
+            all_writers_frozen_evidence_sha256=s.sha(self.freeze),snapshot_manifest_sha256=snapshot_sha)
+        fd=s.private_parent(s.BASE)
+        try:
+            write_private(fd,os.path.basename(s.PERMIT),permit)
+            digest=s.sha(s.canonical(permit));s.authorize(stage,digest);s._ACTIVE=(stage,digest)
+            self.stopped()
+            value=s.snapshot(permit) if stage=='snapshot' else s.validate_clones(permit)
+            self.stopped();s.authorize(stage,digest)
+            write_private(self.parent,attempt()+'-'+stage+'-result.json',dict(
+                format=1,attempt=attempt(),stage=stage,approval_sha256=s.sha(self.braw),permit_sha256=digest,result=value))
+            write_private(self.parent,attempt()+'-'+stage+'-permit.json',permit)
+            need(raw(s.PERMIT,16384)==s.canonical(permit),'ACTIVE_PERMIT_CHANGED')
+            identity=s.identity(os.stat(os.path.basename(s.PERMIT),dir_fd=fd,follow_symlinks=False))
+            self.stopped();s.authorize(stage,digest)
+            need(identity==s.identity(os.stat(os.path.basename(s.PERMIT),dir_fd=fd,follow_symlinks=False)),
+                 'ACTIVE_PERMIT_REPLACED')
+            self.boundary();s.authorize(stage,digest)
+            os.unlink(os.path.basename(s.PERMIT),dir_fd=fd);os.fsync(fd);self.boundary()
+            return value
+        finally:s._ACTIVE=None;os.close(fd)
+    def run_b(self):
+        self.b,self.braw=document(B_APPROVAL)
+        need(set(self.b)=={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at','freeze_sha256','actions'}
+             and type(self.b['format']) is int and self.b['format']==1 and self.b['host']==p.HOST
+             and self.b['mode']==MODE and self.b['attempt']==attempt()
+             and self.b['actions']==['SNAPSHOT','THREE_ISOLATED_CLONES'],'EXACT_B_APPROVAL_REQUIRED')
+        self.freeze=raw(s.FREEZE,16384)
+        need(s.sha(self.freeze)==self.b['freeze_sha256'],'FREEZE_APPROVAL_MISMATCH')
+        self.stopped()
+        write_private(self.parent,attempt()+'-B-intent.json',
+             dict(format=1,mode=MODE,attempt=attempt(),approval_sha256=s.sha(self.braw),freeze_sha256=s.sha(self.freeze)))
+        snap=self.b_stage('snapshot')
+        self.b_stage('validate-clones',snap['manifest_sha256'])
+        need(set(self.captured)==set(CLONES),'REAL_THREE_CLONE_RESULTS_REQUIRED')
+        self.bdone=True
+    def evidence(self,active):
+        self.boundary()
+        m,mb=document(s.BACKUP+'/private-manifest.json',8*1024*1024)
+        need(set(m)=={'format','old_id','old_image','product_image','all_writers_frozen_evidence_sha256','trees'}
+             and type(m['format']) is int and m['format']==1 and m['old_id']==s.OLD_ID
+             and m['old_image']==s.OLD_IMAGE and m['product_image']==s.NEW_IMAGE
+             and m['all_writers_frozen_evidence_sha256']==s.sha(self.freeze),'SNAPSHOT_BINDING_CHANGED')
+        need(set(m['trees'])=={'data','config'} and s.copy_roots(s.BACKUP+'/snapshot',None)==m['trees'],'IMMUTABLE_BACKUP_CHANGED')
+        if active:
+            self.boundary();self.freeze_live()
+            need(s.copy_roots(s.DATA,None)==m['trees'],'CURRENT_TREE_DRIFT')
+            self.freeze_live();self.boundary()
+        result,rb=document(s.BACKUP+'/clone-results.json')
+        need(set(result)=={'stage','snapshot_manifest_sha256','logical_evidence_sha256','tested_at','restore_original_host',
+             'downgrade_logical_equality','production_acceptance','rollback_health_acceptance'}
+             and result['stage']=='validate-clones' and result['snapshot_manifest_sha256']==s.sha(mb)
+             and result['restore_original_host'] is True and result['downgrade_logical_equality'] is True
+             and result['production_acceptance'] is False and result['rollback_health_acceptance'] is False
+             and type(result['tested_at']) is int,'REAL_CLONE_RESULT_REQUIRED')
+        rows=[];hashes={}
+        for name,path in paths().items():
+            row,b=document(path)
+            image=s.NEW_IMAGE if name=='verify-f131' else s.OLD_IMAGE
+            need(set(row)=={'format','attempt','name','image','code_sha256','result'}
+                 and type(row['format']) is int and row['format']==1 and row['attempt']==attempt()
+                 and row['name']==name and row['image']==image and row['code_sha256']==s.sha(s.CLONE_CODE.encode()),
+                 'CLONE_SOURCE_OR_IMAGE_CHANGED')
+            rows.append(row['result']);hashes[name]=s.sha(b)
+        need(rows[0]==rows[1]==rows[2] and set(rows[0])=={'format','original_host_open','center_integrity','stores'}
+             and rows[0]['format']==1 and type(rows[0]['format']) is int
+             and rows[0]['original_host_open'] is True and rows[0]['center_integrity'] is True
+             and type(rows[0]['stores']) is list and rows[0]['stores']
+             and s.sha(s.canonical(rows[0]))==result['logical_evidence_sha256'],'CLONE_BODY_MISMATCH')
+        if active:
+            f=s.exact_json(self.freeze)
+            need(f['issued_at']<=result['tested_at']<=c.now() and c.now()-600<=result['tested_at'],
+                 'RESTORE_PROOF_STALE')
+        records={}
+        intent,ib=document(b_records()['B-intent'])
+        need(type(intent.get('format')) is int and intent==dict(format=1,mode=MODE,attempt=attempt(),approval_sha256=s.sha(self.braw),
+             freeze_sha256=s.sha(self.freeze)),'B_INTENT_CHANGED')
+        records['B-intent']=s.sha(ib)
+        for stage in ('snapshot','validate-clones'):
+            event,eb=document(b_records()[stage+'-result'])
+            permit,pb=document(b_records()[stage+'-permit'])
+            need(set(event)=={'format','attempt','stage','approval_sha256','permit_sha256','result'}
+                 and type(event['format']) is int and event['format']==1 and event['attempt']==attempt()
+                 and event['stage']==stage and event['approval_sha256']==s.sha(self.braw)
+                 and event['permit_sha256']==s.sha(pb),'B_RESULT_BINDING_CHANGED')
+            need(set(permit)=={'format','host','stage','entry_sha256','issued_at','expires_at',
+                 'all_writers_frozen_evidence_sha256','snapshot_manifest_sha256'}
+                 and type(permit['format']) is int and permit['format']==1 and permit['host']==p.HOST
+                 and permit['stage']==stage and permit['entry_sha256']=='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
+                 and type(permit['issued_at']) is int and type(permit['expires_at']) is int
+                 and permit['issued_at']<=permit['expires_at']<=permit['issued_at']+600
+                 and permit['all_writers_frozen_evidence_sha256']==s.sha(self.freeze)
+                 and permit['snapshot_manifest_sha256']==(None if stage=='snapshot' else s.sha(mb)),
+                 'B_PERMISSION_BINDING_CHANGED')
+            expected=dict(stage='snapshot',manifest_sha256=s.sha(mb),
+                bytes=sum(t['bytes'] for t in m['trees'].values()),recovery_verified=False,downgrade_verified=False)
+            need(event['result']==(expected if stage=='snapshot' else result),'B_RESULT_BODY_CHANGED')
+            if stage=='snapshot':
+                need(type(event['result']['bytes']) is int and event['result']['recovery_verified'] is False
+                     and event['result']['downgrade_verified'] is False,'B_RESULT_TYPE_CHANGED')
+            records[stage+'-result']=s.sha(eb);records[stage+'-permit']=s.sha(pb)
+        self.boundary()
+        return dict(snapshot_sha256=s.sha(mb),clone_results_sha256=s.sha(rb),clones=hashes,
+                    freeze_sha256=s.sha(self.freeze),b_approval_sha256=s.sha(self.braw),b_records=records)
+    def current(self,semantic):
+        value=c.read_current(s.OLD_ID,s.OLD_IMAGE,self.backup)
+        value['backup_reference_sha256']=c.digest(semantic)
+        return value
+    def candidate(self,semantic):
+        receipt=s.exact_json(raw(CONTROL+'/deploy/community-preview/f131-image-receipt.json'))
+        source=dict(source_sha=s.PRODUCT,tree_sha=receipt['product_tree'],
+            source_zip_sha256=receipt['source_artifact']['inner_zip_sha256'],artifact_id=receipt['source_artifact']['id'],
+            artifact_sha256=receipt['source_artifact']['outer_sha256'],run_id=receipt['build_run_id'],ocr_source_sha=p.OCR_SHA,
+            push_evidence_run_id=receipt['push_evidence_run_id'])
+        image=dict(source_sha=s.PRODUCT,tree_sha=source['tree_sha'],source_zip_sha256=source['source_zip_sha256'],
+            oci_revision=s.PRODUCT,image_id=s.NEW_IMAGE,repo_digest=None,image_archive_sha256=receipt['image_artifact']['inner_tar_sha256'],
+            artifact_sha256=receipt['image_artifact']['outer_sha256'],artifact_id=receipt['image_artifact']['id'],run_id=receipt['build_run_id'])
+        return p.prepare_stopped(source,self.current(semantic),image)
+    def c_approval(self,candidate):
+        a,b=document(C_APPROVAL)
+        need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256','plan_sha256','issued_at','expires_at','actions'}
+             and type(a['format']) is int and a['format']==1 and a['host']==p.HOST and a['mode']==MODE
+             and a['attempt']==candidate['attempt'] and a['plan_sha256']==candidate['plan_sha256']
+             and a['carrier_manifest_sha256']==self.pins() and a['actions']==C_ACTIONS,'EXACT_C_APPROVAL_REQUIRED')
+        window(a);self.craw=b;return a
+    def update(self):
+        need(self.bdone,'SAME_PROCESS_CONTINUOUS_B_REQUIRED')
+        self.stopped();semantic=self.evidence(True);self.stopped()
+        self.backup=open_private(s.BACKUP+'/clone-results.json')
+        candidate=self.candidate(semantic)
+        print(json.dumps(dict(state='STOPPED_PLAN_REQUIRES_SEPARATE_C_APPROVAL',plan_sha256=candidate['plan_sha256'],
+                              attempt=candidate['attempt'],site_update=False)),flush=True)
+        deadline=time.monotonic()+120
+        while True:
+            self.boundary()
+            try:self.c_approval(candidate);break
+            except FileNotFoundError:
+                need(time.monotonic()<deadline,'C_APPROVAL_NOT_RECEIVED')
+                time.sleep(.1)  # Missing exact file only; malformed/denied never retried.
+        acknowledge('STOPPED_UPDATE',candidate['plan_sha256']);self.stopped()
+        proof=dict(format=1,mode=MODE,host=p.HOST,attempt=candidate['attempt'],
+             plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic)
+        fd=s.private_parent(s.BACKUP)
+        try:write_private(fd,os.path.basename(PROOF),proof)
+        finally:os.close(fd)
+        return self.consume(proof,False)
+    def reference_digest(self):
+        rows=[]
+        for path in [PROOF,C_APPROVAL,B_APPROVAL,s.FREEZE,s.BACKUP+'/private-manifest.json',
+                     s.BACKUP+'/clone-results.json']+list(paths().values())+list(b_records().values()):
+            limit=8*1024*1024 if path.endswith('/private-manifest.json') else 65536
+            body=raw(path,limit);fd=open_private(path)
+            try:
+                meta=s.identity(os.fstat(fd))
+                need(meta==s.identity(os.stat(path,follow_symlinks=False)) and raw(path,limit)==body,
+                     'REFERENCE_REPLACED_DURING_BIND')
+                rows.append([path,s.sha(body),meta])
+            finally:os.close(fd)
+        return c.digest(rows)
+    def consume(self,proof,recover):
+        need(type(proof) is dict and set(proof)=={'format','mode','host','attempt','plan','approval_sha256','evidence'},
+             'EXACT_HANDOFF_DOCUMENT_REQUIRED')
+        need(proof['mode']==MODE and proof['host']==p.HOST and proof['attempt']==attempt()
+             and type(proof['format']) is int and proof['format']==1,'EXACT_PROOF_SCOPE_REQUIRED')
+        candidate=proof['plan'];self.c_approval(candidate)
+        need(proof['approval_sha256']==s.sha(self.craw),'PROOF_APPROVAL_CHANGED')
+        binding=dict(approval_sha256=s.sha(self.craw),handoff_sha256=self.reference_digest())
+        if recover:
+            active=raw(u.JOURNAL_PARENT+'/active-attempt.json')
+            need(active==json.dumps(dict(attempt=candidate['attempt'],plan_sha256=candidate['plan_sha256']),sort_keys=True).encode(),
+                 'EXISTING_SAME_ATTEMPT_REQUIRED')
+            raw(u.JOURNAL_PARENT+'/'+candidate['attempt']+'/checkpoint.json')
+        self.journal=u.Journal(self.parent,candidate,lease_fd=self.lease,handoff_binding=binding)
+        h=VerifiedHandoff(self,proof,self.journal)
+        transport=u.OriginalTransport(h.bindings,c.BoundHttpsHealth(self.journal,h.bindings))
+        update=u.Update(self.journal,transport,execution_enabled=True,clock=c.now,handoff=h)
+        if recover:
+            c.recovery_admission(self.journal,transport,h.bindings)
+            return update.recover()
+        return update.run_stopped()
+    def recover(self):
+        proof,_=document(PROOF)
+        self.b,self.braw=document(B_APPROVAL);self.freeze=raw(s.FREEZE,16384)
+        self.backup=open_private(s.BACKUP+'/clone-results.json')
+        # No B rerun, no new plan, no automatic recovery of intents/UNKNOWN.
+        need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
+        self.c_approval(proof['plan'])
+        acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
+        return self.consume(proof,True)
+    def close(self):
+        failed=False
+        s._ACTIVE=None
+        if self.old_checkpoint is not None:s.checkpoint=self.old_checkpoint
+        if self.old_clone is not None:s.clone_run=self.old_clone
+        if self.old_checkpoint is not None:s._COMPONENT=self.old_component
+        if self.journal is not None:
+            try:self.journal.close()
+            except BaseException:failed=True
+            self.journal=None
+        for name in ('backup','entry','lease','parent'):
+            fd=getattr(self,name);setattr(self,name,None)
+            if fd is not None:
+                try:os.close(fd)
+                except BaseException:failed=True
+        need(not failed,'BC_CLEANUP_UNKNOWN')
+
+class VerifiedHandoff:
+    def __init__(self,session,proof,journal):
+        self.session=session;self.proof=proof;self.journal=journal
+        need(journal.plan==proof['plan'],'HANDOFF_PLAN_CHANGED')
+    def before_new(self):
+        return self.journal.state['phase'] in ('PREPARED','STOPPED_HANDOFF_ACCEPTED',
+            'OLD_RENAME_INTENT','OLD_RETAINED','NEW_RUN_INTENT')
+    def bindings(self):
+        self.session.boundary()
+        return self.session.current(self.proof['evidence'])
+    def check(self):
+        q=self.session;j=self.journal;q.boundary();j.validate_history()
+        proof,b=document(PROOF)
+        need(proof==self.proof and q.reference_digest()==j.handoff_binding['handoff_sha256']
+             and s.sha(q.craw)==j.handoff_binding['approval_sha256'],'HANDOFF_REFERENCE_REPLACED')
+        before=self.before_new()
+        need(q.evidence(before)==proof['evidence'],'HANDOFF_EVIDENCE_CHANGED')
+        live=self.bindings();base=j.plan['current']
+        need(all(type(live[k]) is type(base[k]) and live[k]==base[k] for k in base if k not in ('running','observed_at')),
+             'LIVE_HANDOFF_BINDING_CHANGED')
+        need(c.now()-600<=live['observed_at']<=c.now()+30,'CURRENT_STALE')
+        if before:
+            need(live['running'] is False,'OLD_REVIVED')
+            q.freeze_live();q.boundary()
+            names=c.exact_stopped_names(j.plan,j.state['phase'])
+            need(names,'STOPPED_NAME_CHANGED')
+            q.freeze_live();q.boundary()
+        q.boundary()
+
+SOURCE_FILES={'loader.py','scripts/community_preview_release_plan.py','scripts/community_preview_upgrade.py',
+ 'scripts/community_preview_version_inspect.py','scripts/community_preview_update_checkpoint.py',
+ 'scripts/community_preview_update_composition.py','scripts/community_preview_site_prepare.py',
+ 'scripts/community_preview_stopped_handoff.py','deploy/community-preview/f131-image-receipt.json'}
+
+def main(argv=None):
+    import argparse
+    parser=argparse.ArgumentParser()
+    group=parser.add_mutually_exclusive_group()
+    group.add_argument('--owner-bc',action='store_true')
+    group.add_argument('--recover-known-failure',action='store_true')
+    args=parser.parse_args(argv)
+    if not args.owner_bc and not args.recover_known_failure:
+        print('{"state":"BC_DEFAULT_HOLD","site_executed":false}');return 2
+    session=Session();result=None;code=2
+    try:
+        session.acquire(recover=args.recover_known_failure)
+        if args.owner_bc:
+            session.run_b();result=session.update()
+        else:result=session.recover()
+        need(result['phase'] in ('COMMITTED','ROLLED_BACK_PREVIEW_HOLD'),'NONTERMINAL_NOT_SUCCESS')
+        code=0
+    except BaseException as error:
+        import re
+        reason=str(error) if type(error) in (u.Hold,s.Hold) and re.fullmatch('[A-Z_]{1,96}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
+        result=dict(phase='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',reason=reason)
+    finally:
+        try:session.close()
+        except BaseException:code=2;result=dict(phase='HOLD_CLEANUP_UNKNOWN')
+    print(json.dumps(dict(state='BC_RESULT',child_exit=code,result=result,
+        production_acceptance=False,ocr_enabled=False,servertrust=False,image=s.NEW_IMAGE,control_mode=MODE),sort_keys=True),flush=True)
+    return code
+
+if __name__=='__main__':raise SystemExit(main())

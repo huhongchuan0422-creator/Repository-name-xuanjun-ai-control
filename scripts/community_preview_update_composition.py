@@ -21,8 +21,8 @@ REFERENCE_UID=0  # fixed production root owner; no argument/environment override
 APPROVAL='/opt/xuanjun-community-preview/update-approval.json'  # proposed, never created
 PRODUCT='f13155ed63a3137d41766ee587d9b4b96a81477f'
 CONTROL='a9324156f94040bb6ff0243815bb91abe2f67b2a'
-PINS={controller:'a73c1fe8ebb71abaefeb56ca880057e23876b5c005d315e4fb1268d3087064fd',
-      plan:'e0870cfaf7f1bb16b8664e644ec616e150b0ada93146a8d955e64c5f3f7ec4b9',
+PINS={controller:'de4f328c3c43eb07db08989609b83dc0d036319248768d8bd328c9b5df990201',
+      plan:'81c01a2f94ff71c0af4555b9026a60db0b5ce226a158601e1cf1b6aa4b646fae',
       original:'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee',
       observation:'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3'}
 RECEIPT_SHA='cba144af0ca2f753413f7bdcec92625c370c479c4708b1d4a1db0b35907c8b45'
@@ -417,3 +417,32 @@ def compose(*,approval_sha256,backup_fd,execution_enabled=False):
     except BaseException:
         if journal is not None:journal.close()
         bindings.close();raise
+
+def exact_stopped_names(candidate,phase):
+    """New mode only. Fixed original/current/candidate names, no unknown objects."""
+    require(candidate.get('handoff_mode')=='STOPPED_HANDOFF_V1','EXPLICIT_STOPPED_MODE_REQUIRED')
+    fmt='{"id":{{json .ID}},"name":{{json .Names}}}'
+    rows=observation.capture(plan.DOCKER+['container','ls','--all','--no-trunc','--format',fmt,
+        '--filter','name=^/xuanjun-community-preview'],timeout=8,budget=16384).splitlines()
+    require(len(rows)<=64,'CONTAINER_NAMES_UNKNOWN')
+    names={}
+    legacy='xuanjun-community-preview-before-2330dd55'
+    allowed={plan.NAME,candidate['rollback_name'],candidate['failed_name'],legacy}
+    for row in rows:
+        value=observation.exact_json(row)
+        require(type(value) is dict and set(value)=={'id','name'} and plan.exact_hex(value['id'],64)
+             and value['name'] in allowed and value['name'] not in names
+             and value['id'] not in names.values(),'STOPPED_NAME_INVENTORY_CHANGED')
+        names[value['name']]=value['id']
+    if legacy in names:
+        cid='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc'
+        image='sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30'
+        require(names[legacy]==cid and inspect_bound(cid,image)['running'] is False,'LEGACY_WRITER_NOT_STOPPED')
+    require(candidate['failed_name'] not in names,'FAILED_NAME_EXISTS')
+    old=candidate['current']['container_id']
+    if phase in ('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT'):
+        require(names.get(plan.NAME)==old and candidate['rollback_name'] not in names,'INITIAL_STOPPED_NAME_CHANGED')
+    else:
+        require(phase in ('OLD_RETAINED','NEW_RUN_INTENT') and plan.NAME not in names
+             and names.get(candidate['rollback_name'])==old,'RETAINED_STOPPED_NAME_CHANGED')
+    return True

@@ -22,7 +22,8 @@ class Hold(RuntimeError):pass
 
 HOLD_PHASE='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT'
 TRANSITIONS={
-    'PREPARED':{'OLD_STOP_INTENT'},'OLD_STOP_INTENT':{'OLD_STOPPED'},
+    'PREPARED':{'OLD_STOP_INTENT','STOPPED_HANDOFF_ACCEPTED'},
+    'STOPPED_HANDOFF_ACCEPTED':{'OLD_RENAME_INTENT'},'OLD_STOP_INTENT':{'OLD_STOPPED'},
     'OLD_STOPPED':{'OLD_RENAME_INTENT'},'OLD_RENAME_INTENT':{'OLD_RETAINED'},
     'OLD_RETAINED':{'NEW_RUN_INTENT'},'NEW_RUN_INTENT':{'NEW_KNOWN'},
     'NEW_KNOWN':{'KNOWN_FAILURE','COMMITTED'},
@@ -50,15 +51,27 @@ class Journal:
     parent_fd is an original protected directory capability, NOT a request path.
     The future composition must open its fixed parent through verified parent chains.
     """
-    def __init__(self,parent_fd,candidate):
+    def __init__(self,parent_fd,candidate,*,lease_fd=None,handoff_binding=None):
         protected(parent_fd,True)
         if os.readlink('/proc/self/fd/'+str(parent_fd))!=JOURNAL_PARENT:raise Hold('FIXED_ORIGINAL_JOURNAL_PARENT_REQUIRED')
         if candidate.get('state')!='REVIEW_CANDIDATE_NOT_AUTHORIZED':raise Hold('COMPLETE_REVIEWED_BINDINGS_REQUIRED')
-        rebuilt=plan.prepare(candidate['source'],candidate['current'],candidate['image'])
+        stopped=candidate.get('handoff_mode')=='STOPPED_HANDOFF_V1'
+        rebuilt=(plan.prepare_stopped if stopped else plan.prepare)(candidate['source'],candidate['current'],candidate['image'])
+        self.handoff_binding=handoff_binding
+        if stopped:
+            if type(handoff_binding) is not dict or set(handoff_binding)!={'approval_sha256','handoff_sha256'} or not all(plan.exact_hex(v,64) for v in handoff_binding.values()):raise Hold('EXACT_HANDOFF_BINDING_REQUIRED')
+        elif handoff_binding is not None or lease_fd is not None:raise Hold('LEGACY_JOURNAL_NO_HANDOFF_ARGUMENTS')
         if candidate!=rebuilt:raise Hold('EXACT_COMPILED_PLAN_REQUIRED')
         self.plan=candidate;self.parent=os.dup(parent_fd);self.fd=None;self.lock=None;self.poisoned=False;self.owner=threading.get_ident()
         try:
-            self.lock=os.open('community-update.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=self.parent)
+            if lease_fd is None:
+                self.lock=os.open('community-update.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=self.parent)
+            else:
+                if type(lease_fd) is not int:raise Hold('EXACT_LEASE_DESCRIPTOR_REQUIRED')
+                protected(lease_fd)
+                bound=os.stat('community-update.lock',dir_fd=self.parent,follow_symlinks=False);held=os.fstat(lease_fd)
+                if (bound.st_dev,bound.st_ino)!=(held.st_dev,held.st_ino):raise Hold('SAME_CONTINUOUS_LOCK_REQUIRED')
+                self.lock=os.dup(lease_fd)
             protected(self.lock);fcntl.flock(self.lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
             name=candidate['attempt']
             active=json.dumps({'attempt':name,'plan_sha256':candidate['plan_sha256']},sort_keys=True).encode()
@@ -101,7 +114,11 @@ class Journal:
         try:return cls(fd,candidate)
         finally:os.close(fd)
     def validate_record(self,value):
-        if type(value) is not dict or set(value)!={'plan_sha256','phase','new_id','sequence'}:raise Hold('CHECKPOINT_SHAPE')
+        keys={'plan_sha256','phase','new_id','sequence'}
+        if self.handoff_binding is not None:keys|={'approval_sha256','handoff_sha256'}
+        if type(value) is not dict or set(value)!=keys:raise Hold('CHECKPOINT_SHAPE')
+        if self.handoff_binding is not None and any(value[k]!=v for k,v in self.handoff_binding.items()):raise Hold('JOURNAL_HANDOFF_BINDING_CHANGED')
+        if value.get('phase')=='STOPPED_HANDOFF_ACCEPTED' and self.handoff_binding is None:raise Hold('LEGACY_RUNNING_PATH_REQUIRED')
         if value['plan_sha256']!=self.plan['plan_sha256']:raise Hold('CHECKPOINT_PLAN_CHANGED')
         if type(value['phase']) is not str or value['phase'] not in TRANSITIONS:raise Hold('CHECKPOINT_PHASE')
         if type(value['sequence']) is not int or not 1<=value['sequence']<=64:raise Hold('CHECKPOINT_SEQUENCE')
@@ -145,6 +162,7 @@ class Journal:
         sequence=(self.state['sequence'] if self.state else 0)+1
         if sequence>64:raise Hold('CHECKPOINT_LIMIT')
         value=dict(plan_sha256=self.plan['plan_sha256'],phase=phase,new_id=new_id,sequence=sequence)
+        if self.handoff_binding is not None:value.update(self.handoff_binding)
         self.validate_transition(self.state,value)
         raw=json.dumps(value,sort_keys=True).encode()
         try:
@@ -181,9 +199,14 @@ class OriginalTransport:
 
 
 class Update:
-    def __init__(self,journal,transport,*,execution_enabled=False,clock=time.time):
+    def __init__(self,journal,transport,*,execution_enabled=False,clock=time.time,handoff=None):
         if type(transport) is not OriginalTransport:raise Hold('ORIGINAL_TRANSPORT_REQUIRED')
         self.journal=journal;self.t=transport;self.enabled=execution_enabled;self.clock=clock;self.last=None
+        self.handoff=handoff
+        if journal.plan.get('handoff_mode')=='STOPPED_HANDOFF_V1':
+            from scripts.community_preview_stopped_handoff import VerifiedHandoff
+            if type(handoff) is not VerifiedHandoff or handoff.journal is not journal:raise Hold('VERIFIED_HANDOFF_OBJECT_REQUIRED')
+        elif handoff is not None:raise Hold('LEGACY_RUNNING_PATH_REQUIRED')
     def guard(self,old_running=None):
         if self.journal.poisoned or threading.get_ident()!=self.journal.owner:raise Hold('JOURNAL_OWNER_OR_IO_HOLD')
         if self.enabled is not True:raise Hold('UPDATE_EXECUTION_DISABLED')
@@ -199,6 +222,7 @@ class Update:
         if any(live[k]!=c[k] for k in c if k not in ('observed_at','running')):raise Hold('PROTECTED_BINDING_CHANGED')
         if old_running is not None and live['running'] is not old_running:raise Hold('OLD_WRITER_PHASE_CHANGED')
         if not now-600<=live['observed_at']<=now+30:raise Hold('CURRENT_OBSERVATION_EXPIRED')
+        if self.handoff is not None:self.handoff.check()
         return int(now)
     def hold(self,code,new_id=None):
         self.journal.write(HOLD_PHASE,new_id);raise Hold(code)
@@ -249,6 +273,18 @@ class Update:
         self.t.inspect(c['container_id'],c['image_id'],True)
         self.action('OLD_STOP_INTENT',p['actions'][1]['argv']);self.t.inspect(c['container_id'],c['image_id'],False);self.t.socket_absent()
         j.write('OLD_STOPPED')
+        return self.replace_and_verify()
+    def run_stopped(self):
+        if self.handoff is None:raise Hold('STOPPED_MODE_DEFAULT_OFF')
+        self.guard(False);j=self.journal;p=j.plan;c=p['current']
+        if j.state['phase']!='PREPARED':raise Hold('EXISTING_ATTEMPT_INSPECT_OR_RECOVER_ONLY')
+        self.t.image_and_names_ready(p);self.t.inspect(c['container_id'],c['image_id'],False);self.t.socket_absent()
+        self.handoff.check();j.write('STOPPED_HANDOFF_ACCEPTED')
+        try:self.handoff.check()
+        except BaseException:self.hold('HANDOFF_CHANGED_AFTER_ACCEPTANCE')
+        return self.replace_and_verify()
+    def replace_and_verify(self):
+        j=self.journal;p=j.plan;c=p['current']
         self.action('OLD_RENAME_INTENT',p['actions'][2]['argv']);j.write('OLD_RETAINED')
         new_id=self.action('NEW_RUN_INTENT',p['actions'][3]['argv'])
         if not plan.exact_hex(new_id,64):j.write('HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT');raise Hold('NEW_ID_UNKNOWN')

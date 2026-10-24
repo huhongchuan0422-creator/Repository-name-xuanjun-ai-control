@@ -102,7 +102,8 @@
           "tests/test_community_ocr_shared_source.py",
           "tests/test_community_ocr_shared_composition.py",
           "clients/community-mini/ocr-host-ui.test.cjs",
-          "tests/test_community_preview_stage_a.py"
+          "tests/test_community_preview_stage_a.py",
+          "tests/test_community_preview_stopped_handoff.py"
         ]
       },
       "reuse": [
@@ -267,7 +268,12 @@
         "docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md",
         "scripts/community_preview_stage_a.py",
         "scripts/community_preview_stage_a_bundle.py",
-        "tests/test_community_preview_stage_a.py"
+        "tests/test_community_preview_stage_a.py",
+        "scripts/community_preview_stopped_handoff.py",
+        "scripts/community_preview_bc_loader.py",
+        "scripts/community_preview_bc_build.py",
+        "tests/test_community_preview_stopped_handoff.py",
+        "docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md"
       ]
     },
     {
