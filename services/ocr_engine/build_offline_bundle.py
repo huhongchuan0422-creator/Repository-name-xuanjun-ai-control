@@ -46,15 +46,18 @@ def validate_deb_cache(deb_cache):
     if root.is_symlink() or not root.is_dir():
         raise BundleError("DEB_CACHE_NOT_DIRECTORY")
     lock_path = regular_file(root / "system-deb-lock.json", "DEB_LOCK")
-    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    lock_snapshot = lock_path.read_bytes()
+    lock_sha256 = hashlib.sha256(lock_snapshot).hexdigest()
+    lock = json.loads(lock_snapshot.decode("utf-8"))
     expected_base = "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199"
     if lock.get("base_image") != expected_base:
         raise BundleError("DEB_LOCK_BASE_IMAGE_MISMATCH")
-    lock_snapshot = lock_path.read_bytes()
-    lock_sha256 = hashlib.sha256(lock_snapshot).hexdigest()
     source = lock.get("apt_source")
     if not isinstance(source,dict) or source.get("path") != "debian.sources" or not isinstance(source.get("content"),str) or hashlib.sha256(source["content"].encode("utf-8")).hexdigest() != source.get("sha256"):
         raise BundleError("APT_SOURCE_FINGERPRINT_INVALID")
+    source_uris = [line.split(":",1)[1].strip().split() for line in source["content"].splitlines() if line.strip().startswith("URIs:")]
+    if not source_uris or any(not uri.startswith(("https://deb.debian.org/","http://deb.debian.org/","https://security.debian.org/","http://security.debian.org/")) for group in source_uris for uri in group):
+        raise BundleError("APT_SOURCE_NOT_OFFICIAL_DEBIAN")
     packages = lock.get("packages")
     if not isinstance(packages, list) or not packages:
         raise BundleError("DEB_LOCK_EMPTY")
