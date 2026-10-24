@@ -627,7 +627,14 @@ class R2HostBackend:
                     ('b5_http','B5_EXPOSURE_CLOSE','release')))
                 c53.require(len(evidence_fds)==6 and evidence_fds<=set(pre),
                             'CLOSEOUT_EVIDENCE_FD_UNKNOWN')
-                allowed.update(evidence_fds)
+                witness=getattr(self.authority,'witness_store',None)
+                c53.require(witness is not None,'CLOSEOUT_WITNESS_STORE_REQUIRED')
+                witness_fds=set(witness.active_action_fds(
+                    self.authority._witness_binding()))
+                c53.require(len(witness_fds)==2 and witness_fds<=set(pre) and
+                            not (witness_fds & evidence_fds),
+                            'CLOSEOUT_WITNESS_FD_UNKNOWN')
+                allowed.update(evidence_fds|witness_fds)
             # A preexisting cached SQLite B (or any unknown FD) is disallowed.
             # Closeout additionally admits only the exact live evidence lease
             # descriptors already validated above; no other phase gets them.
