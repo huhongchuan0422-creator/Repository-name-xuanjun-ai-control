@@ -7,6 +7,8 @@ on:
       - 'services/ocr_engine/test_model_distribution.py'
       - 'services/ocr_engine/startup_selfcheck.py'
       - 'services/ocr_engine/test_startup_selfcheck.py'
+      - 'services/ocr_engine/build_offline_bundle.py'
+      - 'services/ocr_engine/test_offline_bundle.py'
       - 'services/ocr_engine/deployment_config.schema.json'
       - 'services/ocr_engine/model_manifest.json'
       - 'services/ocr_engine/model_distribution/**'
@@ -31,3 +33,5 @@ jobs:
         run: python -m unittest services.ocr_engine.test_model_distribution -v
       - name: Verify read-only startup preflight
         run: python -m unittest services.ocr_engine.test_startup_selfcheck -v
+      - name: Verify offline bundle input gates (synthetic fixtures only)
+        run: python -m unittest services.ocr_engine.test_offline_bundle -v
