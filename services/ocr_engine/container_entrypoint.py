@@ -58,16 +58,14 @@ def check_database_schema(db):
             if actual != wanted:
                 return False, "OCR_DATABASE_COLUMN_CONTRACT_MISMATCH:" + table
             for row in db.execute("PRAGMA index_list(" + table + ")").fetchall():
-                all_indexes[row[1]] = (table,bool(row[2]),_index_columns(db,row[1]))
+                all_indexes[row[1]] = (table, bool(row[2]), _index_columns(db, row[1]), row[3], bool(row[4]))
         if "AUTOINCREMENT" not in table_sql["ocr_audit"].upper():
             return False, "OCR_DATABASE_AUDIT_PK_CONSTRAINT_MISMATCH"
-        if "UNIQUE(TENANT_KEY,IDEM_KEY)" not in table_sql["ocr_jobs"].replace(" ","").upper():
-            return False, "OCR_DATABASE_JOB_UNIQUE_CONSTRAINT_MISSING"
         for name, expected in REQUIRED_INDEXES.items():
-            if all_indexes.get(name) != expected:
+            if all_indexes.get(name) != (*expected, "c", False):
                 return False, "OCR_DATABASE_REQUIRED_INDEX_MISMATCH:" + name
-        unique = {(table,cols) for table,is_unique,cols in all_indexes.values() if is_unique}
-        required = {("ocr_jobs",("tenant_key","idem_key")),("ocr_confirm_idempotency",("tenant_key","job_id","idem_key")),("ocr_rate_window",("tenant_key","window_start")),("ocr_audit_details",("audit_id",))}
+        unique = {(table, cols, origin) for table, is_unique, cols, origin, partial in all_indexes.values() if is_unique and not partial}
+        required = {("ocr_jobs", ("job_id",), "pk"), ("ocr_jobs", ("tenant_key","idem_key"), "u"), ("ocr_confirm_idempotency", ("tenant_key","job_id","idem_key"), "pk"), ("ocr_rate_window", ("tenant_key","window_start"), "pk"), ("ocr_audit_details", ("audit_id",), "pk")}
         if not required.issubset(unique):
             return False, "OCR_DATABASE_UNIQUE_CONSTRAINTS_MISMATCH"
         return True, "OCR_DATABASE_SCHEMA_VERIFIED"
@@ -121,9 +119,14 @@ def readonly_mount_for(path, mountinfo_text=None):
                 target.relative_to(mountpoint)
             except ValueError:
                 continue
-            options = set(fields[5].split(",")) | set(fields[sep+3].split(","))
-            matches.append((len(str(mountpoint)), "ro" in options))
-        return max(matches, key=lambda item:item[0])[1] if matches else False
+            options = set(fields[5].split(","))
+            matches.append((len(mountpoint.parts), "ro" in options and "rw" not in options))
+        if not matches:
+            return False
+        deepest = max(depth for depth, _ in matches)
+        selected = [readonly for depth, readonly in matches if depth == deepest]
+        # Stacked mounts at the same path cannot be disambiguated by line order.
+        return len(selected) == 1 and selected[0]
     except (OSError, ValueError, IndexError):
         return False
 
@@ -190,7 +193,10 @@ def load_bindings(environ=None, mountinfo_text=None, mount_checker=None):
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
-        spec.loader.exec_module(module)
+        # Execute verified source bytes, never a timestamp/size-matched cached .pyc.
+        source_bytes = origin.read_bytes()
+        code = compile(source_bytes, str(origin), "exec", dont_inherit=True)
+        exec(code, module.__dict__)
         module_origin = Path(getattr(module, "__file__", "")).resolve(strict=True)
         module_origin.relative_to(root)
         if module_origin != origin:
