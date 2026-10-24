@@ -503,4 +503,35 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertIn("DEB_FILE_SET_DIFFERS_FROM_LOCK",result.stderr)
         self.assertEqual(calls.read_text(),"")
+\n
+    def test_candidate_manifest_marks_missing_locked_assets_and_never_copies_apt_state(self):
+        root=self.root/"candidate-root"; root.mkdir()
+        models=root/"ocr-model-cache"; models.mkdir()
+        for name in ("PP-OCRv6_det_small.onnx","PP-OCRv6_rec_small.onnx","ch_ppocr_mobile_v2.0_cls_mobile.onnx"):
+            (models/name).write_bytes(b"not-the-pinned-model")
+        debroot=root/"ocr-deb-cache"; debroot.mkdir()
+        apt=debroot/"apt-lists"; apt.mkdir()
+        index=apt/"InRelease"; index.write_bytes(b"index bytes")
+        lock={"packages":[{"filename":"missing_1_amd64.deb","package":"missing","version":"1","architecture":"amd64","sha256":"0"*64}],
+              "apt_lists":[{"path":"InRelease","bytes":len(index.read_bytes()),"sha256":hashlib.sha256(index.read_bytes()).hexdigest()}]}
+        (debroot/"system-deb-lock.json").write_text(json.dumps(lock))
+        (apt/"lock").write_text("mutable lock")
+        (apt/"partial").mkdir(); (apt/"partial"/"download").write_bytes(b"partial")
+        dest=root/"ocr-candidate-inputs"/"payload"
+        env=dict(os.environ,GITHUB_SHA="a"*40,GITHUB_RUN_ID="123")
+        script=Path(__file__).with_name("write_candidate_input_manifest.py")
+        result=subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        manifest=json.loads((dest.parent/"candidate-input-manifest.json").read_text())
+        self.assertEqual(manifest["classification"],"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE")
+        self.assertFalse(manifest["complete"])
+        missing={item["path"] for item in manifest["missing_or_rejected"]}
+        self.assertIn("system-debs/missing_1_amd64.deb",missing)
+        self.assertIn("models/PP-OCRv6_det_small.onnx",missing)
+        payload={str(p.relative_to(dest)) for p in dest.rglob("*") if p.is_file()}
+        self.assertNotIn("apt-lists/lock",payload)
+        self.assertFalse(any("partial" in name for name in payload))
+        self.assertTrue((dest/"apt-lists"/"InRelease").is_file())
+        with self.assertRaises(FileExistsError):
+            subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True,check=True)
 \nif __name__=="__main__": unittest.main()
