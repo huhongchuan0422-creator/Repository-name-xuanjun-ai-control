@@ -33,7 +33,9 @@ def main():
     entries=[]
     for path in include:
         rel=str(path.relative_to(root))
-        if rel.startswith("ocr-model-cache/"):
+        if rel.startswith("ocr-build/source-pins/"):
+            source="repository-pinned-source-input-copied-after-exact-source-checkout"
+        elif rel.startswith("ocr-model-cache/"):
             actual=sha(path)
             if path.name in trusted_model_hashes and actual == trusted_model_hashes[path.name]:
                 source="sha256-matches-fixed-model-manifest"
