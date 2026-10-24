@@ -1,0 +1,8 @@
+# Insert only into the isolated new TLS server; remove this block on withdrawal.
+location = /_xuanjun-connection-peer/__NONCE__ {
+    if ($xuanjun_peer_window = 0) { return 410; }
+    if ($request_method != GET) { return 405; }
+    if ($args != "") { return 400; }
+    access_log __PRIVATE_LOG__ xuanjun_oauth_peer if=$xuanjun_peer_window;
+    return 204;
+}

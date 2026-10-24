@@ -1,0 +1,286 @@
+{
+  "files": [
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/authority.example.json",
+      "bytes": 471,
+      "release_path": "deployment/cloud-connection/oauth/authority.example.json",
+      "sha256": "7d900b8a7829a9a89d20ace656d1470839404f7359b0aca1bf23b4feebf45244"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
+      "bytes": 6843,
+      "release_path": "deployment/cloud-connection/oauth/domestic-py3116-compatibility.json",
+      "sha256": "2ce00bd99e35f8d3496fd1cae457df9841d136188a7fd014e06d62c17b818e6c"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
+      "bytes": 462,
+      "release_path": "deployment/cloud-connection/oauth/nginx-http01-bootstrap.conf.candidate",
+      "sha256": "5367238723be7258185e2f83c7bbd410a6faafbd0472be722aac9264ade2d8e6"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
+      "bytes": 401,
+      "release_path": "deployment/cloud-connection/oauth/nginx-proxy.conf.candidate",
+      "sha256": "7e052480371700645cc03a9b147b1d3db8b9bc0d82e9de4d2353d46213c5cb40"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
+      "bytes": 1276,
+      "release_path": "deployment/cloud-connection/oauth/nginx-vhost-pre-egress.conf.candidate",
+      "sha256": "3084db85240b330699c06809dc29466303d8c65990c024199825b2ac94ef86b5"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
+      "bytes": 1390,
+      "release_path": "deployment/cloud-connection/oauth/nginx-vhost.conf.candidate",
+      "sha256": "a2643e88e1802615e18a623074c4899cb10c8e2554338943482739434fb6bee5"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
+      "bytes": 320,
+      "release_path": "deployment/cloud-connection/oauth/peer-observation.http.conf.template",
+      "sha256": "b0742e99793812ceea1bbbd5d34014fcb8977a098aedab05df87f093f16c8b64"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
+      "bytes": 358,
+      "release_path": "deployment/cloud-connection/oauth/peer-observation.location.conf.template",
+      "sha256": "93575ab5d73465e0ca34d97b613cdd9b10e661cb217d8bc50c35c7b54a6b25ef"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/requirements.cp3116.lock",
+      "bytes": 1795,
+      "release_path": "deployment/cloud-connection/oauth/requirements.cp3116.lock",
+      "sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/requirements.lock",
+      "bytes": 5158,
+      "release_path": "deployment/cloud-connection/oauth/requirements.lock",
+      "sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/resource.example.json",
+      "bytes": 390,
+      "release_path": "deployment/cloud-connection/oauth/resource.example.json",
+      "sha256": "8ec9d5cec3795d3833ca8abc5c88589d71b24e3481b5fa0e872d5386748bbaab"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/run.py",
+      "bytes": 1633,
+      "release_path": "deployment/cloud-connection/oauth/run.py",
+      "sha256": "c45093243a07b4a7a5dc5bef466e3347051131537d1c23de28f587b8243b7157"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/tls-approved.conf.candidate",
+      "bytes": 228,
+      "release_path": "deployment/cloud-connection/oauth/tls-approved.conf.candidate",
+      "sha256": "b6c4d753b2599c6f3ca514097603a9448354c44af0c1406be0006518a82363b1"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
+      "bytes": 729,
+      "release_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-py3116.service.candidate",
+      "sha256": "1c3511ef8dc0f95d9b4ae7d3a989b25c10258eb8eb322c8cb29807866bc5e89c"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
+      "bytes": 814,
+      "release_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth-resource.service.candidate",
+      "sha256": "4bd19ae8e36166b27b247c4705bc8ed7fd1210c9b94609065d1a98b11bf0e581"
+    },
+    {
+      "bundle_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
+      "bytes": 722,
+      "release_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
+      "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/action_binding.py",
+      "bytes": 4452,
+      "release_path": "production/cloud_connection/action_binding.py",
+      "sha256": "7eb14ceccb4255ff90fe8f82c8184abea979984bcbe2e76c78fd34f4fd52e752"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/archive_reader.py",
+      "bytes": 9230,
+      "release_path": "production/cloud_connection/archive_reader.py",
+      "sha256": "39f9aae289f4e7ef64d9579a7f11338bd46382f8906899c503901f778f911ddf"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/credential_lifecycle.py",
+      "bytes": 6064,
+      "release_path": "production/cloud_connection/credential_lifecycle.py",
+      "sha256": "26e8e0ec44ebb057a0106517824f9000406b93562c22b53f5929d3f66bb52620"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/fixed_actions.py",
+      "bytes": 18669,
+      "release_path": "production/cloud_connection/fixed_actions.py",
+      "sha256": "75fe7d4c2d24f125485ced1f2663171d22c92715241373b799a135fd0b3438f0"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/github_network.py",
+      "bytes": 5503,
+      "release_path": "production/cloud_connection/github_network.py",
+      "sha256": "7fd03cfd85c242e615b0cfccd8888718bc069cbd57fb64c89fc9185ac4d9cfe6"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/material_custody.py",
+      "bytes": 9525,
+      "release_path": "production/cloud_connection/material_custody.py",
+      "sha256": "a5ebcd971334ff2965d022d5040a72d7125adc64694a8b0183a4034364cf5352"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/oauth_authority.py",
+      "bytes": 23614,
+      "release_path": "production/cloud_connection/oauth_authority.py",
+      "sha256": "13424309f48afaaa52cdfad83633d1d4921cc481e9ebdd6081ce7185af031bd4"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/oauth_entrypoint.py",
+      "bytes": 7428,
+      "release_path": "production/cloud_connection/oauth_entrypoint.py",
+      "sha256": "66b5c98d8e7e25ea6c6d95385e6e1c6737aa8357fdf1973054f9c3cd0fa37498"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/oauth_http.py",
+      "bytes": 7596,
+      "release_path": "production/cloud_connection/oauth_http.py",
+      "sha256": "ecfec4a91fb38e94e7bbc5720e47ce7b45cfebe9e33fd689b6a482f782c9398b"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/oauth_resource.py",
+      "bytes": 11797,
+      "release_path": "production/cloud_connection/oauth_resource.py",
+      "sha256": "23c94207865012de06c60d82a9bdf2d58ed3fe53a2b88e723477d61c93363558"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/pr122_baseline_collector.py",
+      "bytes": 12809,
+      "release_path": "production/cloud_connection/pr122_baseline_collector.py",
+      "sha256": "c352c041ab62a1bf3c1c55afeea461ba935016e294975dfb515e19972365250f"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/private_mcp.py",
+      "bytes": 9185,
+      "release_path": "production/cloud_connection/private_mcp.py",
+      "sha256": "3c8a94a92b39519bd6797656fed6282815f7fbe0fcd8a794fb0edc77da6e0f86"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/private_transfer.py",
+      "bytes": 26055,
+      "release_path": "production/cloud_connection/private_transfer.py",
+      "sha256": "be2f0ebbf6087fa6a1c804dc24fc67ef2d90ab507869e60125b0fd1cdad3cc5b"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/queue.py",
+      "bytes": 14414,
+      "release_path": "production/cloud_connection/queue.py",
+      "sha256": "603ac5eb330daba82f09b3f1c1d3399a544befc862ede004c95405eda913c8b6"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/runtime.py",
+      "bytes": 14413,
+      "release_path": "production/cloud_connection/runtime.py",
+      "sha256": "daafcd2dca1fcc673f241a37fd11b749ff65fae2f22d3e737c2e5ece74242b8e"
+    },
+    {
+      "bundle_path": "new19-source/production/cloud_connection/worker.py",
+      "bytes": 14424,
+      "release_path": "production/cloud_connection/worker.py",
+      "sha256": "ba309d089b38e3993f1cf794362364d85862bb6f5d0c48c4f2149855045a683e"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_b5_deployment_composition.py",
+      "bytes": 14968,
+      "release_path": "reused-6825/pr17_b5_deployment_composition.py",
+      "sha256": "6a28d418c4f5dce14321e23cee98916b639666121953c5dd6bcbeba491f78756"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_b5_maintenance_runtime.py",
+      "bytes": 6724,
+      "release_path": "reused-6825/pr17_b5_maintenance_runtime.py",
+      "sha256": "61cf0de7485cf012b920d740f5f95336ddd1668bcde3053c09e60b992301f30b"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
+      "bytes": 29283,
+      "release_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
+      "sha256": "6ebebc57260b252bb8e1eed86f7dabdb0c6ff74c7f9191552fb8c2234d33d1cb"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
+      "bytes": 75304,
+      "release_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
+      "sha256": "3ba08a4ec9e5cdba6884cc5b38c3254a3e83f5bdba4916bc5da17b0d8107197d"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_review_transaction.py",
+      "bytes": 31522,
+      "release_path": "reused-6825/pr17_c53_r2_review_transaction.py",
+      "sha256": "6e98681cad506785dc5a0e6f159c1d49217c8940bba0a04b34bd41ac3b447f93"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_b5_original_algorithms.py",
+      "bytes": 8435,
+      "release_path": "reused-6825/pr17_b5_original_algorithms.py",
+      "sha256": "a2afb83417e64d6ee53c26a504156ab82255739fd9833bcf2446ebd3b164f575"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_b5_single_batch_witness.py",
+      "bytes": 19035,
+      "release_path": "reused-6825/pr17_b5_single_batch_witness.py",
+      "sha256": "5a31ef8444071953ee08f0274a4c92e2d21d4491928b379ab3c6f24d83ef4a1a"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_local_adapter.py",
+      "bytes": 3957,
+      "release_path": "reused-6825/pr17_c53_r2_local_adapter.py",
+      "sha256": "e19f065720099850ecf6e178b690d12aafae0e7e2008a9b22890f3d691f01e54"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_local_pinned_source_loader.py",
+      "bytes": 3632,
+      "release_path": "reused-6825/pr17_c53_r2_local_pinned_source_loader.py",
+      "sha256": "d7bca83fdb5f23acced83e9e500642f6f37e97797e1c3a8094ae18316572a5fe"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_transaction_candidate.py",
+      "bytes": 10679,
+      "release_path": "reused-6825/pr17_c53_r2_transaction_candidate.py",
+      "sha256": "e0b693fb934bf15bf0afccc4350938c6ebc3eb0f1c39bc1c97f0d6053547c77f"
+    },
+    {
+      "bundle_path": "test_old_policy_dependency_reader.py",
+      "bytes": 13250,
+      "release_path": null,
+      "sha256": "7c07e5aa7b54a6d223b14eb6b31ca3a52b135c3c8c0de4ef180dd5427f36ff56"
+    },
+    {
+      "bundle_path": "test_original_capability_preflight.py",
+      "bytes": 5396,
+      "release_path": null,
+      "sha256": "5d136bb257f63f0ea96da4d2ba9e1dd245293d3f3e35ad8bd02f9ac9a7801916"
+    },
+    {
+      "bundle_path": "test_canonical_prestart_proof.py",
+      "bytes": 2935,
+      "release_path": null,
+      "sha256": "a9d6b7f09e9fa5bf0d1dbd191413ad28dbab9e570bbc97ecf8b3d860eade58f5"
+    },
+    {
+      "bundle_path": "README.md",
+      "bytes": 1626,
+      "release_path": null,
+      "sha256": "01ad62a4a68e0afcb6f72aa31cf4992fe7f1743dd75d864e666198438829eb98"
+    }
+  ],
+  "known_hold": "LIVE_WAL_PRECHECK_SHM_READER_MARK_UNDECIDED",
+  "previous_reader_package_sha256": "c1bbad4995c738635f11585fb4d052fd6faa779e351415595fa0405300e49d2a",
+  "schema": 1,
+  "source_base_manifest_sha256": "08dbcf69b427c44dd4f8f9959f299c363f39f9e371342e0ffd91f231d977eefc",
+  "source_base_original_archive_sha256": "e6d3a3cef96ee996eb4b130fb0bd9305438489326b85678a263998602413e485",
+  "status": "DRAFT_NOT_REVIEWED_NOT_INSTALLABLE"
+}

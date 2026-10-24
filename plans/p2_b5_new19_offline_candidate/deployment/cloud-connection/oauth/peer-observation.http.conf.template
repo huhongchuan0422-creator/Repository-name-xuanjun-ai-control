@@ -1,0 +1,6 @@
+# Preparation only: render one 60-second epoch window; no live enrollment.
+map $msec $xuanjun_peer_window {
+    default 0;
+    ~^(?:__SECONDS_PATTERN__)\. 1;
+}
+log_format xuanjun_oauth_peer escape=json '{"nonce":"__NONCE__","utc_epoch":"$msec","peer":"$realip_remote_addr","method":"$request_method","status":$status}';

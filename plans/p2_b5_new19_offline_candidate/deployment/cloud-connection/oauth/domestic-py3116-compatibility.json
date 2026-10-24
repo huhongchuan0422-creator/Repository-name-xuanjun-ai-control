@@ -1,0 +1,227 @@
+{
+  "libc": [
+    "glibc",
+    "2.36"
+  ],
+  "openssl": "OpenSSL 3.0.11 19 Sep 2023",
+  "purpose": "ISOLATED_CI_COMPATIBILITY_NOT_PRODUCTION",
+  "python": "3.11.6",
+  "selected_lock_sha256": "d1652d76675260ecc791d74950aa0636d94f7b646780b620b747caf845eead71",
+  "soabi": "cpython-311-x86_64-linux-gnu",
+  "source_lock_sha256": "a1b599978d9624aba2f55574625a3395159382a87edd85fd0985a9971192e4d4",
+  "sqlite": "3.40.1",
+  "wheels": [
+    {
+      "bytes": 266042,
+      "filename": "authlib-1.9.1-py2.py3-none-any.whl",
+      "name": "authlib",
+      "requires_python": ">=3.10",
+      "sha256": "8b9be8b1e5174dcbf5520e984f1a22dc2edae5b6e40a61d4cedbf86b97e9e69b",
+      "tags": [
+        "py2-none-any",
+        "py3-none-any"
+      ],
+      "version": "1.9.1"
+    },
+    {
+      "bytes": 8458,
+      "filename": "blinker-1.9.0-py3-none-any.whl",
+      "name": "blinker",
+      "requires_python": ">=3.9",
+      "sha256": "ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "1.9.0"
+    },
+    {
+      "bytes": 136464,
+      "filename": "certifi-2026.10.19-py3-none-any.whl",
+      "name": "certifi",
+      "requires_python": ">=3.7",
+      "sha256": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "2026.10.19"
+    },
+    {
+      "bytes": 217807,
+      "filename": "cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "name": "cffi",
+      "requires_python": ">=3.10",
+      "sha256": "34e261f78cb6ceaaa36f42f2613f4380d94d9c759a9c73c769ee6e0247364632",
+      "tags": [
+        "cp311-cp311-manylinux_2_17_x86_64",
+        "cp311-cp311-manylinux2014_x86_64"
+      ],
+      "version": "2.1.1"
+    },
+    {
+      "bytes": 269972,
+      "filename": "charset_normalizer-3.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "name": "charset-normalizer",
+      "requires_python": ">=3.7",
+      "sha256": "211d5a3eb6af8f513b8d4ca19a8c1b7accab1b5f0d3175f9826b03c1a920dc1f",
+      "tags": [
+        "cp311-cp311-manylinux_2_17_x86_64",
+        "cp311-cp311-manylinux2014_x86_64",
+        "cp311-cp311-manylinux_2_28_x86_64"
+      ],
+      "version": "3.5.2"
+    },
+    {
+      "bytes": 125251,
+      "filename": "click-8.5.0-py3-none-any.whl",
+      "name": "click",
+      "requires_python": ">=3.10",
+      "sha256": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "8.5.0"
+    },
+    {
+      "bytes": 4752576,
+      "filename": "cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl",
+      "name": "cryptography",
+      "requires_python": ">=3.9, !=3.9.0, !=3.9.1",
+      "sha256": "9dab55f57c74c3cad24c323bacbbd04be4705ba6eb0d92e920b1fc4837ed5079",
+      "tags": [
+        "cp311-abi3-manylinux_2_34_x86_64"
+      ],
+      "version": "50.0.2"
+    },
+    {
+      "bytes": 103308,
+      "filename": "flask-3.1.2-py3-none-any.whl",
+      "name": "flask",
+      "requires_python": ">=3.9",
+      "sha256": "ca1d8112ec8a6158cc29ea4858963350011b5c846a414cdb7a954aa9e967d03c",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.1.2"
+    },
+    {
+      "bytes": 69583,
+      "filename": "idna-3.20-py3-none-any.whl",
+      "name": "idna",
+      "requires_python": ">=3.9",
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.20"
+    },
+    {
+      "bytes": 16234,
+      "filename": "itsdangerous-2.2.0-py3-none-any.whl",
+      "name": "itsdangerous",
+      "requires_python": ">=3.8",
+      "sha256": "c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "2.2.0"
+    },
+    {
+      "bytes": 134899,
+      "filename": "jinja2-3.1.6-py3-none-any.whl",
+      "name": "jinja2",
+      "requires_python": ">=3.7",
+      "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.1.6"
+    },
+    {
+      "bytes": 71758,
+      "filename": "joserfc-1.7.7-py3-none-any.whl",
+      "name": "joserfc",
+      "requires_python": ">=3.10",
+      "sha256": "06979cfbab78bc802f14c0358f32969826cc26720e13cb38926ffdc86bc0cb2c",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "1.7.7"
+    },
+    {
+      "bytes": 22961,
+      "filename": "markupsafe-3.0.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "name": "markupsafe",
+      "requires_python": ">=3.9",
+      "sha256": "6da83a088f8ef93b2d483a8232a4dbf4d69d3d8496b568a03c56becac43e1808",
+      "tags": [
+        "cp311-cp311-manylinux_2_17_x86_64",
+        "cp311-cp311-manylinux2014_x86_64",
+        "cp311-cp311-manylinux_2_28_x86_64"
+      ],
+      "version": "3.0.4"
+    },
+    {
+      "bytes": 51178,
+      "filename": "pycparser-3.11-py3-none-any.whl",
+      "name": "pycparser",
+      "requires_python": ">=3.10",
+      "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.11"
+    },
+    {
+      "bytes": 64738,
+      "filename": "requests-2.32.5-py3-none-any.whl",
+      "name": "requests",
+      "requires_python": ">=3.9",
+      "sha256": "2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "2.32.5"
+    },
+    {
+      "bytes": 135717,
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "name": "urllib3",
+      "requires_python": ">=3.10",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "2.8.0"
+    },
+    {
+      "bytes": 56232,
+      "filename": "waitress-3.0.2-py3-none-any.whl",
+      "name": "waitress",
+      "requires_python": ">=3.9.0",
+      "sha256": "c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.0.2"
+    },
+    {
+      "bytes": 228700,
+      "filename": "werkzeug-3.1.9-py3-none-any.whl",
+      "name": "werkzeug",
+      "requires_python": ">=3.9",
+      "sha256": "6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab",
+      "tags": [
+        "py3-none-any"
+      ],
+      "version": "3.1.9"
+    }
+  ],
+  "source_commit": "787286ca7b590068b328e996500260a821511bb2",
+  "source_run": 39725084091,
+  "source_job": 119647031445,
+  "image": "python:3.11.6-bookworm@sha256:ba7a7ac30c38e119c4304f98ef0e188f90f4f67a958bb6899da9defb99bfb471",
+  "oauth_http_pass": 29,
+  "offline_pass": 187,
+  "offline_skipped": 8,
+  "live_domestic_acceptance": "NOT_EXECUTED"
+}

@@ -1,0 +1,38 @@
+# Candidate only: not included, installed, tested against or reloading live Nginx.
+# Requires real approved certificate references, host/version and egress preflight.
+limit_req_zone $binary_remote_addr zone=xuanjun_oauth:10m rate=10r/s;
+server {
+    listen 80;
+    server_name cloud-auth.wenwenwenyiyiyi.work;
+    access_log off;
+    error_log /dev/null;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+    location / {
+        return 308 https://cloud-auth.wenwenwenyiyiyi.work$request_uri;
+    }
+}
+server {
+    listen 443 ssl;
+    server_name cloud-auth.wenwenwenyiyiyi.work;
+    include /etc/xuanjun-cloud-oauth/tls-approved.conf;
+    client_max_body_size 16k;
+    client_body_timeout 5s;
+    client_header_timeout 5s;
+    access_log off;
+    error_log /dev/null;
+    limit_req zone=xuanjun_oauth burst=20 nodelay;
+    location = /introspect {
+        return 403;
+    }
+    location = /.well-known/oauth-authorization-server {
+        include /etc/xuanjun-cloud-oauth/proxy-approved.conf;
+    }
+    location ~ ^/(authorize|login|github/callback|consent|token|revoke)$ {
+        include /etc/xuanjun-cloud-oauth/proxy-approved.conf;
+    }
+    location / { return 404; }
+}
