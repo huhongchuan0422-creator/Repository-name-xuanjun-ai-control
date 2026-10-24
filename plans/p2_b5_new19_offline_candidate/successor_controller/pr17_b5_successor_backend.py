@@ -618,8 +618,19 @@ class R2HostBackend:
             c53.require(len(threads)==1,code+'_NOT_SINGLE_THREADED')
             pre=self._snapshot_live_fds()
             allowed={0,1,2,root,held,self.lock_fd}
-            # A preexisting cached SQLite B (or any unknown FD) is disallowed
-            # even if a bogus connect() subsequently opens an unrelated A FD.
+            evidence_fds=set()
+            if code=='CLOSEOUT_DB':
+                store=getattr(self.authority,'evidence_store',None)
+                c53.require(store is not None,'CLOSEOUT_EVIDENCE_STORE_REQUIRED')
+                evidence_fds=set(store.active_action_fds(
+                    self.authority._witness_binding(),
+                    ('b5_http','B5_EXPOSURE_CLOSE')))
+                c53.require(len(evidence_fds)==4 and evidence_fds<=set(pre),
+                            'CLOSEOUT_EVIDENCE_FD_UNKNOWN')
+                allowed.update(evidence_fds)
+            # A preexisting cached SQLite B (or any unknown FD) is disallowed.
+            # Closeout additionally admits only the exact live evidence lease
+            # descriptors already validated above; no other phase gets them.
             c53.require(set(pre)<=allowed and held in pre,
                         code+'_PREEXISTING_FD_UNKNOWN')
             c53.require(pre[held][:2]==original,code+'_PINNED_FD_CHANGED')
