@@ -6,8 +6,8 @@
 
 ## 1 一包四输入与固定目的地
 
-本地已实际生成单包 `ISSUE76_STAGE_A_9b071542577c.zip`，57177136B，SHA256
-0b1dbd4e31fe55de1be29c7a140fea155a05b9178f6a1681c721029cc97e0754。
+本地已实际生成单包 `ISSUE76_STAGE_A_94326ff1f3eb.zip`，57179504B，SHA256
+258ce847ff8b3e4b2046a35c99ced9cf1b9011a523ea802a77e59c657cccca43。
 六个ZIP成员=下列四个**公开业务输入**+stage-a-entry.py管理入口+manifest.json元数据；不是
 六个业务输入，不含秘密/config/DB、原私有资料、credential或新镜像。ZIP_STORED不改原制品。
 
@@ -24,7 +24,7 @@ release image571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a，
 f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝，不改有效期。
 
 唯一待落地收件路径：
-`/home/admin/ISSUE76_STAGE_A_9b071542577c.zip`。
+`/home/admin/ISSUE76_STAGE_A_94326ff1f3eb.zip`。
 本窗口**没有UK上传/执行工具**；已连接状态/OS结果只读工具不提供文件上传/任意Shell。
 不把本地存在冒成服务器存在，不用过期signedURL、不从服务器临时下载公网包。
 
@@ -42,33 +42,33 @@ f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝�
 
 ## 2 完整原调用链与真实批准来源
 
-完整外层固定文件为 deploy/community-preview/stage-a-owner-call.sh：3569B，SHA256
- 0d89a73d36229cc375cd02bad09b824d1baa04e416f4bc8cc19c5ac5f5b70656。
-实际Python入口stage-a-entry.py SHA9b071542577c6ddd932826a167dbbd262c2f8493c093c147d475915c5aa7a727。
+完整外层固定文件为 deploy/community-preview/stage-a-owner-call.sh：4865B，SHA256
+ 3e7f4f08fa06615ec2320cce346c6e3ad07d3a5269f61fd180dcf3d7279374ce。
+实际Python入口stage-a-entry.py SHA94326ff1f3eb5a3d71cdd0cd7ab1846e0beca3dc5e11d4be34c9cc8d2d000f65。
 完整链：原admin终端→条件子shell→sudo -n原Python隔离模式→只读收件包→全包/六成员/manifest/
-四输入SHA和路径保护→加载已核新阶段A源码→原root BASE锁→真实Owner阶段确认→原保护许可
+四输入SHA和路径保护→加载已核新阶段A源码→原root BASE锁→受控sudo操作确认行→原保护许可
 记录→**原prepare-site.sh→原site_prepare.main**→原install/image_load→结果与许可归档。
 原core/b789/产品算法无改动，没有新的部署通道、服务或权限scope。
 
 ### 批准与servertrust分开
 
 代码只接受原UK/root、既有admin的SUDO_USER/UID/GID与原OS pwd一致、内核本进程loginuid
-为该实际admin UID（非unset/root/未知），以及该进程的真实前台controlling TTY。
-两个阶段各在/dev/tty显示**实际输入manifest所绑定scopeSHA**，要求Owner本人当场精确确认
-`APPROVE_INSTALL 4d77302682886cc9469a906c59e09c1972dc3eeed1b0b2f8cd65f65affc7a279`，
-随后`APPROVE_IMAGE_LOAD 4d77302682886cc9469a906c59e09c1972dc3eeed1b0b2f8cd65f65affc7a279`。
+为该实际admin UID（非unset/root/未知），以及该进程的本进程的controlling TTY（首次可为后台组）。
+两个阶段各在/dev/tty显示**实际输入manifest所绑定scopeSHA**，消费相应阶段的精确确认行
+`APPROVE_INSTALL ae9f71cce106bd0e39f838659728c45f5fa75f1eb82645230cba98b46e7b8e74`，
+随后`APPROVE_IMAGE_LOAD ae9f71cce106bd0e39f838659728c45f5fa75f1eb82645230cba98b46e7b8e74`。
 这两句仅为未来运行时终端逐阶段确认内容，不是当前批准，不需Owner替换命令变量。
 
 这是Owner本人沿原sudo权限的实际操作记录，不是机器签名/独立approve/servertrust；源码
 明确servertrust=false。它不能辨别共享admin背后的自然人，因此仅适用于Owner本人原受控
 终端；不能把转贴聊天、“approved=true”、脚本入参或runner模拟TTY当成Owner批准。
 若要求自动化或独立签名Owner身份，当前没有已证映射，仍需原受信接线，不由此适配补造。
-无原sudo上下文、内核loginuid未设/不符、无真实前台TTY、拒绝/超时均在写许可前HOLD。
+无原sudo上下文、内核loginuid未设/不符、无本进程controlling TTY、拒绝/超时均在写许可前HOLD。
 根审通过本源码也**不等于**Owner已批准现场A。
 
 ### 两个单独许可与无重试
 
-每阶段批准时取真实issued_at，固定expires_at=issued_at+600；不在耗时后重新取最新时间
+每阶段消费对应确认行时取服务器issued_at（不是该行的物理输入时刻），固定expires_at=issued_at+600；不在耗时后重新取最新时间
 延长该次许可。A两个evidence字段始终null；许可canonical编码、root0600，写前/写中/同步前
 重核同一操作上下文与期限。完整输入复制和读回耗时跨期时零对应许可/调用。
 
@@ -106,17 +106,19 @@ stop/start/rename，无安装service，无业务更新或private backup。原ima
 
 ## 4 异常收尾、完整外层与测试范围
 
-外层`if ( set +e; sudo ...; 记录inner; exit inner ); then ... else ... fi`把exit限制在子shell。
-父登录shell无exit/exec、无set -e变更；即使父已有errexit，inner失败仍记录内外码并回到父。
-没有把失败exit强改成功；打印LOGIN_SHELL_PRESERVED表示父仍存活，不表示A成功。
-
+外层仍在条件子shell里运行sudo，不退出父登录shell、不改父errexit。stdout被收成明确的
+child结果，再打印结构化终态：child_exit、child_state、state、stage_a_result_valid、
+login_shell_preserved、shell_exit_not_acceptance、servertrust。顶层shell rc0只表示该防退出
+控制块返回，**绝不表示A通过**。只有真实child_exit=0且严格匹配原完成JSON（含准确image和
+四个False布尔字段）才stage_a_result_valid=true；非0/信号码、空JSON、HOLD或错误结构均HOLD。
+缺少结构化记录也为UNKNOWN，不用最后printf/$?冒PASS。
 root适配始终finally释放固定BASE独占锁、TTY和FD；原子写的部分文件、活动许可/intent、
 阶段结果保留供根查，不rmtree/unlink未知历史。仅完成阶段自己的确切活动许可可退役；
-归档冲突先HOLD不覆盖。原caller进程沿原3b6 capture限300秒+原有界group清理；原load本身
+归档冲突先HOLD不覆盖。新增适配进程通过PIPE单独限制stdout16KiB，使用原3b6 child_status/finish_child作有界原组清理；阶段install的regular-file RLIMIT_FSIZE固定131072B、image-load固定67108864B，继承hard低于需要则拒绝，不设无限额；原caller文件/其子进程16KiB policy保持原字节。外层bootstrap最多300秒；原load本身
 120秒；CLI cleanup不证明daemon操作已取消。非0、格式/版本不符、跨期、异常或清理未知
 均停止，不推进下一阶段；所有自持FD即使一项close失败也继续逐项释放，清理未知不返回成功；归档退役前绑定本次活动许可inode/metadata，替换则HOLD保留；外层仍恢复，原44项安全语义直接复用。
 
-新增18项隔离联验：完整适配→原wrapper精确Python AST→原main→原install与import primitive，
+本轮24项适用联验（原18回归＋6项新增）：完整适配→真实shell→独立bootstrap Python中的原wrapper精确AST→exec独立caller Python→原main/install/import primitive，
 真实保护临时文件/许可/归档/锁与私有模式；Root/Owner/TTY、所有Docker及image外层字节
 入口为明确合成fixture。原caller/wrapper函数主体不改，仅测试root路径/UID/exec边界投影。
 另核完整单包校验器对SHA篡改/symlink拒绝、外层真实bash+errexit仍活、无确认零写、输入
@@ -130,3 +132,28 @@ root适配始终finally释放固定BASE独占锁、TTY和FD；原子写的部分
 目前没有任一UK落地证明或许可记录。本窗口的正常GitHub读/制品获取不能替代UK上传。
 若上述原权限/身份/运输能力缺失，HOLD并报准确项，不新密钥/服务/权限、不模拟servertrust。
 B/C、私有备份、真实更新、旧2330 backend时间及生产OCR权限均不由A解除。
+
+
+## 6 8028完整独审四项修复与仍未知
+
+8028原18项/bash-n与四输入重算复用；8028旧包57177136B/0b1dbd4e31fe55de1be29c7a140fea155a05b9178f6a1681c721029cc97e0754
+只作历史，不是当前新适配包。新单包/入口摘要见本页与stage-a-delivery.json，原四输入字节完全不变。
+
+真实子进程正例执行原wrapper bootstrap写完整32470B入口、exec原caller；新适配install上限
+128KiB满足它，image阶段64MiB满足原57365044B合法tar。负例真实继承16KiB时入口恰被截为
+16384B、caller未执行即HOLD，部分文件保留。原caller子进程的原16KiB RLIMIT实际探针仍为
+[16384,16384]；新适配stdout PIPE超过16KiB则HOLD，不用提高日志限额来修合法文件写入。
+
+Python从heredoc启动且sudo use_pty时最初后台是正常形态。生产check_terminal只要求
+/dev/tty字符设备/isatty，不在首次读前要求前台，也不主动tcsetpgrp/发SIGTTIN/修改sudoers。
+读交由原内核与sudo的job control处理，异常EIO/无TTY/无法交接均HOLD。真实PTY测试只在私有
+测试会话模拟交接；UK是否use_pty及实际调用行为仍UNKNOWN，本轮不现场检查/改设置。
+
+两确认行可以在第一提示之前预排队；第二次读取成功不能证明第二行一定在提示后输入。
+两段许可的时间是该阶段消费确认行的服务器时间，不是独立Owner身份认证/签名/机器授权，
+不能用这个操作记录替代外部的Owner精确现场批准。所有servertrust字段继续false。
+本进程仅选择读取SUDO_USER/SUDO_UID/SUDO_GID非秘密元数据，不读取应用/容器Env或secret。
+
+本轮把site-preparation-manifest里的workflow/governance等每个列出文件的真实bytes/SHA全部
+重新核对，并登记当前新适配/完整命令/文档对象；不把旧字节标当前同版。完整输入包、manifest、
+源码、调用块及CI制品分别核摘要；包外层digest不代替任何内层digest或Git blob匹配。

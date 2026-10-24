@@ -39,6 +39,7 @@ class StageATest(unittest.TestCase):
             self.tty_fd=os.open(str(self.tty_file),os.O_RDWR);return self.tty_fd
         self.stack.enter_context(patch.object(a,'open_terminal',side_effect=open_tty))
         self.stack.enter_context(patch.object(a,'check_terminal',side_effect=lambda fd:self.assertEqual(fd,self.tty_fd)))
+        self.real_select=a.select.select
         self.stack.enter_context(patch.object(a.select,'select',side_effect=lambda read,*rest:(read,[],[])))
         real_read=os.read;real_chown=os.fchown;uid=os.getuid();gid=os.getgid()
         def read(fd,size):
@@ -61,6 +62,7 @@ class StageATest(unittest.TestCase):
         # image bytes enter the original protected import primitive below.
         s.image_load=lambda:s._load_fixed_archive(b'SYNTHETIC_TAR','fmt',b'EXPECTED')
         s.capture=self.dispatch
+        self.obj.capture_bootstrap=self.dispatch
     def dispatch(self,args,timeout=10):
         if args[:1]==['/bin/sh']:
             self.events.append(('caller',args[-2]));return self.wrapper(args)
@@ -142,7 +144,7 @@ class StageATest(unittest.TestCase):
         command=command.replace('/usr/bin/sudo',str(fake))
         prefix='set -e\n'
         proc=subprocess.run(['/bin/bash'],input=(prefix+command+'\nprintf "PARENT_ALIVE\\n"\n').encode(),capture_output=True,timeout=3)
-        self.assertEqual(proc.returncode,0);self.assertIn(b'STAGE_A_INNER_EXIT=17',proc.stdout);self.assertIn(b'STAGE_A_OUTER_EXIT=17',proc.stdout);self.assertIn(b'PARENT_ALIVE',proc.stdout)
+        self.assertEqual(proc.returncode,0);record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],17);self.assertFalse(record['stage_a_result_valid']);self.assertEqual(record['state'],'HOLD_CHILD_NONZERO');self.assertIn(b'PARENT_ALIVE',proc.stdout)
     def test_image_failure_or_permission_archive_conflict_holds_without_retry(self):
         original=self.obj.call
         def fail_image(raw):
@@ -232,6 +234,154 @@ class StageATest(unittest.TestCase):
             ast.parse(Path('scripts/'+name).read_text(),feature_version=(3,6))
         command=b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode()
         ast.parse(command.split("<<'STAGE_A'\n",1)[1].rsplit('\nSTAGE_A',1)[0],feature_version=(3,6))
+    def real_chain_scripts(self):
+        # Separate shell -> bootstrap Python -> exec caller Python. Original
+        # wrapper AST/caller bodies run with fixture roots/UID/clock only;
+        # every OS subprocess/resource limit and regular file write is real.
+        common="""import ast,contextlib,hashlib,os,sys,time,types
+from pathlib import Path
+sys.path.insert(0,REPO)
+from scripts import community_preview_stage_a as a
+uid=os.getuid();gid=os.getgid();real_chown=os.fchown;real_exec=os.execv
+root,base,phase,digest,now=sys.argv[1:]
+root=Path(root);base=Path(base);inputs=base/'image-f131-40059478387'
+blobs={n:(inputs/n).read_bytes() for n in a.PAYLOAD}
+a.BASE=str(base);a.PAYLOAD=dict(a.PAYLOAD);a.PAYLOAD['artifact12546452389.zip']=(len(blobs['artifact12546452389.zip']),a.sha(blobs['artifact12546452389.zip']))
+s=a.original(blobs)
+for k,v in dict(BASE=str(base),INPUT=str(inputs),ENTRY=str(base/'site-prepare-v1.py'),PERMIT=str(base/'site-prepare-approval.json'),INSTALL=str(base/'control-oci2330-v1'),ROOT_ANCHOR=str(root),UID=uid,ROOT_GID=gid).items():setattr(s,k,v)
+os.getuid=lambda:0;os.geteuid=lambda:0;os.uname=lambda:types.SimpleNamespace(nodename=a.HOST)
+os.fchown=lambda fd,u,g:real_chown(fd,uid if u==0 else u,gid if g==0 else g)
+time.time=lambda:float(now)
+s.space=lambda *args:None;s.image_present=lambda *args:False;s.daemon_capacity=lambda:None
+import json
+probe=s.capture([sys.executable,'-c','import resource,json;print(json.dumps(resource.getrlimit(resource.RLIMIT_FSIZE)))'])
+assert json.loads(probe)==[16384,16384]  # frozen caller child policy remains intact
+s.image_load=lambda:s._load_fixed_archive(b'Z'*57365044,'fmt',b'EXPECTED')
+def docker(args,timeout=10):
+ assert args[:3]==s.DOCKER
+ if args[3:5]==['image','load']:return b'Loaded'
+ if args[3:5]==['image','inspect']:return b'EXPECTED'
+ raise RuntimeError('UNEXPECTED_DOCKER_FIXTURE')
+s.capture=docker
+""".replace('REPO',repr(str(Path.cwd())))
+        caller=self.root/'caller-worker.py';caller.write_text(common+"\nraise SystemExit(s.main(['--stage',phase,'--approval-sha256',digest]))\n")
+        bootstrap=self.root/'bootstrap-worker.py'
+        tail="""
+source=blobs['prepare-site.sh'].decode().split("<<'PREPARE'\\n",1)[1].rsplit('\\nPREPARE',1)[0]
+tree=ast.parse(source)
+class Project(ast.NodeTransformer):
+ def visit_Assign(self,node):
+  if any(isinstance(x,ast.Name) and x.id=='BASE' for x in node.targets):node.value=ast.Constant(str(base))
+  return self.generic_visit(node)
+ def visit_Compare(self,node):
+  if isinstance(node.left,ast.Attribute) and node.left.attr=='st_uid':node.comparators=[ast.Constant(uid) if isinstance(x,ast.Constant) and x.value==0 else x for x in node.comparators]
+  return self.generic_visit(node)
+ def visit_FunctionDef(self,node):
+  if node.name=='directory':
+   for child in ast.walk(node):
+    if isinstance(child,ast.Call) and isinstance(child.func,ast.Attribute) and child.func.attr=='open' and child.args and isinstance(child.args[0],ast.Constant) and child.args[0].value=='/':child.args[0]=ast.Constant(str(root))
+    if isinstance(child,ast.For):child.iter=ast.parse('path[len(FIXTURE_ROOT)+1:].split("/")',mode='eval').body
+  return self.generic_visit(node)
+def projected_exec(exe,argv):
+ assert exe=='/usr/bin/python3' and argv[4]==s.ENTRY
+ real_exec(sys.executable,[sys.executable,'-I','-B','-S',CALLER,str(root),str(base),phase,digest,now])
+os.execv=projected_exec;sys.argv=['',phase,digest]
+exec(compile(ast.fix_missing_locations(Project().visit(tree)),'<original-bootstrap-real-process>','exec'),{'FIXTURE_ROOT':str(root)})
+""".replace('CALLER',repr(str(caller)))
+        bootstrap.write_text(common+tail)
+        shell=self.root/'original-bootstrap-chain.sh'
+        shell.write_text('#!/bin/sh\nexec '+sys.executable+' -I -B -S '+str(bootstrap)+' '+str(self.root)+' '+str(self.base)+' "$1" "$2" "$3"\n')
+        return shell
+    def use_real_capture(self,force_old_limit=False):
+        shell=self.real_chain_scripts()
+        real=a.StageA.capture_bootstrap
+        def capture(args,timeout=300):
+            with patch.object(a.select,'select',self.real_select):
+                return real(self.obj,['/bin/sh',str(shell),args[-2],args[-1],str(self.clock[0])],timeout=10)
+        self.obj.capture_bootstrap=capture
+        if force_old_limit:
+            # At the exact adapter boundary, simulate the rejected inherited
+            # 16KiB policy; do not change original caller or fake write results.
+            real_set=a.resource.setrlimit
+            def old(kind,value):
+                real_set(kind,(16384,16384) if kind==a.resource.RLIMIT_FSIZE else value)
+            return patch.object(a.resource,'setrlimit',side_effect=old)
+        return contextlib.nullcontext()
+    def test_real_subprocess_bootstrap_exec_caller_and_phase_file_budgets(self):
+        with self.use_real_capture():result=self.obj.run()
+        self.assertEqual(result['state'],'STAGE_A_ORIGINAL_CALLER_COMPLETED')
+        self.assertEqual((self.base/'site-prepare-v1.py').stat().st_size,32470)
+        self.assertEqual((self.inputs/'community-backend-image.tar.gz').stat().st_size,57365044)
+    def test_real_subprocess_old_16k_limit_truncates_and_stops_before_caller(self):
+        with self.use_real_capture(force_old_limit=True),self.assertRaises(a.Hold):self.obj.run()
+        self.assertEqual((self.base/'site-prepare-v1.py').stat().st_size,16384)
+        self.assertFalse((self.base/'control-oci2330-v1').exists())
+        self.assertFalse((self.base/'stage-a-install-result.json').exists())
+    def test_bootstrap_stdout_budget_is_separate_from_regular_files(self):
+        self.obj.preflight();self.obj.confirm('install')
+        try:
+            with patch.object(a.select,'select',self.real_select),self.assertRaisesRegex(a.Hold,'OUTPUT_LIMIT'):
+                a.StageA.capture_bootstrap(self.obj,[sys.executable,'-c','import os;os.write(1,b"x"*20000)'],timeout=3)
+        finally:self.obj.close()
+    def test_structured_child_status_not_top_level_shell_status(self):
+        command=b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode()
+        valid={'state':'STAGE_A_ORIGINAL_CALLER_COMPLETED','image':'sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a','site_update':False,'private_data':False,'ocr_enabled':False,'servertrust':False}
+        for code,body,expected in ((0,'',False),(0,json.dumps(valid),True),(2,json.dumps(valid),False),(143,'',False),(0,'{"state":"HOLD_STAGE_A_PRESERVE_NO_RETRY"}',False)):
+            fake=self.root/'sudo-result-fixture';fake.write_text('#!/bin/sh\nprintf \'%s\\n\' \''+body+'\'\nexit '+str(code)+'\n');fake.chmod(0o700)
+            fixture=command.replace('/usr/bin/sudo',str(fake))
+            proc=subprocess.run(['/bin/bash'],input=('set -e\n'+fixture+'\nprintf "PARENT_ALIVE\n"\n').encode(),capture_output=True,timeout=3)
+            self.assertEqual(proc.returncode,0)
+            record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],code);self.assertEqual(record['stage_a_result_valid'],expected);self.assertTrue(record['shell_exit_not_acceptance']);self.assertFalse(record['servertrust'])
+    def test_two_ack_lines_can_be_prequeued_not_independent_owner_auth(self):
+        # Both responses exist before the first prompt; acceptance must never
+        # imply the second line was typed afterwards or independently signed.
+        self.assertEqual(len(self.answers),2);result=self.obj.run();self.assertFalse(result['servertrust'])
+    def test_real_pty_background_first_read_uses_kernel_job_control(self):
+        code=r"""import os,sys,fcntl,termios,signal,time
+sys.path.insert(0,REPO)
+from scripts.community_preview_stage_a import check_terminal
+# Private test-session HUP on PTY teardown must not kill the test driver.
+signal.signal(signal.SIGHUP,signal.SIG_IGN)
+master,slave=os.openpty();reader=None;done=False
+try:
+ fcntl.ioctl(slave,termios.TIOCSCTTY,0)
+ reader=os.fork()
+ if reader==0:
+  try:
+   os.setpgid(0,0);signal.signal(signal.SIGTTIN,signal.SIG_DFL)
+   assert os.tcgetpgrp(slave)!=os.getpgrp()
+   check_terminal(slave)  # production check must admit initial background
+   data=os.read(slave,256)
+   assert data==b'queued-operator-line\n'
+   os._exit(0)
+  except BaseException:os._exit(3)
+ end=time.monotonic()+2;status=None
+ while time.monotonic()<end:
+  pid,value=os.waitpid(reader,os.WNOHANG|os.WUNTRACED)
+  if pid:
+   status=value;break
+  time.sleep(.01)
+ assert status is not None and os.WIFSTOPPED(status) and os.WSTOPSIG(status)==signal.SIGTTIN
+ # Test driver models sudo's kernel handoff; production never tcsetpgrp's.
+ os.tcsetpgrp(slave,reader);os.kill(reader,signal.SIGCONT);os.write(master,b'queued-operator-line\n')
+ end=time.monotonic()+2
+ while time.monotonic()<end:
+  pid,value=os.waitpid(reader,os.WNOHANG)
+  if pid:
+   done=True;assert os.WIFEXITED(value) and os.WEXITSTATUS(value)==0;break
+  time.sleep(.01)
+ assert done
+ print('BACKGROUND_SIGTTIN_FOREGROUND_READ_OK_NOT_ACTUAL_SUDO')
+finally:
+ if reader and not done:
+  try:os.kill(reader,signal.SIGKILL)
+  except ProcessLookupError:pass
+  try:os.waitpid(reader,0)
+  except ChildProcessError:pass
+ os.close(master);os.close(slave)
+""".replace('REPO',repr(str(Path.cwd())))
+        proc=subprocess.run([sys.executable,'-c',code],start_new_session=True,capture_output=True,timeout=5)
+        self.assertEqual(proc.returncode,0,proc.stderr.decode());self.assertIn(b'BACKGROUND_SIGTTIN_FOREGROUND_READ_OK',proc.stdout)
     def test_owner_context_missing_kernel_identity_is_not_servertrust(self):
         # Actual production function AST, synthetic OS/NSS/env data only.
         tree=ast.parse(Path(a.__file__).read_text());node=next(x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name=='owner_context')

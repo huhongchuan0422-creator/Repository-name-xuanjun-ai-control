@@ -1,7 +1,7 @@
 """Fixed stage A manual Owner/sudo adapter. No default execution or servertrust.
 
-Only the original admin SSH controlling terminal may give a fresh, exact-stage
-confirmation. These local records document that privileged action; they are NOT
+Only the original admin SSH controlling terminal may supply an exact-stage
+acknowledgement (including a queued line). These local records document that privileged action; they are NOT
 OAuth/signatures, independent approval, or a grant from copied chat text.
 """
 import fcntl
@@ -12,6 +12,8 @@ import os
 import pwd
 import re
 import select
+import resource
+import subprocess
 import stat
 import time
 import types
@@ -52,7 +54,9 @@ def owner_context():
 
 def check_terminal(fd):
     info=os.fstat(fd)
-    need(stat.S_ISCHR(info.st_mode) and os.isatty(fd) and os.tcgetpgrp(fd)==os.getpgrp(),'OWNER_CONTROLLING_TTY_REQUIRED')
+    # sudo use_pty can initially keep a heredoc command in a background group.
+    # Do not preempt the kernel SIGTTIN/sudo foreground handoff or alter it.
+    need(stat.S_ISCHR(info.st_mode) and os.isatty(fd),'OWNER_CONTROLLING_TTY_REQUIRED')
 
 def open_terminal():
     fd=os.open('/dev/tty',os.O_RDWR|os.O_NOFOLLOW|os.O_NOCTTY)
@@ -120,7 +124,8 @@ class StageA:
         need(select.select([self.tty],[],[],120)[0]==[self.tty],'OWNER_CONFIRMATION_TIMEOUT')
         answer=os.read(self.tty,257)
         need(len(answer)<=256 and answer in (expected+b'\n',expected+b'\r\n'),'NO_EXACT_OPERATOR_CONFIRMATION')
-        # No caller-supplied times, approved=true flag or copied chat accepted.
+        # Time is line CONSUMPTION time, not evidence it was typed after prompt.
+        # No independent Owner authentication or servertrust is established.
         issued=int(clock());self.phase=phase;self.issued=issued;self.deadline=issued+600
         self.gate()
     def gate(self):
@@ -164,9 +169,43 @@ class StageA:
         need(self.s.read(BASE+'/'+PERMIT,16384)==raw,'PERMIT_READBACK_CHANGED')
         self.permit_identity=self.s.identity(os.stat(PERMIT,dir_fd=self.parent,follow_symlinks=False))
         self.gate();return raw
+    def capture_bootstrap(self,args,timeout=300):
+        # Adaptation only: the frozen caller's 16KiB RLIMIT is for its log
+        # children, not for a Python which writes 32470B ENTRY / 57365044B tar.
+        # stdout is a bounded PIPE; regular file writes get a phase-fixed cap.
+        need(self.phase in ('install','image-load'),'STAGE_A_ONLY')
+        file_limit=131072 if self.phase=='install' else 64*1024**2
+        def limits():
+            hard=resource.getrlimit(resource.RLIMIT_FSIZE)[1]
+            need(hard==resource.RLIM_INFINITY or hard>=file_limit,'INHERITED_FILE_LIMIT_TOO_SMALL')
+            resource.setrlimit(resource.RLIMIT_FSIZE,(file_limit,file_limit))
+            resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+            need(owner_context()==self.operator,'OPERATOR_CHANGED')
+            now=clock();need(self.issued<=now<=self.deadline and now<EXPIRES,'STAGE_APPROVAL_EXPIRED')
+        self.gate()
+        proc=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+            start_new_session=True,preexec_fn=limits,env=dict({'PATH':'/usr/bin:/bin'},
+                **{k:os.environ.get(k,'') for k in ('SUDO_USER','SUDO_UID','SUDO_GID')}))
+        try:
+            end=time.monotonic()+timeout;out=bytearray();eof=False;status=None
+            fd=proc.stdout.fileno()
+            while True:
+                need(time.monotonic()<=end,'BOOTSTRAP_TIMEOUT_UNKNOWN')
+                ready=select.select([] if eof else [fd],[],[],.025)[0]
+                if ready:
+                    data=os.read(fd,min(4096,16385-len(out)))
+                    if data:out.extend(data);need(len(out)<=16384,'BOOTSTRAP_OUTPUT_LIMIT')
+                    else:eof=True
+                status=self.s.child_status(proc)  # original WNOWAIT PID binding
+                if status is not None and eof:break
+            need(status.si_code==os.CLD_EXITED and status.si_status==0,'BOOTSTRAP_CHILD_FAILED')
+            return bytes(out)
+        finally:
+            try:self.s.finish_child(proc)  # original bounded owned-group cleanup
+            finally:proc.stdout.close()
     def call(self,raw):
         self.gate()
-        reply=self.s.exact_json(self.s.capture(['/bin/sh',INPUT+'/prepare-site.sh',self.phase,sha(raw)],timeout=300))
+        reply=self.s.exact_json(self.capture_bootstrap(['/bin/sh',INPUT+'/prepare-site.sh',self.phase,sha(raw)],timeout=300))
         self.gate()
         if self.phase=='install':
             need(reply=={'stage':'install','carrier_manifest_sha256':self.s.CARRIER_MANIFEST,'update_executed':False},'INSTALL_RESULT_UNKNOWN')
