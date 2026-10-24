@@ -60,6 +60,15 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
         raise BundleError("TARGET_PLATFORM_MISMATCH")
     if not lock.get("python_implementation") or not lock.get("python_version") or not lock.get("abi"):
         raise BundleError("LOCK_RUNTIME_ABI_METADATA_MISSING")
+    if target_platform == "linux-x86_64-cp311":
+        if lock.get("python_implementation") != "CPython" or lock.get("python_version") != "3.11.17" or lock.get("abi") != "cp311":
+            raise BundleError("LOCK_RUNTIME_VERSION_MISMATCH")
+        if lock.get("base_image") != "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199":
+            raise BundleError("LOCK_BASE_IMAGE_MISMATCH")
+        if lock.get("base_image_config_sha256") != "c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee":
+            raise BundleError("LOCK_BASE_CONFIG_MISMATCH")
+        if not isinstance(lock.get("glibc_version"), str) or not lock["glibc_version"].startswith("glibc "):
+            raise BundleError("LOCK_GLIBC_EVIDENCE_MISSING")
     requirements_sha = sha256_file(Path(requirements_path))
     if lock.get("requirements_sha256") != requirements_sha:
         raise BundleError("REQUIREMENTS_LOCK_INPUT_SHA_MISMATCH")
@@ -242,6 +251,10 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 "python_version": checked["python_version"],
                 "abi": checked["abi"],
                 "target_tags": checked["target_tags"],
+                "base_image": checked.get("base_image"),
+                "base_image_manifest_sha256": checked.get("base_image_manifest_sha256"),
+                "base_image_config_sha256": checked.get("base_image_config_sha256"),
+                "glibc_version": checked.get("glibc_version"),
                 "requirements_sha256": checked["requirements_sha256"],
                 "wheels": archive_manifest["wheels"],
             }
