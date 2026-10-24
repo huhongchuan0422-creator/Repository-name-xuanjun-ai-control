@@ -85,6 +85,23 @@ class OfflineBundleInputTests(unittest.TestCase):
             with self.assertRaisesRegex(BundleError,'OUTPUT_ALREADY_EXISTS_NO_CLOBBER'): builder.publish_no_clobber(temp,output)
         self.assertEqual(output.read_bytes(),b'concurrent winner')
         self.assertTrue(temp.exists())
+    def test_validate_to_freeze_model_change_is_rejected_against_validated_digest(self):
+        model=self.models/"det.onnx"
+        original=model.read_bytes()
+        output=self.root/"race-before-freeze.tar.gz"
+        original_validate=builder.validate_inputs
+        def validate_then_mutate(*args,**kwargs):
+            checked=original_validate(*args,**kwargs)
+            model.write_bytes(b"B-after-validate-before-freeze")
+            return checked
+        try:
+            with mock.patch.object(builder,"validate_inputs",side_effect=validate_then_mutate):
+                with self.assertRaisesRegex(BundleError,"VALIDATE_FREEZE_SHA256_MISMATCH:models/det.onnx"):
+                    builder.build_bundle("linux-x86_64-cp311",self.lock,self.wheels,self.models,output)
+        finally:
+            model.write_bytes(original)
+        self.assertFalse(output.exists())
+
     def test_archive_member_tampering_between_validation_and_packaging_is_detected(self):
         package=self.root/'package'; (package/'model_distribution').mkdir(parents=True)
         for name in ('api.py','ocr_core.py','secure_store.py','startup_selfcheck.py'): (package/name).write_text('# synthetic source '+name)
