@@ -452,9 +452,7 @@ def child_query(root,action='query',execute_start=None):
                 tx.guarded=child_traced_guarded
                 def execute_run(argv,**kwargs):
                     if argv[:2]==['/usr/bin/systemctl','show']:
-                        return type('Result',(),{'returncode':0,'stdout':(
-                            'ActiveState=active\\nSubState=running\\nMainPID=123\\n'
-                            'NRestarts=0\\nExecMainStartTimestampMonotonic=4000\\n').encode()})()
+                        return recorded_status(argv,**kwargs)
                     if argv[0:1]!=['/usr/bin/systemctl']:
                         raise AssertionError('UNRECORDED_EXTERNAL_OS_ACTION')
                     return type('Result',(),{'returncode':3 if
