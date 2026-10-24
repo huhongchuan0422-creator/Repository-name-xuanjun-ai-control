@@ -359,7 +359,7 @@ class Fence(object):
         keys = self.adapter.normalize_many(resources)
         return self.supervisor.claim_writer(
             task_id, attempt_id, owner, entry, caller, lease_id,
-            keys, valid_until)
+            self.locks.provider_id, keys, valid_until)
 
     def prepare(self, ticket, caller, operation):
         operation = dict(operation)
