@@ -64,7 +64,7 @@ def load_bindings(environ=None):
     if not module_name or not module_name.isidentifier() or not integration_path:
         raise RuntimeError("OCR_TRUSTED_BINDINGS_MODULE_AND_PATH_REQUIRED")
     supplied_root = Path(integration_path)
-    if not supplied_root.is_absolute():
+    if not supplied_root.is_absolute() or ".." in supplied_root.parts:
         raise RuntimeError("OCR_INTEGRATION_PATH_INVALID")
     # Reject symlinks in every path component, not only at the leaf.
     current = Path(supplied_root.anchor)
