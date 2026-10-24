@@ -43,12 +43,12 @@ def main():
             source="downloaded-from-pypi-and-self-hashed-not-independently-pinned"
         elif rel.startswith("ocr-deb-cache/apt-lists/"):
             source="downloaded-from-configured-debian-source-and-self-hashed"
+        elif rel.startswith("ocr-deb-cache/apt-lists/") and ("InRelease" in path.name or "Release" in path.name):
+            source="apt-index-signature-checked-by-apt-get-update-and-self-hashed"
         elif rel.startswith("ocr-deb-cache/") and path.name == "system-deb-lock.json":
             source="generated-lock; package and apt-index digests recorded; validate lock/source fingerprint before reuse"
         elif rel.startswith("ocr-deb-cache/") and path.name.endswith(".deb"):
             source="apt-resolved-package-and-self-hashed; validate package SHA and signed-index provenance before reuse"
-        elif rel.startswith("ocr-deb-cache/apt-lists/") and ("InRelease" in path.name or "Release" in path.name):
-            source="apt-index-signature-checked-by-apt-get-update-and-self-hashed"
 
         elif path.name=="requirements-lock-linux-x86_64-cp311.json":
             source="generated-from-current-run-runtime-and-self-hashed"
