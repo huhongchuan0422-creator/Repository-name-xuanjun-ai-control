@@ -232,14 +232,14 @@ class IdentityBoundaryTests(unittest.TestCase):
             finally:os.close(parent)
         real.unlink()
         real.symlink_to('/opt/xuanjun-fixture/releases/new')
+        real_owner=(real.lstat().st_uid,real.lstat().st_gid)
         with boundary.active():
             parent=os.open('/opt/xuanjun-fixture',os.O_RDONLY|os.O_DIRECTORY)
             try:
                 replaced=os.stat('current',dir_fd=parent,follow_symlinks=False)
                 # inode numbers may be reused immediately after unlink; the
                 # sealed target/type/link metadata is part of the identity.
-                self.assertEqual((replaced.st_uid,replaced.st_gid),
-                                 (real.lstat().st_uid,real.lstat().st_gid))
+                self.assertEqual((replaced.st_uid,replaced.st_gid),real_owner)
                 self.assertEqual(os.readlink('current',dir_fd=parent),
                                  '/opt/xuanjun-fixture/releases/new')
             finally:os.close(parent)
