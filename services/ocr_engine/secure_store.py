@@ -200,7 +200,7 @@ class SecureSQLiteJobStore:
     def update(self, job_id: str, **changes):
         forbidden = {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_type",
                      "application_revision", "provider_version", "document_sha256", "job_id",
-                     "confirmed_fields", "confirmation_revision", "authenticity_verified"}
+                     "confirmed_fields", "confirmation_revision", "confirmed_binding", "authenticity_verified"}
         if forbidden.intersection(changes):
             raise ValueError("OCR_IMMUTABLE_FIELD")
         def action(job):
