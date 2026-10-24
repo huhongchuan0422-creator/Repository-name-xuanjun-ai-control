@@ -199,6 +199,10 @@ class ApiTests(unittest.TestCase):
         body={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'Human confirmed synthetic'}}
         confirmed=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
         self.assertEqual(confirmed.status_code,200,confirmed.text)
+        self.assertEqual(confirmed.json().get('application_revision'),'1')
+        self.assertEqual(confirmed.json().get('provider_version'),'1.2.0')
+        self.assertEqual(confirmed.json().get('confirmed_binding',{}).get('provider_version'),'1.2.0')
+        self.assertTrue(confirmed.json().get('shared_writeback_eligible'))
         read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
         self.assertEqual(read.status_code,200,read.text)
         self.assertEqual(read.json().get('confirmed_fields'),body['fields'])
@@ -222,6 +226,16 @@ class ApiTests(unittest.TestCase):
         from services.ocr_engine.api import _valid_provider_version
         for value in (True, -1, '01', '1..2', ' 1.2', 1.5):
             with self.subTest(value=value): self.assertFalse(_valid_provider_version(value))
+    def test_noncanonical_authoritative_application_or_provider_version_rejected(self):
+        for field,values in [('current_revision',[True,-1,'01','1..2',' 1.2']),('current_provider_version',[True,-1,'01','1..2',' 1.2',1.5])]:
+            for value in values:
+                with self.subTest(field=field,value=value):
+                    setattr(self,field,value)
+                    response=self.client.post('/api/v1/ocr/jobs',headers={**self.headers,'Idempotency-Key':'bad-version-'+str(values.index(value)).zfill(2)+'-'+field},
+                        data={'document_type':'business_license','onboarding_application_id':'synthetic-app','attachment_id':'synthetic-attachment'},
+                        files={'file':('synthetic.jpg',self.image,'image/jpeg')})
+                    self.assertEqual(response.status_code,403,response.text)
+                    setattr(self,field,'1' if field=='current_revision' else '1.2.0')
     def test_get_then_provider_change_blocks_confirmation(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         seen=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
