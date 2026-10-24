@@ -295,7 +295,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
         if (not _valid_revision(body.application_revision) or
-                (body.provider_version is not None and not _valid_provider_version(body.provider_version)):
+                (body.provider_version is not None and not _valid_provider_version(body.provider_version))):
             raise HTTPException(status_code=400, detail="OCR_CONFIRM_BINDING_VERSION_INVALID")
         if str(body.application_revision) != str(existing.get("application_revision")):
             raise HTTPException(status_code=409, detail="OCR_APPLICATION_REVISION_CONFLICT")
