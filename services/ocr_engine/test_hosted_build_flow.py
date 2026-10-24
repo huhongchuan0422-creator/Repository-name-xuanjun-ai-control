@@ -26,7 +26,7 @@ class HostedBuildFlowTests(unittest.TestCase):
         docker.write_text("#!/bin/sh\necho \"$*\" >> \"$FAKE_CALL_LOG\"\ncase \"$1\" in pull) exit \"${FAKE_PULL_EXIT:-0}\";; run) exit 0;; *) exit 0;; esac\n")
         docker.chmod(0o755)
         self.env = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ.get("PATH",""), FAKE_CALL_LOG=str(self.calls),
-                        RUNNER_TEMP=str(self.root), OCR_BASE_IMAGE="python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
+                        RUNNER_TEMP=str(self.root), GITHUB_WORKSPACE=str(self.root), OCR_BASE_IMAGE="python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
                         OCR_BASE_CONFIG_SHA256="c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee",
                         OCR_TARGET_PLATFORM="linux-x86_64-cp311", GITHUB_SHA="a"*40, INPUT_SOURCE_SHA="a"*40,
                         GITHUB_REF=EXPECTED_REF)
