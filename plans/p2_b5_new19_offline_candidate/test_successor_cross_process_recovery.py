@@ -34,10 +34,10 @@ class Authority:
  def observe_original_success_progress(self,ids,catalog):
   assert catalog==bundle['catalog_sha'] and tuple(ids)==tuple(r['request_id'] for r in bundle['requests'])
   return int((root/'progress').read_text())
-b=object.__new__(R2HostBackend)
-b.legacy=Legacy();b.job=str(root);b.expected_ids=tuple(r['request_id'] for r in bundle['requests'])
-b.authority=Authority();b.window_open=False;b.bundle=None
-b.spec=binder.verify_spec_bytes((fixture_root/'SUCCESSOR_SPEC.json').read_bytes())
+spec=binder.verify_spec_bytes((fixture_root/'SUCCESSOR_SPEC.json').read_bytes())
+b=R2HostBackend(legacy_io=Legacy(),spec=spec,source_blobs={},observed_bytes={},
+                authority=Authority())
+b.job=str(root);b.expected_ids=tuple(r['request_id'] for r in bundle['requests'])
 b.release_gate=fixture_gate(b.spec,'recover')
 try:
  observed=Transaction.recover_intake_readonly(b,bundle)
@@ -45,7 +45,9 @@ try:
   # Fixture facts model the separately checked activation marker; this child
   # tests the phase transition, not the UK protected activation reader.
   b.recovered_from_protected=True;b.activation_committed=True;b.bundle=bundle
-  tx=object.__new__(Transaction);tx.b=b;tx.bundle=bundle;tx.stage='UNKNOWN'
+  bundle['files']={name:b'' for name in __import__('pr17_b5_successor_review').CONFIGS+
+                   __import__('pr17_b5_successor_review').SLOTS}
+  tx=Transaction(spec,bundle,b);tx.stage='UNKNOWN'
   observed['resume']=tx.resume_recovered_b5_http_wait()
   observed['stage']=tx.stage
  print(json.dumps(observed,sort_keys=True))
