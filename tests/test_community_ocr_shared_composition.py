@@ -188,6 +188,12 @@ class SharedOcrComposition(unittest.TestCase):
         self.assertEqual(r.status_code,200,r.text);before=self.snapshot();self.assertFalse(self.apply(path)['written']);self.assertEqual(self.snapshot(),before)
         for kind in ('storefront_photo','interior_photo','cashier_photo'):
             with self.assertRaises(PermissionError):self.bridge.source(self.auth(self.fx.token),self.app['application'],kind)
+    def test_shared_service_removal_cannot_fall_back_to_platform_only_write(self):
+        path,_=self.confirmed();before=self.snapshot()
+        self.fx.onboarding.wechat_applyment=None
+        with self.assertRaisesRegex(PermissionError,'SHARED_DRAFT_WRITEBACK_VERSION_BINDING'):
+            self.apply(path)
+        self.assertEqual(self.snapshot(),before)
     def test_missing_or_mutated_confirmation_binding_not_qualified(self):
         path,_=self.confirmed();jobid=path.rsplit('/',1)[1]
         with self.assertRaises(ValueError):self.store.update(jobid,confirmed_binding={'provider_version':1})

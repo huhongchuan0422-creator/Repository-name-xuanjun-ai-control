@@ -135,6 +135,8 @@ class CommunityOcrBridge:
                 or source['application_revision'] != revision):
             raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
         service = self.merchant.onboarding.wechat_applyment
+        if service is None and job.get('provider_version') is not None:
+            raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
         if service is not None:
             version = job.get('provider_version')
             if type(version) is not int or version < 0:
