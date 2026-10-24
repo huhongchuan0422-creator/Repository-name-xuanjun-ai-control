@@ -84,7 +84,7 @@ def main():
                 "apt_source": {"path": source.name, "sha256": hashlib.sha256(source_bytes).hexdigest(),
                                "content": source_text},
                 "packages": packages, "apt_lists": indexes}
-        lock_bytes = (json.dumps(lock, sort_keys=True, indent=2) + "\\n").encode("utf-8")
+        lock_bytes = (json.dumps(lock, sort_keys=True, indent=2) + "\n").encode("utf-8")
         temp = root / ".system-deb-lock.json.tmp"
         with temp.open("xb") as stream:
             stream.write(lock_bytes)
