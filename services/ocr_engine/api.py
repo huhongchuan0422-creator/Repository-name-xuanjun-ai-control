@@ -131,7 +131,7 @@ def _valid_revision(value):
     return (not isinstance(value, bool) and isinstance(value, (str, int)) and
             str(value).strip() != "" and str(value) == str(value).strip() and
             not (isinstance(value, int) and value < 0) and
-            (not isinstance(value, str) or __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}", value) is not None))
+            (not isinstance(value, str) or __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}", value) is not None))
 
 def _valid_provider_version(value):
     return _valid_revision(value)
