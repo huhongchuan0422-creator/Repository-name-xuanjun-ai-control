@@ -905,8 +905,11 @@ class Supervisor(object):
             row = self.db.execute(
                 'SELECT * FROM writer_operations WHERE operation_id=?',
                 (operation_id,)).fetchone()
-            if row is None or row['state'] not in ('DISPATCHING','UNKNOWN'):
+            if row is None or row['state'] not in (
+                    'PREPARED','DISPATCHING','UNKNOWN'):
                 raise ValueError('OPERATION_NOT_RECONCILABLE')
+            if row['state'] == 'PREPARED' and outcome != 'NOT_APPLIED':
+                raise ValueError('UNDISPATCHED_OPERATION_ONLY_NOT_APPLIED')
             body = canonical(evidence)
             existing = self.db.execute('''SELECT * FROM writer_reconcile_evidence
               WHERE operation_id=? AND evidence_id=?''',
@@ -926,7 +929,8 @@ class Supervisor(object):
             if receipt is None:
                 raise ValueError('FINAL_RECEIPT_REQUIRED')
             self.db.execute('''UPDATE writer_operations SET state=?,updated_at=?
-              WHERE operation_id=? AND state IN ('DISPATCHING','UNKNOWN')''',
+              WHERE operation_id=? AND state IN
+              ('PREPARED','DISPATCHING','UNKNOWN')''',
               (outcome, now, operation_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('RECONCILE_CAS_FAILED')
