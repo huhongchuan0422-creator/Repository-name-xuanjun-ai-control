@@ -2,6 +2,9 @@ import hashlib
 import json
 import tempfile
 import unittest
+import zipfile
+from unittest import mock
+import services.ocr_engine.build_offline_bundle as builder
 from pathlib import Path
 from services.ocr_engine.build_offline_bundle import BundleError, validate_inputs
 
@@ -23,9 +26,12 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.notice=self.root/"NOTICE.md"
         self.notice.write_text("\n".join(x["filename"]+" "+x["sha256"] for x in self.model_files.values()))
         self.schema=self.root/"schema.json"; self.schema.write_text("{}")
-        wheel=self.wheels/"demo-1.0-py3-none-any.whl"; wheel.write_bytes(b"synthetic wheel")
+        wheel=self.wheels/"demo-1.0-py3-none-any.whl"
+        with zipfile.ZipFile(wheel,"w") as z:
+            z.writestr("demo-1.0.dist-info/WHEEL","Wheel-Version: 1.0\nGenerator: synthetic\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
+            z.writestr("demo.py","synthetic")
         self.lock=self.root/"lock.json"
-        self.lock.write_text(json.dumps({"target_platform":"linux-x86_64-cp311","python_implementation":"CPython","python_version":"3.11","abi":"cp311","requirements_sha256":hashlib.sha256(self.requirements.read_bytes()).hexdigest(),"wheels":[{"filename":wheel.name,"sha256":hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
+        self.lock.write_text(json.dumps({"target_platform":"linux-x86_64-cp311","python_implementation":"CPython","python_version":"3.11","abi":"cp311","target_tags":["cp311-cp311-manylinux_2_17_x86_64","py3-none-any"],"requirements_sha256":hashlib.sha256(self.requirements.read_bytes()).hexdigest(),"wheels":[{"filename":wheel.name,"sha256":hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
     def tearDown(self): self.tmp.cleanup()
     def check(self,platform="linux-x86_64-cp311"):
         return validate_inputs(platform,self.lock,self.wheels,self.models,self.requirements,self.manifest,self.license,self.notice,self.schema)
@@ -48,6 +54,26 @@ class OfflineBundleInputTests(unittest.TestCase):
     def test_requirements_change_invalidates_lock(self):
         self.requirements.write_text("demo==2.0\n")
         with self.assertRaisesRegex(BundleError,"REQUIREMENTS_LOCK_INPUT_SHA_MISMATCH"): self.check()
+    def test_cp312_windows_wheel_rejected_for_linux_cp311_target(self):
+        wheel=self.wheels/'demo-1.0-cp312-cp312-win_amd64.whl'
+        with zipfile.ZipFile(wheel,'w') as z:
+            z.writestr('demo-1.0.dist-info/WHEEL','Wheel-Version: 1.0\nTag: cp312-cp312-win_amd64\n')
+        self.lock.write_text(json.dumps({'target_platform':'linux-x86_64-cp311','python_implementation':'CPython','python_version':'3.11','abi':'cp311','target_tags':['cp311-cp311-manylinux_2_17_x86_64','py3-none-any'],'requirements_sha256':hashlib.sha256(self.requirements.read_bytes()).hexdigest(),'wheels':[{'filename':wheel.name,'sha256':hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
+        with self.assertRaisesRegex(BundleError,'WHEEL_TARGET_TAG_MISMATCH'): self.check()
+    def test_filename_and_internal_wheel_tags_must_match(self):
+        wheel=self.wheels/'demo-1.0-py3-none-any.whl'
+        with zipfile.ZipFile(wheel,'w') as z:
+            z.writestr('demo-1.0.dist-info/WHEEL','Wheel-Version: 1.0\nTag: cp312-cp312-win_amd64\n')
+        self.lock.write_text(json.dumps({'target_platform':'linux-x86_64-cp311','python_implementation':'CPython','python_version':'3.11','abi':'cp311','target_tags':['cp311-cp311-manylinux_2_17_x86_64','py3-none-any'],'requirements_sha256':hashlib.sha256(self.requirements.read_bytes()).hexdigest(),'wheels':[{'filename':wheel.name,'sha256':hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
+        with self.assertRaisesRegex(BundleError,'WHEEL_FILENAME_INTERNAL_TAG_MISMATCH'): self.check()
+    def test_default_cli_is_closed_without_explicit_build_flag(self):
+        with mock.patch.object(builder,'build_bundle',side_effect=AssertionError('must not build')):
+            self.assertEqual(builder.main(['--target-platform','linux-x86_64-cp311','--lock-json','x','--wheelhouse','w','--model-cache','m','--output','/tmp/new.tar.gz']),3)
+    def test_output_existing_target_is_never_overwritten(self):
+        output=self.root/'existing.tar.gz'; output.write_bytes(b'preserve-me')
+        with self.assertRaisesRegex(BundleError,'OUTPUT_MUST_BE_ABSOLUTE_AND_NOT_EXIST'):
+            builder.build_bundle('linux-x86_64-cp311',self.lock,self.wheels,self.models,output)
+        self.assertEqual(output.read_bytes(),b'preserve-me')
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
         with self.assertRaisesRegex(BundleError,"MODEL_NOTICE_MISSING_ATTRIBUTION:det"): self.check()
