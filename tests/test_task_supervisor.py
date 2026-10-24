@@ -40,6 +40,58 @@ class SupervisorTests(unittest.TestCase):
         self.s.claim(task, attempt, 'developer', 'WORK', 'run1', 'session1',
                      'lease1', 1, 1, now=self.now)
 
+
+    def development_contract(self, task='t1'):
+        return dict(
+            task_id=task,spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            entry='WORK',developer={'issuer':'native','subject':'developer'},
+            allowed_files=['src/f.py'],
+            trusted_reviewers=[
+                {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
+                {'issuer':'native','subject':'security','key_id':'sec',
+                 'role':'SECURITY'}])
+
+    def test_development_contract_is_canonical_idempotent_and_conflicting(self):
+        self.registration()
+        contract=self.development_contract()
+        first=self.s.register_development_contract('t1',contract,now=1000)
+        second=self.s.register_development_contract('t1',contract,now=1000)
+        self.assertFalse(first['duplicate']);self.assertTrue(second['duplicate'])
+        changed=dict(contract);changed['target_base_sha']='d'*40
+        with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
+            self.s.register_development_contract('t1',changed,now=1000)
+
+    def test_failed_development_completion_never_unlocks_dependency(self):
+        self.registration('t1')
+        self.registration('child',['t1'])
+        self.s.register_development_contract(
+            't1',self.development_contract(),now=1000)
+        caller={'caller_id':'writer','run_id':'run1',
+                'session_id':'session1','gateway_id':'gateway1'}
+        self.s.claim_writer('t1','a1','developer','WORK',caller,
+                            'lease1','provider1',['fake:development/source'],
+                            1700)
+        receipt=dict(
+            schema=1,entry='WORK',execution_path='WORK_NATIVE',task_id='t1',
+            spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            code_commit='d'*40,event='CODE_READY',attempt_id='a1',
+            lease_id='lease1',fence=1,epoch=1,source_comment_id=1,
+            status='RECEIPT_VALIDATED_NOT_ADMITTED',
+            native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
+            authority_effect='NONE',
+            required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
+        candidate=self.s.bind_development_candidate(
+            receipt,{'src/f.py':'e'*64},now=1001)
+        with self.assertRaises(ValueError):
+            self.s.complete_development_candidate(
+                't1',candidate['candidate_event_id'],'bad',
+                {'QA':'1'*64,'SECURITY':'2'*64},'complete',now=1002)
+        self.assertNotEqual(self.s._task('t1')['state'],'SUCCESS')
+        self.assertNotIn('child',[x['task_id'] for x in self.s.ready()])
+
+
     def test_ready_fair_scan_and_dependencies(self):
         self.registration('b')
         self.registration('a', ['b'])
