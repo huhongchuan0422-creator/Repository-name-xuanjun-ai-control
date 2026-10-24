@@ -181,10 +181,15 @@ class OriginalLifecycle(unittest.TestCase):
             'catalog_sha256':b.bundle['catalog_sha'],
             'window_start':900,'window_end':4500,
             'state':'ACTIVE_NOT_DELIVERED'})+b'\n')
+        b.legacy.newfile(b.job+'/checkpoint-001.json',c53.canon({
+            'schema':1,'sequence':1,'release_commit':c53.COMMIT,
+            'project':c53.PROJ,'phase':'WINDOW_ENABLED'})+b'\n')
         b.bundle['files']={name:b'' for name in c53.CONFIGS+c53.SLOTS}
         tx=c53.Transaction(b.spec,b.bundle,b)
         tx.stage='WINDOW_ENABLED'
-        intake=tx.run_19_after_window()
+        import pr17_b5_successor_entry as entry
+        with patch.object(entry,'_recover',return_value=tx):
+            intake=entry.dispatch('intake')
         self.assertEqual(intake['state'],'INTAKE_SENT_AWAITING_READY',intake)
         self.assertEqual(len(comments),19)
         self.assertEqual(tx.continue_after_original_ready()['state'],
@@ -265,7 +270,6 @@ finally:q.close()
         original.attach_after_worker_start(*pair(True))
         self.assertEqual(b.observe_poststart_canonical_readonly(b.bundle)['state'],
                          'SUCCESS_SNAPSHOT_READONLY')
-        import pr17_b5_successor_entry as entry
         b.recovered_from_protected=True
         b.authority.runtime_attachment=lambda phase:(original.queue,original.resource)
         with patch.object(entry,'_recover',return_value=tx):
