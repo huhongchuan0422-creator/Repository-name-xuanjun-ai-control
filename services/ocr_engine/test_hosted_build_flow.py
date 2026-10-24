@@ -71,6 +71,18 @@ class HostedBuildFlowTests(unittest.TestCase):
         self.assertNotIn("docker run",diagnostics)
         self.assertNotIn("docker pull",diagnostics)
         self.assertIn("docker image inspect",diagnostics)
+    def test_actual_offline_install_step_uses_python_dpkg_query_and_network_none(self):
+        steps=load_build_job()
+        step=self.step(steps,"Install and import-check only from the offline wheelhouse in the same pinned base")
+        self.calls.write_text("")
+        result=run_step(step,self.env)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        calls=self.calls.read_text().splitlines()
+        self.assertEqual(len(calls),1,calls)
+        self.assertTrue(calls[0].startswith("run "),calls)
+        self.assertIn("--network none",calls[0])
+        self.assertIn("verify_offline_runtime.py",calls[0])
+        self.assertNotIn("dpkg-query -W -f=",calls[0])
     def test_workflow_has_no_always_run_or_pull_in_failure_diagnostics(self):
         steps=load_build_job()
         diag=self.step(steps,"Record non-secret build/runtime diagnostics")
