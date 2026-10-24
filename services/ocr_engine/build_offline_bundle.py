@@ -41,7 +41,7 @@ def regular_file(path, label):
 
 def validate_deb_cache(deb_cache):
     if deb_cache is None:
-        return [], None, []
+        return [], None, [], None, None
     root = Path(deb_cache)
     if root.is_symlink() or not root.is_dir():
         raise BundleError("DEB_CACHE_NOT_DIRECTORY")
@@ -50,6 +50,8 @@ def validate_deb_cache(deb_cache):
     expected_base = "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199"
     if lock.get("base_image") != expected_base:
         raise BundleError("DEB_LOCK_BASE_IMAGE_MISMATCH")
+    lock_snapshot = lock_path.read_bytes()
+    lock_sha256 = hashlib.sha256(lock_snapshot).hexdigest()
     source = lock.get("apt_source")
     if not isinstance(source,dict) or source.get("path") != "debian.sources" or not isinstance(source.get("content"),str) or hashlib.sha256(source["content"].encode("utf-8")).hexdigest() != source.get("sha256"):
         raise BundleError("APT_SOURCE_FINGERPRINT_INVALID")
@@ -67,10 +69,11 @@ def validate_deb_cache(deb_cache):
         path = regular_file(root/name,"DEB")
         if sha256_file(path) != item["sha256"]:
             raise BundleError("DEB_SHA256_MISMATCH:"+name)
-        fields = subprocess.check_output(["dpkg-deb","-f",str(path),"Package","Version","Architecture"],text=True).splitlines()
+        fields = [subprocess.check_output(["dpkg-deb","-f",str(path),field],text=True).strip()
+                  for field in ("Package","Version","Architecture")]
         if fields != [item["package"],item["version"],item["architecture"]]:
             raise BundleError("DEB_METADATA_MISMATCH:"+name)
-        verified.append((path,"system-debs/"+name))
+        verified.append((path,"system-debs/"+name,item["sha256"]))
     actual = {p.name for p in root.glob("*.deb")}
     if actual != seen:
         raise BundleError("DEB_MEMBER_SET_MISMATCH")
@@ -90,11 +93,11 @@ def validate_deb_cache(deb_cache):
         path = regular_file(apt_root/rel,"APT_INDEX")
         if path.stat().st_size != item["bytes"] or sha256_file(path) != item["sha256"]:
             raise BundleError("APT_INDEX_SHA256_MISMATCH:"+rel)
-        verified_apt.append((path,"system-apt-lists/"+rel))
+        verified_apt.append((path,"system-apt-lists/"+rel,item["sha256"]))
     actual_apt = {str(p.relative_to(apt_root)) for p in apt_root.rglob("*") if p.is_file() and not p.is_symlink()}
     if actual_apt != apt_seen:
         raise BundleError("APT_INDEX_MEMBER_SET_MISMATCH")
-    return verified, lock_path, verified_apt
+    return verified, lock_path, verified_apt, lock_snapshot, lock_sha256
 
 def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requirements_path=REQUIREMENTS,
                     manifest_path=MODEL_MANIFEST, license_path=LICENSE, notice_path=NOTICE,
@@ -249,13 +252,13 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
     checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
                               requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
                               license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
-    verified_debs, deb_lock_path, verified_apt = validate_deb_cache(system_deb_cache)
+    verified_debs, deb_lock_path, verified_apt, deb_lock_snapshot, deb_lock_sha256 = validate_deb_cache(system_deb_cache)
     archive_manifest = {k:v for k,v in checked.items() if not k.startswith("verified_")}
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
     archive_manifest["notice_file"] = "NOTICE.md"
     archive_manifest["system_deb_lock"] = "system-deb-lock.json" if deb_lock_path else None
-    archive_manifest["system_deb_lock_sha256"] = sha256_file(deb_lock_path) if deb_lock_path else None
+    archive_manifest["system_deb_lock_sha256"] = deb_lock_sha256 if deb_lock_path else None
     # Freeze only the digests already verified by validate_inputs. Never bless bytes
     # observed after validation as the new source of truth.
     frozen = {
@@ -270,10 +273,10 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
         frozen["models/" + item["filename"]] = item["sha256"]
     for item in checked["wheels"]:
         frozen["wheelhouse/" + item["filename"]] = item["sha256"]
-    for path, arcname in verified_debs + verified_apt:
-        frozen[arcname] = sha256_file(path)
+    for path, arcname, expected_sha in verified_debs + verified_apt:
+        frozen[arcname] = expected_sha
     if deb_lock_path:
-        frozen["system-deb-lock.json"] = sha256_file(deb_lock_path)
+        frozen["system-deb-lock.json"] = deb_lock_sha256
     # Detect any validate→freeze race before the first archive member is written.
     current_paths = {
         "services/ocr_engine/model_manifest.json": Path(MODEL_MANIFEST),
@@ -288,7 +291,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
     }
     current_paths.update({"models/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_models"]})
     current_paths.update({"wheelhouse/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_wheels"]})
-    current_paths.update({arcname:path for path,arcname in verified_debs + verified_apt})
+    current_paths.update({arcname:path for path,arcname,_expected_sha in verified_debs + verified_apt})
     if deb_lock_path:
         current_paths["system-deb-lock.json"] = deb_lock_path
     for arcname, expected_sha in frozen.items():
@@ -296,6 +299,8 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
         regular_file(path, "BUNDLE_INPUT")
         if sha256_file(path) != expected_sha:
             raise BundleError("VALIDATE_FREEZE_SHA256_MISMATCH:" + arcname)
+    if deb_lock_path and deb_lock_path.read_bytes() != deb_lock_snapshot:
+        raise BundleError("VALIDATE_FREEZE_SHA256_MISMATCH:system-deb-lock.json")
     with tempfile.NamedTemporaryFile(prefix=".ocr-bundle-", suffix=".tmp", dir=str(output.parent), delete=False) as temp:
         temp_path = Path(temp.name)
     try:
@@ -318,10 +323,16 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
                 (Path(CONFIG_SCHEMA), "deployment_config.schema.json"),
             ):
                 archive.add(str(path), arcname=arcname, recursive=False)
-            for path, arcname in checked["verified_models"] + checked["verified_wheels"] + verified_debs + verified_apt:
+            for path, arcname in checked["verified_models"] + checked["verified_wheels"] + [(p,a) for p,a,_ in verified_debs + verified_apt]:
                 archive.add(str(path), arcname=arcname, recursive=False)
             if deb_lock_path:
-                archive.add(str(deb_lock_path), arcname="system-deb-lock.json", recursive=False)
+                with tempfile.NamedTemporaryFile(prefix=".ocr-deb-lock-", suffix=".json", dir=str(output.parent), delete=False) as lock_temp:
+                    lock_temp.write(deb_lock_snapshot)
+                    frozen_lock_path=Path(lock_temp.name)
+                try:
+                    archive.add(str(frozen_lock_path), arcname="system-deb-lock.json", recursive=False)
+                finally:
+                    frozen_lock_path.unlink(missing_ok=True)
             lock_payload = {
                 "target_platform": checked["target_platform"],
                 "python_implementation": checked["python_implementation"],
