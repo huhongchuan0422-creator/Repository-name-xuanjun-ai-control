@@ -21,7 +21,7 @@ def build():
     stream=io.BytesIO()
     with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED) as z:
         for name,b in sorted(dict(files,**{'manifest.json':body}).items()):
-            meta=zipfile.ZipInfo(name,(2026,10,24,0,0,0));meta.create_system=3;meta.external_attr=0o100600<<16
+            meta=zipfile.ZipInfo(name,(2026,10,24,0,0,0));meta.create_system=3;meta.external_attr=0o100600<<16;meta.compress_type=zipfile.ZIP_DEFLATED
             z.writestr(meta,b)
     loader_sha=hashlib.sha256(files['loader.py']).hexdigest()
     manifest_sha=hashlib.sha256(body).hexdigest()
@@ -56,7 +56,8 @@ if (
  set +e
  /usr/bin/sudo -n /usr/bin/python3 -I -B -S -c """+shlex.quote(code)+"""
  community_bc_exit=$?
- printf '{"record":"SUDO_CHILD_EXIT","child_exit":%s,"login_shell_preserved":true,"shell_exit_not_acceptance":true,"servertrust":false}\\n' "$community_bc_exit"
+ printf '{"record":"SUDO_CHILD_EXIT","child_exit":%s,"login_shell_preserved":true,"shell_exit_not_acceptance":true,"servertrust":false}\n' "$community_bc_exit"
+ printf '{"record":"BC_OUTER_NOT_ACCEPTANCE","requires":["BC_RESULT","SUDO_CHILD_EXIT"],"shell_rc_is_acceptance":false}\n'
  exit "$community_bc_exit"
 ); then
  :
@@ -66,13 +67,20 @@ fi
 """).encode()
     return stream.getvalue(),body,commands
 
+EXPECTED_SOURCE_FILES={'loader.py','scripts/community_preview_release_plan.py','scripts/community_preview_upgrade.py',
+ 'scripts/community_preview_version_inspect.py','scripts/community_preview_update_checkpoint.py',
+ 'scripts/community_preview_update_composition.py','scripts/community_preview_site_prepare.py',
+ 'scripts/community_preview_stopped_handoff.py','deploy/community-preview/f131-image-receipt.json'}
+BUILD_INPUTS={'scripts/community_preview_bc_build.py','scripts/community_preview_bc_loader.py'}
+
 def commit_binding():
     try:
+        if h.SOURCE_FILES!=EXPECTED_SOURCE_FILES:return None
         head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
         if re.fullmatch('[0-9a-f]{40}',head) is None:return None
         if os.environ.get('GITHUB_SHA') and os.environ['GITHUB_SHA']!=head:return None
-        for name in h.SOURCE_FILES:
-            path='scripts/community_preview_bc_loader.py' if name=='loader.py' else name
+        paths=BUILD_INPUTS|{('scripts/community_preview_bc_loader.py' if name=='loader.py' else name) for name in EXPECTED_SOURCE_FILES}
+        for path in paths:
             if subprocess.check_output(['git','show',head+':'+path],cwd=ROOT,stderr=subprocess.DEVNULL)!=(ROOT/path).read_bytes():return None
         return head
     except (OSError,subprocess.SubprocessError):return None
@@ -89,5 +97,7 @@ if __name__=='__main__':
         status='PROPOSAL_NOT_TESTED_NOT_AUTHORIZED',product_source='f13155ed63a3137d41766ee587d9b4b96a81477f',
         archive_bytes=len(archive),archive_sha256=hashlib.sha256(archive).hexdigest(),
         files={name:dict(bytes=len(b),sha256=hashlib.sha256(b).hexdigest()) for name,b in commands.items()},
+        install_candidate=dict(site_executed=False,install_executed=False,directory_mode='0700',file_mode='0600',
+            no_extractall=True,requires_separate_root_review=True,install_root=h.CONTROL),
         source_manifest_sha256=hashlib.sha256(manifest).hexdigest(),site_executed=False)
     (target/'delivery.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')

@@ -59,6 +59,7 @@ class Journal:
         rebuilt=(plan.prepare_stopped if stopped else plan.prepare)(candidate['source'],candidate['current'],candidate['image'])
         self.handoff_binding=handoff_binding
         if stopped:
+            if lease_fd is None:raise Hold('STOPPED_HANDOFF_CONTINUOUS_LEASE_REQUIRED')
             if type(handoff_binding) is not dict or set(handoff_binding)!={'approval_sha256','handoff_sha256'} or not all(plan.exact_hex(v,64) for v in handoff_binding.values()):raise Hold('EXACT_HANDOFF_BINDING_REQUIRED')
         elif handoff_binding is not None or lease_fd is not None:raise Hold('LEGACY_JOURNAL_NO_HANDOFF_ARGUMENTS')
         if candidate!=rebuilt:raise Hold('EXACT_COMPILED_PLAN_REQUIRED')
@@ -175,9 +176,22 @@ class Journal:
             self.state=value
         except BaseException:self.poisoned=True;raise
     def close(self):
+        unknown=False
         for name in ('fd','lock','parent'):
             value=getattr(self,name,None)
-            if value is not None:os.close(value);setattr(self,name,None)
+            if value is None:continue
+            try:
+                os.close(value);setattr(self,name,None)
+            except BaseException:
+                # Never retry a possibly-consumed fd: it may already have been
+                # recycled. Prove EBADF only; otherwise retain the reference.
+                try:os.fstat(value)
+                except OSError as error:
+                    if error.errno==9:setattr(self,name,None)
+                    else:unknown=True
+                except BaseException:unknown=True
+                else:unknown=True
+        if unknown:raise Hold('JOURNAL_CLEANUP_UNKNOWN')
 
 
 class OriginalTransport:
@@ -229,6 +243,7 @@ class Update:
     def phase_check(self,intent,new_id):
         p=self.journal.plan;c=p['current'];old_running=intent=='OLD_STOP_INTENT'
         self.guard(old_running)
+        if self.handoff is not None:self.handoff.pre_action(intent,new_id)
         self.t.inspect(c['container_id'],c['image_id'],old_running)
         if intent.startswith('RECOVERY_'):
             if not plan.exact_hex(new_id,64) or new_id!=self.journal.state['new_id']:raise Hold('EXACT_NEW_ID_REQUIRED')

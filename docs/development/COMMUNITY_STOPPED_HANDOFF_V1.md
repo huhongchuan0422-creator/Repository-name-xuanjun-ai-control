@@ -126,3 +126,9 @@ binding; whole-writer maintenance responsibility and actual root freeze witness;
 real protected data capacity; B actual snapshot/three clone evidence; final plan-bound
 C approval and truthful rollback-health limitation decision. No private input upload.
 Physical B/C/backup/stop/start/update/WeChat/OCR remain separately unapproved.
+
+## Source-only installation admission (not executed)
+
+The generated carrier is **not an installer**. Any later separately approved root installer must create the fixed `control-stopped-v1` directory chain as root-owned mode `0700`, create every listed regular file as root-owned single-link mode `0600`, verify the manifest and file hashes before import, and publish atomically. A generic ZIP `extractall` is not an admitted installation path. The existing A `control-oci2330-v1` tree is never overwritten.
+
+The wrapper shell is intentionally login-shell-preserving: its outer shell return code is not acceptance. Acceptance requires both a structured Python `BC_RESULT` record and a matching `SUDO_CHILD_EXIT=0`; the wrapper also emits `BC_OUTER_NOT_ACCEPTANCE` to make this explicit. B/C server installation, snapshot, stop/rename/run/recovery and deployment remain separately authorized现场 actions and are not performed by this source delivery.

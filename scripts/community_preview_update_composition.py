@@ -418,15 +418,14 @@ def compose(*,approval_sha256,backup_fd,execution_enabled=False):
         if journal is not None:journal.close()
         bindings.close();raise
 
-def exact_stopped_names(candidate,phase):
-    """New mode only. Fixed original/current/candidate names, no unknown objects."""
+def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
+    """Stopped-handoff full prefix inventory for every durable phase."""
     require(candidate.get('handoff_mode')=='STOPPED_HANDOFF_V1','EXPLICIT_STOPPED_MODE_REQUIRED')
     fmt='{"id":{{json .ID}},"name":{{json .Names}}}'
     rows=observation.capture(plan.DOCKER+['container','ls','--all','--no-trunc','--format',fmt,
         '--filter','name=^/xuanjun-community-preview'],timeout=8,budget=16384).splitlines()
     require(len(rows)<=64,'CONTAINER_NAMES_UNKNOWN')
-    names={}
-    legacy='xuanjun-community-preview-before-2330dd55'
+    names={};legacy='xuanjun-community-preview-before-2330dd55'
     allowed={plan.NAME,candidate['rollback_name'],candidate['failed_name'],legacy}
     for row in rows:
         value=observation.exact_json(row)
@@ -438,11 +437,27 @@ def exact_stopped_names(candidate,phase):
         cid='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc'
         image='sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30'
         require(names[legacy]==cid and inspect_bound(cid,image)['running'] is False,'LEGACY_WRITER_NOT_STOPPED')
-    require(candidate['failed_name'] not in names,'FAILED_NAME_EXISTS')
-    old=candidate['current']['container_id']
-    if phase in ('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT'):
-        require(names.get(plan.NAME)==old and candidate['rollback_name'] not in names,'INITIAL_STOPPED_NAME_CHANGED')
-    else:
-        require(phase in ('OLD_RETAINED','NEW_RUN_INTENT') and plan.NAME not in names
-             and names.get(candidate['rollback_name'])==old,'RETAINED_STOPPED_NAME_CHANGED')
+    old=candidate['current']['container_id'];rb=candidate['rollback_name'];failed=candidate['failed_name']
+    pre=('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT')
+    retained=('OLD_RETAINED','NEW_RUN_INTENT')
+    live_new=('NEW_KNOWN','KNOWN_FAILURE','RECOVERY_STOP_NEW_INTENT','COMMITTED')
+    if phase in pre:
+        require(names.get(plan.NAME)==old and rb not in names and failed not in names,'INITIAL_STOPPED_NAME_CHANGED')
+    elif phase in retained:
+        require(plan.NAME not in names and names.get(rb)==old and failed not in names,'RETAINED_STOPPED_NAME_CHANGED')
+    elif phase in live_new:
+        require(plan.exact_hex(new_id,64) and names.get(plan.NAME)==new_id and names.get(rb)==old
+                and failed not in names,'NEW_WRITER_NAME_CHANGED')
+    elif phase in ('RECOVERY_RENAME_NEW_INTENT',):
+        before=(names.get(plan.NAME)==new_id and names.get(rb)==old and failed not in names)
+        after=(plan.NAME not in names and names.get(rb)==old and names.get(failed)==new_id)
+        require(plan.exact_hex(new_id,64) and (before if pre_action else before or after),'RECOVERY_NEW_NAME_CHANGED')
+    elif phase in ('RECOVERY_RESTORE_OLD_INTENT',):
+        before=(plan.NAME not in names and names.get(rb)==old and names.get(failed)==new_id)
+        after=(names.get(plan.NAME)==old and rb not in names and names.get(failed)==new_id)
+        require(plan.exact_hex(new_id,64) and (before if pre_action else before or after),'RECOVERY_FAILED_NAME_CHANGED')
+    elif phase in ('RECOVERY_START_OLD_INTENT','ROLLED_BACK_PREVIEW_HOLD'):
+        require(plan.exact_hex(new_id,64) and names.get(plan.NAME)==old and rb not in names
+                and names.get(failed)==new_id,'RECOVERY_OLD_NAME_CHANGED')
+    else:raise controller.Hold('PHASE_NAME_INVENTORY_INSPECT_ONLY')
     return True
