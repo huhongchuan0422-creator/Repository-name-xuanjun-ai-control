@@ -677,6 +677,16 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertFalse(ready)
         self.assertEqual(reason, "OCR_DATABASE_KEY_BINDING_MISMATCH")
 
+    def test_preview_entrypoint_holds_before_app_creation_when_db_absent(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_main_hold_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        with mock.patch.object(module, "check_environment", return_value={
+                "ok": True, "database": "DB_ABSENT_PARENT_CHAIN_VERIFIED_NOT_READY", "models": {}, "errors": []}), \
+             mock.patch.object(module, "create_app", side_effect=AssertionError("must not construct app")) as create, \
+             mock.patch.dict(os.environ, {"OCR_SQLITE_PATH":str(self.root/"missing.sqlite3"),"OCR_ENCRYPTION_KEY":"synthetic"}, clear=False):
+            self.assertEqual(module.main(), 78)
+            create.assert_not_called()
+
     def test_preview_entrypoint_rejects_external_module_origin_and_bad_callback_arity(self):
         spec = importlib.util.spec_from_file_location("ocr_entrypoint_origin_test", Path(__file__).with_name("container_entrypoint.py"))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
