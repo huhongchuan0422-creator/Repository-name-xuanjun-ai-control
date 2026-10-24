@@ -2,9 +2,9 @@
   "files": [
     {
       "bundle_path": "README.md",
-      "bytes": 6593,
+      "bytes": 7497,
       "release_path": null,
-      "sha256": "062607f2b4ddfdb6f6b6a2c720d2750a0506972d0c2659115111b4ed980a71e2"
+      "sha256": "b74d3a912030bd5d141cf75fd740f8108d93fff32ce1264e23847b7de8b5fb12"
     },
     {
       "bundle_path": "deployment/cloud-connection/oauth/authority.example.json",
@@ -105,8 +105,8 @@
     {
       "bundle_path": "freeze_runtime_source.py",
       "release_path": null,
-      "bytes": 3471,
-      "sha256": "454bd1f0ebfbbb26994b2faee10ecde07bb66f8b68e28110d7d9fb0d7c96aab1"
+      "bytes": 3667,
+      "sha256": "8ab0644c9df57231296513c5656595fe850ea469c76585d43dfd9c45dabf7825"
     },
     {
       "bundle_path": "new19-source/production/cloud_connection/action_binding.py",
@@ -291,8 +291,8 @@
     {
       "bundle_path": "test_runtime_freeze_and_caller.py",
       "release_path": null,
-      "bytes": 3413,
-      "sha256": "8dafb94288cd356132625b8a9b1bba78816d0c3ee071c5cd978d0183abbcc386"
+      "bytes": 5344,
+      "sha256": "6384be45f670666f9fe56973c64f36271d99070f5a23c39a03678bbea6368151"
     }
   ],
   "known_hold": "LIVE_WAL_PRECHECK_SHM_READER_MARK_UNDECIDED",

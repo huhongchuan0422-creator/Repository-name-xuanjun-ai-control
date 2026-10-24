@@ -52,9 +52,15 @@ def inventory():
             'source_manifest_sha256': digest((ROOT / 'SOURCE_MANIFEST.json').read_bytes())}
 
 
-def git(*args):
+def git_bytes(*args):
+    # Git blob contents are exact bytes, including the terminal LF.
     return subprocess.check_output(('git',) + args, cwd=str(ROOT),
-                                   stderr=subprocess.DEVNULL).decode().strip()
+                                   stderr=subprocess.DEVNULL)
+
+
+def git(*args):
+    # Only Git's textual identifiers/status receive line-ending normalization.
+    return git_bytes(*args).decode().strip()
 
 
 def binder(commit):
@@ -66,7 +72,7 @@ def binder(commit):
         raise ValueError('COMMIT_NOT_CURRENT_HEAD')
     manifest = canonical(inventory()) + b'\n'
     path = 'plans/p2_b5_new19_offline_candidate/RUNTIME_SOURCE_MANIFEST.json'
-    if git('show', commit + ':' + path).encode() != manifest:
+    if git_bytes('show', commit + ':' + path) != manifest:
         raise ValueError('COMMITTED_RUNTIME_MANIFEST_CHANGED')
     return {'schema': 'B5_EXTERNAL_RELEASE_BINDER_V1',
             'release_commit': commit, 'release_tree': git('rev-parse', commit+'^{tree}'),

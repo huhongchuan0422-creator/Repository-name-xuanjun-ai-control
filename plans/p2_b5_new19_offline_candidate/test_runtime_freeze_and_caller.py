@@ -1,6 +1,8 @@
 """No network, credentials, server, or batch operations."""
 import pathlib
 import json
+import subprocess
+import tempfile
 import sys
 import unittest
 from unittest import mock
@@ -39,6 +41,41 @@ class FreezeAndCallerTests(unittest.TestCase):
                                '' if args[0]=='status' else 'b'*40):
             with self.assertRaisesRegex(ValueError,'COMMIT_NOT_CURRENT_HEAD'):
                 freeze.binder('a'*40)
+
+    def test_real_git_binder_preserves_manifest_lf(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=pathlib.Path(temporary)/'plans/p2_b5_new19_offline_candidate'
+            root.mkdir(parents=True)
+            relative='production/cloud_connection/queue.py'
+            source=root/relative
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b'# inert source\n')
+            (root/'SOURCE_MANIFEST.json').write_text(json.dumps({'files':[
+                {'bundle_path':relative,'release_path':relative,
+                 'bytes':len(source.read_bytes()),
+                 'sha256':freeze.digest(source.read_bytes())}]}))
+            def git(*args):
+                return subprocess.check_output(('git',)+args,cwd=temporary,
+                                               stderr=subprocess.DEVNULL).decode().strip()
+            git('init','-q')
+            git('config','user.name','Test')
+            git('config','user.email','test@example.invalid')
+            with mock.patch.object(freeze,'ROOT',root), \
+                 mock.patch.object(freeze,'ORDER',('queue.py',)):
+                manifest=freeze.canonical(freeze.inventory())+b'\n'
+                path=root/'RUNTIME_SOURCE_MANIFEST.json'
+                path.write_bytes(manifest)
+                git('add','.')
+                git('commit','-qm','exact manifest')
+                head=git('rev-parse','HEAD')
+                self.assertEqual(freeze.binder(head)['runtime_manifest_sha256'],
+                                 freeze.digest(manifest))
+                path.write_bytes(manifest[:-1])
+                git('add','.')
+                git('commit','-qm','missing LF')
+                with self.assertRaisesRegex(ValueError,
+                                            'COMMITTED_RUNTIME_MANIFEST_CHANGED'):
+                    freeze.binder(git('rev-parse','HEAD'))
 
     def test_original_factory_uses_one_original_network_without_io(self):
         sentinel=object()

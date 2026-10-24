@@ -80,3 +80,16 @@ worker code pin. It refuses a dirty tree or a mismatched HEAD. Neither this
 inventory nor the external binder changes the c53 spec, old code pin, or any
 protected deployment slot. A separate reviewed successor spec and exact
 site admission remain necessary; the old c53 pin cannot install this draft.
+
+The Owner's staged decision places final body retrieval in B5's own original
+OAuth HTTP call. This source still contains the old controller's post-activation
+dual-scope gate and maintenance-side `receive_and_verify_19`. These functions
+are not a staged successor spec: moving or skipping either gate without an
+exact versioned replacement would silently change admission and closeout.
+The original c53 spec raw, its 32-file source loader and fixed release paths
+are byte-pinned to the old commit/pin. A successor must bind the new runtime
+manifest, state which scoped approval applies at each stage, preserve the
+stop/lock/CAS and UNKNOWN recovery, and define a trustworthy return receipt
+from B5's HTTP read before the exact close approval. No such original producer
+or successor spec is present in this candidate, so staged execution remains
+HOLD even though the offline source inventory is verified.
