@@ -134,9 +134,37 @@ class StageBoundaryTests(unittest.TestCase):
                 transaction.Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
             candidate.close_after_b5_http(proof)
         self.assertEqual(checkpoints,
-                         ['FAILURE_READY_FOR_B5_HTTP_NOT_RECEIVED'])
-        self.assertEqual(candidate.stage,'READY_FOR_B5_HTTP_NOT_RECEIVED')
+                         ['CLOSE_ATTEMPT','FAILURE_CLOSE_ATTEMPT'])
+        self.assertEqual(candidate.stage,'CLOSE_ATTEMPT')
         self.assertEqual(effects,['proof','approve','close'])
+
+    def test_close_preintent_must_persist_before_close_leaf(self):
+        checkpoints=[];effects=[]
+        class Authority:
+            evidence_store=object()
+        class Backend:
+            authority=Authority()
+            def checkpoint(self,phase):
+                checkpoints.append(phase)
+                if phase=='CLOSE_ATTEMPT':
+                    raise transaction.Hold('CHECKPOINT_NOT_DURABLE')
+            def witness_action(self):return contextlib.nullcontext()
+            def successor_release_action(self):return contextlib.nullcontext()
+            def successor_evidence_action(self,kind):return contextlib.nullcontext()
+            def verify_b5_http_provenance(self,*args):effects.append('proof')
+            def approve_precise_b5_exposure_close(self,*args):effects.append('approve')
+            def close_b5_exposure_success_successor_only(self):effects.append('close')
+        candidate=transaction.Transaction(self.spec,self.bundle,Backend())
+        candidate.stage='READY_FOR_B5_HTTP_NOT_RECEIVED'
+        proof={'state':'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+               'bytes':93592,'objects':19,'close_approval':'NOT_PROVEN',
+               'proof_sha256':'b'*64}
+        with self.assertRaisesRegex(transaction.Hold,'CHECKPOINT_NOT_DURABLE'):
+            candidate.close_after_b5_http(proof)
+        self.assertEqual(checkpoints,['CLOSE_ATTEMPT',
+                                      'FAILURE_CLOSE_ATTEMPT'])
+        self.assertEqual(effects,['proof','approve'])
+        self.assertEqual(candidate.stage,'CLOSE_ATTEMPT')
 
     def test_successor_factory_type_and_close_sources_fail_closed(self):
         candidate=transaction.Transaction(self.spec,self.bundle,self.backend)
