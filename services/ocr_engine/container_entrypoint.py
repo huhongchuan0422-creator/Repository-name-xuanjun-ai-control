@@ -46,7 +46,8 @@ def check_existing_database(db_path, key_bytes):
             if not REQUIRED_TABLES.issubset(tables):
                 return False, "OCR_DATABASE_SCHEMA_NOT_READY"
             rows = db.execute("SELECT check_value FROM ocr_key_check").fetchall()
-            expected = hashlib.sha256(b"xuanjun-ocr-index-v1:" + key_bytes).hexdigest()
+            signing_key = hashlib.sha256(b"xuanjun-ocr-index-v1:" + key_bytes).digest()
+            expected = hmac.new(signing_key, b"encryption-key-check-v1", hashlib.sha256).hexdigest()
             # The store records this derived key check as an HMAC-style opaque digest.
             if len(rows) != 1 or not isinstance(rows[0][0], str) or not hmac.compare_digest(rows[0][0], expected):
                 return False, "OCR_DATABASE_KEY_BINDING_MISMATCH"
