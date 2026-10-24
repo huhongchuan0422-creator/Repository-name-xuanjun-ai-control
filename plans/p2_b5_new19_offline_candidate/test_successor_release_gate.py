@@ -64,14 +64,21 @@ class GateTests(unittest.TestCase):
         manifest=(ROOT/'SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json').read_bytes()
         old={base:base+'/releases/e78bd7749414d1637012f57b65d2019955282fc3'
              for base in c53.BASES}
+        listed=json.loads((ROOT/'SOURCE_MANIFEST.json').read_bytes())
+        runtime={x['release_path']:(ROOT/x['bundle_path']).read_bytes()
+                 for x in listed['files'] if x['release_path'] is not None}
+        runtime[c53.binder.MANIFEST_PATH]=(ROOT/'RUNTIME_SOURCE_MANIFEST.json').read_bytes()
+        current=dict(old)
         gate=ExternalReleaseGate(approved_sha256=c53.sha(raw),
             read_binder=lambda:raw,read_manifest=lambda:manifest,
             read_source=lambda name:(ROOT/name).read_bytes(),
-            read_current=lambda:old,
-            read_installed_runtime=lambda base,name:(_ for _ in ()).throw(
-                AssertionError('PUBLISH_MUST_NOT_READ_UNPUBLISHED_RUNTIME')))
-        self.assertEqual(gate.check('publish',self.spec),
-                         '277e88648215806b3102d8d3eb7d114b09fbe16e')
+            read_current=lambda:current,
+            read_installed_runtime=lambda base,name:runtime[name])
+        for phase in ('preflight','publish','start','recover'):
+            if phase=='start':
+                current.update(zip(c53.BASES,self.spec['fixed_paths']['target_release']))
+            self.assertEqual(gate.check(phase,self.spec),
+                             '1068f49acf8c6052e3f9774c38fa3585a45dbfce')
 
     def test_binder_wrong_spec_or_current_rejected(self):
         gate=fixture_gate(self.spec,'publish')
