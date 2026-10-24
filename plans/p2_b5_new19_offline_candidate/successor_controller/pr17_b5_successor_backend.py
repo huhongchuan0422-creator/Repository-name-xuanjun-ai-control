@@ -1200,11 +1200,11 @@ class R2HostBackend:
         approved=self._receipt('approve_c53_b5_exposure_close',self.job)
         c53.require(approved.get('approved') is True and approved.get('job')==self.job,
                     'SUCCESSOR_CLOSEOUT_NOT_APPROVED')
-        self.legacy.command(['/usr/bin/systemctl','stop','xuanjun-cloud-connection.service'],60)
-        self.legacy.command(['/usr/bin/systemctl','is-active','--quiet',
-                             'xuanjun-cloud-connection.service'],10,(3,))
-        self.worker_stopped=True
         try:
+            self.legacy.command(['/usr/bin/systemctl','stop','xuanjun-cloud-connection.service'],60)
+            self.legacy.command(['/usr/bin/systemctl','is-active','--quiet',
+                                 'xuanjun-cloud-connection.service'],10,(3,))
+            self.worker_stopped=True
             from pr17_b5_successor_authority import ExistingRequestAuthority
             c53.require(type(self.authority) is ExistingRequestAuthority and
                         self.authority.original is not None,
