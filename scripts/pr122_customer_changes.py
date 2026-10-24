@@ -29,10 +29,23 @@ class Changes:
         self.c.audit(project,uid,'CHANGE_HISTORY_READ',case)
         return result
 
-    def _append(self, uid, project, case, revision, kind, payload,guard=None):
+    def _append(self, uid, project, case, revision, kind, payload,guard=None,submit_key=None):
         with self.c.tx():
             self.c.project(uid,project)
             if guard:guard()
+            if submit_key is not None:
+                # BEGIN IMMEDIATE in Center.tx serializes competing requests.
+                # The original change_events table remains the only source of truth.
+                for row in self.c.db.execute(
+                    "SELECT id,case_id,seq,payload FROM change_events WHERE project=? AND actor=? AND kind='REQUEST'",
+                    (project,uid)):
+                    prior=json.loads(self.c.decrypt(row['payload'],row['id']))
+                    if prior.get('idempotency_key')!=submit_key:continue
+                    if prior.get('request_sha256')!=payload['request_sha256']:
+                        raise Conflict('IDEMPOTENCY_KEY_REUSED')
+                    return {'id':row['case_id'],'revision':row['seq'],'event_id':row['id'],**prior}
+                # Charge quota only for the first committed logical request.
+                self.c.limit('change-submit:'+uid+':'+project,30,300)
             latest=self.c.db.execute('SELECT MAX(seq) FROM change_events WHERE project=? AND case_id=?',(project,case)).fetchone()[0] or 0
             if type(revision) is not int or revision!=latest:raise Conflict('CHANGE_REVISION')
             eid='ce_'+secrets.token_hex(16);seq=revision+1
@@ -58,13 +71,26 @@ class Changes:
             if self._preview(uid,project,page,version)!=bound or document(self.c,uid,project,document_id,page,version)!=doc:raise Conflict('AUTHORITY_CHANGED')
         return self._append(uid,project,'baseline_'+secrets.token_hex(12),0,'BASELINE',{'page':page,'page_sha256':version,'document_id':doc['id'],'document_sha256':doc['document_sha256'],'version_sha256':doc['version_sha256'],'confirmed_requirement':doc['text'],'confirmed_by':doc['confirmed_by'],'confirmed_at':doc['confirmed_at'],'source_ref':doc['source_ref'],'preview':bound,'state':'CANONICAL_BASELINE_SELECTED'},guard)
 
-    def submit(self, uid, project, page, version, text, intent='RECTIFICATION'):
+    def submit(self, uid, project, page, version, text, intent='RECTIFICATION', idempotency_key=None):
         self.c.project(uid,project,{'OWNER'});bound=self._preview(uid,project,page,version)
         if intent not in ('RECTIFICATION','NEW_ORDER'):raise ValueError('REQUEST_INTENT')
-        self.c.limit('change-submit:'+uid+':'+project,30,300)
+        if idempotency_key is None:
+            # Exact legacy ordering: valid identity/authority and intent consume
+            # the original quota before request text validation.
+            self.c.limit('change-submit:'+uid+':'+project,30,300)
+            request=safe_text(text)
+            def guard():
+                if self._preview(uid,project,page,version)!=bound:raise Conflict('AUTHORITY_CHANGED')
+            payload={'page':page,'page_sha256':version,'preview':bound,'request':request,'intent':intent,'state':'REQUESTED'}
+            return self._append(uid,project,'change_'+secrets.token_hex(12),0,'REQUEST',payload,guard)
+        if type(idempotency_key) is not str or not re.fullmatch(r'[A-Za-z0-9_-]{16,128}',idempotency_key):
+            raise ValueError('INVALID_IDEMPOTENCY_KEY')
+        request=safe_text(text)
         def guard():
             if self._preview(uid,project,page,version)!=bound:raise Conflict('AUTHORITY_CHANGED')
-        return self._append(uid,project,'change_'+secrets.token_hex(12),0,'REQUEST',{'page':page,'page_sha256':version,'preview':bound,'request':safe_text(text),'intent':intent,'state':'REQUESTED'},guard)
+        payload={'page':page,'page_sha256':version,'preview':bound,'request':request,'intent':intent,'state':'REQUESTED','idempotency_key':idempotency_key}
+        payload['request_sha256']=digest(canonical({'page':page,'version':version,'request':request,'intent':intent}))
+        return self._append(uid,project,'change_'+secrets.token_hex(12),0,'REQUEST',payload,guard,idempotency_key)
 
     def confirm_new_scope(self, uid, project, case, revision, document_id):
         self.c.project(uid,project,{'OWNER'});events=self._events(uid,project,case);request=events[0]['payload']
