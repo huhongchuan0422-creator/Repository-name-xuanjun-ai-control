@@ -39,6 +39,9 @@ class SealedOSBoundary:
     def __init__(self, root, allowed, pins):
         self.root = pathlib.Path(root)
         self.allowed = frozenset(allowed)
+        self.directories = frozenset({'/'} | {
+            str(parent) for path in self.allowed
+            for parent in pathlib.PurePosixPath(path).parents})
         self.pins = {}
         self.sealed_paths = {}
         for path, identity in pins.items():
@@ -53,24 +56,27 @@ class SealedOSBoundary:
         identity = self.pins.get((st.st_dev, st.st_ino))
         if identity:
             return StatView(st, *identity)
-        # Every fixture directory is root-owned in this synthetic boundary;
-        # unregistered regular files remain untrusted and keep their identity.
-        if (st.st_mode & 0o170000) == 0o040000:
+        # The disposable fixture models UK root ownership on both prepared
+        # directories and files atomically published after sealing. New files
+        # retain their real dev/ino, so they cannot inherit a baseline pin.
+        if (st.st_mode & 0o170000) in (0o040000,0o100000):
             return StatView(st, st.st_dev, st.st_ino)
         return st
 
     def open(self, path, flags, mode=0o777, *, dir_fd=None):
+        path = os.fspath(path)
         if path == '/' and dir_fd is None:
             return self._open(str(self.root), flags, mode)
-        if dir_fd is None and isinstance(path, str) and path.startswith('/'):
-            if path not in self.allowed:
+        if dir_fd is None and path.startswith('/'):
+            if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             return self._open(str(self.root/path.lstrip('/')), flags, mode)
         return self._open(path, flags, mode, dir_fd=dir_fd)
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
-        if dir_fd is None and isinstance(path, str) and path.startswith('/'):
-            if path not in self.allowed:
+        path = os.fspath(path)
+        if dir_fd is None and path.startswith('/'):
+            if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             path = str(self.root/path.lstrip('/'))
         return self._mapped(self._stat(path, dir_fd=dir_fd,
@@ -80,7 +86,8 @@ class SealedOSBoundary:
         return self._mapped(self._fstat(fd))
 
     def readlink(self, path, *, dir_fd=None):
-        if dir_fd is None and isinstance(path, str) and path.startswith('/proc/self/fd/'):
+        path = os.fspath(path)
+        if dir_fd is None and path.startswith('/proc/self/fd/'):
             suffix = path[len('/proc/self/fd/'):]
             if not suffix.isdecimal():
                 raise PermissionError('UNLISTED_PROC_FD')
@@ -93,8 +100,8 @@ class SealedOSBoundary:
             if sealed is None or self._readlink(path) != str(self.root/sealed.lstrip('/')):
                 raise PermissionError('UNLISTED_PROC_FD')
             return sealed
-        if dir_fd is None and isinstance(path, str) and path.startswith('/'):
-            if path not in self.allowed:
+        if dir_fd is None and path.startswith('/'):
+            if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             path = str(self.root/path.lstrip('/'))
         return self._readlink(path, dir_fd=dir_fd)
@@ -183,6 +190,31 @@ class IdentityBoundaryTests(unittest.TestCase):
         sample.setUp()
         with self.assertRaisesRegex(c53.Hold,'BASELINE_HASH_CHANGED'):
             c53.verify_observed_bytes(self.spec, sample.baselines)
+
+    def test_actual_backend_reads_six_fds_then_rejects_wrong_bytes(self):
+        from test_successor_bundle_offline import SyntheticSixSlotTests
+        sample=SyntheticSixSlotTests();sample.setUp()
+        pins={c53.DB:(self.spec['observed_baseline']['db']['dev'],
+                       self.spec['observed_baseline']['db']['ino']),
+              c53.LOCK:(self.spec['observed_baseline']['worker_lock']['dev'],
+                         self.spec['observed_baseline']['worker_lock']['ino'])}
+        for path,raw in sample.baselines.items():
+            target=self.root/path.lstrip('/')
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(raw)
+            target.chmod(0o600)
+            st=target.stat()
+            pins[path]=(st.st_dev,st.st_ino)
+        boundary=SealedOSBoundary(self.root, list(pins), pins)
+        backend=R2HostBackend(legacy_io=self.io,spec=self.spec,
+                              source_blobs=sample.source,
+                              observed_bytes=sample.baselines)
+        with boundary.active(), patch.object(os,'uname',
+                return_value=type('Host',(),{'nodename':c53.HOST})()),\
+             patch.dict(os.environ,{'SUDO_UID':'1000'}):
+            with self.assertRaisesRegex(c53.Hold,'BASELINE_HASH_CHANGED'):
+                backend.get_generator_inputs_verified(self.spec)
+        self.assertFalse(backend.generator_inputs_verified)
 
     def test_original_lock_uses_real_flock_and_rejects_replaced_inode(self):
         backend = R2HostBackend(legacy_io=self.io, spec=self.spec,
