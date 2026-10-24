@@ -322,6 +322,14 @@ class SyntheticSpecTests(unittest.TestCase):
                                      observed.stderr+'\n'+observed.stdout)
                     self.assertEqual(json.loads(observed.stdout)['state'],expected,
                                      observed.stdout)
+                recovered=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-recover',str(root)],
+                    capture_output=True,text=True,timeout=20,check=False)
+                self.assertEqual(recovered.returncode,0,
+                                 recovered.stderr+'\n'+recovered.stdout)
+                self.assertEqual(json.loads(recovered.stdout)['state'],
+                                 'CUSTODY_COMPLETE_DELIVERY_NOT_PROVEN',
+                                 recovered.stdout)
                 # Recovery consumes the same sealed source bytes; a changed
                 # import after the successful observation cannot be accepted.
                 queue_source=root/(entry.SOURCE+
