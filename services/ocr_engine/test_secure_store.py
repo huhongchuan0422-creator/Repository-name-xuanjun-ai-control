@@ -114,6 +114,19 @@ class SecureStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'OCR_IDEMPOTENCY_CONFLICT'):
             self.store.create('tenant-a','user-a','app-a','business_license','f'*64,'revision-key-0001','synthetic-attachment','2')
         self.assertEqual(self.store.get(first['job_id'],'tenant-a')['application_revision'],'1')
+    def test_same_idempotency_key_changed_provider_version_conflicts(self):
+        first=self.store.create('tenant-a','user-a','app-a','business_license','9'*64,'provider-key-0001','synthetic-attachment','1','1.2.0')
+        with self.assertRaisesRegex(ValueError,'OCR_IDEMPOTENCY_CONFLICT'):
+            self.store.create('tenant-a','user-a','app-a','business_license','9'*64,'provider-key-0001','synthetic-attachment','1','1.3.0')
+        saved=self.store.get(first['job_id'],'tenant-a')
+        self.assertEqual(saved['provider_version'],'1.2.0')
+    def test_frozen_binding_fields_cannot_be_changed_by_update(self):
+        job=self.store.create('tenant-a','user-a','app-a','business_license','8'*64,'frozen-fields-key-01','synthetic-attachment','1','1.2.0')
+        for field,value in [('attachment_id','other'),('document_type','id_front'),('application_revision','2'),('provider_version','1.3.0')]:
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError,'OCR_IMMUTABLE_FIELD'): self.store.update(job['job_id'],**{field:value})
+        saved=self.store.get(job['job_id'],'tenant-a')
+        self.assertEqual((saved['attachment_id'],saved['document_type'],saved['application_revision'],saved['provider_version']),('synthetic-attachment','business_license','1','1.2.0'))
     def test_attachment_changes_idempotency_fingerprint(self):
         first = self.store.create("tenant-a", "user-a", "app-a", "business_license", "d"*64, "attachment-key-0001", "attachment-a", "1")
         with self.assertRaisesRegex(ValueError, "OCR_IDEMPOTENCY_CONFLICT"):
