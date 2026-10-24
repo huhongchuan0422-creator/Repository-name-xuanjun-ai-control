@@ -104,7 +104,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
-          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-deb-cache" "$RUNNER_TEMP/ocr-deb-cache/apt-lists" "$RUNNER_TEMP/ocr-build"
+          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-deb-cache" "$RUNNER_TEMP/ocr-deb-cache/apt-lists" "$RUNNER_TEMP/ocr-build/source-pins"
+          cp services/ocr_engine/requirements.txt services/ocr_engine/model_manifest.json services/ocr_engine/deployment_config.schema.json "$RUNNER_TEMP/ocr-build/source-pins/"
+          cp services/ocr_engine/model_distribution/LICENSE-2.0.txt services/ocr_engine/model_distribution/NOTICE.md "$RUNNER_TEMP/ocr-build/source-pins/"
           docker run --rm --platform linux/amd64 \
             -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
             -e OCR_BASE_MANIFEST_SHA256=8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 \
