@@ -20,8 +20,12 @@ class SupervisorTests(unittest.TestCase):
         self.s = Supervisor(self.path, lambda: self.now)
 
     def tearDown(self):
-        self.s.close()
-        os.unlink(self.path)
+        try:
+            self.s.close()
+        except Exception:
+            pass
+        if os.path.exists(self.path):
+            os.unlink(self.path)
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
