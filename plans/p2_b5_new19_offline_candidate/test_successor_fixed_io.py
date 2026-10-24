@@ -183,6 +183,60 @@ class FixedIOTests(unittest.TestCase):
                 self.io.resource_ready()
         self.assertGreater(len(attempts),1)
 
+    def test_complete_http_failure_never_retries_to_success(self):
+        from production.cloud_connection import oauth_entrypoint
+        config={'enabled':True,'hostname':c53.HOST,
+                'settings':{'issuer':'issuer','audience':'audience'}}
+        for status,body,content_type,reason in (
+                (403,b'{}','application/json','HTTP_REJECTED'),
+                (302,b'{}','application/json','HTTP_REJECTED'),
+                (200,b'{}','text/plain','CONTENT_TYPE'),
+                (200,b'{broken','application/json','INVALID_JSON'),
+                (200,b'x'*2049,'application/json','BODY_BOUND')):
+            calls=[]
+            class Response:
+                def __init__(self):self.status=status
+                def getheader(self,*args):return content_type
+                def read(self,*args):return body
+            class HTTP:
+                def __init__(self,*args,**kwargs):calls.append(1)
+                def request(self,*args,**kwargs):pass
+                def getresponse(self):return Response()
+                def close(self):pass
+            with self.subTest(status=status,body=body[:10]),\
+                 patch.object(oauth_entrypoint,'private_bytes',
+                              return_value=json.dumps(config).encode()),\
+                 patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',HTTP):
+                with self.assertRaisesRegex(c53.Hold,reason):
+                    self.io.resource_ready()
+                self.assertEqual(len(calls),1)
+
+    def test_incomplete_http_transport_can_retry_same_target(self):
+        import http.client
+        from production.cloud_connection import oauth_entrypoint
+        config={'enabled':True,'hostname':c53.HOST,
+                'settings':{'issuer':'issuer','audience':'audience'}}
+        calls=[]
+        class Response:
+            status=200
+            def getheader(self,*args):return 'application/json'
+            def read(self,*args):
+                if len(calls)==1:raise http.client.IncompleteRead(b'{')
+                return json.dumps({'resource':'audience',
+                    'authorization_servers':['issuer'],
+                    'scopes_supported':['connection.status','project.files.read'],
+                    'bearer_methods_supported':['header']}).encode()
+        class HTTP:
+            def __init__(self,*args,**kwargs):calls.append(1)
+            def request(self,*args,**kwargs):pass
+            def getresponse(self):return Response()
+            def close(self):pass
+        with patch.object(oauth_entrypoint,'private_bytes',
+                          return_value=json.dumps(config).encode()),\
+             patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',HTTP):
+            self.assertTrue(self.io.resource_ready())
+        self.assertEqual(len(calls),2)
+
 
 if __name__ == '__main__':
     unittest.main()

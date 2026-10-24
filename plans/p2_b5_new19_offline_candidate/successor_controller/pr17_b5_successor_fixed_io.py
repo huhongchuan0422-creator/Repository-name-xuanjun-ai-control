@@ -349,16 +349,23 @@ class FixedR2IO:
                     conn.request('GET', '/.well-known/oauth-protected-resource',
                                  headers={'Host':'127.0.0.1','Connection':'close'})
                     response = conn.getresponse()
+                    c53.require(response.status == 200,
+                                'FIXED_IO_RESOURCE_HTTP_REJECTED')
+                    c53.require(response.getheader('Content-Type','').startswith(
+                                'application/json'), 'FIXED_IO_RESOURCE_CONTENT_TYPE')
                     body = response.read(2049)
-                    if (response.status == 200 and len(body) <= 2048 and
-                        response.getheader('Content-Type','').startswith('application/json')):
+                    c53.require(len(body) <= 2048,
+                                'FIXED_IO_RESOURCE_BODY_BOUND')
+                    try:
                         metadata = json.loads(body.decode('utf-8'))
-                        c53.require(metadata == wanted,'FIXED_IO_RESOURCE_BINDING')
-                        c53.require(private_bytes(c53.CONFIGS[1],262144) == raw,
-                                    'FIXED_IO_RESOURCE_CONFIG_CHANGED')
-                        return True
-                except (OSError, ValueError, UnicodeError):
-                    pass  # transient refusal or incomplete response, same fixed target
+                    except (ValueError, UnicodeError) as exc:
+                        raise c53.Hold('FIXED_IO_RESOURCE_INVALID_JSON') from exc
+                    c53.require(metadata == wanted,'FIXED_IO_RESOURCE_BINDING')
+                    c53.require(private_bytes(c53.CONFIGS[1],262144) == raw,
+                                'FIXED_IO_RESOURCE_CONFIG_CHANGED')
+                    return True
+                except (OSError, http.client.IncompleteRead):
+                    pass  # connection not yet ready or incomplete transport
                 finally:
                     conn.close()
                 time.sleep(min(0.15,max(0,signal.getitimer(signal.ITIMER_REAL)[0])))
