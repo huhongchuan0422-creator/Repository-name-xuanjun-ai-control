@@ -1,0 +1,63 @@
+{
+  "files": [
+    {
+      "bytes": 30898,
+      "path": "successor_controller/pr17_b5_successor_authority.py",
+      "sha256": "329e26de92bf1b247ba81785ca558fe95cf5d1e23108bccfb90fc81192da3a5f"
+    },
+    {
+      "bytes": 77563,
+      "path": "successor_controller/pr17_b5_successor_backend.py",
+      "sha256": "b01e973830f2fb57f8bf17fe0fa367058471ad5cd66eacfa0ee01e67e04043c4"
+    },
+    {
+      "bytes": 3302,
+      "path": "successor_controller/pr17_b5_successor_binder.py",
+      "sha256": "2354312b5a0fec42ed0965500a09439f49ad7231c3bfdc8cf7baee43179abe65"
+    },
+    {
+      "bytes": 1411,
+      "path": "successor_controller/pr17_b5_successor_loader.py",
+      "sha256": "1d4439bfc66366f35ff4433404e5c4576a7a83770663e24c9386db4dea4afb4e"
+    },
+    {
+      "bytes": 5189,
+      "path": "successor_controller/pr17_b5_successor_local.py",
+      "sha256": "66b71203a7c78f091921ba94f49e17794583e96905274920b883fe16b257cd8e"
+    },
+    {
+      "bytes": 30792,
+      "path": "successor_controller/pr17_b5_successor_review.py",
+      "sha256": "c8c42afbc79ca15a3499b8f9e66e2ab98a01f8a346b780da93ae86865d700d71"
+    },
+    {
+      "bytes": 6709,
+      "path": "successor_controller/pr17_b5_successor_runtime.py",
+      "sha256": "6cb26e1e48a13101916cb71c2783c8a6ccbf518312edb8ae18d7715ec14ea4a2"
+    },
+    {
+      "bytes": 19053,
+      "path": "successor_controller/pr17_b5_successor_witness.py",
+      "sha256": "b5a338a5c294d141be4b661fb8556d8695ecc9c3b3a7b086977d0f5e2df4fa4f"
+    },
+    {
+      "bytes": 10389,
+      "path": "successor_contract.py",
+      "sha256": "e90a748441d2247128268838c319656abb50d7c237caa7bf0d75d2a64fe63d87"
+    },
+    {
+      "bytes": 3228,
+      "path": "successor_source_loader.py",
+      "sha256": "fcb804616a55d1e5a3fb75ac379f5424b080d7042859b7f105dd2d570906c7b6"
+    },
+    {
+      "bytes": 4005,
+      "path": "successor_analyst_read.py",
+      "sha256": "48181fb861851124a9b2cb247406865c17e87c85b93c7ed7bf9ebdd772660c24"
+    }
+  ],
+  "runtime_manifest_sha256": "814c0779dfaaeefb79481864dd95a8e145f7074c60e8cc439fda7f9c5434098d",
+  "schema": "PR17_B5_SUCCESSOR_CONTROLLER_SOURCE_V1",
+  "source_release_commit": "f0fe0d3978b72a11e4fa4cfb9928424d60124940",
+  "state": "DRAFT_NOT_RELEASE_BOUND"
+}
