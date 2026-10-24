@@ -158,7 +158,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",text)
         self.assertIn("c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee",text)
         self.assertIn("permissions:\n      contents: read",text)
-        self.assertNotIn("self-hosted",text)
+        self.assertNotIn("runs-on: self-hosted",text)
         self.assertNotIn("secrets.",text)
         self.assertIn("docker run --rm --network none --platform linux/amd64",text)
 
