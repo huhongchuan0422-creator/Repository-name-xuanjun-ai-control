@@ -41,6 +41,12 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertEqual(result["target_platform"],"linux-x86_64-cp311")
         self.assertEqual(len(result["verified_models"]),3)
         self.assertEqual(len(result["verified_wheels"]),1)
+    def test_base_image_manifest_or_config_mismatch_rejected(self):
+        lock=json.loads(self.lock.read_text())
+        lock["base_image_manifest_sha256"]="0"*64
+        self.lock.write_text(json.dumps(lock))
+        with self.assertRaisesRegex(BundleError,"LOCK_BASE_MANIFEST_MISMATCH"): self.check()
+
     def test_platform_mismatch_rejected(self):
         with self.assertRaisesRegex(BundleError,"TARGET_PLATFORM_MISMATCH"): self.check("win-amd64-cp311")
     def test_missing_model_rejected(self):
@@ -146,6 +152,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:",text)
         self.assertIn("default: false",text)
         self.assertIn("inputs.build_enabled == true",text)
+        self.assertIn("if: ${{ github.event_name != 'workflow_dispatch' }}",text)
         self.assertIn("refs/heads/docs/self-hosted-ocr-architecture-20261024",text)
         self.assertIn('test "$INPUT_SOURCE_SHA" = "$GITHUB_SHA"',text)
         self.assertIn("python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",text)
