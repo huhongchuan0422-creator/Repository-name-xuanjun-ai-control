@@ -63,10 +63,22 @@ def load_bindings(environ=None):
     integration_path = env.get("OCR_INTEGRATION_PATH", "")
     if not module_name or not module_name.isidentifier() or not integration_path:
         raise RuntimeError("OCR_TRUSTED_BINDINGS_MODULE_AND_PATH_REQUIRED")
-    root = Path(integration_path)
-    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+    supplied_root = Path(integration_path)
+    if not supplied_root.is_absolute():
         raise RuntimeError("OCR_INTEGRATION_PATH_INVALID")
-    root = root.resolve(strict=True)
+    # Reject symlinks in every path component, not only at the leaf.
+    current = Path(supplied_root.anchor)
+    for part in supplied_root.parts[1:]:
+        current = current / part
+        try:
+            info = current.lstat()
+        except OSError:
+            raise RuntimeError("OCR_INTEGRATION_PATH_INVALID")
+        if stat.S_ISLNK(info.st_mode):
+            raise RuntimeError("OCR_INTEGRATION_PATH_SYMLINK")
+    if not supplied_root.is_dir():
+        raise RuntimeError("OCR_INTEGRATION_PATH_INVALID")
+    root = supplied_root.resolve(strict=True)
     if module_name in sys.modules:
         raise RuntimeError("OCR_TRUSTED_BINDINGS_MODULE_ALREADY_LOADED")
     candidate = root / (module_name + ".py")
