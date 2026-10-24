@@ -425,22 +425,20 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         with patch.object(c.observation,'capture',side_effect=observe),self.assertRaises(u.Hold):self.session.update()
         self.assertTrue(fired[0]);self.assertNotEqual(self.session.journal.state['phase'],'COMMITTED')
 
-    def test_commit_final_extra_prefix_and_running_legacy_cannot_commit(self):
-        for legacy in (False,True):
-            with self.subTest(legacy=legacy):
-                if self.session is not None:
-                    try:self.session.close()
-                    except Exception:pass
-                self.setUp()
-                self.prepare_b_and_c();write=u.Journal.write
-                def publish(j,phase,*args):
-                    write(j,phase,*args)
-                    if phase=='COMMITTED':
-                        if legacy:
-                            self.names['xuanjun-community-preview-before-2330dd55']='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc';self.legacy_running=True
-                        else:self.names['xuanjun-community-preview-extra']='8'*64
-                with patch.object(u.Journal,'write',publish),self.assertRaises(u.Hold):self.session.update()
-                self.assertEqual(self.session.journal.state['phase'],u.HOLD_PHASE)
+    def _commit_inventory_fault(self,legacy):
+        self.prepare_b_and_c();write=u.Journal.write
+        def publish(j,phase,*args):
+            write(j,phase,*args)
+            if phase=='COMMITTED':
+                if legacy:
+                    self.names['xuanjun-community-preview-before-2330dd55']='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc';self.legacy_running=True
+                else:self.names['xuanjun-community-preview-extra']='8'*64
+        with patch.object(u.Journal,'write',publish),self.assertRaises(u.Hold):self.session.update()
+        self.assertEqual(self.session.journal.state['phase'],u.HOLD_PHASE)
+    def test_commit_final_extra_prefix_cannot_commit(self):
+        self._commit_inventory_fault(False)
+    def test_commit_final_running_legacy_cannot_commit(self):
+        self._commit_inventory_fault(True)
 
     def test_recovery_extra_inventory_or_unknown_inspect_never_starts_old(self):
         self.prepare_b_and_c();real=self.recorded_observe
@@ -569,10 +567,11 @@ manifest=entries['manifest.json'];manifest_sha=__import__('hashlib').sha256(mani
 spec=importlib.util.spec_from_file_location('isolated_bc_loader',repo/'scripts/community_preview_bc_loader.py')
 loader=importlib.util.module_from_spec(spec);spec.loader.exec_module(loader)
 loader.read_file=lambda rel: manifest if rel=='manifest.json' else entries[rel]
+uid=os.getuid();gid=os.getgid()
 loader.os.getuid=lambda:0;loader.os.geteuid=lambda:0;loader.os.uname=lambda:types.SimpleNamespace(nodename=loader.HOST)
 h=loader.load(manifest_sha);s=h.s;c=h.c;u=h.u;p=h.p
 assert s.__file__==h.CONTROL+'/scripts/community_preview_site_prepare.py'
-root=Path(tempfile.mkdtemp());root.chmod(0o700);uid=os.getuid();gid=os.getgid()
+root=Path(tempfile.mkdtemp());root.chmod(0o700)
 base=root/'opt/xuanjun-community-preview';base.mkdir(parents=True,mode=0o700)
 data=root/'var/lib/xuanjun-community-preview';(data/'data').mkdir(parents=True,mode=0o700);(data/'config').mkdir(mode=0o700)
 for name in ('host.json','center-keys.json','wechat.json'):
