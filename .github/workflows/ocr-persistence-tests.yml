@@ -5,6 +5,9 @@ on:
       - 'services/ocr_engine/secure_store.py'
       - 'services/ocr_engine/test_secure_store.py'
       - 'services/ocr_engine/test_model_distribution.py'
+      - 'services/ocr_engine/startup_selfcheck.py'
+      - 'services/ocr_engine/test_startup_selfcheck.py'
+      - 'services/ocr_engine/deployment_config.schema.json'
       - 'services/ocr_engine/model_manifest.json'
       - 'services/ocr_engine/model_distribution/**'
       - 'services/ocr_engine/README.md'
@@ -26,3 +29,5 @@ jobs:
         run: python -m unittest discover -s services/ocr_engine -p 'test_secure_store.py' -v
       - name: Verify model license and attribution bundle
         run: python -m unittest services.ocr_engine.test_model_distribution -v
+      - name: Verify read-only startup preflight
+        run: python -m unittest services.ocr_engine.test_startup_selfcheck -v
