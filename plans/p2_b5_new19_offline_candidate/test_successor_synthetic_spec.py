@@ -335,6 +335,16 @@ class SyntheticSpecTests(unittest.TestCase):
                                      observed.stderr+'\n'+observed.stdout)
                     self.assertEqual(json.loads(observed.stdout)['state'],expected,
                                      observed.stdout)
+                # Recovery consumes the same sealed source bytes; a changed
+                # import after the successful observation cannot be accepted.
+                queue_source=root/(entry.SOURCE+
+                    '/production/cloud_connection/queue.py').lstrip('/')
+                queue_source.write_bytes(queue_source.read_bytes()+b'X')
+                changed=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-query',str(root)],
+                    capture_output=True,text=True,timeout=20,check=False)
+                self.assertNotEqual(changed.returncode,0)
+                self.assertIn('SUCCESSOR_SOURCE_NOT_BOUND',changed.stderr)
 
 
 def child_query(root,action='query'):
