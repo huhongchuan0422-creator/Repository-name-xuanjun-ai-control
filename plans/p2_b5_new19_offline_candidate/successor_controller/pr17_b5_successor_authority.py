@@ -353,6 +353,24 @@ class ExistingRequestAuthority:
     def approve_precise_pre_start_restore(self, job):
         raise c53.Hold('PRE_START_RESTORE_APPROVAL_SOURCE_UNKNOWN')
 
+    def verify_b5_http_provenance(self, proof, catalog_sha, request_ids):
+        c53.require(type(proof) is dict and
+                    proof.get('state') ==
+                    'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING' and
+                    proof.get('bytes') == 93592 and
+                    proof.get('objects') == 19 and
+                    proof.get('close_approval') == 'NOT_PROVEN' and
+                    type(proof.get('proof_sha256')) is str and
+                    len(proof['proof_sha256']) == 64 and
+                    catalog_sha == self.catalog_sha and
+                    tuple(request_ids) == self.request_ids,
+                    'B5_HTTP_CATALOG_REQUEST_BINDING')
+        # No original provider currently emits a protected authenticated
+        # cloud-tool provenance record that this UK process can consume.
+        # A caller-supplied hash, chat approval, or maintenance witness is not
+        # a substitute for that independent source.
+        raise c53.Hold('B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')
+
     def approve_c53_b5_exposure_close(self, job):
         raise c53.Hold('C53_CLOSE_APPROVAL_SOURCE_UNKNOWN')
 
@@ -421,7 +439,7 @@ def prepare_maintenance_candidate(*, authorization_from_request=None,
             # Construct the production caller from this exact prepared
             # transaction. The closure still requires the next reviewed pin
             # and activated protected facts at invocation time.
-            from pr17_b5_maintenance_runtime import attachment_for_prepared
+            from pr17_b5_successor_runtime import attachment_for_prepared
             backend.authority.runtime_attachment=attachment_for_prepared(transaction)
     return transaction
 
@@ -466,7 +484,8 @@ def check_candidate_authority(transaction):
 
 def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
                                    authorization_from_request=None,
-                                   runtime_attachment=None, witness_store=None):
+                                   runtime_attachment=None, witness_store=None,
+                                   release_gate=None):
     """Fresh-process reconstruction from exact protected backup and source bytes.
 
     This does not execute the transaction. The caller must attach original
@@ -480,6 +499,10 @@ def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
     from production.cloud_connection.worker import Github, Cloud, Network
     single_thread()
     spec=c53.binder.verify_spec_bytes(spec_raw)
+    from pr17_b5_successor_release_gate import ExternalReleaseGate
+    c53.require(type(release_gate) is ExternalReleaseGate,
+                'EXTERNAL_RELEASE_BINDER_NOT_BOUND')
+    release_gate.check('recover', spec)
     job=spec['fixed_paths']['job_proposed']
     c53.require(job=='/opt/xuanjun-cloud-connection/l2-b5-staged-f0fe0d3978b7',
                 'RECOVERY_JOB_SCOPE')
@@ -520,7 +543,7 @@ def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
                 reservation.get('request_set_sha256')==c53.sha(c53.canon(bundle['requests'])),
                 'RECOVERY_REGENERATED_BUNDLE_MISMATCH')
     backend=R2HostBackend(legacy_io=legacy_io,spec=spec,source_blobs=sources,
-                          observed_bytes=baselines)
+                          observed_bytes=baselines,release_gate=release_gate)
     c53.require(tuple(x['request_id'] for x in bundle['requests'])==backend.expected_ids,
                 'RECOVERY_REQUEST_SET_NOT_ORIGINAL_BATCH')
     # Closeout reads the original resource/env bytes, never the now-active
@@ -547,7 +570,7 @@ def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
     backend.restore_activation_identity_readonly(bundle)
     transaction=c53.Transaction(spec,bundle,backend)
     if runtime_attachment is None:
-        from pr17_b5_maintenance_runtime import attachment_for_prepared
+        from pr17_b5_successor_runtime import attachment_for_prepared
         backend.authority.runtime_attachment=attachment_for_prepared(transaction)
     return transaction
 

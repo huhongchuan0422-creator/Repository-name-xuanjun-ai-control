@@ -33,7 +33,8 @@ def _rename_release_noreplace(directory, old, new):
         raise Hold('RELEASE_ATOMIC_NOREPLACE_FAILED')
 
 class R2HostBackend:
-    def __init__(self, *, legacy_io, spec, source_blobs, observed_bytes, authority=None):
+    def __init__(self, *, legacy_io, spec, source_blobs, observed_bytes,
+                 authority=None, release_gate=None):
         self.legacy=legacy_io
         self.spec=spec
         c53.require(type(observed_bytes) is dict and
@@ -43,6 +44,7 @@ class R2HostBackend:
         self.generator_identities={}
         self.generator_inputs_verified=False
         self.authority=authority
+        self.release_gate=release_gate
         self.paths=spec['fixed_paths']
         self.job=self.paths['job_proposed']
         self.db=None;self.lock_fd=None;self.reserved=False;self.seq=0
@@ -65,6 +67,12 @@ class R2HostBackend:
     def _guard_host(self):
         c53.require(os.geteuid()==0 and os.getegid()==0 and os.environ.get('SUDO_UID')=='1000', 'IDENTITY')
         c53.require(os.uname().nodename==c53.HOST,'UK_HOST')
+
+    def verify_external_release(self, phase):
+        from pr17_b5_successor_release_gate import ExternalReleaseGate
+        c53.require(type(self.release_gate) is ExternalReleaseGate,
+                    'EXTERNAL_RELEASE_BINDER_NOT_BOUND')
+        return self.release_gate.check(phase, self.spec)
 
     def get_generator_inputs_verified(self,spec):
         # Only the fixed six protected inputs and 33 pinned c53 source bytes.
@@ -100,6 +108,7 @@ class R2HostBackend:
         # for all eleven original operations before a reservation or stop.
         # The current adapter intentionally HOLDs: original Queue.submit,
         # private_mcp and custody primitives are not an authenticated caller.
+        self.verify_external_release('preflight')
         from pr17_b5_successor_authority import ExistingRequestAuthority
         c53.require(type(self.authority) is ExistingRequestAuthority,
                     'ORIGINAL_AUTHORITY_TYPE')
@@ -153,6 +162,7 @@ class R2HostBackend:
         The original authenticated queue observer supplies canonical READY and
         SUCCESS facts; a stored intent alone proves neither.
         """
+        self.verify_external_release('recover')
         from production.cloud_connection.queue import canonical
         c53.require(type(bundle) is dict and type(bundle.get('requests')) is list
                     and len(bundle['requests'])==19,'RECOVERY_REQUEST_SCOPE')
@@ -915,6 +925,7 @@ class R2HostBackend:
         self.legacy.newfile(backups['links'],c53.canon(self.links)+b'\n')
 
     def publish_two_releases_exact(self,commit,manifest,pin,spec):
+        self.verify_external_release('publish')
         c53.require(self.lock_fd is not None and self.before,'PUBLISH_PREREQUISITE')
         c53.require(self.generator_inputs_verified is True and spec is self.spec,
                     'PUBLISH_GENERATOR_BINDING')
@@ -1007,6 +1018,7 @@ class R2HostBackend:
                     'RUNTIME_ATTACHMENT_ACTIVATION')
         return True
     def start_worker_bounded(self):
+        self.verify_external_release('start')
         c53.require(self.tried_start,'START_MARKER_REQUIRED')
         self.legacy.command(['/usr/bin/systemctl','start','xuanjun-cloud-connection.service'],20)
     def verify_worker_stable(self):self.legacy.stable_unit('xuanjun-cloud-connection.service')
@@ -1100,6 +1112,27 @@ class R2HostBackend:
         body=self._auth('read_project_chunk_complete',request,catalog_sha,obj)
         c53.require(type(body) is bytes,'RECEIVER_BODY_UNKNOWN')
         return body
+
+    def verify_b5_http_provenance(self,proof,bundle,spec):
+        c53.require(bundle is self.bundle and spec is self.spec and
+                    type(proof) is dict and
+                    proof.get('state') ==
+                    'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+                    'B5_HTTP_PROOF_BOUNDARY')
+        # The local SHA proof is deliberately insufficient. Only the B5
+        # request-local cloud tool's authenticated provenance may close it.
+        return self._auth('verify_b5_http_provenance',proof,bundle['catalog_sha'],
+                          self.expected_ids)
+
+    def approve_precise_b5_exposure_close(self,bundle,spec):
+        c53.require(bundle is self.bundle and spec is self.spec,
+                    'SUCCESSOR_CLOSE_SCOPE')
+        return self._auth('approve_c53_b5_exposure_close',self.job)
+
+    def close_b5_exposure_success_successor_only(self):
+        # The original close implementation rechecks its own independent
+        # approval before touching the worker. No alias bypasses that gate.
+        return self.close_b5_exposure_success_c53_only()
     def close_b5_exposure_success_c53_only(self):
         # Successful delivery closeout never restores the e78 runtime or removes
         # queue history. It disables only B5 exposure; consent is not revoked.
@@ -1300,7 +1333,7 @@ class R2HostBackend:
 
 def prepare_bound_transaction(*, spec_raw, observed_bytes, source_blobs,
                               batch_id, approval_ref, window_start,
-                              legacy_io, authority=None):
+                              legacy_io, authority=None, release_gate=None):
     """Explicit generator -> sealed transaction -> backend linkage.
 
     Does not execute the transaction or create grant/ACK; absent authority
@@ -1317,7 +1350,8 @@ def prepare_bound_transaction(*, spec_raw, observed_bytes, source_blobs,
         verified_source_blobs=source_blobs)
     backend=R2HostBackend(legacy_io=legacy_io,spec=spec,
                            source_blobs=source_blobs,
-                           observed_bytes=observed_bytes,authority=authority)
+                           observed_bytes=observed_bytes,authority=authority,
+                           release_gate=release_gate)
     if authority is not None:
         from pr17_b5_successor_authority import ExistingRequestAuthority
         c53.require(type(authority) is ExistingRequestAuthority,'ORIGINAL_AUTHORITY_TYPE')

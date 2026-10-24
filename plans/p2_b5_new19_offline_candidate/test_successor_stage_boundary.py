@@ -36,7 +36,7 @@ class StageBoundaryTests(unittest.TestCase):
         effects=[]
         self.backend.approve_precise_b5_exposure_close=lambda *args:effects.append('approve')
         self.backend.close_b5_exposure_success_successor_only=lambda:effects.append('close')
-        with self.assertRaisesRegex(transaction.Hold,'SUCCESSOR_BACKEND_METHOD_MISSING'):
+        with self.assertRaisesRegex(transaction.Hold,'B5_HTTP_PROOF_BOUNDARY'):
             candidate.close_after_b5_http({'sha256':'not-an-attestation'})
         self.assertEqual(effects,[])
 

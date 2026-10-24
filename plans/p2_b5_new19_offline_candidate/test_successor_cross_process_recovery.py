@@ -17,9 +17,11 @@ import pr17_b5_successor_review as c53
 
 CHILD = r'''
 import json, os, pathlib, sys
-sys.path.insert(0, sys.argv[1]);sys.path.insert(0, sys.argv[3]);sys.path.insert(0, sys.argv[4])
+sys.path.insert(0, sys.argv[1]);sys.path.insert(0, sys.argv[3]);sys.path.insert(0, sys.argv[4]);sys.path.insert(0, sys.argv[5])
 from pr17_b5_successor_backend import R2HostBackend
 from pr17_b5_successor_review import Hold, Transaction
+from test_successor_release_gate import fixture_gate, ROOT as fixture_root
+import pr17_b5_successor_binder as binder
 root=pathlib.Path(sys.argv[2]); bundle=json.loads((root/'bundle.json').read_text())
 class Legacy:
  def read(self,path):
@@ -35,6 +37,8 @@ class Authority:
 b=object.__new__(R2HostBackend)
 b.legacy=Legacy();b.job=str(root);b.expected_ids=tuple(r['request_id'] for r in bundle['requests'])
 b.authority=Authority();b.window_open=False;b.bundle=None
+b.spec=binder.verify_spec_bytes((fixture_root/'SUCCESSOR_SPEC.json').read_bytes())
+b.release_gate=fixture_gate(b.spec,'recover')
 try:
  print(json.dumps(Transaction.recover_intake_readonly(b,bundle),sort_keys=True))
 except BaseException as exc:
@@ -83,7 +87,7 @@ class CrossProcessRecovery(unittest.TestCase):
         return rid
 
     def child(self):
-        proc=subprocess.run([sys.executable,'-B','-c',CHILD,str(ROOT),str(self.root),str(SOURCE),str(pathlib.Path(__file__).parent / 'successor_controller')],
+        proc=subprocess.run([sys.executable,'-B','-c',CHILD,str(ROOT),str(self.root),str(SOURCE),str(pathlib.Path(__file__).parent / 'successor_controller'),str(pathlib.Path(__file__).parent)],
             capture_output=True,text=True,timeout=15)
         return proc,json.loads(proc.stdout)
 

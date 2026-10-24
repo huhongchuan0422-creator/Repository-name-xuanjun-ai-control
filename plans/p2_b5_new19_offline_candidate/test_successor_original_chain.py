@@ -5,6 +5,7 @@ import io
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -39,6 +40,7 @@ class OriginalLifecycle(unittest.TestCase):
         if not parent:self.skipTest('protected nonroot parent unavailable')
         temp=tempfile.TemporaryDirectory(dir=parent);self.addCleanup(temp.cleanup)
         root=pathlib.Path(temp.name)
+        self.root=root
         archive_root=root/'archive';archive_root.mkdir(mode=0o700)
         packages=root/'packages';packages.mkdir(mode=0o700)
         dest=root/'receiver';dest.mkdir(mode=0o700)
@@ -80,9 +82,11 @@ class OriginalLifecycle(unittest.TestCase):
                 'member_prefix':'','max_headers':64,'max_read_bytes':1048576,
                 'sha256':digest}}}
         raw=canonical(binding).encode()
+        self.binding_raw=raw
         self.policy=ApprovedObjectsPolicy(raw,hashlib.sha256(raw).hexdigest())
         self.queue=Queue(str(root/'queue.sqlite'),'b'*64,[332398908],
                          approved_objects=self.policy)
+        (root/'queue.sqlite').chmod(0o600)
         self.addCleanup(self.queue.close)
         self.requests=[{'schema':1,'request_id':requests[x['ref']],
             'project':PROJECT,'target':'uk','operation':'fetch_approved_object',
@@ -142,8 +146,22 @@ class OriginalLifecycle(unittest.TestCase):
         b.bundle={'catalog_sha':self.policy.catalog.sha,
                   'requests':self.requests,
                   'envelopes':['XJ_CLOUD_TASK_V1\n'+canonical(x) for x in self.requests]}
+        b.bundle.update(batch_id='fixture-batch',generation_seal='f'*64,
+                        window_start=900,window_end=4500)
+        b.legacy.newfile(b.job+'/reservation.json',c53.canon({
+            'batch':'fixture-batch','ids':list(b.expected_ids),
+            'catalog_sha256':b.bundle['catalog_sha'],
+            'request_set_sha256':c53.sha(c53.canon(self.requests)),
+            'generation_seal':b.bundle['generation_seal'],
+            'window_start':900,'window_end':4500,'release':c53.COMMIT,
+            'state':'RESERVED_NOT_SUBMITTED'})+b'\n')
+        b.legacy.newfile(b.job+'/window-open.json',c53.canon({
+            'catalog_sha256':b.bundle['catalog_sha'],
+            'window_start':900,'window_end':4500,
+            'state':'ACTIVE_NOT_DELIVERED'})+b'\n')
         tx=c53.Transaction.__new__(c53.Transaction)
         tx.b=b;tx.spec={'objects':[dict(x) for x in self.policy.catalog.objects.values()]}
+        b.spec=tx.spec
         tx.bundle=b.bundle;tx.stage='WINDOW_ENABLED';tx.trace=[]
         self.assertEqual(tx.run_19_after_window()['state'],'INTAKE_SENT_AWAITING_READY')
         self.assertEqual(len(comments),19)
@@ -160,6 +178,50 @@ class OriginalLifecycle(unittest.TestCase):
                      'recipient_id':RECIPIENT,'bytes':item['bytes'],
                      'sha256':item['sha256'],'action_binding_sha256':self.policy.sha}
             self.queue.terminal(request['request_id'],invoke,receipt)
+        # A new interpreter reopens the actual file-backed original Queue and
+        # reads the protected intent/SENT journal. No publisher is available to
+        # that interpreter, so a recovery regression cannot silently repost.
+        fixture={'binding':self.binding_raw.decode(),'requests':self.requests,
+                 'queue':str(self.root/'queue.sqlite'),
+                 'receiver':str(self.root/'receiver'),
+                 'owner':os.geteuid(),
+                 'bundle':b.bundle}
+        (self.root/'fresh-process.json').write_text(json.dumps(fixture))
+        child=r'''import json,pathlib,sys
+root=pathlib.Path(sys.argv[1]);here=pathlib.Path(sys.argv[2])
+sys.path[:0]=[str(here),str(here/'reused-6825'),str(here/'new19-source'),str(here/'successor_controller')]
+from production.cloud_connection.fixed_actions import ApprovedObjectsPolicy
+from production.cloud_connection.queue import Queue
+from production.cloud_connection.oauth_resource import OAuthProjectResource
+from production.cloud_connection.worker import Github,Cloud,Network
+from pr17_b5_deployment_composition import OriginalComposition
+from pr17_b5_successor_authority import ExistingRequestAuthority
+from pr17_b5_successor_backend import R2HostBackend
+from test_successor_release_gate import fixture_gate
+import pr17_b5_successor_binder as binder
+f=json.loads((root/'fresh-process.json').read_text())
+policy=ApprovedObjectsPolicy(f['binding'].encode(),__import__('hashlib').sha256(f['binding'].encode()).hexdigest())
+q=Queue(f['queue'],'b'*64,[332398908],approved_objects=policy,existing_readonly=True)
+class Auth:
+ def authenticate(self,*args):raise AssertionError('BODY_AUTH_NOT_USED_IN_RECOVERY')
+resource=OAuthProjectResource(q.db,{policy.catalog.sha:(policy.catalog,policy.binding['roots'])},Auth(),enabled=True,clock=lambda:1000,custodies={policy.catalog.sha:(f['receiver'],f['owner'])})
+network=Network()
+authorization=lambda:'Bearer fixture-only'
+o=OriginalComposition(queue=None,resource=None,github=Github('/etc/xuanjun-development/github-intake-token',network,1003),cloud=Cloud('/etc/xuanjun-cloud-executor/credentials.json',network),policy=policy,requests=f['requests'],archive_root_ref='archive',destination_root=f['receiver'],destination_owner=f['owner'],authorization_from_request=authorization,clock=lambda:1000,request_publisher=lambda _:None,test_only=True)
+o.attach_after_worker_start(q,resource)
+a=object.__new__(ExistingRequestAuthority);a.original=o;a.catalog_raw=o.catalog_raw;a.catalog_sha=o.catalog_sha;a.request_ids=o.request_ids;a.authorization_from_request=o.authorization_from_request
+b=object.__new__(R2HostBackend);b.authority=a;b.expected_ids=o.request_ids;b.job=str(root/'job');b.legacy=type('Legacy',(),{'read':lambda self,p:((root/'job'/p.rsplit('/',1)[-1]).read_bytes(),None)})()
+b.spec=binder.verify_spec_bytes((here/'SUCCESSOR_SPEC.json').read_bytes());b.release_gate=fixture_gate(b.spec,'recover')
+try:print(json.dumps(b.recover_intake_readonly(f['bundle']),sort_keys=True))
+finally:q.close()
+'''
+        proc=subprocess.run([sys.executable,'-B','-c',child,str(self.root),str(HERE)],
+                            capture_output=True,text=True,timeout=15)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+        observed=json.loads(proc.stdout)
+        self.assertEqual((observed['state'],observed['success_count'],
+                          observed['mutation_allowed']),
+                         ('SUCCESS_OBSERVED_READONLY',19,False))
         # The production pinned archive is 559 MB. This explicit local fixture
         # substitutes only that fixed archive identity, then calls the same
         # original whole-hash/member algorithm with its own bounded tar.
@@ -186,7 +248,7 @@ class OriginalLifecycle(unittest.TestCase):
                  'Bearer fixture-only',args,NOW))
         self.assertEqual(result['state'],
              'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING')
-        with self.assertRaisesRegex(c53.Hold,'SUCCESSOR_BACKEND_METHOD_MISSING'):
+        with self.assertRaisesRegex(c53.Hold,'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN'):
             tx.close_after_b5_http(result)
         self.assertEqual(len(comments),19)
         self.assertEqual(b._auth('observe_original_success_progress',

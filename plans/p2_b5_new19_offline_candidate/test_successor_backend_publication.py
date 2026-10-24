@@ -10,6 +10,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'reused-6825'),str(ROOT/'successor_controller')
 
 import pr17_b5_successor_binder as binder
 from pr17_b5_successor_backend import R2HostBackend
+from test_successor_release_gate import fixture_gate
 
 class DisposableIO:
     """Temporary path mapping only; never an actual UK lock or admission."""
@@ -42,7 +43,8 @@ class ActualBackendPublisherTests(unittest.TestCase):
         self.blobs[binder.MANIFEST_PATH]=(ROOT/'RUNTIME_SOURCE_MANIFEST.json').read_bytes()
         self.io=DisposableIO(self.root)
         self.backend=R2HostBackend(legacy_io=self.io,spec=self.spec,
-            source_blobs=self.blobs,observed_bytes={},authority=None)
+            source_blobs=self.blobs,observed_bytes={},authority=None,
+            release_gate=fixture_gate(self.spec,'publish'))
         self.backend.lock_fd=1
         self.backend.before={'fixture-original-six':'local-test-only'}
         self.backend.generator_inputs_verified=True

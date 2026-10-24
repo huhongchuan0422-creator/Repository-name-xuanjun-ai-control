@@ -7,8 +7,10 @@ The 22,830-byte original reviewed specification remains intact as
 `ORIGINAL_REVIEWED_SPEC.json`. `SUCCESSOR_SPEC.json` is a distinct 17-stage
 candidate for the 42-path f0fe runtime. The old 32-path c53 binder cannot
 authorize this version. `SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json` records
-the source bytes in this candidate; an independent deployment binder for the
-**actual commit containing these files** has not been issued or consumed.
+the source bytes in this candidate. The new release gate checks a separately
+approved binder SHA, all controller source bytes, and both current targets
+again at preflight, publish, start and recover. An approved binder for the
+**actual commit containing these files** has not been issued.
 
 | Stage | Candidate source | Boundary |
 | --- | --- | --- |
@@ -17,10 +19,10 @@ the source bytes in this candidate; an independent deployment binder for the
 | Maintenance | `successor_controller/pr17_b5_successor_local.py`, `pr17_b5_successor_review.py`, `pr17_b5_successor_runtime.py` | Owner/B5 batch witnesses, original queue, stop, release, start, window, intake and custody are separate checkpoints. No bearer copied to maintenance. |
 | Read | `successor_analyst_read.py` | B5's request-local cloud read validates each original response and whole SHA. A callable fixture proves bytes, not tool provenance or a real files grant. |
 | Close | `pr17_b5_successor_review.py` | Requires a trusted B5 HTTP provenance record and separate precise close approval. These producer interfaces are unbound and remain HOLD. |
-| Recovery | `pr17_b5_successor_backend.py` | Protected intent/SENT observations in a new process do not repeat POST; uncertain custody and mutations remain HOLD. |
+| Recovery | `pr17_b5_successor_backend.py` | Protected intent/SENT observations and the original file-backed Queue in a new process do not repeat POST; uncertain custody and mutations remain HOLD. |
 
-No live caller is wired to the new controller manifest or an external binder
-for this candidate's final commit. The original protected six paths, two
+No live caller supplies the new gate's independently approved binder digest,
+protected source reader and link observations. The original protected six paths, two
 current links, queue identity, original maintenance/restore/close scopes and
 per-request files grant require actual protected observations. Source freshness
 also remains unproved: A5 refers to the retained archive, and L14 to the

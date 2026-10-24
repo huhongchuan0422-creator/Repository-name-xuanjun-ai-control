@@ -83,7 +83,7 @@ class BoundReads(ProtectedReads):
 
 def prepare_local_adapter(*, spec_raw, source_root, legacy_io,
                           batch_id, approval_ref, window_start, authority=None,
-                          private_bytes=None):
+                          private_bytes=None, release_gate=None):
     """Read current six files in memory; prepare only, never execute.
 
     Production provenance of the supplied primitive/provider remains a caller
@@ -111,4 +111,5 @@ def prepare_local_adapter(*, spec_raw, source_root, legacy_io,
     return prepare_bound_transaction(
         spec_raw=spec_raw, observed_bytes=observed, source_blobs=sources,
         batch_id=batch_id, approval_ref=approval_ref, window_start=window_start,
-        legacy_io=backend_reads, authority=authority)
+        legacy_io=backend_reads, authority=authority,
+        release_gate=release_gate)

@@ -1,14 +1,14 @@
 {
   "files": [
     {
-      "bytes": 30898,
+      "bytes": 32239,
       "path": "successor_controller/pr17_b5_successor_authority.py",
-      "sha256": "329e26de92bf1b247ba81785ca558fe95cf5d1e23108bccfb90fc81192da3a5f"
+      "sha256": "d25c7f8bd7c9bfc487ea09a4eef0a07e184bb2fc580751379e7d475927a832da"
     },
     {
-      "bytes": 77563,
+      "bytes": 79316,
       "path": "successor_controller/pr17_b5_successor_backend.py",
-      "sha256": "b01e973830f2fb57f8bf17fe0fa367058471ad5cd66eacfa0ee01e67e04043c4"
+      "sha256": "a2bb54a0628e63411a1830f0b03bba8bc06ff66a54ed3ba813fabc169c953fe6"
     },
     {
       "bytes": 3302,
@@ -21,9 +21,14 @@
       "sha256": "1d4439bfc66366f35ff4433404e5c4576a7a83770663e24c9386db4dea4afb4e"
     },
     {
-      "bytes": 5189,
+      "bytes": 5243,
       "path": "successor_controller/pr17_b5_successor_local.py",
-      "sha256": "66b71203a7c78f091921ba94f49e17794583e96905274920b883fe16b257cd8e"
+      "sha256": "2ca630af9e3326c2c02420ddda84039b88f8f25848dc95a30aef0170b0d41e99"
+    },
+    {
+      "bytes": 5856,
+      "path": "successor_controller/pr17_b5_successor_release_gate.py",
+      "sha256": "8b6aad8ba03a950f08045532da75070d98848cfbb7fa72d081edabc2d15dcb84"
     },
     {
       "bytes": 30792,
