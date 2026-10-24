@@ -21,8 +21,10 @@ REAL_PROGRESS = frozenset(('SOURCE_COMMIT', 'TEST_RUN', 'ARTIFACT',
                            'PHASE_EXECUTION'))
 ACTIVE = frozenset(('RECEIVED', 'STARTED', 'RUNNING', 'HANDOFF_PENDING'))
 SUPERVISOR_APPLICATION_ID = 0x58534A31
-SUPERVISOR_SCHEMA_VERSION = 2
-TASK_COLUMNS = (
+SUPERVISOR_SCHEMA_VERSION = 3
+AUTHORITY_STATES = frozenset(('NONE', 'VALID', 'REVOKING', 'REVOKED',
+                              UNKNOWN))
+V2_TASK_COLUMNS = (
     'task_id', 'parent_task_id', 'stage', 'writer_scope', 'state', 'owner',
     'entry', 'run_id', 'session_id', 'attempt_id', 'checkpoint_sha256',
     'spec_sha256', 'lease_id', 'fence', 'epoch', 'next_action',
@@ -34,6 +36,12 @@ TASK_COLUMNS = (
     'old_fence_invalidated', 'recovery_level', 'recovery_generation',
     'created_at', 'updated_at',
 )
+TASK_COLUMNS = V2_TASK_COLUMNS + (
+    'authority_state', 'authority_valid_until', 'authority_run_id',
+    'authority_session_id', 'authority_gateway_id', 'resource_scope_json',
+    'receiver_ack_json', 'receiver_ack_sha256', 'coverage_digest',
+    'last_trusted_time',
+)
 PERSISTENT_COLUMNS = {
     'events': ('task_id', 'attempt_id', 'event_id', 'kind',
                'observed_at', 'evidence_kind', 'evidence_ref',
@@ -43,6 +51,18 @@ PERSISTENT_COLUMNS = {
                'delivered_at', 'dead_lettered_at', 'last_error'),
     'supervisor_heartbeats': ('instance_id', 'observed_at', 'process_ref',
                               'evidence_ref', 'updated_at'),
+    'writer_operations': ('operation_id', 'task_id', 'attempt_id', 'event_id',
+                          'resource_key', 'ticket_sha256', 'caller_sha256',
+                          'payload_json', 'state', 'created_at', 'updated_at'),
+    'writer_reconcile_evidence': ('operation_id', 'evidence_id', 'outcome',
+                                  'evidence_json', 'observed_at'),
+    'writer_receipts': ('operation_id', 'receipt_json', 'receipt_sha256',
+                        'created_at'),
+    'resource_claims': ('resource_key', 'task_id', 'attempt_id', 'fence',
+                        'epoch', 'state', 'updated_at'),
+    'resource_invalidation_receipts': ('task_id', 'old_attempt_id',
+                                       'resource_key', 'receipt_json',
+                                       'receipt_sha256', 'created_at'),
 }
 
 
@@ -83,16 +103,10 @@ class Supervisor(object):
                      self.db.execute('PRAGMA index_info("%s")' %
                                      name.replace('"', '""')))
 
-    def _validate_schema(self, allow_previous):
-        previous = tuple(name for name in TASK_COLUMNS
-                         if name != 'recovery_generation')
+    def _validate_schema(self, allow_previous=False):
         task_columns = tuple(row['name'] for row in
                              self.db.execute('PRAGMA table_info(tasks)'))
-        current_ok = (len(task_columns) == len(TASK_COLUMNS)
-                      and set(task_columns) == set(TASK_COLUMNS))
-        previous_ok = (allow_previous and len(task_columns) == len(previous)
-                       and set(task_columns) == set(previous))
-        if not (current_ok or previous_ok):
+        if task_columns != TASK_COLUMNS:
             raise ValueError('SUPERVISOR_TASK_SCHEMA_MISMATCH')
         for table, expected in PERSISTENT_COLUMNS.items():
             actual = tuple(row['name'] for row in self.db.execute(
@@ -111,7 +125,9 @@ class Supervisor(object):
                 or primary_key('events') !=
                    ('task_id', 'attempt_id', 'event_id')
                 or primary_key('outbox') != ('outbox_id',)
-                or primary_key('supervisor_heartbeats') != ('instance_id',)):
+                or primary_key('writer_operations') != ('operation_id',)
+                or primary_key('writer_receipts') != ('operation_id',)
+                or primary_key('resource_claims') != ('resource_key',)):
             raise ValueError('SUPERVISOR_PRIMARY_KEY_MISMATCH')
 
         def unique_sets(table):
@@ -123,48 +139,27 @@ class Supervisor(object):
 
         if (('writer_scope',) not in unique_sets('tasks')
                 or ('task_id', 'attempt_id', 'event_id')
-                   not in unique_sets('outbox')):
+                   not in unique_sets('outbox')
+                or ('task_id', 'attempt_id', 'event_id')
+                   not in unique_sets('writer_operations')
+                or ('task_id', 'old_attempt_id', 'resource_key')
+                   not in unique_sets('resource_invalidation_receipts')):
             raise ValueError('SUPERVISOR_UNIQUE_KEY_MISMATCH')
-        for table in ('events', 'outbox'):
-            foreign = [row for row in
-                       self.db.execute('PRAGMA foreign_key_list("%s")' %
-                                       table)]
-            if (len(foreign) != 1 or foreign[0]['table'] != 'tasks'
-                    or foreign[0]['from'] != 'task_id'
-                    or foreign[0]['to'] != 'task_id'):
-                raise ValueError('SUPERVISOR_FOREIGN_KEY_MISMATCH')
         required_indexes = {
             'task_ready_idx': ('state', 'updated_at', 'task_id'),
             'outbox_due_idx': ('delivered_at', 'next_attempt_at', 'outbox_id'),
+            'writer_operations_state_idx':
+                ('task_id', 'state', 'updated_at', 'operation_id'),
         }
         for name, expected in required_indexes.items():
             if self._index_columns(name) != expected:
                 raise ValueError('SUPERVISOR_INDEX_MISMATCH')
-        return previous_ok
+        return False
 
-    def _schema(self):
-        application_id = self.db.execute(
-            'PRAGMA application_id').fetchone()[0]
-        user_version = self.db.execute('PRAGMA user_version').fetchone()[0]
-        if application_id not in (0, SUPERVISOR_APPLICATION_ID):
-            raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
-        if user_version not in (0, 1, SUPERVISOR_SCHEMA_VERSION):
-            raise ValueError('UNSUPPORTED_SUPERVISOR_SCHEMA')
-        existing = self.db.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
-        ).fetchone()
-        previous_ok = False
-        if existing is not None:
-            previous_ok = self._validate_schema(allow_previous=True)
-            if previous_ok and user_version not in (0, 1):
-                raise ValueError('SUPERVISOR_MIGRATION_VERSION_MISMATCH')
-        else:
-            unexpected = self.db.execute("""SELECT name FROM sqlite_master
-              WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1""").fetchone()
-            if unexpected is not None:
-                raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
-        self.db.executescript('''
-        CREATE TABLE IF NOT EXISTS tasks(
+    @staticmethod
+    def _v3_schema_statements():
+        return (
+        '''CREATE TABLE IF NOT EXISTS tasks(
           task_id TEXT PRIMARY KEY,
           parent_task_id TEXT NOT NULL,
           stage TEXT NOT NULL,
@@ -202,63 +197,151 @@ class Supervisor(object):
           recovery_level INTEGER NOT NULL DEFAULT 0,
           recovery_generation INTEGER NOT NULL DEFAULT 0,
           created_at REAL NOT NULL,
-          updated_at REAL NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS events(
-          task_id TEXT NOT NULL,
-          attempt_id TEXT NOT NULL,
-          event_id TEXT NOT NULL,
-          kind TEXT NOT NULL,
-          observed_at REAL NOT NULL,
-          evidence_kind TEXT NOT NULL,
-          evidence_ref TEXT NOT NULL,
-          payload_json TEXT NOT NULL,
-          PRIMARY KEY(task_id, attempt_id, event_id),
-          FOREIGN KEY(task_id) REFERENCES tasks(task_id)
-        );
-        CREATE TABLE IF NOT EXISTS outbox(
-          outbox_id TEXT PRIMARY KEY,
-          task_id TEXT NOT NULL,
-          attempt_id TEXT NOT NULL,
-          event_id TEXT NOT NULL,
-          payload_json TEXT NOT NULL,
-          attempts INTEGER NOT NULL DEFAULT 0,
-          next_attempt_at REAL NOT NULL,
-          delivered_at REAL,
-          dead_lettered_at REAL,
-          last_error TEXT NOT NULL DEFAULT '',
-          UNIQUE(task_id, attempt_id, event_id),
-          FOREIGN KEY(task_id) REFERENCES tasks(task_id)
-        );
-        CREATE TABLE IF NOT EXISTS supervisor_heartbeats(
-          instance_id TEXT PRIMARY KEY,
-          observed_at REAL NOT NULL,
-          process_ref TEXT NOT NULL,
-          evidence_ref TEXT NOT NULL,
-          updated_at REAL NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS task_ready_idx
-          ON tasks(state, updated_at, task_id);
-        CREATE INDEX IF NOT EXISTS outbox_due_idx
-          ON outbox(delivered_at, next_attempt_at, outbox_id);
-        ''')
+          updated_at REAL NOT NULL,
+          authority_state TEXT NOT NULL DEFAULT 'NONE',
+          authority_valid_until REAL,
+          authority_run_id TEXT NOT NULL DEFAULT 'UNKNOWN',
+          authority_session_id TEXT NOT NULL DEFAULT 'UNKNOWN',
+          authority_gateway_id TEXT NOT NULL DEFAULT 'UNKNOWN',
+          resource_scope_json TEXT NOT NULL DEFAULT '[]',
+          receiver_ack_json TEXT NOT NULL DEFAULT '{}',
+          receiver_ack_sha256 TEXT NOT NULL DEFAULT 'UNKNOWN',
+          coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN',
+          last_trusted_time REAL
+        )''',
+        '''CREATE TABLE IF NOT EXISTS events(
+          task_id TEXT NOT NULL, attempt_id TEXT NOT NULL, event_id TEXT NOT NULL,
+          kind TEXT NOT NULL, observed_at REAL NOT NULL, evidence_kind TEXT NOT NULL,
+          evidence_ref TEXT NOT NULL, payload_json TEXT NOT NULL,
+          PRIMARY KEY(task_id,attempt_id,event_id),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS outbox(
+          outbox_id TEXT PRIMARY KEY, task_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL,event_id TEXT NOT NULL,payload_json TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at REAL NOT NULL,
+          delivered_at REAL,dead_lettered_at REAL,last_error TEXT NOT NULL DEFAULT '',
+          UNIQUE(task_id,attempt_id,event_id),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS supervisor_heartbeats(
+          instance_id TEXT PRIMARY KEY,observed_at REAL NOT NULL,
+          process_ref TEXT NOT NULL,evidence_ref TEXT NOT NULL,
+          updated_at REAL NOT NULL)''',
+        '''CREATE TABLE IF NOT EXISTS writer_operations(
+          operation_id TEXT PRIMARY KEY,task_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL,event_id TEXT NOT NULL,resource_key TEXT NOT NULL,
+          ticket_sha256 TEXT NOT NULL,caller_sha256 TEXT NOT NULL,
+          payload_json TEXT NOT NULL,state TEXT NOT NULL,
+          created_at REAL NOT NULL,updated_at REAL NOT NULL,
+          UNIQUE(task_id,attempt_id,event_id),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS writer_reconcile_evidence(
+          operation_id TEXT NOT NULL,evidence_id TEXT NOT NULL,outcome TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,observed_at REAL NOT NULL,
+          PRIMARY KEY(operation_id,evidence_id),
+          FOREIGN KEY(operation_id) REFERENCES writer_operations(operation_id))''',
+        '''CREATE TABLE IF NOT EXISTS writer_receipts(
+          operation_id TEXT PRIMARY KEY,receipt_json TEXT NOT NULL,
+          receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL,
+          FOREIGN KEY(operation_id) REFERENCES writer_operations(operation_id))''',
+        '''CREATE TABLE IF NOT EXISTS resource_claims(
+          resource_key TEXT PRIMARY KEY,task_id TEXT NOT NULL,
+          attempt_id TEXT NOT NULL,fence INTEGER NOT NULL,epoch INTEGER NOT NULL,
+          state TEXT NOT NULL,updated_at REAL NOT NULL,
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE TABLE IF NOT EXISTS resource_invalidation_receipts(
+          task_id TEXT NOT NULL,old_attempt_id TEXT NOT NULL,
+          resource_key TEXT NOT NULL,receipt_json TEXT NOT NULL,
+          receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL,
+          UNIQUE(task_id,old_attempt_id,resource_key),
+          FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
+        '''CREATE INDEX IF NOT EXISTS task_ready_idx
+           ON tasks(state,updated_at,task_id)''',
+        '''CREATE INDEX IF NOT EXISTS outbox_due_idx
+           ON outbox(delivered_at,next_attempt_at,outbox_id)''',
+        '''CREATE INDEX IF NOT EXISTS writer_operations_state_idx
+           ON writer_operations(task_id,state,updated_at,operation_id)''',
+        )
+
+    def _schema(self):
+        application_id = self.db.execute(
+            'PRAGMA application_id').fetchone()[0]
+        user_version = self.db.execute('PRAGMA user_version').fetchone()[0]
+        existing = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks'"
+        ).fetchone()
+        if existing is not None:
+            if application_id != SUPERVISOR_APPLICATION_ID:
+                raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
+            if user_version in (1, 2):
+                # Normal opens never migrate an existing ledger.
+                raise ValueError('HOLD_MIGRATION_REQUIRED')
+            if user_version != SUPERVISOR_SCHEMA_VERSION:
+                raise ValueError('UNSUPPORTED_SUPERVISOR_SCHEMA')
+            self._validate_schema()
+            return
+        unexpected = self.db.execute("""SELECT name FROM sqlite_master
+          WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1""").fetchone()
+        if unexpected is not None:
+            raise ValueError('SUPERVISOR_DATABASE_ID_MISMATCH')
         self.db.execute('BEGIN IMMEDIATE')
         try:
-            if previous_ok:
-                self.db.execute('''ALTER TABLE tasks ADD COLUMN
-                  recovery_generation INTEGER NOT NULL DEFAULT 0''')
-                self._migration_failpoint('after_alter')
-            self._validate_schema(allow_previous=False)
+            for statement in self._v3_schema_statements():
+                self.db.execute(statement)
             self.db.execute('PRAGMA application_id=%d' %
                             SUPERVISOR_APPLICATION_ID)
-            self._migration_failpoint('after_application_id')
             self.db.execute('PRAGMA user_version=%d' %
                             SUPERVISOR_SCHEMA_VERSION)
-            self._migration_failpoint('after_user_version')
+            self._validate_schema()
             self.db.commit()
         except Exception:
             self.db.rollback()
             raise
+
+    @classmethod
+    def offline_migrate_v2_to_v3(cls, path, clock=None):
+        """Explicit offline migration.  Production invocation is separately gated."""
+        db = sqlite3.connect(path, timeout=10, isolation_level='IMMEDIATE')
+        db.row_factory = sqlite3.Row
+        try:
+            app = db.execute('PRAGMA application_id').fetchone()[0]
+            ver = db.execute('PRAGMA user_version').fetchone()[0]
+            cols = tuple(r['name'] for r in db.execute(
+                'PRAGMA table_info(tasks)'))
+            if app != SUPERVISOR_APPLICATION_ID or ver != 2:
+                raise ValueError('V2_LEDGER_REQUIRED')
+            if cols != V2_TASK_COLUMNS:
+                raise ValueError('V2_TASK_SCHEMA_MISMATCH')
+            db.execute('BEGIN IMMEDIATE')
+            additions = (
+                "authority_state TEXT NOT NULL DEFAULT 'NONE'",
+                'authority_valid_until REAL',
+                "authority_run_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "authority_session_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "authority_gateway_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "resource_scope_json TEXT NOT NULL DEFAULT '[]'",
+                "receiver_ack_json TEXT NOT NULL DEFAULT '{}'",
+                "receiver_ack_sha256 TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                'last_trusted_time REAL',
+            )
+            for definition in additions:
+                db.execute('ALTER TABLE tasks ADD COLUMN ' + definition)
+            for statement in cls._v3_schema_statements()[4:]:
+                db.execute(statement)
+            db.execute("""UPDATE tasks SET authority_state='UNKNOWN',state='HOLD'
+              WHERE state IN ('RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')""")
+            db.execute("""UPDATE tasks SET authority_state='NONE'
+              WHERE authority_state!='UNKNOWN'""")
+            db.execute('PRAGMA user_version=%d' % SUPERVISOR_SCHEMA_VERSION)
+            probe = cls.__new__(cls)
+            probe.db = db
+            probe._validate_schema()
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     def _tx(self):
         return self.db
@@ -538,6 +621,459 @@ class Supervisor(object):
               WHERE task_id=?''',
               (state, progress, observed_at, observed_at, task_id))
             return {'duplicate': False, 'state': state}
+
+    def _authority_ticket(self, task):
+        return {
+            'schema': 1, 'task_id': task['task_id'],
+            'writer_scope': task['writer_scope'],
+            'attempt_id': task['attempt_id'], 'lease_id': task['lease_id'],
+            'fence': task['fence'], 'epoch': task['epoch'],
+            'valid_until': task['authority_valid_until'],
+            'checkpoint_sha256': task['checkpoint_sha256'],
+            'spec_sha256': task['spec_sha256'],
+            'assigned_run_id': task['authority_run_id'],
+            'assigned_session_id': task['authority_session_id'],
+            'gateway_id': task['authority_gateway_id'],
+            'resource_keys': json.loads(task['resource_scope_json']),
+        }
+
+    @staticmethod
+    def _scope_digest(resource_keys):
+        return hashlib.sha256(canonical(
+            sorted(set(resource_keys))).encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def _exact_resource_keys(resource_keys):
+        if (not isinstance(resource_keys, list) or not resource_keys
+                or any(not isinstance(x, str) or not x.strip()
+                       for x in resource_keys)):
+            raise ValueError('RESOURCE_SCOPE_REQUIRED')
+        if len(resource_keys) != len(set(resource_keys)):
+            raise ValueError('DUPLICATE_RESOURCE_KEY')
+        return tuple(sorted(resource_keys))
+
+    def ticket_resource_keys(self, ticket):
+        if not isinstance(ticket, dict):
+            raise ValueError('EXACT_WRITER_TICKET_REQUIRED')
+        return self._exact_resource_keys(ticket.get('resource_keys'))
+
+    @staticmethod
+    def _caller(caller):
+        required = {'caller_id', 'run_id', 'session_id', 'gateway_id'}
+        if (not isinstance(caller, dict) or set(caller) != required
+                or any(not isinstance(caller[x], str) or not caller[x]
+                       for x in required)):
+            raise ValueError('TRUSTED_CALLER_CONTEXT_REQUIRED')
+        return caller
+
+    def claim_writer(self, task_id, attempt_id, owner, entry, run_id,
+                     session_id, lease_id, gateway_id, resource_keys,
+                     valid_until, now=None):
+        now = self.clock() if now is None else now
+        keys = self._exact_resource_keys(resource_keys)
+        if (not finite(now) or not finite(valid_until) or now >= valid_until
+                or any(not isinstance(x, str) or not x for x in
+                       (attempt_id, owner, entry, run_id, session_id,
+                        lease_id, gateway_id))):
+            raise ValueError('EXACT_EXECUTION_AUTHORITY_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if (task['authority_state'] != 'NONE' or task['state'] != 'READY'
+                    or not self._dependencies_done(task)):
+                raise ValueError('WRITER_AUTHORITY_NOT_CLAIMABLE')
+            conflicts = self.db.execute(
+                'SELECT resource_key FROM resource_claims WHERE resource_key IN (%s)'
+                % ','.join('?' for _ in keys), keys).fetchall()
+            if conflicts:
+                raise ValueError('RESOURCE_SCOPE_CONFLICT')
+            fence = task['max_fence'] + 1
+            epoch = task['max_epoch'] + 1
+            for key in keys:
+                self.db.execute('''INSERT INTO resource_claims
+                  VALUES (?,?,?,?,?,?,?)''',
+                  (key, task_id, attempt_id, fence, epoch, 'VALID', now))
+            self.db.execute('''UPDATE tasks SET state='RECEIVED',owner=?,entry=?,
+              run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
+              max_fence=?,max_epoch=?,authority_state='VALID',
+              authority_valid_until=?,authority_run_id=?,authority_session_id=?,
+              authority_gateway_id=?,resource_scope_json=?,last_trusted_time=?,
+              received_at=?,last_event_at=?,updated_at=?
+              WHERE task_id=? AND authority_state='NONE' ''',
+              (owner, entry, run_id, session_id, attempt_id, lease_id, fence,
+               epoch, fence, epoch, valid_until, run_id, session_id, gateway_id,
+               canonical(list(keys)), now, now, now, now, task_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('SINGLE_WRITER_CAS_FAILED')
+            return self._authority_ticket(self._task(task_id))
+
+    def _validate_writer_locked(self, ticket, caller, now):
+        caller = self._caller(caller)
+        if not isinstance(ticket, dict):
+            raise ValueError('EXACT_WRITER_TICKET_REQUIRED')
+        task = self._task(ticket.get('task_id'))
+        expected = self._authority_ticket(task)
+        if canonical(ticket) != canonical(expected):
+            raise ValueError('STALE_WRITER_TICKET')
+        if task['authority_state'] != 'VALID':
+            raise ValueError('WRITER_AUTHORITY_NOT_VALID')
+        if (caller['run_id'] != task['authority_run_id']
+                or caller['session_id'] != task['authority_session_id']
+                or caller['gateway_id'] != task['authority_gateway_id']):
+            raise ValueError('CALLER_CONTEXT_MISMATCH')
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
+        if (task['last_trusted_time'] is not None
+                and now < task['last_trusted_time']):
+            raise ValueError('CLOCK_ROLLBACK_HOLD')
+        if (task['authority_valid_until'] is None
+                or not now < task['authority_valid_until']):
+            raise ValueError('WRITER_TICKET_EXPIRED')
+        self.db.execute('UPDATE tasks SET last_trusted_time=? WHERE task_id=?',
+                        (now, task['task_id']))
+        return task
+
+    def prepare_operation(self, ticket, caller, operation, now=None):
+        now = self.clock() if now is None else now
+        required = {'operation_id', 'event_id', 'resource_key',
+                    'operation_kind', 'expected_before', 'requested_after',
+                    'request_sha256', 'operation_marker'}
+        if not isinstance(operation, dict) or set(operation) != required:
+            raise ValueError('EXACT_OPERATION_REQUIRED')
+        for name in ('operation_id','event_id','resource_key','operation_kind',
+                     'request_sha256','operation_marker'):
+            if not isinstance(operation[name], str) or not operation[name]:
+                raise ValueError('EXACT_OPERATION_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._validate_writer_locked(ticket, caller, now)
+            if operation['resource_key'] not in json.loads(
+                    task['resource_scope_json']):
+                raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
+            payload = canonical(operation)
+            ticket_sha = hashlib.sha256(
+                canonical(ticket).encode('utf-8')).hexdigest()
+            caller_sha = hashlib.sha256(
+                canonical(self._caller(caller)).encode('utf-8')).hexdigest()
+            existing = self.db.execute('''SELECT * FROM writer_operations
+              WHERE operation_id=? OR (task_id=? AND attempt_id=? AND event_id=?)''',
+              (operation['operation_id'], task['task_id'], task['attempt_id'],
+               operation['event_id'])).fetchall()
+            if existing:
+                if (len(existing) == 1 and existing[0]['payload_json'] == payload
+                        and existing[0]['ticket_sha256'] == ticket_sha
+                        and existing[0]['caller_sha256'] == caller_sha):
+                    return {'duplicate': True,
+                            'state': existing[0]['state']}
+                raise ValueError('OPERATION_IDENTITY_CONFLICT')
+            self.db.execute('''INSERT INTO writer_operations
+              VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+              (operation['operation_id'], task['task_id'], task['attempt_id'],
+               operation['event_id'], operation['resource_key'], ticket_sha,
+               caller_sha, payload, 'PREPARED', now, now))
+            return {'duplicate': False, 'state': 'PREPARED'}
+
+    def begin_dispatch(self, ticket, caller, operation_id, now=None):
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._validate_writer_locked(ticket, caller, now)
+            row = self.db.execute(
+                'SELECT * FROM writer_operations WHERE operation_id=?',
+                (operation_id,)).fetchone()
+            if (row is None or row['task_id'] != task['task_id']
+                    or row['attempt_id'] != task['attempt_id']):
+                raise ValueError('OPERATION_IDENTITY_MISMATCH')
+            self.db.execute("""UPDATE writer_operations SET state='DISPATCHING',
+              updated_at=? WHERE operation_id=? AND state='PREPARED'""",
+              (now, operation_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('OPERATION_NOT_PREPARED')
+            return {'state': 'DISPATCHING'}
+
+    def _append_receipt_locked(self, operation_id, receipt, now):
+        if not isinstance(receipt, dict) or not receipt:
+            raise ValueError('FINAL_RECEIPT_REQUIRED')
+        body = canonical(receipt)
+        sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        existing = self.db.execute(
+            'SELECT * FROM writer_receipts WHERE operation_id=?',
+            (operation_id,)).fetchone()
+        if existing is not None:
+            if existing['receipt_sha256'] == sha and existing['receipt_json'] == body:
+                return {'duplicate': True}
+            raise ValueError('FINAL_RECEIPT_CONFLICT')
+        self.db.execute('INSERT INTO writer_receipts VALUES (?,?,?,?)',
+                        (operation_id, body, sha, now))
+        return {'duplicate': False}
+
+    def confirm_operation(self, ticket, caller, operation_id, receipt,
+                          now=None):
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._validate_writer_locked(ticket, caller, now)
+            self.db.execute("""UPDATE writer_operations SET state='CONFIRMED',
+              updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
+              AND state='DISPATCHING'""",
+              (now, operation_id, task['task_id'], task['attempt_id']))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('OPERATION_NOT_DISPATCHING')
+            self._append_receipt_locked(operation_id, receipt, now)
+            return {'state': 'CONFIRMED'}
+
+    def mark_operation_unknown(self, ticket, caller, operation_id, evidence,
+                               now=None):
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._validate_writer_locked(ticket, caller, now)
+            self.db.execute("""UPDATE writer_operations SET state='UNKNOWN',
+              updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
+              AND state='DISPATCHING'""",
+              (now, operation_id, task['task_id'], task['attempt_id']))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                row = self.db.execute('SELECT state FROM writer_operations
+                                      WHERE operation_id=?',
+                                      (operation_id,)).fetchone()
+                if row is None or row['state'] != 'UNKNOWN':
+                    raise ValueError('OPERATION_NOT_DISPATCHING')
+            evidence_id = hashlib.sha256(canonical({
+                'operation_id': operation_id, 'evidence': evidence
+            }).encode('utf-8')).hexdigest()
+            self.db.execute('''INSERT OR IGNORE INTO writer_reconcile_evidence
+              VALUES (?,?,?,?,?)''',
+              (operation_id, evidence_id, 'UNKNOWN',
+               canonical(evidence), now))
+            return {'state': 'UNKNOWN'}
+
+    def reconcile_operation(self, operation_id, context, outcome, evidence,
+                            receipt=None, now=None):
+        now = self.clock() if now is None else now
+        required = {'role', 'evidence_id', 'caller_id'}
+        if (not isinstance(context, dict) or set(context) != required
+                or context['role'] != 'RECONCILER'
+                or any(not isinstance(context[x], str) or not context[x]
+                       for x in required)):
+            raise ValueError('TRUSTED_RECONCILER_REQUIRED')
+        if outcome not in ('UNKNOWN','CONFIRMED','NOT_APPLIED','CONFLICT'):
+            raise ValueError('RECONCILE_OUTCOME_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            row = self.db.execute(
+                'SELECT * FROM writer_operations WHERE operation_id=?',
+                (operation_id,)).fetchone()
+            if row is None or row['state'] not in ('DISPATCHING','UNKNOWN'):
+                raise ValueError('OPERATION_NOT_RECONCILABLE')
+            body = canonical(evidence)
+            existing = self.db.execute('''SELECT * FROM writer_reconcile_evidence
+              WHERE operation_id=? AND evidence_id=?''',
+              (operation_id, context['evidence_id'])).fetchone()
+            if existing is not None:
+                if existing['outcome'] == outcome and existing['evidence_json'] == body:
+                    return {'duplicate': True, 'state': row['state']}
+                raise ValueError('RECONCILE_EVIDENCE_CONFLICT')
+            self.db.execute('''INSERT INTO writer_reconcile_evidence
+              VALUES (?,?,?,?,?)''',
+              (operation_id, context['evidence_id'], outcome, body, now))
+            if outcome == 'UNKNOWN':
+                if row['state'] == 'DISPATCHING':
+                    self.db.execute("""UPDATE writer_operations SET state='UNKNOWN',
+                      updated_at=? WHERE operation_id=?""", (now, operation_id))
+                return {'duplicate': False, 'state': 'UNKNOWN'}
+            if receipt is None:
+                raise ValueError('FINAL_RECEIPT_REQUIRED')
+            self.db.execute('''UPDATE writer_operations SET state=?,updated_at=?
+              WHERE operation_id=? AND state IN ('DISPATCHING','UNKNOWN')''',
+              (outcome, now, operation_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('RECONCILE_CAS_FAILED')
+            self._append_receipt_locked(operation_id, receipt, now)
+            return {'duplicate': False, 'state': outcome}
+
+    def unresolved_operations(self, task_id):
+        return [dict(r) for r in self.db.execute('''SELECT * FROM
+          writer_operations WHERE task_id=? AND state IN
+          ('PREPARED','DISPATCHING','UNKNOWN') ORDER BY operation_id''',
+          (task_id,))]
+
+    @staticmethod
+    def _controller(caller):
+        if (not isinstance(caller, dict)
+                or set(caller) != {'role','caller_id'}
+                or caller['role'] != 'REVOCATION_CONTROLLER'
+                or not isinstance(caller['caller_id'], str)
+                or not caller['caller_id']):
+            raise ValueError('TRUSTED_REVOCATION_CONTROLLER_REQUIRED')
+
+    def begin_revocation(self, task_id, caller, now=None):
+        self._controller(caller)
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != 'VALID':
+                raise ValueError('VALID_AUTHORITY_REQUIRED')
+            keys = self._exact_resource_keys(
+                json.loads(task['resource_scope_json']))
+            self.db.execute("""UPDATE tasks SET authority_state='REVOKING',
+              updated_at=? WHERE task_id=? AND authority_state='VALID'""",
+              (now, task_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('REVOCATION_CAS_FAILED')
+            self.db.execute("""UPDATE resource_claims SET state='REVOKING',
+              updated_at=? WHERE task_id=?""", (now, task_id))
+            return keys
+
+    def recover_unknown_to_revoking(self, task_id, caller, evidence, now=None):
+        self._controller(caller)
+        if not isinstance(evidence, dict) or not evidence:
+            raise ValueError('UNKNOWN_RECOVERY_EVIDENCE_REQUIRED')
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != UNKNOWN:
+                raise ValueError('UNKNOWN_AUTHORITY_REQUIRED')
+            self.db.execute("""UPDATE tasks SET authority_state='REVOKING',
+              state='HOLD',updated_at=? WHERE task_id=? AND authority_state=?""",
+              (now, task_id, UNKNOWN))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('UNKNOWN_RECOVERY_CAS_FAILED')
+            return {'state': 'REVOKING', 'evidence': canonical(evidence)}
+
+    def record_resource_invalidation(self, task_id, resource_key, receipt,
+                                     now=None):
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != 'REVOKING':
+                raise ValueError('REVOKING_AUTHORITY_REQUIRED')
+            keys = self._exact_resource_keys(
+                json.loads(task['resource_scope_json']))
+            if resource_key not in keys:
+                raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
+            if (not isinstance(receipt, dict)
+                    or receipt.get('outcome') != 'INVALIDATED'):
+                raise ValueError('RESOURCE_INVALIDATION_RECEIPT_REQUIRED')
+            body = canonical(receipt)
+            sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+            existing = self.db.execute('''SELECT * FROM
+              resource_invalidation_receipts WHERE task_id=? AND
+              old_attempt_id=? AND resource_key=?''',
+              (task_id, task['attempt_id'], resource_key)).fetchone()
+            if existing is not None:
+                if existing['receipt_sha256'] == sha and existing['receipt_json'] == body:
+                    return {'duplicate': True}
+                raise ValueError('RESOURCE_INVALIDATION_CONFLICT')
+            self.db.execute('''INSERT INTO resource_invalidation_receipts
+              VALUES (?,?,?,?,?,?)''',
+              (task_id, task['attempt_id'], resource_key, body, sha, now))
+            return {'duplicate': False}
+
+    def complete_revocation(self, task_id, now=None):
+        now = self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != 'REVOKING':
+                raise ValueError('REVOKING_AUTHORITY_REQUIRED')
+            if self.unresolved_operations(task_id):
+                raise ValueError('REVOCATION_NOT_COMPLETED')
+            keys = self._exact_resource_keys(
+                json.loads(task['resource_scope_json']))
+            rows = [dict(r) for r in self.db.execute('''SELECT * FROM
+              resource_invalidation_receipts WHERE task_id=? AND
+              old_attempt_id=? ORDER BY resource_key''',
+              (task_id, task['attempt_id']))]
+            if [r['resource_key'] for r in rows] != list(keys):
+                raise ValueError('RESOURCE_COVERAGE_INCOMPLETE')
+            coverage = hashlib.sha256(canonical([
+                {'resource_key': r['resource_key'],
+                 'receipt_sha256': r['receipt_sha256']} for r in rows
+            ]).encode('utf-8')).hexdigest()
+            self.db.execute("""UPDATE tasks SET authority_state='REVOKED',
+              authority_valid_until=NULL,coverage_digest=?,updated_at=?
+              WHERE task_id=? AND authority_state='REVOKING'""",
+              (coverage, now, task_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('REVOCATION_CAS_FAILED')
+            self.db.execute("""UPDATE resource_claims SET state='REVOKED',
+              updated_at=? WHERE task_id=?""", (now, task_id))
+            return {'state': 'REVOKED', 'coverage_digest': coverage}
+
+    def record_receiver_ack(self, task_id, ack, now=None):
+        now = self.clock() if now is None else now
+        required = {'task_id','old_attempt_id','new_attempt_id','new_owner',
+                    'new_entry','new_run_id','new_session_id','new_lease_id',
+                    'new_gateway_id','resource_scope_digest','spec_sha256',
+                    'checkpoint_sha256'}
+        if (not isinstance(ack, dict) or set(ack) != required
+                or any(not isinstance(ack[x], str) or not ack[x]
+                       for x in required)):
+            raise ValueError('EXACT_RECEIVER_ACK_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != 'REVOKED':
+                raise ValueError('REVOKED_AUTHORITY_REQUIRED')
+            expected = {
+                'task_id': task_id, 'old_attempt_id': task['attempt_id'],
+                'resource_scope_digest': task['coverage_digest'],
+                'spec_sha256': task['spec_sha256'],
+                'checkpoint_sha256': task['checkpoint_sha256']}
+            if any(ack[k] != v for k, v in expected.items()):
+                raise ValueError('RECEIVER_ACK_BINDING_MISMATCH')
+            body = canonical(ack)
+            sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+            self.db.execute('''UPDATE tasks SET receiver_ack_json=?,
+              receiver_ack_sha256=?,updated_at=? WHERE task_id=?''',
+              (body, sha, now, task_id))
+            return {'receiver_ack_sha256': sha}
+
+    def takeover_claim(self, task_id, ack, valid_until, now=None):
+        now = self.clock() if now is None else now
+        if not finite(now) or not finite(valid_until) or now >= valid_until:
+            raise ValueError('FRESH_AUTHORITY_DEADLINE_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            body = canonical(ack)
+            ack_sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+            if (task['authority_state'] != 'REVOKED'
+                    or task['receiver_ack_sha256'] != ack_sha
+                    or task['receiver_ack_json'] != body
+                    or ack.get('resource_scope_digest') != task['coverage_digest']):
+                raise ValueError('TAKEOVER_PREREQUISITES_INCOMPLETE')
+            keys = self._exact_resource_keys(
+                json.loads(task['resource_scope_json']))
+            claims = [dict(r) for r in self.db.execute('''SELECT * FROM
+              resource_claims WHERE task_id=? ORDER BY resource_key''',
+              (task_id,))]
+            if ([r['resource_key'] for r in claims] != list(keys)
+                    or any(r['state'] != 'REVOKED' for r in claims)):
+                raise ValueError('RESOURCE_COVERAGE_INCOMPLETE')
+            fence = task['max_fence'] + 1
+            epoch = task['max_epoch'] + 1
+            self.db.execute('''UPDATE tasks SET state='RECEIVED',owner=?,entry=?,
+              run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
+              max_fence=?,max_epoch=?,authority_state='VALID',
+              authority_valid_until=?,authority_run_id=?,authority_session_id=?,
+              authority_gateway_id=?,last_trusted_time=?,received_at=?,
+              last_event_at=?,updated_at=?
+              WHERE task_id=? AND authority_state='REVOKED' ''',
+              (ack['new_owner'], ack['new_entry'], ack['new_run_id'],
+               ack['new_session_id'], ack['new_attempt_id'], ack['new_lease_id'],
+               fence, epoch, fence, epoch, valid_until, ack['new_run_id'],
+               ack['new_session_id'], ack['new_gateway_id'], now, now, now,
+               now, task_id))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('TAKEOVER_CAS_FAILED')
+            self.db.execute('''UPDATE resource_claims SET attempt_id=?,
+              fence=?,epoch=?,state='VALID',updated_at=? WHERE task_id=?''',
+              (ack['new_attempt_id'], fence, epoch, now, task_id))
+            return self._authority_ticket(self._task(task_id))
 
     def _enqueue(self, task_id, attempt_id, event_id, payload, now):
         seed = canonical({'task_id': task_id, 'attempt_id': attempt_id,
