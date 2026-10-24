@@ -304,6 +304,19 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn('source-pins/"',text)
         self.assertIn("model_distribution/NOTICE.md",text)
         self.assertIn("model_manifest.json",text)
+    def test_candidate_manifest_never_claims_signature_from_release_filename(self):
+        root=self.root/"candidate"; (root/"ocr-deb-cache"/"apt-lists").mkdir(parents=True)
+        release=root/"ocr-deb-cache"/"apt-lists"/"debian_dists_bookworm_InRelease"
+        release.write_bytes(b"not verified signed metadata")
+        out=root/"ocr-candidate-inputs"/"candidate-input-manifest.json"
+        script=Path(__file__).with_name("write_candidate_input_manifest.py")
+        env=dict(os.environ,RUNNER_TEMP=str(root),GITHUB_SHA="a"*40,GITHUB_RUN_ID="123")
+        subprocess.run([sys.executable,str(script),str(root),str(out)],env=env,check=True,capture_output=True,text=True)
+        manifest=json.loads(out.read_text(encoding="utf-8"))
+        entry=next(x for x in manifest["files"] if x["path"].endswith("debian_dists_bookworm_InRelease"))
+        self.assertIn("signature-verification-not-independently-proven",entry["provenance"])
+        self.assertNotIn("signature-checked",entry["provenance"])
+
     def test_candidate_artifact_is_always_uploaded_but_not_release(self):
         workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
         text=workflow.read_text(encoding="utf-8")
