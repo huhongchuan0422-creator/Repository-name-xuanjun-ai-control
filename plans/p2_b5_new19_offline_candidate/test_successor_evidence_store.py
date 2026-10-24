@@ -226,36 +226,40 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         payload=dict(scope='B5_EXPOSURE_CLOSE',job=JOB,
                      decision_id='decision-fd',approved=True,phase='AFTER_B5_HTTP')
         self.register('B5_EXPOSURE_CLOSE',payload)
-        with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
-            fds=self.store.active_action_fds(
-                self.binding,('B5_EXPOSURE_CLOSE',))
-            self.assertEqual(len(fds),2)
-            lock=fds[1]
-            os.close(lock)
-            reused=os.open('/dev/null',os.O_RDONLY)
-            try:
-                self.assertEqual(reused,lock)
-                with self.assertRaisesRegex(Hold,
-                        'SUCCESSOR_EVIDENCE_LEASE_IDENTITY_CHANGED'):
-                    self.store.active_action_fds(
-                        self.binding,('B5_EXPOSURE_CLOSE',))
-            finally:
-                # action_exact finalizer owns this descriptor number.
-                if reused!=lock:os.close(reused)
-        # New action: replace the named lock while the original inode remains
-        # held; the dirfd/name identity check must reject it.
-        with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
-            old=self.root/'register.lock'
-            moved=self.root/'register.lock.old'
-            old.rename(moved)
-            old.write_bytes(b'');old.chmod(0o600)
-            try:
-                with self.assertRaisesRegex(Hold,
-                        'SUCCESSOR_EVIDENCE_LEASE_IDENTITY_CHANGED'):
-                    self.store.active_action_fds(
-                        self.binding,('B5_EXPOSURE_CLOSE',))
-            finally:
-                old.unlink();moved.rename(old)
+        with self.assertRaisesRegex(
+                Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+            with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+                fds=self.store.active_action_fds(
+                    self.binding,('B5_EXPOSURE_CLOSE',))
+                self.assertEqual(len(fds),2)
+                lock=fds[1]
+                os.close(lock)
+                reused=os.open('/dev/null',os.O_RDONLY)
+                try:
+                    self.assertEqual(reused,lock)
+                    with self.assertRaisesRegex(
+                            Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+                        self.store.active_action_fds(
+                            self.binding,('B5_EXPOSURE_CLOSE',))
+                finally:
+                    # action_exact owns the descriptor number until safe exit.
+                    if reused!=lock:os.close(reused)
+        # New action: replacing the named lock also poisons the whole action;
+        # restoring the name does not rehabilitate that lease.
+        with self.assertRaisesRegex(
+                Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+            with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+                old=self.root/'register.lock'
+                moved=self.root/'register.lock.old'
+                old.rename(moved)
+                old.write_bytes(b'');old.chmod(0o600)
+                try:
+                    with self.assertRaisesRegex(
+                            Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+                        self.store.active_action_fds(
+                            self.binding,('B5_EXPOSURE_CLOSE',))
+                finally:
+                    old.unlink();moved.rename(old)
 
     def test_nested_lease_revocation_waits_until_outer_release(self):
         self.register('PRE_START_RESTORE',dict(scope='PRE_START_RESTORE',
