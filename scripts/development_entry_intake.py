@@ -147,19 +147,33 @@ def _controlled_candidate_files(supervisor, receipt, root):
     if (observed_repo != receipt['target_repository']
             or observed_head != receipt['code_commit']):
         raise ValueError('CANDIDATE_CHECKOUT_IDENTITY_MISMATCH')
+    dirty = subprocess.check_output(
+        ['git','-C',root,'status','--porcelain=v1','--untracked-files=all'],
+        stderr=subprocess.DEVNULL)
+    if dirty:
+        raise ValueError('DIRTY_CANDIDATE_CHECKOUT')
     contract = supervisor.development_contract(receipt['task_id'])
     result = {}
-    root_real = os.path.realpath(root)
+    total = 0
     for path in contract['allowed_files']:
-        full = os.path.join(root, path)
-        real = os.path.realpath(full)
-        if not real.startswith(root_real + os.sep):
-            raise ValueError('CANDIDATE_FILE_ESCAPES_ROOT')
-        info = os.lstat(full)
-        if not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode):
-            raise ValueError('CANDIDATE_FILE_NOT_REGULAR')
-        with open(full, 'rb') as stream:
-            result[path] = stream.read()
+        if (not isinstance(path, str)
+                or not re.fullmatch(r'[A-Za-z0-9_./-]+', path)
+                or any(part in ('', '.', '..') for part in path.split('/'))):
+            raise ValueError('CANONICAL_CANDIDATE_PATH_REQUIRED')
+        object_name = receipt['code_commit'] + ':' + path
+        check = subprocess.run(
+            ['git','-C',root,'cat-file','-e',object_name],
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+        if check.returncode != 0:
+            raise ValueError('CANDIDATE_OBJECT_REQUIRED')
+        raw = subprocess.check_output(
+            ['git','-C',root,'show',object_name],stderr=subprocess.DEVNULL)
+        if len(raw) > 131072:
+            raise ValueError('CANDIDATE_OBJECT_TOO_LARGE')
+        total += len(raw)
+        if total > 524288:
+            raise ValueError('CANDIDATE_BUNDLE_TOO_LARGE')
+        result[path] = raw
     return result
 
 
