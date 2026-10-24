@@ -76,7 +76,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-build"
-          cp services/ocr_engine/requirements.txt "$RUNNER_TEMP/ocr-build/requirements.txt"
           docker run --rm --platform linux/amd64 \
             -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
             -e OCR_BASE_MANIFEST_SHA256=8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 \
@@ -84,34 +83,8 @@ jobs:
             -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse" -v "$RUNNER_TEMP/ocr-build:/build" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
-              python -m pip download --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
-              python - <<'PY'
-import hashlib,json,os,platform,sys,sysconfig
-from pathlib import Path
-from pip._vendor.packaging.tags import sys_tags
-req=Path("/src/services/ocr_engine/requirements.txt")
-wheels=sorted(Path("/wheelhouse").glob("*.whl"))
-if not wheels: raise SystemExit("WHEELHOUSE_EMPTY")
-if platform.python_implementation() != "CPython" or platform.python_version() != "3.11.17" or platform.machine() != "x86_64":
-    raise SystemExit("TARGET_RUNTIME_MISMATCH")
-glibc= os.confstr("CS_GNU_LIBC_VERSION")
-lock={
- "target_platform":"linux-x86_64-cp311",
- "python_implementation":platform.python_implementation(),
- "python_version":platform.python_version(),
- "abi":"cp311",
- "soabi":sysconfig.get_config_var("SOABI"),
- "base_image":os.environ["OCR_BASE_IMAGE"],
- "base_image_manifest_sha256":os.environ["OCR_BASE_MANIFEST_SHA256"],
- "base_image_config_sha256":os.environ["OCR_BASE_CONFIG_SHA256"],
- "glibc_version":glibc,
- "target_tags":[str(tag) for tag in sys_tags()],
- "requirements_sha256":hashlib.sha256(req.read_bytes()).hexdigest(),
- "wheels":[{"filename":p.name,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()} for p in wheels]
-}
-Path("/build/requirements-lock-linux-x86_64-cp311.json").write_text(json.dumps(lock,sort_keys=True,indent=2)+"\n")
-print(json.dumps({"python":lock["python_version"],"abi":lock["abi"],"wheel_count":len(wheels),"top_tags":lock["target_tags"][:8]},sort_keys=True))
-PY
+              python -m pip download --index-url https://pypi.org/simple --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
+              python /src/services/ocr_engine/generate_platform_lock.py /src /wheelhouse /build/requirements-lock-linux-x86_64-cp311.json
             '
       - name: Fetch fixed model assets and verify the three published SHA256 pins
         shell: bash
@@ -129,7 +102,9 @@ PY
           docker run --rm --network none --platform linux/amd64 \
             -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse:ro" -v "$GITHUB_WORKSPACE:/src:ro" \
             "$OCR_BASE_IMAGE" sh -lc '
+              set -eu
               python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
+              python -m pip check
               python -c "import fastapi,uvicorn,onnxruntime,rapidocr,cv2,numpy,cryptography; print(\"OFFLINE_IMPORT_CHECK=PASS\")"
             '
       - name: Build the verified archive (no service start or inference)
@@ -144,7 +119,32 @@ PY
             --output "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" \
             --execute-build
           sha256sum "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" > "$RUNNER_TEMP/ocr-build/SHA256SUMS"
-      - uses: actions/upload-artifact@v4
+      - name: Record non-secret build/runtime diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          {
+            echo "source_sha=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "target_platform=$OCR_TARGET_PLATFORM"
+            echo "base_image=$OCR_BASE_IMAGE"
+            docker image inspect --format '{{json .RepoDigests}}' "$OCR_BASE_IMAGE" 2>&1 || true
+            docker run --rm --platform linux/amd64 "$OCR_BASE_IMAGE" sh -lc 'python -VV; python -c "import sysconfig; print(sysconfig.get_config_var(\"SOABI\"))"; getconf GNU_LIBC_VERSION' 2>&1 || true
+          } > "$RUNNER_TEMP/ocr-diagnostics/build-runtime.log"
+          find "$RUNNER_TEMP/ocr-build" -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null > "$RUNNER_TEMP/ocr-diagnostics/output-inventory.txt" || true
+      - name: Upload failure diagnostics (never presented as a successful package)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-ocr-build-diagnostics-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/ocr-diagnostics/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload verified package only after successful build and archive verification
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: xuanjun-ocr-linux-x86_64-cp311-${{ github.sha }}
           path: |
