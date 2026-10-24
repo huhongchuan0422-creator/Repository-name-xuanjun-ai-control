@@ -956,17 +956,22 @@ class Supervisor(object):
     def _validate_operation_receipt(row, outcome, receipt):
         if not isinstance(receipt, dict):
             raise ValueError('FINAL_RECEIPT_REQUIRED')
-        required = {'schema','outcome','operation_id','resource_key',
-                    'operation_marker','attribution'}
+        base_required = {'schema','outcome','operation_id','resource_key',
+                         'operation_marker','attribution'}
+        operation = json.loads(row['payload_json'])
+        attribution = receipt.get('attribution')
+        git_receipt = (isinstance(attribution, dict)
+                       and attribution.get('kind') == 'GIT_CAS')
+        required = set(base_required)
+        if git_receipt:
+            required.add('observed_revision')
         if set(receipt) != required or receipt.get('schema') != 1:
             raise ValueError('FINAL_RECEIPT_SCHEMA_REQUIRED')
-        operation = json.loads(row['payload_json'])
         if (receipt['outcome'] != outcome
                 or receipt['operation_id'] != row['operation_id']
                 or receipt['resource_key'] != row['resource_key']
                 or receipt['operation_marker'] != operation['operation_marker']):
             raise ValueError('FINAL_RECEIPT_BINDING_MISMATCH')
-        attribution = receipt['attribution']
         if (not isinstance(attribution, dict)
                 or set(attribution) != {'kind','before','after'}):
             raise ValueError('FINAL_RECEIPT_ATTRIBUTION_REQUIRED')
@@ -975,14 +980,28 @@ class Supervisor(object):
                     or attribution['before'] != operation['expected_before']
                     or attribution['after'] != operation['requested_after']):
                 raise ValueError('CONFIRMED_ATTRIBUTION_REQUIRED')
+            if operation.get('operation_kind') == 'GIT_CAS':
+                observed = receipt.get('observed_revision')
+                if (attribution['kind'] != 'GIT_CAS'
+                        or not isinstance(observed, str)
+                        or re.fullmatch(
+                            r'[0-9a-f]{40}(?:[0-9a-f]{24})?', observed)
+                           is None):
+                    raise ValueError('GIT_OBSERVED_REVISION_REQUIRED')
+            elif 'observed_revision' in receipt:
+                raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         elif outcome == 'NOT_APPLIED':
             if (attribution['kind'] != 'READBACK'
                     or attribution['before'] != operation['expected_before']
                     or attribution['after'] != operation['expected_before']):
                 raise ValueError('NOT_APPLIED_ATTRIBUTION_REQUIRED')
+            if 'observed_revision' in receipt:
+                raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         elif outcome == 'CONFLICT':
             if attribution['kind'] != 'READBACK':
                 raise ValueError('CONFLICT_ATTRIBUTION_REQUIRED')
+            if 'observed_revision' in receipt:
+                raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         return receipt
 
     def _append_receipt_locked(self, row, outcome, receipt, now):
