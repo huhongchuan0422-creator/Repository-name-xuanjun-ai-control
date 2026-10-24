@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1]/'scripts'))
 from task_supervisor import Supervisor
+from task_writer_fence import Fence
 
 spec=importlib.util.spec_from_file_location('gate',pathlib.Path(__file__).parents[1]/'scripts/entry_review_gate.py')
 gate=importlib.util.module_from_spec(spec);spec.loader.exec_module(gate)
@@ -138,10 +139,11 @@ class ReviewTests(unittest.TestCase):
 class CanonicalCompletionTests(unittest.TestCase):
     def setUp(self):
         handle,self.path=tempfile.mkstemp();os.close(handle)
+        self.lock_root=self.path+'.locks'
         self.now=1000.0
         self.s=Supervisor(self.path,lambda:self.now)
-        self.task='original'
-        self.child='child'
+        self.fence=Fence(self.s,self.lock_root)
+        self.task='original';self.child='child'
         self.s.register(dict(
             task_id=self.task,parent_task_id='parent',stage='dev',
             owner='developer',entry='CHATGPT',checkpoint_sha256='b'*64,
@@ -169,12 +171,12 @@ class CanonicalCompletionTests(unittest.TestCase):
                 {'issuer':'native','subject':'security','key_id':'security-key',
                  'role':'SECURITY'}])
         base={k:v for k,v in self.contract.items() if k!='code_commit'}
-        self.s.register_development_contract(self.task,base,now=self.now)
-        caller={'caller_id':'writer','run_id':'run1',
-                'session_id':'session1','gateway_id':'gateway1'}
-        self.s.claim_writer(self.task,'a1','developer','CHATGPT',caller,
-                            'lease1','provider1',['fake:development/source'],
-                            1700)
+        self.s.register_development_contract(self.task,base)
+        self.caller={'caller_id':'writer','run_id':'run1',
+                     'session_id':'session1','gateway_id':'gateway1'}
+        ticket=self.fence.claim(
+            self.task,'a1','developer','CHATGPT',self.caller,'lease1',
+            ['fake:development/source'],1700)
         self.files={'src/f.py':b'answer=42\n','src/data.json':b'{}\n'}
         manifest={p:hashlib.sha256(raw).hexdigest()
                   for p,raw in self.files.items()}
@@ -183,114 +185,179 @@ class CanonicalCompletionTests(unittest.TestCase):
             task_id=self.task,spec_sha256='a'*64,checkpoint_sha256='b'*64,
             target_repository='owner/repo',target_base_sha='c'*40,
             code_commit='d'*40,event='CODE_READY',attempt_id='a1',
-            lease_id='lease1',fence=1,epoch=1,source_comment_id=123,
-            status='RECEIPT_VALIDATED_NOT_ADMITTED',
+            lease_id='lease1',fence=ticket['fence'],epoch=ticket['epoch'],
+            caller_id=self.caller['caller_id'],run_id=self.caller['run_id'],
+            session_id=self.caller['session_id'],
+            gateway_id=self.caller['gateway_id'],
+            lock_provider_id=self.fence.locks.provider_id,
+            source_comment_id=123,status='RECEIPT_VALIDATED_NOT_ADMITTED',
             native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
             authority_effect='NONE',
             required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
-        self.candidate=self.s.bind_development_candidate(receipt,manifest,now=1001)
+        self.candidate=self.s.bind_development_candidate(receipt,manifest)
 
     def tearDown(self):
+        try:self.fence.close()
+        except Exception:pass
         try:self.s.close()
         except Exception:pass
         if os.path.exists(self.path):os.unlink(self.path)
+        if os.path.isdir(self.lock_root):
+            for name in os.listdir(self.lock_root):
+                os.unlink(os.path.join(self.lock_root,name))
+            os.rmdir(self.lock_root)
 
-    def reviews(self):
-        sha=gate.review_bundle(self.contract,self.files,[])['bundle_sha256']
+    def reviews(self, contract=None, files=None):
+        contract=contract or self.contract
+        files=files or self.files
+        sha=gate.review_bundle(contract,files,[])['bundle_sha256']
         result=[]
-        for p in self.contract['trusted_reviewers']:
+        for p in contract['trusted_reviewers']:
             payload=dict(
                 reviewer={k:p[k] for k in ('issuer','subject')},
                 role=p['role'],bundle_sha256=sha,decision='PASS')
             result.append(signed(payload,p['key_id']))
         return result
 
-    def test_exact_independent_reviews_complete_and_unlock_registered_child(self):
+    def reviewed(self, event_id='dev-reviewed-1'):
+        return gate.complete_reviewed_candidate(
+            self.s,self.task,self.candidate['candidate_event_id'],
+            self.files,self.reviews(),KEYS,event_id)
+
+    def revoke_complete(self):
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
+        self.fence.begin_revocation(self.task,controller)
+        self.fence.drain(self.task,controller,0.2)
+        self.fence.invalidate_source_resources(self.task,'dev-invalidate')
+        return self.s.complete_revocation(self.task)
+
+    def test_review_pass_does_not_complete_or_unlock_before_revocation(self):
+        result=self.reviewed()
+        self.assertEqual(result['canonical_review']['reviewed']['code_commit'],
+                         'd'*40)
+        self.assertNotEqual(self.s._task(self.task)['state'],'SUCCESS')
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
-        result=gate.complete_reviewed_candidate(
-            self.s,self.contract,self.files,self.reviews(),KEYS,
-            self.candidate,'dev-complete-1')
-        self.assertEqual(result['canonical_completion']['state'],'SUCCESS')
-        self.assertEqual(self.s._task(self.task)['state'],'SUCCESS')
+        with self.assertRaisesRegex(
+                ValueError,'DEVELOPMENT_REVOCATION_PROOF_REQUIRED'):
+            gate.finalize_reviewed_candidate(
+                self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
+
+    def test_exact_reviews_revoke_coverage_then_unlock_registered_child(self):
+        reviewed=self.reviewed()
+        revoke=self.revoke_complete()
+        self.assertEqual(revoke['state'],'REVOKED')
+        result=gate.finalize_reviewed_candidate(
+            self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        self.assertEqual(result['state'],'SUCCESS')
+        task=self.s._task(self.task)
+        self.assertEqual(task['authority_state'],'REVOKED')
+        self.assertEqual(task['state'],'SUCCESS')
+        self.assertNotEqual(task['coverage_digest'],'UNKNOWN')
+        self.assertNotEqual(task['resource_scope_digest'],'UNKNOWN')
+        self.assertNotEqual(task['writer_stopped'],'TRUE')
+        self.assertNotEqual(task['effects_reconciled'],'TRUE')
         self.assertIn(self.child,[x['task_id'] for x in self.s.ready()])
         event=self.s.db.execute(
             "SELECT payload_json FROM events WHERE task_id=? AND event_id=?",
             (self.task,'dev-complete-1')).fetchone()
         payload=__import__('json').loads(event[0])
-        self.assertEqual(payload['bundle_sha256'],result['bundle_sha256'])
+        self.assertEqual(payload['authority_state'],'REVOKED')
+        self.assertEqual(payload['coverage_digest'],task['coverage_digest'])
         self.assertEqual(payload['code_commit'],'d'*40)
         self.assertEqual(set(payload['review_record_ids']),{'QA','SECURITY'})
 
     def test_missing_reviewer_holds_and_does_not_unlock_child(self):
         result=gate.complete_reviewed_candidate(
-            self.s,self.contract,self.files,self.reviews()[:1],KEYS,
-            self.candidate,'dev-complete-1')
+            self.s,self.task,self.candidate['candidate_event_id'],
+            self.files,self.reviews()[:1],KEYS,'dev-reviewed-1')
         self.assertEqual(
-            result['canonical_completion'],'HOLD_INDEPENDENT_REVIEW_REQUIRED')
-        self.assertNotEqual(self.s._task(self.task)['state'],'SUCCESS')
+            result['canonical_review'],'HOLD_INDEPENDENT_REVIEW_REQUIRED')
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
+        self.assertIsNone(self.s.db.execute(
+            "SELECT 1 FROM events WHERE kind='DEVELOPMENT_REVIEWED'"
+        ).fetchone())
 
-    def test_changed_bundle_or_wrong_commit_does_not_complete(self):
-        reviews=self.reviews()
+    def test_changed_bundle_and_canonical_event_id_mismatch_rejected(self):
         changed=dict(self.files);changed['src/f.py']=b'answer=99\n'
         with self.assertRaises(ValueError):
             gate.complete_reviewed_candidate(
-                self.s,self.contract,changed,reviews,KEYS,
-                self.candidate,'dev-complete-1')
-        wrong=dict(self.contract);wrong['code_commit']='9'*40
-        wrong_sha=gate.review_bundle(wrong,self.files,[])['bundle_sha256']
-        wrong_reviews=[]
-        for p in wrong['trusted_reviewers']:
-            payload=dict(
-                reviewer={k:p[k] for k in ('issuer','subject')},
-                role=p['role'],bundle_sha256=wrong_sha,decision='PASS')
-            wrong_reviews.append(signed(payload,p['key_id']))
-        with self.assertRaisesRegex(
-                ValueError,'REVIEW_CANDIDATE_BINDING_MISMATCH'):
+                self.s,self.task,self.candidate['candidate_event_id'],
+                changed,self.reviews(),KEYS,'dev-reviewed-change')
+        with self.assertRaisesRegex(ValueError,'CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED'):
             gate.complete_reviewed_candidate(
-                self.s,wrong,self.files,wrong_reviews,KEYS,
-                self.candidate,'dev-complete-2')
+                self.s,self.task,'development-candidate:wrong',
+                self.files,self.reviews(),KEYS,'dev-reviewed-wrong')
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
 
-    def test_review_policy_drift_from_canonical_contract_is_rejected(self):
+    def test_review_policy_and_wrong_commit_cannot_replace_canonical_contract(self):
         drift=copy.deepcopy(self.contract)
         drift['developer']={'issuer':'native','subject':'other-developer'}
-        drift_sha=gate.review_bundle(drift,self.files,[])['bundle_sha256']
-        drift_reviews=[]
-        for p in drift['trusted_reviewers']:
-            payload=dict(
-                reviewer={k:p[k] for k in ('issuer','subject')},
-                role=p['role'],bundle_sha256=drift_sha,decision='PASS')
-            drift_reviews.append(signed(payload,p['key_id']))
-        with self.assertRaisesRegex(
-                ValueError,'REVIEW_CANDIDATE_BINDING_MISMATCH'):
-            gate.complete_reviewed_candidate(
-                self.s,drift,self.files,drift_reviews,KEYS,
-                self.candidate,'dev-complete-policy-drift')
+        with self.assertRaises(ValueError):
+            gate.review_bundle(drift,self.files,self.reviews(drift),KEYS)
+        candidate=self.s.development_candidate(
+            self.task,self.candidate['candidate_event_id'])
+        self.assertEqual(candidate['code_commit'],'d'*40)
         self.assertNotIn(self.child,[x['task_id'] for x in self.s.ready()])
 
-    def test_completion_replay_restart_outbox_and_conflict(self):
-        reviews=self.reviews()
-        first=gate.complete_reviewed_candidate(
-            self.s,self.contract,self.files,reviews,KEYS,
-            self.candidate,'dev-complete-1')
-        replay=gate.complete_reviewed_candidate(
-            self.s,self.contract,self.files,reviews,KEYS,
-            self.candidate,'dev-complete-1')
-        self.assertFalse(first['canonical_completion']['duplicate'])
-        self.assertTrue(replay['canonical_completion']['duplicate'])
-        self.s.close();self.s=Supervisor(self.path,lambda:self.now)
+    def test_revoking_and_unresolved_operation_block_final_success(self):
+        self.reviewed()
+        operation={
+            'operation_id':'op1','event_id':'op-event',
+            'resource_key':'fake:development/source',
+            'operation_kind':'FAKE_TXN',
+            'expected_before':{'value':'old'},
+            'requested_after':{'value':'new'},
+            'request_sha256':'9'*64,
+            'operation_marker':'xuanjun-op:op1'}
+        ticket=self.s._authority_ticket(self.s._task(self.task))
+        self.fence.prepare(ticket,self.caller,operation)
+        self.s.begin_dispatch(
+            ticket,self.caller,'op1',self.fence.locks.provider_id)
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
+        self.fence.begin_revocation(self.task,controller)
+        self.fence.drain(self.task,controller,0.2)
+        self.fence.invalidate_source_resources(self.task,'dev-invalidate')
+        with self.assertRaisesRegex(ValueError,'REVOCATION_NOT_COMPLETED'):
+            self.s.complete_revocation(self.task)
+        with self.assertRaises(ValueError):
+            gate.finalize_reviewed_candidate(
+                self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        ctx={'role':'RECONCILER','evidence_id':'readback',
+             'caller_id':'reader'}
+        receipt={
+            'schema':1,'outcome':'NOT_APPLIED','operation_id':'op1',
+            'resource_key':'fake:development/source',
+            'operation_marker':'xuanjun-op:op1',
+            'attribution':{'kind':'READBACK',
+                           'before':{'value':'old'},
+                           'after':{'value':'old'}}}
+        self.s.reconcile_operation(
+            'op1',ctx,'NOT_APPLIED',{'readback':'old'},receipt)
+        self.s.complete_revocation(self.task)
+        result=gate.finalize_reviewed_candidate(
+            self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        self.assertEqual(result['state'],'SUCCESS')
+
+    def test_completion_restart_idempotent_and_conflict_stays_closed(self):
+        self.reviewed()
+        self.revoke_complete()
+        first=gate.finalize_reviewed_candidate(
+            self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        replay=gate.finalize_reviewed_candidate(
+            self.s,self.task,'dev-reviewed-1','dev-complete-1')
+        self.assertFalse(first['duplicate']);self.assertTrue(replay['duplicate'])
+        self.fence.close();self.s.close()
+        self.s=Supervisor(self.path,lambda:self.now)
+        self.fence=Fence(self.s,self.lock_root)
         due=self.s.due_outbox(1000)
         self.assertEqual(len(due),1)
         self.assertEqual(self.s._task(self.task)['state'],'SUCCESS')
         self.assertIn(self.child,[x['task_id'] for x in self.s.ready()])
         with self.assertRaisesRegex(
                 ValueError,'DEVELOPMENT_COMPLETION_EVENT_CONFLICT'):
-            self.s.complete_development_candidate(
-                self.task,self.candidate['candidate_event_id'],
-                first['bundle_sha256'],
-                {'QA':'1'*64,'SECURITY':'2'*64},
-                'dev-complete-1',now=1002)
+            gate.finalize_reviewed_candidate(
+                self.s,self.task,'dev-reviewed-1','different-completion-id')
 
 
 
