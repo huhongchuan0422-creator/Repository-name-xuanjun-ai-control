@@ -46,11 +46,23 @@ test or a hash supplied by the caller cannot substitute for either fact.
 
 | Source | Minimum non-secret bound facts | Current consumer and state |
 | --- | --- | --- |
-| Original UK maintenance enrollment and protected file reader | Approved SHA of `EXTERNAL_SUCCESSOR_DEPLOYMENT_BINDER.json`, controller commit, 12 source records, fixed source root, both `current` link identities and both installed 42-file runtime trees, batch/job, validity and revocation. The source file is 1,011 bytes with SHA256 `31c93ab6f1701cb15dd601d1f8b73e99a5a0cc8745e530688e5cf5042d8f8a3d`. | `ExternalReleaseGate.check` is called at preflight, publish, start and recover. `prepare_local_adapter` and `reconstruct_recovery_candidate` accept only an explicitly supplied gate. No enrolled protected digest/reader currently constructs it; HOLD. |
-| Original UK scoped decision registrar | Independent exact job, batch, attempt, actor, source ID, valid-until and revocation for pre-start restore and post-B5 close, each with its own scope. Maintenance approval alone cannot satisfy either. | `ExistingRequestAuthority.approve_precise_pre_start_restore` and `approve_c53_b5_exposure_close` remain HOLD. |
-| Original B5 request-local cloud tool | Authenticated invocation provenance bound to 19 request IDs, catalog, recipient, original InvokeIds, custody receipt, per-item and total SHA/bytes; active `project.files.read` checked on each call. | `successor_analyst_read.receive_all` verifies response bytes. `verify_b5_http_provenance` refuses the caller-supplied hash and keeps close HOLD until an original authenticated provenance reader exists. |
+| Original UK maintenance enrollment and protected file reader | Independently approved SHA of the freshly frozen external binder, controller commit, 12 source records, both `current` targets and installed 42-file runtime trees, exact batch/job/attempt, validity and revocation. | Default-off `SuccessorEvidenceStore.register_exact('release')` publishes a fixed root-protected record; `ExternalReleaseGate.from_registered` reads it, and `check` re-reads it at preflight/publish/start/recover. Production preflight checks that the authority and gate use the same binding. The trusted UK registrar and actual protected source readers are **not yet enrolled**. A generated binder or fixture SHA cannot register itself. |
+| Original UK scoped decision registrar | Separate original source ID/content digest, witness identity, job/batch/attempt/19 IDs/catalog, scope, phase, validity and revocation for `PRE_START_RESTORE` and `B5_EXPOSURE_CLOSE`. | `ExistingRequestAuthority` consumes the fixed records; restore/close actions hold a shared scope lock until the bounded action ends, while completed revocation excludes new actions. No live original decision or registrar has been supplied; absent record still HOLD. Maintenance approval cannot fill either record. |
+| Original B5 request-local cloud tool and UK coordinator | B5's actual 19 `read_project_chunk` result references, original InvokeIds, per-item SHA/bytes, custody digest, authenticated subject/recipient and `project.files.read` scope; coordinator checks the original results and registers only non-secret metadata. | `successor_analyst_read.receive_all` verifies actual response bytes. A separate fixed `b5_http` UK witness binds its proof digest and 19 rows; `verify_b5_http_provenance` consumes it under the revocation lock before close. This is **human witness custody**, not a tool signature or an automatic authentication chain. Neither B5's real results nor the trusted coordinator registration exists yet; live per-request files grant remains necessary. |
 | Original UK source custodian | Current A5 archive and L14 installed file identity, path, owner, size and SHA, with no substitution of historical A5 by live L14. | Source freshness before new batch UNKNOWN; neither this repository commit nor a catalog date proves it. |
 
 The binder file only describes code identity. Its SHA in this document or a
 test is not a production approval. The normal OAuth tool's definition does
 not prove that 19 SUCCESS jobs, custody, or live files grant exist.
+
+The proposed fixed UK evidence root is
+`/var/lib/xuanjun-cloud-connection/b5-new19-successor-evidence-staged-f0fe0d3978b7`.
+Production registration is disabled by default and requires the original UK
+Workbench plus sudo identity, an independently reviewed original source, a
+pre-existing root-owned `0700` directory and `0600` `register.lock`. The only
+non-overwriting output names are `release.json`, `restore.json`, `close.json`,
+`b5-http.json` and `revoked.json` (each root-owned `0600`); interrupted
+`.pending` files cause HOLD. No directory, permission, approval record, grant,
+or tool result was created on the UK host by this candidate. The registrar
+identity, original approval sources and B5 result references are site facts
+to establish separately before any stage admission.

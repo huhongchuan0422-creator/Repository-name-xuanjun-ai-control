@@ -18,6 +18,7 @@ import threading
 import time
 
 ROOT = '/var/lib/xuanjun-cloud-connection/b5-new19-witness-staged-f0fe0d3978b7'
+SUCCESSOR_ROOT = '/var/lib/xuanjun-cloud-connection/b5-new19-successor-evidence-staged-f0fe0d3978b7'
 HOST = 'iZd7oeikknn1z21sq6ji6zZ'
 JOB = '/opt/xuanjun-cloud-connection/l2-b5-staged-f0fe0d3978b7'
 COMMIT = 'f0fe0d3978b72a11e4fa4cfb9928424d60124940'
@@ -428,4 +429,212 @@ class WitnessStore:
         finally:
             if 'lock' in locals():
                 os.close(lock)
+            os.close(fd)
+
+
+class SuccessorEvidenceStore(WitnessStore):
+    """Separate, default-off UK registrar records for the successor.
+
+    Source authentication is the trusted registrar's inspection of the
+    original Workbench records. A digest alone does not authenticate a person.
+    The directory and register.lock must already exist under the reviewed
+    fixed root; this class never creates a production approval directory.
+    """
+    NAMES = {'release':'release.json', 'PRE_START_RESTORE':'restore.json',
+             'B5_EXPOSURE_CLOSE':'close.json', 'b5_http':'b5-http.json'}
+
+    def __init__(self, root=SUCCESSOR_ROOT, *, enabled=False, test_only=False,
+                 clock=time.time):
+        check(enabled is True, 'SUCCESSOR_EVIDENCE_DEFAULT_DISABLED')
+        check(root == SUCCESSOR_ROOT or test_only is True,
+              'SUCCESSOR_EVIDENCE_FIXED_ROOT')
+        self.root, self.clock, self.test_only = root, clock, test_only
+        self._last_clock = None
+        self._lease = threading.local()
+
+    def _now_bound(self, binding):
+        self._binding(binding)
+        now = self._admit_time(binding)
+        return int(now)
+
+    def _record(self, binding, kind, *, source_id, source_raw,
+                witness_identity, payload):
+        pin = self._binding(binding)
+        check(kind in self.NAMES and type(source_id) is str and
+              TOKEN.fullmatch(source_id) and type(source_raw) is bytes and
+              0 < len(source_raw) <= 16384 and type(witness_identity) is str and
+              TOKEN.fullmatch(witness_identity) and type(payload) is dict,
+              'SUCCESSOR_EVIDENCE_INPUT')
+        now = self._now_bound(binding)
+        return {'schema':1, 'kind':kind, 'binding_sha256':pin,
+                'source_id':source_id, 'source_sha256':digest(source_raw),
+                'witness_identity':witness_identity,
+                'witness_method':'AUTHENTICATED_UK_WORKBENCH_AND_SUDO',
+                'observed_at':now, 'payload':payload}
+
+    def _lock(self, fd, exclusive, binding=None, revoke=False):
+        lock = os.open('register.lock', (os.O_RDWR if exclusive else os.O_RDONLY) |
+                       os.O_NOFOLLOW,
+                       dir_fd=fd)
+        try:
+            _regular(lock, 0o600, *self._expected_owner())
+            self._lock_bounded(lock, fcntl.LOCK_EX if exclusive else
+                               fcntl.LOCK_SH, binding, revoke=revoke)
+            return lock
+        except BaseException:
+            os.close(lock)
+            raise
+
+    def register_exact(self, binding, kind, *, source_id, source_raw,
+                       witness_identity, payload):
+        """Publish once; existing, partial, revoked or unknown state is HOLD."""
+        self._payload(kind, payload, binding)
+        row = self._record(binding, kind, source_id=source_id,
+                           source_raw=source_raw,
+                           witness_identity=witness_identity, payload=payload)
+        fd = self._open()
+        lock = None
+        try:
+            lock = self._lock(fd, True, binding)
+            names = set(os.listdir(fd))
+            check(names <= {'register.lock'} | set(self.NAMES.values()) |
+                  {'revoked.json'} and not any(n.startswith('.') for n in names),
+                  'SUCCESSOR_EVIDENCE_PARTIAL_OR_UNKNOWN')
+            check('revoked.json' not in names,
+                  'SUCCESSOR_EVIDENCE_REVOKED')
+            check(self.NAMES[kind] not in names,
+                  'SUCCESSOR_EVIDENCE_ALREADY_REGISTERED')
+            self._now_bound(binding)
+            return self._publish(fd, self.NAMES[kind], row,
+                        before_link=lambda:self._now_bound(binding))
+        finally:
+            if lock is not None:os.close(lock)
+            os.close(fd)
+
+    def read_exact(self, binding, kind):
+        pin = self._binding(binding)
+        check(kind in self.NAMES, 'SUCCESSOR_EVIDENCE_SCOPE')
+        fd = self._open()
+        lock = None
+        try:
+            lock = self._lock(fd, False, binding)
+            names = set(os.listdir(fd))
+            check(names <= {'register.lock'} | set(self.NAMES.values()) |
+                  {'revoked.json'} and not any(n.startswith('.') for n in names),
+                  'SUCCESSOR_EVIDENCE_PARTIAL_OR_UNKNOWN')
+            check('revoked.json' not in names,
+                  'SUCCESSOR_EVIDENCE_REVOKED')
+            row, record_sha = self._read(fd, self.NAMES[kind])
+            check(set(row)=={'schema','kind','binding_sha256','source_id',
+                  'source_sha256','witness_identity','witness_method',
+                  'observed_at','payload'} and row['schema']==1 and
+                  row['kind']==kind and row['binding_sha256']==pin and
+                  row['witness_method']=='AUTHENTICATED_UK_WORKBENCH_AND_SUDO' and
+                  type(row['observed_at']) is int and
+                  binding['valid_from'] <= row['observed_at'] < binding['valid_until'] and
+                  type(row['source_id']) is str and TOKEN.fullmatch(row['source_id']) and
+                  type(row['source_sha256']) is str and HEX.fullmatch(row['source_sha256']) and
+                  type(row['witness_identity']) is str and TOKEN.fullmatch(row['witness_identity']) and
+                  type(row['payload']) is dict and
+                  self._now_bound(binding) >= row['observed_at'],
+                  'SUCCESSOR_EVIDENCE_BINDING')
+            self._payload(kind, row['payload'], binding)
+            return row, record_sha
+        finally:
+            if lock is not None:os.close(lock)
+            os.close(fd)
+
+    @contextlib.contextmanager
+    def action_exact(self, binding, kind):
+        """A successful revoke waits for this action; later actions cannot start."""
+        pin=self._binding(binding)
+        check(kind in self.NAMES, 'SUCCESSOR_EVIDENCE_SCOPE')
+        fd=self._open();lock=None
+        try:
+            lock=self._lock(fd, False, binding)
+            names=set(os.listdir(fd))
+            check(names <= {'register.lock'} | set(self.NAMES.values()) |
+                  {'revoked.json'} and not any(n.startswith('.') for n in names),
+                  'SUCCESSOR_EVIDENCE_PARTIAL_OR_UNKNOWN')
+            check('revoked.json' not in names,'SUCCESSOR_EVIDENCE_REVOKED')
+            row,_=self._read(fd,self.NAMES[kind])
+            check(row.get('binding_sha256')==pin and row.get('kind')==kind,
+                  'SUCCESSOR_EVIDENCE_BINDING')
+            self._payload(kind,row.get('payload'),binding)
+            self._now_bound(binding)
+            yield
+        finally:
+            if lock is not None:os.close(lock)
+            os.close(fd)
+
+    @staticmethod
+    def _payload(kind, payload, binding):
+        check(type(payload) is dict, 'SUCCESSOR_EVIDENCE_PAYLOAD')
+        if kind == 'release':
+            keys={'binder_sha256','controller_commit','controller_manifest_sha256',
+                  'controller_code_pin_sha256','successor_spec_sha256',
+                  'runtime_manifest_sha256','runtime_code_pin_sha256',
+                  'target_release','catalog_sha256'}
+            check(set(payload)==keys and
+                  all(type(payload[k]) is str and HEX.fullmatch(payload[k])
+                      for k in keys if k.endswith('sha256')) and
+                  type(payload['controller_commit']) is str and
+                  re.fullmatch(r'[0-9a-f]{40}',payload['controller_commit']) and
+                  type(payload['target_release']) is list and
+                  len(payload['target_release'])==2 and
+                  all(type(x) is str and x.startswith('/opt/xuanjun-cloud-')
+                      for x in payload['target_release']) and
+                  payload['catalog_sha256']==binding['catalog_sha256'],
+                  'SUCCESSOR_RELEASE_SCOPE')
+        elif kind in ('PRE_START_RESTORE','B5_EXPOSURE_CLOSE'):
+            check(set(payload)=={'scope','job','decision_id','approved','phase'} and
+                  payload['scope']==kind and payload['job']==binding['job'] and
+                  payload['approved'] is True and
+                  type(payload['decision_id']) is str and
+                  TOKEN.fullmatch(payload['decision_id']) and
+                  payload['phase']==('PRE_START' if kind=='PRE_START_RESTORE'
+                                     else 'AFTER_B5_HTTP'),
+                  'SUCCESSOR_DECISION_SCOPE')
+        elif kind=='b5_http':
+            check(set(payload)=={'proof_sha256','custody_receipt_sha256','rows',
+                  'subject','scope','catalog_sha256','recipient'} and
+                  type(payload['proof_sha256']) is str and
+                  HEX.fullmatch(payload['proof_sha256']) and
+                  type(payload['custody_receipt_sha256']) is str and
+                  HEX.fullmatch(payload['custody_receipt_sha256']) and
+                  payload['subject']==binding['subject'] and
+                  payload['scope']=='project.files.read' and
+                  payload['catalog_sha256']==binding['catalog_sha256'] and
+                  payload['recipient']==binding['recipient'] and
+                  type(payload['rows']) is list and len(payload['rows'])==19,
+                  'SUCCESSOR_B5_PROVENANCE_SCOPE')
+            rows=payload['rows']
+            check(all(type(r) is dict for r in rows) and
+                  {r.get('request_id') for r in rows}==set(binding['ids']) and
+                  all(set(r)=={'request_id','object_ref',
+                      'invoke_id','bytes','sha256','result_ref'} and
+                      type(r['bytes']) is int and 0<r['bytes']<=65536 and
+                      type(r['sha256']) is str and HEX.fullmatch(r['sha256']) and
+                      all(type(r[k]) is str and TOKEN.fullmatch(r[k]) for k in
+                          ('request_id','object_ref','invoke_id','result_ref'))
+                      for r in rows) and
+                  sum(r['bytes'] for r in rows)==93592 and
+                  len({r['result_ref'] for r in rows})==19,
+                  'SUCCESSOR_B5_PROVENANCE_ROWS')
+        else:
+            raise Hold('SUCCESSOR_EVIDENCE_SCOPE')
+
+    def revoke_exact(self, binding, reason_id):
+        self._binding(binding)
+        check(type(reason_id) is str and TOKEN.fullmatch(reason_id),
+              'SUCCESSOR_EVIDENCE_REVOCATION_REASON')
+        fd = self._open()
+        lock = None
+        try:
+            lock = self._lock(fd, True, revoke=True)
+            return self._publish(fd, 'revoked.json',
+                    {'schema':1,'binding_sha256':digest(canonical(binding)),
+                     'reason_id':reason_id,'revoked_at':int(self._now())})
+        finally:
+            if lock is not None:os.close(lock)
             os.close(fd)

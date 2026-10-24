@@ -252,6 +252,9 @@ class Transaction:
     def guarded(self,method,*args):
         action=getattr(self.b,method,None)
         require(callable(action),'SUCCESSOR_BACKEND_METHOD_MISSING')
+        if method=='restore_exact_backups_pre_start_only':
+            with self.b.successor_evidence_action('PRE_START_RESTORE'):
+                return action(*args)
         if method in (
                 'stop_worker_bounded','acquire_original_lock_once',
                 'backup_existing_exact','publish_two_releases_exact',
@@ -526,9 +529,16 @@ class Transaction:
         """
         require(self.stage=='READY_FOR_B5_HTTP_NOT_RECEIVED',
                 'B5_HTTP_CUSTODY_REQUIRED')
-        self.guarded('verify_b5_http_provenance',proof,self.bundle,self.spec)
-        self.guarded('approve_precise_b5_exposure_close',self.bundle,self.spec)
-        self.guarded('close_b5_exposure_success_successor_only')
+        require(type(proof) is dict and
+                proof.get('state')=='B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+                'B5_HTTP_PROOF_BOUNDARY')
+        require(getattr(getattr(self.b,'authority',None),'evidence_store',None)
+                is not None,'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')
+        with self.b.successor_evidence_action('b5_http'):
+            with self.b.successor_evidence_action('B5_EXPOSURE_CLOSE'):
+                self.guarded('verify_b5_http_provenance',proof,self.bundle,self.spec)
+                self.guarded('approve_precise_b5_exposure_close',self.bundle,self.spec)
+                self.guarded('close_b5_exposure_success_successor_only')
         self.note('CLOSED_RECEIVED_19')
         return {'state':'RECEIVED_VERIFIED_19_CLOSED',
                 'received':19,'bytes':93592,'installed':False}

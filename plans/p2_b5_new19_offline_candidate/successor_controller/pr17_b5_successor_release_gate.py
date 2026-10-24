@@ -11,8 +11,24 @@ import pr17_b5_successor_review as c53
 
 
 class ExternalReleaseGate:
+    @classmethod
+    def from_registered(cls, evidence_store, binding, *, read_binder,
+                        read_manifest, read_source, read_current,
+                        read_installed_runtime):
+        from pr17_b5_successor_witness import SuccessorEvidenceStore
+        c53.require(type(evidence_store) is SuccessorEvidenceStore and
+                    type(binding) is dict,
+                    'EXTERNAL_BINDER_ENROLLMENT_SOURCE')
+        row, _ = evidence_store.read_exact(binding, 'release')
+        return cls(approved_sha256=row['payload']['binder_sha256'],
+                   read_binder=read_binder, read_manifest=read_manifest,
+                   read_source=read_source, read_current=read_current,
+                   read_installed_runtime=read_installed_runtime,
+                   evidence_store=evidence_store, evidence_binding=binding)
+
     def __init__(self, *, approved_sha256, read_binder, read_manifest,
-                 read_source, read_current, read_installed_runtime):
+                 read_source, read_current, read_installed_runtime,
+                 evidence_store=None, evidence_binding=None):
         c53.require(type(approved_sha256) is str and
                     re.fullmatch('[0-9a-f]{64}', approved_sha256),
                     'EXTERNAL_BINDER_APPROVED_PIN_UNKNOWN')
@@ -25,15 +41,41 @@ class ExternalReleaseGate:
         self.read_source = read_source
         self.read_current = read_current
         self.read_installed_runtime = read_installed_runtime
+        self.evidence_store = evidence_store
+        self.evidence_binding = evidence_binding
 
     def check(self, phase, spec):
         c53.require(phase in ('preflight', 'publish', 'start', 'recover'),
                     'EXTERNAL_BINDER_PHASE')
+        if self.evidence_store is not None:
+            from pr17_b5_successor_witness import SuccessorEvidenceStore
+            c53.require(type(self.evidence_store) is SuccessorEvidenceStore and
+                        type(self.evidence_binding) is dict,
+                        'EXTERNAL_BINDER_ENROLLMENT_SOURCE')
+            enrolled, _ = self.evidence_store.read_exact(
+                self.evidence_binding, 'release')
+            approval=enrolled['payload']
+            c53.require(approval['binder_sha256']==self.approved_sha256 and
+                        approval['catalog_sha256']==self.evidence_binding['catalog_sha256'],
+                        'EXTERNAL_BINDER_ENROLLMENT_CHANGED')
         raw = self.read_binder()
         c53.require(type(raw) is bytes and len(raw) <= 16384 and
                     c53.sha(raw) == self.approved_sha256,
                     'EXTERNAL_BINDER_APPROVED_BYTES_CHANGED')
         record = c53.strict_json(raw)
+        if self.evidence_store is not None:
+            c53.require(type(record) is dict and all(
+                    approval[key]==record.get(key) for key in (
+                    'controller_commit','controller_manifest_sha256',
+                    'controller_code_pin_sha256','successor_spec_sha256',
+                    'runtime_manifest_sha256','runtime_code_pin_sha256',
+                    'target_release')) and
+                    self.evidence_binding['job']==record['job'] and
+                    self.evidence_binding['project']==record['project'] and
+                    self.evidence_binding['recipient']==record['recipient'] and
+                    tuple(self.evidence_binding['ids'])==tuple(
+                        spec['batch']['draft_request_ids']),
+                    'EXTERNAL_BINDER_ENROLLMENT_SCOPE')
         c53.require(set(record) == {
             'schema', 'state', 'controller_commit', 'controller_manifest_sha256',
             'controller_code_pin_sha256',

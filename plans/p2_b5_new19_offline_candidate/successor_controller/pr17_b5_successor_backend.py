@@ -127,6 +127,12 @@ class R2HostBackend:
                     'WITNESS_AUTHORITY_TYPE')
         return self._auth('witness_action')
 
+    def successor_evidence_action(self,kind):
+        from pr17_b5_successor_authority import ExistingRequestAuthority
+        c53.require(type(self.authority) is ExistingRequestAuthority,
+                    'SUCCESSOR_EVIDENCE_AUTHORITY_TYPE')
+        return self._auth('successor_evidence_action',kind)
+
     def _receipt(self,name,*args):
         if name in ('verify_owner_maintenance_scope','verify_b5_analyst_ack'):
             from pr17_b5_successor_authority import ExistingRequestAuthority

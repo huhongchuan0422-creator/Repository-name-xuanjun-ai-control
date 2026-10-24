@@ -7,7 +7,8 @@ import copy
 import time
 import pr17_b5_successor_review as c53
 from pr17_b5_successor_local import prepare_local_adapter, single_thread
-from pr17_b5_successor_witness import WitnessStore, ROOT as WITNESS_ROOT
+from pr17_b5_successor_witness import (WitnessStore, ROOT as WITNESS_ROOT,
+    SuccessorEvidenceStore, SUCCESSOR_ROOT)
 
 
 def request_local_authorization_only():
@@ -41,6 +42,7 @@ class ExistingRequestAuthority:
         c53.require(self.original.test_only is False,
                     'TEST_COMPOSITION_NOT_PRODUCTION_AUTHORITY')
         self._bound_original(active=False)
+        self._registered_release()
         self.original.preflight()
         # A is a live read-only observation, not an enrollment or mutation
         # permit. B must independently reclassify after stop and lock.
@@ -66,7 +68,8 @@ class ExistingRequestAuthority:
                  prepared_settings=None, witness_store=None,
                  batch_id=None, attempt_id=None, window_start=None,
                  original=None, runtime_attachment=None,
-                 canonical_snapshot_reader=None, receiver_conflict_reader=None):
+                 canonical_snapshot_reader=None, receiver_conflict_reader=None,
+                 evidence_store=None, release_gate=None, successor_spec=None):
         if active_resource_reader is None:
             from production.cloud_connection.oauth_resource import Introspection
             c53.require(type(authenticator) is Introspection and authenticator.open_url is None,
@@ -91,6 +94,14 @@ class ExistingRequestAuthority:
                         witness_store.test_only is False,
                         'PRODUCTION_WITNESS_ROOT_REQUIRED')
         self.witness_store = witness_store
+        c53.require(evidence_store is None or
+                    (type(evidence_store) is SuccessorEvidenceStore and
+                     evidence_store.root == SUCCESSOR_ROOT and
+                     evidence_store.test_only is False),
+                    'SUCCESSOR_EVIDENCE_PRODUCTION_ROOT')
+        self.evidence_store = evidence_store
+        self.release_gate = release_gate
+        self.successor_spec = successor_spec
         self.original = original
         self.runtime_attachment = runtime_attachment
         self.canonical_snapshot_reader = canonical_snapshot_reader
@@ -102,6 +113,25 @@ class ExistingRequestAuthority:
         c53.require(self.witness_store is not None,
                     'INDEPENDENT_WITNESS_NOT_ENROLLED')
         return self.witness_store.inspect(self._witness_binding())
+
+    def _registered_release(self):
+        from pr17_b5_successor_release_gate import ExternalReleaseGate
+        store=getattr(self,'evidence_store',None)
+        gate=getattr(self,'release_gate',None)
+        c53.require(store is not None and type(gate) is ExternalReleaseGate and
+                    gate.evidence_store is store and
+                    gate.evidence_binding==self._witness_binding(),
+                    'SUCCESSOR_RELEASE_ENROLLMENT_NOT_BOUND')
+        c53.require(type(self.successor_spec) is dict,
+                    'SUCCESSOR_SPEC_NOT_BOUND')
+        gate.check('preflight', self.successor_spec)
+        return True
+
+    def successor_evidence_action(self, kind):
+        store=getattr(self,'evidence_store',None)
+        c53.require(store is not None,
+                    'SUCCESSOR_SCOPED_ACTION_SOURCE_UNKNOWN')
+        return store.action_exact(self._witness_binding(),kind)
 
     def _bound_original(self, active=True):
         from pr17_b5_deployment_composition import OriginalComposition
@@ -351,7 +381,16 @@ class ExistingRequestAuthority:
         except BaseException:return False
 
     def approve_precise_pre_start_restore(self, job):
-        raise c53.Hold('PRE_START_RESTORE_APPROVAL_SOURCE_UNKNOWN')
+        store=getattr(self,'evidence_store',None)
+        c53.require(store is not None,
+                    'PRE_START_RESTORE_APPROVAL_SOURCE_UNKNOWN')
+        c53.require(job==self._witness_binding()['job'],
+                    'PRE_START_RESTORE_JOB_CHANGED')
+        row, record_sha=store.read_exact(self._witness_binding(),
+                                         'PRE_START_RESTORE')
+        return {'approved':True,'job':job,'scope':'PRE_START_RESTORE',
+                'source':'ORIGINAL_UK_SCOPED_WITNESS',
+                'record_sha256':record_sha,'source_id':row['source_id']}
 
     def verify_b5_http_provenance(self, proof, catalog_sha, request_ids):
         c53.require(type(proof) is dict and
@@ -369,15 +408,35 @@ class ExistingRequestAuthority:
         # cloud-tool provenance record that this UK process can consume.
         # A caller-supplied hash, chat approval, or maintenance witness is not
         # a substitute for that independent source.
-        raise c53.Hold('B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')
+        store=getattr(self,'evidence_store',None)
+        c53.require(store is not None,
+                    'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')
+        row, record_sha=store.read_exact(self._witness_binding(),'b5_http')
+        payload=row['payload']
+        c53.require(payload['proof_sha256']==proof['proof_sha256'] and
+                    payload['catalog_sha256']==catalog_sha and
+                    {r['request_id'] for r in payload['rows']}==set(request_ids),
+                    'B5_ORIGINAL_TOOL_WITNESS_CHANGED')
+        return {'verified':True,'source':'ORIGINAL_UK_B5_TOOL_HUMAN_WITNESS',
+                'record_sha256':record_sha,'source_id':row['source_id'],
+                'catalog_sha256':catalog_sha}
 
     def approve_c53_b5_exposure_close(self, job):
-        raise c53.Hold('C53_CLOSE_APPROVAL_SOURCE_UNKNOWN')
+        store=getattr(self,'evidence_store',None)
+        c53.require(store is not None,'C53_CLOSE_APPROVAL_SOURCE_UNKNOWN')
+        c53.require(job==self._witness_binding()['job'],
+                    'C53_CLOSE_JOB_CHANGED')
+        row, record_sha=store.read_exact(self._witness_binding(),
+                                         'B5_EXPOSURE_CLOSE')
+        return {'approved':True,'job':job,'scope':'B5_EXPOSURE_CLOSE',
+                'source':'ORIGINAL_UK_SCOPED_WITNESS',
+                'record_sha256':record_sha,'source_id':row['source_id']}
 
 
 def prepare_maintenance_candidate(*, authorization_from_request=None,
                                   witness_store=None, attempt_id=None,
-                                  original=None, runtime_attachment=None, **inputs):
+                                  original=None, runtime_attachment=None,
+                                  evidence_store=None, **inputs):
     """Actual local adapter -> transaction -> original OAuth factory linkage.
 
     Returns a prepared transaction only. Does not call execute or authenticate.
@@ -429,6 +488,9 @@ def prepare_maintenance_candidate(*, authorization_from_request=None,
         batch_id=transaction.bundle['batch_id'], attempt_id=attempt_id,
         window_start=transaction.bundle['window_start'], original=original,
         runtime_attachment=runtime_attachment,
+        evidence_store=evidence_store,
+        release_gate=inputs.get('release_gate'),
+        successor_spec=transaction.spec,
         canonical_snapshot_reader=backend.canonical_prestart_no_new_operations,
         receiver_conflict_reader=backend.observe_fixed_receiver_target_readonly)
     backend.authority.old_policy_reader=backend.observe_cross_project_old_policy_dependency
@@ -485,7 +547,7 @@ def check_candidate_authority(transaction):
 def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
                                    authorization_from_request=None,
                                    runtime_attachment=None, witness_store=None,
-                                   release_gate=None):
+                                   release_gate=None, evidence_store=None):
     """Fresh-process reconstruction from exact protected backup and source bytes.
 
     This does not execute the transaction. The caller must attach original
@@ -565,6 +627,9 @@ def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
         batch_id=bundle['batch_id'],attempt_id=reservation['attempt_id'],
         window_start=bundle['window_start'],original=original,
         runtime_attachment=runtime_attachment,
+        evidence_store=evidence_store,
+        release_gate=release_gate,
+        successor_spec=spec,
         canonical_snapshot_reader=backend.canonical_prestart_no_new_operations,
         receiver_conflict_reader=backend.observe_fixed_receiver_target_readonly)
     backend.restore_activation_identity_readonly(bundle)

@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 import sys
+import os
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parent
@@ -9,6 +11,8 @@ sys.path[:0] = [str(ROOT), str(ROOT/'reused-6825'), str(ROOT/'successor_controll
 import pr17_b5_successor_review as c53
 from pr17_b5_successor_release_gate import ExternalReleaseGate
 from pr17_b5_successor_backend import R2HostBackend
+from pr17_b5_successor_witness import (SuccessorEvidenceStore, JOB, COMMIT,
+                                        PROJECT, RECIPIENT, SUBJECT)
 
 
 def fixture_gate(spec, phase='publish'):
@@ -56,6 +60,39 @@ class GateTests(unittest.TestCase):
         for phase in ('preflight','publish','start','recover'):
             gate=fixture_gate(self.spec,phase)
             self.assertEqual(gate.check(phase,self.spec),'a'*40)
+
+    def test_registered_release_reread_and_revocation(self):
+        with tempfile.TemporaryDirectory() as parent:
+            root=Path(parent)/'evidence';root.mkdir(mode=0o700)
+            (root/'register.lock').write_bytes(b'')
+            os.chmod(root/'register.lock',0o600)
+            store=SuccessorEvidenceStore(str(root),enabled=True,
+                          test_only=True,clock=lambda:1001)
+            binding=dict(batch='batch1',job=JOB,attempt='attempt1',
+                ids=self.spec['batch']['draft_request_ids'],catalog_sha256='a'*64,
+                recipient=RECIPIENT,project=PROJECT,subject=SUBJECT,commit=COMMIT,
+                valid_from=1000,valid_until=4600)
+            fixture=fixture_gate(self.spec)
+            raw=fixture.read_binder();record=json.loads(raw)
+            fields=('controller_commit','controller_manifest_sha256',
+                'controller_code_pin_sha256','successor_spec_sha256',
+                'runtime_manifest_sha256','runtime_code_pin_sha256',
+                'target_release')
+            payload={key:record[key] for key in fields}
+            payload.update(binder_sha256=c53.sha(raw),catalog_sha256='a'*64)
+            store.register_exact(binding,'release',source_id='original-version',
+                source_raw=b'original reviewed version',
+                witness_identity='uk-coordinator',payload=payload)
+            gate=ExternalReleaseGate.from_registered(store,binding,
+                read_binder=fixture.read_binder,
+                read_manifest=fixture.read_manifest,
+                read_source=fixture.read_source,
+                read_current=fixture.read_current,
+                read_installed_runtime=fixture.read_installed_runtime)
+            self.assertEqual(gate.check('publish',self.spec),'a'*40)
+            store.revoke_exact(binding,'review-withdrawn')
+            with self.assertRaisesRegex(Exception,'SUCCESSOR_EVIDENCE_REVOKED'):
+                gate.check('publish',self.spec)
 
     def test_repository_binder_matches_actual_frozen_controller_bytes(self):
         # The digest is computed here only as a fixture. Production must read
