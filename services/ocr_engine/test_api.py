@@ -158,7 +158,7 @@ class ApiTests(unittest.TestCase):
         self.revoked_attachments.add("synthetic-attachment")
         headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"revoke-confirm-key-002"}
         self.assertEqual(self.client.get("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
-        self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"fields":{"company_name":"x"}}).status_code,403)
+        self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"application_revision":"1","provider_version":"1.2.0","fields":{"company_name":"x"}}).status_code,403)
         self.assertEqual(self.client.delete("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
     def test_valid_attachment_id_with_different_bytes_is_denied(self):
         wrong = bytes([255,216,255]) + b'different image bytes'
@@ -196,13 +196,30 @@ class ApiTests(unittest.TestCase):
     def test_confirmed_fields_and_revision_read_back(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         confirm_headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'readback-confirm-key-001'}
-        body={'revision':1,'fields':{'company_name':'Human confirmed synthetic'}}
+        body={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'Human confirmed synthetic'}}
         confirmed=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
         self.assertEqual(confirmed.status_code,200,confirmed.text)
         read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
         self.assertEqual(read.status_code,200,read.text)
         self.assertEqual(read.json().get('confirmed_fields'),body['fields'])
         self.assertEqual(read.json().get('confirmation_revision'),1)
+    def test_provider_version_change_denies_get_confirm_delete(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        self.current_provider_version='1.3.0'
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'provider-change-confirm-001'}
+        self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'x'}}).status_code,403)
+        self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
+    def test_confirm_body_cannot_forge_provider_version(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'forged-provider-confirm-001'}
+        response=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'application_revision':'1','provider_version':'9.9.9','fields':{'company_name':'x'}})
+        self.assertEqual(response.status_code,409,response.text)
+        self.assertIn('OCR_PROVIDER_VERSION_CONFLICT',response.text)
+    def test_noncanonical_provider_versions_rejected(self):
+        from services.ocr_engine.api import _valid_provider_version
+        for value in (True, -1, '01', '1..2', ' 1.2', 1.5):
+            with self.subTest(value=value): self.assertFalse(_valid_provider_version(value))
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
