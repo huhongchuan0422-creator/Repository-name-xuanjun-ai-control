@@ -747,6 +747,32 @@ class Supervisor(object):
                         (now, task['task_id']))
         return task
 
+    def _validate_inflight_result_locked(self, ticket, caller,
+                                         operation_id, now):
+        caller = self._caller(caller)
+        if not isinstance(ticket, dict):
+            raise ValueError('EXACT_WRITER_TICKET_REQUIRED')
+        task = self._task(ticket.get('task_id'))
+        expected = self._authority_ticket(task)
+        if canonical(ticket) != canonical(expected):
+            raise ValueError('STALE_WRITER_TICKET')
+        if task['authority_state'] not in ('VALID', 'REVOKING'):
+            raise ValueError('INFLIGHT_RESULT_AUTHORITY_NOT_VALID')
+        if (caller['run_id'] != task['authority_run_id']
+                or caller['session_id'] != task['authority_session_id']
+                or caller['gateway_id'] != task['authority_gateway_id']):
+            raise ValueError('CALLER_CONTEXT_MISMATCH')
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
+        row = self.db.execute(
+            'SELECT * FROM writer_operations WHERE operation_id=?',
+            (operation_id,)).fetchone()
+        if (row is None or row['task_id'] != task['task_id']
+                or row['attempt_id'] != task['attempt_id']
+                or row['state'] not in ('DISPATCHING', 'UNKNOWN')):
+            raise ValueError('OPERATION_NOT_INFLIGHT')
+        return task, row
+
     def prepare_operation(self, ticket, caller, operation, now=None):
         now = self.clock() if now is None else now
         required = {'operation_id', 'event_id', 'resource_key',
@@ -826,7 +852,8 @@ class Supervisor(object):
         now = self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task = self._validate_writer_locked(ticket, caller, now)
+            task, row = self._validate_inflight_result_locked(
+                ticket, caller, operation_id, now)
             self.db.execute("""UPDATE writer_operations SET state='CONFIRMED',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
               AND state='DISPATCHING'""",
@@ -841,7 +868,8 @@ class Supervisor(object):
         now = self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task = self._validate_writer_locked(ticket, caller, now)
+            task, row = self._validate_inflight_result_locked(
+                ticket, caller, operation_id, now)
             self.db.execute("""UPDATE writer_operations SET state='UNKNOWN',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
               AND state='DISPATCHING'""",
