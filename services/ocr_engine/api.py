@@ -31,6 +31,10 @@ Authenticator = Callable[[str], Principal]
 class Confirmation(BaseModel):
     revision: int = Field(ge=1)
     fields: dict[str, str]
+    # Echo the exact versions shown to the human reviewer; these are compared to stored
+    # and freshly resolved authoritative values, never treated as proof by themselves.
+    application_revision: str | int
+    provider_version: str | int | None = None
 class JobStore:
     """In-memory test adapter. Never use as production persistence."""
     def __init__(self):
@@ -123,6 +127,15 @@ class SQLiteJobStore:
             db.execute("UPDATE ocr_jobs SET status=?, payload_json=? WHERE job_id=? AND tenant_id=?",
                        (job["status"], json.dumps(job), job_id, tenant_id))
             return job
+def _valid_revision(value):
+    return (not isinstance(value, bool) and isinstance(value, (str, int)) and
+            str(value).strip() != "" and str(value) == str(value).strip() and
+            not (isinstance(value, int) and value < 0) and
+            (not isinstance(value, str) or __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}", value) is not None))
+
+def _valid_provider_version(value):
+    return _valid_revision(value)
+
 def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
@@ -174,14 +187,15 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             binding = None
         if (not isinstance(binding, dict) or binding.get("authorized") is not True or
                 binding.get("content_sha256") != digest or binding.get("document_type") != document_type or
-                not isinstance(binding.get("application_revision"), (str, int)) or
-                isinstance(binding.get("application_revision"), bool) or str(binding.get("application_revision")).strip() == ""):
+                not _valid_revision(binding.get("application_revision")) or
+                ("provider_version" in binding and not _valid_provider_version(binding.get("provider_version")))):
             raise HTTPException(status_code=403, detail="ATTACHMENT_CONTENT_BINDING_UNVERIFIED")
         application_revision = str(binding["application_revision"])
+        provider_version = binding.get("provider_version")
         if not isinstance(jobs, SecureSQLiteJobStore):
             raise HTTPException(status_code=501, detail="OCR_REQUIRES_SECURE_DURABLE_STORE")
         try:
-            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id, application_revision)
+            job = jobs.create(p.tenant_id, p.subject, onboarding_application_id, document_type, digest, idempotency_key, attachment_id, application_revision, provider_version)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         if job["document_type"] != document_type:
@@ -218,7 +232,8 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if (not isinstance(binding, dict) or binding.get("authorized") is not True or
                 binding.get("content_sha256") != job["document_sha256"] or
                 binding.get("document_type") != job["document_type"] or
-                str(binding.get("application_revision", "")) != str(expected_revision)):
+                str(binding.get("application_revision", "")) != str(expected_revision) or
+                ("provider_version" in job and binding.get("provider_version") != job.get("provider_version"))):
             raise HTTPException(status_code=403, detail="ATTACHMENT_AUTHORIZATION_REVOKED")
 
     @app.get("/api/v1/ocr/jobs/{job_id}")
@@ -245,9 +260,17 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=400, detail="OCR_CONFIRM_FIELDS_INVALID")
         if not (16 <= len(idempotency_key) <= 128):
             raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
+        if (not _valid_revision(body.application_revision) or
+                (body.provider_version is not None and not _valid_provider_version(body.provider_version))):
+            raise HTTPException(status_code=400, detail="OCR_CONFIRM_BINDING_VERSION_INVALID")
+        if str(body.application_revision) != str(existing.get("application_revision")):
+            raise HTTPException(status_code=409, detail="OCR_APPLICATION_REVISION_CONFLICT")
+        if body.provider_version != existing.get("provider_version"):
+            raise HTTPException(status_code=409, detail="OCR_PROVIDER_VERSION_CONFLICT")
         try:
             if isinstance(jobs, SecureSQLiteJobStore):
-                job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields, idempotency_key)
+                job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields, idempotency_key,
+                                   body.application_revision, body.provider_version)
             else:
                 job = jobs.confirm(job_id, p.tenant_id, body.revision, body.fields)
         except ValueError as exc:
