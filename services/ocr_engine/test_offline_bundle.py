@@ -269,7 +269,8 @@ class OfflineBundleInputTests(unittest.TestCase):
         expected={v["filename"]:v["sha256"] for v in data["model_set"]["files"].values()}
         self.assertEqual(len(expected),3)
         script=Path(__file__).with_name("write_candidate_input_manifest.py").read_text(encoding="utf-8")
-        self.assertIn("actual == trusted_model_hashes[path.name]",script)
+        self.assertIn("digest == trusted_model_hashes[path.name]",script)
+        self.assertIn('"sha256":digest',script)
         self.assertIn("downloaded-and-self-hashed-only-not-trusted-by-model-manifest",script)
     def test_runtime_check_requires_ldd_closure_and_single_opencv_distribution(self):
         script=Path(__file__).with_name("verify_offline_runtime.py").read_text(encoding="utf-8")
