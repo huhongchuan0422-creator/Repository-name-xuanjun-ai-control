@@ -5,10 +5,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from development_entry_intake import (validate_event, bind_validated_receipt,
-    bind_from_controlled_environment, TASK, ENTRIES)
+    bind_from_controlled_environment, main, TASK, ENTRIES)
 from task_supervisor import Supervisor
 
 REPO = 'owner/control'
@@ -180,6 +181,51 @@ class CanonicalBindingTests(unittest.TestCase):
             os.environ.clear();os.environ.update(old_env)
         self.assertEqual(result['state'],'CANONICAL_SOURCE_BOUND')
         self.assertIsNotNone(result['candidate_event_id'])
+
+    def test_writer_bind_api_has_no_caller_now_override(self):
+        receipt=self.receipt()
+        manifest={p:__import__('hashlib').sha256(raw).hexdigest()
+                  for p,raw in self.files().items()}
+        with self.assertRaises(TypeError):
+            self.s.bind_development_candidate(receipt,manifest,now=1001)
+
+    def test_main_calls_canonical_gate_and_holds_without_controlled_inputs(self):
+        value,event=fixture('WORK')
+        handle,event_path=tempfile.mkstemp();os.close(handle)
+        with open(event_path,'w',encoding='utf-8') as stream:
+            json.dump(event,stream)
+        captured={}
+        class Response(object):
+            status=201
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+        def fake_open(request,timeout=15):
+            captured['body']=json.loads(request.data.decode('utf-8'))['body']
+            return Response()
+        old_env=dict(os.environ)
+        try:
+            os.environ['GITHUB_EVENT_PATH']=event_path
+            os.environ['GITHUB_REPOSITORY']=REPO
+            os.environ['GITHUB_TOKEN']='fixture-token'
+            os.environ.pop('XJ_CANONICAL_LEDGER_PATH',None)
+            os.environ.pop('XJ_CANDIDATE_ROOT',None)
+            with mock.patch(
+                    'development_entry_intake.syntax_receipt',
+                    return_value={'state':'PASS_SYNTAX_NOT_ADMITTED',
+                                  'authority_effect':'NONE'}), \
+                 mock.patch(
+                    'development_entry_intake.urllib.request.urlopen',
+                    side_effect=fake_open):
+                main()
+        finally:
+            os.environ.clear();os.environ.update(old_env)
+            os.unlink(event_path)
+        marker=captured['body'].split('\n',1)[0]
+        payload=json.loads(marker[len('<!-- XJ_DEV_ENTRY_RECEIPT '):-4])
+        self.assertEqual(
+            payload['canonical_gate']['state'],
+            'HOLD_CANONICAL_SOURCE_INPUT_UNAVAILABLE')
+        self.assertEqual(payload['canonical_gate']['authority_effect'],'NONE')
 
     def test_non_code_ready_never_creates_candidate(self):
         value,event=fixture('WORK');value['event']='RECEIVED'
