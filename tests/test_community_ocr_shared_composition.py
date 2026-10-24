@@ -203,6 +203,83 @@ class SharedOcrComposition(unittest.TestCase):
             with patch.object(self.store,'get',return_value=job):
                 with self.assertRaises(PermissionError):self.apply(path)
             self.assertEqual(self.snapshot(),before)
+    def test_real_local_engine_output_through_original_source_confirm_restart_and_writeback(self):
+        import importlib.util, io, os
+        required_env=('OCR_DET_MODEL_PATH','OCR_CLS_MODEL_PATH','OCR_REC_MODEL_PATH','OCR_MODEL_SHA256')
+        missing=[]
+        if importlib.util.find_spec('rapidocr') is None:missing.append('rapidocr')
+        if importlib.util.find_spec('PIL') is None:missing.append('PIL')
+        for key in required_env:
+            if not os.environ.get(key):missing.append(key)
+        for key in required_env[:3]:
+            value=os.environ.get(key)
+            if value and (not os.path.isabs(value) or not os.path.isfile(value)):missing.append(key+'_FILE')
+        fonts=['/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc','/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc']
+        font_path=next((value for value in fonts if os.path.isfile(value)),None)
+        if font_path is None:missing.append('NotoSansCJK')
+        if missing:self.skipTest('REAL_OCR_ENGINE_ENV_NOT_STAGED:'+','.join(missing))
+        from PIL import Image,ImageDraw,ImageFont
+        def image(kind):
+            canvas=Image.new('RGB',(1800,1000),'white');draw=ImageDraw.Draw(canvas);font=ImageFont.truetype(font_path,48)
+            if kind=='business_license':
+                lines=['营业执照（合成测试，非真实证件）','名称：玄钧AI社区合成测试企业','统一社会信用代码：91350100M000100Y43','法定代表人：张测试','住所：重庆市测试区示例路一号','经营范围：软件开发测试']
+            else:
+                lines=['居民身份证（合成测试，非真实证件）','姓名：张测试','性别：男 民族：汉','出生：1990年01月01日','住址：重庆市测试区示例路一号','公民身份号码：110101199001010011']
+            y=45
+            for line in lines:draw.text((55,y),line,font=font,fill='black');y+=145
+            out=io.BytesIO();canvas.save(out,format='PNG');return out.getvalue()
+        def actual_client():
+            return fixture.OwnerHttp(fixture.TestClient(self.api.create_app(authenticate=self.auth,store=self.store,
+                infer=self.api.run_local_ocr,authorize_application=self.bridge.authorize_application,
+                authorize_attachment=self.bridge.authorize_attachment)),self.owner)
+        self.assertEqual(self.api.run_local_ocr.__module__,'community_pinned_ocr.ocr_core')
+        # Business-license bytes originate from the original encrypted community attachment.
+        license_bytes=image('business_license');self.raw=license_bytes
+        self.app=self.fx.material(self.app,raw=license_bytes,kind='business_license')
+        self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'business_license')
+        self.assertEqual(self.source['data'],license_bytes)
+        self.headers['Idempotency-Key']='real-community-license-submit-0001'
+        real=actual_client()
+        try:
+            response=self.submit(real);self.assertEqual(response.status_code,202,response.text)
+            path='/api/v1/ocr/jobs/'+response.json()['job_id'];seen=real.get(path,headers=self.headers);self.assertEqual(seen.status_code,200,seen.text)
+            payload=seen.json();allowed={'company_name','registered_address'}
+            confirmed={key:value['value'] for key,value in payload['fields'].items()
+                       if key in allowed and type(value) is dict and type(value.get('value')) is str and value['value'].strip()}
+            self.assertTrue(confirmed,'REAL_OCR_LICENSE_WRITEBACK_FIELD_REQUIRED')
+            reply=real.post(path+'/confirm',headers={**self.headers,'Idempotency-Key':'real-community-license-confirm-0001'},json={
+                'revision':1,'application_revision':payload['application_revision'],'provider_version':payload['provider_version'],'fields':confirmed})
+            self.assertEqual(reply.status_code,200,reply.text)
+        finally:real.close()
+        # Reopen the encrypted store before applying the human-confirmed values.
+        self.store=self.api.SecureSQLiteJobStore(self.store.db_path,self.store_key);self.bridge.store=self.store
+        jobid=path.rsplit('/',1)[1];persisted=self.store.get(jobid,self.source['tenant_id']);self.assertEqual(persisted['status'],'confirmed')
+        self.assertEqual(persisted['confirmed_fields'],confirmed)
+        applied=self.apply(path);self.assertTrue(applied['written'])
+        current=self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]
+        mapping={'company_name':'legal_name','registered_address':'address'}
+        for key,value in confirmed.items():self.assertEqual(current['fields'][mapping[key]],value)
+        # ID-front uses the same real inference and confirmation path but has no community writeback target.
+        id_bytes=image('id_front');self.raw=id_bytes
+        self.app=self.fx.material({'application':self.app['application'],'revision':current['revision']},raw=id_bytes,kind='identity_front')
+        self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'id_front')
+        self.headers['Idempotency-Key']='real-community-id-submit-00001'
+        real=actual_client()
+        try:
+            response=self.submit(real,document_type='id_front');self.assertEqual(response.status_code,202,response.text)
+            idpath='/api/v1/ocr/jobs/'+response.json()['job_id'];seen=real.get(idpath,headers=self.headers);self.assertEqual(seen.status_code,200,seen.text)
+            payload=seen.json();allowed={'id_name','id_number','registered_address'}
+            confirmed={key:value['value'] for key,value in payload['fields'].items()
+                       if key in allowed and type(value) is dict and type(value.get('value')) is str and value['value'].strip()}
+            self.assertTrue(confirmed,'REAL_OCR_ID_CONFIRM_FIELD_REQUIRED')
+            reply=real.post(idpath+'/confirm',headers={**self.headers,'Idempotency-Key':'real-community-id-confirm-00001'},json={
+                'revision':1,'application_revision':payload['application_revision'],'provider_version':payload['provider_version'],'fields':confirmed})
+            self.assertEqual(reply.status_code,200,reply.text)
+        finally:real.close()
+        self.store=self.api.SecureSQLiteJobStore(self.store.db_path,self.store_key);self.bridge.store=self.store
+        before=self.snapshot();result=self.apply(idpath);self.assertFalse(result['written']);self.assertEqual(result['reason'],'OCR_IDCARD_TARGET_UNDEFINED')
+        self.assertEqual(self.snapshot(),before)
+
     def test_original_host_transport_echoes_seen_pair_without_auto_writeback(self):
         from scripts.community_ocr_host import HostOcr
         host=HostOcr(self.fx.service,'shop1',self.api,self.store)

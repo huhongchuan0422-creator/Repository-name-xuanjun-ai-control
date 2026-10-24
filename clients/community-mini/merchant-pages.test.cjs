@@ -13,7 +13,7 @@ test('new admission defaults to LEGAL and places business-license fields and upl
  assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.mobile_phone'));
  assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_email'));
  assert.ok(f.page.data.licenseMaterial);
- assert.match(fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8'),/营业执照资料/);
+ const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(markup,/营业执照资料/);assert.match(markup,/OCR按需调用且默认关闭/);assert.match(markup,/识别：按需调用/);assert.equal(markup.includes('当前尚无真实OCR接口'),false);assert.equal(markup.includes('OCR未接通'),false);
 });
 test('native home/recommendations/profile tabs and entry navigation stay in the same five-page app',()=>{
  const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
@@ -204,16 +204,16 @@ test('saved SUPER administrator remains SUPER when reopening its original applic
  assert.equal(form.get(f.page.profile,'contact_info.contact_type'),'SUPER');
 });
 
-test('scene photographs require no OCR while business license keeps its distinct status',()=>{const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');const photos=markup.split('线下实际经营场景照片')[1].split('小程序服务截图')[0];assert.ok(!photos.includes('OCR未接通'));assert.match(photos,/场景照片无需OCR/);assert.match(markup,/识别：未接通/);});
+test('scene photographs require no OCR while business license keeps its distinct status',()=>{const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');const photos=markup.split('线下实际经营场景照片')[1].split('小程序服务截图')[0];assert.ok(!photos.includes('OCR未接通'));assert.match(photos,/场景照片无需OCR/);assert.match(markup,/识别：按需调用/);});
 test('scene photo cards have three visually separated upload frames',()=>{const css=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxss','utf8');const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(css,/\.scene-photo-card\{[^}]*border:/);assert.match(wxml,/wx:for="{{scenePhotoCards}}"[^>]*class="scene-photo-card"/);assert.match(wxml,/item.uploaded\?'1\/1':'0\/1'/);});
 test('scene photos appear beside chosen actual store scene and not in mini-only scene',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(wxml.indexOf('营业执照资料')<wxml.indexOf('门店名称 *'));assert.ok(wxml.indexOf('经营场景：')<wxml.indexOf('线下实际经营场景照片')&&wxml.indexOf('线下实际经营场景照片')<wxml.indexOf('本组证件材料'));assert.equal(f.page.data.scenePhotoCards.length,0);f.page.setData({step:1,options:{...f.page.data.options,scene:'both'},catalog:[...f.page.data.catalog,...['storefront_photo','interior_photo','mini_program_screenshot'].map(id=>({id,title:id}))]});f.page.refresh();assert.deepEqual(Array.from(f.page.data.scenePhotoCards,x=>x.title),['门头照','店内环境照','收银台照']);assert.deepEqual(Array.from(f.page.data.scenePhotoCards,x=>x.connected),[true,true,false]);assert.equal(f.page.materialProfilePath('storefront_photo'),'business_info.sales_info.biz_store_info.store_entrance_pic');assert.equal(f.page.materialProfilePath('interior_photo'),'business_info.sales_info.biz_store_info.indoor_pic');assert.equal(f.page.materialProfilePath('mini_program_screenshot'),'business_info.sales_info.mini_program_info.mini_program_pics');assert.equal(f.page.data.miniSceneMaterials.length,1);assert.match(wxml,/addition_info.business_addition_pics/);f.page.setData({options:{...f.page.data.options,scene:'mini'}});f.page.refresh();assert.equal(f.page.data.scenePhotoCards.length,0);});
 test('UBO passport hides only current beneficiaries back material',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({catalog:[...f.page.data.catalog,...['ubo_1_front','ubo_1_back','ubo_2_front','ubo_2_back'].map(id=>({id,title:id}))],options:{...f.page.data.options,entity:'ENTERPRISE',ubos:2,uboIndex:0}});form.put(f.page.profile,'subject_info.ubo_info_list.0.ubo_id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');form.put(f.page.profile,'subject_info.ubo_info_list.1.ubo_id_doc_type','IDENTIFICATION_TYPE_IDCARD');f.page.refresh();assert.deepEqual(Array.from(f.page.data.adjacentMaterials,x=>x.id),['ubo_1_front']);f.page.setData({options:{...f.page.data.options,uboIndex:1}});f.page.refresh();assert.deepEqual(Array.from(f.page.data.adjacentMaterials,x=>x.id),['ubo_2_front','ubo_2_back']);});
-test('selection immediately reveals document uploads above editable text with OCR explicitly unavailable',async()=>{
+test('selection immediately reveals document uploads above editable text with OCR default-off and on-demand',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
  const license=wxml.indexOf('营业执照资料'),adjacent=wxml.indexOf('本组证件材料'),field=wxml.indexOf('第{{fieldCursor+1}}项');
  assert.ok(license>=0&&adjacent>license&&field>adjacent,'upload cards precede editable fields');
- assert.match(wxml,/识别：未接通/);
+ assert.match(wxml,/识别：按需调用/);
  assert.equal(f.page.data.showLicenseUpload,true);
  f.page.setData({options:{...f.page.data.options,entity:'SOLE_PROPRIETOR'}});f.page.refresh();
  assert.equal(f.page.data.showLicenseUpload,true);
