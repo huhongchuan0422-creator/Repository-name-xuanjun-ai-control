@@ -164,10 +164,10 @@ class OriginalLifecycle(unittest.TestCase):
             for header,data in headers:
                 out.write(header);out.write(data)
                 padding=(-len(data))%512
-                if padding:out.write(b'\\0'*padding)
+                if padding:out.write(bytes(padding))
             out.write(filler_raw)
             out.seek(filler_bytes,os.SEEK_CUR)
-            out.write(b'\\0'*1024);out.flush();os.fsync(out.fileno())
+            out.write(bytes(1024));out.flush();os.fsync(out.fileno())
         path.chmod(0o600)
         if path.stat().st_size!=total_bytes:
             raise AssertionError('FIXTURE_ARCHIVE_SIZE')
