@@ -33,11 +33,11 @@ def main():
     entries=[]
     for path in include:
         rel=str(path.relative_to(root))
+        digest=sha(path)
         if rel.startswith("ocr-build/source-pins/"):
             source="repository-pinned-source-input-copied-after-exact-source-checkout"
         elif rel.startswith("ocr-model-cache/"):
-            actual=sha(path)
-            if path.name in trusted_model_hashes and actual == trusted_model_hashes[path.name]:
+            if path.name in trusted_model_hashes and digest == trusted_model_hashes[path.name]:
                 source="sha256-matches-fixed-model-manifest"
             else:
                 source="downloaded-and-self-hashed-only-not-trusted-by-model-manifest"
@@ -58,7 +58,7 @@ def main():
             source="partial-or-final-build-output; not release unless success-only artifact also exists"
         else:
             source="generated-candidate-file-self-hashed"
-        entries.append({"path":rel,"bytes":path.stat().st_size,"sha256":sha(path),"provenance":source})
+        entries.append({"path":rel,"bytes":path.stat().st_size,"sha256":digest,"provenance":source})
     result={"classification":"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE","files_scope":"exact payload files under ocr-wheelhouse/, ocr-model-cache/, ocr-deb-cache/, and ocr-build/; this manifest is the separate index record and does not self-hash","source_sha":os.environ.get("GITHUB_SHA"),"run_id":os.environ.get("GITHUB_RUN_ID"),"files":entries}
     manifest_path.write_text(json.dumps(result,sort_keys=True,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"classification":result["classification"],"candidate_file_count":len(entries),"manifest_sha256":sha(manifest_path)},sort_keys=True))
