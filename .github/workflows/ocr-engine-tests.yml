@@ -77,22 +77,32 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-build"
           cp services/ocr_engine/requirements.txt "$RUNNER_TEMP/ocr-build/requirements.txt"
           docker run --rm --platform linux/amd64 \
+            -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
+            -e OCR_BASE_MANIFEST_SHA256=8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 \
+            -e OCR_BASE_CONFIG_SHA256="$OCR_BASE_CONFIG_SHA256" \
             -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse" -v "$RUNNER_TEMP/ocr-build:/build" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               python -m pip download --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
               python - <<'PY'
-import hashlib,json,platform,sys
+import hashlib,json,os,platform,sys
 from pathlib import Path
 from pip._vendor.packaging.tags import sys_tags
 req=Path("/src/services/ocr_engine/requirements.txt")
 wheels=sorted(Path("/wheelhouse").glob("*.whl"))
 if not wheels: raise SystemExit("WHEELHOUSE_EMPTY")
+if platform.python_implementation() != "CPython" or platform.python_version() != "3.11.17" or platform.machine() != "x86_64":
+    raise SystemExit("TARGET_RUNTIME_MISMATCH")
+glibc= os.confstr("CS_GNU_LIBC_VERSION")
 lock={
  "target_platform":"linux-x86_64-cp311",
  "python_implementation":platform.python_implementation(),
  "python_version":platform.python_version(),
  "abi":sys.implementation.cache_tag,
+ "base_image":os.environ["OCR_BASE_IMAGE"],
+ "base_image_manifest_sha256":os.environ["OCR_BASE_MANIFEST_SHA256"],
+ "base_image_config_sha256":os.environ["OCR_BASE_CONFIG_SHA256"],
+ "glibc_version":glibc,
  "target_tags":[str(tag) for tag in sys_tags()],
  "requirements_sha256":hashlib.sha256(req.read_bytes()).hexdigest(),
  "wheels":[{"filename":p.name,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()} for p in wheels]
