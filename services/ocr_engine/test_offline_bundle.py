@@ -523,6 +523,28 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("DEB_FILE_SET_DIFFERS_FROM_LOCK",result.stderr)
         self.assertEqual(calls.read_text(),"")
 \n
+    def test_candidate_copy_uses_frozen_expected_sha_and_rejects_changed_destination(self):
+        script=Path(__file__).with_name("write_candidate_input_manifest.py")
+        spec=importlib.util.spec_from_file_location("candidate_manifest_module",script)
+        module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        source=self.root/"source.deb"; frozen=b"locked package bytes"; source.write_bytes(frozen)
+        frozen_bytes=source.read_bytes(); expected=hashlib.sha256(frozen_bytes).hexdigest()
+        # Mutation after the authoritative snapshot must not change the bytes copied.
+        source.write_bytes(b"mutated after snapshot")
+        target=self.root/"payload"/"package.deb"
+        copied_sha=module.write_verified_snapshot(target,frozen_bytes,expected,"system-debs/package.deb")
+        self.assertEqual(copied_sha,expected)
+        self.assertEqual(target.read_bytes(),frozen)
+        target2=self.root/"payload"/"tampered.deb"
+        original_read=Path.read_bytes
+        def changed_read(path):
+            if path == target2:
+                return b"changed during copy verification"
+            return original_read(path)
+        with mock.patch.object(Path,"read_bytes",new=changed_read):
+            with self.assertRaisesRegex(SystemExit,"CANDIDATE_COPY_SHA_MISMATCH:system-debs/tampered.deb"):
+                module.write_verified_snapshot(target2,frozen_bytes,expected,"system-debs/tampered.deb")
+
     def test_candidate_manifest_marks_missing_locked_assets_and_never_copies_apt_state(self):
         root=self.root/"candidate-root"; root.mkdir()
         models=root/"ocr-model-cache"; models.mkdir()
