@@ -43,10 +43,10 @@ def main():
                 source="downloaded-and-self-hashed-only-not-trusted-by-model-manifest"
         elif rel.startswith("ocr-wheelhouse/"):
             source="downloaded-from-pypi-and-self-hashed-not-independently-pinned"
-        elif rel.startswith("ocr-deb-cache/apt-lists/"):
-            source="downloaded-from-configured-debian-source-and-self-hashed"
         elif rel.startswith("ocr-deb-cache/apt-lists/") and ("InRelease" in path.name or "Release" in path.name):
             source="apt-index-signature-checked-by-apt-get-update-and-self-hashed"
+        elif rel.startswith("ocr-deb-cache/apt-lists/"):
+            source="downloaded-from-configured-debian-source-and-self-hashed"
         elif rel.startswith("ocr-deb-cache/") and path.name == "system-deb-lock.json":
             source="generated-lock; package and apt-index digests recorded; validate lock/source fingerprint before reuse"
         elif rel.startswith("ocr-deb-cache/") and path.name.endswith(".deb"):
