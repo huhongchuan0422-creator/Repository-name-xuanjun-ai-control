@@ -44,6 +44,7 @@ class SealedOSBoundary:
             for parent in pathlib.PurePosixPath(path).parents})
         self.pins = {}
         self.sealed_paths = {}
+        self.sealed_symlinks = {}
         for path, identity in pins.items():
             real = self.root/path.lstrip('/')
             st = real.lstat()
@@ -51,11 +52,33 @@ class SealedOSBoundary:
             self.sealed_paths[(st.st_dev, st.st_ino)] = path
         self._open, self._stat, self._fstat = os.open, os.stat, os.fstat
         self._readlink = os.readlink
+        for path in self.allowed:
+            real = self.root/path.lstrip('/')
+            try:
+                st = real.lstat()
+            except FileNotFoundError:
+                continue
+            if (st.st_mode & 0o170000) == 0o120000:
+                self.sealed_symlinks[path] = (
+                    st.st_dev, st.st_ino, st.st_mode, st.st_nlink,
+                    self._readlink(str(real)))
 
-    def _mapped(self, st):
+    def _mapped(self, st, path=None, follow_symlinks=True):
         identity = self.pins.get((st.st_dev, st.st_ino))
         if identity:
             return StatView(st, *identity)
+        # Fixed current symlinks are external observed OS facts too.  Preserve
+        # their real lstat identity/type/link-count/target at seal time and only
+        # synthesize UK root ownership while every sealed property still
+        # matches.  A replacement inode or retargeted link never inherits it.
+        sealed = self.sealed_symlinks.get(path) if not follow_symlinks else None
+        if sealed is not None:
+            dev, ino, mode, nlink, target = sealed
+            real = self.root/path.lstrip('/')
+            if ((st.st_dev, st.st_ino, st.st_mode, st.st_nlink) ==
+                    (dev, ino, mode, nlink) and
+                    self._readlink(str(real)) == target):
+                return StatView(st, st.st_dev, st.st_ino)
         # The disposable fixture models UK root ownership on both prepared
         # directories and files atomically published after sealing. New files
         # retain their real dev/ino, so they cannot inherit a baseline pin.
@@ -75,12 +98,14 @@ class SealedOSBoundary:
 
     def stat(self, path, *, dir_fd=None, follow_symlinks=True):
         path = os.fspath(path)
-        if dir_fd is None and path.startswith('/'):
+        logical = path if dir_fd is None and path.startswith('/') else None
+        if logical is not None:
             if path not in self.allowed and path not in self.directories:
                 raise PermissionError('UNLISTED_OS_PATH')
             path = str(self.root/path.lstrip('/'))
         return self._mapped(self._stat(path, dir_fd=dir_fd,
-                                       follow_symlinks=follow_symlinks))
+                                       follow_symlinks=follow_symlinks),
+                            logical, follow_symlinks)
 
     def fstat(self, fd):
         return self._mapped(self._fstat(fd))
@@ -181,6 +206,24 @@ class IdentityBoundaryTests(unittest.TestCase):
                                  (os.fstat(fd).st_dev,os.fstat(fd).st_ino))
             finally:
                 os.close(fd)
+
+    def test_sealed_current_symlink_maps_owner_but_replacement_does_not(self):
+        current_path='/opt/xuanjun-fixture/current'
+        real=self.root/current_path.lstrip('/')
+        real.parent.mkdir(parents=True,exist_ok=True)
+        real.symlink_to('/opt/xuanjun-fixture/releases/old')
+        boundary=SealedOSBoundary(self.root,[current_path],{})
+        with boundary.active():
+            sealed=os.stat(current_path,follow_symlinks=False)
+            self.assertEqual((sealed.st_uid,sealed.st_gid),(0,0))
+        real.unlink()
+        real.symlink_to('/opt/xuanjun-fixture/releases/new')
+        with boundary.active():
+            replaced=os.stat(current_path,follow_symlinks=False)
+            self.assertNotEqual((replaced.st_dev,replaced.st_ino),
+                                boundary.sealed_symlinks[current_path][:2])
+            self.assertEqual((replaced.st_uid,replaced.st_gid),
+                             (real.lstat().st_uid,real.lstat().st_gid))
 
     def test_synthetic_six_bytes_cannot_pass_original_digest_guard(self):
         # Device/inode translation never supplies or authenticates file bytes.
