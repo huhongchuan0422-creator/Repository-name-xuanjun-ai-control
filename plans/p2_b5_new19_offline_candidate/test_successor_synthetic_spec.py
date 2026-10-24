@@ -425,6 +425,18 @@ class SyntheticSpecTests(unittest.TestCase):
                 self.assertEqual(json.loads(recovered.stdout)['state'],
                                  'CUSTODY_COMPLETE_DELIVERY_NOT_PROVEN',
                                  recovered.stdout)
+                waiting=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-query',str(root)],
+                    capture_output=True,text=True,timeout=20,check=False)
+                self.assertEqual(waiting.returncode,0,waiting.stderr+'\n'+waiting.stdout)
+                self.assertEqual(json.loads(waiting.stdout)['state'],
+                                 'B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY')
+                closed=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-http-close-trace',
+                    str(root)],capture_output=True,text=True,timeout=20,check=False)
+                self.assertEqual(closed.returncode,0,closed.stderr+'\n'+closed.stdout)
+                self.assertEqual(json.loads(closed.stdout)['state'],
+                                 'RECEIVED_VERIFIED_19_CLOSED',closed.stdout)
                 # Recovery consumes the same sealed source bytes; a changed
                 # import after the successful observation cannot be accepted.
                 queue_source=root/(entry.SOURCE+
@@ -593,6 +605,85 @@ def child_query(root,action='query',execute_start=None):
                     result=dict(result,_guard_calls=guard_calls)
                 if tx.b.authority.original.queue is not None:
                     tx.b.authority.original.queue.close()
+            elif action=='http-close-trace':
+                tx=entry._recover()
+                from pr17_b5_successor_authority import inspect_recovered_candidate_readonly
+                observed=inspect_recovered_candidate_readonly(tx)
+                if observed.get('state')!='B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY':
+                    raise AssertionError('B5_HTTP_WAIT_REQUIRED')
+                tx.resume_recovered_b5_http_wait()
+                original=tx.b.authority.original
+                now=int(time.time())
+                auth=original.resource.authenticator
+                auth.secret_provider=lambda:'fixture-client-secret'
+                auth.wall_clock=lambda:now
+                auth.monotonic=lambda:1.0
+                claims={'active':True,'iss':auth.issuer,'token_type':'Bearer',
+                    'exp':now+600,'iat':now-1,'aud':auth.audience,
+                    'scope':'project.files.read','sub':c53.SUBJECT}
+                class IntrospectionResponse:
+                    def __enter__(self):return self
+                    def __exit__(self,*_):return False
+                    def getcode(self):return 200
+                    def read(self,*_):return json.dumps(claims).encode()
+                auth.open_url=lambda request,timeout:IntrospectionResponse()
+                requests=tx.bundle['requests']
+                objects=[original.policy.catalog.objects[
+                         request['arguments']['object_ref']] for request in requests]
+                invokes={}
+                for request in requests:
+                    row=original.queue.db.execute(
+                        'SELECT state,invoke_id FROM connection_jobs WHERE request_id=?',
+                        (request['request_id'],)).fetchone()
+                    if row is None or row[0]!='SUCCESS' or not row[1]:
+                        raise AssertionError('FIXTURE_SUCCESS_INVOKE_ABSENT')
+                    invokes[request['request_id']]=row[1]
+                custody={'state':'MATERIAL_CUSTODY_COMPLETE','objects':19,
+                    'bytes':93592,'catalog_sha256':original.policy.catalog.sha,
+                    'analyst_receipt':'NOT_VERIFIED','source_execution':False}
+                from successor_analyst_read import receive_all
+                proof=receive_all(requests=requests,objects=objects,
+                    catalog_sha=original.policy.catalog.sha,project=c53.PROJ,
+                    recipient=c53.RECIP,success_invokes=invokes,custody=custody,
+                    read_project_chunk=lambda **args:original.resource.read(
+                        'Bearer fixture-http-token-0123456789',args,now))
+                rows=[{'request_id':request['request_id'],
+                       'object_ref':'b5-material-%02d'%(number+1),
+                       'invoke_id':invokes[request['request_id']],
+                       'bytes':objects[number]['bytes'],
+                       'sha256':objects[number]['sha256'],
+                       'result_ref':'fixture-http-result-%02d'%(number+1)}
+                      for number,request in enumerate(requests)]
+                binding=tx.b.authority._witness_binding()
+                evidence=tx.b.authority.evidence_store
+                evidence.register_exact(binding,'b5_http',
+                    source_id='fixture-http-witness',
+                    source_raw=b'fixture nonsecret HTTP result witness',
+                    witness_identity='fixture-registrar',
+                    payload={'proof_sha256':proof['proof_sha256'],
+                        'custody_receipt_sha256':c53.sha(c53.canon(custody)),
+                        'rows':rows,'subject':c53.SUBJECT,
+                        'scope':'project.files.read',
+                        'catalog_sha256':original.policy.catalog.sha,
+                        'recipient':c53.RECIP})
+                evidence.register_exact(binding,'B5_EXPOSURE_CLOSE',
+                    source_id='fixture-independent-close',
+                    source_raw=b'fixture independent close decision',
+                    witness_identity='fixture-close-registrar',
+                    payload={'scope':'B5_EXPOSURE_CLOSE','job':tx.b.job,
+                        'decision_id':'fixture-close-decision','approved':True,
+                        'phase':'AFTER_B5_HTTP'})
+                guard_calls=[]
+                original_guarded=tx.guarded
+                def traced_close(name,*args):
+                    guard_calls.append(name)
+                    try:return original_guarded(name,*args)
+                    except BaseException as exc:
+                        guard_calls.append('ERROR:'+name+':'+str(exc));raise
+                tx.guarded=traced_close
+                result=tx.close_after_b5_http(proof)
+                result=dict(result,_guard_calls=guard_calls)
+                if original.queue is not None:original.queue.close()
             elif action=='recover-trace':
                 tx=entry._recover()
                 guard_calls=[]
@@ -649,7 +740,8 @@ if __name__=='__main__':
         raise SystemExit(child_query(sys.argv[2],'execute',sys.argv[3]))
     if len(sys.argv)==3 and sys.argv[1] in (
             '--child-query','--child-intake','--child-worker-ready',
-            '--child-worker-success','--child-recover','--child-recover-trace'):
+            '--child-worker-success','--child-recover','--child-recover-trace',
+            '--child-http-close-trace'):
         raise SystemExit(child_query(sys.argv[2],
             sys.argv[1][8:] if sys.argv[1]!='--child-query' else 'query'))
     unittest.main()
