@@ -223,6 +223,45 @@ class OfflineBundleInputTests(unittest.TestCase):
         lock_path.write_text(json.dumps({**lock,"packages":[]}))
         self.assertNotEqual(hashlib.sha256(lock_path.read_bytes()).hexdigest(),digest)
         self.assertNotEqual(lock_path.read_bytes(),snapshot)
+    def test_builder_rejects_deb_lock_mutation_after_validation_before_freeze(self):
+        package=self.root/"runtime-package"; (package/"model_distribution").mkdir(parents=True)
+        for name in ("api.py","ocr_core.py","secure_store.py","startup_selfcheck.py"):
+            (package/name).write_text("# synthetic "+name)
+        (package/"model_manifest.json").write_text(self.manifest.read_text())
+        (package/"requirements.txt").write_text(self.requirements.read_text())
+        (package/"model_distribution"/"LICENSE-2.0.txt").write_text(self.license.read_text())
+        (package/"model_distribution"/"NOTICE.md").write_text(self.notice.read_text())
+        (package/"deployment_config.schema.json").write_text("{}")
+        debs=self.root/"deb-race"; debs.mkdir()
+        apt=debs/"apt-lists"; apt.mkdir()
+        index=apt/"Packages"; index.write_bytes(b"synthetic apt index")
+        pkgroot=self.root/"deb-package"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        deb=debs/"libxcb1_1.0_amd64.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(deb)],check=True,capture_output=True,text=True)
+        source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm\nComponents: main\n"
+        lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
+              "apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_content.encode()).hexdigest(),"content":source_content},
+              "packages":[{"filename":deb.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(deb.read_bytes()).hexdigest()}],
+              "apt_lists":[{"path":"Packages","bytes":index.stat().st_size,"sha256":hashlib.sha256(index.read_bytes()).hexdigest()}]}
+        lock_path=debs/"system-deb-lock.json"; lock_path.write_text(json.dumps(lock))
+        original_validate=builder.validate_deb_cache
+        def validate_then_mutate(path):
+            result=original_validate(path)
+            lock_path.write_text(json.dumps({**lock,"packages":[]}))
+            return result
+        output=self.root/"deb-lock-race.tar.gz"
+        with (mock.patch.object(builder,"HERE",package),
+              mock.patch.object(builder,"MODEL_MANIFEST",package/"model_manifest.json"),
+              mock.patch.object(builder,"REQUIREMENTS",package/"requirements.txt"),
+              mock.patch.object(builder,"LICENSE",package/"model_distribution"/"LICENSE-2.0.txt"),
+              mock.patch.object(builder,"NOTICE",package/"model_distribution"/"NOTICE.md"),
+              mock.patch.object(builder,"CONFIG_SCHEMA",package/"deployment_config.schema.json"),
+              mock.patch.object(builder,"validate_deb_cache",side_effect=validate_then_mutate)):
+            with self.assertRaisesRegex(BundleError,"VALIDATE_FREEZE_SHA256_MISMATCH:system-deb-lock.json"):
+                builder.build_bundle("linux-x86_64-cp311",self.lock,self.wheels,self.models,output,system_deb_cache=debs)
+        self.assertFalse(output.exists())
+
     def test_candidate_manifest_classifies_model_by_actual_pinned_sha(self):
         manifest=Path(__file__).with_name("model_manifest.json")
         data=json.loads(manifest.read_text(encoding="utf-8"))
