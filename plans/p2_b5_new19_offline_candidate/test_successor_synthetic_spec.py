@@ -323,7 +323,7 @@ class SyntheticSpecTests(unittest.TestCase):
                     self.assertEqual(json.loads(observed.stdout)['state'],expected,
                                      observed.stdout)
                 recovered=subprocess.run([sys.executable,'-B',str(HERE/
-                    'test_successor_synthetic_spec.py'),'--child-recover',str(root)],
+                    'test_successor_synthetic_spec.py'),'--child-recover-trace',str(root)],
                     capture_output=True,text=True,timeout=20,check=False)
                 self.assertEqual(recovered.returncode,0,
                                  recovered.stderr+'\n'+recovered.stdout)
@@ -491,6 +491,26 @@ def child_query(root,action='query',execute_start=None):
                     result=dict(result,_guard_calls=guard_calls)
                 if tx.b.authority.original.queue is not None:
                     tx.b.authority.original.queue.close()
+            elif action=='recover-trace':
+                tx=entry._recover()
+                guard_calls=[]
+                original_guarded=tx.guarded
+                def traced_guarded(name,*args):
+                    guard_calls.append(name)
+                    try:return original_guarded(name,*args)
+                    except BaseException as exc:
+                        guard_calls.append('ERROR:'+name+':'+str(exc))
+                        raise
+                tx.guarded=traced_guarded
+                from pr17_b5_successor_authority import inspect_recovered_candidate_readonly
+                observed=inspect_recovered_candidate_readonly(tx)
+                if observed.get('state')=='SUCCESS_SNAPSHOT_READONLY':
+                    result=tx.resume_recovered_custody()
+                elif observed.get('state')=='B5_HTTP_AWAITING_PROVENANCE_NO_REPLAY':
+                    result=tx.resume_recovered_b5_http_wait()
+                else:
+                    result=observed
+                result=dict(result,_guard_calls=guard_calls)
             elif action in ('worker-ready','worker-success'):
                 from production.cloud_connection.queue import Queue,canonical
                 tx=entry._recover()
@@ -527,7 +547,7 @@ if __name__=='__main__':
         raise SystemExit(child_query(sys.argv[2],'execute',sys.argv[3]))
     if len(sys.argv)==3 and sys.argv[1] in (
             '--child-query','--child-intake','--child-worker-ready',
-            '--child-worker-success','--child-recover'):
+            '--child-worker-success','--child-recover','--child-recover-trace'):
         raise SystemExit(child_query(sys.argv[2],
             sys.argv[1][8:] if sys.argv[1]!='--child-query' else 'query'))
     unittest.main()
