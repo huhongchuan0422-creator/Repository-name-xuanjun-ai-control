@@ -27,7 +27,7 @@ ordinary preview can be prepared without enabling OCR or inventing grants.
 
 Owner-approved once-only 03:00 UK observation: current container/image/recheck
 OBSERVED, running=true, original nonroot user MATCH, identity_image_state MATCH.
-Root verified OCI revision 2330dd55c07f58d7f45a7c4510a97610dd4735d6 directly from
+Root verified OCI revision 2330dd55c07f58d7f45a7c4510a9761d0d4735d6 directly from
 the original screenshot. HTTP200/READY proves only
 PROCESS_AND_DATABASE_CONNECTIVITY. runtime_source_sha/version_source/
 backend_observed_at/freshness and runtime/image version relationship are

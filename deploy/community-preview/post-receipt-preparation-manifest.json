@@ -1,0 +1,80 @@
+{
+  "purpose": "ROOT_REVIEW_POST_RECEIPT_PREPARATION_NOT_SITE_AUTHORIZATION",
+  "previous_source_sha": "cec5b49ab7bb0169348b896e11266eca3e6ace60",
+  "correct_current_source": "2330dd55c07f58d7f45a7c4510a9761d0d4735d6",
+  "correct_tree": "d89428ae6f0ba2e990f4c58a0dc28975271da497",
+  "observation_already_executed_at": "2026-10-24T05:26:43Z",
+  "inner_exit": 2,
+  "outer_exit": 2,
+  "normalization": false,
+  "files": {
+    "scripts/community_preview_three_diagnostics.py": {
+      "bytes": 5483,
+      "sha256": "683289f3436e3bb61f266b0058c2104c3902e49d9206ca5cb88f1c9a61317817",
+      "mode": "0644"
+    },
+    "scripts/community_preview_root_loader.py": {
+      "bytes": 5027,
+      "sha256": "393b9c3f3e5720a1a9164aaafba0f2198fd5e461c49c4e58859c497ef5100f19",
+      "mode": "0644"
+    },
+    "scripts/community_preview_control_carrier.py": {
+      "bytes": 1260,
+      "sha256": "6d1838086f1db541da06398c7f81807ca64dd89afe2cd4657f386a6d29a02143",
+      "mode": "0644"
+    },
+    "deploy/community-preview/three-reasons-readonly.py": {
+      "bytes": 51434,
+      "sha256": "5885210b7f75517847bc5580a6cc45363891f931cabded4623fb85be1c5e2172",
+      "mode": "0644"
+    },
+    "deploy/community-preview/three-reasons-readonly.sh": {
+      "bytes": 51782,
+      "sha256": "1da3183964a1125291c63a504d70def99b75740d2329e02323a204c688d014fc",
+      "mode": "0644"
+    },
+    "deploy/community-preview/control-oci2330-v1.zip": {
+      "bytes": 104493,
+      "sha256": "a3f139cfaf955e32b48c1cb095cb5981a42bc92ad7b4d69169aa4077b619d380",
+      "mode": "0644"
+    },
+    "deploy/community-preview/control-oci2330-v1-manifest.json": {
+      "bytes": 1201,
+      "sha256": "47f2212f52239ea8806fd2e7379b5455f4222689460254c9dd75b2628afd0053",
+      "mode": "0644"
+    },
+    "deploy/community-preview/current-source-correction.json": {
+      "bytes": 1366,
+      "sha256": "a8b56df8f6d457c6afa5f0a41ff35f7a2a13a2b4f030f4a773d753e89d4d0eb8",
+      "mode": "0644"
+    },
+    "tests/test_community_preview_site_prepare.py": {
+      "bytes": 7812,
+      "sha256": "074f941edcf1bf568a49ce649a7ab05ad53fa9a7a4bd92fcd1d495a85e074c88",
+      "mode": "0644"
+    },
+    "docs/development/COMMUNITY_POST_RECEIPT_PREPARATION_20261024.md": {
+      "bytes": 12436,
+      "sha256": "94ccfe1c195c2aec9aa39215906787405be97384d9d5c90b2d347235c2c2c2b9",
+      "mode": "0644"
+    }
+  },
+  "proposed_root": "/opt/xuanjun-community-preview/control-oci2330-v1",
+  "proposed_root_dir_mode": "0700",
+  "proposed_installed_file_mode": "0600",
+  "proposed_owner_uid": 0,
+  "image_stage": "/opt/xuanjun-community-preview/image-f131-40059478387",
+  "backup_stage": "/opt/xuanjun-community-preview/backup-2330-to-f131-v1",
+  "actual_site_changes": false,
+  "install_executed": false,
+  "image_load_executed": false,
+  "backup_executed": false,
+  "restore_verified": false,
+  "downgrade_verified": false,
+  "private_root_probe": "SOURCE_PROTOCOL_MISMATCH_ACTUAL_STATUS_UNKNOWN",
+  "current_recheck_reason": "UNKNOWN_NEEDS_NARROW_REASON_IF_AUTHORIZED",
+  "f131_loaded_reason": "UNKNOWN_NOT_NOT_FOUND",
+  "update_permission": "NOT_GRANTED",
+  "diagnostic_permission": "NOT_REQUESTED_BEFORE_ROOT_REVIEW",
+  "fresh_600s_snapshot": "ONLY_IMMEDIATELY_BEFORE_ACTUAL_UPDATE"
+}

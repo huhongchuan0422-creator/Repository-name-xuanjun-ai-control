@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PINS={
  'scripts/community_preview_version_inspect.py':'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3',
- 'scripts/community_preview_update_composition.py':'6b2efd8413b1798305dc96f23db9e8e0d1064dde6be8ca66d95ba78419f5a9f5',
+ 'scripts/community_preview_update_composition.py':'1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9',
  'scripts/community_preview_upgrade.py':'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee'}
 
 
@@ -50,8 +50,23 @@ v=types.ModuleType('fixed_approved_observer')
     return python,shell
 
 
+def build_three():
+    five,_=build()
+    text=(ROOT/'scripts/community_preview_three_diagnostics.py').read_text().replace(
+        'from scripts import community_preview_preupdate_observe as base\n','')
+    prefix="import types\nbase=types.ModuleType('fixed_readonly_base')\n"
+    prefix+='exec(compile('+repr(five.decode())+",'<fixed-readonly-base>','exec'),base.__dict__)\n"
+    python=(prefix+text).encode()
+    shell=(b"#!/bin/bash\n# REVIEW ONLY: three fixed objects, never executed by author.\nset -eu\nif [ \"$#\" -ne 0 ]; then exit 2; fi\ncommunity_three_exit=0\n/usr/bin/python3 -I -B -S - <<'COMMUNITY_THREE_READONLY_PY' || community_three_exit=$?\n"+python.rstrip(b'\n')+
+        b"\nCOMMUNITY_THREE_READONLY_PY\nprintf 'COMMUNITY_THREE_EXIT_CODE=%s\\n' \"$community_three_exit\"\nexit \"$community_three_exit\"\n")
+    return python,shell
+
+
 if __name__=='__main__':
     python,shell=build()
     target=ROOT/'deploy/community-preview'
     (target/'preupdate-five-readonly.py').write_bytes(python)
     (target/'preupdate-five-readonly.sh').write_bytes(shell)
+    python,shell=build_three()
+    (target/'three-reasons-readonly.py').write_bytes(python)
+    (target/'three-reasons-readonly.sh').write_bytes(shell)

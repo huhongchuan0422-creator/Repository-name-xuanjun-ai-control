@@ -1,7 +1,7 @@
 {
   "purpose": "ROOT_REVIEW_ONLY_UK_UPDATE_COMPOSITION_NOT_SITE_APPROVAL",
   "controller_source_sha": "a9324156f94040bb6ff0243815bb91abe2f67b2a",
-  "composition_file_sha256": "6b2efd8413b1798305dc96f23db9e8e0d1064dde6be8ca66d95ba78419f5a9f5",
+  "composition_file_sha256": "1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9",
   "product_receipt": {
     "purpose": "ROOT_SCOPE_ACCEPTED_HOSTED_IMAGE_RECEIPT_NOT_SITE_APPROVAL",
     "product_source_sha": "f13155ed63a3137d41766ee587d9b4b96a81477f",

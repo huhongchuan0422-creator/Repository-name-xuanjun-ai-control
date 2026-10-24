@@ -62,7 +62,7 @@ class FiveObjectReadonly(unittest.TestCase):
                     fields=p.approved.original.INSPECT_FIELDS+[('ports',''),('published',''),('devices',''),('capadd','')]
                     return '\n'.join(json.dumps(self.info[k]) for k,_ in fields)
                 if argv[3:5]==['image','inspect']:
-                    image=argv[-1];revision=p.PRODUCT if image==p.IMAGE else '2330dd55c07f58d7f45a7c4510a97610dd4735d6'
+                    image=argv[-1];revision=p.PRODUCT if image==p.IMAGE else '2330dd55c07f58d7f45a7c4510a9761d0d4735d6'
                     return '\n'.join(json.dumps(v) for v in (image,[],revision,'10001:1008'))
                 raise AssertionError('OUT_OF_SCOPE_DOCKER')
             self.assertEqual(argv[:5],['/usr/bin/python3','-I','-B','-S','-c'])

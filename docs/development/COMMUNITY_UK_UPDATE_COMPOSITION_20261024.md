@@ -20,7 +20,7 @@ root composition 可复用：a932 的真实 readers 是必填依赖，此前尚�
 | 产品 receipt | deploy/community-preview/f131-image-receipt.json；原样复用，含 source artifact、OCR90aca、stamp0444/User10001:1008/11层独验事实 |
 
 03:00 根的真实观察证明原旧容器/image 可观察且前后相符，OCI准确为
-2330dd55c07f58d7f45a7c4510a97610dd4735d6。它不是 f131，且此交接没有当前完整
+2330dd55c07f58d7f45a7c4510a9761d0d4735d6。它不是 f131，且此交接没有当前完整
 containerID/imageID 原值。不能用旧历史818fe0/0846…补当前值。现网 health200/READY
 仅PROCESS_AND_DATABASE_CONNECTIVITY，runtimeSHA/version_source/freshness仍UNKNOWN。
 本轮不重新连接、查看服务器或运行原2330固定升级器。

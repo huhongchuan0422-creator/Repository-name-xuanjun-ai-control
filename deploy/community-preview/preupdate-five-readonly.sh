@@ -36,9 +36,9 @@ APPROVAL=BASE+'/update-approval.json'
 JOURNAL=BASE+'/update-journal'
 SOCKET=v.RUN+'/preview.sock'
 PUBLIC_PINS={
- 'scripts/community_preview_update_composition.py':'6b2efd8413b1798305dc96f23db9e8e0d1064dde6be8ca66d95ba78419f5a9f5',
+ 'scripts/community_preview_update_composition.py':'1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9',
  'scripts/community_preview_update_checkpoint.py':'a73c1fe8ebb71abaefeb56ca880057e23876b5c005d315e4fb1268d3087064fd',
- 'scripts/community_preview_release_plan.py':'a44335c587ced937d16c5abef8916a200705adf15f9f86942560ac47d2dd7566',
+ 'scripts/community_preview_release_plan.py':'e0870cfaf7f1bb16b8664e644ec616e150b0ada93146a8d955e64c5f3f7ec4b9',
  'scripts/community_preview_upgrade.py':'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee',
  'scripts/community_preview_version_inspect.py':'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3'}
 

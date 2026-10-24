@@ -86,7 +86,7 @@ enable OCR, alter grants/credentials, or install any server/runtime dependency.
 The current image build status is NOT_EXECUTED; image ID, RepoDigest, image tar
 SHA and image artifact ID are null. New normal source CI tests this entry only,
 not an image build. The current UK observed OCI remains
-2330dd55c07f58d7f45a7c4510a97610dd4735d6, runtimeSHA/freshness unknown, preview
+2330dd55c07f58d7f45a7c4510a9761d0d4735d6, runtimeSHA/freshness unknown, preview
 HOLD. The accepted offline update/rollback plan and existing private data/account
 configuration/history are unchanged. Image build permission never implies
 server deployment, official preview upload, real login or production acceptance.

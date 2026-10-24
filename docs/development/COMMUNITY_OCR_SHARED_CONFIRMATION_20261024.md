@@ -103,7 +103,7 @@ Owner-approved minimal read-only candidate ran once at 03:00. Inner and outer
 exit2; original admin prompt returned. current_container/current_image/
 current_recheck OBSERVED, running=true, original nonroot user MATCH,
 identity_image_state MATCH. Root independently verified OCI revision
-2330dd55c07f58d7f45a7c4510a97610dd4735d6 from the original 03:00 screenshot.
+2330dd55c07f58d7f45a7c4510a9761d0d4735d6 from the original 03:00 screenshot.
 This is the observation as supplied, distinct from older upgrade-source constants;
 do not silently normalize either identifier. The observed 2330 image is not this
 new community source candidate.

@@ -92,7 +92,7 @@ DB downgrade/backup restoration is not implemented or authorized automatically.
 ## Live bindings still required; no guessed evidence
 
 Root's 03:00 old container/image/recheck OBSERVED and matching OCI
-2330dd55c07f58d7f45a7c4510a97610dd4735d6 remain historical observations. Do not
+2330dd55c07f58d7f45a7c4510a9761d0d4735d6 remain historical observations. Do not
 re-query connectivity here or treat their summary as exact current bindings.
 Before any separately authorized execution, root must freeze/recheck:
 

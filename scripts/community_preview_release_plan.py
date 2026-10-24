@@ -12,7 +12,7 @@ NAME='xuanjun-community-preview'
 ROOT='/var/lib/xuanjun-community-preview'
 RUN='/run/xuanjun-community-preview'
 DOCKER=['/usr/bin/docker','--host','unix:///var/run/docker.sock']
-OBSERVED_OCI='2330dd55c07f58d7f45a7c4510a97610dd4735d6'
+OBSERVED_OCI='2330dd55c07f58d7f45a7c4510a9761d0d4735d6'
 OCR_SHA='90aca1cfca1ec2a354950c394a4b0c2689b37d13'
 URL='https://uk.wenwenwenyiyiyi.work/community-preview/community/health'
 

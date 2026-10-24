@@ -50,7 +50,7 @@ metadata，不读正文。数据只固定data目录metadata，不枚举或读数
 历史真实部署回执Issue76#6333101186：工具f5f6492ce827aa8cd9273f37bd9742190570f2f1，
 旧产品2330dd55c07f58d7f45a7c4510a9761d0d4735d6、原数据配置复用、旧容器保留；它没有给
 当前新鲜准入、DB备份恢复证明或新root composition安装位置。根03:00观察的OCI准确是
-2330dd55c07f58d7f45a7c4510a97610dd4735d6，不能把两个历史字符串归一或冒当前image ID。
+2330dd55c07f58d7f45a7c4510a9761d0d4735d6，不能把两个历史字符串归一或冒当前image ID。
 这些历史来源已核，不在本候选重复读取旧attempt/resume receipt或旧rollback。
 
 root caller可能历史通过内存脚本执行，但没有准确持久安装路径证据，不能推定已安装在stage下

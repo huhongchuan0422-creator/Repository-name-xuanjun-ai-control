@@ -5,39 +5,39 @@
   "host": "iZd7oeikknn1z21sq6ji6zZ",
   "reuse_pins": {
     "scripts/community_preview_version_inspect.py": "98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3",
-    "scripts/community_preview_update_composition.py": "6b2efd8413b1798305dc96f23db9e8e0d1064dde6be8ca66d95ba78419f5a9f5",
+    "scripts/community_preview_update_composition.py": "1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9",
     "scripts/community_preview_upgrade.py": "2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee"
   },
   "files": {
     "scripts/community_preview_preupdate_observe.py": {
       "bytes": 14176,
       "mode": "0644",
-      "sha256": "57aa4ee37d2dfdd82948a4396141e111459f4701db770a6fd3f6d2a58a204f61"
+      "sha256": "64ffb65690e68efe90fa44733375a05a22008c9713553ebc55ed258c5a38f555"
     },
     "scripts/community_preview_preupdate_bundle.py": {
-      "bytes": 3630,
+      "bytes": 4636,
       "mode": "0644",
-      "sha256": "2d62f77f5cb5a8c25e2b13608aed785f27b741afca2908e68d396ad3c2a46fef"
+      "sha256": "54193187fae9c08421e0cb6eb4ce834d78bc0517417188e3fa411178cefddd5e"
     },
     "deploy/community-preview/preupdate-five-readonly.py": {
       "bytes": 42696,
       "mode": "0644",
-      "sha256": "45ea764e69069297d932f0f9fe0f03e935b6555e4803a6f730233e95e36b2f81"
+      "sha256": "84c2471873592b270fe685a9099202caebaaa32498d7d3823c0956aa9265f6b9"
     },
     "deploy/community-preview/preupdate-five-readonly.sh": {
       "bytes": 43101,
       "mode": "0644",
-      "sha256": "8937dc61f039ec6d85cffb02e199ba23d00d19719e91339eef8a7a6a8cf1dc93"
+      "sha256": "594ec04c941c4c5bdd9b1431bfcbca325315a4bb4028556ae6cd34c207e66743"
     },
     "tests/test_community_preview_preupdate_observe.py": {
       "bytes": 15205,
       "mode": "0644",
-      "sha256": "6e952ec5398bff9fd269c7bbe42dc45c018cabe5226ebc3099b6ad0a661ba6a8"
+      "sha256": "890e7fba2e966dd9b206d32bff155b06711ec190bfe30e0238b91f3f329ac7d0"
     },
     "docs/development/COMMUNITY_PREUPDATE_FIVE_READONLY_20261024.md": {
       "bytes": 10676,
       "mode": "0644",
-      "sha256": "c1d28de0c1dc6df720f6a384fb422371f7e3c487093e49bffbb66c92f613aeb6"
+      "sha256": "06ece89afdef631c5b2de1625cf62cbeefddca5c75a7c4c4f77db69c98382143"
     }
   },
   "bound": {
