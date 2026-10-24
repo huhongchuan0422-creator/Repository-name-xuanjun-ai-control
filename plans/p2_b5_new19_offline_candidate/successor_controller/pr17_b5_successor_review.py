@@ -538,11 +538,18 @@ class Transaction:
                 'B5_HTTP_PROOF_BOUNDARY')
         require(getattr(getattr(self.b,'authority',None),'evidence_store',None)
                 is not None,'B5_ORIGINAL_TOOL_PROVENANCE_SOURCE_UNKNOWN')
-        with self.b.successor_evidence_action('b5_http'):
-            with self.b.successor_evidence_action('B5_EXPOSURE_CLOSE'):
-                self.guarded('verify_b5_http_provenance',proof,self.bundle,self.spec)
-                self.guarded('approve_precise_b5_exposure_close',self.bundle,self.spec)
-                self.guarded('close_b5_exposure_success_successor_only')
+        try:
+            with self.b.successor_evidence_action('b5_http'):
+                with self.b.successor_evidence_action('B5_EXPOSURE_CLOSE'):
+                    self.guarded('verify_b5_http_provenance',proof,self.bundle,self.spec)
+                    self.guarded('approve_precise_b5_exposure_close',self.bundle,self.spec)
+                    self.guarded('close_b5_exposure_success_successor_only')
+        except BaseException:
+            # Persist the same attempt's uncertainty. Recovery accepts no
+            # FAILURE_* terminal checkpoint, so a fresh process cannot forget
+            # a lost/unknown action lease and retry close in a new context.
+            self.note_failure_safely()
+            raise
         self.note('CLOSED_RECEIVED_19')
         return {'state':'RECEIVED_VERIFIED_19_CLOSED',
                 'received':19,'bytes':93592,'installed':False}
