@@ -1,0 +1,122 @@
+
+> test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: same-origin identity/login/logout and csrf
+ok 1 - same-origin identity/login/logout and csrf
+  ---
+  duration_ms: 1.913372
+  type: 'test'
+  ...
+# Subtest: transport ambiguity only for POST
+ok 2 - transport ambiguity only for POST
+  ---
+  duration_ms: 2.218152
+  type: 'test'
+  ...
+# Subtest: preview URL strict
+ok 3 - preview URL strict
+  ---
+  duration_ms: 0.295777
+  type: 'test'
+  ...
+# Subtest: retest exact 4dc body
+ok 4 - retest exact 4dc body
+  --
+  duration_ms: 0.428948
+  type: 'test'
+  ...
+# Subtest: candidate lost response: explicit retry reuses key and stable case/event
+ok 5 - candidate lost response: explicit retry reuses key and stable case/event
+  ---
+  duration_ms: 3.947915
+  type: 'test'
+  ...
+# Subtest: candidate same key changed body is 409 at server
+ok 6 - candidate same key changed body is 409 at server
+  ---
+  duration_ms: 0.326152
+  type: 'test'
+  ...
+# Subtest: candidate absent never falls back to legacy
+ok 7 - candidate absent never falls back to legacy
+  ---
+  duration_ms: 0.388817
+  type: 'test'
+  ...
+# Subtest: GET me does not require CSRF but POST without recovered csrf remains server-deniable
+ok 8 - GET me does not require CSRF but POST without recovered csrf remains server-deniable
+  ---
+  duration_ms: 0.288676
+  type: 'test'
+  ...
+# Subtest: HTTP journey requires authority preview to move v1 -> v2 before page_updates
+ok 9 - HTTP journey requires authority preview to move v1 -> v2 before page_updates
+  ---
+  duration_ms: 62.957283
+  type: 'test'
+  ...
+# Subtest: HTTP rejects cross-project/revoke/expiry/version drift
+ok 10 - HTTP rejects cross-project/revoke/expiry/version drift
+  ---
+  duration_ms: 13.257654
+  type: 'test'
+  ...
+# Subtest: legacy lost response creates one server case and requires reconcile
+ok 11 - legacy lost response creates one server case and requires reconcile
+  ---
+  duration_ms: 5.835839
+  type: 'test'
+  ...
+# Subtest: main clears previous project content immediately on switch and on rejected load
+ok 12 - main clears previous project content immediately on switch and on rejected load
+  ---
+  duration_ms: 1.836105
+  type: 'test'
+  ...
+# Subtest: 401 clears csrf and project view
+ok 13 - 401 clears csrf and project view
+  ---
+  duration_ms: 0.312993
+  type: 'test'
+  ...
+# Subtest: frozen prototype maps all 69 routes without claiming real verification
+ok 14 - frozen prototype maps all 69 routes without claiming real verification
+  ---
+  duration_ms: 1.635932
+  type: 'test'
+  ...
+# Subtest: legacy success stores no feedback text and permits later same-version new feedback
+ok 15 - legacy success stores no feedback text and permits later same-version new feedback
+  ---
+  duration_ms: 1.12452
+  type: 'test'
+  ...
+# Subtest: legacy definite 409/403 does not lock unknown
+ok 16 - legacy definite 409/403 does not lock unknown
+  ---
+  duration_ms: 1.896075
+  type: 'test'
+  ...
+# Subtest: legacy transport unknown blocks blind resend but stores no text
+ok 17 - legacy transport unknown blocks blind resend but stores no text
+  ---
+  duration_ms: 0.875583
+  type: 'test'
+  ...
+# Subtest: candidate definite failure clears slot; unknown reuses key only on explicit retry
+ok 18 - candidate definite failure clears slot; unknown reuses key only on explicit retry
+  ---
+  duration_ms: 1.289158
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 194.031954

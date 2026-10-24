@@ -1,52 +1,90 @@
-# SaaS console isolated integration — 2026-10-24
+# SaaS Console Integration 2026-10-24 — V4
 
-Source anchor: website integration branch commit `4dc5e349243d5fd277807c0c023281118d6df9d6`, tree `66b45dc175afa7ecf4347afcbec49455dd4d91c8`. Do not mix with PR122 head `cd348c77506e07ba9516a869b8fe1e66597a6e69`.
+## Bound sources
 
-Existing server endpoints: GET `/customer/center/api/me`, GET `/customer/center/api/checklist/{project}`, GET `/customer/center/api/previews/{project}`, GET `/customer/center/api/changes/{project}`, POST `change_context`, `change_submit`, `change_updates`, `change_retest`. POST requests carry session CSRF header and exact body schema. Server supplies preview URL; never synthesize or iframe. GET `/me` may return account-only data lacking `projects`, in which case console holds. OWNER rights on preview and feedback are server enforced. This implementation hides these actions for other roles but never assumes client-side permission is authority.
+- PR122 website source anchor: `4dc5e349243d5fd277807c0c023281118d6df9d6` / tree `66b45dc175afa7ecf4347afcbec49455dd4d91c8`.
+- Do not mix with PR122 head `cd348c77506e07ba9516a869b8fe1e66597a6e69`.
+- Browser prototype handoff received and byte-verified: `2e211190c0d6edb6f2861bd860cbe9b03e27da92cb629c49277b1d4ab4ea5b62`.
+- Final ecosystem/8-stage integration specification received and byte-verified: `5049d4f8dc9fe555492338c00afee4ab77c08d29557e52340660426e78330037`.
+- Prototype package declares Replacement V3 commit `75f6c245ae29f54b918336a83b39b6ff78b58c7a`, tree `795e923301483cf0f2c8ba59878d8243495ad614`, 69 routes, 34 subviews, offline 52/52 PASS, browser `BROWSER_UNVERIFIED`.
 
-Transport-ambiguous POST submission has no automatic retry. The same applies to retest. Re-open current server state before manual resolution. A completed `change_retest` is NOT contract final acceptance. No payments, deployments or production claims. UI visual mapping held until authentic 69-page prototype and 8-stage spec arrive. This deliverable is source only; no live backend, browser or deployment proof.
+## Frozen-page mapping
 
-## 2026-10-24 isolated contract suite / two-version compatibility
+`clients/saas-console/prototype-page-map.json` is a mechanical 69/69 projection of `03_PAGE_TRACEABILITY.csv`; it does not upgrade any page to production verified. Current first operable slice maps to:
 
-`change_submit` is the pinned 4dc production-source contract with no server idempotency; legacy mode is the only mode wired in the UI and NEVER automatically resends a submission, including after browser reload. Pending intent journal is stored in browser localStorage per project/page/version, with no credentials or sensitive request body exposed as an external transport. **Caution:** it contains the customer feedback text, so local-storage confidentiality and retention require review before production use. Do not treat the journal as authoritative state. Reconciliation through authenticated `changes/{project}` is needed after UNKNOWN, and opening a new request requires explicit confirmation and record reconciliation.
+- CUS-005 project list: original `/me` project membership projection.
+- CUS-006 project overview: project metadata + checklist + previews + cases + messages.
+- CUS-007 requirement view: only fields already exposed by PR122 checklist are projected; full structured requirement capture/confirmation backend remains HOLD.
+- CUS-008 private materials: PR122 source exists, but this console slice does not add upload UI.
+- CUS-012/CUS-013 delivery list/detail: `change_updates` only after authoritative preview listing moves to the delivery `after_sha256`.
+- CUS-014 formal acceptance: NOT WIRED. `change_retest` is version retest only and never presented as contract final acceptance.
+- CUS-015/CUS-016 maintenance: no matching backend evidence in this slice; HOLD.
 
-`change_submit_idempotent` is a **UNMERGED / UNDEPLOYED backend candidate**, not an available production endpoint. Candidate expects `{project,page,version,text,intent,idempotency_key}` and uses a 16–128 character `[A-Za-z0-9_-]` key. The journal prepares and persists one key before first send, reuses the key on explicit retry after network ambiguity, never silently falls back to legacy on 404, and forbids same key with changed body. A server returning an unchanged case/event on replay and 409 on mismatched body is simulated by the bounded contract test, **not verified against deployed server**. Idempotent mode is presently accessible in the isolated JS adapter only; enabling it in UI requires official backend acceptance plus coordinated integration. Local storage alone does not replace server-enforced idempotency or prevent multiple devices from submitting.
+All other frozen routes remain mapped with their source `gate`, `source_implemented`, `owner_gap_task`, and `real_verified=NO` values. No redesign was performed.
 
-Tests use a deterministic in-process fake HTTP boundary which enforces cookie option, CSRF header, project membership, version pin, delivery proof and candidate request replay. They do not impersonate real users or assert actual backend connectivity. Cases: project list/checklist/preview, context, submit, updates, retest; expiration/revocation/cross-tenant 403; version drift 409; lost response/replay stable case and event; repeated button; same key different body 409; legacy uncertainty; absent candidate 404; key format and explicit new request. Exact private URL originates only in the response. `change_retest` does not constitute contractual final signoff.
+## Corrected preview/change sequence
 
-Actual end-to-end authenticated server requests, backend candidate acceptance, browser policy/frame behavior, production asset hosting, 69-page design mapping, and eight-stage prototype acceptance: **NOT_EXECUTED / NOT_RECEIVED**. No server/deploy/payment/credentials/privilege operations.
+4dc `Changes.page_updates(uid, project, page, version)` first calls `_preview(uid, project, page, version)` and only returns delivery records where `record.after_sha256 == version`. Therefore the client must not ask for an update while the authoritative listing is still the old SHA. V4 flow is:
 
-## 2026-10-24 first operable product slice
+1. open original trusted preview V1;
+2. submit feedback against V1 once;
+3. reload authoritative `previews/{project}`;
+4. only after the same path is listed at V2 call `change_updates(project,path,V2)`;
+5. render `before_sha256` as the modified-from version and `after_sha256` as the current delivery version;
+6. call `change_retest` with V2, current case revision and exact `delivery_sha256`.
 
-The console UI now directly uses the pinned 4dc contracts, not only adapter tests. It renders the authenticated `/me` project fields (`id/title/role/tenant/customer`), checklist requirement fields and revision/version history, server-returned trusted preview URLs and SHA256 version, original change case/request page/version/text, delivery update proof/new SHA when present, and project-scoped WEB Q&A through `messages/{project}` + `message`.
+Local HTTP tests enforce this sequence. The former v1 request returning a synthetic v2 delivery has been removed.
 
-Formal UI submission remains pinned to legacy `change_submit`: one click/one network attempt; transport ambiguity is held and reconciled by re-reading `changes/{project}`. The unmerged `change_submit_idempotent` exists only in the candidate adapter and bounded tests; there is no UI switch or automatic fallback. `change_retest` is labeled version retest only and is explicitly not contract final acceptance.
+## Identity / CSRF contract
 
-Actual loop exercised over a real local HTTP socket using 4dc response shapes: GET me -> checklist/previews/changes/messages -> POST change_context -> legacy change_submit -> GET changes -> POST change_updates -> POST change_retest -> POST project message. Rejection tests cover cross-tenant access, revoke/expiry and version drift. A socket-destroyed response after legacy server acceptance verifies the client does not resend and the original server case is recovered by reading changes. This is a local isolated HTTP boundary, not authenticated Hosted/production proof.
+The console now uses the original 4dc identity surface rather than fabricating roles/tokens:
 
-### API status
+- `POST /customer/center/api/login {email,password}` returns `csrf`; session token remains server-set HttpOnly SameSite cookie.
+- CSRF is stored only in `sessionStorage`, matching the original UI behavior.
+- `GET /me` can identify an existing cookie-backed session without CSRF.
+- authenticated write operations require the CSRF header.
+- `POST /logout {}` uses the original logout contract and clears local CSRF.
+- 401 clears CSRF and all project content; 403 clears the selected project content and requires a refreshed project list.
 
-CONNECTED IN UI against pinned 4dc source contract:
-- GET `/customer/center/api/me`
-- GET `/customer/center/api/checklist/{project}`
-- GET `/customer/center/api/previews/{project}`
-- GET `/customer/center/api/changes/{project}`
-- GET `/customer/center/api/messages/{project}`
-- POST `/customer/center/api/message`
-- POST `/customer/center/api/change_context`
-- POST `/customer/center/api/change_submit` (legacy safety policy, no blind resend)
-- POST `/customer/center/api/change_updates`
-- POST `/customer/center/api/change_retest` (version retest only)
+Accurate remaining backend limitation: 4dc exposes no endpoint to recover the CSRF value from an already-valid HttpOnly session cookie in a new tab. Therefore a new tab can remain read-only after `GET /me`, but must re-login before writes. The frontend does not invent a token-recovery protocol.
 
-CANDIDATE ONLY / NOT DEPLOYED:
-- POST `/customer/center/api/change_submit_idempotent`
+## Project-switch privacy correction
 
-NOT EXECUTED / NOT RECEIVED:
-- authenticated real-user Hosted HTTP session and browser E2E
-- production deployment
-- accepted idempotent backend endpoint
-- frozen 69-page prototype and eight-stage artifact for page-by-page visual mapping
+Opening any project first clears project metadata, requirements, previews, cases and messages, then shows loading placeholders. A stale earlier response is generation-checked and ignored. Any denied/failed project load clears the detail view, so customer A data is never left under customer B's title. `main.test.js` exercises project switch, stale completion and rejected load; 401 clearing is separately tested.
 
-### Minimal backend gaps for the website owner
+## Submission safety
 
-No new SaaS backend is requested. For this first slice, the pinned 4dc backend already supplies the project, requirement, preview, case, update/retest and Q&A contracts. Remaining integration gaps are external to this frontend scope: (1) real authenticated/Hosted acceptance of those routes; (2) merge/deploy decision and contract fixture for `change_submit_idempotent` before any UI enablement; (3) if product requires a distinct contractual-final-acceptance action, expose a dedicated server contract rather than reusing `change_retest`; (4) provide the frozen 69-page/8-stage artifacts so UI placement and page IDs can be mapped without redesign.
+### Deployed legacy `change_submit`
+
+Legacy feedback has no server idempotency key. V4 does not persist the customer feedback body in localStorage/sessionStorage and does not permanently occupy a project/page/version slot after a successful or explicit 400/403/409 response. A transport-ambiguous POST stores only `{project,page,version,at}` in sessionStorage and blocks blind re-send until the user reconciles by reading the authoritative case list. After reconciliation the marker can be explicitly cleared and a later legitimate feedback on the same page/version is allowed.
+
+### Candidate `change_submit_idempotent`
+
+Still candidate-only / not deployed. A 16–128 `[A-Za-z0-9_-]` key is kept only in in-memory adapter state in this slice; a definite 4xx clears the candidate slot, while a transport-unknown result requires explicit retry and reuses the same key. A missing candidate endpoint never falls back to legacy. This does not claim multi-tab/device idempotency; production-safe durable replay needs the server candidate to be merged and deployed.
+
+## Retest semantics
+
+Local fake/server tests now require exact `project`, `case`, `revision`, `page`, current delivery `version`, `delivery_sha256`, and `ACCEPT|FEEDBACK`. No fictitious `final_contract_acceptance` field is returned or asserted. The result checks `automatic_charge:false` when supplied. Formal project acceptance remains a separate missing server capability from the final specification.
+
+## Test layers and result
+
+Current isolated suite: 18/18 PASS.
+
+- 4 fetch-stub/API boundary tests: HTTP method/body/same-origin/CSRF, transport ambiguity, private URL allowlist, exact retest body.
+- 4 candidate-contract in-memory tests: stable replay, same-key changed-body 409, missing endpoint no fallback, cookie-read/CSRF-write distinction.
+- 3 real local HTTP socket tests: corrected V1→V2 preview/update/retest journey, cross-project/revoke/expiry/version-drift rejects, legacy response-loss reconciliation.
+- 2 `main.js` UI state tests with a minimal deterministic DOM harness: switch/failed-load stale-data clearing and 401 session clearing.
+- 1 frozen 69-page mapping integrity test.
+- 4 submission state tests: same-version later feedback, definite failures do not lock, unknown does not store feedback body and prevents blind resend, candidate definite-vs-unknown behavior.
+
+These are isolated source tests. They are NOT a real authenticated backend run, browser E2E, Hosted acceptance or production proof.
+
+## Remaining exact gaps for website/backend owner
+
+1. Real authenticated Hosted run of 4dc identity + project + preview/change routes and browser E2E remains NOT_EXECUTED.
+2. New-tab CSRF recovery does not exist in 4dc. Either accept re-login-for-write behavior or add a reviewed server endpoint/flow; frontend must not derive the token from the HttpOnly cookie.
+3. `change_submit_idempotent` remains unmerged/unavailable; no UI enablement until backend acceptance/deployment.
+4. Full structured requirement capture/version confirmation (CUS-007), prototype page-confirmation object (S4/GAP-11), original-task receipt/completion binding (GAP-02/03/07), and frozen-69-page preview registration (GAP-01) remain backend/task-registry gaps.
+5. Formal whole-project acceptance (CUS-014/S7) requires an independent server record/authority check. Never reuse `RETEST_ACCEPTED`.
+6. Finance/order/entitlement/subscription/maintenance routes outside this first project slice remain HOLD where the final spec has no production interface evidence.
+7. Real 360/390/768/1440 browser acceptance and the prototype's 276 screenshot baseline remain BROWSER_UNVERIFIED.
