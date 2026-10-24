@@ -357,7 +357,8 @@ class OfflineBundleInputTests(unittest.TestCase):
 
     def test_deb_lock_generator_excludes_apt_lock_partial_and_auxfiles(self):
         root=self.root/"apt-filter"; root.mkdir()
-        apt=root/"apt-lists"; (apt/"partial").mkdir(parents=True); (apt/"auxfiles").mkdir()
+        apt=root/"apt-work"; apt.mkdir()
+        (apt/"partial").mkdir(); (apt/"auxfiles").mkdir()
         (apt/"InRelease").write_bytes(b"index")
         (apt/"lock").write_bytes(b"runtime lock")
         (apt/"partial"/"download.part").write_bytes(b"partial")
