@@ -8,6 +8,7 @@ import os
 import sys
 import subprocess
 import shutil
+import sqlite3
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
 from services.ocr_engine.build_offline_bundle import validate_deb_cache
@@ -706,5 +707,106 @@ class OfflineBundleInputTests(unittest.TestCase):
         (root / "trusted.py").write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e): return {}\n")
         with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_CALLBACK_SIGNATURE_INVALID:authorize_attachment"):
             module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted", "OCR_INTEGRATION_PATH":str(root)})
+
+
+    def test_preview_db_schema_accepts_real_store_and_rejects_wrong_columns_and_unique(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_schema_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        from cryptography.fernet import Fernet
+        from services.ocr_engine.secure_store import SecureSQLiteJobStore
+        key = Fernet.generate_key()
+        good = self.root / "good-store.sqlite3"
+        store = SecureSQLiteJobStore(str(good), key)
+        ok, reason = module.check_existing_database(str(good), key)
+        self.assertTrue(ok, reason)
+        bad_columns = self.root / "bad-columns.sqlite3"
+        db = sqlite3.connect(bad_columns)
+        db.executescript("""
+            CREATE TABLE ocr_jobs(wrong_column TEXT);
+            CREATE TABLE ocr_confirm_idempotency(wrong_column TEXT);
+            CREATE TABLE ocr_rate_window(wrong_column TEXT);
+            CREATE TABLE ocr_audit(wrong_column TEXT);
+            CREATE TABLE ocr_audit_details(wrong_column TEXT);
+            CREATE TABLE ocr_key_check(check_value TEXT NOT NULL);
+        """)
+        signing = hashlib.sha256(b"xuanjun-ocr-index-v1:" + key).digest()
+        import hmac
+        db.execute("INSERT INTO ocr_key_check VALUES(?)", (hmac.new(signing,b"encryption-key-check-v1",hashlib.sha256).hexdigest(),))
+        db.commit(); db.close(); bad_columns.chmod(0o600)
+        ok, reason = module.check_existing_database(str(bad_columns), key)
+        self.assertFalse(ok)
+        self.assertIn("COLUMN_CONTRACT_MISMATCH", reason)
+        bad_unique = self.root / "bad-unique.sqlite3"
+        db = sqlite3.connect(bad_unique)
+        store_schema = SecureSQLiteJobStore(str(bad_unique), key)
+        db = sqlite3.connect(bad_unique)
+        db.execute("DROP INDEX idx_ocr_tenant")
+        db.execute("CREATE INDEX idx_ocr_tenant ON ocr_jobs(subject_key)")
+        db.commit(); db.close(); bad_unique.chmod(0o600)
+        ok, reason = module.check_existing_database(str(bad_unique), key)
+        self.assertFalse(ok)
+        self.assertIn("REQUIRED_INDEX_MISMATCH", reason)
+
+    def test_preview_main_never_constructs_app_for_schema_mismatch(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_no_app_schema_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        from cryptography.fernet import Fernet
+        from services.ocr_engine.secure_store import SecureSQLiteJobStore
+        key = Fernet.generate_key()
+        bad = self.root / "wrong-schema.sqlite3"
+        store = SecureSQLiteJobStore(str(bad), key)
+        db = sqlite3.connect(bad)
+        db.execute("DROP INDEX idx_ocr_tenant")
+        db.execute("CREATE INDEX idx_ocr_tenant ON ocr_jobs(subject_key)")
+        db.commit(); db.close()
+        bad.chmod(0o600)
+        with mock.patch.object(module, "check_environment", return_value={"ok":True,"database":"EXISTING_PROTECTED_FILE_VERIFIED","models":{},"errors":[]}), \
+             mock.patch.object(module, "create_app", side_effect=AssertionError("must not construct app")) as create, \
+             mock.patch.dict(os.environ, {"OCR_SQLITE_PATH":str(bad),"OCR_ENCRYPTION_KEY":key.decode("ascii")}, clear=False):
+            self.assertEqual(module.main(), 78)
+            create.assert_not_called()
+
+    def test_trusted_binding_requires_readonly_mount_before_module_exec(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_mount_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        root = self.root / "ro-bindings"; root.mkdir()
+        marker_file = self.root / "module-executed"
+        source = root / "trusted_ro.py"
+        source.write_text("from pathlib import Path\nPath(" + repr(str(marker_file)) + ").write_text('executed')\ndef authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e,f): return {}\n")
+        root.chmod(0o755); source.chmod(0o644)
+        calls = []
+        def rw_checker(path, _mountinfo):
+            calls.append(Path(path))
+            return False
+        with mock.patch.object(module, "_safe_root_owned", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "OCR_INTEGRATION_ROOT_MOUNT_NOT_READ_ONLY"):
+                module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_ro","OCR_INTEGRATION_PATH":str(root)}, mountinfo_text="synthetic-rw", mount_checker=rw_checker)
+        self.assertEqual(calls, [root])
+        self.assertFalse(marker_file.exists())
+        calls.clear()
+        def ro_checker(path, _mountinfo):
+            calls.append(Path(path))
+            return True
+        with mock.patch.object(module, "_safe_root_owned", return_value=True):
+            loaded = module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_ro","OCR_INTEGRATION_PATH":str(root)}, mountinfo_text="synthetic-ro", mount_checker=ro_checker)
+        self.assertTrue(callable(loaded["authenticate"]))
+        self.assertEqual(calls, [root, source])
+        self.assertTrue(marker_file.exists())
+        sys.modules.pop("trusted_ro", None)
+
+    def test_trusted_binding_rejects_world_writable_root_or_source(self):
+        spec = importlib.util.spec_from_file_location("ocr_entrypoint_modes_test", Path(__file__).with_name("container_entrypoint.py"))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        root = self.root / "mode-bindings"; root.mkdir()
+        source = root / "trusted_mode.py"
+        source.write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e,f): return {}\n")
+        root.chmod(0o777)
+        with mock.patch.object(module, "readonly_mount_for", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "OCR_INTEGRATION_ROOT_OWNER_OR_MODE_UNSAFE"):
+                module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_mode","OCR_INTEGRATION_PATH":str(root)})
+        root.chmod(0o755); source.chmod(0o666)
+        with mock.patch.object(module, "readonly_mount_for", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_BINDINGS_SOURCE_OWNER_OR_MODE_UNSAFE"):
+                module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted_mode","OCR_INTEGRATION_PATH":str(root)})
 
 if __name__=="__main__": unittest.main()
