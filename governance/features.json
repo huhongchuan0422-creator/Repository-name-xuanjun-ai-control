@@ -107,6 +107,39 @@
         "scripts/p2_uk_readonly_diagnostic.py",
         "tests/test_p2_uk_readonly_diagnostic.py"
       ]
+    },
+    {
+      "feature_id": "TASK_WRITER_FENCING_SOURCE",
+      "status": "IN_DEVELOPMENT",
+      "design": {
+        "document": "docs/development/TASK_WRITER_FENCING_20261024.md",
+        "section": "1. Canonical authority"
+      },
+      "development": {
+        "document": "docs/development/DEVELOPMENT_V27_ECOLOGY_V11_20261014.md",
+        "section": "10.19 唯一Writer强制隔离与断点接管（2026-10-24）",
+        "phase": 1
+      },
+      "acceptance": {
+        "criteria": [
+          "Canonical source authority fences old writer attempts without granting production capability",
+          "CommitLease, revocation drain, recovery, resource coverage and exact receiver ACK fail closed under concurrency and restart",
+          "Production inventory, real adapters, credentials, deployment and production migration remain HOLD/NOT_EXECUTED"
+        ],
+        "tests": [
+          "tests/test_task_supervisor.py",
+          "tests/test_task_writer_fence.py"
+        ]
+      },
+      "reuse": [
+        "Existing task_supervisor canonical task/event/outbox state and SQLite CAS",
+        "Existing B5 NOFOLLOW/fsync/lock/revoke source patterns",
+        "Existing community journal/flock/CAS/UNKNOWN-no-replay source patterns"
+      ],
+      "paths": [
+        "scripts/task_writer_fence.py",
+        "tests/test_task_writer_fence.py"
+      ]
     }
   ]
 }
