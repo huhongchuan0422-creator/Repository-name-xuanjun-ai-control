@@ -1,0 +1,54 @@
+{
+  "allowed_docker_operations": [
+    "container inspect",
+    "image inspect"
+  ],
+  "approved_preview_baseline": "84e2e3ad1ce9b723f196a2335c7ef3a8f4ed1e1d",
+  "bounded": {
+    "collection_deadline_seconds": 60,
+    "command_combined_output_bytes": 65536,
+    "command_seconds": 8,
+    "health_bytes": 4096,
+    "health_seconds": 10,
+    "json_report_bytes": 16384,
+    "kill_and_reap_grace_seconds": 2,
+    "shell_stdout_additional_bytes": 64
+  },
+  "containers": [
+    "xuanjun-community-preview",
+    "xuanjun-community-preview-before-2330dd55"
+  ],
+  "database_body_read": false,
+  "docker_host": "unix:///var/run/docker.sock",
+  "environment_read": false,
+  "executable_maintenance": false,
+  "files": {
+    "deploy/community-preview/inspect-version-readonly.sh": {
+      "bytes": 20197,
+      "mode": "0644",
+      "sha256": "762d6b4e29baeb64908f403928187109b63c66b3d2ff84ab11b2aeef93a97e33"
+    },
+    "scripts/community_preview_version_inspect.py": {
+      "bytes": 19691,
+      "mode": "0644",
+      "sha256": "eb295126389871d8087a906ffafd3be424b53bc46edebf4d683332a85f2d2765"
+    },
+    "tests/test_community_preview_version_inspect.py": {
+      "bytes": 16899,
+      "mode": "0644",
+      "sha256": "a1aad1c0fec0de8236ed82af427c8e030fb8edc0ed2330e5c0ed0e3f76f33ece"
+    }
+  },
+  "filesystem_writes": false,
+  "format": 1,
+  "host": "iZd7oeikknn1z21sq6ji6zZ",
+  "image_reference": "ONLY_IMAGE_ID_OBSERVED_FROM_FIXED_CURRENT_CONTAINER",
+  "public_health": "https://uk.wenwenwenyiyiyi.work/community-preview/community/health",
+  "purpose": "ROOT_REVIEW_READONLY_CANDIDATE_NOT_SITE_EXECUTION",
+  "python": "/usr/bin/python3 -I -B -S (existing Python3.6 stdlib)",
+  "relation": "OBSERVATION_ONLY_NO_FRONTEND_BACKEND_ACCEPTANCE; ORIGINAL_EXACT_SOURCE_MATCH_UNCHANGED",
+  "secret_body_read": false,
+  "shared_vhost_scope": "FILE_METADATA_AND_SHA256_ONLY_NO_P2_RUNTIME_OR_DATA",
+  "site_executed": false,
+  "source_parent": "9fdd4b89002b4343f205bbd53602b3411a3b5724"
+}
