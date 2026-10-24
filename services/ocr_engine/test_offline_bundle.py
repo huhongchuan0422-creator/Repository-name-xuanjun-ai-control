@@ -32,7 +32,7 @@ class OfflineBundleInputTests(unittest.TestCase):
             z.writestr("demo-1.0.dist-info/WHEEL","Wheel-Version: 1.0\nGenerator: synthetic\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
             z.writestr("demo.py","synthetic")
         self.lock=self.root/"lock.json"
-        self.lock.write_text(json.dumps({"target_platform":"linux-x86_64-cp311","python_implementation":"CPython","python_version":"3.11","abi":"cp311","target_tags":["cp311-cp311-manylinux_2_17_x86_64","py3-none-any"],"requirements_sha256":hashlib.sha256(self.requirements.read_bytes()).hexdigest(),"wheels":[{"filename":wheel.name,"sha256":hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
+        self.lock.write_text(json.dumps({"target_platform":"linux-x86_64-cp311","python_implementation":"CPython","python_version":"3.11.17","abi":"cp311","base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","base_image_manifest_sha256":"8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","base_image_config_sha256":"c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee","glibc_version":"glibc 2.36","target_tags":["cp311-cp311-manylinux_2_17_x86_64","py3-none-any"],"requirements_sha256":hashlib.sha256(self.requirements.read_bytes()).hexdigest(),"wheels":[{"filename":wheel.name,"sha256":hashlib.sha256(wheel.read_bytes()).hexdigest()}]}))
     def tearDown(self): self.tmp.cleanup()
     def check(self,platform="linux-x86_64-cp311"):
         return validate_inputs(platform,self.lock,self.wheels,self.models,self.requirements,self.manifest,self.license,self.notice,self.schema)
