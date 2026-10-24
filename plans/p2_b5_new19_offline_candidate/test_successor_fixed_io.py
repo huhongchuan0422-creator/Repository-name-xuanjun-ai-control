@@ -94,10 +94,31 @@ class FixedIOTests(unittest.TestCase):
 
     def test_stability_observes_elapsed_time_without_restart(self):
         calls=[]
-        with patch.object(self.io,'command',side_effect=lambda argv,timeout: calls.append(tuple(argv))):
+        def report(pid=123,restarts=2):
+            return ('ActiveState=active\nSubState=running\nMainPID=%d\nNRestarts=%d\n'
+                    'ExecMainStartTimestampMonotonic=4000\n'%(pid,restarts)).encode()
+        class Result:
+            returncode=0
+            stdout=report()
+        with patch.object(self.io,'command',side_effect=lambda argv,timeout: calls.append(tuple(argv))),\
+             patch('pr17_b5_successor_fixed_io.subprocess.run',return_value=Result()) as run:
             self.assertTrue(self.io.stable_unit('xuanjun-cloud-connection.service'))
         self.assertGreaterEqual(len(calls),2)
         self.assertTrue(all(x[1:3]==('is-active','--quiet') for x in calls))
+        self.assertGreaterEqual(run.call_count,2)
+        self.assertEqual(run.call_args.args[0][-1],'xuanjun-cloud-connection.service')
+        states=iter([report(),report(pid=124)])
+        with patch.object(self.io,'command',return_value=0),\
+             patch('pr17_b5_successor_fixed_io.subprocess.run',
+                   side_effect=lambda *a,**k:type('R',(),{'returncode':0,'stdout':next(states)})()):
+            with self.assertRaisesRegex(c53.Hold,'FIXED_IO_UNIT_DRIFT_UNKNOWN'):
+                self.io.stable_unit('xuanjun-cloud-connection.service')
+        states=iter([report(),report(restarts=3)])
+        with patch.object(self.io,'command',return_value=0),\
+             patch('pr17_b5_successor_fixed_io.subprocess.run',
+                   side_effect=lambda *a,**k:type('R',(),{'returncode':0,'stdout':next(states)})()):
+            with self.assertRaisesRegex(c53.Hold,'FIXED_IO_UNIT_DRIFT_UNKNOWN'):
+                self.io.stable_unit('xuanjun-cloud-connection.service')
 
     def test_resource_readiness_has_total_deadline(self):
         from pr17_b5_successor_fixed_io import signal
@@ -117,6 +138,50 @@ class FixedIOTests(unittest.TestCase):
                 self.assertLess(time.monotonic()-start,3.8)
         self.assertEqual(signal.getsignal(signal.SIGALRM),previous)
         self.assertEqual(signal.getitimer(signal.ITIMER_REAL),(0.0,0.0))
+
+    def test_resource_refusal_then_same_target_recovers_without_restart(self):
+        from production.cloud_connection import oauth_entrypoint
+        config={'enabled':True,'hostname':c53.HOST,
+                'settings':{'issuer':'issuer','audience':'audience'}}
+        raw=json.dumps(config).encode()
+        calls=[]
+        class Response:
+            status=200
+            def read(self,size):return json.dumps({
+                'resource':'audience','authorization_servers':['issuer'],
+                'scopes_supported':['connection.status','project.files.read'],
+                'bearer_methods_supported':['header']}).encode()
+            def getheader(self,*a):return 'application/json'
+        class HTTP:
+            def __init__(self,host,port,timeout):
+                calls.append((host,port,timeout))
+            def request(self,*a,**k):
+                if len(calls)==1:raise ConnectionRefusedError('startup')
+            def getresponse(self):return Response()
+            def close(self):pass
+        with patch.object(oauth_entrypoint,'private_bytes',return_value=raw),\
+             patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',HTTP),\
+             patch.object(self.io,'command',side_effect=AssertionError('restart not allowed')):
+            self.assertTrue(self.io.resource_ready())
+        self.assertEqual(len(calls),2)
+        self.assertTrue(all((host,port)==('127.0.0.1',18769)
+                            for host,port,_ in calls))
+
+    def test_resource_repeated_refusal_expires_without_restart(self):
+        from production.cloud_connection import oauth_entrypoint
+        config={'enabled':True,'hostname':c53.HOST,
+                'settings':{'issuer':'issuer','audience':'audience'}}
+        attempts=[]
+        class Refused:
+            def __init__(self,*args,**kwargs):attempts.append(1)
+            def request(self,*args,**kwargs):raise ConnectionRefusedError('startup')
+            def close(self):pass
+        with patch.object(oauth_entrypoint,'private_bytes',return_value=json.dumps(config).encode()),\
+             patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',Refused),\
+             patch.object(self.io,'command',side_effect=AssertionError('restart not allowed')):
+            with self.assertRaisesRegex(c53.Hold,'FIXED_IO_RESOURCE_DEADLINE'):
+                self.io.resource_ready()
+        self.assertGreater(len(attempts),1)
 
 
 if __name__ == '__main__':

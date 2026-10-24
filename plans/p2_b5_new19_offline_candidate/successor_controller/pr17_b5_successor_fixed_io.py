@@ -269,13 +269,47 @@ class FixedR2IO:
                     'FIXED_IO_UNIT_SCOPE')
         deadline = time.monotonic() + 6.0
         first_active = None
+        identity = None
+        show = ['/usr/bin/systemctl','show','--property=ActiveState',
+                '--property=SubState','--property=MainPID',
+                '--property=NRestarts',
+                '--property=ExecMainStartTimestampMonotonic',name]
         while True:
             c53.require(time.monotonic() < deadline, 'FIXED_IO_STABILITY_DEADLINE')
             self.command(['/usr/bin/systemctl','is-active','--quiet',name],2)
+            result = subprocess.run(show,stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                                    timeout=2,check=False,close_fds=True)
+            c53.require(result.returncode == 0 and len(result.stdout) <= 1024,
+                        'FIXED_IO_UNIT_STATUS_UNKNOWN')
+            fields = {}
+            try:
+                lines = result.stdout.decode('ascii').splitlines()
+            except UnicodeDecodeError:
+                raise c53.Hold('FIXED_IO_UNIT_STATUS_UNKNOWN') from None
+            for line in lines:
+                key, separator, value = line.partition('=')
+                c53.require(separator and key not in fields,
+                            'FIXED_IO_UNIT_STATUS_UNKNOWN')
+                fields[key] = value
+            c53.require(set(fields) == {'ActiveState','SubState','MainPID',
+                         'NRestarts','ExecMainStartTimestampMonotonic'} and
+                        fields['ActiveState'] == 'active' and
+                        fields['SubState'] == 'running' and
+                        all(fields[key].isdecimal() for key in
+                            ('MainPID','NRestarts','ExecMainStartTimestampMonotonic')),
+                        'FIXED_IO_UNIT_STATUS_UNKNOWN')
+            current = tuple(int(fields[key]) for key in
+                            ('MainPID','NRestarts','ExecMainStartTimestampMonotonic'))
+            c53.require(current[0] > 0 and current[2] > 0,
+                        'FIXED_IO_UNIT_IDENTITY_UNKNOWN')
             observed = time.monotonic()
             c53.require(observed < deadline, 'FIXED_IO_STABILITY_DEADLINE')
             if first_active is None:
                 first_active = observed
+                identity = current
+            elif current != identity:
+                raise c53.Hold('FIXED_IO_UNIT_DRIFT_UNKNOWN')
             elif observed - first_active >= 2.0:
                 return True
             time.sleep(0.25)
@@ -301,24 +335,33 @@ class FixedR2IO:
                         type(expected['issuer']) is str and
                         type(expected['audience']) is str,
                         'FIXED_IO_RESOURCE_CONFIG')
-            conn = http.client.HTTPConnection('127.0.0.1', 18769, timeout=2)
-            try:
-                conn.request('GET', '/.well-known/oauth-protected-resource',
-                             headers={'Host':'127.0.0.1','Connection':'close'})
-                response = conn.getresponse()
-                body = response.read(2049)
-                c53.require(response.status == 200 and len(body) <= 2048 and
-                            response.getheader('Content-Type','').startswith('application/json'),
-                            'FIXED_IO_RESOURCE_RESPONSE')
-            finally:
-                conn.close()
-            metadata = json.loads(body.decode('utf-8'))
-            c53.require(metadata == {
+            wanted = {
                 'resource': expected['audience'],
                 'authorization_servers': [expected['issuer']],
                 'scopes_supported': ['connection.status','project.files.read'],
-                'bearer_methods_supported': ['header']},
-                'FIXED_IO_RESOURCE_BINDING')
+                'bearer_methods_supported': ['header']}
+            while True:
+                remaining = signal.getitimer(signal.ITIMER_REAL)[0]
+                c53.require(remaining > 0, 'FIXED_IO_RESOURCE_DEADLINE')
+                conn = http.client.HTTPConnection('127.0.0.1', 18769,
+                                                  timeout=min(1.0,remaining))
+                try:
+                    conn.request('GET', '/.well-known/oauth-protected-resource',
+                                 headers={'Host':'127.0.0.1','Connection':'close'})
+                    response = conn.getresponse()
+                    body = response.read(2049)
+                    if (response.status == 200 and len(body) <= 2048 and
+                        response.getheader('Content-Type','').startswith('application/json')):
+                        metadata = json.loads(body.decode('utf-8'))
+                        c53.require(metadata == wanted,'FIXED_IO_RESOURCE_BINDING')
+                        c53.require(private_bytes(c53.CONFIGS[1],262144) == raw,
+                                    'FIXED_IO_RESOURCE_CONFIG_CHANGED')
+                        return True
+                except (OSError, ValueError, UnicodeError):
+                    pass  # transient refusal or incomplete response, same fixed target
+                finally:
+                    conn.close()
+                time.sleep(min(0.15,max(0,signal.getitimer(signal.ITIMER_REAL)[0])))
         except (OSError, ValueError, KeyError, UnicodeError, TypeError) as exc:
             raise c53.Hold('FIXED_IO_RESOURCE_READINESS_UNKNOWN') from exc
         finally:
