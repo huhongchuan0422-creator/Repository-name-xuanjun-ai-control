@@ -82,6 +82,8 @@ def finite(value):
 class Supervisor(object):
     """SQLite-backed state machine; one instance is enough per ledger DB."""
 
+    migration_fail_at = None
+
     def __init__(self, path, clock=None):
         self.path = path
         self.clock = clock or time.time
@@ -346,11 +348,17 @@ class Supervisor(object):
             raise
 
     @classmethod
+    def _offline_migration_failpoint(cls, name):
+        if cls.migration_fail_at == name:
+            raise RuntimeError('injected migration interruption:' + name)
+
+    @classmethod
     def offline_migrate_v2_to_v3(cls, path, clock=None):
-        """Explicit offline migration.  Production invocation is separately gated."""
+        """Explicit fixture/offline migration; normal opens never migrate."""
         db = sqlite3.connect(path, timeout=10, isolation_level='IMMEDIATE')
         db.row_factory = sqlite3.Row
         try:
+            db.execute('PRAGMA foreign_keys=ON')
             app = db.execute('PRAGMA application_id').fetchone()[0]
             ver = db.execute('PRAGMA user_version').fetchone()[0]
             cols = tuple(r['name'] for r in db.execute(
@@ -376,13 +384,17 @@ class Supervisor(object):
             )
             for definition in additions:
                 db.execute('ALTER TABLE tasks ADD COLUMN ' + definition)
+            cls._offline_migration_failpoint('after_task_alter')
             for statement in cls._v3_schema_statements()[4:]:
                 db.execute(statement)
+            cls._offline_migration_failpoint('after_fence_tables')
             db.execute("""UPDATE tasks SET authority_state='UNKNOWN',state='HOLD'
               WHERE state IN ('RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')""")
             db.execute("""UPDATE tasks SET authority_state='NONE'
               WHERE authority_state!='UNKNOWN'""")
+            cls._offline_migration_failpoint('after_authority_mapping')
             db.execute('PRAGMA user_version=%d' % SUPERVISOR_SCHEMA_VERSION)
+            cls._offline_migration_failpoint('after_user_version')
             probe = cls.__new__(cls)
             probe.db = db
             probe._validate_schema()
