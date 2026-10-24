@@ -176,33 +176,34 @@
       "sha256": "94326ff1f3eb5a3d71cdd0cd7ab1846e0beca3dc5e11d4be34c9cc8d2d000f65"
     },
     "scripts/community_preview_stage_a_bundle.py": {
-      "bytes": 7639,
-      "sha256": "e9c5dd869f1aaf6efc66273d76421830d3ad06f70626dc503aa079f8f15a6813"
+      "bytes": 7754,
+      "sha256": "21f968e4af21cc0efe39a94956a7531559daa49da4af0eb027918d5de1386daf"
     },
     "tests/test_community_preview_stage_a.py": {
-      "bytes": 28105,
-      "sha256": "661cb89fb62fd6f402b8d6a468dd2cc53edf91d7065427fda5343eda4e04cb22"
+      "bytes": 34556,
+      "sha256": "0ee65ab44b36a34f798437f9de8a0ffb5fb6eb155a212a364e7fc652d03aef44"
     },
     "deploy/community-preview/stage-a-owner-call.sh": {
-      "bytes": 4865,
-      "sha256": "3e7f4f08fa06615ec2320cce346c6e3ad07d3a5269f61fd180dcf3d7279374ce"
+      "bytes": 5076,
+      "sha256": "84b97a7c88144b5fc3e54ea481d92fa30fd0a560c18654468591fac6a864bfd8"
     },
     "deploy/community-preview/stage-a-delivery.json": {
-      "bytes": 1178,
-      "sha256": "e2dff525a7f6de8e17e7c48cf34439e206ac1af2982388439fd9ff400391b2f6"
+      "bytes": 1295,
+      "sha256": "13bcf76be7478b1ddf56ceb9ac63f124bb7c7d2dac931209b3c70194b0adad25"
     },
     "docs/development/COMMUNITY_STAGE_A_COMPLETE_20261024.md": {
-      "bytes": 13157,
-      "sha256": "f26228205506af9663739303072fc5c286b267abd3844fbc0f740b7d8c3f5382"
+      "bytes": 15330,
+      "sha256": "1cc44d949c5c7ce65ad7851d42c69be55a16f156998ce5ea1906f495ad5451fa"
     }
   },
   "stage_a_delivery": {
+    "acceptance": "PYTHON_COMPLETION_AND_MATCHING_SUDO_CHILD_EXIT",
     "destination": "/home/admin/ISSUE76_STAGE_A_94326ff1f3eb.zip",
     "entry_sha256": "94326ff1f3eb5a3d71cdd0cd7ab1846e0beca3dc5e11d4be34c9cc8d2d000f65",
     "format": 1,
     "manifest_sha256": "8660d85b3a378bfaf426cb7715ac9da34be2b4a08ada06271758174c3d419e81",
-    "outer_bytes": 4865,
-    "outer_sha256": "3e7f4f08fa06615ec2320cce346c6e3ad07d3a5269f61fd180dcf3d7279374ce",
+    "outer_bytes": 5076,
+    "outer_sha256": "84b97a7c88144b5fc3e54ea481d92fa30fd0a560c18654468591fac6a864bfd8",
     "package_bytes": 57179504,
     "package_filename": "ISSUE76_STAGE_A_94326ff1f3eb.zip",
     "package_sha256": "258ce847ff8b3e4b2046a35c99ced9cf1b9011a523ea802a77e59c657cccca43",
@@ -228,6 +229,7 @@
     "scope_sha256": "ae9f71cce106bd0e39f838659728c45f5fa75f1eb82645230cba98b46e7b8e74",
     "servertrust": false,
     "site_executed": false,
-    "site_uploaded": false
+    "site_uploaded": false,
+    "sudo_launch": "FIXED_PYTHON_C_DIRECT_TTY_STDIN_STDOUT"
   }
 }

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import io
 import json
+import shlex
 import zipfile
 from pathlib import Path
 from scripts import community_preview_stage_a as stage
@@ -13,12 +14,7 @@ def canonical(v):return json.dumps(v,sort_keys=True,separators=(',',':')).encode
 
 def outer_script(filename,size,digest,entry_sha,manifest_sha):
     # Complete conditional subshell: no PHASE/PERMIT_SHA or exit in login shell.
-    text=r'''# REVIEW CANDIDATE ONLY. Run only after root review and Owner's exact stage-A approval.
-if (
-  set +e
-  community_stage_a_output="$(
-  /usr/bin/sudo -n /usr/bin/python3 -I -B -S - <<'STAGE_A'
-import os,stat,pwd,hashlib,io,json,zipfile
+    body=r'''import os,stat,pwd,hashlib,io,json,zipfile
 PATH='/home/admin/FILENAME'
 SIZE=ARCHIVE_BYTES
 DIGEST='ARCHIVE_DIGEST'
@@ -63,43 +59,40 @@ try:
   for name,meta in m['payload'].items():
    b=archive.read(name);need(meta=={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()});blobs[name]=b
  ns={'__name__':'verified_stage_a_entry'};exec(compile(source,'<verified-stage-a-entry>','exec'),ns)
- result=ns['run'](blobs,MANIFEST_SHA)
-except BaseException:
- print('{"state":"HOLD_STAGE_A_INPUT_OR_CONTEXT","site_update":false,"servertrust":false}');result=2
-raise SystemExit(result)
-STAGE_A
-  )"
-  community_stage_a_inner=$?
-  printf '%s\n' "$community_stage_a_output"
-  /usr/bin/python3 -I -B -S - "$community_stage_a_inner" "$community_stage_a_output" <<'RESULT'
-import json,sys
-code=int(sys.argv[1]);valid=False;child_state='UNVERIFIED'
-try:
- def unique(rows):
-  value={}
-  for k,v in rows:
-   if k in value:raise ValueError()
-   value[k]=v
-  return value
- value=json.loads(sys.argv[2],object_pairs_hook=unique)
+ # Only Python-level completion output is captured, never the sudo OS stdin/stdout.
+ # Production confirm uses the inherited controlling TTY, including select/read.
+ import contextlib
+ output=io.StringIO()
+ with contextlib.redirect_stdout(output):result=ns['run'](blobs,MANIFEST_SHA)
+ value=json.loads(output.getvalue(),object_pairs_hook=unique)
  expected={'state':'STAGE_A_ORIGINAL_CALLER_COMPLETED','image':'sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a','site_update':False,'private_data':False,'ocr_enabled':False,'servertrust':False}
- valid=code==0 and value==expected and all(type(value[k]) is bool for k in ('site_update','private_data','ocr_enabled','servertrust'))
- if type(value) is dict and value.get('state') in ('STAGE_A_ORIGINAL_CALLER_COMPLETED','HOLD_STAGE_A_PRESERVE_NO_RETRY','HOLD_STAGE_A_INPUT_OR_CONTEXT'):child_state=value['state']
-except Exception:pass
-state='STAGE_A_RECEIPT_VALID_NOT_UPDATE' if valid else ('HOLD_CHILD_NONZERO' if code else 'HOLD_COMPLETION_RECEIPT_INVALID')
-print(json.dumps({'schema':1,'child_exit':code,'child_state':child_state,'state':state,'stage_a_result_valid':valid,'login_shell_preserved':True,'shell_exit_not_acceptance':True,'servertrust':False},sort_keys=True))
-RESULT
-  # Root's real child status is in the structured record above. This subshell
-  # may fail without exiting the interactive parent; shell $? is NOT acceptance.
+ valid=type(result) is int and result==0 and value==expected and all(type(value[k]) is bool for k in ('site_update','private_data','ocr_enabled','servertrust'))
+ if not valid:raise RuntimeError('COMPLETION_RECEIPT_INVALID')
+ print(json.dumps({'schema':1,'state':'STAGE_A_RECEIPT_VALID_NOT_UPDATE','child_exit':0,'stage_a_result_valid':True,'completion':value,'servertrust':False},sort_keys=True),flush=True)
+ result=0
+except BaseException:
+ print('{"schema":1,"state":"HOLD_STAGE_A_INPUT_CONTEXT_OR_COMPLETION","child_exit":2,"stage_a_result_valid":false,"servertrust":false}',flush=True);result=2
+raise SystemExit(result)
+'''
+    body=(body.replace('FILENAME',filename).replace('ARCHIVE_BYTES',str(size)).replace('ARCHIVE_DIGEST',digest)
+        .replace('ENTRY_DIGEST',entry_sha).replace('MANIFEST_DIGEST',manifest_sha))
+    # Fixed Python text is an argv value. No command substitution, stdin heredoc,
+    # pipeline or redirection around sudo: both descriptors inherit the terminal.
+    text="""# REVIEW CANDIDATE ONLY. Exact stage-A approval still required.
+# Acceptance requires BOTH the Python completion record and matching sudo exit.
+if (
+  set +e
+  /usr/bin/sudo -n /usr/bin/python3 -I -B -S -c PYTHON_BODY
+  community_stage_a_inner=$?
+  printf '{"schema":1,"record":"SUDO_CHILD_EXIT","child_exit":%s,"login_shell_preserved":true,"shell_exit_not_acceptance":true,"servertrust":false}\\n' "$community_stage_a_inner"
   exit "$community_stage_a_inner"
 ); then
   :
 else
   :
 fi
-'''
-    return (text.replace('FILENAME',filename).replace('ARCHIVE_BYTES',str(size)).replace('ARCHIVE_DIGEST',digest)
-        .replace('ENTRY_DIGEST',entry_sha).replace('MANIFEST_DIGEST',manifest_sha)).encode()
+"""
+    return text.replace('PYTHON_BODY',shlex.quote(body)).encode()
 
 def build(image_file):
     # Only already reviewed original artifact bytes; never downloads a signedURL.
@@ -122,7 +115,8 @@ def build(image_file):
         'destination':'/home/admin/'+filename,'manifest_sha256':sha(manifest),'entry_sha256':sha(entry),
         'scope_sha256':stage.StageA(blobs,sha(manifest)).scope,
         'outer_bytes':len(command),'outer_sha256':sha(command),'payload':json.loads(manifest)['payload'],
-        'site_uploaded':False,'site_executed':False,'servertrust':False,'requires_original_owner_sudo_tty':True}
+        'site_uploaded':False,'site_executed':False,'servertrust':False,'requires_original_owner_sudo_tty':True,
+        'sudo_launch':'FIXED_PYTHON_C_DIRECT_TTY_STDIN_STDOUT','acceptance':'PYTHON_COMPLETION_AND_MATCHING_SUDO_CHILD_EXIT'}
     return filename,raw,command,canonical(report)
 
 if __name__=='__main__':

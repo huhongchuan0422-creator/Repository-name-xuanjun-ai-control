@@ -2,7 +2,7 @@
 
 原3b6be4aa1ff06d088fe26f44f08b9a505c5b5513 / Tree cdd9ae50d91d65cebac79897a414ff4d9a6032ec
 两修44项及独审SCOPE_PASS直接复用。原caller/wrapper字节、b789/core、111330B载体及f131
-镜像均不变；本轮只增加固定阶段A适配、离线打包、防外层退出入口及新联验。
+镜像均不变；本轮仅修a89新增外壳的TTY调用形态、内部完成JSON校验及对应联验/证据；原适配入口字节也不变。
 
 ## 1 一包四输入与固定目的地
 
@@ -42,10 +42,10 @@ f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝�
 
 ## 2 完整原调用链与真实批准来源
 
-完整外层固定文件为 deploy/community-preview/stage-a-owner-call.sh：4865B，SHA256
- 3e7f4f08fa06615ec2320cce346c6e3ad07d3a5269f61fd180dcf3d7279374ce。
+完整外层固定文件为 deploy/community-preview/stage-a-owner-call.sh：5076B，SHA256
+ 84b97a7c88144b5fc3e54ea481d92fa30fd0a560c18654468591fac6a864bfd8。
 实际Python入口stage-a-entry.py SHA94326ff1f3eb5a3d71cdd0cd7ab1846e0beca3dc5e11d4be34c9cc8d2d000f65。
-完整链：原admin终端→条件子shell→sudo -n原Python隔离模式→只读收件包→全包/六成员/manifest/
+完整链：原admin终端→条件子shell→sudo -n原Python隔离模式-c固定正文（stdin/stdout直接继承终端）→只读收件包→全包/六成员/manifest/
 四输入SHA和路径保护→加载已核新阶段A源码→原root BASE锁→受控sudo操作确认行→原保护许可
 记录→**原prepare-site.sh→原site_prepare.main**→原install/image_load→结果与许可归档。
 原core/b789/产品算法无改动，没有新的部署通道、服务或权限scope。
@@ -106,19 +106,26 @@ stop/start/rename，无安装service，无业务更新或private backup。原ima
 
 ## 4 异常收尾、完整外层与测试范围
 
-外层仍在条件子shell里运行sudo，不退出父登录shell、不改父errexit。stdout被收成明确的
-child结果，再打印结构化终态：child_exit、child_state、state、stage_a_result_valid、
-login_shell_preserved、shell_exit_not_acceptance、servertrust。顶层shell rc0只表示该防退出
-控制块返回，**绝不表示A通过**。只有真实child_exit=0且严格匹配原完成JSON（含准确image和
-四个False布尔字段）才stage_a_result_valid=true；非0/信号码、空JSON、HOLD或错误结构均HOLD。
-缺少结构化记录也为UNKNOWN，不用最后printf/$?冒PASS。
+外层仍在条件子shell里运行sudo，不退出父登录shell、不改父errexit。**sudo不在$()、管道、
+heredoc或stdin/stdout重定向中**；完整固定Python正文用shell引用后作为-c参数，原stdin/stdout
+直接继承Owner终端。Python仅在自身内部暂存固定entry的Python print结果，/dev/tty的实际
+os.write/select/read不受影响，底层fd0/1仍为终端。
+
+验收必须同时看到两条独立记录：
+1. Python内部严格校验原完成JSON（固定image、四个精确False布尔字段、result为int0，重复key拒绝），
+   打印state=STAGE_A_RECEIPT_VALID_NOT_UPDATE、stage_a_result_valid=true、child_exit=0及原completion。
+2. shell紧邻sudo返回保存真实$?，独立printf record=SUDO_CHILD_EXIT、child_exit及login_shell_preserved、
+   shell_exit_not_acceptance、servertrust=false。该值必须为0且与第一条一致。
+任一缺损、不一致、非0/信号码/空结果/HOLD/异常均不得验收；外层不推断已完成。顶层shell rc0
+只表示防退出控制块返回，**绝不表示A通过**。若sudo本身拒绝/被信号终止，可能没有第一条记录，
+仍打印原childcode，保留父登录shell，不拿该shell状态冒PASS。
 root适配始终finally释放固定BASE独占锁、TTY和FD；原子写的部分文件、活动许可/intent、
 阶段结果保留供根查，不rmtree/unlink未知历史。仅完成阶段自己的确切活动许可可退役；
 归档冲突先HOLD不覆盖。新增适配进程通过PIPE单独限制stdout16KiB，使用原3b6 child_status/finish_child作有界原组清理；阶段install的regular-file RLIMIT_FSIZE固定131072B、image-load固定67108864B，继承hard低于需要则拒绝，不设无限额；原caller文件/其子进程16KiB policy保持原字节。外层bootstrap最多300秒；原load本身
 120秒；CLI cleanup不证明daemon操作已取消。非0、格式/版本不符、跨期、异常或清理未知
 均停止，不推进下一阶段；所有自持FD即使一项close失败也继续逐项释放，清理未知不返回成功；归档退役前绑定本次活动许可inode/metadata，替换则HOLD保留；外层仍恢复，原44项安全语义直接复用。
 
-本轮24项适用联验（原18回归＋6项新增）：完整适配→真实shell→独立bootstrap Python中的原wrapper精确AST→exec独立caller Python→原main/install/import primitive，
+本轮28项适用联验（保留a89已过范围，替换不充分的直接read测试并补生产confirm调用形态）：完整适配→真实shell→独立bootstrap Python中的原wrapper精确AST→exec独立caller Python→原main/install/import primitive，
 真实保护临时文件/许可/归档/锁与私有模式；Root/Owner/TTY、所有Docker及image外层字节
 入口为明确合成fixture。原caller/wrapper函数主体不改，仅测试root路径/UID/exec边界投影。
 另核完整单包校验器对SHA篡改/symlink拒绝、外层真实bash+errexit仍活、无确认零写、输入
@@ -144,11 +151,18 @@ B/C、私有备份、真实更新、旧2330 backend时间及生产OCR权限均�
 16384B、caller未执行即HOLD，部分文件保留。原caller子进程的原16KiB RLIMIT实际探针仍为
 [16384,16384]；新适配stdout PIPE超过16KiB则HOLD，不用提高日志限额来修合法文件写入。
 
-Python从heredoc启动且sudo use_pty时最初后台是正常形态。生产check_terminal只要求
-/dev/tty字符设备/isatty，不在首次读前要求前台，也不主动tcsetpgrp/发SIGTTIN/修改sudoers。
-读交由原内核与sudo的job control处理，异常EIO/无TTY/无法交接均HOLD。真实PTY测试只在私有
-测试会话模拟交接；UK是否use_pty及实际调用行为仍UNKNOWN，本轮不现场检查/改设置。
-
+a89外壳用$()收集sudo stdout，配合sudo use_pty可能使命令初始后台且不转发TTY输入；
+生产confirm的select先于read，不能据直接read的SIGTTIN正例宣称它能交接。该旧测试已替换：
+真实私有PTY后台进程执行**原生产confirm**，无预注入/无人工job-control交接，实际select超时HOLD。
+新正例运行生成外壳→argv/FD直通sudo fixture→隔离Python→原生产confirm/select/read/gate/close，
+等待每次实际提示后才发送精确确认行，两阶段均完成，底层stdin/stdout必须是真TTY。没有测试驱动
+预先排队输入或tcsetpgrp/发SIGCONT让正例通过；也不新造生产job-control机制。
+同一实际调用形态实测EOF、错误确认、真实select短超时、select异常、清理异常和确认过期均HOLD，
+TTY关闭、Python记录与sudo childcode一致且父shell继续。Python完成校验另覆盖错返回码/bool、
+重复JSON、空值和非bool伪False；外层覆盖0/2/17/143退出值，0本身不冒完成。
+UID/Owner/时钟、短超时、sudo直通、局部合成成功结果为明确fixture；无实际sudo、UK或Docker操作。
+UK实际use_pty、策略、终端传递能力仍UNKNOWN，须未来另获具体批准后验，未以本地PTY冒现场。
+生产不改use_pty/sudoers，不主动tcsetpgrp/发SIGTTIN，不改安全设置。
 两确认行可以在第一提示之前预排队；第二次读取成功不能证明第二行一定在提示后输入。
 两段许可的时间是该阶段消费确认行的服务器时间，不是独立Owner身份认证/签名/机器授权，
 不能用这个操作记录替代外部的Owner精确现场批准。所有servertrust字段继续false。
@@ -157,3 +171,10 @@ Python从heredoc启动且sudo use_pty时最初后台是正常形态。生产chec
 本轮把site-preparation-manifest里的workflow/governance等每个列出文件的真实bytes/SHA全部
 重新核对，并登记当前新适配/完整命令/文档对象；不把旧字节标当前同版。完整输入包、manifest、
 源码、调用块及CI制品分别核摘要；包外层digest不代替任何内层digest或Git blob匹配。
+
+## 7 a89 TTY单项收口的版本边界
+
+a89原24项及根独立/外层审计通过部分复用；本轮只更改builder生成的新外壳和测试/交付证据。
+管理入口stage-a-entry.py与四个输入完全不变，因此完整57179504B包及其258ce847完整SHA仍相同，
+不是新产品镜像；必须配本页新5076B外壳，不能继续运行a89旧4865B命令。
+3b6原caller/core/f131没有源码改动或重建。现场状态仍NOT_EXECUTED，根本次独审仍PENDING。

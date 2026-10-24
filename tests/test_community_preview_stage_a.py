@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -144,7 +145,7 @@ class StageATest(unittest.TestCase):
         command=command.replace('/usr/bin/sudo',str(fake))
         prefix='set -e\n'
         proc=subprocess.run(['/bin/bash'],input=(prefix+command+'\nprintf "PARENT_ALIVE\\n"\n').encode(),capture_output=True,timeout=3)
-        self.assertEqual(proc.returncode,0);record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],17);self.assertFalse(record['stage_a_result_valid']);self.assertEqual(record['state'],'HOLD_CHILD_NONZERO');self.assertIn(b'PARENT_ALIVE',proc.stdout)
+        self.assertEqual(proc.returncode,0);record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],17);self.assertEqual(record['record'],'SUDO_CHILD_EXIT');self.assertIn(b'PARENT_ALIVE',proc.stdout)
     def test_image_failure_or_permission_archive_conflict_holds_without_retry(self):
         original=self.obj.call
         def fail_image(raw):
@@ -196,7 +197,7 @@ class StageATest(unittest.TestCase):
         incoming=self.root/'incoming.zip';incoming.write_bytes(raw);incoming.chmod(0o600)
         if symlink:
             other=self.root/'original.zip';incoming.rename(other);incoming.symlink_to(other)
-        body=command.decode().split("<<'STAGE_A'\n",1)[1].rsplit('\nSTAGE_A',1)[0]
+        body=self.outer_body(command.decode())
         tree=ast.parse(body)
         class Fixture(ast.NodeTransformer):
             def visit_Assign(inner,node):
@@ -211,7 +212,9 @@ class StageATest(unittest.TestCase):
                 return inner.generic_visit(node)
         tree=ast.fix_missing_locations(Fixture().visit(tree));calls=[]
         def verified_entry(code,ns):
-            ns['run']=lambda blobs,manifest:(calls.append((blobs,manifest)) or 0)
+            def run(blobs,manifest):
+                calls.append((blobs,manifest));print(json.dumps(self.completion()));return 0
+            ns['run']=run
         with patch.object(a.pwd,'getpwnam',return_value=types.SimpleNamespace(pw_uid=self.owner['sudo_uid'] or 1000)),contextlib.redirect_stdout(io.StringIO()):
             try:exec(compile(tree,'<exact-outer-validator-projection>','exec'),{'FIXTURE_ROOT':str(self.root),'fixture_exec':verified_entry})
             except SystemExit as result:return result.code,calls
@@ -233,7 +236,7 @@ class StageATest(unittest.TestCase):
         for name in ('community_preview_stage_a.py','community_preview_stage_a_bundle.py'):
             ast.parse(Path('scripts/'+name).read_text(),feature_version=(3,6))
         command=b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode()
-        ast.parse(command.split("<<'STAGE_A'\n",1)[1].rsplit('\nSTAGE_A',1)[0],feature_version=(3,6))
+        ast.parse(self.outer_body(command),feature_version=(3,6))
     def real_chain_scripts(self):
         # Separate shell -> bootstrap Python -> exec caller Python. Original
         # wrapper AST/caller bodies run with fixture roots/UID/clock only;
@@ -323,24 +326,36 @@ exec(compile(ast.fix_missing_locations(Project().visit(tree)),'<original-bootstr
             with patch.object(a.select,'select',self.real_select),self.assertRaisesRegex(a.Hold,'OUTPUT_LIMIT'):
                 a.StageA.capture_bootstrap(self.obj,[sys.executable,'-c','import os;os.write(1,b"x"*20000)'],timeout=3)
         finally:self.obj.close()
+    @staticmethod
+    def outer_body(command):
+        return shlex.split(command.split('  /usr/bin/sudo ',1)[1].split('\n  community_stage_a_inner=',1)[0])[-1]
+    @staticmethod
+    def completion():
+        return {'state':'STAGE_A_ORIGINAL_CALLER_COMPLETED','image':'sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a','site_update':False,'private_data':False,'ocr_enabled':False,'servertrust':False}
     def test_structured_child_status_not_top_level_shell_status(self):
         command=b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode()
-        valid={'state':'STAGE_A_ORIGINAL_CALLER_COMPLETED','image':'sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a','site_update':False,'private_data':False,'ocr_enabled':False,'servertrust':False}
-        for code,body,expected in ((0,'',False),(0,json.dumps(valid),True),(2,json.dumps(valid),False),(143,'',False),(0,'{"state":"HOLD_STAGE_A_PRESERVE_NO_RETRY"}',False)):
-            fake=self.root/'sudo-result-fixture';fake.write_text('#!/bin/sh\nprintf \'%s\\n\' \''+body+'\'\nexit '+str(code)+'\n');fake.chmod(0o700)
+        self.assertNotIn('$(',command);self.assertNotIn('<<',command)
+        for code in (0,2,17,143):
+            fake=self.root/'sudo-result-fixture';fake.write_text('#!/bin/sh\nexit '+str(code)+'\n');fake.chmod(0o700)
             fixture=command.replace('/usr/bin/sudo',str(fake))
-            proc=subprocess.run(['/bin/bash'],input=('set -e\n'+fixture+'\nprintf "PARENT_ALIVE\n"\n').encode(),capture_output=True,timeout=3)
+            proc=subprocess.run(['/bin/bash'],input=('set -e\n'+fixture+'\nprintf "PARENT_ALIVE\\n"\n').encode(),capture_output=True,timeout=3)
             self.assertEqual(proc.returncode,0)
-            record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],code);self.assertEqual(record['stage_a_result_valid'],expected);self.assertTrue(record['shell_exit_not_acceptance']);self.assertFalse(record['servertrust'])
+            record=json.loads(proc.stdout.splitlines()[-2]);self.assertEqual(record['child_exit'],code);self.assertEqual(record['record'],'SUDO_CHILD_EXIT');self.assertTrue(record['shell_exit_not_acceptance']);self.assertFalse(record['servertrust'])
+    def test_python_completion_validator_rejects_bad_type_duplicate_and_wrong_exit(self):
+        body=self.outer_body(b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode())
+        tail=body[body.index(' import contextlib'):]
+        for code,value,ok in ((0,json.dumps(self.completion()),True),(2,json.dumps(self.completion()),False),(True,json.dumps(self.completion()),False),(0,'',False),(0,'{"state":1,"state":2}',False),(0,json.dumps(dict(self.completion(),site_update=0)),False)):
+            prefix='import io,json\ndef unique(rows):\n d={}\n for k,v in rows:\n  if k in d:raise ValueError()\n  d[k]=v\n return d\ndef run(*args):\n print('+repr(value)+');return '+repr(code)+'\nns={"run":run};blobs={};MANIFEST_SHA="fixture"\ntry:\n pass\n'
+            proc=subprocess.run([sys.executable,'-c',prefix+tail],capture_output=True,timeout=3)
+            record=json.loads(proc.stdout);self.assertEqual(proc.returncode,0 if ok else 2);self.assertEqual(record['child_exit'],proc.returncode);self.assertEqual(record['stage_a_result_valid'],ok)
     def test_two_ack_lines_can_be_prequeued_not_independent_owner_auth(self):
         # Both responses exist before the first prompt; acceptance must never
         # imply the second line was typed afterwards or independently signed.
         self.assertEqual(len(self.answers),2);result=self.obj.run();self.assertFalse(result['servertrust'])
-    def test_real_pty_background_first_read_uses_kernel_job_control(self):
+    def test_real_pty_background_production_select_confirm_cannot_trigger_handoff(self):
         code=r"""import os,sys,fcntl,termios,signal,time
 sys.path.insert(0,REPO)
-from scripts.community_preview_stage_a import check_terminal
-# Private test-session HUP on PTY teardown must not kill the test driver.
+from scripts import community_preview_stage_a as a
 signal.signal(signal.SIGHUP,signal.SIG_IGN)
 master,slave=os.openpty();reader=None;done=False
 try:
@@ -350,28 +365,24 @@ try:
   try:
    os.setpgid(0,0);signal.signal(signal.SIGTTIN,signal.SIG_DFL)
    assert os.tcgetpgrp(slave)!=os.getpgrp()
-   check_terminal(slave)  # production check must admit initial background
-   data=os.read(slave,256)
-   assert data==b'queued-operator-line\n'
+   a.owner_context=lambda:{'fixture':True}
+   original=a.select.select
+   a.select.select=lambda r,w,e,t:original(r,w,e,.08)
+   obj=a.StageA.__new__(a.StageA);obj.tty=slave;obj.operator={'fixture':True};obj.scope='a'*64
+   try:obj.confirm('install')
+   except a.Hold as exc:assert str(exc)=='OWNER_CONFIRMATION_TIMEOUT'
+   else:raise AssertionError('unexpected confirmation')
    os._exit(0)
   except BaseException:os._exit(3)
- end=time.monotonic()+2;status=None
+ end=time.monotonic()+2
  while time.monotonic()<end:
   pid,value=os.waitpid(reader,os.WNOHANG|os.WUNTRACED)
   if pid:
-   status=value;break
-  time.sleep(.01)
- assert status is not None and os.WIFSTOPPED(status) and os.WSTOPSIG(status)==signal.SIGTTIN
- # Test driver models sudo's kernel handoff; production never tcsetpgrp's.
- os.tcsetpgrp(slave,reader);os.kill(reader,signal.SIGCONT);os.write(master,b'queued-operator-line\n')
- end=time.monotonic()+2
- while time.monotonic()<end:
-  pid,value=os.waitpid(reader,os.WNOHANG)
-  if pid:
+   assert not os.WIFSTOPPED(value),'select must not be mistaken for SIGTTIN handoff'
    done=True;assert os.WIFEXITED(value) and os.WEXITSTATUS(value)==0;break
   time.sleep(.01)
  assert done
- print('BACKGROUND_SIGTTIN_FOREGROUND_READ_OK_NOT_ACTUAL_SUDO')
+ print('PRODUCTION_SELECT_BACKGROUND_TIMEOUT_NO_INJECT_NO_HANDOFF')
 finally:
  if reader and not done:
   try:os.kill(reader,signal.SIGKILL)
@@ -381,7 +392,110 @@ finally:
  os.close(master);os.close(slave)
 """.replace('REPO',repr(str(Path.cwd())))
         proc=subprocess.run([sys.executable,'-c',code],start_new_session=True,capture_output=True,timeout=5)
-        self.assertEqual(proc.returncode,0,proc.stderr.decode());self.assertIn(b'BACKGROUND_SIGTTIN_FOREGROUND_READ_OK',proc.stdout)
+        self.assertEqual(proc.returncode,0,proc.stderr.decode());self.assertIn(b'PRODUCTION_SELECT_BACKGROUND_TIMEOUT',proc.stdout)
+    def test_delivery_declared_files_and_exact_generated_outer_match(self):
+        manifest=json.loads(Path('deploy/community-preview/site-preparation-manifest.json').read_text())
+        for group in ('files','stage_a_adapter_files'):
+            for name,meta in manifest[group].items():
+                raw=Path(name).read_bytes();self.assertEqual(meta,{'bytes':len(raw),'sha256':a.sha(raw)},name)
+        report=json.loads(Path('deploy/community-preview/stage-a-delivery.json').read_text())
+        command=b.outer_script(report['package_filename'],report['package_bytes'],report['package_sha256'],report['entry_sha256'],report['manifest_sha256'])
+        self.assertEqual(command,Path('deploy/community-preview/stage-a-owner-call.sh').read_bytes())
+        self.assertEqual(manifest['stage_a_delivery'],report)
+    def production_confirm_pty(self,mode):
+        # Real PTY, generated shell, sudo argv/FD pass-through fixture, exact
+        # production confirm/select/read/gate/close. No actual sudo/UK assumed.
+        import pty,select,signal,time,errno
+        scope='a'*64
+        worker=r"""import sys,os,json,io,types,importlib.util
+spec=importlib.util.spec_from_file_location('stage_fixture',SOURCE)
+a=importlib.util.module_from_spec(spec);spec.loader.exec_module(a)
+a.owner_context=lambda:{'fixture':True}
+a.clock=lambda:100
+a.EXPIRES=1000
+real_select=a.select.select
+if MODE=='timeout':a.select.select=lambda r,w,e,t:real_select(r,w,e,.08)
+if MODE=='exception':
+ def bad(*args):raise OSError('synthetic select failure')
+ a.select.select=bad
+obj=a.StageA.__new__(a.StageA);obj.operator={'fixture':True};obj.scope='a'*64
+obj.phase=None;obj.issued=None;obj.deadline=None
+obj.parent=None;obj.input=None;obj.lock=None;obj.tty=a.open_terminal()
+def run(*args):
+ try:
+  assert os.isatty(0) and os.isatty(1)
+  obj.confirm('install')
+  if MODE=='expired':a.clock=lambda:701
+  obj.gate()
+  obj.confirm('image-load')
+  obj.gate()
+  if MODE=='cleanup':raise a.Hold('SYNTHETIC_CLEANUP_FAILURE')
+  print(json.dumps(COMPLETION));return 0
+ finally:
+  fd=obj.tty;obj.close()
+  try:os.fstat(fd)
+  except OSError:os.write(1,b'TTY_FD_CLOSED\n')
+  else:raise RuntimeError('FD leak')
+ns={'run':run};blobs={};MANIFEST_SHA='fixture'
+def unique(rows):
+ d={}
+ for k,v in rows:
+  if k in d:raise ValueError()
+  d[k]=v
+ return d
+try:
+ pass
+""".replace('SOURCE',repr(str(Path(a.__file__).resolve()))).replace('MODE',repr(mode)).replace('COMPLETION',repr(self.completion()))
+        command=b.outer_script('fixed.zip',1,'a'*64,'b'*64,'c'*64).decode()
+        body=self.outer_body(command);tail=body[body.index(' import contextlib'):]
+        command=command.replace(shlex.quote(body),shlex.quote(worker+tail))
+        fake=self.root/'sudo-tty-fixture';fake.write_text('#!/bin/sh\n[ "$1" = -n ] || exit 99\nshift\nexec "$@"\n');fake.chmod(0o700)
+        command=command.replace('/usr/bin/sudo',str(fake))
+        pid,master=pty.fork()
+        if pid==0:os.execv('/bin/bash',['/bin/bash','-c','set -e\n'+command+'\nprintf "PARENT_ALIVE\\n"\n'])
+        data=b'';sent=0;done=False;end=time.monotonic()+4
+        try:
+            while time.monotonic()<end:
+                if select.select([master],[],[],.05)[0]:
+                    try:part=os.read(master,65536)
+                    except OSError as exc:
+                        if exc.errno==errno.EIO:break
+                        raise
+                    if not part:break
+                    data+=part
+                    # Wait for each actual prompt, never pre-inject answers.
+                    for index,phase in enumerate(('INSTALL','IMAGE_LOAD')):
+                        prompt=('APPROVE_'+phase+' '+scope).encode()
+                        if sent==index and prompt in data and mode!='timeout':
+                            line=b'\x04' if mode=='eof' else (b'WRONG\n' if mode=='wrong' else prompt+b'\n')
+                            os.write(master,line);sent+=1
+                got,status=os.waitpid(pid,os.WNOHANG)
+                if got:done=True;self.assertEqual(os.waitstatus_to_exitcode(status),0);break
+            if not done:
+                got,status=os.waitpid(pid,os.WNOHANG)
+                if got:done=True;self.assertEqual(os.waitstatus_to_exitcode(status),0)
+            self.assertTrue(done,data.decode(errors='replace'))
+        finally:
+            if not done:
+                os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
+            os.close(master)
+        records=[]
+        for line in data.splitlines():
+            if line.startswith(b'{'):
+                try:records.append(json.loads(line))
+                except ValueError:pass
+        self.assertEqual(len(records),2,data.decode(errors='replace'))
+        completion,child=records
+        self.assertEqual(child['record'],'SUDO_CHILD_EXIT');self.assertEqual(completion['child_exit'],child['child_exit'])
+        self.assertEqual(completion['stage_a_result_valid'],mode=='success',data.decode(errors='replace'))
+        self.assertEqual(child['child_exit'],0 if mode=='success' else 2)
+        self.assertIn(b'TTY_FD_CLOSED',data);self.assertIn(b'PARENT_ALIVE',data)
+        return sent
+    def test_production_confirm_direct_outer_pty_waits_for_both_prompts(self):
+        self.assertEqual(self.production_confirm_pty('success'),2)
+    def test_production_confirm_direct_outer_pty_eof_wrong_timeout_exception_cleanup_expiry(self):
+        for mode in ('eof','wrong','timeout','exception','cleanup','expired'):
+            with self.subTest(mode=mode):self.production_confirm_pty(mode)
     def test_owner_context_missing_kernel_identity_is_not_servertrust(self):
         # Actual production function AST, synthetic OS/NSS/env data only.
         tree=ast.parse(Path(a.__file__).read_text());node=next(x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name=='owner_context')
