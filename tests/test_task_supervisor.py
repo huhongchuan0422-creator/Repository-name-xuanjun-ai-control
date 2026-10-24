@@ -55,18 +55,18 @@ class SupervisorTests(unittest.TestCase):
     def test_development_contract_is_canonical_idempotent_and_conflicting(self):
         self.registration()
         contract=self.development_contract()
-        first=self.s.register_development_contract('t1',contract,now=1000)
-        second=self.s.register_development_contract('t1',contract,now=1000)
+        first=self.s.register_development_contract('t1',contract)
+        second=self.s.register_development_contract('t1',contract)
         self.assertFalse(first['duplicate']);self.assertTrue(second['duplicate'])
         changed=dict(contract);changed['target_base_sha']='d'*40
         with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
-            self.s.register_development_contract('t1',changed,now=1000)
+            self.s.register_development_contract('t1',changed)
 
     def test_failed_development_completion_never_unlocks_dependency(self):
         self.registration('t1')
         self.registration('child',['t1'])
         self.s.register_development_contract(
-            't1',self.development_contract(),now=1000)
+            't1',self.development_contract())
         caller={'caller_id':'writer','run_id':'run1',
                 'session_id':'session1','gateway_id':'gateway1'}
         self.s.claim_writer('t1','a1','developer','WORK',caller,
@@ -77,17 +77,19 @@ class SupervisorTests(unittest.TestCase):
             spec_sha256='b'*64,checkpoint_sha256='a'*64,
             target_repository='owner/repo',target_base_sha='c'*40,
             code_commit='d'*40,event='CODE_READY',attempt_id='a1',
-            lease_id='lease1',fence=1,epoch=1,source_comment_id=1,
+            lease_id='lease1',fence=1,epoch=1,caller_id='writer',
+            run_id='run1',session_id='session1',gateway_id='gateway1',
+            lock_provider_id='provider1',source_comment_id=1,
             status='RECEIPT_VALIDATED_NOT_ADMITTED',
             native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
             authority_effect='NONE',
             required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
         candidate=self.s.bind_development_candidate(
-            receipt,{'src/f.py':'e'*64},now=1001)
-        with self.assertRaises(ValueError):
+            receipt,{'src/f.py':'e'*64})
+        with self.assertRaisesRegex(
+                ValueError,'CANONICAL_DEVELOPMENT_REVIEW_REQUIRED'):
             self.s.complete_development_candidate(
-                't1',candidate['candidate_event_id'],'bad',
-                {'QA':'1'*64,'SECURITY':'2'*64},'complete',now=1002)
+                't1','missing-reviewed-event','complete')
         self.assertNotEqual(self.s._task('t1')['state'],'SUCCESS')
         self.assertNotIn('child',[x['task_id'] for x in self.s.ready()])
 
