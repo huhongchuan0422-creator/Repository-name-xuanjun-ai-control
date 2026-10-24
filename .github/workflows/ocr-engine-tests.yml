@@ -158,7 +158,7 @@ jobs:
             echo "target_platform=$OCR_TARGET_PLATFORM"
             echo "base_image=$OCR_BASE_IMAGE"
             docker image inspect --format '{{json .RepoDigests}}' "$OCR_BASE_IMAGE" 2>&1 || true
-            docker run --rm --platform linux/amd64 "$OCR_BASE_IMAGE" sh -lc 'python -VV; python -c "import sysconfig; print(sysconfig.get_config_var(\"SOABI\"))"; getconf GNU_LIBC_VERSION' 2>&1 || true
+            echo "runtime_probe=NOT_RUN_IN_FAILURE_DIAGNOSTICS; recorded during normal verified-base step only"
           } > "$RUNNER_TEMP/ocr-diagnostics/build-runtime.log"
           find "$RUNNER_TEMP/ocr-build" -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null > "$RUNNER_TEMP/ocr-diagnostics/output-inventory.txt" || true
       - name: Upload failure diagnostics (never presented as a successful package)
