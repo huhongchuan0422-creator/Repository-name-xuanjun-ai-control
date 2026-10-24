@@ -1,4 +1,5 @@
 """Isolated protected registrar records; no live enrollment or cloud reads."""
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from pr17_b5_successor_witness import (SuccessorEvidenceStore, Hold,
                                         JOB, COMMIT, PROJECT, RECIPIENT, SUBJECT)
 from pr17_b5_successor_authority import ExistingRequestAuthority
 from pr17_b5_successor_backend import R2HostBackend
+import pr17_b5_successor_binder as binder
 import pr17_b5_successor_review as c53
 
 
@@ -119,6 +121,62 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         alternate=dict(payload,custody_receipt_sha256='d'*64)
         with self.assertRaisesRegex(Hold,'SUCCESSOR_B5_PROOF_CHANGED'):
             self.store._payload('b5_http',alternate,self.binding)
+
+    def test_transaction_close_requires_distinct_provenance_and_close_records(self):
+        rows=[dict(request_id=rid,object_ref='b5-material-%02d'%(i+1),
+                   invoke_id='invoke%02d'%i,bytes=4900 if i<18 else 5392,
+                   sha256='%064x'%i,result_ref='tool-result-%02d'%i)
+              for i,rid in enumerate(self.binding['ids'])]
+        custody_sha='c'*64
+        proof_sha=c53.sha(c53.canon(dict(catalog_sha256='a'*64,
+            project=PROJECT,recipient=RECIPIENT,
+            custody_receipt_sha256=custody_sha,
+            rows=[{k:r[k] for k in ('request_id','object_ref','invoke_id',
+                                    'bytes','sha256')} for r in rows])))
+        self.register('b5_http',dict(proof_sha256=proof_sha,
+            custody_receipt_sha256=custody_sha,rows=rows,subject=SUBJECT,
+            scope='project.files.read',catalog_sha256='a'*64,recipient=RECIPIENT))
+        authority=object.__new__(ExistingRequestAuthority)
+        authority.evidence_store=self.store
+        authority.batch_id=self.binding['batch'];authority.attempt_id=self.binding['attempt']
+        authority.window_start=self.binding['valid_from']
+        authority.request_ids=tuple(self.binding['ids']);authority.catalog_sha='a'*64
+        spec=binder.verify_spec_bytes((HERE/'SUCCESSOR_SPEC.json').read_bytes())
+        backend=object.__new__(R2HostBackend)
+        backend.authority=authority;backend.job=JOB;backend.spec=spec
+        backend.expected_ids=tuple(self.binding['ids'])
+        bundle={'catalog_sha':'a'*64,
+            'requests':[{'request_id':rid} for rid in self.binding['ids']],
+            'files':{p:b'' for p in c53.CONFIGS+c53.SLOTS}}
+        backend.bundle=bundle
+        backend.successor_evidence_action=R2HostBackend.successor_evidence_action.__get__(backend)
+        backend.verify_b5_http_provenance=R2HostBackend.verify_b5_http_provenance.__get__(backend)
+        backend.approve_precise_b5_exposure_close=R2HostBackend.approve_precise_b5_exposure_close.__get__(backend)
+        backend.witness_action=lambda:contextlib.nullcontext()
+        backend.successor_release_action=lambda:contextlib.nullcontext()
+        effects=[]
+        def close_leaf():
+            # The leaf independently re-reads the close record just like the
+            # production closeout before any service/config effect.
+            receipt=R2HostBackend._receipt(backend,'approve_c53_b5_exposure_close',JOB)
+            self.assertEqual(receipt['scope'],'B5_EXPOSURE_CLOSE')
+            effects.append('close')
+        backend.close_b5_exposure_success_successor_only=close_leaf
+        tx=c53.Transaction(spec,bundle,backend);tx.stage='READY_FOR_B5_HTTP_NOT_RECEIVED'
+        proof={'state':'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+               'bytes':93592,'objects':19,'close_approval':'NOT_PROVEN',
+               'proof_sha256':proof_sha}
+        with self.assertRaises(FileNotFoundError):
+            tx.close_after_b5_http(proof)
+        self.assertEqual(effects,[])
+        self.register('B5_EXPOSURE_CLOSE',dict(scope='B5_EXPOSURE_CLOSE',
+            job=JOB,decision_id='close-independent',approved=True,
+            phase='AFTER_B5_HTTP'))
+        result=tx.close_after_b5_http(proof)
+        self.assertEqual(result,{'state':'RECEIVED_VERIFIED_19_CLOSED',
+            'received':19,'bytes':93592,'installed':False})
+        self.assertEqual(effects,['close'])
+        self.assertEqual(tx.stage,'CLOSED_RECEIVED_19')
 
     def test_action_rechecks_complete_row_before_side_effect(self):
         payload=dict(scope='PRE_START_RESTORE',job=JOB,decision_id='decision1',
