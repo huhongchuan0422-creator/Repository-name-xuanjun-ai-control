@@ -23,7 +23,7 @@ class HostedBuildFlowTests(unittest.TestCase):
         self.bin.mkdir()
         self.calls = self.root / "calls.log"
         docker = self.bin / "docker"
-        docker.write_text("#!/bin/sh\necho \"$*\" >> \"$FAKE_CALL_LOG\"\ncase \"$1\" in pull) exit \"${FAKE_PULL_EXIT:-0}\";; run) exit 0;; *) exit 0;; esac\n")
+        docker.write_text("#!/usr/bin/env python3\\nimport json,os,sys\\nwith open(os.environ['FAKE_CALL_LOG'],'a',encoding='utf-8') as stream:\\n stream.write(json.dumps(sys.argv[1:])+'\\\\n')\\nargs=sys.argv[1:]\\nif args and args[0]=='pull': sys.exit(int(os.environ.get('FAKE_PULL_EXIT','0')))\\nsys.exit(0)\\n")
         docker.chmod(0o755)
         self.env = dict(os.environ, PATH=str(self.bin)+os.pathsep+os.environ.get("PATH",""), FAKE_CALL_LOG=str(self.calls),
                         RUNNER_TEMP=str(self.root), GITHUB_WORKSPACE=str(self.root), OCR_BASE_IMAGE="python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
@@ -54,9 +54,8 @@ class HostedBuildFlowTests(unittest.TestCase):
                 env=dict(self.env); env[key]=value
                 result=run_step(gate,env)
                 self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
-                calls=self.calls.read_text() if self.calls.exists() else ""
-                self.assertNotIn("pull",calls)
-                self.assertNotIn("run",calls)
+                calls=[json.loads(line) for line in self.calls.read_text().splitlines()] if self.calls.exists() else []
+                self.assertEqual(calls,[])
     def test_pull_failure_is_logged_and_never_runs_or_retries_base(self):
         steps=load_build_job()
         pull=self.step(steps,"Pull and verify exact official base image")
@@ -64,9 +63,9 @@ class HostedBuildFlowTests(unittest.TestCase):
         env=dict(self.env,FAKE_PULL_EXIT="17")
         result=run_step(pull,env)
         self.assertNotEqual(result.returncode,0)
-        calls=self.calls.read_text().splitlines()
+        calls=[json.loads(line) for line in self.calls.read_text().splitlines()]
         self.assertEqual(len(calls),1,calls)
-        self.assertTrue(calls[0].startswith("pull "),calls)
+        self.assertEqual(calls[0][0],"pull",calls)
         diagnostics=self.step(steps,"Record non-secret build/runtime diagnostics")["run"]
         self.assertNotIn("docker run",diagnostics)
         self.assertNotIn("docker pull",diagnostics)
@@ -77,12 +76,14 @@ class HostedBuildFlowTests(unittest.TestCase):
         self.calls.write_text("")
         result=run_step(step,self.env)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
-        calls=self.calls.read_text().splitlines()
+        calls=[json.loads(line) for line in self.calls.read_text().splitlines()]
         self.assertEqual(len(calls),1,calls)
-        self.assertTrue(calls[0].startswith("run "),calls)
-        self.assertIn("--network none",calls[0])
-        self.assertIn("verify_offline_runtime.py",calls[0])
-        self.assertNotIn("dpkg-query -W -f=",calls[0])
+        argv=calls[0]
+        self.assertEqual(argv[0],"run",argv)
+        self.assertIn("--network",argv,argv)
+        self.assertEqual(argv[argv.index("--network")+1],"none",argv)
+        self.assertIn("verify_offline_runtime.py"," ".join(argv))
+        self.assertFalse(any("dpkg-query -W -f=" in arg for arg in argv))
     def test_workflow_has_no_always_run_or_pull_in_failure_diagnostics(self):
         steps=load_build_job()
         diag=self.step(steps,"Record non-secret build/runtime diagnostics")
