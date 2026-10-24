@@ -145,8 +145,11 @@ paths:
       summary: Store the human-reviewed field snapshot
       description: >
         The user must echo the exact application_revision and optional provider_version
-        shown in the review UI. The server does not trust body values as authority: it
-        compares them with the stored job and re-resolves the current authoritative tuple.
+        shown in the review UI. The server validates raw JSON scalar types before Pydantic
+        parsing to prevent booleans/floats being coerced into integers. It does not trust
+        body values as authority: it compares them with the stored job and re-resolves the
+        current authoritative tuple. shared_writeback_eligible is true only for status
+        confirmed with a positive confirmation_revision and a complete, exact confirmed_binding.
         The tuple, fields, confirmation_revision, audit event and idempotency response are
         committed in the OCR database transaction. No cross-database atomicity with a
         community shared draft is implied. Jobs without provider_version may be confirmed
@@ -201,7 +204,7 @@ paths:
                   provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
                   shared_writeback_eligible: {type: boolean}
                   recorded: {type: boolean, const: true}
-        '400': {description: Invalid schema, field set or version format}
+        '400': {description: Invalid schema, field set or version format; raw bool, float and noncanonical version values rejected}
         '401': {description: Missing or invalid authentication}
         '403': {description: Current application/attachment authorization revoked}
         '404': {description: Job not found or not visible to this subject}
