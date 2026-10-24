@@ -1,90 +1,84 @@
-# SaaS Console Integration 2026-10-24 — V4
+# SaaS Console Integration 2026-10-24 — V5
 
-## Bound sources
+## Fixed anchors
 
-- PR122 website source anchor: `4dc5e349243d5fd277807c0c023281118d6df9d6` / tree `66b45dc175afa7ecf4347afcbec49455dd4d91c8`.
+- PR122 customer source: `4dc5e349243d5fd277807c0c023281118d6df9d6` / tree `66b45dc175afa7ecf4347afcbec49455dd4d91c8`.
 - Do not mix with PR122 head `cd348c77506e07ba9516a869b8fe1e66597a6e69`.
-- Browser prototype handoff received and byte-verified: `2e211190c0d6edb6f2861bd860cbe9b03e27da92cb629c49277b1d4ab4ea5b62`.
-- Final ecosystem/8-stage integration specification received and byte-verified: `5049d4f8dc9fe555492338c00afee4ab77c08d29557e52340660426e78330037`.
-- Prototype package declares Replacement V3 commit `75f6c245ae29f54b918336a83b39b6ff78b58c7a`, tree `795e923301483cf0f2c8ba59878d8243495ad614`, 69 routes, 34 subviews, offline 52/52 PASS, browser `BROWSER_UNVERIFIED`.
+- Prototype handoff SHA256: `2e211190c0d6edb6f2861bd860cbe9b03e27da92cb629c49277b1d4ab4ea5b62`.
+- Final 8-stage specification SHA256: `5049d4f8dc9fe555492338c00afee4ab77c08d29557e52340660426e78330037`.
+- Traceability CSV decompressed-byte SHA256: `496624feab3ba3259e1e9bec78b07ecf1b54118b52a37ec2ed7aca7a13feb209`.
 
-## Frozen-page mapping
+The repository carries the exact CSV bytes as deterministic gzip at `clients/saas-console/spec/03_PAGE_TRACEABILITY.csv.gz` and the exact 69-row/26-field projection as `prototype-page-map.json.gz`. The small `prototype-page-map.json` is only a carrier manifest. Tests gunzip both artifacts, recompute the fixed CSV SHA, and compare every page and all 26 fields including `owner_gap_task`. Existing `real_verified=NO` and HOLD gates are preserved.
 
-`clients/saas-console/prototype-page-map.json` is a mechanical 69/69 projection of `03_PAGE_TRACEABILITY.csv`; it does not upgrade any page to production verified. Current first operable slice maps to:
+## First product slice
 
-- CUS-005 project list: original `/me` project membership projection.
-- CUS-006 project overview: project metadata + checklist + previews + cases + messages.
-- CUS-007 requirement view: only fields already exposed by PR122 checklist are projected; full structured requirement capture/confirmation backend remains HOLD.
-- CUS-008 private materials: PR122 source exists, but this console slice does not add upload UI.
-- CUS-012/CUS-013 delivery list/detail: `change_updates` only after authoritative preview listing moves to the delivery `after_sha256`.
-- CUS-014 formal acceptance: NOT WIRED. `change_retest` is version retest only and never presented as contract final acceptance.
-- CUS-015/CUS-016 maintenance: no matching backend evidence in this slice; HOLD.
+No second identity system, database, project ledger, payment backend, task registry or preview engine is created.
 
-All other frozen routes remain mapped with their source `gate`, `source_implemented`, `owner_gap_task`, and `real_verified=NO` values. No redesign was performed.
+- CUS-005/006: `/me` project membership, project metadata, checklist/requirements, preview/case/message read model.
+- CUS-012/013: authoritative private preview, version-bound feedback, original case history, server delivery update and version retest.
+- CUS-014 formal whole-project acceptance remains HOLD; `RETEST_ACCEPTED` is never formal acceptance.
 
-## Corrected preview/change sequence
+## Preview/update contract
 
-4dc `Changes.page_updates(uid, project, page, version)` first calls `_preview(uid, project, page, version)` and only returns delivery records where `record.after_sha256 == version`. Therefore the client must not ask for an update while the authoritative listing is still the old SHA. V4 flow is:
+4dc `page_updates` first validates the supplied preview version and then returns only deliveries with `after_sha256 == version`. The UI therefore submits feedback against V1, rereads authoritative `previews/{project}`, waits until the same path is V2, calls `change_updates` with V2, displays `before_sha256` and `after_sha256` separately, and retests using exact project/case/revision/page/V2/delivery SHA/action. The old fake V1→V2 positive path is removed.
 
-1. open original trusted preview V1;
-2. submit feedback against V1 once;
-3. reload authoritative `previews/{project}`;
-4. only after the same path is listed at V2 call `change_updates(project,path,V2)`;
-5. render `before_sha256` as the modified-from version and `after_sha256` as the current delivery version;
-6. call `change_retest` with V2, current case revision and exact `delivery_sha256`.
+## Identity / CSRF
 
-Local HTTP tests enforce this sequence. The former v1 request returning a synthetic v2 delivery has been removed.
+The console reuses 4dc login/logout/session semantics. The session token stays HttpOnly/SameSite; only the returned CSRF value is stored in `sessionStorage`. A valid cookie with no tab-local CSRF may read `GET me`, but the login form stays visible because writes require explicit re-login. No token or CSRF is derived from the cookie.
 
-## Identity / CSRF contract
+4dc maps `AUTH_REQUIRED` to HTTP 403. For an active-operation 403, the frontend performs read-only `GET me`: if `me` also rejects 401/403, the session is treated as invalid; if `me` succeeds, identity is still valid and the event is treated as project/write denial, with the authorized project list refreshed. A stale 403 from a previously selected project is generation/project guarded and cannot clear the new project.
 
-The console now uses the original 4dc identity surface rather than fabricating roles/tokens:
+Successful logout clears local CSRF and reports success. Transport-unknown logout clears local write capability for safety but reports **unknown**, never successful logout.
 
-- `POST /customer/center/api/login {email,password}` returns `csrf`; session token remains server-set HttpOnly SameSite cookie.
-- CSRF is stored only in `sessionStorage`, matching the original UI behavior.
-- `GET /me` can identify an existing cookie-backed session without CSRF.
-- authenticated write operations require the CSRF header.
-- `POST /logout {}` uses the original logout contract and clears local CSRF.
-- 401 clears CSRF and all project content; 403 clears the selected project content and requires a refreshed project list.
+4dc has no reviewed CSRF recovery endpoint for a new tab. That remains a backend HOLD; current safe behavior is explicit re-login for write capability.
 
-Accurate remaining backend limitation: 4dc exposes no endpoint to recover the CSRF value from an already-valid HttpOnly session cookie in a new tab. Therefore a new tab can remain read-only after `GET /me`, but must re-login before writes. The frontend does not invent a token-recovery protocol.
+## Async isolation
 
-## Project-switch privacy correction
+Project loads and Q&A/feedback/update/retest mutations capture generation + project. After every await, success/failure DOM changes are allowed only if that context is still active. Tests cover late A success and late A 403 after switching to B, so A cannot reopen or clear B. Project switching clears metadata, requirements, previews, cases and messages before new data is rendered.
 
-Opening any project first clears project metadata, requirements, previews, cases and messages, then shows loading placeholders. A stale earlier response is generation-checked and ignored. Any denied/failed project load clears the detail view, so customer A data is never left under customer B's title. `main.test.js` exercises project switch, stale completion and rejected load; 401 clearing is separately tested.
+## Legacy UNKNOWN reconciliation
 
-## Submission safety
+Deployed `change_submit` remains the only formal UI submit endpoint and has no server idempotency.
 
-### Deployed legacy `change_submit`
+- no feedback text is persisted;
+- transport-unknown stores only `{project,page,version,at}` under a scope-specific sessionStorage key;
+- unknown A does not block B or another page/version;
+- definite 400/403/409 do not create UNKNOWN;
+- the UI first performs read-only `changes/{project}` reconciliation, then enables explicit clearing of that exact scope;
+- clearing never resends;
+- successful submission defensively clears the same-scope marker.
 
-Legacy feedback has no server idempotency key. V4 does not persist the customer feedback body in localStorage/sessionStorage and does not permanently occupy a project/page/version slot after a successful or explicit 400/403/409 response. A transport-ambiguous POST stores only `{project,page,version,at}` in sessionStorage and blocks blind re-send until the user reconciles by reading the authoritative case list. After reconciliation the marker can be explicitly cleared and a later legitimate feedback on the same page/version is allowed.
+`change_submit_idempotent` remains adapter/test-only, unmerged and undeployed, with explicit retry only and no fallback to legacy.
 
-### Candidate `change_submit_idempotent`
+## Private preview URL
 
-Still candidate-only / not deployed. A 16–128 `[A-Za-z0-9_-]` key is kept only in in-memory adapter state in this slice; a definite 4xx clears the candidate slot, while a transport-unknown result requires explicit retry and reuses the same key. A missing candidate endpoint never falls back to legacy. This does not claim multi-tab/device idempotency; production-safe durable replay needs the server candidate to be merged and deployed.
+Server-returned URLs are normalized with `new URL` against a fixed dummy same-origin base, then required to match exactly:
 
-## Retest semantics
+`/customer/center/preview/{project}/{64-hex-page-key}/{64-hex-version}`
 
-Local fake/server tests now require exact `project`, `case`, `revision`, `page`, current delivery `version`, `delivery_sha256`, and `ACCEPT|FEEDBACK`. No fictitious `final_contract_acceptance` field is returned or asserted. The result checks `automatic_charge:false` when supplied. Formal project acceptance remains a separate missing server capability from the final specification.
+Expected project/version come from the authorized record. Query, fragment, percent encoding (including encoded traversal), backslash, external/protocol-relative origin, wrong project, non-hex key and normalized escape are rejected. No iframe workaround or synthesized preview URL exists.
 
-## Test layers and result
+## Test evidence
 
-Current isolated suite: 18/18 PASS.
+V5 isolated suite: **24/24 PASS, 0 FAIL**.
 
-- 4 fetch-stub/API boundary tests: HTTP method/body/same-origin/CSRF, transport ambiguity, private URL allowlist, exact retest body.
-- 4 candidate-contract in-memory tests: stable replay, same-key changed-body 409, missing endpoint no fallback, cookie-read/CSRF-write distinction.
-- 3 real local HTTP socket tests: corrected V1→V2 preview/update/retest journey, cross-project/revoke/expiry/version-drift rejects, legacy response-loss reconciliation.
-- 2 `main.js` UI state tests with a minimal deterministic DOM harness: switch/failed-load stale-data clearing and 401 session clearing.
-- 1 frozen 69-page mapping integrity test.
-- 4 submission state tests: same-version later feedback, definite failures do not lock, unknown does not store feedback body and prevents blind resend, candidate definite-vs-unknown behavior.
+- 4 fetch/API boundary tests.
+- 3 candidate-idempotency adapter tests.
+- 3 local real HTTP-socket tests using 4dc response/body semantics; not production authentication.
+- 8 deterministic `main.js` DOM/state tests for async races, 403 session discrimination and logout-unknown behavior.
+- 2 traceability tests: fixed CSV SHA plus exact 69×26 field comparison.
+- 4 submission-state tests for scoped UNKNOWN and definite/unknown behavior.
 
-These are isolated source tests. They are NOT a real authenticated backend run, browser E2E, Hosted acceptance or production proof.
+This is source/isolation evidence, not Hosted, real browser E2E, production deployment, payment or customer acceptance proof.
 
-## Remaining exact gaps for website/backend owner
+## Remaining HOLD / NOT_EXECUTED
 
-1. Real authenticated Hosted run of 4dc identity + project + preview/change routes and browser E2E remains NOT_EXECUTED.
-2. New-tab CSRF recovery does not exist in 4dc. Either accept re-login-for-write behavior or add a reviewed server endpoint/flow; frontend must not derive the token from the HttpOnly cookie.
-3. `change_submit_idempotent` remains unmerged/unavailable; no UI enablement until backend acceptance/deployment.
-4. Full structured requirement capture/version confirmation (CUS-007), prototype page-confirmation object (S4/GAP-11), original-task receipt/completion binding (GAP-02/03/07), and frozen-69-page preview registration (GAP-01) remain backend/task-registry gaps.
-5. Formal whole-project acceptance (CUS-014/S7) requires an independent server record/authority check. Never reuse `RETEST_ACCEPTED`.
-6. Finance/order/entitlement/subscription/maintenance routes outside this first project slice remain HOLD where the final spec has no production interface evidence.
-7. Real 360/390/768/1440 browser acceptance and the prototype's 276 screenshot baseline remain BROWSER_UNVERIFIED.
+1. Authenticated Hosted real-user 4dc journey: `NOT_EXECUTED`.
+2. 360/390/768/1440 real-browser acceptance against frozen baselines: `NOT_EXECUTED`.
+3. New-tab CSRF recovery: `MISSING/HOLD`.
+4. Frozen 69-page signed preview registration / GAP-01: `HOLD`.
+5. Original Task Registry binding/completion-event writeback / GAP-02/GAP-03: `NOT_WIRED`.
+6. Full structured requirement fact/version chain / GAP-04: `HOLD`.
+7. Formal whole-project acceptance / CUS-014: `HOLD`; never reuse `change_retest`.
+8. `change_submit_idempotent` backend merge/deployment: `NOT_DEPLOYED`.
+9. Finance/order/entitlement/subscription/maintenance interfaces outside this slice: `HOLD` where the final specification has no production evidence.

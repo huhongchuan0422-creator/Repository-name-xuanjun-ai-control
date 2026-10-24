@@ -1,0 +1,154 @@
+TAP version 13
+# Subtest: same-origin identity/login/logout and csrf
+ok 1 - same-origin identity/login/logout and csrf
+  ---
+  duration_ms: 1.251176
+  type: 'test'
+  ...
+# Subtest: transport ambiguity only for POST
+ok 2 - transport ambiguity only for POST
+  ---
+  duration_ms: 1.545849
+  type: 'test'
+  ...
+# Subtest: preview URL normalizes then requires exact project/key/version and rejects encodings/backslash
+ok 3 - preview URL normalizes then requires exact project/key/version and rejects encodings/backslash
+  ---
+  duration_ms: 0.374969
+  type: 'test'
+  ...
+# Subtest: retest exact 4dc body
+ok 4 - retest exact 4dc body
+  ---
+  duration_ms: 0.444388
+  type: 'test'
+  ...
+# Subtest: candidate lost response reuses same key only on explicit retry
+ok 5 - candidate lost response reuses same key only on explicit retry
+  ---
+  duration_ms: 3.4238
+  type: 'test'
+  ...
+# Subtest: candidate same key changed body returns server 409
+ok 6 - candidate same key changed body returns server 409
+  ---
+  duration_ms: 0.260259
+  type: 'test'
+  ...
+# Subtest: candidate unavailable never falls back to legacy
+ok 7 - candidate unavailable never falls back to legacy
+  ---
+  duration_ms: 0.368779
+  type: 'test'
+  ...
+# Subtest: HTTP journey requires authoritative preview to move v1->v2 before page_updates/retest
+ok 8 - HTTP journey requires authoritative preview to move v1->v2 before page_updates/retest
+  ---
+  duration_ms: 51.659291
+  type: 'test'
+  ...
+# Subtest: HTTP rejects cross-project/revoke/expiry/version drift
+ok 9 - HTTP rejects cross-project/revoke/expiry/version drift
+  ---
+  duration_ms: 12.920123
+  type: 'test'
+  ...
+# Subtest: legacy lost response leaves scoped marker; read-only cases recover evidence without resend
+ok 10 - legacy lost response leaves scoped marker; read-only cases recover evidence without resend
+  ---
+  duration_ms: 6.468063
+  type: 'test'
+  ...
+# Subtest: start with valid cookie but no csrf keeps login visible for write recovery
+ok 11 - start with valid cookie but no csrf keeps login visible for write recovery
+  ---
+  duration_ms: 1.416746
+  type: 'test'
+  ...
+# Subtest: project switch clears old DOM and stale rejected load cannot clear new project
+ok 12 - project switch clears old DOM and stale rejected load cannot clear new project
+  ---
+  duration_ms: 0.745701
+  type: 'test'
+  ...
+# Subtest: late Q&A success from A cannot reopen A after switch to B
+ok 13 - late Q&A success from A cannot reopen A after switch to B
+  ---
+  duration_ms: 0.593723
+  type: 'test'
+  ...
+# Subtest: late Q&A 403 from A cannot globally clear B
+ok 14 - late Q&A 403 from A cannot globally clear B
+  ---
+  duration_ms: 0.352393
+  type: 'test'
+  ...
+# Subtest: late feedback success from A cannot reopen A after switch to B
+ok 15 - late feedback success from A cannot reopen A after switch to B
+  ---
+  duration_ms: 1.739804
+  type: 'test'
+  ...
+# Subtest: late retest 403 from A cannot clear B
+ok 16 - late retest 403 from A cannot clear B
+  ---
+  duration_ms: 0.917772
+  type: 'test'
+  ...
+# Subtest: 403 distinguishes invalid session from project denial via read-only me
+ok 17 - 403 distinguishes invalid session from project denial via read-only me
+  ---
+  duration_ms: 0.411006
+  type: 'test'
+  ...
+# Subtest: logout transport unknown never claims successful logout
+ok 18 - logout transport unknown never claims successful logout
+  ---
+  duration_ms: 0.249181
+  type: 'test'
+  ...
+# Subtest: fixed traceability CSV hash and every one of 69 rows/26 fields matches source including owner_gap_task
+ok 19 - fixed traceability CSV hash and every one of 69 rows/26 fields matches source including owner_gap_task
+  ---
+  duration_ms: 35.191115
+  type: 'test'
+  ...
+# Subtest: frozen mapping preserves HOLD/no-real-verified and exact key SaaS pages
+ok 20 - frozen mapping preserves HOLD/no-real-verified and exact key SaaS pages
+  ---
+  duration_ms: 0.178771
+  type: 'test'
+  ...
+# Subtest: legacy unknown is scoped and stores no feedback body
+ok 21 - legacy unknown is scoped and stores no feedback body
+  ---
+  duration_ms: 1.195579
+  type: 'test'
+  ...
+# Subtest: scoped unknown A does not block B and explicit clear allows A later new request
+ok 22 - scoped unknown A does not block B and explicit clear allows A later new request
+  ---
+  duration_ms: 1.458522
+  type: 'test'
+  ...
+# Subtest: definite 400/403/409 do not create unknown marker
+ok 23 - definite 400/403/409 do not create unknown marker
+  ---
+  duration_ms: 0.323859
+  type: 'test'
+  ...
+# Subtest: candidate definite failure clears memory slot; unknown explicit retry reuses key
+ok 24 - candidate definite failure clears memory slot; unknown explicit retry reuses key
+  ---
+  duration_ms: 1.090924
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 179.222238
