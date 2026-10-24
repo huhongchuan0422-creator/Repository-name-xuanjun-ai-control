@@ -59,6 +59,9 @@ class ReleaseCandidate(unittest.TestCase):
         for key in ('run_id','artifact_id'):
             v=source();v[key]=True
             with self.assertRaises(ValueError):p.prepare(v)
+        for value in (True,2.0,'2'):
+            v=image();v['run_id']=value
+            with self.assertRaises(ValueError):p.prepare(source(),current(),v)
         for key in ('image_archive_sha256','artifact_sha256','repo_digest'):
             v=image();v[key]='UNKNOWN'
             with self.assertRaises(ValueError):p.prepare(source(),current(),v)
@@ -85,7 +88,7 @@ class ReleaseCandidate(unittest.TestCase):
         s=source()['source_sha'];v=dict(http_status=200,url=p.URL,status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',
             production_acceptance=False,runtime_source_sha=s,version_source='IMAGE_BUILD_STAMP',observed_at=1000)
         self.assertTrue(p.exact_health(v,s,s,1000))
-        for key,bad in (('runtime_source_sha',None),('version_source',None),('observed_at',True),('observed_at',399),
+        for key,bad in (('http_status',200.0),('runtime_source_sha',None),('version_source',None),('observed_at',True),('observed_at',399),
                         ('observed_at',1031),('url','https://other/'),('production_acceptance',True)):
             r={**v,key:bad};self.assertFalse(p.exact_health(r,s,s,1000))
         self.assertFalse(p.exact_health(v,s,p.OBSERVED_OCI,1000))

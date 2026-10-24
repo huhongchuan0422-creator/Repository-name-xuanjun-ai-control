@@ -59,6 +59,7 @@ def image_evidence(value,source):
     keys={'source_sha','tree_sha','source_zip_sha256','oci_revision','image_id','repo_digest',
           'image_archive_sha256','artifact_sha256','artifact_id','run_id'}
     require(type(value) is dict and set(value)==keys,'EXACT_IMAGE_EVIDENCE_REQUIRED')
+    require(type(value['run_id']) is int and value['run_id']>0,'IMAGE_RUN_ID_REQUIRED')
     require(all(value[k]==source[k] for k in ('source_sha','tree_sha','source_zip_sha256','run_id')),
             'SAME_SOURCE_BUILD_REQUIRED')
     require(value['oci_revision']==source['source_sha'] and image_id(value['image_id']),'IMAGE_REVISION_REQUIRED')
@@ -151,7 +152,7 @@ def next_phase(phase,event):
 
 def exact_health(value,source_sha,image_revision,now):
     if (type(value) is not dict or type(now) is not int or not exact_hex(source_sha,40)
-            or value.get('http_status')!=200 or value.get('url')!=URL
+            or type(value.get('http_status')) is not int or value.get('http_status')!=200 or value.get('url')!=URL
             or value.get('status')!='READY' or value.get('scope')!='PROCESS_AND_DATABASE_CONNECTIVITY'
             or value.get('production_acceptance') is not False
             or value.get('runtime_source_sha')!=source_sha or image_revision!=source_sha
