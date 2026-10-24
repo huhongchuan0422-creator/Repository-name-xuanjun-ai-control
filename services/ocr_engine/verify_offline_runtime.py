@@ -4,6 +4,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+def verify_shared_libraries(candidates, runner=subprocess.run):
+    checked=set()
+    for shared in candidates:
+        result=runner(["ldd",str(shared)],text=True,capture_output=True)
+        output=result.stdout+"\n"+result.stderr
+        if result.returncode != 0:
+            raise RuntimeError("LDD_FAILED:"+Path(shared).name+":"+output)
+        if "not found" in output:
+            raise RuntimeError("SHARED_LIBRARY_NOT_FOUND:"+Path(shared).name+":"+output)
+        if "not a dynamic executable" in output.lower() or "statically linked" in output.lower():
+            raise RuntimeError("LDD_NOT_DYNAMIC_ELF:"+Path(shared).name+":"+output)
+        checked.add(Path(shared).name)
+    return checked
+
 def main():
     import cv2
     import fastapi, uvicorn, onnxruntime, rapidocr, numpy, cryptography
@@ -14,13 +28,12 @@ def main():
     candidates=sorted({p for p in package_root.rglob("*.so") if p.is_file() and not p.is_symlink()} |
                       {p for p in package_root.rglob("*.so.*") if p.is_file() and not p.is_symlink()})
     if not candidates: raise SystemExit("CV2_SHARED_OBJECT_NOT_FOUND")
-    checked=set()
-    for shared in candidates:
-        result=subprocess.run(["ldd",str(shared)],text=True,capture_output=True)
-        output=result.stdout+"\n"+result.stderr
-        if result.returncode not in (0,1): raise SystemExit("LDD_FAILED:"+shared.name+":"+output)
-        if "not found" in output: raise SystemExit("SHARED_LIBRARY_NOT_FOUND:"+shared.name+":"+output)
-        checked.add(shared.name)
+    try:
+        checked=verify_shared_libraries(candidates)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc))
+    subprocess.run(["dpkg-query","-W","-f="+ "${Package}=${Version}" + chr(10),
+                    "libgl1","libglib2.0-0","libsm6","libxext6","libxrender1","libxcb1"],check=True,text=True)
     subprocess.run([sys.executable,"-m","pip","check"],check=True)
     print("OPENCV_DISTRIBUTION=opencv-python=="+importlib.metadata.version("opencv-python"))
     print("CV2_IMPORT=PASS:"+str(cv2.__version__))
