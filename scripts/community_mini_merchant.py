@@ -14,13 +14,14 @@ READS={'community.orders','community.summary','community.orders_page',
        'community.ads_page','community.refund_preview','community.reconciliation'}
 
 class MiniMerchant:
-    def __init__(self,identity,onboarding,operations=None,collection_codes=None):
+    def __init__(self,identity,onboarding,operations=None,collection_codes=None,ocr=None):
         if (type(identity) is not CenterIdentity or type(onboarding) is not MerchantOnboarding
                 or identity.center is not onboarding.center
                 or operations is not None and (operations.center is not identity.center or operations.runtime is not identity.runtime)):
             raise PermissionError('ORIGINAL_MINI_MERCHANT_SERVICES_REQUIRED')
         self.identity,self.onboarding,self.operations=identity,onboarding,operations
         self.collection_codes=collection_codes
+        self.ocr=ocr
     def context(self,token,scene):
         return self.identity.merchant_context(token,scene)
     def _grant(self,token,scene,workspace):
@@ -40,6 +41,18 @@ class MiniMerchant:
                 or type(body['operation']) is not str or type(body['params']) is not dict):
             raise ValueError('INVALID_MINI_MERCHANT_REQUEST')
         op,p=body['operation'],body['params']
+        if op=='ocr':
+            from scripts.community_ocr_host import HostOcr, OcrPublicError
+            if type(self.ocr) is not HostOcr or self.ocr.merchant.identity is not self.identity or self.ocr.merchant.onboarding is not self.onboarding:
+                raise OcrPublicError('OCR_UNAVAILABLE')
+            try:return self.ocr.dispatch(token,scene,p)
+            except PermissionError as error:
+                from scripts.community_ocr_host import OcrPublicError
+                code=str(error)
+                if any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
+                elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
+                else:public='OCR_UNAVAILABLE'
+                raise OcrPublicError(public) from None
         if op=='collection_code':
             if set(p)!={'workspace'} or type(p['workspace']) is not str:raise ValueError('EXACT_COLLECTION_WORKSPACE_REQUIRED')
             from scripts.community_collection_code import CollectionCodes

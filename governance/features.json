@@ -88,7 +88,9 @@
           "tests/test_community_finance_record_isolation.py",
           "tests/test_community_integrated_platform_bill_journey.py",
           "tests/test_community_preview_version_inspect.py",
-          "tests/test_community_ocr_bridge.py"
+          "tests/test_community_ocr_bridge.py",
+          "tests/test_community_ocr_host.py",
+          "clients/community-mini/ocr-host-ui.test.cjs"
         ]
       },
       "reuse": [
@@ -228,7 +230,11 @@
         "tests/test_community_preview_version_inspect.py",
         "scripts/community_ocr_bridge.py",
         "scripts/community_ocr_dependency.json",
-        "tests/test_community_ocr_bridge.py"
+        "tests/test_community_ocr_bridge.py",
+        "scripts/community_ocr_host.py",
+        "tests/test_community_ocr_host.py",
+        "clients/community-mini/ocr-host-ui.test.cjs",
+        "docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md"
       ]
     },
     {

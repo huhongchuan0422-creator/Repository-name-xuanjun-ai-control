@@ -8,7 +8,7 @@ from pathlib import Path
 
 def build(root):
     root = Path(root)
-    patterns = ('docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
+    patterns = ('docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
                 'tests/test_community_*.mjs', 'tests/community_*.cjs',
                 'tests/test_stage5_*.py', 'demos/community-local-e2e/*',
                 'demos/community-stage/*', 'demos/community-stage/ui-preview/*', 'demos/community-payment/*',

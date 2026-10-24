@@ -109,6 +109,7 @@ class PlatformHost:
         self.persistence = None
         self.application = None
         self.center_lock = None
+        self.ocr = None
 
     @classmethod
     def open(cls, plan_path, keys_path, wechat_path):
@@ -169,6 +170,35 @@ class PlatformHost:
             owner.close()
             raise
 
+    def configure_ocr(self, scene, api, store):
+        """Explicit protected Python opt-in; plan/env/HTTP cannot enable OCR.
+
+        Uses existing Center and admitted encrypted store; no key generation,
+        grant, new server, replacement identity or configuration migration.
+        """
+        if self.application is None or self.application.server is not None or self.ocr is not None:
+            raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        from scripts.community_mini_merchant import MiniMerchant
+        from scripts.community_ocr_host import HostOcr
+        app=self.application
+        if app.onboarding is None:raise PermissionError('OCR_ONBOARDING_REQUIRED')
+        app.center.db.execute('SELECT 1')  # Original owner thread, before opt-in.
+        from scripts.community_ocr_bridge import compose
+        # compose validates exact pinned dependency/store type before any use.
+        # Protected original store must already exist; never initialize it here.
+        if type(store) is not api.SecureSQLiteJobStore:raise PermissionError('OCR_ENCRYPTED_STORE_REQUIRED')
+        _directory(str(Path(store.db_path).parent))
+        store_info=_file(Path(store.db_path))
+        original=[Path(self.plan['center_root'])/'center.sqlite']
+        original += [Path(self.plan['runtime_directory'])/(name+'.sqlite') for name in NAMES]
+        if any((store_info.st_dev,store_info.st_ino)==(info.st_dev,info.st_ino)
+               for info in (_file(path) for path in original)):
+            raise PermissionError('OCR_SEPARATE_STORE_REQUIRED')
+        merchant=MiniMerchant(app.identity,app.onboarding,app.operations)
+        self.ocr=HostOcr(merchant,scene,api,store)
+        app.gateway.ocr=self.ocr
+        return self.ocr
+
     def serve(self):
         if self.application is None:
             raise RuntimeError('OPEN_PLATFORM_HOST_REQUIRED')
@@ -182,6 +212,11 @@ class PlatformHost:
 
     def close(self):
         first = None
+        if self.ocr is not None:
+            try:self.ocr.close()
+            except BaseException as error:first=error
+            if self.application is not None:self.application.gateway.ocr=None
+            self.ocr=None
         for target, operation in ((self.application,'close'), (self.center,'db'), (self.persistence,'close')):
             if target is None:
                 continue

@@ -211,7 +211,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     from scripts.community_mini_merchant import MiniMerchant
                     if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token') or self.headers.get_all('Authorization',[]):
                         raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
-                    mini_merchant=MiniMerchant(gateway.identity,onboarding,operations,getattr(gateway,'collection_codes',None))
+                    mini_merchant=MiniMerchant(gateway.identity,onboarding,operations,getattr(gateway,'collection_codes',None),getattr(gateway,'ocr',None))
                     mini_merchant.context(self.headers.get('X-Community-Session',''),self.headers.get('X-Community-Scene',''))
                     limit=7_000_000
                 if self.path=='/mini/project-materials':
@@ -324,7 +324,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 else:result=gateway.dispatch(token,body)
                 return self.answer(200,{'result':result,'payment_enabled':False})
             except LoginUnavailable:return self.answer(503,{'error':'LOGIN_UNKNOWN_OR_REJECTED'})
-            except PermissionError:return self.answer(403,{'error':'ACCESS_DENIED'})
+            except PermissionError as error:
+                from scripts.community_ocr_host import OcrPublicError
+                return self.answer(403,{'error':error.code if type(error) is OcrPublicError else 'ACCESS_DENIED'})
             except (ValueError,TypeError,KeyError):return self.answer(400,{'error':'INVALID_REQUEST'})
             except (socket.timeout,TimeoutError):return self.answer(408,{'error':'REQUEST_TIMEOUT'})
             except Exception:return self.answer(503,{'error':'SERVICE_UNAVAILABLE'})

@@ -34,6 +34,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         const error=Error('SERVICE_REQUEST_REJECTED');
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
+        if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
         reject(error);
       },
       fail:detail=>{
@@ -86,7 +87,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     async merchant(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
-         !['workspaces','onboarding','read','write','collection_code'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
+         !['workspaces','onboarding','read','write','collection_code','ocr'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
       const version=generation;
       const reply=await request('/mini/merchant',{operation,params},token,scene);
       if(version!==generation)throw Error('STALE_SESSION');
