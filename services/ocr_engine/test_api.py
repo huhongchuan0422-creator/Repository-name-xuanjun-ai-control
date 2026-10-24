@@ -33,13 +33,14 @@ class ApiTests(unittest.TestCase):
         self.revoked_apps = set()
         self.revoked_attachments = set()
         self.current_revision = "1"
+        self.current_provider_version = "1.2.0"
         def attachment_resolver(p, app, attachment, content_sha, document_type, expected_application_revision=None):
             valid = (app == "synthetic-app" and attachment == "synthetic-attachment" and
                      content_sha == self.expected_sha and attachment not in self.revoked_attachments and
                      document_type == "business_license" and
                      (expected_application_revision is None or str(expected_application_revision) == self.current_revision))
             return {"authorized": valid, "content_sha256": self.expected_sha,
-                    "document_type": "business_license", "application_revision": self.current_revision}
+                    "document_type": "business_license", "application_revision": self.current_revision, "provider_version": self.current_provider_version}
         self.attachment_resolver = attachment_resolver
         from cryptography.fernet import Fernet
         self._tmp = tempfile.TemporaryDirectory()
@@ -105,7 +106,7 @@ class ApiTests(unittest.TestCase):
                 return TestClient(create_app(authenticate=auth,
                     store=SecureSQLiteJobStore(path, key), infer=inference_fixture,
                     authorize_application=lambda p, app_id: app_id == "synthetic-app",
-                    authorize_attachment=lambda p, app_id, attachment, content_sha, document_type, expected_revision=None: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest() and document_type == "business_license" and expected_revision in (None, "1"), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "document_type": "business_license", "application_revision": "1"}))
+                    authorize_attachment=lambda p, app_id, attachment, content_sha, document_type, expected_revision=None: {"authorized": attachment == "synthetic-attachment" and content_sha == hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest() and document_type == "business_license" and expected_revision in (None, "1"), "content_sha256": hashlib.sha256(bytes([255,216,255])+b"synthetic").hexdigest(), "document_type": "business_license", "application_revision": "1", "provider_version": "1.2.0"}))
             with app() as client1:
                 first = client1.post("/api/v1/ocr/jobs", headers=self.headers,
                     data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
@@ -137,8 +138,8 @@ class ApiTests(unittest.TestCase):
     def test_confirmation_rejects_extra_fields_and_oversize_values(self):
         r=self.submit(); url="/api/v1/ocr/jobs/"+r.json()["job_id"]+"/confirm"
         headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"confirm-validation-0001"}
-        self.assertEqual(self.client.post(url, headers=headers, json={"revision":1, "fields":{"authenticity_verified":"true"}}).status_code,400)
-        self.assertEqual(self.client.post(url, headers={**headers, "Idempotency-Key":"confirm-validation-0002"}, json={"revision":1, "fields":{"company_name":"x"*257}}).status_code,400)
+        self.assertEqual(self.client.post(url, headers=headers, json={"revision":1, "application_revision":"1", "provider_version":"1.2.0", "fields":{"authenticity_verified":"true"}}).status_code,400)
+        self.assertEqual(self.client.post(url, headers={**headers, "Idempotency-Key":"confirm-validation-0002"}, json={"revision":1, "application_revision":"1", "provider_version":"1.2.0", "fields":{"company_name":"x"*257}}).status_code,400)
     def test_wrong_bytes_rejected_for_valid_attachment_id(self):
         r=self.client.post("/api/v1/ocr/jobs",headers={**self.headers,"Idempotency-Key":"wrong-bytes-key-001"},
             data={"document_type":"business_license","onboarding_application_id":"synthetic-app","attachment_id":"synthetic-attachment"},
@@ -150,7 +151,7 @@ class ApiTests(unittest.TestCase):
         self.revoked_apps.add("synthetic-app")
         headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"revoke-confirm-key-001"}
         self.assertEqual(self.client.get("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
-        self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"fields":{"company_name":"x"}}).status_code,403)
+        self.assertEqual(self.client.post("/api/v1/ocr/jobs/"+job_id+"/confirm",headers=headers,json={"revision":1,"application_revision":"1","provider_version":"1.2.0","fields":{"company_name":"x"}}).status_code,403)
         self.assertEqual(self.client.delete("/api/v1/ocr/jobs/"+job_id,headers=headers).status_code,403)
     def test_attachment_revocation_denies_get_confirm_delete(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()["job_id"]
@@ -177,7 +178,7 @@ class ApiTests(unittest.TestCase):
         self.current_revision='2'
         headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revision-change-confirm-001'}
         self.assertEqual(self.client.get('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
-        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'fields':{'company_name':'x'}}).status_code,403)
+        self.assertEqual(self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,json={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'x'}}).status_code,403)
         self.assertEqual(self.client.delete('/api/v1/ocr/jobs/'+job_id,headers=headers).status_code,403)
     def test_legacy_job_missing_application_revision_fails_closed(self):
         from cryptography.fernet import Fernet
