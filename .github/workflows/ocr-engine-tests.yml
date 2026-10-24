@@ -132,12 +132,15 @@ for p in sorted(root.glob("*.deb")):
     if len(fields)!=3: raise SystemExit("DEB_METADATA_INVALID:"+p.name)
     items.append({"filename":p.name,"package":fields[0],"version":fields[1],"architecture":fields[2],"sha256":hashlib.sha256(p.read_bytes()).hexdigest()})
 if not items: raise SystemExit("DEB_CLOSURE_EMPTY")
+apt_sources=Path("/etc/apt/sources.list.d/debian.sources")
+if not apt_sources.is_file(): raise SystemExit("OFFICIAL_APT_SOURCE_FILE_MISSING")
+source_bytes=apt_sources.read_bytes()
 apt_lists=[]
 for p in sorted(Path("/var/lib/apt/lists").rglob("*")):
     if p.is_file():
         apt_lists.append({"path":str(p.relative_to("/var/lib/apt/lists")),"bytes":p.stat().st_size,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()})
 if not apt_lists: raise SystemExit("APT_INDEX_CACHE_EMPTY")
-Path("/debs/system-deb-lock.json").write_text(json.dumps({"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","packages":items,"apt_lists":apt_lists},sort_keys=True,indent=2)+"\\n")
+Path("/debs/system-deb-lock.json").write_text(json.dumps({"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199","apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_bytes).hexdigest(),"content":source_bytes.decode("utf-8")},"packages":items,"apt_lists":apt_lists},sort_keys=True,indent=2)+"\\n")
 print(json.dumps({"deb_count":len(items),"packages":[{"package":x["package"],"version":x["version"],"architecture":x["architecture"],"sha256":x["sha256"]} for x in items]},sort_keys=True))
 PY
             '
