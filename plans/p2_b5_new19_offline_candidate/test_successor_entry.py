@@ -1,7 +1,10 @@
 """The production entry must fail before a host action without enrollment."""
 import os
+import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -59,6 +62,34 @@ class EntryTests(unittest.TestCase):
                 self.assertEqual(entry.dispatch('recover')['state'],
                                  'UNKNOWN_OR_PENDING_NO_REPOST')
             self.assertEqual(called,['custody','wait'])
+
+    def test_clean_deliverable_tree_imports_without_unbound_helper_copy(self):
+        manifest=json.loads((ROOT/'SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json').read_bytes())
+        with tempfile.TemporaryDirectory() as temp:
+            destination=Path(temp)
+            for row in manifest['files']:
+                source=ROOT/row['path'];target=destination/row['path']
+                target.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copyfile(source,target)
+            for source in (ROOT/'new19-source').rglob('*'):
+                if source.is_file():
+                    target=destination/'new19-source'/source.relative_to(ROOT/'new19-source')
+                    target.parent.mkdir(parents=True,exist_ok=True)
+                    shutil.copyfile(source,target)
+            self.assertFalse((destination/'reused-6825').exists())
+            result=subprocess.run([sys.executable,'-B',str(destination/
+                    'successor_controller/pr17_b5_successor_entry.py'),'--help'],
+                    capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn(b'recover',result.stdout)
+            execute=subprocess.run([sys.executable,'-B',str(destination/
+                'successor_controller/pr17_b5_successor_entry.py'),
+                'execute','--batch','isolated-unit-batch-20261024',
+                '--attempt','one','--approval-ref','fixture','--window-start','1792830000'],
+                capture_output=True,timeout=10)
+            self.assertEqual(execute.returncode,2,execute.stderr)
+            self.assertIn(b'ENTRY_UK_IDENTITY',execute.stdout)
+            self.assertNotIn(b'ModuleNotFoundError',execute.stdout)
 
 
 if __name__=='__main__':

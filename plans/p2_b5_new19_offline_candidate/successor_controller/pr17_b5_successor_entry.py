@@ -12,7 +12,8 @@ import stat
 import sys
 
 LOCAL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _root in (LOCAL_ROOT, LOCAL_ROOT+'/reused-6825', LOCAL_ROOT+'/new19-source'):
+for _root in (LOCAL_ROOT, LOCAL_ROOT+'/new19-source/reused-6825',
+              LOCAL_ROOT+'/new19-source'):
     if _root not in sys.path:
         sys.path.insert(0, _root)
 
