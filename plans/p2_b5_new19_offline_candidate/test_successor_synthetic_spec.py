@@ -298,6 +298,13 @@ class SyntheticSpecTests(unittest.TestCase):
                         def getresponse(self):return Response()
                         def close(self):pass
                     guard_calls=[]
+                    fd_snapshots=[]
+                    original_snapshot=tx.b._snapshot_live_fds
+                    def traced_snapshot():
+                        value=original_snapshot()
+                        fd_snapshots.append(value)
+                        return value
+                    tx.b._snapshot_live_fds=traced_snapshot
                     original_guarded=tx.guarded
                     def traced_guarded(name,*args):
                         guard_calls.append(name)
@@ -312,7 +319,7 @@ class SyntheticSpecTests(unittest.TestCase):
                                RecordedHTTP):
                         result=tx.execute()
                     self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED',
-                                     (result,guard_calls))
+                                     (result,guard_calls,fd_snapshots))
                     self.assertEqual(result['new_requests'],0)
                     tx.b.authority.original.queue.close()
                 child=subprocess.run([sys.executable,'-B',str(HERE/
