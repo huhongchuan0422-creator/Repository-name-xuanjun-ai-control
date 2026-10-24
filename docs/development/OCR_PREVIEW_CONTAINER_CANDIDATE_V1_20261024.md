@@ -95,3 +95,15 @@ Status remains SOURCE_CANDIDATE / NOT_BUILT / NOT_INSTALLED / NOT_STARTED / COMM
 - Dockerfile commit: 478fcd02ee6542f9974e2ccfe7c13fd79fbf1946.
 - Launcher commit: 6d0617e8be5e58bc95298adb4c7a3e6e46946fc3.
 - Final candidate HEAD is verified after this document update; use only the exact branch HEAD and verify the formal artifact hashes before any separately approved build.
+
+## 9. Security review follow-up — source only
+
+This revision closes four source-level findings from the independent review:
+1. The Dockerfile model-pin environment value is single-quoted as one key=value token so the embedded JSON double quotes survive Dockerfile parsing; the synthetic test tokenizes the ENV instruction and parses the extracted value with json.loads. This is not a Docker daemon/parser integration test.
+2. The launcher now requires check_environment().database == EXISTING_PROTECTED_FILE_VERIFIED, then opens the existing database read-only, runs SQLite integrity_check, checks required schema tables and verifies the encryption-key binding. Missing DB, empty/uninitialized schema, corruption, wrong key, unsafe permissions or read-only inspection errors HOLD before create_app()/Uvicorn. It does not create, migrate, or reset a database.
+3. Trusted bindings are loaded from one regular .py file under the supplied absolute read-only integration root. Symlinked path components, symlinked source, noncanonical/escaped module origin, a same-name preloaded sys.modules entry, absent callbacks and incompatible callback signatures are rejected. Required positional call shapes are authenticate(1), authorize_application(2), authorize_attachment(6). No Principal is fabricated.
+4. The base image is now a literal FROM digest and cannot be overridden with an ARG. OCR_CONTAINER_SOURCE_SHA must be nonempty, lowercase hex and exactly 40 characters. The floating Dockerfile frontend syntax directive was removed; the build still requires an already-installed local BuildKit using its built-in frontend and the exact pinned base image already present locally. No frontend or base-image download is authorized in this task.
+
+Synthetic test coverage added for ENV tokenization/JSON parsing, fixed base and source-SHA gates, absent and ready encrypted DB behavior/key mismatch, symlinked binding source, and wrong callback arity. These are source-level tests and have NOT been executed in this environment.
+
+The formal runtime package remains source cb28f605291cde6dc48a2d6431166211059dc595; the independent container candidate has a different source commit. The package itself is reused without rebuilding. The image build, actual Docker lexer/frontend, read-only rootfs/capability restrictions, mounted integration path, UK network/volume, service lifecycle, Chinese HTTP inference in the container, real authentication/tenant isolation, community backend integration and Mini Program same-version E2E remain NOT_EXECUTED.
