@@ -112,6 +112,8 @@ class StageBoundaryTests(unittest.TestCase):
         class Backend:
             authority=Authority()
             def checkpoint(self,phase):checkpoints.append(phase)
+            def witness_action(self):return contextlib.nullcontext()
+            def successor_release_action(self):return contextlib.nullcontext()
             @contextlib.contextmanager
             def successor_evidence_action(self,kind):
                 try:
