@@ -8,11 +8,12 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 HERE=Path(__file__).resolve().parent
 sys.path[:0]=[str(HERE),str(HERE/'reused-6825'),
               str(HERE/'successor_controller')]
-from pr17_b5_successor_witness import (SuccessorEvidenceStore, Hold,
+from pr17_b5_successor_witness import (SuccessorEvidenceStore, WitnessStore, Hold,
                                         JOB, COMMIT, PROJECT, RECIPIENT, SUBJECT)
 from pr17_b5_successor_authority import ExistingRequestAuthority
 from pr17_b5_successor_backend import R2HostBackend
@@ -278,6 +279,69 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         self.assertTrue(done.is_set())
         with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_REVOKED'):
             self.store.read_exact(self.binding,'B5_EXPOSURE_CLOSE')
+
+    def test_evidence_continuity_unknown_is_sticky_and_never_relocks(self):
+        self.register('B5_EXPOSURE_CLOSE',dict(scope='B5_EXPOSURE_CLOSE',
+            job=JOB,decision_id='continuity-close',approved=True,
+            phase='AFTER_B5_HTTP'))
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+            with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+                self.assertEqual(len(self.store.active_action_fds(
+                    self.binding,('B5_EXPOSURE_CLOSE',))),2)
+                with patch('pr17_b5_successor_witness._shared_flock_held',
+                           return_value=False):
+                    with self.assertRaisesRegex(
+                            Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+                        self.store.active_action_fds(
+                            self.binding,('B5_EXPOSURE_CLOSE',))
+                # Proof recovery cannot rehabilitate this action: the lease was
+                # poisoned at first uncertainty and no re-lock path exists.
+                with self.assertRaisesRegex(
+                        Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+                    self.store.active_action_fds(
+                        self.binding,('B5_EXPOSURE_CLOSE',))
+
+    def test_nested_continuity_failure_poison_all_active_layers(self):
+        self.register('PRE_START_RESTORE',dict(scope='PRE_START_RESTORE',
+            job=JOB,decision_id='continuity-restore',approved=True,
+            phase='PRE_START'))
+        self.register('B5_EXPOSURE_CLOSE',dict(scope='B5_EXPOSURE_CLOSE',
+            job=JOB,decision_id='continuity-nested',approved=True,
+            phase='AFTER_B5_HTTP'))
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+            with self.store.action_exact(self.binding,'PRE_START_RESTORE'):
+                with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+                    self.assertEqual(len(self.store.active_action_fds(
+                        self.binding,('PRE_START_RESTORE','B5_EXPOSURE_CLOSE'))),4)
+                    with patch('pr17_b5_successor_witness._shared_flock_held',
+                               return_value=False):
+                        with self.assertRaisesRegex(
+                                Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+                            self.store.active_action_fds(
+                                self.binding,
+                                ('PRE_START_RESTORE','B5_EXPOSURE_CLOSE'))
+
+    def test_witness_action_continuity_unknown_is_sticky(self):
+        root=Path(self.temp.name)/'witness'
+        root.mkdir(mode=0o700)
+        (root/'register.lock').write_bytes(b'')
+        os.chmod(root/'register.lock',0o600)
+        store=WitnessStore(str(root),enabled=True,test_only=True,
+                           clock=lambda:self.now)
+        store.register(self.binding,owner_source_id='owner-source',
+            owner_source_raw=b'owner original',analyst_source_id='analyst-source',
+            analyst_source_raw=b'analyst original',witness_identity='registrar')
+        with self.assertRaisesRegex(Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
+            with store.action(self.binding):
+                self.assertEqual(len(store.active_action_fds(self.binding)),2)
+                with patch('pr17_b5_successor_witness._shared_flock_held',
+                           return_value=False):
+                    with self.assertRaisesRegex(
+                            Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
+                        store.active_action_fds(self.binding)
+                with self.assertRaisesRegex(
+                        Hold,'WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN'):
+                    store.active_action_fds(self.binding)
 
     def test_revocation_serializes_with_started_action(self):
         payload=dict(scope='B5_EXPOSURE_CLOSE',job=JOB,
