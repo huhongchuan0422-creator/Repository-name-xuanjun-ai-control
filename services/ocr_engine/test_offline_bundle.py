@@ -184,15 +184,17 @@ class OfflineBundleInputTests(unittest.TestCase):
         debs=self.root/"debs"; debs.mkdir()
         apt=(debs/"apt-lists"); apt.mkdir()
         apt_index=apt/"bookworm-main-Packages"; apt_index.write_bytes(b"synthetic apt index")
-        package=debs/"libxcb1_1.0_amd64.deb"; package.write_bytes(b"synthetic deb payload")
+        pkgroot=self.root/"pkgroot"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        package=debs/"libxcb1_1.0_amd64.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(package)],check=True,capture_output=True,text=True)
         source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm bookworm-updates\nComponents: main\n"
         lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
               "apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_content.encode()).hexdigest(),"content":source_content},
               "packages":[{"filename":package.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(package.read_bytes()).hexdigest()}],
               "apt_lists":[{"path":apt_index.name,"bytes":apt_index.stat().st_size,"sha256":hashlib.sha256(apt_index.read_bytes()).hexdigest()}]}
         (debs/"system-deb-lock.json").write_text(json.dumps(lock))
-        with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
-            verified,lock_path,verified_apt,lock_snapshot,lock_sha=validate_deb_cache(debs)
+        verified,lock_path,verified_apt,lock_snapshot,lock_sha=validate_deb_cache(debs)
         self.assertEqual(len(verified),1)
         self.assertEqual(lock_snapshot,(debs/"system-deb-lock.json").read_bytes())
         self.assertEqual(lock_sha,hashlib.sha256(lock_snapshot).hexdigest())
@@ -201,22 +203,23 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertEqual(verified_apt[0][1],"system-apt-lists/"+apt_index.name)
         self.assertEqual(lock_path,debs/"system-deb-lock.json")
         package.write_bytes(b"tampered deb")
-        with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
-            with self.assertRaisesRegex(BundleError,"DEB_SHA256_MISMATCH"): validate_deb_cache(debs)
+        with self.assertRaisesRegex(BundleError,"DEB_SHA256_MISMATCH"): validate_deb_cache(debs)
 
     def test_deb_lock_change_after_validation_is_not_retrusted(self):
         debs=self.root/"debs"; debs.mkdir()
         apt=debs/"apt-lists"; apt.mkdir()
         apt_index=apt/"Packages"; apt_index.write_bytes(b"index")
-        package=debs/"libxcb1_1.0_amd64.deb"; package.write_bytes(b"deb")
+        pkgroot=self.root/"pkgroot2"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        package=debs/"libxcb1_1.0_amd64.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(package)],check=True,capture_output=True,text=True)
         source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm\nComponents: main\n"
         lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
               "apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_content.encode()).hexdigest(),"content":source_content},
               "packages":[{"filename":package.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(package.read_bytes()).hexdigest()}],
               "apt_lists":[{"path":"Packages","bytes":apt_index.stat().st_size,"sha256":hashlib.sha256(apt_index.read_bytes()).hexdigest()}]}
         lock_path=debs/"system-deb-lock.json"; lock_path.write_text(json.dumps(lock))
-        with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
-            _,_,_,snapshot,digest=validate_deb_cache(debs)
+        _,_,_,snapshot,digest=validate_deb_cache(debs)
         lock_path.write_text(json.dumps({**lock,"packages":[]}))
         self.assertNotEqual(hashlib.sha256(lock_path.read_bytes()).hexdigest(),digest)
         self.assertNotEqual(lock_path.read_bytes(),snapshot)
