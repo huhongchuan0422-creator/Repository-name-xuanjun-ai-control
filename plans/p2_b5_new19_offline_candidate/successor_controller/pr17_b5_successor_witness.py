@@ -78,31 +78,6 @@ def _lease_identity(s):
     return (s.st_dev,s.st_ino,stat.S_IFMT(s.st_mode),s.st_uid,s.st_gid,
             stat.S_IMODE(s.st_mode),s.st_nlink)
 
-def _shared_flock_held(fd):
-    """Kernel proof that this exact open fd still carries the action SH flock.
-
-    This never acquires or repairs a lock. Missing/ambiguous proof is HOLD.
-    Linux exposes locks belonging to an fd in /proc/self/fdinfo/<fd>.
-    """
-    try:
-        proof_fd=os.open('/proc/self/fdinfo/%d'%fd,
-                         os.O_RDONLY|os.O_NOFOLLOW)
-        try:
-            raw=os.read(proof_fd,16385)
-        finally:
-            os.close(proof_fd)
-    except OSError:
-        return False
-    if len(raw)>16384:
-        return False
-    try:
-        lines=raw.decode('ascii').splitlines()
-    except UnicodeError:
-        return False
-    locks=[line.split() for line in lines if line.startswith('lock:')]
-    return any('FLOCK' in fields and 'ADVISORY' in fields and
-               'READ' in fields for fields in locks)
-
 
 class WitnessStore:
     def __init__(self, root=ROOT, *, enabled=False, test_only=False, clock=time.time):
@@ -111,6 +86,10 @@ class WitnessStore:
         self.root, self.clock, self.test_only = root, clock, test_only
         self._last_clock = None
         self._lease = threading.local()
+        self._lease_serial = 0
+        self._lease_serial_guard = threading.Lock()
+        self._lease_serial = 0
+        self._lease_serial_guard = threading.Lock()
 
     def _now(self):
         value = self.clock()
@@ -129,6 +108,33 @@ class WitnessStore:
 
     def _expected_owner(self):
         return (os.geteuid(), os.getegid()) if self.test_only else (0, 0)
+
+    def _new_lease_cursor(self, fd):
+        """Seal the current open-file-description without another descriptor.
+
+        register.lock is never read/written through this descriptor. Its file
+        offset is therefore a private action-generation marker. A close/reopen
+        creates a new open-file-description at offset zero; this method is
+        called only once, immediately after the original SH flock succeeds.
+        """
+        with self._lease_serial_guard:
+            self._lease_serial += 1
+            serial = self._lease_serial
+        cursor=(1 << 40) + (serial << 12) + (fd & 0xfff)
+        try:
+            os.lseek(fd,cursor,os.SEEK_SET)
+            check(os.lseek(fd,0,os.SEEK_CUR)==cursor,
+                  'WITNESS_ACTION_LEASE_CURSOR_UNKNOWN')
+        except OSError:
+            raise Hold('WITNESS_ACTION_LEASE_CURSOR_UNKNOWN') from None
+        return cursor
+
+    @staticmethod
+    def _lease_cursor_held(fd, cursor):
+        try:
+            return os.lseek(fd,0,os.SEEK_CUR)==cursor
+        except OSError:
+            return False
 
     def _lock_bounded(self, fd, mode, binding=None, revoke=False):
         """Acquire only with LOCK_NB, bounded by monotonic time and T1.
@@ -415,22 +421,22 @@ class WitnessStore:
         """Return the exact descriptors held by the current witness action."""
         pin=self._binding(binding)
         leased=getattr(self._lease,'current',None)
-        check(type(leased) is list and len(leased)==6 and leased[1]==pin,
+        check(type(leased) is list and len(leased)==7 and leased[1]==pin,
               'WITNESS_ACTION_LEASE_REQUIRED')
-        if leased[5]:
+        if leased[6]:
             raise Hold('WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN')
-        fd,_,lock,dir_identity,lock_identity,_=leased
+        fd,_,lock,dir_identity,lock_identity,cursor,_=leased
         try:
             current_dir=os.fstat(fd);current_lock=os.fstat(lock)
             named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
             valid=(_lease_identity(current_dir)==dir_identity and
                    _lease_identity(current_lock)==lock_identity and
                    _lease_identity(named_lock)==lock_identity and
-                   _shared_flock_held(lock))
+                   self._lease_cursor_held(lock,cursor))
         except OSError:
             valid=False
         if not valid:
-            leased[5]=True
+            leased[6]=True
             raise Hold('WITNESS_ACTION_LEASE_CONTINUITY_UNKNOWN')
         result=(fd,lock)
         check(result[0]!=result[1],'WITNESS_ACTION_LEASE_FD_DUPLICATE')
@@ -461,8 +467,9 @@ class WitnessStore:
             named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
             check(lock_identity==_lease_identity(named_lock),
                   'WITNESS_ACTION_LEASE_LOCK_CHANGED')
+            cursor=self._new_lease_cursor(lock)
             self._lease.current = [fd, self._binding(binding), lock,
-                                   dir_identity,lock_identity,False]
+                                   dir_identity,lock_identity,cursor,False]
             try:
                 yield
             finally:
@@ -470,7 +477,7 @@ class WitnessStore:
                 try:
                     self.active_action_fds(binding)
                 except BaseException:
-                    leased[5]=True
+                    leased[6]=True
                     raise
                 finally:
                     del self._lease.current
@@ -624,22 +631,22 @@ class SuccessorEvidenceStore(WitnessStore):
               tuple(row[3] for row in stack)==kinds and
               all(row[2]==pin for row in stack),
               'SUCCESSOR_EVIDENCE_LEASE_REQUIRED')
-        if any(row[6] for row in stack):
+        if any(row[7] for row in stack):
             raise Hold('SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN')
         result=[]
         for lease in stack:
-            fd,lock,_,_,dir_identity,lock_identity,_=lease
+            fd,lock,_,_,dir_identity,lock_identity,cursor,_=lease
             try:
                 current_dir=os.fstat(fd);current_lock=os.fstat(lock)
                 named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
                 valid=(_lease_identity(current_dir)==dir_identity and
                        _lease_identity(current_lock)==lock_identity and
                        _lease_identity(named_lock)==lock_identity and
-                       _shared_flock_held(lock))
+                       self._lease_cursor_held(lock,cursor))
             except OSError:
                 valid=False
             if not valid:
-                for active in stack:active[6]=True
+                for active in stack:active[7]=True
                 raise Hold('SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN')
             result.extend((fd,lock))
         check(len(result)==2*len(kinds) and len(set(result))==len(result),
@@ -669,7 +676,8 @@ class SuccessorEvidenceStore(WitnessStore):
             named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
             check(lock_identity==_lease_identity(named_lock),
                   'SUCCESSOR_EVIDENCE_LEASE_LOCK_CHANGED')
-            lease=[fd,lock,pin,kind,dir_identity,lock_identity,False]
+            cursor=self._new_lease_cursor(lock)
+            lease=[fd,lock,pin,kind,dir_identity,lock_identity,cursor,False]
             stack.append(lease)
             try:
                 yield
@@ -679,7 +687,7 @@ class SuccessorEvidenceStore(WitnessStore):
                 try:
                     self.active_action_fds(binding,tuple(row[3] for row in stack))
                 except BaseException:
-                    for active in stack:active[6]=True
+                    for active in stack:active[7]=True
                     raise
                 finally:
                     stack.pop()
