@@ -27,18 +27,60 @@ def check_environment(environ=None, manifest_path=None):
     except (ValueError, TypeError, UnicodeError):
         errors.append("OCR_ENCRYPTION_KEY_INVALID")
     db_path = Path(env[DB_ENV])
-    if not db_path.is_absolute() or db_path.is_symlink():
+    if not db_path.is_absolute():
         errors.append("OCR_DB_PATH_INVALID")
         db_state = "INVALID"
-    elif not db_path.parent.is_dir():
-        errors.append("OCR_DB_DIRECTORY_NOT_FOUND")
-        db_state = "PARENT_MISSING"
-    elif db_path.exists() and (not db_path.is_file() or (db_path.stat().st_mode & 0o077)):
-        errors.append("OCR_DB_PERMISSIONS_UNSAFE")
-        db_state = "UNSAFE_EXISTING_FILE"
     else:
-        # Read-only check: do not create or open SQLite and do not create parent directories.
-        db_state = "EXISTING_PROTECTED_FILE" if db_path.exists() else "READY_TO_CREATE_BY_SEPARATE_APPROVED_DEPLOYMENT"
+        # Inspect the lexical path without resolving through symlinks. This is read-only.
+        chain = list(reversed(db_path.parents)) + [db_path]
+        chain_ok = True
+        for index, component in enumerate(chain):
+            try:
+                info = component.lstat()
+            except FileNotFoundError:
+                # Missing final DB file is acceptable for offline preparation, but every
+                # directory in its parent chain must already exist.
+                if component == db_path:
+                    continue
+                errors.append("OCR_DB_PARENT_CHAIN_MISSING")
+                chain_ok = False
+                break
+            except OSError:
+                errors.append("OCR_DB_PATH_UNREADABLE")
+                chain_ok = False
+                break
+            if stat.S_ISLNK(info.st_mode):
+                errors.append("OCR_DB_PATH_SYMLINK")
+                chain_ok = False
+                break
+            if component != db_path:
+                if not stat.S_ISDIR(info.st_mode):
+                    errors.append("OCR_DB_PARENT_NOT_DIRECTORY")
+                    chain_ok = False
+                    break
+                # Sticky world-writable ancestors such as /tmp are allowed for isolated
+                # test sandboxes; the actual DB parent and all non-sticky ancestors must
+                # not be group/world writable.
+                writable = bool(info.st_mode & 0o022)
+                sticky = bool(info.st_mode & stat.S_ISVTX)
+                if writable and not sticky:
+                    errors.append("OCR_DB_PARENT_PERMISSIONS_UNSAFE:" + str(component))
+                    chain_ok = False
+                    break
+        if not chain_ok:
+            db_state = "PARENT_CHAIN_NOT_VERIFIED"
+        elif db_path.exists() and (not stat.S_ISREG(db_path.lstat().st_mode) or (db_path.lstat().st_mode & 0o077)):
+            errors.append("OCR_DB_PERMISSIONS_UNSAFE")
+            db_state = "UNSAFE_EXISTING_FILE"
+        else:
+            parent_info = db_path.parent.lstat()
+            if parent_info.st_mode & 0o022:
+                errors.append("OCR_DB_PARENT_PERMISSIONS_UNSAFE:" + str(db_path.parent))
+                db_state = "PARENT_CHAIN_NOT_VERIFIED"
+            else:
+                # Shape and current path protections were checked without writes. No claim
+                # is made that the DB can safely be created or that service startup is ready.
+                db_state = "EXISTING_PROTECTED_FILE_VERIFIED" if db_path.exists() else "DB_ABSENT_PARENT_CHAIN_VERIFIED_NOT_READY"
 
     try:
         provided = json.loads(env[SHA_ENV])
