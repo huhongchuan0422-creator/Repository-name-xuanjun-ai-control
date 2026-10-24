@@ -23,6 +23,8 @@ on:
       - 'services/ocr_engine/run_chinese_http_e2e.py'
       - 'services/ocr_engine/run_synthetic_inference.py'
       - 'services/ocr_engine/requirements.txt'
+      - 'services/ocr_engine/build_offline_bundle.py'
+      - 'services/ocr_engine/test_offline_bundle.py'
       - 'services/ocr_engine/model_manifest.json'
       - 'services/ocr_engine/generate_platform_lock.py'
       - 'services/ocr_engine/validate_workflow_syntax.py'
@@ -182,6 +184,7 @@ PY
             --lock-json "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" \
             --wheelhouse "$RUNNER_TEMP/ocr-wheelhouse" \
             --model-cache "$RUNNER_TEMP/ocr-model-cache" \
+            --system-deb-cache "$RUNNER_TEMP/ocr-deb-cache" \
             --output "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" \
             --execute-build
           sha256sum "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" > "$RUNNER_TEMP/ocr-build/SHA256SUMS"
