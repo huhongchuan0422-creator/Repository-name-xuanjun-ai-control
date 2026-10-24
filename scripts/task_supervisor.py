@@ -518,6 +518,259 @@ class Supervisor(object):
                     if self._dependencies_done(dict(row))]
         return eligible[:limit]
 
+    @staticmethod
+    def _development_contract_shape(contract):
+        required = {'task_id','spec_sha256','checkpoint_sha256',
+                    'target_repository','target_base_sha','entry',
+                    'developer','allowed_files','trusted_reviewers'}
+        if not isinstance(contract, dict) or set(contract) != required:
+            raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        for name in ('task_id','entry'):
+            if not isinstance(contract[name], str) or not contract[name]:
+                raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        for name in ('spec_sha256','checkpoint_sha256'):
+            if (not isinstance(contract[name], str)
+                    or re.fullmatch(r'[0-9a-f]{64}', contract[name]) is None):
+                raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        if (not isinstance(contract['target_repository'], str)
+                or re.fullmatch(
+                    r'[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+',
+                    contract['target_repository']) is None
+                or not isinstance(contract['target_base_sha'], str)
+                or re.fullmatch(
+                    r'[0-9a-f]{40}', contract['target_base_sha']) is None):
+            raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        if (not isinstance(contract['allowed_files'], list)
+                or not contract['allowed_files']
+                or len(contract['allowed_files'])
+                   != len(set(contract['allowed_files']))
+                or any(not isinstance(path, str)
+                       or re.fullmatch(r'[A-Za-z0-9_./-]+', path) is None
+                       or any(part in ('','.','..') for part in path.split('/'))
+                       for path in contract['allowed_files'])
+                or not isinstance(contract['developer'], dict)
+                or not isinstance(contract['trusted_reviewers'], list)
+                or len(contract['trusted_reviewers']) != 2):
+            raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        return contract
+
+    def register_development_contract(self, task_id, contract, now=None):
+        contract = self._development_contract_shape(contract)
+        now = self.clock() if now is None else now
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
+        body = canonical(contract)
+        evidence_ref = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if (task['state'] != 'READY' or task['authority_state'] != 'NONE'
+                    or contract['task_id'] != task_id
+                    or contract['spec_sha256'] != task['spec_sha256']
+                    or contract['checkpoint_sha256']
+                       != task['checkpoint_sha256']
+                    or contract['entry'] != task['entry']):
+                raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
+            prior = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, UNKNOWN, 'development-contract-v1')).fetchone()
+            if prior is not None:
+                if (prior['kind'] == 'DEVELOPMENT_CONTRACT'
+                        and prior['payload_json'] == body
+                        and prior['evidence_ref'] == evidence_ref):
+                    return {'duplicate': True,
+                            'contract_sha256': evidence_ref}
+                raise ValueError('DEVELOPMENT_CONTRACT_CONFLICT')
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task_id, UNKNOWN, 'development-contract-v1',
+                 'DEVELOPMENT_CONTRACT', now, 'PHASE_EXECUTION',
+                 evidence_ref, body))
+            return {'duplicate': False, 'contract_sha256': evidence_ref}
+
+    def development_contract(self, task_id):
+        row = self.db.execute('''SELECT * FROM events
+          WHERE task_id=? AND attempt_id=? AND event_id=?''',
+          (task_id, UNKNOWN, 'development-contract-v1')).fetchone()
+        if row is None or row['kind'] != 'DEVELOPMENT_CONTRACT':
+            raise ValueError('DEVELOPMENT_CONTRACT_REQUIRED')
+        return json.loads(row['payload_json'])
+
+    def bind_development_candidate(self, receipt, file_manifest, now=None):
+        now = self.clock() if now is None else now
+        if not finite(now):
+            raise ValueError('FINITE_TIME_REQUIRED')
+        required = {'schema','entry','execution_path','task_id','spec_sha256',
+                    'checkpoint_sha256','target_repository','target_base_sha',
+                    'code_commit','event','attempt_id','lease_id','fence',
+                    'epoch','source_comment_id','status','native_identity',
+                    'quota_attribution','authority_effect','required_gate'}
+        if (not isinstance(receipt, dict)
+                or not required.issubset(set(receipt))
+                or receipt.get('status') != 'RECEIPT_VALIDATED_NOT_ADMITTED'
+                or receipt.get('authority_effect') != 'NONE'
+                or receipt.get('event') != 'CODE_READY'):
+            raise ValueError('VALIDATED_CODE_READY_RECEIPT_REQUIRED')
+        if (not isinstance(file_manifest, dict) or not file_manifest
+                or any(not isinstance(path, str)
+                       or not isinstance(value, str)
+                       or re.fullmatch(r'[0-9a-f]{64}', value) is None
+                       for path, value in file_manifest.items())):
+            raise ValueError('EXACT_CANDIDATE_FILE_MANIFEST_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(receipt['task_id'])
+            contract = self.development_contract(receipt['task_id'])
+            expected_core = {
+                'task_id': task['task_id'],
+                'spec_sha256': task['spec_sha256'],
+                'checkpoint_sha256': task['checkpoint_sha256'],
+                'target_repository': contract['target_repository'],
+                'target_base_sha': contract['target_base_sha'],
+                'entry': task['entry'],
+                'attempt_id': task['attempt_id'],
+                'lease_id': task['lease_id'],
+                'fence': task['fence'],
+                'epoch': task['epoch'],
+            }
+            if (task['authority_state'] != 'VALID'
+                    or task['state'] not in ACTIVE
+                    or task['attempt_id'] == UNKNOWN
+                    or any(receipt.get(k) != v
+                           for k, v in expected_core.items())):
+                raise ValueError('CANONICAL_CODE_READY_BINDING_MISMATCH')
+            if set(file_manifest) != set(contract['allowed_files']):
+                raise ValueError('EXACT_CANDIDATE_FILE_SET_REQUIRED')
+            contract_body = canonical(contract)
+            candidate = {
+                'schema': 1,
+                'task_id': task['task_id'],
+                'attempt_id': task['attempt_id'],
+                'lease_id': task['lease_id'],
+                'fence': task['fence'],
+                'epoch': task['epoch'],
+                'spec_sha256': task['spec_sha256'],
+                'checkpoint_sha256': task['checkpoint_sha256'],
+                'target_repository': contract['target_repository'],
+                'target_base_sha': contract['target_base_sha'],
+                'entry': task['entry'],
+                'code_commit': receipt['code_commit'],
+                'source_comment_id': receipt['source_comment_id'],
+                'contract_sha256': hashlib.sha256(
+                    contract_body.encode('utf-8')).hexdigest(),
+                'files': {path: file_manifest[path]
+                          for path in sorted(file_manifest)},
+            }
+            body = canonical(candidate)
+            candidate_sha = hashlib.sha256(
+                body.encode('utf-8')).hexdigest()
+            event_id = 'development-candidate:%s' % receipt['source_comment_id']
+            prior = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task['task_id'], task['attempt_id'], event_id)).fetchone()
+            if prior is not None:
+                if (prior['kind'] == 'DEVELOPMENT_CANDIDATE'
+                        and prior['payload_json'] == body
+                        and prior['evidence_ref'] == candidate_sha):
+                    return {'duplicate': True, 'candidate_event_id': event_id,
+                            'candidate_sha256': candidate_sha,
+                            'candidate': candidate}
+                raise ValueError('DEVELOPMENT_CANDIDATE_CONFLICT')
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task['task_id'], task['attempt_id'], event_id,
+                 'DEVELOPMENT_CANDIDATE', now, 'SOURCE_COMMIT',
+                 candidate_sha, body))
+            return {'duplicate': False, 'candidate_event_id': event_id,
+                    'candidate_sha256': candidate_sha,
+                    'candidate': candidate}
+
+    def complete_development_candidate(self, task_id, candidate_event_id,
+                                       bundle_sha256, review_record_ids,
+                                       completion_event_id,
+                                       next_action='DEPENDENCIES_RECHECK',
+                                       now=None):
+        now = self.clock() if now is None else now
+        if (not finite(now)
+                or not isinstance(bundle_sha256, str)
+                or re.fullmatch(r'[0-9a-f]{64}', bundle_sha256) is None
+                or not isinstance(review_record_ids, dict)
+                or set(review_record_ids) != {'QA','SECURITY'}
+                or any(not isinstance(value, str)
+                       or re.fullmatch(r'[0-9a-f]{64}', value) is None
+                       for value in review_record_ids.values())
+                or review_record_ids['QA'] == review_record_ids['SECURITY']
+                or not isinstance(completion_event_id, str)
+                or not completion_event_id.strip()
+                or not isinstance(next_action, str)
+                or not next_action.strip()):
+            raise ValueError('EXACT_DEVELOPMENT_COMPLETION_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            prior = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, task['attempt_id'], completion_event_id)).fetchone()
+            candidate_row = self.db.execute('''SELECT * FROM events
+              WHERE task_id=? AND attempt_id=? AND event_id=?''',
+              (task_id, task['attempt_id'], candidate_event_id)).fetchone()
+            if candidate_row is None or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE':
+                raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
+            candidate = json.loads(candidate_row['payload_json'])
+            payload = {
+                'schema': 1,
+                'state': 'SUCCESS',
+                'task_id': task_id,
+                'attempt_id': task['attempt_id'],
+                'lease_id': task['lease_id'],
+                'fence': task['fence'],
+                'epoch': task['epoch'],
+                'candidate_event_id': candidate_event_id,
+                'candidate_sha256': candidate_row['evidence_ref'],
+                'code_commit': candidate['code_commit'],
+                'bundle_sha256': bundle_sha256,
+                'review_record_ids': {
+                    'QA': review_record_ids['QA'],
+                    'SECURITY': review_record_ids['SECURITY'],
+                },
+                'writer_stopped': True,
+                'effects_reconciled': True,
+                'next_action': next_action,
+            }
+            body = canonical(payload)
+            if prior is not None:
+                if (prior['kind'] == 'DEVELOPMENT_COMPLETION'
+                        and prior['payload_json'] == body
+                        and prior['evidence_ref'] == bundle_sha256):
+                    return {'duplicate': True, 'state': task['state'],
+                            'completion': payload}
+                raise ValueError('DEVELOPMENT_COMPLETION_EVENT_CONFLICT')
+            if (task['state'] not in ACTIVE
+                    or task['authority_state'] != 'VALID'
+                    or candidate['attempt_id'] != task['attempt_id']
+                    or candidate['lease_id'] != task['lease_id']
+                    or candidate['fence'] != task['fence']
+                    or candidate['epoch'] != task['epoch']):
+                raise ValueError('CURRENT_DEVELOPMENT_ATTEMPT_REQUIRED')
+            accepted_at = self.clock()
+            if (not finite(accepted_at) or now < task['last_event_at']
+                    or now > accepted_at + 300):
+                raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task_id, task['attempt_id'], completion_event_id,
+                 'DEVELOPMENT_COMPLETION', now, 'TEST_RUN',
+                 bundle_sha256, body))
+            self._enqueue(task_id, task['attempt_id'], completion_event_id,
+                          payload, now)
+            self.db.execute('''UPDATE tasks SET state='SUCCESS',
+              writer_stopped='TRUE',effects_reconciled='TRUE',
+              next_action=?,last_event_at=?,updated_at=? WHERE task_id=?
+              AND attempt_id=? AND state IN
+              ('RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')''',
+              (next_action, now, now, task_id, task['attempt_id']))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('DEVELOPMENT_COMPLETION_CAS_FAILED')
+            return {'duplicate': False, 'state': 'SUCCESS',
+                    'completion': payload}
+
     def claim(self, task_id, attempt_id, owner, entry, run_id, session_id,
               lease_id, fence, epoch, now=None, deadlines=None):
         now = self.clock() if now is None else now
