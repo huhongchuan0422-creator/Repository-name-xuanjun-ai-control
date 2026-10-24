@@ -295,7 +295,7 @@ class CanonicalCompletionTests(unittest.TestCase):
         drift['developer']={'issuer':'native','subject':'other-developer'}
         drift_reviews=self.reviews(drift)
         with self.assertRaisesRegex(
-                ValueError,'REVIEW_BUNDLE_CANONICAL_MISMATCH'):
+                ValueError,'INDEPENDENT_EXACT_VERSION_REVIEW_REQUIRED'):
             gate.complete_reviewed_candidate(
                 self.s,self.task,self.candidate['candidate_event_id'],
                 self.files,drift_reviews,KEYS,'dev-reviewed-policy-drift')
