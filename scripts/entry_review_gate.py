@@ -150,7 +150,9 @@ def complete_reviewed_candidate(supervisor, contract, files, reviews,
             or candidate_binding.get('candidate', {}).get('target_base_sha')
                != contract.get('target_base_sha')
             or candidate_binding.get('candidate', {}).get('entry')
-               != contract.get('entry')):
+               != contract.get('entry')
+            or candidate_binding.get('candidate', {}).get('files')
+               != result.get('binding', {}).get('files')):
         raise ValueError('REVIEW_CANDIDATE_BINDING_MISMATCH')
     completion = supervisor.complete_development_candidate(
         contract['task_id'],
