@@ -377,13 +377,19 @@ class Fence(object):
         keys = self.supervisor.begin_revocation(task_id, controller)
         held = self.locks.acquire(keys, exclusive=True, timeout=timeout)
         try:
+            task = self.supervisor._task(task_id)
+            ticket = self.supervisor._authority_ticket(task)
             receipt = {
                 'schema': 1, 'kind': 'LOCAL_DRAIN',
                 'capability': LOCAL_ONLY, 'task_id': task_id,
-                'old_attempt_id': self.supervisor._task(task_id)['attempt_id'],
+                'old_attempt_id': task['attempt_id'],
+                'old_lease_id': task['lease_id'],
+                'old_fence': task['fence'],
+                'old_epoch': task['epoch'],
+                'ticket_sha256': self.supervisor._ticket_sha(ticket),
+                'spec_sha256': task['spec_sha256'],
                 'provider_id': self.locks.provider_id,
-                'resource_scope_digest':
-                    self.supervisor._task(task_id)['resource_scope_digest'],
+                'resource_scope_digest': task['resource_scope_digest'],
                 'outcome': 'DRAINED',
             }
             self.supervisor.record_revocation_drain(
