@@ -179,14 +179,14 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("if: always()",text)
         self.assertIn("ocr-deb-cache",text)
         self.assertIn("apt-get install -y --download-only",text)
-        self.assertIn("dpkg-deb",text)
+        self.assertIn("generate_deb_runtime_lock.py",text)
 
     def test_deb_runtime_closure_lock_is_hash_bound(self):
         debs=self.root/"debs"; debs.mkdir()
         apt=(debs/"apt-lists"); apt.mkdir()
         apt_index=apt/"bookworm-main-Packages"; apt_index.write_bytes(b"synthetic apt index")
         pkgroot=self.root/"pkgroot"; (pkgroot/"DEBIAN").mkdir(parents=True)
-        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: OCR test <test@example.invalid>","Description: synthetic test package",""]))
         package=debs/"libxcb1_1.0_amd64.deb"
         subprocess.run(["dpkg-deb","--build",str(pkgroot),str(package)],check=True,capture_output=True,text=True)
         source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm bookworm-updates\nComponents: main\n"
@@ -211,7 +211,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         apt=debs/"apt-lists"; apt.mkdir()
         apt_index=apt/"Packages"; apt_index.write_bytes(b"index")
         pkgroot=self.root/"pkgroot2"; (pkgroot/"DEBIAN").mkdir(parents=True)
-        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: OCR test <test@example.invalid>","Description: synthetic test package",""]))
         package=debs/"libxcb1_1.0_amd64.deb"
         subprocess.run(["dpkg-deb","--build",str(pkgroot),str(package)],check=True,capture_output=True,text=True)
         source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm\nComponents: main\n"
@@ -237,7 +237,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         apt=debs/"apt-lists"; apt.mkdir()
         index=apt/"Packages"; index.write_bytes(b"synthetic apt index")
         pkgroot=self.root/"deb-package"; (pkgroot/"DEBIAN").mkdir(parents=True)
-        (pkgroot/"DEBIAN"/"control").write_text("Package: libxcb1\\nVersion: 1.0\\nArchitecture: amd64\\nMaintainer: OCR test <test@example.invalid>\\nDescription: synthetic test package\\n")
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: OCR test <test@example.invalid>","Description: synthetic test package",""]))
         deb=debs/"libxcb1_1.0_amd64.deb"
         subprocess.run(["dpkg-deb","--build",str(pkgroot),str(deb)],check=True,capture_output=True,text=True)
         source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm\nComponents: main\n"
