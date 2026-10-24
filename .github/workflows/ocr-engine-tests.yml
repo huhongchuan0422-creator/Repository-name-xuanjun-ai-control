@@ -1,0 +1,44 @@
+name: OCR Offline Build Registration
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_enabled:
+        description: "Default-branch registration only; real build is intentionally unavailable on main"
+        required: true
+        type: boolean
+        default: false
+      source_sha:
+        description: "Exact reviewed source SHA on docs/self-hosted-ocr-architecture-20261024; this stub never checks it out or builds"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  default-branch-registration:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Validate default-branch registration request without checkout or build
+        shell: bash
+        env:
+          INPUT_BUILD_ENABLED: ${{ inputs.build_enabled }}
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          if ! [[ "$INPUT_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "HOLD=SOURCE_SHA_MUST_BE_EXACT_40_HEX"
+            exit 2
+          fi
+          if [ "$INPUT_BUILD_ENABLED" = "true" ]; then
+            echo "HOLD=DEFAULT_BRANCH_STUB_ONLY; use the separately reviewed source branch workflow after explicit approval"
+            exit 3
+          fi
+          echo "REGISTERED_DEFAULT_BRANCH_WORKFLOW=PASS"
+          echo "BUILD_ENABLED=false; NO_CHECKOUT; NO_PULL; NO_RUN; NO_DOWNLOAD; NO_ARTIFACT"
