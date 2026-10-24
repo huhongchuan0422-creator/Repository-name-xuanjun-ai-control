@@ -1,5 +1,6 @@
 """Explicit isolated six-slot data; production pins remain unchanged."""
 import copy
+import hashlib
 import json
 import pathlib
 import os
@@ -33,6 +34,14 @@ class SyntheticSpec:
         self.source=sample.source
         self.baselines=dict(sample.baselines)
         self.spec=copy.deepcopy(sample.spec)
+        self.object_bytes={}
+        for number,obj in enumerate(self.spec['objects'],1):
+            seed=hashlib.sha256(('synthetic-object-%02d:%s'%
+                (number,obj['relative_path'])).encode()).digest()
+            size=obj['bytes']
+            raw=(seed*((size+len(seed)-1)//len(seed)))[:size]
+            self.object_bytes[obj['relative_path']]=raw
+            obj['sha256']=c53.sha(raw)
         resource=json.loads(self.baselines[c53.CONFIGS[1]])
         resource['settings'].update(
             issuer='https://fixture.invalid/issuer',
@@ -52,12 +61,86 @@ class SyntheticSpec:
         self.spec_sha=c53.sha(self.raw)
         self.resource_sha=resource_sha
 
-    def active(self):
+    @staticmethod
+    def _write_sparse_gnu_tar(path,members,total_bytes=559237632):
+        import tarfile
+        headers=[]
+        for name,data in members:
+            info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o600
+            info.uid=0;info.gid=0;info.mtime=0
+            headers.append((info.tobuf(format=tarfile.GNU_FORMAT),data))
+        occupied=sum(len(header)+((len(data)+511)//512)*512
+                     for header,data in headers)
+        filler=tarfile.TarInfo('unselected-filler.bin')
+        filler.mode=0o600;filler.uid=0;filler.gid=0;filler.mtime=0
+        filler_bytes=total_bytes-occupied-512-1024
+        if filler_bytes<=0 or filler_bytes%512:
+            raise AssertionError('FIXTURE_FILLER_ALIGNMENT')
+        filler.size=filler_bytes
+        with path.open('xb') as out:
+            for header,data in headers:
+                out.write(header);out.write(data)
+                padding=(-len(data))%512
+                if padding:out.write(bytes(padding))
+            out.write(filler.tobuf(format=tarfile.GNU_FORMAT))
+            out.seek(filler_bytes,os.SEEK_CUR)
+            out.write(bytes(1024));out.flush();os.fsync(out.fileno())
+        path.chmod(0o600)
+        if path.stat().st_size!=total_bytes:
+            raise AssertionError('FIXTURE_ARCHIVE_SIZE')
+
+    def original_fixture(self,root,create):
+        root=pathlib.Path(root)
+        archive_root=root/c53.binder.ARCHIVE_ROOT.lstrip('/')
+        package_root=root/c53.binder.PACKAGE_ROOT.lstrip('/')
+        archive=archive_root/'source-tree.tar.pending'
+        if create:
+            archive_root.mkdir(parents=True,mode=0o700)
+            package_root.mkdir(parents=True,mode=0o700)
+            members=[]
+            for number,obj in enumerate(self.spec['objects']):
+                raw=self.object_bytes[obj['relative_path']]
+                if number<5:
+                    members.append((c53.binder.ARCHIVE_PREFIX+
+                                    obj['relative_path'],raw))
+                else:
+                    target=package_root/obj['relative_path']
+                    target.parent.mkdir(parents=True,exist_ok=True)
+                    target.parent.chmod(0o700)
+                    target.write_bytes(raw);target.chmod(0o600)
+            self._write_sparse_gnu_tar(archive,members)
+        if not archive.is_file():
+            raise AssertionError('FIXTURE_ARCHIVE_ABSENT')
+        digest=hashlib.sha256()
+        with archive.open('rb') as stream:
+            while True:
+                block=stream.read(1024*1024)
+                if not block:break
+                digest.update(block)
+        st=archive.stat()
+        identity=(st.st_dev,st.st_ino,st.st_mode,0,0,st.st_nlink,
+                  st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+        return {'sha256':digest.hexdigest(),'identity':identity}
+
+    def active(self,archive=None):
         stack=ExitStack()
         stack.enter_context(patch.object(c53.binder,'RESOURCE_SHA',self.resource_sha))
         stack.enter_context(patch.object(c53.binder,'SPEC_SHA256',self.spec_sha))
         stack.enter_context(patch.object(c53,'SPEC_CANON_SHA',
                                          c53.sha(c53.canon(self.spec))))
+        if archive is not None:
+            stack.enter_context(patch.object(c53.binder,'ARCHIVE_SHA',
+                                             archive['sha256']))
+            stack.enter_context(patch.object(c53.binder,'ARCHIVE_IDENTITY',
+                                             tuple(archive['identity'])))
+            roots={'b5-original-archive':[c53.binder.ARCHIVE_ROOT,0],
+                   'b5-original-packages':[c53.binder.PACKAGE_ROOT,0]}
+            meta=dict(filename='source-tree.tar.pending',
+                identity=list(archive['identity']),
+                member_prefix=c53.binder.ARCHIVE_PREFIX,max_headers=65536,
+                max_read_bytes=32*1024*1024,sha256=archive['sha256'])
+            stack.enter_context(patch.object(c53,'ROOTS',roots))
+            stack.enter_context(patch.object(c53,'ARCHIVE_META',meta))
         return stack
 
 
@@ -141,12 +224,14 @@ class SyntheticSpecTests(unittest.TestCase):
         start=int(time.time())-10
         with f.active():
             spec=c53.binder.verify_spec_bytes(f.raw)
-            bundle=c53.make_bundle(spec,f.baselines,f.source,
-                batch_id='c53-recovery-draft',approval_ref='fixture-only',
-                window_start=start)
-            gate=fixture_gate(spec)
             with tempfile.TemporaryDirectory() as temp:
                 root=pathlib.Path(temp)
+                archive=f.original_fixture(root,True)
+                with f.active(archive):
+                    bundle=c53.make_bundle(spec,f.baselines,f.source,
+                        batch_id='c53-recovery-draft',approval_ref='fixture-only',
+                        window_start=start)
+                gate=fixture_gate(spec)
                 files={entry.SPEC:f.raw,
                     entry.BINDER:gate.read_binder(),
                     entry.MANIFEST:gate.read_manifest()}
@@ -202,6 +287,11 @@ class SyntheticSpecTests(unittest.TestCase):
                 allowed.update((WitnessStore.__init__.__globals__['ROOT'],
                                 SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']))
                 allowed.update(base+'/current' for base in c53.BASES)
+                original_paths={c53.binder.ARCHIVE_ROOT,c53.binder.PACKAGE_ROOT,
+                    c53.binder.ARCHIVE_ROOT+'/source-tree.tar.pending'}
+                original_paths.update(c53.binder.PACKAGE_ROOT+'/'+obj['relative_path']
+                                      for obj in spec['objects'][5:])
+                allowed.update(original_paths)
                 job_root=spec['fixed_paths']['job_proposed']
                 release_roots=(*spec['fixed_paths']['stage_proposed'],
                                *spec['fixed_paths']['target_release'])
@@ -217,11 +307,16 @@ class SyntheticSpecTests(unittest.TestCase):
                                spec['observed_baseline']['db']['ino'])
                 pins[c53.LOCK]=(spec['observed_baseline']['worker_lock']['dev'],
                                  spec['observed_baseline']['worker_lock']['ino'])
+                for path in original_paths:
+                    target=root/path.lstrip('/')
+                    if target.is_file():
+                        st=target.stat();pins[path]=(st.st_dev,st.st_ino)
                 store_roots=(WitnessStore.__init__.__globals__['ROOT'],
                              SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
                 boundary=SealedOSBoundary(root,allowed,pins,
                     dynamic_roots=store_roots+(job_root,),
-                    recursive_dynamic_roots=release_roots)
+                    recursive_dynamic_roots=release_roots+
+                        (spec['fixed_paths']['receiver_root'],))
                 binding=entry._binding(spec,'c53-recovery-draft','fixture-attempt',
                                        start,bundle['catalog_sha'])
                 record=json.loads(gate.read_binder())
@@ -345,7 +440,8 @@ class SyntheticSpecTests(unittest.TestCase):
 def child_query(root,action='query',execute_start=None):
     """Fresh interpreter, same sealed test tree and original read-only entry."""
     f=SyntheticSpec()
-    with f.active():
+    archive=f.original_fixture(pathlib.Path(root),False)
+    with f.active(archive):
         spec=c53.binder.verify_spec_bytes(f.raw)
         known={entry.ROOT,entry.SOURCE,entry.SPEC,entry.MANIFEST,entry.BINDER,
                c53.DB,c53.LOCK,c53.DB+'-wal',c53.DB+'-shm',c53.DB+'-journal',
@@ -360,6 +456,11 @@ def child_query(root,action='query',execute_start=None):
             known.add(base+'/current')
             known.update(base+'/releases/'+c53.COMMIT+'/'+name for name in
                          f.source)
+        original_paths={c53.binder.ARCHIVE_ROOT,c53.binder.PACKAGE_ROOT,
+            c53.binder.ARCHIVE_ROOT+'/source-tree.tar.pending'}
+        original_paths.update(c53.binder.PACKAGE_ROOT+'/'+obj['relative_path']
+                              for obj in spec['objects'][5:])
+        known.update(original_paths)
         job=spec['fixed_paths']['job_proposed']
         release_roots=(*spec['fixed_paths']['stage_proposed'],
                        *spec['fixed_paths']['target_release'])
@@ -433,7 +534,8 @@ def child_query(root,action='query',execute_start=None):
                      SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
         with SealedOSBoundary(root,known,pins,
              dynamic_roots=store_roots+(job,),
-             recursive_dynamic_roots=release_roots).active(),\
+             recursive_dynamic_roots=release_roots+
+                (spec['fixed_paths']['receiver_root'],)).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
              patch.object(Github,'call',recorded_comment),\
