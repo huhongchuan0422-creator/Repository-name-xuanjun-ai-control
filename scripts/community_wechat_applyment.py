@@ -123,6 +123,96 @@ class WechatApplyment:
         return None if row is None else json.loads(self.center.decrypt(row[0],'wechat-applyment:'+application))
     def _save(self,application,owner,record):
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_APPLYMENT',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(application,owner,application,self.center.encrypt(canonical(record),'wechat-applyment:'+application)))
+    def fill_confirmed_license_draft(self, session, csrf, application, *,
+                                     expected_application_revision, expected_wechat_version,
+                                     confirmed_fields):
+        """Host-only empty-field fill, original Center transaction + two CAS.
+
+        Caller must supply both versions from an independently bound human
+        confirmation snapshot. OCR jobs currently lack the provider version;
+        this primitive is NOT wired into OCR/HTTP and does not lift bridge HOLD.
+        """
+        from scripts import community_onboarding_offline as workflow
+        from scripts.pr122_customer_core import safe_text
+        c=self.center
+        if self.onboarding.center is not c or self.onboarding.wechat_applyment is not self:
+            raise PermissionError('ORIGINAL_SHARED_DRAFT_REQUIRED')
+        if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
+        if (type(expected_application_revision) is not int or expected_application_revision<1
+                or type(expected_wechat_version) is not int or expected_wechat_version<0):
+            raise ValueError('EXPLICIT_DUAL_VERSIONS_REQUIRED')
+        if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
+        if (type(confirmed_fields) is not dict or not confirmed_fields
+                or not set(confirmed_fields)<= {'company_name','registered_address'}):
+            raise ValueError('CONFIRMED_LICENSE_FIELDS_ONLY')
+        for value in confirmed_fields.values():
+            if type(value) is not str or not value.strip():raise ValueError('CONFIRMED_LICENSE_STRING_REQUIRED')
+            safe_text(value,512)
+        with c.tx():  # Original BEGIN IMMEDIATE; owns both writes and audit.
+            uid=c.session(session,csrf)
+            owner,meta,platform=self.onboarding._load(application,uid)
+            def provider():
+                row=c.db.execute("SELECT user_id,active FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=?",(application,application)).fetchone()
+                if row is not None and (row['user_id']!=owner or row['active']!=1):
+                    raise PermissionError('SHARED_DRAFT_OWNER_REVOKED')
+                return self._read(application)
+            record=provider();version=record['version'] if record is not None else 0
+            if type(version) is not int or version<(1 if record is not None else 0):raise ValueError('PROVIDER_VERSION_INVALID')
+            if platform['revision']!=expected_application_revision or version!=expected_wechat_version:
+                raise ValueError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
+            if (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
+                    or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
+                raise PermissionError('SHARED_DRAFT_EDIT_STATE_DENIED')
+            fields=dict(platform['fields'])
+            if any(type(fields.get(k)) is not str for k in ('legal_name','address')):
+                raise ValueError('ORIGINAL_PROFILE_FIELDS_REQUIRED')
+            result=json.loads(json.dumps(record)) if record is not None else dict(provider_state='NOT_SUBMITTED',profile={})
+            profile=result.get('profile')
+            if type(profile) is not dict:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+            subject=profile.get('subject_info',{})
+            if type(subject) is not dict:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+            license_info=subject.get('business_license_info',{})
+            if type(license_info) is not dict or type(license_info.get('merchant_name','')) is not str:
+                raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+            applied=[];skipped=[]
+            name=confirmed_fields.get('company_name');existing=license_info.get('merchant_name','')
+            if name is not None:
+                # Provider names project into platform views. A different manual
+                # value on either side prevents filling the other side with a
+                # conflicting suggestion (even without changing its raw column).
+                if any(value and value!=name for value in (fields['legal_name'],existing)):
+                    skipped.append('company_name')
+                else:
+                    changed=False
+                    if not fields['legal_name']:fields['legal_name']=name;changed=True
+                    if not existing:
+                        profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['merchant_name']=name
+                        changed=True
+                    if changed:applied.append('company_name')
+            address=confirmed_fields.get('registered_address')
+            if address is not None:
+                if fields['address']:skipped.append('registered_address')
+                else:fields['address']=address;applied.append('registered_address')
+            if not applied:
+                return dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped)
+            if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+            # Recheck after decoding/validation and immediately before first write.
+            if (c.session(session,csrf)!=uid or self.onboarding._load(application,uid)[2]!=platform
+                    or provider()!=record):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
+            revision=workflow.save_draft(c.db,owner,application,uid,fields,expected_application_revision,
+                encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
+            meta['reviews']={};self.onboarding._meta(application,owner,meta)
+            if c.session(session,csrf)!=uid or provider()!=record:
+                raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
+            result.update(version=version+1,state='DRAFT')
+            self._save(application,owner,result)
+            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
+            _,latest_meta,latest=self.onboarding._load(application,uid)
+            if (c.session(session,csrf)!=uid or latest['revision']!=revision or latest['status']!='DRAFT'
+                    or latest['fields']!=fields or latest_meta.get('reviews')!={}
+                    or provider()!=result):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
+            return dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped)
+
     def _provider_domain(self,record,*,submission=False):
         merchant=self.reader._mchid
         if type(merchant) is not str or not re.fullmatch('[0-9]{6,32}',merchant):
