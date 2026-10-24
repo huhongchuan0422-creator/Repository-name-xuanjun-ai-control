@@ -233,7 +233,7 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
                 binding.get("content_sha256") != job["document_sha256"] or
                 binding.get("document_type") != job["document_type"] or
                 str(binding.get("application_revision", "")) != str(expected_revision) or
-                ("provider_version" in job and binding.get("provider_version") != job.get("provider_version"))):
+                (job.get("provider_version") is not None and binding.get("provider_version") != job.get("provider_version"))):
             raise HTTPException(status_code=403, detail="ATTACHMENT_AUTHORIZATION_REVOKED")
 
     @app.get("/api/v1/ocr/jobs/{job_id}")
