@@ -260,6 +260,34 @@ class ApiTests(unittest.TestCase):
         confirmed=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'legacy-confirm-key-0001'},json=body)
         self.assertEqual(confirmed.status_code,200,confirmed.text)
         self.assertFalse(confirmed.json().get('shared_writeback_eligible'))
+    def test_raw_json_boolean_and_float_versions_rejected_before_coercion(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'raw-json-type-0001','Content-Type':'application/json'}
+        for raw in ('{"revision":1,"application_revision":true,"provider_version":"1.2.0","fields":{"company_name":"x"}}',
+                    '{"revision":1,"application_revision":"1","provider_version":true,"fields":{"company_name":"x"}}',
+                    '{"revision":1,"application_revision":1.5,"provider_version":"1.2.0","fields":{"company_name":"x"}}',
+                    '{"revision":1,"application_revision":"01","provider_version":"1.2.0","fields":{"company_name":"x"}}'):
+            response=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=headers,content=raw)
+            self.assertEqual(response.status_code,400,response.text)
+    def test_update_cannot_inject_confirmed_binding(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        store=self.client.app.state.ocr_job_store
+        with self.assertRaisesRegex(ValueError,'OCR_IMMUTABLE_FIELD'):
+            store.update(job_id,confirmed_binding={'application_revision':'1','provider_version':'1.2.0','document_type':'business_license','attachment_id':'synthetic-attachment','content_sha256':self.expected_sha})
+        read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(read.status_code,200,read.text)
+        self.assertIsNone(read.json().get('confirmed_binding'))
+        self.assertFalse(read.json().get('shared_writeback_eligible'))
+    def test_shared_writeback_requires_confirmed_status_and_exact_binding_tuple(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        store=self.client.app.state.ocr_job_store
+        with store._connect() as db:
+            row=db.execute('SELECT ciphertext FROM ocr_jobs WHERE job_id=?',(job_id,)).fetchone()
+            payload=store._open(row['ciphertext']); payload['confirmed_binding']={'application_revision':'1','provider_version':'1.2.0','document_type':'business_license','attachment_id':'synthetic-attachment','content_sha256':self.expected_sha}
+            db.execute('UPDATE ocr_jobs SET ciphertext=? WHERE job_id=?',(store._seal(payload),job_id))
+        read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(read.status_code,200,read.text)
+        self.assertFalse(read.json().get('shared_writeback_eligible'))
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
