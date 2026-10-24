@@ -87,6 +87,57 @@ class MiniMerchant:
     def _ocr_origin(self,scene,project,principal):
         return {'project':project,'scene':scene,'scope':dict(self.identity.runtime.bindings[principal])}
 
+    def ocr_shared_source(self,token,scene,application,kind):
+        """Host-only source preparation, NOT an OCR resolver/API contract.
+
+        Both original draft versions and current attachment bytes are observed
+        under the same Center lock. Integers stay integers here; the approved
+        OCR contract must define their wire representation and trusted binding.
+        No confirmation authority, permission or writeback is created.
+        """
+        from scripts.community_wechat_applyment import WechatApplyment
+        service=self.onboarding.wechat_applyment
+        c=self.identity.center
+        if (type(service) is not WechatApplyment or service.center is not c
+                or service.onboarding is not self.onboarding):
+            raise PermissionError('ORIGINAL_SHARED_DRAFT_REQUIRED')
+        if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
+        with c.tx():
+            uid,_,_,_=self.context(token,scene)
+            owner,_,platform=self.onboarding._load(application,uid)
+            def row():
+                return c.db.execute("SELECT user_id,active,payload FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=?",
+                                    (application,application)).fetchone()
+            initial=row()
+            if initial is not None and (initial['user_id']!=owner or initial['active']!=1):
+                raise PermissionError('SHARED_DRAFT_OWNER_REVOKED')
+            record=service._read(application)
+            version=record['version'] if record is not None else 0
+            if (type(version) is not int or version<(1 if record is not None else 0)
+                    or type(platform['revision']) is not int or platform['revision']<1):
+                raise PermissionError('OCR_SHARED_VERSIONS_INVALID')
+            if (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
+                    or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
+                raise PermissionError('SHARED_DRAFT_EDIT_STATE_DENIED')
+            source=self.ocr_source(token,scene,application,kind)
+            # _read decrypts private metadata. Bind its result to the exact row
+            # read before decryption; never substitute the latest provider version.
+            current=row()
+            if ((tuple(initial) if initial is not None else None)
+                    !=(tuple(current) if current is not None else None)
+                    or source['subject']!=owner
+                    or source['application_revision']!=platform['revision']):
+                raise PermissionError('OCR_SHARED_SOURCE_CHANGED')
+            # Original source performs final session/origin/object/expiry checks.
+            # This second read also catches mutations during provider decryption.
+            final=self.ocr_source(token,scene,application,kind)
+            _,_,latest_platform=self.onboarding._load(application,uid)
+            current=row()
+            if (final!=source or latest_platform!=platform or (tuple(initial) if initial is not None else None)
+                    !=(tuple(current) if current is not None else None)):
+                raise PermissionError('OCR_SHARED_SOURCE_CHANGED')
+            return dict(source,wechat_version=version)
+
     def ocr_source(self,token,scene,application,kind):
         """Protected Python-only preparation; no OCR/network call or HTTP exposure.
 

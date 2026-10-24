@@ -134,7 +134,11 @@ jobs:
         run: |
           set -o pipefail
           python -m pip install cryptography==50.0.2
-          PYTHONPATH=.:tests python -B -m unittest test_community_shared_license_cas test_community_mini_merchant.SharedProfileAndSigning -v 2>&1 | tee -a community-tests.log
+          if [ "${{ contains(github.event.head_commit.message, '[shared-source-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_shared_source -v 2>&1 | tee -a community-tests.log
+          else
+            PYTHONPATH=.:tests python -B -m unittest test_community_shared_license_cas test_community_mini_merchant.SharedProfileAndSigning -v 2>&1 | tee -a community-tests.log
+          fi
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Original host OCR lifecycle and Mini feedback affected scope
         if: contains(github.event.head_commit.message, '[community-ocr-host-scope]')

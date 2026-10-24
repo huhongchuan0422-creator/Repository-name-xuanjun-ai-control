@@ -91,6 +91,7 @@
           "tests/test_community_ocr_bridge.py",
           "tests/test_community_ocr_host.py",
           "tests/test_community_shared_license_cas.py",
+          "tests/test_community_ocr_shared_source.py",
           "clients/community-mini/ocr-host-ui.test.cjs"
         ]
       },
@@ -235,6 +236,7 @@
         "scripts/community_ocr_host.py",
         "tests/test_community_ocr_host.py",
         "tests/test_community_shared_license_cas.py",
+        "tests/test_community_ocr_shared_source.py",
         "clients/community-mini/ocr-host-ui.test.cjs",
         "docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md"
       ]
