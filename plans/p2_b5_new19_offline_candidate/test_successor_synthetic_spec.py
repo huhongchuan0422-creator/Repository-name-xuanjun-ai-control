@@ -296,7 +296,7 @@ class SyntheticSpecTests(unittest.TestCase):
                          patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
                                RecordedHTTP):
                         result=tx.execute()
-                    self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED')
+                    self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED',result)
                     self.assertEqual(result['new_requests'],0)
                     tx.b.authority.original.queue.close()
                 child=subprocess.run([sys.executable,'-B',str(HERE/
