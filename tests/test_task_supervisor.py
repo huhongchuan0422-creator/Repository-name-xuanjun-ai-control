@@ -186,11 +186,13 @@ class SupervisorTests(unittest.TestCase):
         try:
             for table in ('writer_reconcile_evidence','writer_receipts',
                           'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
                           'resource_claims'):
                 db.execute('DROP TABLE '+table)
             for column in ('last_trusted_time','coverage_digest',
                            'receiver_ack_sha256','receiver_ack_json',
-                           'resource_scope_json','authority_gateway_id',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_gateway_id',
                            'authority_session_id','authority_run_id',
                            'authority_valid_until','authority_state'):
                 db.execute('ALTER TABLE tasks DROP COLUMN '+column)
