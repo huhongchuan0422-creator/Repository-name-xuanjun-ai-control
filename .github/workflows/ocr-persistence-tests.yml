@@ -15,6 +15,7 @@ on:
       - 'services/ocr_engine/generate_platform_lock.py'
       - 'services/ocr_engine/generate_deb_runtime_lock.py'
       - 'services/ocr_engine/verify_offline_runtime.py'
+      - 'services/ocr_engine/install_deb_closure.py'
       - 'services/ocr_engine/write_candidate_input_manifest.py'
       - '.github/workflows/ocr-engine-tests.yml'
       - 'services/ocr_engine/deployment_config.schema.json'
