@@ -143,69 +143,60 @@ class SupervisorTests(unittest.TestCase):
         self.assertTrue(replay['duplicate'])
         self.assertEqual(self.s._task('t1')['state'],'READY')
 
-    def test_version_one_database_migrates_and_preserves_task(self):
+    def test_v2_normal_open_is_zero_write_then_explicit_migration(self):
         self.registration()
         self.s.close()
         db=sqlite3.connect(self.path)
         try:
-            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
-            db.execute('PRAGMA user_version=1')
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_json','authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
             db.commit()
         finally:
             db.close()
+        with open(self.path,'rb') as stream:
+            before=stream.read()
+        with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
+            Supervisor(self.path,lambda:self.now)
+        with open(self.path,'rb') as stream:
+            self.assertEqual(before,stream.read())
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
         self.s=Supervisor(self.path,lambda:self.now)
-        columns=[row['name'] for row in
-                 self.s.db.execute('PRAGMA table_info(tasks)')]
-        self.assertIn('recovery_generation',columns)
-        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
-        self.assertEqual([row['task_id'] for row in self.s.ready()],['t1'])
-        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['authority_state'],'NONE')
         self.assertEqual(self.s._task('t1')['state'],'READY')
 
-    def test_migration_interruptions_roll_back_all_schema_and_headers(self):
-        self.registration()
+    def test_v2_active_attempt_migrates_to_unknown_hold(self):
+        self.registration(); self.claim()
         self.s.close()
         db=sqlite3.connect(self.path)
         try:
-            db.execute('PRAGMA journal_mode=DELETE')
-            db.execute('ALTER TABLE tasks DROP COLUMN recovery_generation')
-            db.execute('PRAGMA application_id=0')
-            db.execute('PRAGMA user_version=1')
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_json','authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
             db.commit()
         finally:
             db.close()
-
-        class FailingSupervisor(Supervisor):
-            fail_at = None
-            def _migration_failpoint(self, name):
-                if name == self.fail_at:
-                    raise RuntimeError('injected migration interruption')
-
-        for point in ('after_alter','after_application_id',
-                      'after_user_version'):
-            handle,path=tempfile.mkstemp(); os.close(handle)
-            try:
-                shutil.copyfile(self.path,path)
-                FailingSupervisor.fail_at=point
-                with self.assertRaises(RuntimeError):
-                    FailingSupervisor(path,lambda:self.now)
-                check=sqlite3.connect(path)
-                try:
-                    columns=[row[1] for row in
-                             check.execute('PRAGMA table_info(tasks)')]
-                    self.assertNotIn('recovery_generation',columns)
-                    self.assertEqual(check.execute(
-                        'PRAGMA application_id').fetchone()[0],0)
-                    self.assertEqual(check.execute(
-                        'PRAGMA user_version').fetchone()[0],1)
-                    self.assertEqual(check.execute(
-                        'SELECT task_id FROM tasks').fetchone()[0],'t1')
-                finally:
-                    check.close()
-            finally:
-                os.unlink(path)
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
         self.s=Supervisor(self.path,lambda:self.now)
-        self.assertEqual(self.s._task('t1')['recovery_generation'],0)
+        task=self.s._task('t1')
+        self.assertEqual(task['authority_state'],UNKNOWN)
+        self.assertEqual(task['state'],'HOLD')
 
     def test_unknown_database_rejected_without_journal_mutation(self):
         handle,path=tempfile.mkstemp(); os.close(handle)
