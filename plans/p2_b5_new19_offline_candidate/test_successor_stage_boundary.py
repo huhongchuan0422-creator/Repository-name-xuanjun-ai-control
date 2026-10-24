@@ -82,8 +82,8 @@ class StageBoundaryTests(unittest.TestCase):
                        'xuanjun-cloud-connection.service'),calls[1:])
         self.assertIn(('/usr/bin/systemctl','stop',
                        'xuanjun-cloud-oauth-resource.service'),calls[1:])
-        self.assertNotEqual(getattr(backend,'stop_outcome',{}).get('state'),
-                            'ALL_STOPPED')
+        self.assertEqual(getattr(backend,'stop_outcome',{}).get('state'),
+                         'ALL_STOPPED')
 
     def test_prestart_restore_branch_requires_scoped_action(self):
         effects=[]
