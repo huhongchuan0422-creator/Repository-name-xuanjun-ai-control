@@ -96,7 +96,7 @@ class CanonicalBindingTests(unittest.TestCase):
                      'session_id':'session1','gateway_id':'gateway1'}
         self.s.claim_writer(TASK,'a1','developer','WORK',self.caller,
                             'lease1','provider1',['fake:development/source'],
-                            1700)
+                            4102444800.0)
 
     def tearDown(self):
         self.s.close()
@@ -141,7 +141,7 @@ class CanonicalBindingTests(unittest.TestCase):
         self.now=999.0
         with self.assertRaisesRegex(ValueError,'CLOCK_ROLLBACK_HOLD'):
             bind_validated_receipt(self.s,self.receipt(),self.files())
-        self.now=1700.0
+        self.now=4102444800.0
         with self.assertRaisesRegex(ValueError,'WRITER_TICKET_EXPIRED'):
             bind_validated_receipt(self.s,self.receipt(),self.files())
         self.now=1001.0
