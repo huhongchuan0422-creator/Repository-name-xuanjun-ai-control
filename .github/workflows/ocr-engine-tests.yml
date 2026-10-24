@@ -106,7 +106,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
-          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-deb-cache" "$RUNNER_TEMP/ocr-deb-cache/apt-lists" "$RUNNER_TEMP/ocr-build/source-pins"
+          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-deb-cache" "$RUNNER_TEMP/ocr-apt-work" "$RUNNER_TEMP/ocr-build/source-pins"
           cp services/ocr_engine/requirements.txt services/ocr_engine/model_manifest.json services/ocr_engine/deployment_config.schema.json "$RUNNER_TEMP/ocr-build/source-pins/"
           cp services/ocr_engine/model_distribution/LICENSE-2.0.txt services/ocr_engine/model_distribution/NOTICE.md "$RUNNER_TEMP/ocr-build/source-pins/"
           docker run --rm --platform linux/amd64 \
@@ -126,7 +126,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
           exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           docker run --rm --platform linux/amd64 \
-            -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-deb-cache:/debs" -v "$RUNNER_TEMP/ocr-deb-cache/apt-lists:/var/lib/apt/lists" \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-deb-cache:/debs" -v "$RUNNER_TEMP/ocr-apt-work:/apt-work" \
             "$OCR_BASE_IMAGE" sh -lc '
               set -eu
               apt-get update
