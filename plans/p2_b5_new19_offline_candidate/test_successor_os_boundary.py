@@ -36,12 +36,16 @@ class SealedOSBoundary:
     The original fds, flock and SQLite operations run on actual temporary files.
     A newly created inode never inherits a pin from its pathname.
     """
-    def __init__(self, root, allowed, pins, dynamic_roots=()):
+    def __init__(self, root, allowed, pins, dynamic_roots=(),
+                 recursive_dynamic_roots=()):
         self.root = pathlib.Path(root)
         self.allowed = frozenset(allowed)
         self.dynamic_roots = frozenset(dynamic_roots)
+        self.recursive_dynamic_roots = frozenset(recursive_dynamic_roots)
         if not self.dynamic_roots <= self.allowed:
             raise ValueError('DYNAMIC_ROOT_NOT_ALLOWED')
+        if not self.recursive_dynamic_roots <= self.allowed:
+            raise ValueError('RECURSIVE_DYNAMIC_ROOT_NOT_ALLOWED')
         self.directories = frozenset({'/'} | {
             str(parent) for path in self.allowed
             for parent in pathlib.PurePosixPath(path).parents})
@@ -101,8 +105,12 @@ class SealedOSBoundary:
         if parent is None:
             return None
         logical = parent.rstrip('/')+'/'+path
-        permitted_dynamic = (parent in self.dynamic_roots and
-            '/' not in path and path not in ('','.','..'))
+        simple = '/' not in path and path not in ('','.','..')
+        recursive_parent = any(parent == root or
+            parent.startswith(root.rstrip('/')+'/')
+            for root in self.recursive_dynamic_roots)
+        permitted_dynamic = simple and (
+            parent in self.dynamic_roots or recursive_parent)
         if (logical not in self.allowed and logical not in self.directories
                 and not permitted_dynamic):
             raise PermissionError('UNLISTED_OS_PATH')

@@ -202,10 +202,15 @@ class SyntheticSpecTests(unittest.TestCase):
                 allowed.update((WitnessStore.__init__.__globals__['ROOT'],
                                 SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']))
                 allowed.update(base+'/current' for base in c53.BASES)
-                generated_roots=(spec['fixed_paths']['job_proposed'],
-                    *spec['fixed_paths']['stage_proposed'],
-                    *spec['fixed_paths']['target_release'])
-                allowed.update(generated_roots)
+                job_root=spec['fixed_paths']['job_proposed']
+                release_roots=(*spec['fixed_paths']['stage_proposed'],
+                               *spec['fixed_paths']['target_release'])
+                generated_roots=(job_root,*release_roots)
+                replace_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]
+                    for path in c53.CONFIGS+c53.SLOTS)
+                current_stages=tuple(base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
+                    for base in c53.BASES)
+                allowed.update(generated_roots+replace_stages+current_stages)
                 pins={path:(target.stat().st_dev,target.stat().st_ino)
                       for path in files if (target:=root/path.lstrip('/')).exists()}
                 pins[c53.DB]=(spec['observed_baseline']['db']['dev'],
@@ -215,7 +220,8 @@ class SyntheticSpecTests(unittest.TestCase):
                 store_roots=(WitnessStore.__init__.__globals__['ROOT'],
                              SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
                 boundary=SealedOSBoundary(root,allowed,pins,
-                    dynamic_roots=store_roots+generated_roots)
+                    dynamic_roots=store_roots+(job_root,),
+                    recursive_dynamic_roots=release_roots)
                 binding=entry._binding(spec,'c53-recovery-draft','fixture-attempt',
                                        start,bundle['catalog_sha'])
                 record=json.loads(gate.read_binder())
@@ -270,7 +276,7 @@ class SyntheticSpecTests(unittest.TestCase):
                     # Parent setup stops after immutable witness/release registration;
                     # inherited CI/test-harness descriptors must not be normalized away.
                 execute=subprocess.run([sys.executable,'-B',str(HERE/
-                    'test_successor_synthetic_spec.py'),'--child-execute',str(root)],
+                    'test_successor_synthetic_spec.py'),'--child-execute',str(root),str(start)],
                     capture_output=True,text=True,timeout=20,check=False,close_fds=True)
                 self.assertEqual(execute.returncode,0,execute.stderr+'\\n'+execute.stdout)
                 executed=json.loads(execute.stdout)
@@ -328,7 +334,7 @@ class SyntheticSpecTests(unittest.TestCase):
                 self.assertIn('SUCCESSOR_SOURCE_NOT_BOUND',changed.stderr)
 
 
-def child_query(root,action='query'):
+def child_query(root,action='query',execute_start=None):
     """Fresh interpreter, same sealed test tree and original read-only entry."""
     f=SyntheticSpec()
     with f.active():
@@ -347,9 +353,14 @@ def child_query(root,action='query'):
             known.update(base+'/releases/'+c53.COMMIT+'/'+name for name in
                          f.source)
         job=spec['fixed_paths']['job_proposed']
-        generated_roots=(job,*spec['fixed_paths']['stage_proposed'],
-                         *spec['fixed_paths']['target_release'])
-        known.update(generated_roots)
+        release_roots=(*spec['fixed_paths']['stage_proposed'],
+                       *spec['fixed_paths']['target_release'])
+        generated_roots=(job,*release_roots)
+        replace_stages=tuple(path+'.l2-b5-staged-'+c53.COMMIT[:12]
+            for path in c53.CONFIGS+c53.SLOTS)
+        current_stages=tuple(base+'/current.l2-b5-staged-'+c53.COMMIT[:12]
+            for base in c53.BASES)
+        known.update(generated_roots+replace_stages+current_stages)
         known.update(job+'/'+name for name in (
             'reservation.json','window-open.json','activation-identity.json',
             'NEW_WORKER_START_ATTEMPT.json'))
@@ -413,7 +424,8 @@ def child_query(root,action='query'):
         store_roots=(WitnessStore.__init__.__globals__['ROOT'],
                      SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
         with SealedOSBoundary(root,known,pins,
-             dynamic_roots=store_roots+generated_roots).active(),\
+             dynamic_roots=store_roots+(job,),
+             recursive_dynamic_roots=release_roots).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
              patch.object(Github,'call',recorded_comment),\
@@ -425,8 +437,10 @@ def child_query(root,action='query'):
                           '/successor_controller/pr17_b5_successor_entry.py'),\
              patch.object(entry,'LOCAL_ROOT',entry.ROOT):
             if action=='execute':
+                if execute_start is None:
+                    raise AssertionError('EXECUTE_START_REQUIRED')
                 tx=entry._prepare('c53-recovery-draft','fixture-attempt',
-                                  'fixture-only',int(time.time())-10)
+                                  'fixture-only',int(execute_start))
                 guard_calls=[]
                 original_guarded=tx.guarded
                 def child_traced_guarded(name,*args):
@@ -503,8 +517,10 @@ def child_query(root,action='query'):
 
 
 if __name__=='__main__':
+    if len(sys.argv)==4 and sys.argv[1]=='--child-execute':
+        raise SystemExit(child_query(sys.argv[2],'execute',sys.argv[3]))
     if len(sys.argv)==3 and sys.argv[1] in (
-            '--child-query','--child-execute','--child-intake','--child-worker-ready',
+            '--child-query','--child-intake','--child-worker-ready',
             '--child-worker-success','--child-recover'):
         raise SystemExit(child_query(sys.argv[2],
             sys.argv[1][8:] if sys.argv[1]!='--child-query' else 'query'))
