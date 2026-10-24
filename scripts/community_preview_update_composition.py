@@ -21,7 +21,7 @@ REFERENCE_UID=0  # fixed production root owner; no argument/environment override
 APPROVAL='/opt/xuanjun-community-preview/update-approval.json'  # proposed, never created
 PRODUCT='f13155ed63a3137d41766ee587d9b4b96a81477f'
 CONTROL='a9324156f94040bb6ff0243815bb91abe2f67b2a'
-PINS={controller:'de4f328c3c43eb07db08989609b83dc0d036319248768d8bd328c9b5df990201',
+PINS={controller:'06cd05bc3e3b49aae3c87a2bf8488cfda4f6f900ff10af3b897baf85cdd3198d',
       plan:'81c01a2f94ff71c0af4555b9026a60db0b5ce226a158601e1cf1b6aa4b646fae',
       original:'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee',
       observation:'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3'}

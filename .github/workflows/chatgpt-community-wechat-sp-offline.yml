@@ -200,7 +200,7 @@ jobs:
           if [ "${{ contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
             python -B -m py_compile scripts/community_preview_bc_loader.py scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py
-            PYTHONPATH=.:tests python -B -m unittest test_community_preview_stopped_handoff test_community_preview_update_checkpoint.Checkpoints.test_default_disabled_zero_transport_actions test_community_preview_update_checkpoint.Checkpoints.test_real_fsync_journal_serial_success_reopen_and_no_replay test_community_preview_update_checkpoint.Checkpoints.test_known_health_failure_then_restart_and_safe_serial_recovery test_community_preview_update_checkpoint.Checkpoints.test_timeout_after_run_intent_persists_unknown_and_never_restores_old test_community_preview_update_checkpoint.Checkpoints.test_new_stop_unknown_cannot_start_old -v 2>&1 | tee community-tests.log
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_stopped_handoff test_community_preview_release_plan test_community_preview_update_checkpoint test_community_preview_update_composition -v 2>&1 | tee community-tests.log
           elif [ "${{ contains(github.event.head_commit.message, '[preview-stage-a-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_stage_a -v 2>&1 | tee community-tests.log

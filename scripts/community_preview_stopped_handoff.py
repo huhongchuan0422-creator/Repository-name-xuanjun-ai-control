@@ -395,29 +395,24 @@ class Session:
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
         return self.consume(proof,True)
     def close(self):
-        unknown=False
+        unproven_close=False
         s._ACTIVE=None
         if self.old_checkpoint is not None:s.checkpoint=self.old_checkpoint
         if self.old_clone is not None:s.clone_run=self.old_clone
         if self.old_checkpoint is not None:s._COMPONENT=self.old_component
-        if self.journal is not None:
-            try:self.journal.close();self.journal=None
-            except BaseException:
-                # Keep the Journal object when any owned fd remains unproved.
-                if all(getattr(self.journal,n,None) is None for n in ('fd','lock','parent')):self.journal=None
-                else:unknown=True
+        journal=self.journal;self.journal=None
+        if journal is not None:
+            try:journal.close()
+            except BaseException:unproven_close=True
         for name in ('backup','entry','lease','parent'):
             fd=getattr(self,name)
             if fd is None:continue
-            try:os.close(fd);setattr(self,name,None)
-            except BaseException:
-                try:os.fstat(fd)
-                except OSError as error:
-                    if error.errno==9:setattr(self,name,None)
-                    else:unknown=True
-                except BaseException:unknown=True
-                else:unknown=True
-        need(not unknown,'BC_CLEANUP_UNKNOWN')
+            # Drop ownership before invoking close.  Never retry a possibly
+            # consumed/recycled descriptor number after an exceptional close.
+            setattr(self,name,None)
+            try:os.close(fd)
+            except BaseException:unproven_close=True
+        need(not unproven_close,'BC_CLEANUP_UNKNOWN')
 
 class VerifiedHandoff:
     def __init__(self,session,proof,journal):

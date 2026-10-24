@@ -176,22 +176,18 @@ class Journal:
             self.state=value
         except BaseException:self.poisoned=True;raise
     def close(self):
-        unknown=False
+        unproven_close=False
         for name in ('fd','lock','parent'):
             value=getattr(self,name,None)
             if value is None:continue
-            try:
-                os.close(value);setattr(self,name,None)
-            except BaseException:
-                # Never retry a possibly-consumed fd: it may already have been
-                # recycled. Prove EBADF only; otherwise retain the reference.
-                try:os.fstat(value)
-                except OSError as error:
-                    if error.errno==9:setattr(self,name,None)
-                    else:unknown=True
-                except BaseException:unknown=True
-                else:unknown=True
-        if unknown:raise Hold('JOURNAL_CLEANUP_UNKNOWN')
+            # Transfer ownership away BEFORE close().  A close error does not
+            # prove the integer still denotes our resource; it may already have
+            # been consumed and recycled to an unrelated fd.  Never retain or
+            # retry the number after invoking close once.
+            setattr(self,name,None)
+            try:os.close(value)
+            except BaseException:unproven_close=True
+        if unproven_close:raise Hold('JOURNAL_CLEANUP_UNKNOWN')
 
 
 class OriginalTransport:

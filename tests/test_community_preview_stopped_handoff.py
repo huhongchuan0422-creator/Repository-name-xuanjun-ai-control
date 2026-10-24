@@ -296,23 +296,29 @@ print('PARENT_ALIVE',flush=True)
                 replacement.write_bytes(path.read_bytes());replacement.chmod(0o600);os.replace(str(replacement),str(path))
         with patch.object(u.Journal,'write',publish),self.assertRaises(Exception):self.session.update()
         self.assertEqual(self.calls,[])
-    def test_cleanup_error_after_effective_close_still_releases_every_owned_fd(self):
-        fds=[self.session.entry,self.session.lease,self.session.parent];real=os.close;raised=[False]
-        def close(fd):
-            real(fd)
-            if fd==fds[0] and not raised[0]:raised[0]=True;raise OSError('SYNTHETIC_AFTER_CLOSE')
-        with patch.object(h.os,'close',side_effect=close):self.session.close()
-        for fd in fds:
-            with self.assertRaises(OSError):os.fstat(fd)
-    def test_cleanup_unknown_close_keeps_ownership_and_attempts_later_fds(self):
+    def test_cleanup_error_after_effective_close_drops_ownership_and_releases_later_fds(self):
         fds=[self.session.entry,self.session.lease,self.session.parent];real=os.close;seen=[]
         def close(fd):
+            seen.append(fd);real(fd)
+            if fd==fds[0]:raise OSError('SYNTHETIC_AFTER_CLOSE')
+        with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
+        self.assertEqual(seen,fds);self.assertIsNone(self.session.entry);self.assertIsNone(self.session.lease);self.assertIsNone(self.session.parent)
+    def test_cleanup_exception_never_retries_recycled_fd_on_second_cleanup(self):
+        target=self.session.entry;real=os.close;seen=[];replacement=[None];raised=[False]
+        def close(fd):
             seen.append(fd)
-            if fd==fds[0]:raise OSError('SYNTHETIC_NOT_CLOSED')
+            if fd==target and not raised[0]:
+                raised[0]=True;real(fd)
+                new=os.open('/dev/null',os.O_RDONLY)
+                if new!=target:os.dup2(new,target);real(new)
+                replacement[0]=target
+                raise OSError('SYNTHETIC_CLOSE_UNKNOWN_AFTER_RECYCLE')
             return real(fd)
         with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
-        self.assertIn(fds[1],seen);self.assertIn(fds[2],seen);self.assertEqual(self.session.entry,fds[0])
-        os.fstat(fds[0]);real(fds[0]);self.session.entry=None
+        self.assertEqual(seen.count(target),1);self.assertIsNone(self.session.entry)
+        before=len(seen)
+        with patch.object(h.os,'close',side_effect=close):self.session.close()
+        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0])
     def test_same_name_different_plan_and_source_pin_change_reject(self):
         self.prepare_b_and_c();self.session.update()
         candidate=copy.deepcopy(self.session.journal.plan)
@@ -500,15 +506,23 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         legacy=p.prepare(candidate['source'],current,candidate['image'])
         with self.assertRaisesRegex(u.Hold,'LEGACY_JOURNAL_NO_HANDOFF_ARGUMENTS'):u.Journal(self.session.parent,legacy,lease_fd=self.session.lease)
 
-    def test_journal_cleanup_unknown_keeps_fd_and_closes_others_without_retry(self):
-        self.prepare_b_and_c();self.session.update();j=self.session.journal;fds=[j.fd,j.lock,j.parent];real=os.close;seen=[]
+    def test_journal_cleanup_exception_drops_ownership_and_never_retries_recycled_fd(self):
+        self.prepare_b_and_c();self.session.update();j=self.session.journal;fds=[j.fd,j.lock,j.parent];real=os.close;seen=[];replacement=[None];raised=[False]
         def close(fd):
             seen.append(fd)
-            if fd==fds[0]:raise OSError('SYNTHETIC_NOT_CLOSED')
+            if fd==fds[0] and not raised[0]:
+                raised[0]=True;real(fd)
+                new=os.open('/dev/null',os.O_RDONLY)
+                if new!=fds[0]:os.dup2(new,fds[0]);real(new)
+                replacement[0]=fds[0]
+                raise OSError('SYNTHETIC_CLOSE_UNKNOWN_AFTER_RECYCLE')
             return real(fd)
         with patch.object(u.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'JOURNAL_CLEANUP_UNKNOWN'):j.close()
-        self.assertEqual(seen.count(fds[0]),1);self.assertIn(fds[1],seen);self.assertIn(fds[2],seen);self.assertEqual(j.fd,fds[0])
-        real(fds[0]);j.fd=None;self.session.journal=None
+        self.assertEqual(seen.count(fds[0]),1);self.assertIn(fds[1],seen);self.assertIn(fds[2],seen)
+        self.assertIsNone(j.fd);self.assertIsNone(j.lock);self.assertIsNone(j.parent)
+        before=len(seen)
+        with patch.object(u.os,'close',side_effect=close):j.close()
+        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0]);self.session.journal=None
 
     def test_unknown_second_update_is_explicit_inspect_only_and_preserves_files(self):
         self.prepare_b_and_c();self.on_run=lambda:'UNKNOWN'

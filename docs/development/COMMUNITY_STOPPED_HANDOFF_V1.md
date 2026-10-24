@@ -112,13 +112,21 @@ No synthetic timestamps, private proxy spoofing, OCR enablement or payment grant
 
 ## What has NOT been done / remaining values and responsibility
 
-Patch application, Python compile, PTY tests, whole-entry tests, manifest build,
-new carrier SHA, Hosted CI, site installation, B/C and official preview: NOT_EXECUTED.
-Exec environment is not reprobed. Unknown existing local stage_bc draft is preserved.
-This text is based only on full fixed GitHub sources, not recovered local files.
-After original executor recovers the sole Writer must first preserve/check local work,
-integrate this proposal, actually run the new suite plus necessary old running-path
-checks, then produce exact new SHA/Tree/CI/archive. Root's review copy is not integration.
+Source integration, Python compile, PTY/whole-entry tests, the full related
+release/checkpoint/composition regression set, manifest build and Hosted CI are now
+required evidence for this source candidate. They never authorize site installation,
+B/C, backup, stop/start, official preview, OCR or WeChat publication. The unknown old
+stage_bc draft remains outside this integrated path and must not be overwritten.
+
+The real controller source binding is byte-exact: after the final cleanup ownership fix,
+`scripts/community_preview_update_checkpoint.py` SHA256 is
+`06cd05bc3e3b49aae3c87a2bf8488cfda4f6f900ff10af3b897baf85cdd3198d` and
+`community_preview_update_composition.PINS[controller]` must equal that value. Any later
+controller byte change requires a fresh pin and the complete related regression set.
+Cleanup ownership is one-shot: every owned descriptor field is cleared before invoking
+`close`; an exceptional close records unproven cleanup and HOLD while later owned handles
+are still processed. The consumed integer is never retained for a blind retry because the
+same number may already refer to an unrelated replacement resource.
 
 Future Owner/coordinator inputs once, before exact stage approval:
 new protected v2 installation and actual hashes; fresh fixed old/current and route
