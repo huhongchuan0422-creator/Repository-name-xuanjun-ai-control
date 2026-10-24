@@ -315,16 +315,21 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
             raise HTTPException(status_code=409, detail=str(exc))
         if not job:
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
-        confirmed_revision = job.get("confirmation_revision", job.get("revision", body.revision))
-        confirmed_fields = job.get("confirmed_fields", body.fields)
-        confirmed_binding = job.get("confirmed_binding")
-        application_revision = job.get("application_revision", existing.get("application_revision"))
-        provider_version = job.get("provider_version", existing.get("provider_version"))
-        return {"job_id": job_id, "status": job["status"], "revision": confirmed_revision,
+        # Normalize both first-confirm and idempotent replay responses from the persisted job,
+        # because a replay record intentionally contains only the response snapshot, not DB columns.
+        persisted = jobs.get(job_id, p.tenant_id)
+        if not persisted:
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        confirmed_revision = persisted.get("confirmation_revision", job.get("revision", body.revision))
+        confirmed_fields = persisted.get("confirmed_fields", job.get("confirmed_fields", body.fields))
+        confirmed_binding = persisted.get("confirmed_binding", job.get("confirmed_binding"))
+        application_revision = persisted.get("application_revision", existing.get("application_revision"))
+        provider_version = persisted.get("provider_version", existing.get("provider_version"))
+        return {"job_id": job_id, "status": persisted["status"], "revision": confirmed_revision,
                 "confirmed_fields": confirmed_fields, "confirmed_binding": confirmed_binding,
                 "application_revision": application_revision,
                 "provider_version": provider_version,
-                "shared_writeback_eligible": _shared_writeback_eligible(job),
+                "shared_writeback_eligible": _shared_writeback_eligible(persisted),
                 "recorded": True}
     @app.delete("/api/v1/ocr/jobs/{job_id}", status_code=204)
     def delete_job(job_id: str, authorization: Optional[str] = Header(None)):
