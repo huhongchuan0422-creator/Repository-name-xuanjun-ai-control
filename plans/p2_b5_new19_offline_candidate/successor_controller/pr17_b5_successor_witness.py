@@ -99,9 +99,9 @@ def _shared_flock_held(fd):
         lines=raw.decode('ascii').splitlines()
     except UnicodeError:
         return False
-    locks=[line for line in lines if line.startswith('lock:')]
-    return len(locks)==1 and 'FLOCK' in locks[0] and 'ADVISORY' in locks[0] and (
-           ' READ ' in (' '+locks[0]+' ') or '\tREAD\t' in locks[0])
+    locks=[line.split() for line in lines if line.startswith('lock:')]
+    return any('FLOCK' in fields and 'ADVISORY' in fields and
+               'READ' in fields for fields in locks)
 
 
 class WitnessStore:
