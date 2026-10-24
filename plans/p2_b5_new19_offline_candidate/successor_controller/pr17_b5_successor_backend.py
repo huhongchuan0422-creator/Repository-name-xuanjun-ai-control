@@ -624,8 +624,8 @@ class R2HostBackend:
                 c53.require(store is not None,'CLOSEOUT_EVIDENCE_STORE_REQUIRED')
                 evidence_fds=set(store.active_action_fds(
                     self.authority._witness_binding(),
-                    ('b5_http','B5_EXPOSURE_CLOSE')))
-                c53.require(len(evidence_fds)==4 and evidence_fds<=set(pre),
+                    ('b5_http','B5_EXPOSURE_CLOSE','release')))
+                c53.require(len(evidence_fds)==6 and evidence_fds<=set(pre),
                             'CLOSEOUT_EVIDENCE_FD_UNKNOWN')
                 allowed.update(evidence_fds)
             # A preexisting cached SQLite B (or any unknown FD) is disallowed.
