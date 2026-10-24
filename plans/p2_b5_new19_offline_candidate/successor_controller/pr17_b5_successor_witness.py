@@ -74,6 +74,10 @@ def _regular(fd, mode, uid=0, gid=0):
           'WITNESS_FILE_PROTECTION')
     return s
 
+def _lease_identity(s):
+    return (s.st_dev,s.st_ino,stat.S_IFMT(s.st_mode),s.st_uid,s.st_gid,
+            stat.S_IMODE(s.st_mode),s.st_nlink)
+
 
 class WitnessStore:
     def __init__(self, root=ROOT, *, enabled=False, test_only=False, clock=time.time):
@@ -386,13 +390,19 @@ class WitnessStore:
         """Return the exact descriptors held by the current witness action."""
         pin=self._binding(binding)
         leased=getattr(self._lease,'current',None)
-        check(type(leased) is tuple and len(leased)==3 and leased[1]==pin,
+        check(type(leased) is tuple and len(leased)==5 and leased[1]==pin,
               'WITNESS_ACTION_LEASE_REQUIRED')
-        result=(leased[0],leased[2])
-        for current in result:
-            try:os.fstat(current)
-            except OSError:
-                raise Hold('WITNESS_ACTION_LEASE_FD_UNKNOWN') from None
+        fd,_,lock,dir_identity,lock_identity=leased
+        try:
+            current_dir=os.fstat(fd);current_lock=os.fstat(lock)
+            named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
+        except OSError:
+            raise Hold('WITNESS_ACTION_LEASE_FD_UNKNOWN') from None
+        check(_lease_identity(current_dir)==dir_identity and
+              _lease_identity(current_lock)==lock_identity and
+              _lease_identity(named_lock)==lock_identity,
+              'WITNESS_ACTION_LEASE_IDENTITY_CHANGED')
+        result=(fd,lock)
         check(result[0]!=result[1],'WITNESS_ACTION_LEASE_FD_DUPLICATE')
         return result
 
@@ -416,7 +426,13 @@ class WitnessStore:
             self._admit_time(binding)
             check(getattr(self._lease, 'current', None) is None,
                   'WITNESS_NESTED_ACTION')
-            self._lease.current = (fd, self._binding(binding), lock)
+            dir_identity=_lease_identity(os.fstat(fd))
+            lock_identity=_lease_identity(os.fstat(lock))
+            named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
+            check(lock_identity==_lease_identity(named_lock),
+                  'WITNESS_ACTION_LEASE_LOCK_CHANGED')
+            self._lease.current = (fd, self._binding(binding), lock,
+                                   dir_identity,lock_identity)
             try:
                 yield
             finally:
@@ -572,12 +588,17 @@ class SuccessorEvidenceStore(WitnessStore):
               all(row[2]==pin for row in stack),
               'SUCCESSOR_EVIDENCE_LEASE_REQUIRED')
         result=[]
-        for fd,lock,_,_ in stack:
-            for current in (fd,lock):
-                try:os.fstat(current)
-                except OSError:
-                    raise Hold('SUCCESSOR_EVIDENCE_LEASE_FD_UNKNOWN') from None
-                result.append(current)
+        for fd,lock,_,_,dir_identity,lock_identity in stack:
+            try:
+                current_dir=os.fstat(fd);current_lock=os.fstat(lock)
+                named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
+            except OSError:
+                raise Hold('SUCCESSOR_EVIDENCE_LEASE_FD_UNKNOWN') from None
+            check(_lease_identity(current_dir)==dir_identity and
+                  _lease_identity(current_lock)==lock_identity and
+                  _lease_identity(named_lock)==lock_identity,
+                  'SUCCESSOR_EVIDENCE_LEASE_IDENTITY_CHANGED')
+            result.extend((fd,lock))
         check(len(result)==2*len(kinds) and len(set(result))==len(result),
               'SUCCESSOR_EVIDENCE_LEASE_FD_DUPLICATE')
         return tuple(result)
@@ -600,7 +621,12 @@ class SuccessorEvidenceStore(WitnessStore):
             stack=getattr(self._lease,'actions',None)
             if stack is None:
                 stack=[];self._lease.actions=stack
-            lease=(fd,lock,pin,kind);stack.append(lease)
+            dir_identity=_lease_identity(os.fstat(fd))
+            lock_identity=_lease_identity(os.fstat(lock))
+            named_lock=os.stat('register.lock',dir_fd=fd,follow_symlinks=False)
+            check(lock_identity==_lease_identity(named_lock),
+                  'SUCCESSOR_EVIDENCE_LEASE_LOCK_CHANGED')
+            lease=(fd,lock,pin,kind,dir_identity,lock_identity);stack.append(lease)
             try:
                 yield
             finally:
