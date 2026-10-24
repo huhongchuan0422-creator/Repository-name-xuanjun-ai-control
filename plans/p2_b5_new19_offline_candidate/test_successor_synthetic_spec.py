@@ -300,7 +300,11 @@ class SyntheticSpecTests(unittest.TestCase):
                     original_guarded=tx.guarded
                     def traced_guarded(name,*args):
                         guard_calls.append(name)
-                        return original_guarded(name,*args)
+                        try:
+                            return original_guarded(name,*args)
+                        except BaseException as exc:
+                            guard_calls.append('ERROR:'+name+':'+str(exc))
+                            raise
                     tx.guarded=traced_guarded
                     with patch('subprocess.run',side_effect=recorded_run),\
                          patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
