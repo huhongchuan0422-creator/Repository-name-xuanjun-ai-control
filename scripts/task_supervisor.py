@@ -41,7 +41,8 @@ TASK_COLUMNS = V2_TASK_COLUMNS + (
     'authority_state', 'authority_valid_until', 'authority_run_id',
     'authority_session_id', 'authority_gateway_id', 'resource_scope_json',
     'receiver_ack_json', 'receiver_ack_sha256', 'resource_scope_digest',
-    'coverage_digest', 'authority_caller_id', 'last_trusted_time',
+    'coverage_digest', 'authority_caller_id', 'authority_lock_provider_id',
+    'last_trusted_time',
 )
 PERSISTENT_COLUMNS = {
     'events': ('task_id', 'attempt_id', 'event_id', 'kind',
@@ -273,6 +274,7 @@ class Supervisor(object):
           resource_scope_digest TEXT NOT NULL DEFAULT 'UNKNOWN',
           coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN',
           authority_caller_id TEXT NOT NULL DEFAULT 'UNKNOWN',
+          authority_lock_provider_id TEXT NOT NULL DEFAULT 'UNKNOWN',
           last_trusted_time REAL
         )''',
         '''CREATE TABLE IF NOT EXISTS events(
@@ -406,6 +408,7 @@ class Supervisor(object):
                 "resource_scope_digest TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 "coverage_digest TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 "authority_caller_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "authority_lock_provider_id TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 'last_trusted_time REAL',
             )
             for definition in additions:
@@ -735,6 +738,7 @@ class Supervisor(object):
             'checkpoint_sha256': task['checkpoint_sha256'],
             'spec_sha256': task['spec_sha256'],
             'assigned_caller_id': task['authority_caller_id'],
+            'lock_provider_id': task['authority_lock_provider_id'],
             'assigned_run_id': task['authority_run_id'],
             'assigned_session_id': task['authority_session_id'],
             'gateway_id': task['authority_gateway_id'],
@@ -785,13 +789,14 @@ class Supervisor(object):
         return hashlib.sha256(canonical(ticket).encode('utf-8')).hexdigest()
 
     def claim_writer(self, task_id, attempt_id, owner, entry, caller,
-                     lease_id, resource_keys, valid_until):
+                     lease_id, lock_provider_id, resource_keys, valid_until):
         now = self.clock()
         caller = self._caller(caller)
         keys = self._exact_resource_keys(resource_keys)
         if (not finite(now) or not finite(valid_until) or now >= valid_until
                 or any(not isinstance(x, str) or not x for x in
-                       (attempt_id, owner, entry, lease_id))):
+                       (attempt_id, owner, entry, lease_id,
+                        lock_provider_id))):
             raise ValueError('EXACT_EXECUTION_AUTHORITY_REQUIRED')
         scope_digest = self._scope_digest(keys)
         self.db.execute('BEGIN IMMEDIATE')
@@ -815,16 +820,17 @@ class Supervisor(object):
               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
               max_fence=?,max_epoch=?,authority_state='VALID',
               authority_valid_until=?,authority_caller_id=?,
-              authority_run_id=?,authority_session_id=?,
-              authority_gateway_id=?,resource_scope_json=?,
+              authority_lock_provider_id=?,authority_run_id=?,
+              authority_session_id=?,authority_gateway_id=?,resource_scope_json=?,
               resource_scope_digest=?,coverage_digest=?,
               receiver_ack_json='{}',receiver_ack_sha256=?,
               last_trusted_time=?,received_at=?,last_event_at=?,updated_at=?
               WHERE task_id=? AND authority_state='NONE' ''',
               (owner, entry, caller['run_id'], caller['session_id'], attempt_id,
                lease_id, fence, epoch, fence, epoch, valid_until,
-               caller['caller_id'], caller['run_id'], caller['session_id'],
-               caller['gateway_id'], canonical(list(keys)), scope_digest,
+               caller['caller_id'], lock_provider_id, caller['run_id'],
+               caller['session_id'], caller['gateway_id'],
+               canonical(list(keys)), scope_digest,
                UNKNOWN, UNKNOWN, now, now, now, now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
@@ -1153,9 +1159,11 @@ class Supervisor(object):
               (task_id, task['attempt_id'], inventory['evidence_id'],
                evidence_body, now))
             self.db.execute("""UPDATE tasks SET authority_state='REVOKING',
-              resource_scope_json=?,resource_scope_digest=?,updated_at=?
+              authority_lock_provider_id=?,resource_scope_json=?,
+              resource_scope_digest=?,updated_at=?
               WHERE task_id=? AND authority_state=?""",
-              (canonical(list(keys)), scope_digest, now, task_id, UNKNOWN))
+              (inventory['provider_id'], canonical(list(keys)), scope_digest,
+               now, task_id, UNKNOWN))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('UNKNOWN_RECOVERY_CAS_FAILED')
             return {'state': 'REVOKING',
@@ -1180,6 +1188,8 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['authority_state'] != 'REVOKING':
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
+            if provider_id != task['authority_lock_provider_id']:
+                raise ValueError('LOCAL_DRAIN_PROVIDER_MISMATCH')
             expected = {
                 'old_attempt_id': task['attempt_id'],
                 'old_lease_id': task['lease_id'],
@@ -1229,7 +1239,10 @@ class Supervisor(object):
             drain = self.db.execute('''SELECT * FROM revocation_drains
               WHERE task_id=? AND attempt_id=?''',
               (task_id, task['attempt_id'])).fetchone()
-            if drain is None or receipt.get('provider_id') != drain['provider_id']:
+            if (drain is None
+                    or receipt.get('provider_id') != drain['provider_id']
+                    or receipt.get('provider_id')
+                       != task['authority_lock_provider_id']):
                 raise ValueError('LOCAL_DRAIN_PROVIDER_REQUIRED')
             if receipt.get('adapter_id') != 'source-resource-adapter-v1':
                 raise ValueError('SOURCE_ADAPTER_RECEIPT_REQUIRED')
@@ -1318,6 +1331,7 @@ class Supervisor(object):
         required = {'schema','task_id','old_attempt_id','new_attempt_id',
                     'new_owner','new_entry','new_caller_id','new_run_id',
                     'new_session_id','new_lease_id','new_gateway_id',
+                    'new_lock_provider_id',
                     'resource_scope_digest','coverage_digest','spec_sha256',
                     'checkpoint_sha256'}
         if (not isinstance(ack, dict) or set(ack) != required
@@ -1385,16 +1399,18 @@ class Supervisor(object):
               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
               max_fence=?,max_epoch=?,authority_state='VALID',
               authority_valid_until=?,authority_caller_id=?,
-              authority_run_id=?,authority_session_id=?,
-              authority_gateway_id=?,receiver_ack_json='{}',
+              authority_lock_provider_id=?,authority_run_id=?,
+              authority_session_id=?,authority_gateway_id=?,
+              receiver_ack_json='{}',
               receiver_ack_sha256=?,coverage_digest=?,last_trusted_time=?,
               received_at=?,last_event_at=?,updated_at=?
               WHERE task_id=? AND authority_state='REVOKED' ''',
               (ack['new_owner'], ack['new_entry'], ack['new_run_id'],
                ack['new_session_id'], ack['new_attempt_id'], ack['new_lease_id'],
                fence, epoch, fence, epoch, valid_until, ack['new_caller_id'],
-               ack['new_run_id'], ack['new_session_id'], ack['new_gateway_id'],
-               UNKNOWN, UNKNOWN, now, now, now, now, task_id))
+               ack['new_lock_provider_id'], ack['new_run_id'],
+               ack['new_session_id'], ack['new_gateway_id'], UNKNOWN, UNKNOWN,
+               now, now, now, now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('TAKEOVER_CAS_FAILED')
             self.db.execute('''UPDATE resource_claims SET attempt_id=?,
