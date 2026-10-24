@@ -49,10 +49,17 @@ jobs:
       OCR_BASE_CONFIG_SHA256: c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee
       OCR_TARGET_PLATFORM: linux-x86_64-cp311
     steps:
+      - name: Initialize non-secret build diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          : > "$RUNNER_TEMP/ocr-diagnostics/build.log"
       - name: Validate workflow YAML and all embedded shell blocks
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           python -m pip install --disable-pip-version-check PyYAML==6.0.2
           python services/ocr_engine/validate_workflow_syntax.py
       - name: Validate explicit source, branch and target
@@ -61,6 +68,8 @@ jobs:
           INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           test "$GITHUB_REF" = "refs/heads/docs/self-hosted-ocr-architecture-20261024"
           test "$INPUT_SOURCE_SHA" = "$GITHUB_SHA"
           test "$GITHUB_SHA" = "${{ github.sha }}"
@@ -74,6 +83,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           docker pull --platform linux/amd64 "$OCR_BASE_IMAGE"
           actual_id="$(docker image inspect --format '{{.Id}}' "$OCR_BASE_IMAGE" | sed 's/^sha256://')"
           test "$actual_id" = "$OCR_BASE_CONFIG_SHA256"
@@ -84,6 +95,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-build"
           docker run --rm --platform linux/amd64 \
             -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
@@ -99,6 +112,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           d="$RUNNER_TEMP/ocr-model-cache"
           curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx" -o "$d/PP-OCRv6_det_small.onnx"
           curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx" -o "$d/PP-OCRv6_rec_small.onnx"
@@ -108,6 +123,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           docker run --rm --network none --platform linux/amd64 \
             -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse:ro" -v "$GITHUB_WORKSPACE:/src:ro" \
             "$OCR_BASE_IMAGE" sh -lc '
@@ -120,6 +137,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
           python services/ocr_engine/build_offline_bundle.py \
             --target-platform "$OCR_TARGET_PLATFORM" \
             --lock-json "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" \
