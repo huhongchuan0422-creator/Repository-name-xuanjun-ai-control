@@ -19,6 +19,18 @@ on:
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
     inputs:
+      backend_image_enabled:
+        description: 'Build existing Hosted backend image only (default off; no preview or deployment)'
+        type: boolean
+        default: false
+      backend_image_source_sha:
+        description: 'Exact original branch HEAD for Hosted image build (40 lowercase hex)'
+        type: string
+        default: ''
+      backend_image_evidence_run_id:
+        description: 'Successful original push evidence for this exact image source SHA'
+        type: string
+        default: ''
       preview_enabled:
         description: 'Explicitly run existing development preview upload (default off)'
         type: boolean
@@ -53,11 +65,15 @@ jobs:
         with:
           python-version: '3.12'
       - name: Reuse exact successful push Hosted evidence before preview
-        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        if: github.event_name == 'workflow_dispatch' && (inputs.preview_enabled || inputs.backend_image_enabled)
         env:
           PREVIEW_SOURCE_SHA: ${{ inputs.preview_source_sha }}
           PREVIEW_TARGET: ${{ inputs.preview_target }}
           PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+          IMAGE_SOURCE_SHA: ${{ inputs.backend_image_source_sha }}
+          IMAGE_EVIDENCE_RUN_ID: ${{ inputs.backend_image_evidence_run_id }}
+          IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
+          PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
         run: |
           python - <<'EVIDENCE'
           import datetime,json,os,re,time
@@ -100,6 +116,19 @@ jobs:
               return dict(status='EXACT_SHA_HOSTED_TEST_EVIDENCE_REUSED',head_sha=head,
                           run_id=evidence_id,test_job_id=tests[0]['id'],artifact=found[0],
                           artifact_bytes_reverified=False,source_package='REBUILD_FROM_CURRENT_EXACT_CHECKOUT')
+          def validate_context(env):
+              image=env.get('IMAGE_BUILD_ENABLED','false');preview=env.get('PREVIEW_ENABLED','false')
+              if image not in ('true','false') or preview not in ('true','false') or (image=='true')==(preview=='true'):
+                  raise ValueError('ONE_EXPLICIT_HOSTED_OR_PREVIEW_MODE_REQUIRED')
+              head=env.get('GITHUB_SHA','')
+              text=env.get('IMAGE_EVIDENCE_RUN_ID','') if image=='true' else env.get('PREVIEW_EVIDENCE_RUN_ID','')
+              source=env.get('IMAGE_SOURCE_SHA','') if image=='true' else env.get('PREVIEW_SOURCE_SHA','')
+              if (env.get('GITHUB_REPOSITORY')!=REPO or env.get('GITHUB_REF')!='refs/heads/'+BRANCH
+                      or not re.fullmatch('[0-9a-f]{40}',head) or source!=head
+                      or (image!='true' and env.get('PREVIEW_TARGET')!='uk-path-candidate')
+                      or not re.fullmatch('[1-9][0-9]{0,19}',text)):
+                  raise ValueError('EXACT_PREVIEW_CONTEXT_REQUIRED')
+              return head,text
           class NoRedirect(HTTPRedirectHandler):
               def redirect_request(self,*args,**kwargs):return None
           def read(path):
@@ -111,11 +140,7 @@ jobs:
                   return json.loads(raw)
           if __name__=='__main__':
               try:
-                  head=os.environ.get('GITHUB_SHA','');text=os.environ.get('PREVIEW_EVIDENCE_RUN_ID','')
-                  if (os.environ.get('GITHUB_REPOSITORY')!=REPO or os.environ.get('GITHUB_REF')!='refs/heads/'+BRANCH
-                          or os.environ.get('PREVIEW_SOURCE_SHA')!=head or os.environ.get('PREVIEW_TARGET')!='uk-path-candidate'
-                          or not re.fullmatch('[1-9][0-9]{0,19}',text)):
-                      raise ValueError('EXACT_PREVIEW_CONTEXT_REQUIRED')
+                  head,text=validate_context(os.environ)
                   evidence_id=int(text);prefix='/actions/runs/'+text
                   receipt=validate(read(prefix),read(prefix+'/jobs?per_page=100'),read(prefix+'/artifacts?per_page=100'),
                                    head,evidence_id,int(os.environ['GITHUB_RUN_ID']),time.time())
@@ -128,7 +153,11 @@ jobs:
         if: contains(github.event.head_commit.message, '[preview-entry-scope]')
         run: |
           set -o pipefail
-          PYTHONPATH=tests python -B -m unittest test_preview_endpoint_contract.HostedEvidence -v 2>&1 | tee community-tests.log
+          if [ "${{ contains(github.event.head_commit.message, '[image-build-entry-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_image_build_entry test_preview_endpoint_contract.HostedEvidence -v 2>&1 | tee community-tests.log
+          else
+            PYTHONPATH=tests python -B -m unittest test_preview_endpoint_contract.HostedEvidence -v 2>&1 | tee community-tests.log
+          fi
       - name: Shared license draft dual-CAS host-only affected scope
         if: contains(github.event.head_commit.message, '[shared-license-cas-scope]')
         run: |
@@ -176,13 +205,13 @@ jobs:
           fi
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Install exact browser test runner
-        if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
+        if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
           python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
-        if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
+        if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
         run: |
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
@@ -366,7 +395,7 @@ jobs:
           retention-days: 14
 
   community-backend-image:
-    if: contains(github.event.head_commit.message, '[community-image]')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]')) || (github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled == true && inputs.preview_enabled != true && inputs.backend_image_source_sha == github.sha && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -438,7 +467,7 @@ jobs:
           retention-days: 3
 
   mini-python-runtime:
-    if: contains(github.event.head_commit.message, '[mini-runtime]')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-runtime]')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -469,7 +498,7 @@ jobs:
           retention-days: 1
 
   mini-runtime:
-    if: contains(github.event.head_commit.message, '[mini-runtime]')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-runtime]')
     needs: [test, mini-python-runtime]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
@@ -574,7 +603,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -599,7 +628,7 @@ jobs:
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
