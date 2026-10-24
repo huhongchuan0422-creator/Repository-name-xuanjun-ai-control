@@ -43,8 +43,13 @@ def main():
             source="downloaded-from-pypi-and-self-hashed-not-independently-pinned"
         elif rel.startswith("ocr-deb-cache/apt-lists/"):
             source="downloaded-from-configured-debian-source-and-self-hashed"
+        elif rel.startswith("ocr-deb-cache/") and path.name == "system-deb-lock.json":
+            source="generated-lock; package and apt-index digests recorded; validate lock/source fingerprint before reuse"
         elif rel.startswith("ocr-deb-cache/") and path.name.endswith(".deb"):
-            source="apt-resolved-package-and-self-hashed; verify lock/source fingerprint before reuse"
+            source="apt-resolved-package-and-self-hashed; validate package SHA and signed-index provenance before reuse"
+        elif rel.startswith("ocr-deb-cache/apt-lists/") and ("InRelease" in path.name or "Release" in path.name):
+            source="apt-index-signature-checked-by-apt-get-update-and-self-hashed"
+
         elif path.name=="requirements-lock-linux-x86_64-cp311.json":
             source="generated-from-current-run-runtime-and-self-hashed"
         elif path.name.endswith(".tar.gz") or path.name=="SHA256SUMS":
@@ -52,7 +57,7 @@ def main():
         else:
             source="generated-candidate-file-self-hashed"
         entries.append({"path":rel,"bytes":path.stat().st_size,"sha256":sha(path),"provenance":source})
-    result={"classification":"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE","source_sha":os.environ.get("GITHUB_SHA"),"run_id":os.environ.get("GITHUB_RUN_ID"),"files":entries}
+    result={"classification":"CANDIDATE_INPUTS_ONLY_NOT_A_RELEASE_PACKAGE","files_scope":"exact payload files under ocr-wheelhouse/, ocr-model-cache/, ocr-deb-cache/, and ocr-build/; this manifest is the separate index record and does not self-hash","source_sha":os.environ.get("GITHUB_SHA"),"run_id":os.environ.get("GITHUB_RUN_ID"),"files":entries}
     manifest_path.write_text(json.dumps(result,sort_keys=True,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"classification":result["classification"],"candidate_file_count":len(entries),"manifest_sha256":sha(manifest_path)},sort_keys=True))
 
