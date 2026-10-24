@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.7
-ARG OCR_BASE_IMAGE=python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199
-FROM ${OCR_BASE_IMAGE}
+FROM python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199
 
 ARG OCR_CONTAINER_SOURCE_SHA
 LABEL org.opencontainers.image.title="Xuanjun OCR isolated preview" \
@@ -15,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OCR_DET_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_det_small.onnx \
     OCR_REC_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_rec_small.onnx \
     OCR_CLS_MODEL_PATH=/opt/ocr-bundle/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx \
-    OCR_MODEL_SHA256={"det":"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f","rec":"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884","cls":"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"} \
+    OCR_MODEL_SHA256='{"det":"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f","rec":"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884","cls":"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"}' \
     OCR_INTEGRATION_PATH=/opt/ocr-integration \
     OCR_PORT=8080
 
@@ -26,6 +24,7 @@ COPY --chown=0:0 services/ocr_engine/install_deb_closure.py /usr/local/libexec/i
 
 # Every install uses only the previously verified bundle; no apt, pip, or model network access.
 RUN --network=none set -eu; \
+    test -n "$OCR_CONTAINER_SOURCE_SHA"; case "$OCR_CONTAINER_SOURCE_SHA" in *[!0-9a-f]*|"") echo OCR_CONTAINER_SOURCE_SHA_INVALID >&2; exit 64;; esac; test "${#OCR_CONTAINER_SOURCE_SHA}" -eq 40; \
     python -c 'import hashlib,json,pathlib; r=pathlib.Path("/opt/ocr-bundle"); l=json.loads((r/"requirements-lock.json").read_text()); e={x["filename"]:x["sha256"] for x in l["wheels"]}; a={p.name for p in (r/"wheelhouse").glob("*.whl")}; assert a==set(e), "WHEEL_FILE_SET_MISMATCH"; assert all(hashlib.sha256((r/"wheelhouse"/n).read_bytes()).hexdigest()==h for n,h in e.items()), "WHEEL_SHA256_MISMATCH"; m=json.loads((r/"services/ocr_engine/model_manifest.json").read_text()); pins={x["filename"]:x["sha256"] for x in m["model_set"]["files"].values()}; assert all(hashlib.sha256((r/"models"/n).read_bytes()).hexdigest()==h for n,h in pins.items()), "MODEL_SHA256_MISMATCH"'; \
     mkdir -m 0700 /tmp/ocr-deb-input; \
     cp /opt/ocr-bundle/system-deb-lock.json /tmp/ocr-deb-input/system-deb-lock.json; \
