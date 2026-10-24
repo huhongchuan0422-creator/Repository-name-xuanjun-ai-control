@@ -182,6 +182,28 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("apt-get install -y --download-only",text)
         self.assertIn("generate_deb_runtime_lock.py",text)
 
+    def test_deb_lock_generator_reads_real_synthetic_package_and_official_source(self):
+        root=self.root/"generated-debs"; root.mkdir()
+        apt=root/"apt-lists"; apt.mkdir()
+        (apt/"InRelease").write_bytes(b"synthetic apt metadata; not asserting signature")
+        source=self.root/"debian.sources"
+        source.write_text(chr(10).join(["Types: deb","URIs: https://deb.debian.org/debian","Suites: bookworm bookworm-updates","Components: main",""]))
+        pkgroot=self.root/"generator-package"; (pkgroot/"DEBIAN").mkdir(parents=True)
+        (pkgroot/"DEBIAN"/"control").write_text(chr(10).join(["Package: libxcb1","Version: 1.0","Architecture: amd64","Maintainer: OCR test <test@example.invalid>","Description: synthetic test package",""]))
+        deb=root/"libxcb1_1.0_amd64.deb"
+        subprocess.run(["dpkg-deb","--build",str(pkgroot),str(deb)],check=True,capture_output=True,text=True)
+        script=Path(__file__).with_name("generate_deb_runtime_lock.py")
+        result=subprocess.run([sys.executable,str(script),str(root),str(source),str(apt)],check=True,capture_output=True,text=True)
+        lock=json.loads((root/"system-deb-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["packages"][0]["package"],"libxcb1")
+        self.assertEqual(lock["packages"][0]["version"],"1.0")
+        self.assertEqual(lock["packages"][0]["architecture"],"amd64")
+        self.assertEqual(lock["packages"][0]["sha256"],hashlib.sha256(deb.read_bytes()).hexdigest())
+        self.assertEqual(lock["apt_source"]["path"],"debian.sources")
+        self.assertEqual(lock["apt_source"]["content"],source.read_text(encoding="utf-8"))
+        self.assertEqual(lock["apt_lists"][0]["path"],"InRelease")
+        self.assertIn("LOCKED",result.stdout)
+
     def test_deb_runtime_closure_lock_is_hash_bound(self):
         debs=self.root/"debs"; debs.mkdir()
         apt=(debs/"apt-lists"); apt.mkdir()
