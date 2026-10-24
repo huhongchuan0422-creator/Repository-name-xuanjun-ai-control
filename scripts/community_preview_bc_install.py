@@ -123,38 +123,38 @@ def absent(parent,name):
     except FileNotFoundError:return
     raise Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS')
 
-def mkdir_owned(parent,name,root_uid=0):
+def mkdir_owned(parent,name,root_uid=0,root_gid=0):
     os.mkdir(name,0o700,dir_fd=parent)
     fd=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
     try:
-        os.fchown(fd,root_uid,0);os.fchmod(fd,0o700);os.fsync(fd)
+        os.fchown(fd,root_uid,root_gid);os.fchmod(fd,0o700);os.fsync(fd)
         need(stat.S_IMODE(os.fstat(fd).st_mode)==0o700,'PRIVATE_DIRECTORY_MODE_REQUIRED')
         return fd
     except BaseException:os.close(fd);raise
 
-def write_owned(parent,name,body,root_uid=0):
+def write_owned(parent,name,body,root_uid=0,root_gid=0):
     fd=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=parent)
     try:
-        os.fchown(fd,root_uid,0);os.fchmod(fd,0o600)
+        os.fchown(fd,root_uid,root_gid);os.fchmod(fd,0o600)
         view=memoryview(body)
         while view:
             n=os.write(fd,view);need(n>0,'WRITE_FAILED');view=view[n:]
         os.fsync(fd)
     finally:os.close(fd)
 
-def create_tree(root,bodies,root_uid=0,fault=None):
+def create_tree(root,bodies,root_uid=0,root_gid=0,fault=None):
     dirs={'scripts','deploy','deploy/community-preview'}
     fds={'':root}
     try:
         for rel in ('scripts','deploy','deploy/community-preview'):
             parent_rel=rel.rsplit('/',1)[0] if '/' in rel else ''
             leaf=rel.rsplit('/',1)[-1]
-            fds[rel]=mkdir_owned(fds[parent_rel],leaf,root_uid)
+            fds[rel]=mkdir_owned(fds[parent_rel],leaf,root_uid,root_gid)
         for index,name in enumerate(sorted(bodies)):
             if fault is not None:fault('before-file',name,index)
             parent_rel=name.rsplit('/',1)[0] if '/' in name else ''
             leaf=name.rsplit('/',1)[-1]
-            write_owned(fds[parent_rel],leaf,bodies[name],root_uid)
+            write_owned(fds[parent_rel],leaf,bodies[name],root_uid,root_gid)
             if fault is not None:fault('after-file',name,index)
         for rel in ('deploy/community-preview','deploy','scripts',''):
             os.fsync(fds[rel])
@@ -192,15 +192,15 @@ def verify_tree(parent,name,manifest,bodies,root_uid=0):
                 for child in reversed(opened):os.close(child)
     finally:os.close(root)
 
-def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,fault=None):
+def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=None):
     manifest,bodies=validate_archive(archive,manifest_raw)
     parent_identity_before=verify_parent(parent_fd,root_uid)
     absent(parent_fd,TARGET);absent(parent_fd,TEMP)
     os.mkdir(TEMP,0o700,dir_fd=parent_fd)
     temp=os.open(TEMP,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent_fd)
     try:
-        os.fchown(temp,root_uid,0);os.fchmod(temp,0o700);os.fsync(temp);os.fsync(parent_fd)
-        create_tree(temp,bodies,root_uid,fault)
+        os.fchown(temp,root_uid,root_gid);os.fchmod(temp,0o700);os.fsync(temp);os.fsync(parent_fd)
+        create_tree(temp,bodies,root_uid,root_gid,fault)
         verify_tree(parent_fd,TEMP,manifest,bodies,root_uid)
         need(parent_identity(os.fstat(parent_fd))==parent_identity_before,'INSTALL_PARENT_CHANGED')
         absent(parent_fd,TARGET)
@@ -238,7 +238,7 @@ def main(argv=None):
     archive=open_input(args.archive,MAX_ARCHIVE);need(sha(archive)==ARCHIVE_SHA256,'FIXED_ARCHIVE_SHA_REQUIRED')
     manifest=open_input(args.manifest,MAX_FILE);need(sha(manifest)==MANIFEST_SHA256,'FIXED_MANIFEST_SHA_REQUIRED')
     parent=open_fixed_parent()
-    try:result=install_bytes(archive,manifest,parent,0)
+    try:result=install_bytes(archive,manifest,parent,0,0)
     finally:os.close(parent)
     print(json.dumps(result,sort_keys=True),flush=True)
     return 0

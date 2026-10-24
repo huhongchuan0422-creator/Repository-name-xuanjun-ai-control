@@ -22,7 +22,7 @@ class FixedInstaller(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);os.chmod(self.root,0o700)
         self.parent=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);self.addCleanup(self._close_parent)
-        self.uid=os.getuid()
+        self.uid=os.getuid();self.gid=os.getgid()
         self.a=self.root/'control-oci2330-v1';self.a.mkdir(mode=0o700);(self.a/'sentinel').write_bytes(b'A_V1_SENTINEL')
         os.chmod(self.a/'sentinel',0o600)
     def _close_parent(self):
@@ -31,7 +31,7 @@ class FixedInstaller(unittest.TestCase):
     def install(self,archive=None,manifest=None,fault=None):
         return ins.install_bytes(self.archive if archive is None else archive,
                                  self.manifest if manifest is None else manifest,
-                                 self.parent,self.uid,fault)
+                                 self.parent,self.uid,self.gid,fault)
     def assert_a(self):self.assertEqual((self.a/'sentinel').read_bytes(),b'A_V1_SENTINEL')
     def mutate_zip(self,entries):
         out=io.BytesIO()
