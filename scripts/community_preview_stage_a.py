@@ -76,13 +76,18 @@ class StageA:
         need(type(manifest_sha256) is str and re.fullmatch('[0-9a-f]{64}',manifest_sha256),'VERIFIED_DELIVERY_BINDING_REQUIRED')
         self.blobs=blobs;self.s=original(blobs);self.parent=None;self.input=None;self.tty=None
         self.manifest_sha256=manifest_sha256
+        self.permit_identity=None
         self.phase=None;self.issued=None;self.deadline=None;self.operator=None;self.scope=sha(canonical({
             'format':1,'host':HOST,'delivery_manifest_sha256':manifest_sha256,'original_source':SOURCE,'payload':PAYLOAD,'stages':['install','image-load'],
             'site_update':False,'private_data':False,'servertrust':False}))
     def close(self):
+        failed=False
         for attr in ('input','tty','parent'):
-            value=getattr(self,attr)
-            if value is not None:os.close(value);setattr(self,attr,None)
+            value=getattr(self,attr);setattr(self,attr,None)
+            if value is not None:
+                try:os.close(value)
+                except BaseException:failed=True
+        if failed:raise Hold('STAGE_A_CLEANUP_UNKNOWN')
     def absent(self,name):
         try:os.stat(name,dir_fd=self.parent,follow_symlinks=False)
         except FileNotFoundError:return
@@ -156,7 +161,9 @@ class StageA:
             'issued_at':self.issued,'expires_at':self.deadline,
             'all_writers_frozen_evidence_sha256':None,'snapshot_manifest_sha256':None}
         raw=canonical(value);self.write(self.parent,PERMIT,raw)
-        need(self.s.read(BASE+'/'+PERMIT,16384)==raw,'PERMIT_READBACK_CHANGED');self.gate();return raw
+        need(self.s.read(BASE+'/'+PERMIT,16384)==raw,'PERMIT_READBACK_CHANGED')
+        self.permit_identity=self.s.identity(os.stat(PERMIT,dir_fd=self.parent,follow_symlinks=False))
+        self.gate();return raw
     def call(self,raw):
         self.gate()
         reply=self.s.exact_json(self.s.capture(['/bin/sh',INPUT+'/prepare-site.sh',self.phase,sha(raw)],timeout=300))
@@ -173,6 +180,8 @@ class StageA:
         # Only our exact completed phase record may be retired. Never replace an
         # unknown active permit or erase a failed/partial attempt.
         need(self.s.read(BASE+'/'+PERMIT,16384)==raw,'PERMIT_CHANGED');self.gate()
+        need(self.s.identity(os.stat(PERMIT,dir_fd=self.parent,follow_symlinks=False))==self.permit_identity,'PERMIT_IDENTITY_CHANGED')
+        now=clock();need(self.issued<=now<=self.deadline and now<EXPIRES,'STAGE_APPROVAL_EXPIRED')
         os.unlink(PERMIT,dir_fd=self.parent);self.gate();os.fsync(self.parent)
     def run(self):
         try:

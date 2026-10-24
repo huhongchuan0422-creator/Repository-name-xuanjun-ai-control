@@ -164,6 +164,25 @@ class StageATest(unittest.TestCase):
         target=self.root/'other';target.mkdir(mode=0o700);self.inputs.symlink_to(target,target_is_directory=True)
         with self.assertRaises(OSError):self.obj.run()
         self.assertEqual(list(target.iterdir()),[]);self.assertEqual(self.reads,0)
+    def test_failed_fd_cleanup_still_closes_other_owned_fds(self):
+        fd1=os.open(str(self.tty_file),os.O_RDONLY);fd2=os.open(str(self.tty_file),os.O_RDONLY);fd3=os.open(str(self.tty_file),os.O_RDONLY)
+        self.obj.input=fd1;self.obj.tty=fd2;self.obj.parent=fd3;real=os.close;calls=[]
+        def close(fd):
+            calls.append(fd)
+            if fd==fd1:raise OSError('synthetic cleanup')
+            real(fd)
+        try:
+            with patch.object(a.os,'close',side_effect=close),self.assertRaisesRegex(a.Hold,'CLEANUP_UNKNOWN'):self.obj.close()
+            self.assertEqual(calls,[fd1,fd2,fd3]);self.assertIsNone(self.obj.parent)
+        finally:real(fd1)
+    def test_replaced_active_permit_never_deleted_as_completed_record(self):
+        original=self.obj.write
+        def replace(fd,name,raw):
+            original(fd,name,raw)
+            if name=='site-prepare-approval.install.json':
+                current=self.base/a.PERMIT;body=current.read_bytes();current.unlink();current.write_bytes(body);current.chmod(0o600)
+        with patch.object(self.obj,'write',side_effect=replace),self.assertRaisesRegex(a.Hold,'PERMIT_IDENTITY_CHANGED'):self.obj.run()
+        self.assertTrue((self.base/a.PERMIT).exists());self.assertEqual(self.loads,0)
     def test_second_confirmation_or_permit_serialization_expiry_zero_second_permit(self):
         original=self.obj.permit
         def late_permit():

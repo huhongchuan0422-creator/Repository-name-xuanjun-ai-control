@@ -6,8 +6,8 @@
 
 ## 1 一包四输入与固定目的地
 
-本地已实际生成单包 `ISSUE76_STAGE_A_4e794b04db1c.zip`，57176609B，SHA256
-c617411697012fc301be2702182bf879e6b852bb7ff1424ca5abb16e07b69ebf。
+本地已实际生成单包 `ISSUE76_STAGE_A_9b071542577c.zip`，57177136B，SHA256
+0b1dbd4e31fe55de1be29c7a140fea155a05b9178f6a1681c721029cc97e0754。
 六个ZIP成员=下列四个**公开业务输入**+stage-a-entry.py管理入口+manifest.json元数据；不是
 六个业务输入，不含秘密/config/DB、原私有资料、credential或新镜像。ZIP_STORED不改原制品。
 
@@ -24,7 +24,7 @@ release image571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a，
 f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝，不改有效期。
 
 唯一待落地收件路径：
-`/home/admin/ISSUE76_STAGE_A_4e794b04db1c.zip`。
+`/home/admin/ISSUE76_STAGE_A_9b071542577c.zip`。
 本窗口**没有UK上传/执行工具**；已连接状态/OS结果只读工具不提供文件上传/任意Shell。
 不把本地存在冒成服务器存在，不用过期signedURL、不从服务器临时下载公网包。
 
@@ -43,8 +43,8 @@ f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝�
 ## 2 完整原调用链与真实批准来源
 
 完整外层固定文件为 deploy/community-preview/stage-a-owner-call.sh：3569B，SHA256
- bf0bb7833757dabef4293d740ae78bf930fbd557b0e33ea6c4e51e16b486a967。
-实际Python入口stage-a-entry.py SHA4e794b04db1c8c52ac510ccb6b57c62eadef836305efbaf22aa30fef952356f9。
+ 0d89a73d36229cc375cd02bad09b824d1baa04e416f4bc8cc19c5ac5f5b70656。
+实际Python入口stage-a-entry.py SHA9b071542577c6ddd932826a167dbbd262c2f8493c093c147d475915c5aa7a727。
 完整链：原admin终端→条件子shell→sudo -n原Python隔离模式→只读收件包→全包/六成员/manifest/
 四输入SHA和路径保护→加载已核新阶段A源码→原root BASE锁→真实Owner阶段确认→原保护许可
 记录→**原prepare-site.sh→原site_prepare.main**→原install/image_load→结果与许可归档。
@@ -55,8 +55,8 @@ f13155ed63a3137d41766ee587d9b4b96a81477f，过2026-10-27T03:44:30Z继续拒绝�
 代码只接受原UK/root、既有admin的SUDO_USER/UID/GID与原OS pwd一致、内核本进程loginuid
 为该实际admin UID（非unset/root/未知），以及该进程的真实前台controlling TTY。
 两个阶段各在/dev/tty显示**实际输入manifest所绑定scopeSHA**，要求Owner本人当场精确确认
-`APPROVE_INSTALL 320d9bac9067631eb699077a5a693e10f03756a0fbc74709fcacd516fd9368ef`，
-随后`APPROVE_IMAGE_LOAD 320d9bac9067631eb699077a5a693e10f03756a0fbc74709fcacd516fd9368ef`。
+`APPROVE_INSTALL 4d77302682886cc9469a906c59e09c1972dc3eeed1b0b2f8cd65f65affc7a279`，
+随后`APPROVE_IMAGE_LOAD 4d77302682886cc9469a906c59e09c1972dc3eeed1b0b2f8cd65f65affc7a279`。
 这两句仅为未来运行时终端逐阶段确认内容，不是当前批准，不需Owner替换命令变量。
 
 这是Owner本人沿原sudo权限的实际操作记录，不是机器签名/独立approve/servertrust；源码
@@ -114,9 +114,9 @@ root适配始终finally释放固定BASE独占锁、TTY和FD；原子写的部分
 阶段结果保留供根查，不rmtree/unlink未知历史。仅完成阶段自己的确切活动许可可退役；
 归档冲突先HOLD不覆盖。原caller进程沿原3b6 capture限300秒+原有界group清理；原load本身
 120秒；CLI cleanup不证明daemon操作已取消。非0、格式/版本不符、跨期、异常或清理未知
-均停止，不推进下一阶段；外层仍恢复，原44项安全语义直接复用。
+均停止，不推进下一阶段；所有自持FD即使一项close失败也继续逐项释放，清理未知不返回成功；归档退役前绑定本次活动许可inode/metadata，替换则HOLD保留；外层仍恢复，原44项安全语义直接复用。
 
-新增16项隔离联验：完整适配→原wrapper精确Python AST→原main→原install与import primitive，
+新增18项隔离联验：完整适配→原wrapper精确Python AST→原main→原install与import primitive，
 真实保护临时文件/许可/归档/锁与私有模式；Root/Owner/TTY、所有Docker及image外层字节
 入口为明确合成fixture。原caller/wrapper函数主体不改，仅测试root路径/UID/exec边界投影。
 另核完整单包校验器对SHA篡改/symlink拒绝、外层真实bash+errexit仍活、无确认零写、输入

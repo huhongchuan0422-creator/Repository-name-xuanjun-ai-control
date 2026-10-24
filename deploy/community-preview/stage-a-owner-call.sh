@@ -3,11 +3,11 @@ if (
   set +e
   /usr/bin/sudo -n /usr/bin/python3 -I -B -S - <<'STAGE_A'
 import os,stat,pwd,hashlib,io,json,zipfile
-PATH='/home/admin/ISSUE76_STAGE_A_4e794b04db1c.zip'
-SIZE=57176609
-DIGEST='c617411697012fc301be2702182bf879e6b852bb7ff1424ca5abb16e07b69ebf'
-ENTRY_SHA='4e794b04db1c8c52ac510ccb6b57c62eadef836305efbaf22aa30fef952356f9'
-MANIFEST_SHA='2496033f8b5a5b67e74149ab6ec734551f7ea37ba68d7dac8108ac71c86c0093'
+PATH='/home/admin/ISSUE76_STAGE_A_9b071542577c.zip'
+SIZE=57177136
+DIGEST='0b1dbd4e31fe55de1be29c7a140fea155a05b9178f6a1681c721029cc97e0754'
+ENTRY_SHA='9b071542577c6ddd932826a167dbbd262c2f8493c093c147d475915c5aa7a727'
+MANIFEST_SHA='2c56e970ffaf67838d00c7f950fb9e37692b51b45b851412cc955e93b28539c6'
 def need(v):
  if not v:raise RuntimeError('FIXED_STAGE_A_INPUT_HOLD')
 def identity(s):return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
