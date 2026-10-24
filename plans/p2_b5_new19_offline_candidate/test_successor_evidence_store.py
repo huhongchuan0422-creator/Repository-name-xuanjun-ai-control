@@ -221,6 +221,64 @@ assert s.read_exact(b,'PRE_START_RESTORE')[0]['payload']['decision_id']=='decisi
         with self.assertRaisesRegex(Hold,'WITNESS_ROOT_PROTECTION'):
             self.store.read_exact(self.binding,'PRE_START_RESTORE')
 
+    def test_active_action_fds_reject_closed_reused_and_rebound_lock(self):
+        payload=dict(scope='B5_EXPOSURE_CLOSE',job=JOB,
+                     decision_id='decision-fd',approved=True,phase='AFTER_B5_HTTP')
+        self.register('B5_EXPOSURE_CLOSE',payload)
+        with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+            fds=self.store.active_action_fds(
+                self.binding,('B5_EXPOSURE_CLOSE',))
+            self.assertEqual(len(fds),2)
+            lock=fds[1]
+            os.close(lock)
+            reused=os.open('/dev/null',os.O_RDONLY)
+            try:
+                self.assertEqual(reused,lock)
+                with self.assertRaisesRegex(Hold,
+                        'SUCCESSOR_EVIDENCE_LEASE_IDENTITY_CHANGED'):
+                    self.store.active_action_fds(
+                        self.binding,('B5_EXPOSURE_CLOSE',))
+            finally:
+                # action_exact finalizer owns this descriptor number.
+                if reused!=lock:os.close(reused)
+        # New action: replace the named lock while the original inode remains
+        # held; the dirfd/name identity check must reject it.
+        with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+            old=self.root/'register.lock'
+            moved=self.root/'register.lock.old'
+            old.rename(moved)
+            old.write_bytes(b'');old.chmod(0o600)
+            try:
+                with self.assertRaisesRegex(Hold,
+                        'SUCCESSOR_EVIDENCE_LEASE_IDENTITY_CHANGED'):
+                    self.store.active_action_fds(
+                        self.binding,('B5_EXPOSURE_CLOSE',))
+            finally:
+                old.unlink();moved.rename(old)
+
+    def test_nested_lease_revocation_waits_until_outer_release(self):
+        self.register('PRE_START_RESTORE',dict(scope='PRE_START_RESTORE',
+            job=JOB,decision_id='nested-restore',approved=True,phase='PRE_START'))
+        self.register('B5_EXPOSURE_CLOSE',dict(scope='B5_EXPOSURE_CLOSE',
+            job=JOB,decision_id='nested-close',approved=True,phase='AFTER_B5_HTTP'))
+        entered=threading.Event();release=threading.Event();done=threading.Event()
+        def action():
+            with self.store.action_exact(self.binding,'PRE_START_RESTORE'):
+                with self.store.action_exact(self.binding,'B5_EXPOSURE_CLOSE'):
+                    self.assertEqual(len(self.store.active_action_fds(
+                        self.binding,('PRE_START_RESTORE','B5_EXPOSURE_CLOSE'))),4)
+                    entered.set();release.wait(2)
+        thread=threading.Thread(target=action);thread.start()
+        self.assertTrue(entered.wait(2))
+        def revoke():
+            self.store.revoke_exact(self.binding,'nested-revoke');done.set()
+        revoker=threading.Thread(target=revoke);revoker.start()
+        self.assertFalse(done.wait(.05))
+        release.set();thread.join(2);revoker.join(2)
+        self.assertTrue(done.is_set())
+        with self.assertRaisesRegex(Hold,'SUCCESSOR_EVIDENCE_REVOKED'):
+            self.store.read_exact(self.binding,'B5_EXPOSURE_CLOSE')
+
     def test_revocation_serializes_with_started_action(self):
         payload=dict(scope='B5_EXPOSURE_CLOSE',job=JOB,
                      decision_id='decision2',approved=True,phase='AFTER_B5_HTTP')
