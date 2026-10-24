@@ -311,6 +311,13 @@ class SyntheticSpecTests(unittest.TestCase):
                 self.assertEqual(pending.returncode,0,pending.stderr+'\n'+pending.stdout)
                 self.assertEqual(json.loads(pending.stdout)['state'],
                                  'UNKNOWN_OR_PENDING_NO_REPOST')
+                premature=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-recover',str(root)],
+                    capture_output=True,text=True,timeout=20,check=False)
+                self.assertEqual(premature.returncode,0,
+                                 premature.stderr+'\n'+premature.stdout)
+                self.assertEqual(json.loads(premature.stdout)['state'],
+                                 'UNKNOWN_OR_PENDING_NO_REPOST')
                 for action,expected in (('--child-worker-ready',
                                            'UNKNOWN_OR_PENDING_NO_REPOST'),
                                           ('--child-worker-success',
@@ -449,7 +456,7 @@ def child_query(root,action='query'):
 if __name__=='__main__':
     if len(sys.argv)==3 and sys.argv[1] in (
             '--child-query','--child-intake','--child-worker-ready',
-            '--child-worker-success'):
+            '--child-worker-success','--child-recover'):
         raise SystemExit(child_query(sys.argv[2],
             sys.argv[1][8:] if sys.argv[1]!='--child-query' else 'query'))
     unittest.main()
