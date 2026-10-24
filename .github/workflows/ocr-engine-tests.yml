@@ -24,6 +24,7 @@ on:
       - 'services/ocr_engine/run_synthetic_inference.py'
       - 'services/ocr_engine/requirements.txt'
       - 'services/ocr_engine/model_manifest.json'
+      - '.github/workflows/ocr-engine-tests.yml'
       - 'tests/test_ocr_core.py'
   push:
     branches: [main]
@@ -153,6 +154,7 @@ PY
           if-no-files-found: error
           retention-days: 14
   ocr-unit-api:
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
