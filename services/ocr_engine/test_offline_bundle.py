@@ -648,7 +648,7 @@ class OfflineBundleInputTests(unittest.TestCase):
                 env_lines.append(line.strip())
             elif collecting:
                 break
-        env_text = " ".join(env_lines).replace("\\\\", "")
+        env_text = " ".join(line.removesuffix(chr(92)) for line in env_lines)
         token = next(item for item in shlex.split(env_text) if item.startswith("OCR_MODEL_SHA256="))
         parsed = json.loads(token.split("=", 1)[1])
         self.assertEqual(set(parsed), {"det", "rec", "cls"})
@@ -681,6 +681,12 @@ class OfflineBundleInputTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("ocr_entrypoint_origin_test", Path(__file__).with_name("container_entrypoint.py"))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         root = self.root / "trusted-bindings"; root.mkdir()
+        sys.modules["trusted"] = object()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "OCR_TRUSTED_BINDINGS_MODULE_ALREADY_LOADED"):
+                module.load_bindings({"OCR_TRUSTED_BINDINGS_MODULE":"trusted", "OCR_INTEGRATION_PATH":str(root)})
+        finally:
+            sys.modules.pop("trusted", None)
         outside = self.root / "outside.py"
         outside.write_text("def authenticate(token): return None\ndef authorize_application(principal, app): return True\ndef authorize_attachment(a,b,c,d,e,f=None): return {}\n")
         (root / "trusted.py").symlink_to(outside)
