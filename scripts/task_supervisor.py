@@ -695,6 +695,15 @@ class Supervisor(object):
                     'candidate_sha256': candidate_sha,
                     'candidate': candidate}
 
+    def development_candidate(self, task_id, candidate_event_id):
+        task = self._task(task_id)
+        row = self.db.execute('''SELECT * FROM events
+          WHERE task_id=? AND attempt_id=? AND event_id=?''',
+          (task_id, task['attempt_id'], candidate_event_id)).fetchone()
+        if row is None or row['kind'] != 'DEVELOPMENT_CANDIDATE':
+            raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
+        return json.loads(row['payload_json'])
+
     def record_development_review(self, task_id, candidate_event_id, files,
                                   bundle_sha256, review_record_ids,
                                   reviewed_event_id):
