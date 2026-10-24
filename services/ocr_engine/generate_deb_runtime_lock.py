@@ -35,7 +35,11 @@ def main():
             indexes.append({"path":str(path.relative_to(apt_root)),"bytes":path.stat().st_size,"sha256":sha(path)})
     if not indexes: raise SystemExit("APT_INDEX_CACHE_EMPTY")
     source_bytes=source.read_bytes()
-    lock={"base_image":BASE,"apt_source":{"path":source.name,"sha256":hashlib.sha256(source_bytes).hexdigest(),"content":source_bytes.decode("utf-8")},"packages":packages,"apt_lists":indexes}
+    source_text=source_bytes.decode("utf-8")
+    uris=[line.split(":",1)[1].strip().split() for line in source_text.splitlines() if line.strip().startswith("URIs:")]
+    if not uris or any(not uri.startswith(("https://deb.debian.org/","http://deb.debian.org/","https://security.debian.org/","http://security.debian.org/")) for group in uris for uri in group):
+        raise SystemExit("APT_SOURCE_NOT_OFFICIAL_DEBIAN")
+    lock={"base_image":BASE,"apt_source":{"path":source.name,"sha256":hashlib.sha256(source_bytes).hexdigest(),"content":source_text},"packages":packages,"apt_lists":indexes}
     out.write_text(json.dumps(lock,sort_keys=True,indent=2)+"\n",encoding="utf-8")
     print(json.dumps({"status":"LOCKED","deb_count":len(packages),"apt_index_count":len(indexes),"lock_sha256":sha(out)},sort_keys=True))
 
