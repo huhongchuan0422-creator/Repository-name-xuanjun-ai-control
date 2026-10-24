@@ -109,7 +109,7 @@ kill/reap仅保证CLI子进程回收；**不证明Docker daemon中load或推理/
    fstatvfs，不列目录/读Docker数据/Env。四目录必须同设备并各满足预算，读后info必须一致；
    containerd/未知driver/分离设备/空间不明全部HOLD，不能把DockerRootDir猜成/var/lib/docker。
    这项有限metadata属于未来A的明确范围，不是扫未知根；本轮未执行。安装自身需至少
-   1GiB安全余量+2×载体及128inode。image load intent后不确定停止，不自动清理/重试。
+   1GiB安全余量+2×载体及192inode。image load intent后不确定停止，不自动清理/重试。
 
 ## 4 阶段B：冻结、完整快照、真实隔离恢复/降级（单独维护批准）
 

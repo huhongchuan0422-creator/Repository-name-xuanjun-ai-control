@@ -197,7 +197,11 @@ jobs:
         if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
         run: |
           set -o pipefail
-          if [ "${{ contains(github.event.head_commit.message, '[preview-site-steps-scope]') }}" = true ]; then
+          if [ "${{ contains(github.event.head_commit.message, '[preview-stage-a-scope]') }}" = true ]; then
+            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_stage_a -v 2>&1 | tee community-tests.log
+            bash -n deploy/community-preview/stage-a-owner-call.sh
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-site-steps-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_preparation_steps -v 2>&1 | tee community-tests.log
             bash -n deploy/community-preview/prepare-site.sh
@@ -473,6 +477,20 @@ jobs:
             deploy/community-preview/control-oci2330-v1-manifest.json
             tests/test_community_preview_preparation_steps.py
             docs/development/COMMUNITY_SITE_PREPARATION_STEPS_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve complete stage A input and invocation review
+        if: contains(github.event.head_commit.message, '[preview-stage-a-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-stage-a-complete-review
+          path: |
+            scripts/community_preview_stage_a.py
+            scripts/community_preview_stage_a_bundle.py
+            tests/test_community_preview_stage_a.py
+            deploy/community-preview/stage-a-owner-call.sh
+            deploy/community-preview/stage-a-delivery.json
+            docs/development/COMMUNITY_STAGE_A_COMPLETE_20261024.md
           if-no-files-found: error
           retention-days: 14
 
