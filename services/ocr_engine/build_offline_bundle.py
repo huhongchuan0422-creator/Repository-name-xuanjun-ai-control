@@ -11,6 +11,7 @@ import stat
 import sys
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -62,6 +63,10 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
     requirements_sha = sha256_file(Path(requirements_path))
     if lock.get("requirements_sha256") != requirements_sha:
         raise BundleError("REQUIREMENTS_LOCK_INPUT_SHA_MISMATCH")
+    target_tags = lock.get("target_tags")
+    if not isinstance(target_tags, list) or not target_tags or any(not isinstance(tag, str) or not tag for tag in target_tags):
+        raise BundleError("LOCK_TARGET_TAGS_REQUIRED")
+    target_tag_set = set(target_tags)
     wheels = lock.get("wheels")
     if not isinstance(wheels, list) or not wheels:
         raise BundleError("LOCK_WHEEL_LIST_EMPTY")
@@ -81,6 +86,30 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
         path = regular_file(wheelhouse / name, "WHEEL")
         if sha256_file(path) != expected:
             raise BundleError("WHEEL_SHA256_MISMATCH:" + name)
+        # Check wheel filename tags and internal WHEEL metadata; do not trust filename alone.
+        parts = name[:-4].split("-")
+        if len(parts) < 5:
+            raise BundleError("WHEEL_FILENAME_TAGS_INVALID:" + name)
+        py_tag, abi_tag, platform_tag = parts[-3:]
+        filename_tags = {"-".join((py, abi, platform))
+                         for py in py_tag.split(".") for abi in abi_tag.split(".") for platform in platform_tag.split(".")}
+        if not (filename_tags & target_tag_set) and "py3-none-any" not in filename_tags:
+            raise BundleError("WHEEL_TARGET_TAG_MISMATCH:" + name)
+        try:
+            with zipfile.ZipFile(path, "r") as wheel_zip:
+                metadata_files = [n for n in wheel_zip.namelist() if n.endswith(".dist-info/WHEEL")]
+                if len(metadata_files) != 1:
+                    raise BundleError("WHEEL_INTERNAL_METADATA_MISSING:" + name)
+                metadata = wheel_zip.read(metadata_files[0]).decode("utf-8")
+                internal_tags = {line[5:].strip() for line in metadata.splitlines() if line.startswith("Tag: ")}
+        except (zipfile.BadZipFile, UnicodeError, OSError):
+            raise BundleError("WHEEL_INTERNAL_METADATA_INVALID:" + name)
+        if not internal_tags:
+            raise BundleError("WHEEL_INTERNAL_TAGS_MISSING:" + name)
+        if not (internal_tags & target_tag_set) and "py3-none-any" not in internal_tags:
+            raise BundleError("WHEEL_INTERNAL_TARGET_TAG_MISMATCH:" + name)
+        if not (internal_tags & filename_tags):
+            raise BundleError("WHEEL_FILENAME_INTERNAL_TAG_MISMATCH:" + name)
         verified_wheels.append((path, "wheelhouse/" + name))
     model_files = manifest.get("model_set", {}).get("files", {})
     if set(model_files) != set(REQUIRED_MODELS):
@@ -106,6 +135,7 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
         "python_implementation": lock["python_implementation"],
         "python_version": lock["python_version"],
         "abi": lock["abi"],
+        "target_tags": target_tags,
         "requirements_sha256": requirements_sha,
         "models": [{"filename": str(path.name), "sha256": model_files[name]["sha256"]} for name,path in zip(REQUIRED_MODELS,[x[0] for x in verified_models])],
         "wheels": [{"filename": path.name, "sha256": sha256_file(path)} for path,_ in verified_wheels],
@@ -132,6 +162,22 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
     archive_manifest["notice_file"] = "NOTICE.md"
+    # Freeze digests before archive creation; verify the actual archive against this snapshot.
+    frozen = {}
+    frozen_sources = [
+        (Path(MODEL_MANIFEST), "model_manifest.json"),
+        (Path(REQUIREMENTS), "requirements.txt"),
+        (Path(LICENSE), "LICENSE-2.0.txt"),
+        (Path(NOTICE), "NOTICE.md"),
+        (Path(CONFIG_SCHEMA), "deployment_config.schema.json"),
+        (HERE / "api.py", "services/ocr_engine/api.py"),
+        (HERE / "ocr_core.py", "services/ocr_engine/ocr_core.py"),
+        (HERE / "secure_store.py", "services/ocr_engine/secure_store.py"),
+        (HERE / "startup_selfcheck.py", "services/ocr_engine/startup_selfcheck.py"),
+    ] + checked["verified_models"] + checked["verified_wheels"]
+    for source_path, arcname in frozen_sources:
+        regular_file(source_path, "BUNDLE_INPUT")
+        frozen[arcname] = sha256_file(Path(source_path))
     with tempfile.NamedTemporaryFile(prefix=".ocr-bundle-", suffix=".tmp", dir=str(output.parent), delete=False) as temp:
         temp_path = Path(temp.name)
     try:
@@ -161,6 +207,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 "python_implementation": checked["python_implementation"],
                 "python_version": checked["python_version"],
                 "abi": checked["abi"],
+                "target_tags": checked["target_tags"],
                 "requirements_sha256": checked["requirements_sha256"],
                 "wheels": archive_manifest["wheels"],
             }
@@ -178,10 +225,36 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 archive.add(str(bundle_manifest_path), arcname="offline-bundle-manifest.json", recursive=False)
             finally:
                 bundle_manifest_path.unlink(missing_ok=True)
-        # Re-check all staged source inputs immediately before atomic publication.
-        validate_inputs(target_platform, lock_path, wheelhouse, model_dir)
+        # Verify the final archive's exact member set and bytes against the frozen snapshot.
+        with tarfile.open(temp_path, "r:gz") as archive:
+            members = {member.name: member for member in archive.getmembers() if member.isfile()}
+            expected_names = set(frozen) | {"requirements-lock.json", "offline-bundle-manifest.json"}
+            if set(members) != expected_names:
+                raise BundleError("ARCHIVE_MEMBER_SET_MISMATCH")
+            for arcname, expected_sha in frozen.items():
+                extracted = archive.extractfile(members[arcname])
+                if extracted is None:
+                    raise BundleError("ARCHIVE_MEMBER_UNREADABLE:" + arcname)
+                digest = hashlib.sha256()
+                for chunk in iter(lambda: extracted.read(1024 * 1024), b""):
+                    digest.update(chunk)
+                if digest.hexdigest() != expected_sha:
+                    raise BundleError("ARCHIVE_MEMBER_SHA256_MISMATCH:" + arcname)
+            lock_member = archive.extractfile(members["requirements-lock.json"])
+            lock_in_archive = json.loads(lock_member.read().decode("utf-8"))
+            if lock_in_archive.get("target_platform") != target_platform or lock_in_archive.get("target_tags") != checked["target_tags"]:
+                raise BundleError("ARCHIVE_LOCK_BINDING_MISMATCH")
+            manifest_member = archive.extractfile(members["offline-bundle-manifest.json"])
+            manifest_in_archive = json.loads(manifest_member.read().decode("utf-8"))
+            if manifest_in_archive.get("target_platform") != target_platform or manifest_in_archive.get("inputs") != checked["inputs"]:
+                raise BundleError("ARCHIVE_MANIFEST_BINDING_MISMATCH")
         os.chmod(temp_path, 0o600)
-        os.replace(str(temp_path), str(output))
+        # Atomic no-clobber publication: link creation fails if another process wins the name.
+        try:
+            os.link(str(temp_path), str(output), follow_symlinks=False)
+        except FileExistsError:
+            raise BundleError("OUTPUT_ALREADY_EXISTS_NO_CLOBBER")
+        os.unlink(str(temp_path))
     finally:
         if temp_path.exists():
             temp_path.unlink()
