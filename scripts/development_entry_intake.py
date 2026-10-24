@@ -1,4 +1,5 @@
 """Three native entrants share existing GitHub task; no ledger or model effects."""
+import hashlib
 import json
 import os
 import re
@@ -10,7 +11,7 @@ MARKER = re.compile(r'<!-- XJ_DEV_ENTRY (\{[^\n]*\}) -->')
 ENTRIES = {'WORK': 'WORK_NATIVE', 'CHATGPT': 'CHATGPT_NATIVE', 'DOTS': 'DOTS_NATIVE'}
 FIELDS = {'schema', 'entry', 'execution_path', 'task_id', 'spec_sha256',
           'checkpoint_sha256', 'target_repository', 'target_base_sha',
-          'code_commit', 'event'}
+          'code_commit', 'event', 'attempt_id', 'lease_id', 'fence', 'epoch'}
 EVENTS = {'RECEIVED', 'CODE_READY', 'STOPPED', 'HANDOFF', 'HOLD'}
 TASK = 'XUANJUN_WORK_DOTS_OPENCLAW_FOUNDATION_DISCOVERY_V1'
 
@@ -55,6 +56,11 @@ def validate_event(event, control_repository, trusted_owner):
                         ('target_base_sha', 40), ('code_commit', 40)]:
         if not isinstance(value.get(key), str) or not re.fullmatch('[0-9a-f]{%d}' % length, value[key]):
             raise ValueError('EXACT_HASH_BINDING_REQUIRED')
+    if (not isinstance(value.get('attempt_id'), str) or not value['attempt_id']
+            or not isinstance(value.get('lease_id'), str) or not value['lease_id']
+            or type(value.get('fence')) is not int or value['fence'] < 1
+            or type(value.get('epoch')) is not int or value['epoch'] < 1):
+        raise ValueError('EXACT_WRITER_BINDING_REQUIRED')
     if type(comment.get('id')) is not int or comment['id'] < 1:
         raise ValueError('GITHUB_COMMENT_ID_REQUIRED')
     return dict(value, source_comment_id=comment['id'],
@@ -62,6 +68,49 @@ def validate_event(event, control_repository, trusted_owner):
                 native_identity='CLAIMED_NOT_VERIFIED', quota_attribution='UNKNOWN',
                 authority_effect='NONE',
                 required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
+
+
+def bind_validated_receipt(supervisor, receipt, files=None):
+    """Bind one validated intake receipt to current canonical task state.
+
+    This does not create authority. CODE_READY additionally persists an exact
+    candidate manifest under the already-valid canonical writer generation.
+    """
+    if (not isinstance(receipt, dict)
+            or receipt.get('status') != 'RECEIPT_VALIDATED_NOT_ADMITTED'
+            or receipt.get('authority_effect') != 'NONE'):
+        raise ValueError('VALIDATED_ENTRY_RECEIPT_REQUIRED')
+    task = supervisor._task(receipt.get('task_id'))
+    contract = supervisor.development_contract(task['task_id'])
+    expected = {
+        'task_id': task['task_id'],
+        'spec_sha256': task['spec_sha256'],
+        'checkpoint_sha256': task['checkpoint_sha256'],
+        'target_repository': contract['target_repository'],
+        'target_base_sha': contract['target_base_sha'],
+        'entry': task['entry'],
+    }
+    if any(receipt.get(key) != value for key, value in expected.items()):
+        raise ValueError('CANONICAL_INTAKE_BINDING_MISMATCH')
+    if receipt.get('event') != 'CODE_READY':
+        return {'state': 'CANONICAL_MATCH_NOT_ADMITTED',
+                'authority_effect': 'NONE'}
+    if (receipt.get('attempt_id') != task['attempt_id']
+            or receipt.get('lease_id') != task['lease_id']
+            or receipt.get('fence') != task['fence']
+            or receipt.get('epoch') != task['epoch']):
+        raise ValueError('CURRENT_ATTEMPT_BINDING_REQUIRED')
+    if not isinstance(files, dict) or not files:
+        raise ValueError('CODE_READY_FILES_REQUIRED')
+    manifest = {}
+    for path, raw in files.items():
+        if (not isinstance(path, str)
+                or not re.fullmatch(r'[A-Za-z0-9_./-]+', path)
+                or any(part in ('', '.', '..') for part in path.split('/'))
+                or type(raw) is not bytes):
+            raise ValueError('CANONICAL_CODE_READY_FILE_REQUIRED')
+        manifest[path] = hashlib.sha256(raw).hexdigest()
+    return supervisor.bind_development_candidate(receipt, manifest)
 
 
 def main():
