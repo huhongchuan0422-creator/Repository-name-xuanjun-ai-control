@@ -149,6 +149,14 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
         },
     }
 
+def publish_no_clobber(temp_path, output_path):
+    """Atomically publish without replacing a concurrently-created target."""
+    try:
+        os.link(str(temp_path), str(output_path), follow_symlinks=False)
+    except FileExistsError:
+        raise BundleError("OUTPUT_ALREADY_EXISTS_NO_CLOBBER")
+    os.unlink(str(temp_path))
+
 def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path):
     checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
                               requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
@@ -252,11 +260,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 raise BundleError("ARCHIVE_MANIFEST_BINDING_MISMATCH")
         os.chmod(temp_path, 0o600)
         # Atomic no-clobber publication: link creation fails if another process wins the name.
-        try:
-            os.link(str(temp_path), str(output), follow_symlinks=False)
-        except FileExistsError:
-            raise BundleError("OUTPUT_ALREADY_EXISTS_NO_CLOBBER")
-        os.unlink(str(temp_path))
+        publish_no_clobber(temp_path, output)
     finally:
         if temp_path.exists():
             temp_path.unlink()
