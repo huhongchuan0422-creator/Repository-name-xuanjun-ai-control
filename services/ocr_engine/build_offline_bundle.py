@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import stat
 import sys
 import tarfile
@@ -63,7 +64,7 @@ def validate_deb_cache(deb_cache):
         path = regular_file(root/name,"DEB")
         if sha256_file(path) != item["sha256"]:
             raise BundleError("DEB_SHA256_MISMATCH:"+name)
-        fields = __import__("subprocess").check_output(["dpkg-deb","-f",str(path),"Package","Version","Architecture"],text=True).splitlines()
+        fields = subprocess.check_output(["dpkg-deb","-f",str(path),"Package","Version","Architecture"],text=True).splitlines()
         if fields != [item["package"],item["version"],item["architecture"]]:
             raise BundleError("DEB_METADATA_MISMATCH:"+name)
         verified.append((path,"system-debs/"+name))
