@@ -182,6 +182,35 @@ class CanonicalBindingTests(unittest.TestCase):
         self.assertEqual(result['state'],'CANONICAL_SOURCE_BOUND')
         self.assertIsNotNone(result['candidate_event_id'])
 
+    def test_dirty_checkout_is_rejected_and_commit_object_bytes_are_exact(self):
+        root=os.path.join(os.path.dirname(self.path),'candidate-dirty')
+        os.mkdir(root)
+        subprocess.check_call(['git','-C',root,'init','-q'])
+        subprocess.check_call(['git','-C',root,'config','user.name','Fixture'])
+        subprocess.check_call(['git','-C',root,'config','user.email','fixture@example.invalid'])
+        subprocess.check_call(['git','-C',root,'remote','add','origin',
+                               'https://github.com/owner/business.git'])
+        os.makedirs(os.path.join(root,'src'))
+        with open(os.path.join(root,'src','f.py'),'wb') as stream:
+            stream.write(b'answer=42\n')
+        with open(os.path.join(root,'src','data.json'),'wb') as stream:
+            stream.write(b'{}\n')
+        subprocess.check_call(['git','-C',root,'add','src/f.py','src/data.json'])
+        subprocess.check_call(['git','-C',root,'commit','-q','-m','fixture'])
+        head=subprocess.check_output(
+            ['git','-C',root,'rev-parse','HEAD']).decode().strip()
+        receipt=self.receipt();receipt['code_commit']=head
+        with open(os.path.join(root,'src','f.py'),'wb') as stream:
+            stream.write(b'answer=999\n')
+        old_env=dict(os.environ)
+        try:
+            os.environ['XJ_CANONICAL_LEDGER_PATH']=self.path
+            os.environ['XJ_CANDIDATE_ROOT']=root
+            with self.assertRaisesRegex(ValueError,'DIRTY_CANDIDATE_CHECKOUT'):
+                bind_from_controlled_environment(receipt)
+        finally:
+            os.environ.clear();os.environ.update(old_env)
+
     def test_writer_bind_api_has_no_caller_now_override(self):
         receipt=self.receipt()
         manifest={p:__import__('hashlib').sha256(raw).hexdigest()
