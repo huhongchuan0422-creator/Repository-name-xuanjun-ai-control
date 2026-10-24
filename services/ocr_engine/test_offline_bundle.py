@@ -535,4 +535,5 @@ class OfflineBundleInputTests(unittest.TestCase):
         second=subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True)
         self.assertNotEqual(second.returncode,0)
         self.assertIn("CANDIDATE_STAGING_MUST_BE_NEW",second.stderr)
-\nif __name__=="__main__": unittest.main()
+
+if __name__=="__main__": unittest.main()
