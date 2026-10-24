@@ -833,9 +833,9 @@ class Supervisor(object):
               AND state='DISPATCHING'""",
               (now, operation_id, task['task_id'], task['attempt_id']))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
-                row = self.db.execute('SELECT state FROM writer_operations
-                                      WHERE operation_id=?',
-                                      (operation_id,)).fetchone()
+                row = self.db.execute(
+                    'SELECT state FROM writer_operations WHERE operation_id=?',
+                    (operation_id,)).fetchone()
                 if row is None or row['state'] != 'UNKNOWN':
                     raise ValueError('OPERATION_NOT_DISPATCHING')
             evidence_id = hashlib.sha256(canonical({
