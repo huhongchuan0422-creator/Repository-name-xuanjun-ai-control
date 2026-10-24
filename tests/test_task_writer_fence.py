@@ -174,7 +174,22 @@ class WriterFenceTests(unittest.TestCase):
         ticket = self.claim()
         with self.assertRaises(TypeError):
             self.s.prepare_operation(ticket, self.caller(), self.op(),
-                                     now=999)
+                                     self.fence.locks.provider_id, now=999)
+
+    def test_different_lock_root_cannot_dispatch_current_ticket(self):
+        ticket=self.claim();operation=self.op()
+        self.fence.prepare(ticket,self.caller(),operation)
+        other_root=os.path.join(self.directory.name,'other-dispatch-locks')
+        other=Fence(self.s,other_root)
+        try:
+            with self.assertRaisesRegex(ValueError,'LOCK_PROVIDER_MISMATCH'):
+                with other.commit_lease(ticket,self.caller(),'op1'):
+                    pass
+            self.assertEqual(self.s.db.execute(
+                "SELECT state FROM writer_operations WHERE operation_id='op1'"
+            ).fetchone()[0],'PREPARED')
+        finally:
+            other.close()
 
     def test_different_lock_root_cannot_drain_current_generation(self):
         self.claim()
@@ -276,7 +291,8 @@ class WriterFenceTests(unittest.TestCase):
     def test_confirm_rejects_missing_fields_wrong_marker_and_content_match(self):
         ticket=self.claim(); operation=self.op()
         self.fence.prepare(ticket,self.caller(),operation)
-        self.s.begin_dispatch(ticket,self.caller(),'op1')
+        self.s.begin_dispatch(ticket,self.caller(),'op1',
+                              self.fence.locks.provider_id)
         for bad in (
             {'outcome':'CONFIRMED'},
             self.final_receipt(operation,after={'value':'same'},
@@ -284,7 +300,8 @@ class WriterFenceTests(unittest.TestCase):
             dict(self.final_receipt(operation),operation_marker='other'),
         ):
             with self.assertRaises(ValueError):
-                self.s.confirm_operation(ticket,self.caller(),'op1',bad)
+                self.s.confirm_operation(ticket,self.caller(),'op1',bad,
+                                         self.fence.locks.provider_id)
         self.assertIsNone(self.s.db.execute(
             "SELECT 1 FROM writer_receipts WHERE operation_id='op1'"
         ).fetchone())
@@ -319,7 +336,8 @@ class WriterFenceTests(unittest.TestCase):
             "SELECT count(*) FROM writer_receipts WHERE operation_id='op1'"
         ).fetchone()[0],1)
         with self.assertRaises(ValueError):
-            self.s.begin_dispatch(ticket,self.caller(),'op1')
+            self.s.begin_dispatch(ticket,self.caller(),'op1',
+                              self.fence.locks.provider_id)
 
     def test_unknown_observations_append_without_consuming_receipt(self):
         ticket=self.claim();operation=self.op()
