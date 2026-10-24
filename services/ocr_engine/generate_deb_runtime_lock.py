@@ -43,6 +43,8 @@ def main():
                 stream.read(1)
         except OSError:
             continue
+        # Publish only this exact verified index file as runner-readable input; do not chmod apt state directories.
+        __import__("os").chmod(path,0o644)
         indexes.append({"path":str(rel),"bytes":path.stat().st_size,"sha256":sha(path)})
     if not indexes: raise SystemExit("APT_INDEX_CACHE_EMPTY")
     if not indexes: raise SystemExit("APT_INDEX_CACHE_EMPTY")
