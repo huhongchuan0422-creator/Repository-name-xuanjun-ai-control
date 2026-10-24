@@ -168,8 +168,12 @@ jobs:
         if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
         run: |
           set -o pipefail
-          python -B -m unittest discover -s tests -p 'test_community_preview_version_inspect.py' -v 2>&1 | tee community-tests.log
-          bash -n deploy/community-preview/inspect-version-readonly.sh
+          if [ "${{ contains(github.event.head_commit.message, '[preview-release-plan-scope]') }}" = true ]; then
+            PYTHONPATH=. python -B -m unittest discover -s tests -p 'test_community_preview_release_plan.py' -v 2>&1 | tee community-tests.log
+          else
+            python -B -m unittest discover -s tests -p 'test_community_preview_version_inspect.py' -v 2>&1 | tee community-tests.log
+            bash -n deploy/community-preview/inspect-version-readonly.sh
+          fi
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Install exact browser test runner
         if: "!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')"
