@@ -138,6 +138,59 @@ class FixedInstaller(unittest.TestCase):
             self.install()
         self.assertTrue(cm.exception.target_published);self.assertTrue(cm.exception.parent_fsync_completed);self.assertFalse(cm.exception.retry_safe)
         self.assertTrue((self.root/ins.TARGET).is_dir());self.assert_a()
+    def test_publish_call_raises_after_actual_rename_is_unknown_from_identity_reconcile(self):
+        real=ins.publish_noreplace
+        def publish(parent,old,new):
+            real(parent,old,new)
+            raise OSError('SYNTHETIC_AFTER_SYSCALL_BEFORE_RETURN')
+        with patch.object(ins,'publish_noreplace',side_effect=publish),self.assertRaises(ins.PublishedUnknown) as cm:
+            self.install()
+        e=cm.exception;self.assertTrue(e.publish_attempted);self.assertTrue(e.target_published);self.assertFalse(e.retry_safe)
+        self.assertTrue((self.root/ins.TARGET).is_dir());self.assertFalse((self.root/ins.TEMP).exists());self.assert_a()
+    def test_foreign_empty_target_after_publish_attempt_is_confirmed_nonpublished_and_not_retryable(self):
+        seen={}
+        def publish(parent,old,new):
+            target=self.root/ins.TARGET;target.mkdir(mode=0o700);seen['inode']=target.stat().st_ino
+            raise ins.Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS')
+        with patch.object(ins,'publish_noreplace',side_effect=publish),self.assertRaises(ins.Hold) as cm:self.install()
+        e=cm.exception;self.assertNotIsInstance(e,ins.PublishedUnknown);self.assertTrue(e.publish_attempted)
+        target=self.root/ins.TARGET;self.assertEqual(target.stat().st_ino,seen['inode']);self.assertEqual(list(target.iterdir()),[])
+        self.assertTrue((self.root/ins.TEMP).is_dir());self.assert_a()
+    def test_publish_identity_reconcile_exception_is_unknown(self):
+        real=ins.publish_noreplace
+        def publish(parent,old,new):
+            real(parent,old,new);raise OSError('SYNTHETIC_AFTER_RENAME')
+        with patch.object(ins,'publish_noreplace',side_effect=publish),patch.object(ins,'reconcile_publish',return_value='unknown'),self.assertRaises(ins.PublishedUnknown) as cm:
+            self.install()
+        self.assertTrue(cm.exception.publish_attempted);self.assertFalse(cm.exception.retry_safe);self.assert_a()
+    def test_partial_temp_cli_hold_record_is_never_retry_safe(self):
+        e=ins.Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS',False,None,False)
+        record={'state':'V2_INSTALL_HOLD','reason':str(e),'publish_attempted':e.publish_attempted,
+                'temp_identity_sha256':ins.identity_digest(e.temp_identity),'target_published':False,'retry_safe':False,
+                'parent_fsync_completed':e.parent_fsync_completed,'site_executed':False,'bc_executed':False}
+        self.assertFalse(record['retry_safe']);self.assertFalse(record['target_published'])
+    def test_parent_close_unknown_after_success_becomes_published_unknown_single_attempt(self):
+        success={'state':'V2_CARRIER_INSTALLED','install_root':ins.INSTALL_ROOT,'archive_sha256':ins.ARCHIVE_SHA256,
+                 'manifest_sha256':ins.MANIFEST_SHA256,'publish_attempted':True,'temp_identity_sha256':'a'*64,
+                 'target_published':True,'retry_safe':False,'parent_fsync_completed':True,'site_executed':False,'bc_executed':False}
+        with patch.object(ins,'production_identity'),patch.object(ins,'open_input',side_effect=[self.archive,self.manifest]),             patch.object(ins,'open_fixed_parent',return_value=123),patch.object(ins,'install_bytes',return_value=success),             patch.object(ins.os,'close',side_effect=OSError('SYNTHETIC_PARENT_CLOSE')) as close,             self.assertRaises(ins.PublishedUnknown) as cm:
+            ins.main(['--archive','/a','--manifest','/m'])
+        self.assertEqual(close.call_count,1);self.assertTrue(cm.exception.target_published);self.assertFalse(cm.exception.retry_safe)
+    def test_parent_close_failure_does_not_replace_existing_published_unknown(self):
+        original=ins.PublishedUnknown('ORIGINAL_UNKNOWN',False,('x',))
+        with patch.object(ins,'production_identity'),patch.object(ins,'open_input',side_effect=[self.archive,self.manifest]),             patch.object(ins,'open_fixed_parent',return_value=123),patch.object(ins,'install_bytes',side_effect=original),             patch.object(ins.os,'close',side_effect=OSError('SYNTHETIC_PARENT_CLOSE')) as close,             self.assertRaises(ins.PublishedUnknown) as cm:
+            ins.main(['--archive','/a','--manifest','/m'])
+        self.assertEqual(close.call_count,1);self.assertIs(cm.exception,original);self.assertEqual(cm.exception.detail,'ORIGINAL_UNKNOWN')
+    def test_success_receipt_consumer_requires_one_complete_line_and_exit_zero(self):
+        success={'state':'V2_CARRIER_INSTALLED','install_root':ins.INSTALL_ROOT,'archive_sha256':ins.ARCHIVE_SHA256,
+                 'manifest_sha256':ins.MANIFEST_SHA256,'publish_attempted':True,'temp_identity_sha256':'a'*64,
+                 'target_published':True,'retry_safe':False,'parent_fsync_completed':True,'site_executed':False,'bc_executed':False}
+        raw=(json.dumps(success,sort_keys=True)+'\n').encode()
+        self.assertEqual(ins.consume_entry_receipt(0,raw),success)
+        bad=[(2,raw),(0,b''),(0,raw[:-1]),(0,b'{'),(0,raw+raw),(0,b'x'*4097)]
+        for child,payload in bad:
+            with self.subTest(child=child,size=len(payload)),self.assertRaisesRegex(ins.Hold,'INSTALL_ENTRY_RECEIPT_UNKNOWN'):
+                ins.consume_entry_receipt(child,payload)
     def test_production_identity_is_not_inferred_from_test_fixture(self):
         with patch.object(ins.os,'getuid',return_value=1234),patch.object(ins.os,'geteuid',return_value=1234),self.assertRaisesRegex(ins.Hold,'EXACT_ROOT_HOST'):
             ins.production_identity()
@@ -145,9 +198,10 @@ class FixedInstaller(unittest.TestCase):
         source=Path(ins.__file__).read_text();self.assertNotIn('extractall(',source)
         shell=(Path(__file__).resolve().parents[1]/'deploy/community-preview/install-stopped-v1.sh').read_text()
         self.assertIn('/opt/xuanjun-community-preview/install-stopped-v1.py',shell)
-        self.assertIn('e4989f75d7bd1892b78fe131f51d6868910f58d4fa1ae88e7628c112bebca529',shell)
+        self.assertIn('bc4ece1bc6891b770b906dca37304018515495c59c5d3aad8828c0d8ec481260',shell)
         self.assertIn('os.O_NOFOLLOW',shell);self.assertIn('st.st_nlink==1',shell);self.assertIn('stat.S_IMODE(st.st_mode)==0o600',shell)
         self.assertIn('exec(compile(raw,path,"exec"),ns)',shell)
+        self.assertIn('V2_INSTALL_ENTRY_UNKNOWN',shell);self.assertIn('bc_admitted',shell);self.assertIn('receipt_file',shell)
         self.assertNotIn(' scripts/community_preview_bc_install.py',shell)
         self.assertNotIn('control-oci2330-v1',shell)
 

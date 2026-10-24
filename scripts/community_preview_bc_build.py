@@ -104,7 +104,11 @@ if __name__=='__main__':
             archive_sha256=hashlib.sha256(archive).hexdigest(),manifest_sha256=hashlib.sha256(manifest).hexdigest(),
             installer_sha256=hashlib.sha256((ROOT/'scripts/community_preview_bc_install.py').read_bytes()).hexdigest(),
             shell_sha256=hashlib.sha256((ROOT/'deploy/community-preview/install-stopped-v1.sh').read_bytes()).hexdigest(),
-            publish_success_requires=['renameat2_noreplace','parent_fsync','final_identity','final_tree'],
-            published_unknown=dict(target_published=True,retry_safe=False,parent_fsync_completed='boolean')),
+            publish_success_requires=['renameat2_noreplace','identity_reconcile','parent_fsync','final_identity','final_tree'],
+            published_unknown=dict(target_published=True,retry_safe=False,parent_fsync_completed='boolean',
+                publish_attempted=True,temp_identity_sha256='sha256'),
+            nonpublished_hold=dict(retry_safe=False,publish_attempted='boolean',target_published=False),
+            entry_consumption=dict(success_requires=['exactly_one_complete_success_receipt','child_exit_0'],
+                otherwise='V2_INSTALL_ENTRY_UNKNOWN_INSPECT_ONLY',retry_safe=False,bc_admitted=False)),
         source_manifest_sha256=hashlib.sha256(manifest).hexdigest(),site_executed=False)
     (target/'delivery.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')

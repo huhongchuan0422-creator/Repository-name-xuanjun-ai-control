@@ -26,17 +26,23 @@ MAX_ARCHIVE=4*1024*1024
 MAX_FILE=131072
 TEMP=TARGET+'.installing-'+ARCHIVE_SHA256[:16]
 
-class Hold(RuntimeError):pass
+class Hold(RuntimeError):
+    def __init__(self,reason,publish_attempted=False,temp_identity=None,parent_fsync_completed=False):
+        self.reason=reason if type(reason) is str and reason else 'INSTALL_HOLD'
+        self.publish_attempted=bool(publish_attempted)
+        self.temp_identity=temp_identity
+        self.parent_fsync_completed=bool(parent_fsync_completed)
+        super().__init__(self.reason)
 
 class PublishedUnknown(Hold):
-    def __init__(self,reason,parent_fsync_completed):
-        self.reason=reason if type(reason) is str and reason else 'POST_PUBLISH_UNKNOWN'
+    def __init__(self,reason,parent_fsync_completed,temp_identity=None):
+        super().__init__('V2_INSTALL_PUBLISHED_UNKNOWN',True,temp_identity,parent_fsync_completed)
+        self.detail=reason if type(reason) is str and reason else 'POST_PUBLISH_UNKNOWN'
         self.target_published=True
         self.retry_safe=False
-        self.parent_fsync_completed=bool(parent_fsync_completed)
-        super().__init__('V2_INSTALL_PUBLISHED_UNKNOWN')
     def record(self):
-        return {'state':'V2_INSTALL_PUBLISHED_UNKNOWN','reason':self.reason,'target_published':True,
+        return {'state':'V2_INSTALL_PUBLISHED_UNKNOWN','reason':self.detail,'publish_attempted':True,
+                'temp_identity_sha256':identity_digest(self.temp_identity),'target_published':True,
                 'retry_safe':False,'parent_fsync_completed':self.parent_fsync_completed,
                 'install_root':INSTALL_ROOT,'archive_sha256':ARCHIVE_SHA256,
                 'manifest_sha256':MANIFEST_SHA256,'site_executed':False,'bc_executed':False}
@@ -123,6 +129,10 @@ def validate_archive(archive,manifest_raw):
     return validate_archive_contents(archive,manifest_raw)
 
 def _identity(st):return (st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+
+def identity_digest(value):
+    if value is None:return None
+    return sha(canonical(list(value)))
 
 def parent_identity(st):
     return (st.st_dev,st.st_ino,stat.S_IFMT(st.st_mode),st.st_uid,st.st_gid,stat.S_IMODE(st.st_mode))
@@ -232,6 +242,21 @@ def _post_publish_reason(error):
     if type(error) is Hold and str(error):return str(error)
     return 'POST_PUBLISH_'+type(error).__name__.upper()
 
+def _path_dir_identity(parent,name):
+    try:st=os.stat(name,dir_fd=parent,follow_symlinks=False)
+    except FileNotFoundError:return None
+    need(stat.S_ISDIR(st.st_mode),'PUBLISH_RECONCILE_NON_DIRECTORY')
+    return dir_identity(st)
+
+def reconcile_publish(parent,temp_identity):
+    try:
+        temp_now=_path_dir_identity(parent,TEMP)
+        target_now=_path_dir_identity(parent,TARGET)
+    except BaseException:return 'unknown'
+    if temp_now==temp_identity:return 'not_published'
+    if temp_now is None and target_now==temp_identity:return 'published'
+    return 'unknown'
+
 def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=None):
     manifest,bodies=validate_archive(archive,manifest_raw)
     parent_identity_before=verify_parent(parent_fd,root_uid)
@@ -239,16 +264,24 @@ def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=Non
     try:os.mkdir(TEMP,0o700,dir_fd=parent_fd)
     except FileExistsError:raise Hold('TARGET_OR_PARTIAL_ALREADY_EXISTS') from None
     temp=os.open(TEMP,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent_fd)
-    published=False;parent_fsync_completed=False;pending=None
+    attempted=False;published=False;parent_fsync_completed=False;pending=None;temp_identity=None
     try:
         os.fchown(temp,root_uid,root_gid);os.fchmod(temp,0o700);os.fsync(temp);os.fsync(parent_fd)
         create_tree(temp,bodies,root_uid,root_gid,fault)
         verify_tree(parent_fd,TEMP,manifest,bodies,root_uid)
         need(parent_identity(os.fstat(parent_fd))==parent_identity_before,'INSTALL_PARENT_CHANGED')
         absent(parent_fd,TARGET)
-        need(dir_identity(os.fstat(temp))==dir_identity(os.stat(TEMP,dir_fd=parent_fd,follow_symlinks=False)),'TEMP_PATH_REPLACED')
+        temp_identity=dir_identity(os.fstat(temp))
+        need(temp_identity==dir_identity(os.stat(TEMP,dir_fd=parent_fd,follow_symlinks=False)),'TEMP_PATH_REPLACED')
         if fault is not None:fault('before-publish',TARGET,-1)
-        publish_noreplace(parent_fd,TEMP,TARGET)
+        attempted=True
+        try:publish_noreplace(parent_fd,TEMP,TARGET)
+        except BaseException as error:
+            outcome=reconcile_publish(parent_fd,temp_identity)
+            if outcome=='not_published':raise Hold(str(error),True,temp_identity,parent_fsync_completed) from error
+            raise PublishedUnknown(_post_publish_reason(error),parent_fsync_completed,temp_identity) from error
+        outcome=reconcile_publish(parent_fd,temp_identity)
+        if outcome!='published':raise PublishedUnknown('PUBLISH_IDENTITY_UNPROVEN',parent_fsync_completed,temp_identity)
         published=True
         if fault is not None:fault('after-publish',TARGET,-1)
         os.fsync(parent_fd);parent_fsync_completed=True
@@ -256,17 +289,42 @@ def install_bytes(archive,manifest_raw,parent_fd,root_uid=0,root_gid=0,fault=Non
         need(dir_identity(os.fstat(temp))==dir_identity(os.stat(TARGET,dir_fd=parent_fd,follow_symlinks=False)),'FINAL_PATH_REPLACED')
         verify_tree(parent_fd,TARGET,manifest,bodies,root_uid)
     except BaseException as error:
-        if published:pending=PublishedUnknown(_post_publish_reason(error),parent_fsync_completed)
+        if isinstance(error,PublishedUnknown):pending=error
+        elif published:pending=PublishedUnknown(_post_publish_reason(error),parent_fsync_completed,temp_identity)
+        elif attempted and not isinstance(error,Hold):
+            outcome=reconcile_publish(parent_fd,temp_identity)
+            if outcome=='not_published':pending=Hold(str(error),True,temp_identity,parent_fsync_completed)
+            else:pending=PublishedUnknown(_post_publish_reason(error),parent_fsync_completed,temp_identity)
         else:pending=error
     try:os.close(temp)
     except BaseException as error:
-        if published:
-            if pending is None:pending=PublishedUnknown('TEMP_CLOSE_UNKNOWN',parent_fsync_completed)
+        if published or isinstance(pending,PublishedUnknown):
+            if pending is None:pending=PublishedUnknown('TEMP_CLOSE_UNKNOWN',parent_fsync_completed,temp_identity)
         elif pending is None:pending=error
     if pending is not None:raise pending
     return {'state':'V2_CARRIER_INSTALLED','install_root':INSTALL_ROOT,'archive_sha256':ARCHIVE_SHA256,
-            'manifest_sha256':MANIFEST_SHA256,'target_published':True,'retry_safe':False,
+            'manifest_sha256':MANIFEST_SHA256,'publish_attempted':True,
+            'temp_identity_sha256':identity_digest(temp_identity),'target_published':True,'retry_safe':False,
             'parent_fsync_completed':True,'site_executed':False,'bc_executed':False}
+
+SUCCESS_RECEIPT_KEYS={'state','install_root','archive_sha256','manifest_sha256','publish_attempted',
+                      'temp_identity_sha256','target_published','retry_safe','parent_fsync_completed',
+                      'site_executed','bc_executed'}
+
+def consume_entry_receipt(child_exit,raw):
+    need(type(child_exit) is int and type(raw) is bytes and len(raw)<=4096,'INSTALL_ENTRY_RECEIPT_UNKNOWN')
+    need(raw.endswith(b'\n') and raw.count(b'\n')==1,'INSTALL_ENTRY_RECEIPT_UNKNOWN')
+    try:value=json.loads(raw[:-1])
+    except (ValueError,UnicodeError):raise Hold('INSTALL_ENTRY_RECEIPT_UNKNOWN') from None
+    need(child_exit==0 and type(value) is dict and set(value)==SUCCESS_RECEIPT_KEYS
+         and value['state']=='V2_CARRIER_INSTALLED' and value['install_root']==INSTALL_ROOT
+         and value['archive_sha256']==ARCHIVE_SHA256 and value['manifest_sha256']==MANIFEST_SHA256
+         and value['publish_attempted'] is True and type(value['temp_identity_sha256']) is str
+         and re.fullmatch('[0-9a-f]{64}',value['temp_identity_sha256']) is not None
+         and value['target_published'] is True and value['retry_safe'] is False
+         and value['parent_fsync_completed'] is True and value['site_executed'] is False
+         and value['bc_executed'] is False,'INSTALL_ENTRY_RECEIPT_UNKNOWN')
+    return value
 
 def production_identity():
     need(os.getuid()==0 and os.geteuid()==0 and os.uname().nodename.split('.')[0]==HOST,'EXACT_ROOT_HOST_REQUIRED')
@@ -312,6 +370,7 @@ if __name__=='__main__':
         print(json.dumps(error.record(),sort_keys=True),flush=True)
         raise SystemExit(2)
     except Hold as error:
-        print(json.dumps({'state':'V2_INSTALL_HOLD','reason':str(error),'target_published':False,'retry_safe':True,
-                          'parent_fsync_completed':False,'site_executed':False,'bc_executed':False},sort_keys=True),flush=True)
+        print(json.dumps({'state':'V2_INSTALL_HOLD','reason':str(error),'publish_attempted':error.publish_attempted,
+                          'temp_identity_sha256':identity_digest(error.temp_identity),'target_published':False,'retry_safe':False,
+                          'parent_fsync_completed':error.parent_fsync_completed,'site_executed':False,'bc_executed':False},sort_keys=True),flush=True)
         raise SystemExit(2)
