@@ -111,6 +111,55 @@ class PreviewHTTPTests(HttpTests):
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
         self.assertEqual(self.request(url)[0],403);self.assertEqual(self.request(url,headers={**self.auth_headers(),'Range':'bytes=0-2'})[0],403)
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
+
+    def test_first_customer_preview_full_import_list_http_served_and_expiry_chain(self):
+        headers=self.auth_headers()
+        listing_status,_,listing_raw=self.request('api/previews/project-a',headers=headers)
+        self.assertEqual(listing_status,200)
+        pages=json.loads(listing_raw)['pages']
+        self.assertEqual(len(pages),1)
+        self.assertEqual(pages[0]['path'],self.path)
+        self.assertEqual(pages[0]['sha256'],self.sha)
+        self.assertEqual(pages[0]['url'],route('project-a',self.path,self.sha))
+
+        exact=pages[0]['url'].removeprefix('/customer/center/')
+        status,_,raw=self.request(exact,headers=headers)
+        self.assertEqual(status,200)
+        self.assertIn(b'Private HTTP preview',raw)
+
+        deadline=time.time()+2
+        serves=[]
+        while time.time()<deadline:
+            serves=self.c.db.execute("SELECT * FROM preview_serves WHERE project='project-a' ORDER BY rowid").fetchall()
+            if serves:break
+            time.sleep(0.01)
+        self.assertEqual(len(serves),1)
+        proof=json.loads(self.c.decrypt(serves[0]['payload'],serves[0]['id']))
+        authority=load(self.c)
+        self.assertEqual(proof['actor'],self.owner)
+        self.assertEqual(proof['project_revision'],1)
+        self.assertEqual(proof['page'],self.path)
+        self.assertEqual(proof['page_sha256'],self.sha)
+        self.assertEqual(proof['manifest_sha256'],authority['previews'][0]['manifest_sha256'])
+        self.assertEqual(proof['artifact_sha256'],authority['previews'][0]['artifact_sha256'])
+        self.assertEqual(proof['source_commit'],authority['previews'][0]['source_commit'])
+        self.assertEqual(proof['authority_revision'],authority['revision'])
+        self.assertEqual(proof['evidence'],'AUTHENTICATED_HTTP_BYTES_SERVED')
+        self.assertEqual(proof['browser_acceptance'],'NOT_ESTABLISHED')
+        self.assertEqual(proof['tls_acceptance'],'NOT_ESTABLISHED')
+
+        other=self.users['other']
+        other_headers={'Cookie':__import__('scripts.pr122_customer_http',fromlist=['COOKIE']).COOKIE+'='+other['token'],
+                       'X-CSRF-Token':other['csrf']}
+        self.assertEqual(self.request(exact,headers=other_headers)[0],403)
+
+        stale=route('project-a',self.path,'f'*64).removeprefix('/customer/center/')
+        self.assertEqual(self.request(stale,headers=headers)[0],403)
+
+        self.now+=3601
+        with self.assertRaises(Denied):listing(self.c,self.owner,'project-a')
+        with self.assertRaises(Denied):render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha)
+        self.assertEqual(self.c.db.execute("SELECT count(*) FROM preview_serves WHERE project='project-a'").fetchone()[0],1)
     def member_headers(self):
         user=self.users['member']
         return {'Cookie':__import__('scripts.pr122_customer_http',fromlist=['COOKIE']).COOKIE+'='+user['token'],
