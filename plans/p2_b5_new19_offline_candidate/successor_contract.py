@@ -103,12 +103,35 @@ def derive(original_raw, binder_raw, manifest_raw=None):
                                              for x in manifest['files']]
     for row, phase in zip(result['phase_sequence'], PHASES):
         row['phase'] = phase
+        if phase == 'PUBLISH_SUCCESSOR':
+            row['step'] = 7
+            row['required_result'] = ('Verify all 42 fixed runtime source bytes, '
+                                      'the runtime manifest and code pin before '
+                                      'bounded publication of the two exact '
+                                      'successor releases; present target HOLD.')
+        elif phase == 'ACTIVATE_SUCCESSOR':
+            row['step'] = 8
+            row['required_result'] = ('Switch the two current links and six '
+                                      'protected config/slot bytes by the original '
+                                      'lock and CAS, bound to this successor release.')
+        elif phase == 'WINDOW_ENABLE':
+            row['step'] = 13
+            row['required_result'] = ('Only after actual scoped grant, same-batch '
+                                      'analyst ACK, successor activation, conflict '
+                                      'clearance and window approval begin the '
+                                      'single 60-minute window.')
         if phase == 'B5_HTTP_RECEIVE_AND_VERIFY':
-            row['step'] = ('B5 analyst uses the original request-local authenticated '
-                           'HTTP read_project_chunk for each of the 19 exact objects; '
-                           'maintenance receives no bearer or body-read grant.')
+            row['step'] = 16
             row['required_result'] = ('Nineteen bound bytes/SHA/InvokeId proofs '
-                                      'linked to exact custody and close scope.')
+                                      'from B5 request-local authenticated cloud '
+                                      'reads, linked to exact custody and close '
+                                      'scope; no maintenance bearer or body grant.')
+        elif phase == 'CLOSE_EXPOSURE':
+            row['step'] = 17
+            row['required_result'] = ('Close this successor B5 exposure under '
+                                      'independent precise close approval; retain '
+                                      'queue/history and never infer OAuth grant '
+                                      'revocation from catalog expiry.')
     return result
 
 

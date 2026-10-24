@@ -35,6 +35,18 @@ class SuccessorContractTests(unittest.TestCase):
         self.assertEqual(self.spec['fixed_paths']['configs'],
                          json.loads(self.original)['fixed_paths']['configs'])
 
+    def test_successor_phase_descriptions_bound_to_42_and_separate_body(self):
+        rows = self.spec['phase_sequence']
+        self.assertEqual([r['step'] for r in rows], list(range(1, 18)))
+        for number in (7, 8, 13, 16, 17):
+            self.assertNotIn('c53', rows[number - 1]['required_result'])
+        self.assertIn('42 fixed runtime source bytes', rows[6]['required_result'])
+        self.assertIn('request-local authenticated cloud', rows[15]['required_result'])
+        changed = copy.deepcopy(self.spec)
+        changed['phase_sequence'][6]['required_result'] = 'old c53/32 release'
+        with self.assertRaisesRegex(contract.Hold, 'SUCCESSOR_SPEC_UNEXPECTED_FIELDS'):
+            self.check(spec=changed)
+
     def test_old_c53_spec_cannot_stand_in(self):
         with self.assertRaises(contract.Hold):
             contract.validate(self.original, self.original, self.external,

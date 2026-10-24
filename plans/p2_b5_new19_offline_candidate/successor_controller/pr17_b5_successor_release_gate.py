@@ -107,7 +107,8 @@ class ExternalReleaseGate:
             'pr17_b5_successor_binder.py', 'pr17_b5_successor_loader.py',
             'pr17_b5_successor_local.py', 'pr17_b5_successor_release_gate.py',
             'pr17_b5_successor_review.py', 'pr17_b5_successor_runtime.py',
-            'pr17_b5_successor_witness.py')}
+            'pr17_b5_successor_witness.py',
+            'pr17_b5_successor_entry.py', 'pr17_b5_successor_fixed_io.py')}
         exact.update(('successor_contract.py', 'successor_source_loader.py',
                       'successor_analyst_read.py'))
         c53.require(manifest.get('schema') ==

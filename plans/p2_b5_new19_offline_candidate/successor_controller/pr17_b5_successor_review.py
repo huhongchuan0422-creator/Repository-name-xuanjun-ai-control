@@ -13,7 +13,7 @@ import re
 import pr17_b5_successor_binder as binder
 
 HOST = binder.HOST
-SPEC_CANON_SHA = '7ff2992ed2a4ba84063e03d62456f71f3ed757cc2a8eefb495c20aab719f8b28'
+SPEC_CANON_SHA = '3eca32c972038581935b3fd40738b1c8fe2c1a85df22260da71971f57e577729'
 COMMIT = binder.COMMIT
 PIN = binder.CODEPIN
 MANIFEST = binder.MANIFEST
