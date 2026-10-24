@@ -5,29 +5,29 @@
   "host": "iZd7oeikknn1z21sq6ji6zZ",
   "reuse_pins": {
     "scripts/community_preview_version_inspect.py": "98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3",
-    "scripts/community_preview_update_composition.py": "1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9",
+    "scripts/community_preview_update_composition.py": "f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1",
     "scripts/community_preview_upgrade.py": "2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee"
   },
   "files": {
     "scripts/community_preview_preupdate_observe.py": {
       "bytes": 14176,
       "mode": "0644",
-      "sha256": "64ffb65690e68efe90fa44733375a05a22008c9713553ebc55ed258c5a38f555"
+      "sha256": "72969939adca0949186e6021fbdf8747d35d40319edd291b626bf4afb1e34d09"
     },
     "scripts/community_preview_preupdate_bundle.py": {
       "bytes": 4636,
       "mode": "0644",
-      "sha256": "54193187fae9c08421e0cb6eb4ce834d78bc0517417188e3fa411178cefddd5e"
+      "sha256": "6bd5d1eb828669969a956c250eb5315356b447e88abbadf9c68c2b2bdfaffb6f"
     },
     "deploy/community-preview/preupdate-five-readonly.py": {
       "bytes": 42696,
       "mode": "0644",
-      "sha256": "84c2471873592b270fe685a9099202caebaaa32498d7d3823c0956aa9265f6b9"
+      "sha256": "81e15607d2e2368713791b350c4e5ee06c00ef7e15a478f13888e4c3b1b0f10d"
     },
     "deploy/community-preview/preupdate-five-readonly.sh": {
       "bytes": 43101,
       "mode": "0644",
-      "sha256": "594ec04c941c4c5bdd9b1431bfcbca325315a4bb4028556ae6cd34c207e66743"
+      "sha256": "0ddfd6c4a8cd3ea523b2805389162073124ed659b0a083a22277f291571fadad"
     },
     "tests/test_community_preview_preupdate_observe.py": {
       "bytes": 15205,

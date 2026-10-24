@@ -11,6 +11,7 @@ import os
 import stat
 import re
 import time
+import threading
 from scripts import community_preview_update_checkpoint as controller
 from scripts import community_preview_release_plan as plan
 from scripts import community_preview_upgrade as original
@@ -98,6 +99,7 @@ def inspect_bound(cid,image):
     return value
 
 
+# Historical denied-request diagnostics only; never an acceptance path.
 PRIVATE_PROBE = r"""import http.client,json,socket
 class Local(http.client.HTTPConnection):
     def connect(self):
@@ -139,14 +141,108 @@ def read_health_probe(probe):
     return value
 
 
-def actual_health():
-    public=read_health_probe(observation.HTTP_PROBE)
-    private=read_health_probe(PRIVATE_PROBE)
-    require(all(type(public[k]) is type(private[k]) and public[k]==private[k]
-                for k in public if k!='observed_at'),'PUBLIC_PRIVATE_HEALTH_MISMATCH')
-    # Keep the public responder timestamp intact, never label local collection
-    # time as remote time. Both timestamps were independently freshness-checked.
-    return public
+def socket_binding():
+    """Protected stat-only binding of the ORIGINAL Unix socket, no connection."""
+    path=plan.RUN+'/preview.sock';parent,name=observation.parent_fd(path)
+    try:
+        before_parent=observation.identity(os.fstat(parent))
+        before=os.stat(name,dir_fd=parent,follow_symlinks=False)
+        require(stat.S_ISSOCK(before.st_mode) and before.st_uid==observation.PROJECT_UID
+            and before.st_gid==1008 and stat.S_IMODE(before.st_mode)==0o660 and before.st_nlink==1,
+            'EXACT_ORIGINAL_SOCKET_REQUIRED')
+        current,leaf=observation.parent_fd(path)
+        try:
+            require(leaf==name and observation.identity(os.fstat(parent))==before_parent
+                and observation.identity(os.fstat(current))==before_parent
+                and observation.identity(os.stat(leaf,dir_fd=current,follow_symlinks=False))==observation.identity(before),
+                'SOCKET_OR_PARENT_CHANGED')
+        finally:os.close(current)
+        return dict(device=before.st_dev,inode=before.st_ino,uid=before.st_uid,gid=before.st_gid,
+            mode=stat.S_IMODE(before.st_mode),mtime_ns=before.st_mtime_ns,ctime_ns=before.st_ctime_ns)
+    finally:os.close(parent)
+
+
+class BoundHttpsHealth:
+    """ONE anonymous HTTPS response bracketed by protected original-host facts.
+
+    No private request, proxy header, identity switch or independent dual-path
+    assertion. Journal IDs/plan and root live readers are the authority source.
+    """
+    def __init__(self,journal,bindings):
+        require(journal is not None and callable(bindings),'PROTECTED_HEALTH_CONTEXT_REQUIRED')
+        self.journal=journal;self.bindings=bindings;self.last_evidence=None;self.last_time=None
+        self.plan_fingerprint=digest(journal.plan)
+    def clock(self):
+        value=now()
+        require(self.last_time is None or value>=self.last_time,'HEALTH_CLOCK_REVERSED')
+        self.last_time=value;return value
+    def checked_live(self,current,rollback):
+        live=self.bindings()
+        require(type(live) is dict and set(live)==set(current)
+            and all(type(live[k]) is type(current[k]) for k in current)
+            and all(live[k]==current[k] for k in current if k not in ('running','observed_at')),
+            'HEALTH_PROTECTED_SOURCE_INVALID')
+        clock=self.clock()
+        require(clock-600<=live['observed_at']<=clock+30,'HEALTH_PROTECTED_SOURCE_EXPIRED')
+        require(live['running'] is rollback,'HEALTH_OLD_WRITER_STATE_CHANGED')
+        return live
+    def snapshot(self,frozen):
+        root_host();j=self.journal;p=j.plan;c=p['current']
+        require(digest(p)==self.plan_fingerprint,'HEALTH_PLAN_CHANGED')
+        require(not j.poisoned and threading.get_ident()==j.owner and j.state==frozen
+            and frozen['plan_sha256']==p['plan_sha256'],'HEALTH_JOURNAL_CHANGED')
+        new=frozen['new_id'];require(plan.exact_hex(new,64) and new!=c['container_id'],'HEALTH_EXACT_NEW_ID_REQUIRED')
+        rollback=frozen['phase']=='RECOVERY_START_OLD_INTENT'
+        require(rollback or frozen['phase']=='NEW_KNOWN','HEALTH_PHASE_NOT_ADMISSIBLE')
+        live=self.checked_live(c,rollback)
+        old=inspect_bound(c['container_id'],c['image_id']);new_info=inspect_bound(new,p['image']['image_id'])
+        require(old['running'] is rollback and new_info['running'] is (not rollback),'HEALTH_WRITER_PAIR_CHANGED')
+        target=c['container_id'] if rollback else new
+        image=c['image_id'] if rollback else p['image']['image_id']
+        revision=c['oci_revision'] if rollback else p['source']['source_sha']
+        require(rollback or revision==PRODUCT,'HEALTH_FIXED_PRODUCT_REQUIRED')
+        fmt='{{json .Id}}\n{{json (index .Config.Labels "org.opencontainers.image.revision")}}\n{{json .Config.User}}'
+        rows=observation.capture(plan.DOCKER+['image','inspect','--format',fmt,image],timeout=8,budget=4096).splitlines()
+        require([observation.exact_json(v) for v in rows]==[image,revision,'10001:1008'],'HEALTH_IMAGE_OCI_CHANGED')
+        fmt='{{json .Id}}\n{{json .Image}}'
+        rows=observation.capture(plan.DOCKER+['container','inspect','--format',fmt,plan.NAME],timeout=8,budget=4096).splitlines()
+        require([observation.exact_json(v) for v in rows]==[target,image],'HEALTH_ROUTE_TARGET_CHANGED')
+        routes={path:observation.safe_file(path,body=True)[0]['sha256'] for path in observation.ROUTE_PATHS.values()}
+        require(routes[original.INC]==hashlib.sha256(original.FRAGMENT).hexdigest(), 'HEALTH_FIXED_COMMUNITY_ROUTE_REQUIRED')
+        require(digest(routes)==c['routing_sha256'] and live['routing_sha256']==c['routing_sha256'], 'HEALTH_ROUTE_BINDING_CHANGED')
+        sock=socket_binding()
+        # Recheck authority after bounded host reads as well as after HTTPS.
+        require(self.checked_live(c,rollback)['running'] is rollback and j.state==frozen,'HEALTH_SOURCE_CHANGED')
+        self.clock()
+        return dict(target_id=target,image_id=image,oci_revision=revision,socket=sock,routes=routes,
+            live={k:v for k,v in live.items() if k!='observed_at'},rollback=rollback)
+    def __call__(self):
+        self.last_evidence=None;frozen=dict(self.journal.state);started=self.clock()
+        before=self.snapshot(frozen)
+        public=read_health_probe(observation.HTTP_PROBE)  # ONE fixed anonymous GET via real Nginx
+        after=self.snapshot(frozen);finished=self.clock()
+        require(before==after,'HEALTH_HOST_BINDING_CHANGED_DURING_RESPONSE')
+        require(public['scope']=='PROCESS_AND_DATABASE_CONNECTIVITY' and public['production_acceptance'] is False
+            and type(public['status']) is str and public['status'] in ('READY','MAINTENANCE','UNAVAILABLE')
+            and finished-600<=public['observed_at']<=finished+30,'HEALTH_PUBLIC_EVIDENCE_UNKNOWN')
+        if not before['rollback']:
+            require(public['runtime_source_sha']==before['oci_revision']==PRODUCT
+                and public['version_source']=='IMAGE_BUILD_STAMP','HEALTH_RUNTIME_VERSION_UNKNOWN')
+        elif public['runtime_source_sha'] is not None or public['version_source'] is not None:
+            require(public['runtime_source_sha']==before['oci_revision'] and public['version_source']=='IMAGE_BUILD_STAMP',
+                'ROLLBACK_RUNTIME_VERSION_INCONSISTENT')
+        self.last_evidence=dict(contract='ANONYMOUS_HTTPS_ORIGINAL_NGINX_PATH',independent_private_health=False,
+            target_id=before['target_id'],image_id=before['image_id'],oci_revision=before['oci_revision'],
+            binding_sha256=digest(before),started_at=started,finished_at=finished,
+            backend_observed_at=public['observed_at'],runtime_source_sha=public['runtime_source_sha'],
+            version_source=public['version_source'],scope='LEGACY_ROLLBACK_PROCESS_DB_ONLY' if before['rollback'] else 'EXACT_PRODUCT_RUNTIME_AND_HOST_BINDING')
+        return public
+
+
+def actual_health(journal=None,bindings=None):
+    # Unbound use cannot fall back to a bare public GET or synthetic authority.
+    require(journal is not None and bindings is not None,'PROTECTED_HEALTH_CONTEXT_REQUIRED')
+    return BoundHttpsHealth(journal,bindings)()
 
 
 def read_current(cid,image,backup_fd):
@@ -309,6 +405,7 @@ def compose(*,approval_sha256,backup_fd,execution_enabled=False):
         # Validate the existing complete protected history and same-attempt lock
         # BEFORE applying first-run gates. Journal never creates its parent.
         journal=controller.Journal.from_original_parent(candidate)
+        transport.health=BoundHttpsHealth(journal,bindings)
         if journal.state['phase']=='PREPARED':
             require(live['running'] is True,'ORIGINAL_OLD_WRITER_NOT_RUNNING')
             transport.image_and_names_ready(candidate)  # original FIRST-run gate only

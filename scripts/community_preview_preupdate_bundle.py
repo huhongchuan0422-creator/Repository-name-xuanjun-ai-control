@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PINS={
  'scripts/community_preview_version_inspect.py':'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3',
- 'scripts/community_preview_update_composition.py':'1afa61317d7647f7d6fb76f77c15de072f761bc500796659408434d39cc1a0f9',
+ 'scripts/community_preview_update_composition.py':'f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1',
  'scripts/community_preview_upgrade.py':'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee'}
 
 

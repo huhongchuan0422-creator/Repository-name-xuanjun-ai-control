@@ -35,13 +35,13 @@ class CompositionScope(unittest.TestCase):
             if path in (c.plan.ROOT+'/config',c.plan.ROOT+'/data',c.plan.RUN):p.mkdir(exist_ok=True)
             else:p.write_bytes(b'PRIVATE_NOT_READ');p.chmod(0o600)
         for path in c.observation.ROUTE_PATHS.values():
-            p=self.root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'route unchanged');p.chmod(0o600)
+            p=self.root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(c.original.FRAGMENT if path==c.original.INC else b'route unchanged');p.chmod(0o600)
         self.backup_path='/opt/xuanjun-community-preview/existing-reviewed-reference.json'
         p=self.root/self.backup_path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b'NOT_A_NEW_BACKUP');p.chmod(0o600)
         self.fd=os.open(str(p),os.O_RDONLY);self.addCleanup(os.close,self.fd)
         self.c=fixture.current();self.info=old.info(self.c['image_id'],self.c['container_id'])
         self.info.update(ports={},published={},devices=[],capadd=[])
-        self.names={c.plan.NAME:self.c['container_id']}
+        self.names={c.plan.NAME:self.c['container_id']};self.extra_objects={}
         self.readlink=os.readlink
         # Map only the actual private fixture file path, not reusable fd numbers.
         backup_fixture_path=str(p)
@@ -51,13 +51,16 @@ class CompositionScope(unittest.TestCase):
         self.checked=Mock()
         def capture(argv,**kw):
             if argv[3:5]==['container','inspect']:
-                if argv[-1]==c.plan.NAME:return '\n'.join(json.dumps(self.info[k]) for k in ('id','image'))
+                if argv[-1]==c.plan.NAME:
+                    target=self.names[c.plan.NAME];info=self.extra_objects.get(target,self.info)
+                    return '\n'.join(json.dumps(info[k]) for k in ('id','image'))
+                info=self.extra_objects.get(argv[-1],self.info)
                 fields=c.original.INSPECT_FIELDS+[('ports',''),('published',''),('devices',''),('capadd','')]
-                return '\n'.join(json.dumps(self.info[k]) for k,_ in fields)
+                return '\n'.join(json.dumps(info[k]) for k,_ in fields)
             if argv[3:5]==['container','ls']:
                 return '\n'.join(json.dumps(dict(name=n,id=i)) for n,i in self.names.items())
             if argv[3:5]==['image','inspect']:
-                return '\n'.join(json.dumps(v) for v in (self.c['image_id'],c.plan.OBSERVED_OCI,'10001:1008'))
+                return '\n'.join(json.dumps(v) for v in (argv[-1],c.plan.OBSERVED_OCI if argv[-1]==self.c['image_id'] else c.PRODUCT,'10001:1008'))
             return frame(health())
         self.capture=patch.object(c.observation,'capture',side_effect=capture).start()
     def binding(self):
@@ -126,24 +129,20 @@ class CompositionScope(unittest.TestCase):
         p.chmod(0o600);q=p.with_name('retained');p.rename(q);p.write_bytes(b'new');p.chmod(0o600)
         with self.assertRaises(c.controller.Hold):c.backup_reference(self.fd)
         with self.assertRaises(c.controller.Hold):c.backup_reference(True)
-    def test_health_real_remote_times_preserved_private_public_both_required(self):
-        self.capture.side_effect=[frame(health()),frame(dict(health(),observed_at=999))]
-        r=c.actual_health();self.assertEqual(r['observed_at'],1000);self.assertEqual(r['runtime_source_sha'],c.PRODUCT)
-        self.assertEqual(self.capture.call_args_list[-1].kwargs,dict(timeout=10,budget=10000))
-        self.assertIn('/run/xuanjun-community-preview/preview.sock',c.PRIVATE_PROBE)
-        self.assertNotIn('docker',c.PRIVATE_PROBE)
+    def test_public_probe_preserves_remote_time_and_unbound_actual_health_denies(self):
+        self.capture.side_effect=[frame(health())]
+        r=c.read_health_probe(c.observation.HTTP_PROBE);self.assertEqual(r['observed_at'],1000)
+        self.assertEqual(self.capture.call_count,1)
+        with self.assertRaisesRegex(c.controller.Hold,'CONTEXT'):c.actual_health()
     def test_health_missing_stale_bool_float_future_remote_time_is_unknown(self):
         for value in (None,True,1000.0,1,1031):
             self.capture.side_effect=lambda *a,**kw:frame(dict(health(),observed_at=value))
-            with self.assertRaises(c.controller.Hold):c.actual_health()
-    def test_health_different_public_private_or_malformed_frames_denies(self):
-        for other in (dict(health(),runtime_source_sha='0'*40),dict(health(),status='MAINTENANCE')):
-            self.capture.side_effect=[frame(health()),frame(other)]
-            with self.assertRaises(c.controller.Hold):c.actual_health()
+            with self.assertRaises(c.controller.Hold):c.read_health_probe(c.observation.HTTP_PROBE)
+    def test_public_probe_malformed_frames_denied(self):
         for raw in ('{}',json.dumps(dict(http_status=True,body_hex='00')),json.dumps(dict(http_status=200,body_hex=' '*2)),
                     json.dumps(dict(http_status=200,body_hex='0'*8194)),frame([]),'{"x":1,"x":2}'):
             self.capture.side_effect=lambda *a,**kw:raw
-            with self.assertRaises(Exception):c.actual_health()
+            with self.assertRaises(Exception):c.read_health_probe(c.observation.HTTP_PROBE)
     def test_root_protected_source_digest_check(self):
         with patch.object(c.original,'read_root_file',return_value=(b'actual',0o600)):
             self.assertEqual(c.protected_body('/fixed',hashlib.sha256(b'actual').hexdigest()),b'actual')
@@ -165,6 +164,8 @@ class CompositionScope(unittest.TestCase):
              patch.object(c,'LiveBindings') as bindings,patch.object(c.controller.OriginalTransport,'image_and_names_ready') as image,\
              patch.object(c.controller.Journal,'from_original_parent') as journal,patch.object(c,'exact_stage_names'):
             journal.return_value.state={'phase':'PREPARED'}
+            def factory(candidate):journal.return_value.plan=candidate;return journal.return_value
+            journal.side_effect=factory
             bindings.return_value.return_value=dict(a['current'])
             result=c.compose(approval_sha256='b'*64,backup_fd=self.fd,execution_enabled=True)
             return result,journal,image,bindings
@@ -197,7 +198,9 @@ class CompositionScope(unittest.TestCase):
             if argv[3]=='rename':
                 self.names={n:i for n,i in self.names.items() if i!=argv[-2]};self.names[argv[-1]]=argv[-2]
             if argv[3]=='run':
-                new_running[0]=True;self.names[c.plan.NAME]=new_id;return new_id
+                new_running[0]=True;self.names[c.plan.NAME]=new_id
+                v=old.info('sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a',new_id,True)
+                v.update(ports={},published={},devices=[],capadd=[]);self.extra_objects[new_id]=v;return new_id
             return ''
         def inspect(cid):
             if cid==self.c['container_id']:return dict(self.info)
@@ -216,7 +219,7 @@ class CompositionScope(unittest.TestCase):
              patch.object(c.controller,'OWNER_UID',os.getuid()),patch.object(c.os,'uname',return_value=Mock(nodename=c.plan.HOST)),\
              patch.object(c.os,'getuid',return_value=0),patch.object(c.os,'geteuid',return_value=0),\
              patch.object(c.original,'inspect',side_effect=inspect),patch.object(c.original,'command',side_effect=command),\
-             patch.object(c.original,'mutate',side_effect=mutate):
+             patch.object(c.original,'mutate',side_effect=mutate),patch.object(c,'socket_binding',return_value={'synthetic_socket':True}):
             result=c.compose(approval_sha256='b'*64,backup_fd=self.fd,execution_enabled=True)
             result.update.clock=lambda:1000
             try:
@@ -253,7 +256,7 @@ def reopen_process(root,stage):
         elif not p.exists():p.write_bytes(b'private fixture not read');p.chmod(0o600)
     for path in c.observation.ROUTE_PATHS.values():
         p=root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True)
-        if not p.exists():p.write_bytes(b'unchanged fixture route');p.chmod(0o600)
+        if not p.exists():p.write_bytes(c.original.FRAGMENT if path==c.original.INC else b'unchanged fixture route');p.chmod(0o600)
     parent=root/'journal';parent.mkdir(mode=0o700,exist_ok=True)
     approval_file=root/'approval.json';receipt_path=Path('deploy/community-preview/f131-image-receipt.json')
     real_readlink=os.readlink
@@ -268,6 +271,7 @@ def reopen_process(root,stage):
             return '\n'.join(json.dumps(dict(name=n,id=i)) for n,i in sorted(model['names'].items()))
         h=health()
         if stage=='first':h['status']='MAINTENANCE'
+        elif stage=='missing_runtime':h.update(runtime_source_sha=None,version_source=None)
         elif stage=='recover':h.update(runtime_source_sha=None,version_source=None)
         return frame(h)
     def command(argv):
@@ -297,7 +301,7 @@ def reopen_process(root,stage):
             (c.os,'getuid',lambda:0),(c.os,'geteuid',lambda:0),(c.os,'uname',lambda:Mock(nodename=c.plan.HOST)),
             (c.os,'readlink',lambda path:backup_path if real_readlink(path)==str(backup_file) else real_readlink(path)),
             (c.observation,'capture',capture),(c.original,'command',command),(c.original,'inspect',inspect),
-            (c.original,'mutate',mutate),(c,'protected_body',body)):
+            (c.original,'mutate',mutate),(c,'protected_body',body),(c,'socket_binding',lambda:{'synthetic_socket':True})):
             stack.enter_context(patch.object(target,name,value))
         # Only the temporary journal parent's /tmp ancestors use the isolated
         # owner policy. Original root parent protection is unchanged in source.
@@ -313,7 +317,7 @@ def reopen_process(root,stage):
             digest=hashlib.sha256(approval_file.read_bytes()).hexdigest()
             result=c.compose(approval_sha256=digest,backup_fd=fd,execution_enabled=True)
             result.update.clock=lambda:1000
-            if stage=='first':result.update.run()
+            if stage in ('first','missing_runtime'):result.update.run()
             elif stage=='recover':result.update.recover()
             elif stage=='mark_unknown':result.journal.write(c.controller.HOLD_PHASE,result.journal.state['new_id'])
             outcome=dict(result='ACCEPTED',phase=result.journal.state['phase'])
@@ -360,6 +364,11 @@ class CompositionReopen(unittest.TestCase):
         m=json.loads(self.path.read_text());self.assertFalse(m['objects']['9'*64]['running'])
         self.assertTrue(m['objects'][fixture.current()['container_id']]['running'])
         self.assertEqual([a[3] for a in m['actions']],['stop','rename','run','stop','rename','rename','start'])
+        self.rejected_unchanged('EXISTING_PHASE_INSPECT_ONLY')
+    def test_missing_public_runtime_after_real_composition_run_stays_unknown_no_recovery(self):
+        r=self.child('missing_runtime');self.assertEqual(r['result'],'HOLD')
+        self.assertEqual(r['checkpoint']['phase'],c.controller.HOLD_PHASE)
+        self.assertEqual(r['actions'],3)
         self.rejected_unchanged('EXISTING_PHASE_INSPECT_ONLY')
     def test_already_stopped_known_new_writer_reopens_without_duplicate_stop(self):
         self.first();m=json.loads(self.path.read_text());m['objects']['9'*64].update(running=False,status='exited');self.save(m)

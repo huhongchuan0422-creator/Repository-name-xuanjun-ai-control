@@ -1,0 +1,47 @@
+{
+  "purpose": "OWNER_CONFIRMED_HTTPS_ACCEPTANCE_SOURCE_ONLY_NOT_SITE_APPROVAL",
+  "owner_confirmation": "2026-10-24T05:57:29Z",
+  "previous_source": "be5dc3a92948ccd29be254361f2d26f7f3d96860",
+  "product_source": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+  "health_contract": "ONE_ANONYMOUS_HTTPS_ORIGINAL_NGINX_PATH_PROTECTED_HOST_BEFORE_AFTER",
+  "independent_private_health": false,
+  "requests_per_verification": 1,
+  "proxy_headers_sent": false,
+  "identity_switch": false,
+  "server_permission_changed": false,
+  "site_executed": false,
+  "production_acceptance": false,
+  "files": {
+    "scripts/community_preview_update_composition.py": {
+      "bytes": 25262,
+      "sha256": "f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1"
+    },
+    "tests/test_community_preview_https_acceptance.py": {
+      "bytes": 10538,
+      "sha256": "e82207a8491474208575b2e2395ef03740f86e565cbc815d9534c21e73bc0d2d"
+    },
+    "tests/test_community_preview_update_composition.py": {
+      "bytes": 29554,
+      "sha256": "fa861fc864cc1cfc33ac98d64e00c8d52ac1db149cd9d6451cbe7321b049521f"
+    },
+    "deploy/community-preview/control-oci2330-v1.zip": {
+      "bytes": 111330,
+      "sha256": "aa8afb5c05240e3c4835680e8cec765fa4199f0b7f230e3adaced8bc489397f9"
+    },
+    "deploy/community-preview/control-oci2330-v1-manifest.json": {
+      "bytes": 1201,
+      "sha256": "e780675ef48c4cd077000c943c5ffe57b390277b6246d43939f54590aabd199a"
+    },
+    "docs/development/COMMUNITY_HTTPS_ACCEPTANCE_CONTRACT_20261024.md": {
+      "bytes": 7394,
+      "sha256": "728ed420433d0878ad0ff052671f5849ded562401de787cd44d0a91770b29d3b"
+    }
+  },
+  "missing": [
+    "REAL_INSTALLED_ROOT_CARRIER_AND_APPROVAL_JOURNAL",
+    "VERIFIED_DATA_BACKUP_RESTORE_DOWNGRADE_FREEZE",
+    "EXACT_LOADED_IMAGE_NEW_CONTAINER_ID_SOCKET_ROUTE",
+    "REAL_RUNTIME_SHA_STAMP_OBSERVED_AT_FRESHNESS",
+    "ONE_FRESH_600S_SAME_ATTEMPT_SITE_APPROVAL"
+  ]
+}

@@ -63,14 +63,11 @@ reference.json只是私有临时夹具名字，绝不是现场既有路径。
 替换旧身份。每次前后重验审批/源文件固定摘要、600秒审批/备份/原观测有效期和root/hostname；
 变化即HOLD。代码对重复读间的变化拒绝，不宣称文件系统/Docker跨资源原子快照。
 
-`actual_health` 复用已审固定URL HTTPS probe（TLS、禁proxy/redirect、JSON、4096B），
-并通过原Unix socket /run/xuanjun-community-preview/preview.sock读取/community/health。
-两者在限时隔离Python子进程（10s/10000B）中完成，逐一检查远端integer observed_at
-600秒/+30秒、结构及私有/公网版本/状态一致。直接保留公网响应的远端timestamp。
-**不调用 observation.health() 的本地采集时间投影充远端时间，不回填缺失runtimeSHA**。
-新版本最终仍由原controller exact_health要求f131+IMAGE_BUILD_STAMP；旧rollback不要求新SHA，
-但若旧health没有远端时间，恢复后的验收会HOLD而非虚报ROLLED_BACK。任何health读取不明均
-不构成自动恢复许可。
+`actual_health`现依Owner05:57:29确认，改为**一次匿名HTTPS经原真实Nginx**，由受保护
+Journal/LiveBindings对准确新旧ID、image/OCI、socket及原路由做前后绑定。无上下文拒绝，
+不再调用或声称独立private双路。真实runtime SHA/stamp/远端时间必须相符；完整契约及旧
+rollback字段缺失的HOLD边界见COMMUNITY_HTTPS_ACCEPTANCE_CONTRACT_20261024.md。
+原PRIVATE_PROBE仅留历史诊断，不作为验收；不会发私有头、切身份或改server权限。
 
 ## root 审批与固定 journal 组合
 

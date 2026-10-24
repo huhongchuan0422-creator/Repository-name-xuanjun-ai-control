@@ -197,7 +197,11 @@ jobs:
         if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
         run: |
           set -o pipefail
-          if [ "${{ contains(github.event.head_commit.message, '[preview-post-receipt-scope]') }}" = true ]; then
+          if [ "${{ contains(github.event.head_commit.message, '[preview-https-acceptance-scope]') }}" = true ]; then
+            python -B scripts/community_preview_preupdate_bundle.py
+            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_https_acceptance test_community_preview_update_composition -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-post-receipt-scope]') }}" = true ]; then
             python -B scripts/community_preview_preupdate_bundle.py
             PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_site_prepare test_community_preview_release_plan -v 2>&1 | tee community-tests.log
@@ -435,6 +439,21 @@ jobs:
             deploy/community-preview/post-receipt-preparation-manifest.json
             tests/test_community_preview_site_prepare.py
             docs/development/COMMUNITY_POST_RECEIPT_PREPARATION_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve exact HTTPS acceptance contract for root review
+        if: contains(github.event.head_commit.message, '[preview-https-acceptance-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-https-acceptance-contract
+          path: |
+            scripts/community_preview_update_composition.py
+            tests/test_community_preview_https_acceptance.py
+            tests/test_community_preview_update_composition.py
+            deploy/community-preview/control-oci2330-v1.zip
+            deploy/community-preview/control-oci2330-v1-manifest.json
+            deploy/community-preview/https-acceptance-contract.json
+            docs/development/COMMUNITY_HTTPS_ACCEPTANCE_CONTRACT_20261024.md
           if-no-files-found: error
           retention-days: 14
 
