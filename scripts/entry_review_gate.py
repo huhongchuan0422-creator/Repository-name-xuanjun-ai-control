@@ -136,7 +136,11 @@ def complete_reviewed_candidate(supervisor, contract, files, reviews,
     result = review_bundle(contract, files, reviews, review_keys)
     if result['state'] != 'ISOLATED_TEST_ELIGIBLE':
         return dict(result, canonical_completion='HOLD_INDEPENDENT_REVIEW_REQUIRED')
+    canonical_contract = {k:v for k,v in contract.items()
+                          if k != 'code_commit'}
     if (not isinstance(candidate_binding, dict)
+            or candidate_binding.get('candidate', {}).get('contract_sha256')
+               != digest(canonical(canonical_contract))
             or candidate_binding.get('candidate', {}).get('task_id')
                != contract.get('task_id')
             or candidate_binding.get('candidate', {}).get('code_commit')
