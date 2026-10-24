@@ -1164,7 +1164,9 @@ class Supervisor(object):
     def record_revocation_drain(self, task_id, provider_id, receipt):
         now = self.clock()
         required = {'schema','kind','capability','task_id','old_attempt_id',
-                    'provider_id','resource_scope_digest','outcome'}
+                    'old_lease_id','old_fence','old_epoch','ticket_sha256',
+                    'spec_sha256','provider_id','resource_scope_digest',
+                    'outcome'}
         if (not isinstance(receipt, dict) or set(receipt) != required
                 or receipt.get('schema') != 1
                 or receipt.get('kind') != 'LOCAL_DRAIN'
@@ -1178,9 +1180,17 @@ class Supervisor(object):
             task = self._task(task_id)
             if task['authority_state'] != 'REVOKING':
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
-            if (receipt['old_attempt_id'] != task['attempt_id']
-                    or receipt['resource_scope_digest']
-                       != task['resource_scope_digest']):
+            expected = {
+                'old_attempt_id': task['attempt_id'],
+                'old_lease_id': task['lease_id'],
+                'old_fence': task['fence'],
+                'old_epoch': task['epoch'],
+                'ticket_sha256': self._ticket_sha(
+                    self._authority_ticket(task)),
+                'spec_sha256': task['spec_sha256'],
+                'resource_scope_digest': task['resource_scope_digest'],
+            }
+            if any(receipt[k] != v for k, v in expected.items()):
                 raise ValueError('LOCAL_DRAIN_BINDING_MISMATCH')
             body = canonical(receipt)
             sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
@@ -1216,6 +1226,13 @@ class Supervisor(object):
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
             keys = self._exact_resource_keys(
                 json.loads(task['resource_scope_json']))
+            drain = self.db.execute('''SELECT * FROM revocation_drains
+              WHERE task_id=? AND attempt_id=?''',
+              (task_id, task['attempt_id'])).fetchone()
+            if drain is None or receipt.get('provider_id') != drain['provider_id']:
+                raise ValueError('LOCAL_DRAIN_PROVIDER_REQUIRED')
+            if receipt.get('adapter_id') != 'source-resource-adapter-v1':
+                raise ValueError('SOURCE_ADAPTER_RECEIPT_REQUIRED')
             resource_key = receipt['resource_key']
             if resource_key not in keys:
                 raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
@@ -1276,6 +1293,8 @@ class Supervisor(object):
                 'old_epoch': task['epoch'],
                 'spec_sha256': task['spec_sha256'],
                 'resource_scope_digest': task['resource_scope_digest'],
+                'drain_provider_id': drain['provider_id'],
+                'drain_receipt_sha256': drain['receipt_sha256'],
                 'receipts': [
                     {'resource_key': r['resource_key'],
                      'receipt_sha256': r['receipt_sha256']} for r in rows],
