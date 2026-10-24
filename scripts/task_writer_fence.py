@@ -309,7 +309,8 @@ class CommitLease(object):
         self.held = self.fence.locks.acquire(keys, exclusive=False)
         try:
             self.fence.supervisor.begin_dispatch(
-                self.ticket, self.caller, self.operation_id)
+                self.ticket, self.caller, self.operation_id,
+                self.fence.locks.provider_id)
             return self
         except Exception:
             self.fence.locks.release(self.held)
@@ -319,14 +320,16 @@ class CommitLease(object):
         if self.finished:
             raise ValueError('COMMIT_LEASE_ALREADY_FINISHED')
         self.fence.supervisor.confirm_operation(
-            self.ticket, self.caller, self.operation_id, receipt)
+            self.ticket, self.caller, self.operation_id, receipt,
+            self.fence.locks.provider_id)
         self.finished = True
 
     def unknown(self, evidence):
         if self.finished:
             raise ValueError('COMMIT_LEASE_ALREADY_FINISHED')
         self.fence.supervisor.mark_operation_unknown(
-            self.ticket, self.caller, self.operation_id, evidence)
+            self.ticket, self.caller, self.operation_id, evidence,
+            self.fence.locks.provider_id)
         self.finished = True
 
     def __exit__(self, exc_type, exc, tb):
@@ -335,7 +338,8 @@ class CommitLease(object):
                 try:
                     self.fence.supervisor.mark_operation_unknown(
                         self.ticket, self.caller, self.operation_id,
-                        {'kind': 'LEASE_EXIT_WITHOUT_FINAL_RESULT'})
+                        {'kind': 'LEASE_EXIT_WITHOUT_FINAL_RESULT'},
+                        self.fence.locks.provider_id)
                 except Exception:
                     pass
         finally:
@@ -365,7 +369,8 @@ class Fence(object):
         operation = dict(operation)
         operation['resource_key'] = self.adapter.normalize(
             operation['resource_key'])
-        return self.supervisor.prepare_operation(ticket, caller, operation)
+        return self.supervisor.prepare_operation(
+            ticket, caller, operation, self.locks.provider_id)
 
     def commit_lease(self, ticket, caller, operation_id):
         return CommitLease(self, ticket, caller, operation_id)
