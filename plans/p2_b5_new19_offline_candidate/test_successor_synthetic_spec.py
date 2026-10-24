@@ -242,6 +242,8 @@ class SyntheticSpecTests(unittest.TestCase):
                     return original_connect(path,*args,**kwargs)
                 with boundary.active(),patch.object(sqlite3,'connect',side_effect=connect),\
                      patch.object(os,'uname',return_value=synthetic_uname),\
+                     patch.object(os,'geteuid',return_value=0),\
+                     patch.object(os,'getegid',return_value=0),\
                      patch.dict(os.environ,{'SUDO_UID':'1000'}),\
                      patch.object(entry,'__file__',entry.ROOT+
                                   '/successor_controller/pr17_b5_successor_entry.py'),\
@@ -418,6 +420,8 @@ def child_query(root,action='query'):
              patch('subprocess.run',side_effect=recorded_status),\
              patch.object(Github,'call',recorded_comment),\
              patch.object(os,'uname',return_value=synthetic),\
+             patch.object(os,'geteuid',return_value=0),\
+             patch.object(os,'getegid',return_value=0),\
              patch.dict(os.environ,{'SUDO_UID':'1000'}),\
              patch.object(entry,'__file__',entry.ROOT+
                           '/successor_controller/pr17_b5_successor_entry.py'),\
