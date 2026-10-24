@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import re
 
 ENTRIES = ('WORK', 'CHATGPT', 'DOTS')
@@ -154,6 +155,75 @@ def finalize_reviewed_candidate(supervisor, task_id, reviewed_event_id,
         next_action=next_action)
 
 
+def controlled_development_action(review_keys=None):
+    """Source-only CLI entry over an existing canonical ledger.
+
+    REVIEW additionally requires an exact clean local Git checkout. FINALIZE
+    requires prior canonical DEVELOPMENT_REVIEWED plus completed revocation.
+    Missing source inputs return HOLD and never create a ledger.
+    """
+    ledger=os.environ.get('XJ_CANONICAL_LEDGER_PATH')
+    root=os.environ.get('XJ_CANDIDATE_ROOT')
+    request_path=os.environ.get('XJ_DEVELOPMENT_REVIEW_INPUT')
+    if not ledger or not request_path:
+        return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                'authority_effect':'NONE'}
+    if not os.path.isfile(ledger) or not os.path.isfile(request_path):
+        return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                'authority_effect':'NONE'}
+    with open(request_path,'rb') as stream:
+        raw=stream.read(65537)
+    if len(raw)>65536:
+        raise ValueError('BOUNDED_REVIEW_REQUEST_REQUIRED')
+    request=json.loads(raw.decode('utf-8','strict'))
+    if not isinstance(request,dict) or request.get('action') not in ('REVIEW','FINALIZE'):
+        raise ValueError('EXACT_DEVELOPMENT_ACTION_REQUIRED')
+    from task_supervisor import Supervisor
+    supervisor=Supervisor(ledger)
+    try:
+        if request['action']=='FINALIZE':
+            required={'action','task_id','reviewed_event_id','completion_event_id'}
+            if set(request)!=required:
+                raise ValueError('EXACT_FINALIZE_REQUEST_REQUIRED')
+            result=finalize_reviewed_candidate(
+                supervisor,request['task_id'],request['reviewed_event_id'],
+                request['completion_event_id'])
+            return {'state':'CANONICAL_DEVELOPMENT_FINALIZED',
+                    'authority_effect':'NONE','result':result}
+        required={'action','task_id','candidate_event_id','reviewed_event_id',
+                  'reviews'}
+        if set(request)!=required or not root:
+            return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                    'authority_effect':'NONE'}
+        if review_keys is None:
+            return {'state':'HOLD_TRUSTED_REVIEW_KEYS_UNAVAILABLE',
+                    'authority_effect':'NONE'}
+        candidate=supervisor.development_candidate(
+            request['task_id'],request['candidate_event_id'])
+        contract=supervisor.development_contract(request['task_id'])
+        receipt={'task_id':request['task_id'],
+                 'target_repository':contract['target_repository'],
+                 'code_commit':candidate['code_commit']}
+        from development_entry_intake import _controlled_candidate_files
+        files=_controlled_candidate_files(supervisor,receipt,root)
+        result=complete_reviewed_candidate(
+            supervisor,request['task_id'],request['candidate_event_id'],
+            files,request['reviews'],review_keys,request['reviewed_event_id'])
+        return {'state':'CANONICAL_DEVELOPMENT_REVIEW_RECORDED',
+                'authority_effect':'NONE','result':result}
+    finally:
+        supervisor.close()
+
+
+def main():
+    try:
+        result=controlled_development_action()
+    except Exception:
+        result={'state':'HOLD_CANONICAL_DEVELOPMENT_ACTION_ERROR',
+                'authority_effect':'NONE'}
+    print(json.dumps(result,sort_keys=True))
+
+
 def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None):
     fields={'task_id','attempt_id','run_id','session_id','fence','checkpoint_sha256',
             'ledger_revision','receipt_sha256','authority_key_id'}
@@ -214,3 +284,7 @@ def continuation_batch(records, now, ledger_keys=None):
             results.append({'index': index, 'state': 'HOLD_INVALID_CONTINUATION_EVIDENCE',
                             'authority_effect': 'NONE', 'takeover_allowed': False})
     return results
+
+
+if __name__ == '__main__':
+    main()
