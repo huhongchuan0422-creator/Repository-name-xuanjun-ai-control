@@ -119,3 +119,19 @@ The four review groups are implemented in the current candidate source:
 Additional synthetic tests cover missing database preventing app construction, existing protected DB/key binding, wrong key, symlinked module, preloaded module name, bad callback arity, and Docker ENV tokenization. All such tests are currently NOT_EXECUTED because this session has no connected local checkout/test runner and new Hosted dispatch is explicitly prohibited.
 
 Current source binding must be read from the branch ref; this document is not itself an installation authorization. No server/secret/port/volume/real document action has been performed.
+
+## 11. Second-pass review: database schema and integration mount
+
+The database readiness gate now checks the existing SecureSQLiteJobStore schema read-only rather than trusting table names alone. It compares each required table's ordered column names, declared types, NOT NULL flags, primary-key ordinals and defaults; verifies the ocr_audit AUTOINCREMENT contract; verifies the ocr_jobs UNIQUE(tenant_key, idem_key) declaration; verifies idx_ocr_tenant and idx_ocr_audit_job column definitions; and verifies the required unique indexes for job idempotency, confirmation idempotency, rate windows and audit-detail primary key. Integrity, schema, key-binding or permission mismatch is HOLD; no schema migration/repair or create_app call occurs before these checks pass.
+
+Trusted binding loading now reads /proc/self/mountinfo and resolves the deepest mount covering both the configured integration root and its exact module file. Both must be observed read-only. Unknown/missing mount info, read-write mount, symlink path component, traversal, non-regular source, non-root-owned path, group/world-writable root/source, escaped origin, preloaded module, or invalid callback signature fails before module execution. The root/source owner/mode check is read-only and does not chmod/chown anything. A synthetic mount-checker test asserts a read-write result is rejected before the fixture module's marker side effect; a synthetic read-only result permits loading only after both root and source checks. Synthetic mount state is not proof of actual Docker mount flags.
+
+Added source tests:
+- genuine SecureSQLiteJobStore-created DB passes the schema/key check;
+- same-name fake tables with wrong columns fail;
+- a dropped/replaced required index fails;
+- main returns HOLD and never calls create_app for schema mismatch;
+- writable integration root/source fail;
+- a read-write mount stub prevents module execution, while a read-only stub checks root and source before the fixture executes.
+
+These tests have NOT been executed in this session. No actual Docker mount or UK target was inspected. The runtime mount must be proven read-only from the actual container's mount table during a separately approved field test; a declared read-only setting or synthetic stub is not sufficient.
