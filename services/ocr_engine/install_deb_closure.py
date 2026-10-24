@@ -42,7 +42,7 @@ def main():
             raise SystemExit("DEB_LOCK_ENTRY_INVALID")
         name, version, arch, filename, digest = (item[k] for k in
                 ("package", "version", "architecture", "filename", "sha256"))
-        if not all(isinstance(v, str) and v and "\\n" not in v for v in (name, version, arch)):
+        if not all(isinstance(v, str) and v and chr(10) not in v for v in (name, version, arch)):
             raise SystemExit("DEB_LOCK_METADATA_INVALID")
         if name in by_name:
             raise SystemExit("DEB_PACKAGE_DUPLICATE:" + name)
