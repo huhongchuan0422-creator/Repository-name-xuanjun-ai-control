@@ -532,6 +532,7 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertNotIn("apt-lists/lock",payload)
         self.assertFalse(any("partial" in name for name in payload))
         self.assertTrue((dest/"apt-lists"/"InRelease").is_file())
-        with self.assertRaises(FileExistsError):
-            subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True,check=True)
+        second=subprocess.run([sys.executable,str(script),str(root),str(dest)],env=env,text=True,capture_output=True)
+        self.assertNotEqual(second.returncode,0)
+        self.assertIn("CANDIDATE_STAGING_MUST_BE_NEW",second.stderr)
 \nif __name__=="__main__": unittest.main()
