@@ -296,11 +296,18 @@ class SyntheticSpecTests(unittest.TestCase):
                         def request(self,*args,**kwargs):pass
                         def getresponse(self):return Response()
                         def close(self):pass
+                    guard_calls=[]
+                    original_guarded=tx.guarded
+                    def traced_guarded(name,*args):
+                        guard_calls.append(name)
+                        return original_guarded(name,*args)
+                    tx.guarded=traced_guarded
                     with patch('subprocess.run',side_effect=recorded_run),\
                          patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
                                RecordedHTTP):
                         result=tx.execute()
-                    self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED',result)
+                    self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED',
+                                     (result,guard_calls))
                     self.assertEqual(result['new_requests'],0)
                     tx.b.authority.original.queue.close()
                 child=subprocess.run([sys.executable,'-B',str(HERE/
