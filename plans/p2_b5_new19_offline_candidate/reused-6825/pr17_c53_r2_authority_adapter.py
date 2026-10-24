@@ -10,6 +10,11 @@ from pr17_c53_r2_local_adapter import prepare_local_adapter, single_thread
 from pr17_b5_single_batch_witness import WitnessStore, ROOT as WITNESS_ROOT
 
 
+def request_local_authorization_only():
+    """Maintenance cannot borrow the analyst's later HTTP bearer context."""
+    raise c53.Hold('ANALYST_HTTP_REQUEST_CONTEXT_REQUIRED')
+
+
 class ExistingRequestAuthority:
     # These operations require the original enrolled UK queue, custody and
     # authenticated request interfaces. A Python method name is not evidence
@@ -374,8 +379,13 @@ def prepare_maintenance_candidate(*, authorization_from_request=None,
                     witness_store.test_only is False,
                     'PRODUCTION_WITNESS_ROOT_REQUIRED')
     single_thread()
+    if authorization_from_request is None:
+        authorization_from_request=request_local_authorization_only
     transaction = prepare_local_adapter(authority=None, **inputs)
     backend = transaction.b
+    if original is None and callable(authorization_from_request):
+        original=build_original_for_prepared_bundle(
+            transaction.bundle,authorization_from_request)
     # Use current protected bytes read by the adapter, not generated future
     # resource settings (which would add the B5 mapping before activation).
     resource = c53.strict_json(backend.frozen_baselines[c53.CONFIGS[1]])
@@ -416,6 +426,36 @@ def prepare_maintenance_candidate(*, authorization_from_request=None,
     return transaction
 
 
+def build_original_for_prepared_bundle(bundle, authorization_from_request):
+    """Construct the original providers from a frozen, unactivated bundle.
+
+    This does not publish, read a bearer token, open a database, or authorize a
+    batch.  The request-local accessor is supplied by the enrolled caller and
+    cannot be synthesized from maintenance configuration.
+    """
+    from pr17_b5_deployment_composition import OriginalComposition
+    from production.cloud_connection.fixed_actions import ApprovedObjectsPolicy
+    from production.cloud_connection.worker import Github, Cloud, Network
+    c53.require(type(bundle) is dict and callable(authorization_from_request),
+                'ORIGINAL_REQUEST_CONTEXT_UNAVAILABLE')
+    raw=bundle.get('files',{}).get(c53.binder.BIND)
+    c53.require(type(raw) is bytes and
+                type(bundle.get('requests')) in (list,tuple) and
+                len(bundle['requests'])==19,
+                'ORIGINAL_BUNDLE_INCOMPLETE')
+    policy=ApprovedObjectsPolicy(raw,c53.sha(raw))
+    network=Network()
+    return OriginalComposition(
+        queue=None,github=Github('/etc/xuanjun-development/github-intake-token',
+                                  network,1003),
+        cloud=Cloud('/etc/xuanjun-cloud-executor/credentials.json',network),
+        policy=policy,resource=None,requests=bundle['requests'],
+        archive_root_ref='b5-original-archive',
+        destination_root=c53.binder.DEST,destination_owner=0,
+        authorization_from_request=authorization_from_request,
+        clock=time.time,test_only=False)
+
+
 def check_candidate_authority(transaction):
     """Verification-only caller; never reserve/stop/lock/execute on failure."""
     single_thread()
@@ -425,7 +465,7 @@ def check_candidate_authority(transaction):
 
 
 def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
-                                   authorization_from_request,
+                                   authorization_from_request=None,
                                    runtime_attachment=None, witness_store=None):
     """Fresh-process reconstruction from exact protected backup and source bytes.
 
@@ -487,16 +527,9 @@ def reconstruct_recovery_candidate(*, spec_raw, source_root, legacy_io,
     # generated versions. Old inode identities are intentionally not inferred
     # from backup copies, so pre-start rollback stays unavailable here.
     backend.before={p:(raw,None) for p,raw in baselines.items()}
-    policy_raw=bundle['files'][c53.binder.BIND]
-    policy=ApprovedObjectsPolicy(policy_raw,c53.sha(policy_raw))
-    network=Network()
-    original=OriginalComposition(queue=None,
-        github=Github('/etc/xuanjun-development/github-intake-token',network,1003),
-        cloud=Cloud('/etc/xuanjun-cloud-executor/credentials.json',network),
-        policy=policy,resource=None,requests=bundle['requests'],
-        archive_root_ref='b5-original-archive',destination_root=c53.binder.DEST,
-        destination_owner=0,authorization_from_request=authorization_from_request,
-        clock=time.time,test_only=False)
+    if authorization_from_request is None:
+        authorization_from_request=request_local_authorization_only
+    original=build_original_for_prepared_bundle(bundle,authorization_from_request)
     old=c53.strict_json(baselines[c53.CONFIGS[1]])
     settings=copy.deepcopy(old['settings'])
     backend.authority=ExistingRequestAuthority(

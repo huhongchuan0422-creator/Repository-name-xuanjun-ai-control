@@ -36,3 +36,4 @@ jobs:
           python -B plans/p2_b5_new19_offline_candidate/test_adapter_closeout_scope.py -v
           python -B plans/p2_b5_new19_offline_candidate/test_original_capability_preflight.py -v
           python -B plans/p2_b5_new19_offline_candidate/test_canonical_prestart_proof.py -v
+          python -B plans/p2_b5_new19_offline_candidate/test_runtime_freeze_and_caller.py -v

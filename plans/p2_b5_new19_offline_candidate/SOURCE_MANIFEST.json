@@ -1,6 +1,12 @@
 {
   "files": [
     {
+      "bundle_path": "README.md",
+      "bytes": 6593,
+      "release_path": null,
+      "sha256": "062607f2b4ddfdb6f6b6a2c720d2750a0506972d0c2659115111b4ed980a71e2"
+    },
+    {
       "bundle_path": "deployment/cloud-connection/oauth/authority.example.json",
       "bytes": 471,
       "release_path": "deployment/cloud-connection/oauth/authority.example.json",
@@ -95,6 +101,12 @@
       "bytes": 722,
       "release_path": "deployment/cloud-connection/oauth/xuanjun-cloud-oauth.service.candidate",
       "sha256": "16911422086f3034a7d31d046930af9f6f767b2a020e902547696746c007538d"
+    },
+    {
+      "bundle_path": "freeze_runtime_source.py",
+      "release_path": null,
+      "bytes": 3471,
+      "sha256": "454bd1f0ebfbbb26994b2faee10ecde07bb66f8b68e28110d7d9fb0d7c96aab1"
     },
     {
       "bundle_path": "new19-source/production/cloud_connection/action_binding.py",
@@ -205,24 +217,6 @@
       "sha256": "61cf0de7485cf012b920d740f5f95336ddd1668bcde3053c09e60b992301f30b"
     },
     {
-      "bundle_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
-      "bytes": 29283,
-      "release_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
-      "sha256": "6ebebc57260b252bb8e1eed86f7dabdb0c6ff74c7f9191552fb8c2234d33d1cb"
-    },
-    {
-      "bundle_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
-      "bytes": 75983,
-      "release_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
-      "sha256": "b83e7410b8330b1ac199476355743415dcc42dc208903c7417f9437c5866df68"
-    },
-    {
-      "bundle_path": "reused-6825/pr17_c53_r2_review_transaction.py",
-      "bytes": 31522,
-      "release_path": "reused-6825/pr17_c53_r2_review_transaction.py",
-      "sha256": "6e98681cad506785dc5a0e6f159c1d49217c8940bba0a04b34bd41ac3b447f93"
-    },
-    {
       "bundle_path": "reused-6825/pr17_b5_original_algorithms.py",
       "bytes": 8435,
       "release_path": "reused-6825/pr17_b5_original_algorithms.py",
@@ -233,6 +227,18 @@
       "bytes": 19035,
       "release_path": "reused-6825/pr17_b5_single_batch_witness.py",
       "sha256": "5a31ef8444071953ee08f0274a4c92e2d21d4491928b379ab3c6f24d83ef4a1a"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
+      "bytes": 30911,
+      "release_path": "reused-6825/pr17_c53_r2_authority_adapter.py",
+      "sha256": "b2ee975ce4d41433f4da53785bb35b5cf45d9b77dee3c554f9215b7ffe6b3a13"
+    },
+    {
+      "bundle_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
+      "bytes": 75983,
+      "release_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
+      "sha256": "b83e7410b8330b1ac199476355743415dcc42dc208903c7417f9437c5866df68"
     },
     {
       "bundle_path": "reused-6825/pr17_c53_r2_local_adapter.py",
@@ -247,10 +253,28 @@
       "sha256": "d7bca83fdb5f23acced83e9e500642f6f37e97797e1c3a8094ae18316572a5fe"
     },
     {
+      "bundle_path": "reused-6825/pr17_c53_r2_review_transaction.py",
+      "bytes": 31522,
+      "release_path": "reused-6825/pr17_c53_r2_review_transaction.py",
+      "sha256": "6e98681cad506785dc5a0e6f159c1d49217c8940bba0a04b34bd41ac3b447f93"
+    },
+    {
       "bundle_path": "reused-6825/pr17_c53_r2_transaction_candidate.py",
       "bytes": 10679,
       "release_path": "reused-6825/pr17_c53_r2_transaction_candidate.py",
       "sha256": "e0b693fb934bf15bf0afccc4350938c6ebc3eb0f1c39bc1c97f0d6053547c77f"
+    },
+    {
+      "bundle_path": "test_adapter_closeout_scope.py",
+      "bytes": 3561,
+      "release_path": null,
+      "sha256": "86a18b81a8ffd340fe3ee1ca1aa7b4e54702e0b62ca957a0d242f09aa831e523"
+    },
+    {
+      "bundle_path": "test_canonical_prestart_proof.py",
+      "bytes": 2935,
+      "release_path": null,
+      "sha256": "a9d6b7f09e9fa5bf0d1dbd191413ad28dbab9e570bbc97ecf8b3d860eade58f5"
     },
     {
       "bundle_path": "test_old_policy_dependency_reader.py",
@@ -265,22 +289,10 @@
       "sha256": "5d136bb257f63f0ea96da4d2ba9e1dd245293d3f3e35ad8bd02f9ac9a7801916"
     },
     {
-      "bundle_path": "test_canonical_prestart_proof.py",
-      "bytes": 2935,
+      "bundle_path": "test_runtime_freeze_and_caller.py",
       "release_path": null,
-      "sha256": "a9d6b7f09e9fa5bf0d1dbd191413ad28dbab9e570bbc97ecf8b3d860eade58f5"
-    },
-    {
-      "bundle_path": "README.md",
-      "bytes": 3607,
-      "release_path": null,
-      "sha256": "f313766127ac1983ca28faff0879b76f9a8636353934a39f11c0fe4caf745a07"
-    },
-    {
-      "bundle_path": "test_adapter_closeout_scope.py",
-      "bytes": 3561,
-      "release_path": null,
-      "sha256": "86a18b81a8ffd340fe3ee1ca1aa7b4e54702e0b62ca957a0d242f09aa831e523"
+      "bytes": 3071,
+      "sha256": "5b3afc9e0cdadbfe6c5fece44f1c7c63954dade3dc1d6aa86f8ebecf5a4eb636"
     }
   ],
   "known_hold": "LIVE_WAL_PRECHECK_SHM_READER_MARK_UNDECIDED",
