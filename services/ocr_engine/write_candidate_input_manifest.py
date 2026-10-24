@@ -22,11 +22,23 @@ def main():
         for path in sorted(base.rglob("*")):
             if path.is_file() and not path.is_symlink() and path != manifest_path:
                 include.append(path)
+    trusted_model_hashes={}
+    model_manifest=Path(__file__).with_name("model_manifest.json")
+    if model_manifest.is_file():
+        try:
+            data=json.loads(model_manifest.read_text(encoding="utf-8"))
+            trusted_model_hashes={item["filename"]:item["sha256"] for item in data["model_set"]["files"].values()}
+        except (ValueError,KeyError,TypeError):
+            trusted_model_hashes={}
     entries=[]
     for path in include:
         rel=str(path.relative_to(root))
         if rel.startswith("ocr-model-cache/"):
-            source="fixed-model-manifest-sha256" if path.name in ("PP-OCRv6_det_small.onnx","PP-OCRv6_rec_small.onnx","ch_ppocr_mobile_v2.0_cls_mobile.onnx") else "downloaded-and-self-hashed-unverified"
+            actual=sha(path)
+            if path.name in trusted_model_hashes and actual == trusted_model_hashes[path.name]:
+                source="sha256-matches-fixed-model-manifest"
+            else:
+                source="downloaded-and-self-hashed-only-not-trusted-by-model-manifest"
         elif rel.startswith("ocr-wheelhouse/"):
             source="downloaded-from-pypi-and-self-hashed-not-independently-pinned"
         elif rel.startswith("ocr-deb-cache/apt-lists/"):
