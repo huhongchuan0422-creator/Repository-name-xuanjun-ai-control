@@ -140,7 +140,7 @@ class SecureStoreTests(unittest.TestCase):
         self.assertEqual(replay['confirmed_fields'],confirmed['confirmed_fields'])
     def test_frozen_binding_fields_cannot_be_changed_by_update(self):
         job=self.store.create('tenant-a','user-a','app-a','business_license','8'*64,'frozen-fields-key-01','synthetic-attachment','1','1.2.0')
-        for field,value in [('attachment_id','other'),('document_type','id_front'),('application_revision','2'),('provider_version','1.3.0')]:
+        for field,value in [('attachment_id','other'),('document_type','id_front'),('application_revision','2'),('provider_version','1.3.0'),('confirmed_binding',{'forged':True})]:
             with self.subTest(field=field):
                 with self.assertRaisesRegex(ValueError,'OCR_IMMUTABLE_FIELD'): self.store.update(job['job_id'],**{field:value})
         saved=self.store.get(job['job_id'],'tenant-a')
