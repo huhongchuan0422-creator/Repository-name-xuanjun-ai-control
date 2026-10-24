@@ -426,6 +426,15 @@ def child_query(root,action='query'):
             if action=='execute':
                 tx=entry._prepare('c53-recovery-draft','fixture-attempt',
                                   'fixture-only',int(time.time())-10)
+                guard_calls=[]
+                original_guarded=tx.guarded
+                def child_traced_guarded(name,*args):
+                    guard_calls.append(name)
+                    try:return original_guarded(name,*args)
+                    except BaseException as exc:
+                        guard_calls.append('ERROR:'+name+':'+str(exc))
+                        raise
+                tx.guarded=child_traced_guarded
                 def execute_run(argv,**kwargs):
                     if argv[:2]==['/usr/bin/systemctl','show']:
                         return type('Result',(),{'returncode':0,'stdout':(
@@ -457,6 +466,8 @@ def child_query(root,action='query'):
                      patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
                            RecordedHTTP):
                     result=tx.execute()
+                if result.get('state')=='HOLD_PRESERVE_HISTORY':
+                    result=dict(result,_guard_calls=guard_calls)
                 if tx.b.authority.original.queue is not None:
                     tx.b.authority.original.queue.close()
             elif action in ('worker-ready','worker-success'):
