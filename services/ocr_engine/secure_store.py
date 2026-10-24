@@ -128,6 +128,8 @@ class SecureSQLiteJobStore:
             raise ValueError("OCR_IDEMPOTENCY_REQUIRED")
         if not application_revision:
             raise ValueError("OCR_APPLICATION_REVISION_REQUIRED")
+        if isinstance(application_revision, bool) or not isinstance(application_revision, (str, int)) or str(application_revision).strip() == "" or str(application_revision) != str(application_revision).strip() or (isinstance(application_revision, int) and application_revision < 0) or (isinstance(application_revision, str) and __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}", application_revision) is None):
+            raise ValueError("OCR_APPLICATION_REVISION_INVALID")
         if provider_version is not None and (isinstance(provider_version, bool) or not isinstance(provider_version, (str, int)) or str(provider_version).strip() == "" or str(provider_version) != str(provider_version).strip() or (isinstance(provider_version, int) and provider_version < 0)):
             raise ValueError("OCR_PROVIDER_VERSION_INVALID")
         if isinstance(provider_version, str) and not __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}", provider_version):
