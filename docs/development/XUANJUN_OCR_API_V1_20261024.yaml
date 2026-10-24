@@ -1,0 +1,228 @@
+openapi: 3.1.0
+info:
+  title: Xuanjun OCR Gateway
+  version: 1.0.0
+  description: >
+    Contract only; no public listener or production endpoint is deployed.
+    OCR output is a suggestion and never proves document authenticity.
+servers:
+  - url: https://{configured-host}/api/v1
+    variables:
+      configured-host:
+        default: ocr.example.invalid
+security:
+  - bearerAuth: []
+paths:
+  /ocr/jobs:
+    post:
+      operationId: createOcrJob
+      summary: Submit an authorized document image for OCR
+      description: >
+        Supports business_license and id_front only. The trusted attachment resolver
+        receives principal, application ID, attachment ID, uploaded content SHA-256,
+        document type, and expected_application_revision=null. It must query the
+        authoritative source and return authorized=true, the same content SHA-256,
+        the same document type, authoritative application_revision, and optional
+        provider_version. The client cannot supply either authoritative version.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, document_type, onboarding_application_id, attachment_id]
+              properties:
+                file: {type: string, format: binary}
+                document_type: {type: string, enum: [business_license, id_front]}
+                onboarding_application_id: {type: string, minLength: 1, maxLength: 128}
+                attachment_id: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        '202':
+          description: OCR job accepted or an idempotent prior result returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, status, contract_version]
+                properties:
+                  job_id: {type: string}
+                  status: {type: string, enum: [queued, processing, needs_review, failed, confirmed]}
+                  contract_version: {type: string, const: '1.0.0'}
+        '400': {description: Invalid request or unsupported document type}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Missing OCR permission or application/attachment binding denied}
+        '409': {description: Idempotency key reused with a different immutable tuple}
+        '413': {description: Image exceeds byte or pixel limits}
+        '429': {description: Tenant rate limit exceeded}
+  /ocr/jobs/{job_id}:
+    parameters:
+      - in: path
+        name: job_id
+        required: true
+        schema: {type: string}
+    get:
+      operationId: getOcrJob
+      summary: Read suggestions and confirmed snapshot
+      description: >
+        Rechecks current application and attachment authorization before returning data.
+        A legacy job without application_revision fails closed. A legacy job without
+        provider_version may remain reviewable but shared_writeback_eligible is false.
+      responses:
+        '200':
+          description: Current job state and, after confirmation, the exact confirmed snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, status, contract_version, requires_human_confirmation, authenticity_verified, provider_version, shared_writeback_eligible]
+                properties:
+                  job_id: {type: string}
+                  status: {type: string, enum: [queued, processing, needs_review, failed, confirmed]}
+                  contract_version: {type: string, const: '1.0.0'}
+                  document_type: {type: string, enum: [business_license, id_front]}
+                  application_revision:
+                    oneOf:
+                      - {type: string, pattern: '^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}$'}
+                      - {type: integer, minimum: 0}
+                  provider_version:
+                    oneOf:
+                      - {type: string, pattern: '^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}$'}
+                      - {type: integer, minimum: 0}
+                      - {type: 'null'}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  confirmed_fields:
+                    type: object
+                    additionalProperties: {type: string}
+                  confirmation_revision: {type: integer, minimum: 1}
+                  confirmed_binding:
+                    type: object
+                    required: [application_revision, provider_version, document_type, attachment_id, content_sha256]
+                    properties:
+                      application_revision: {oneOf: [{type: string}, {type: integer}]}
+                      provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
+                      document_type: {type: string, enum: [business_license, id_front]}
+                      attachment_id: {type: string}
+                      content_sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+                  shared_writeback_eligible: {type: boolean}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/subject access denied or current application/attachment/version tuple changed}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete encrypted job payload
+      description: >
+        Rechecks current application and attachment authorization including the stored
+        content SHA-256, document type and application revision. Deletes the encrypted job
+        payload and confirmed fields, but retains encrypted ocr_audit_details (including
+        confirmation field values) and encrypted confirmation-idempotency response records.
+        This is not complete erasure from backups or retained audit/idempotency records.
+      responses:
+        '204': {description: Job payload deleted; encrypted audit and idempotency records remain}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application/attachment/version tuple changed or revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store the human-reviewed field snapshot
+      description: >
+        The user must echo the exact application_revision and optional provider_version
+        shown in the review UI. The server validates raw JSON scalar types before Pydantic
+        parsing to prevent booleans/floats being coerced into integers. It does not trust
+        body values as authority: it compares them with the stored job and re-resolves the
+        current authoritative tuple. shared_writeback_eligible is true only for status
+        confirmed with a positive confirmation_revision and a complete, exact confirmed_binding.
+        The tuple, fields, confirmation_revision, audit event and idempotency response are
+        committed in the OCR database transaction. No cross-database atomicity with a
+        community shared draft is implied. Jobs without provider_version may be confirmed
+        for manual review but are not eligible for shared-draft writeback.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields, application_revision]
+              properties:
+                revision: {type: integer, minimum: 1}
+                application_revision:
+                  oneOf:
+                    - {type: string, pattern: '^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}$'}
+                    - {type: integer, minimum: 0}
+                provider_version:
+                  oneOf:
+                    - {type: string, pattern: '^(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}$'}
+                    - {type: integer, minimum: 0}
+                    - {type: 'null'}
+                fields:
+                  type: object
+                  minProperties: 1
+                  maxProperties: 12
+                  additionalProperties: {type: string, maxLength: 2048}
+      responses:
+        '200':
+          description: Confirmed fields and exact frozen binding tuple returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, status, revision, confirmed_fields, confirmed_binding, application_revision, provider_version, shared_writeback_eligible, recorded]
+                properties:
+                  job_id: {type: string}
+                  status: {type: string, const: confirmed}
+                  revision: {type: integer, minimum: 1}
+                  confirmed_fields: {type: object, additionalProperties: {type: string}}
+                  confirmed_binding: {type: object}
+                  application_revision: {oneOf: [{type: string}, {type: integer}]}
+                  provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
+                  shared_writeback_eligible: {type: boolean}
+                  recorded: {type: boolean, const: true}
+        '400': {description: Invalid schema, field set or version format; raw bool, float and noncanonical version values rejected}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+        '409': {description: Stored version changed, confirmation revision conflict or idempotency payload conflict}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  production_identity_callbacks: NOT_CONNECTED
+  model_inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - Only business_license and id_front are accepted.
+    - storefront_photo, interior_photo and cashier_photo are rejected as non-OCR evidence.
+    - Old jobs without provider_version remain manual-review compatible; shared writeback is disabled.
+    - Missing authoritative binding metadata fails closed; no default version is inferred.
+    - A green OCR CI does not establish community identity or attachment ownership.

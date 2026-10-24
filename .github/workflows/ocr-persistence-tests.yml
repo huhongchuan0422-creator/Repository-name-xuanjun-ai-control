@@ -1,0 +1,48 @@
+name: OCR Persistence and Process Restart Tests
+on:
+  pull_request:
+    paths:
+      - 'services/ocr_engine/secure_store.py'
+      - 'services/ocr_engine/test_secure_store.py'
+      - 'services/ocr_engine/test_model_distribution.py'
+      - 'services/ocr_engine/startup_selfcheck.py'
+      - 'services/ocr_engine/test_startup_selfcheck.py'
+      - 'services/ocr_engine/build_offline_bundle.py'
+      - 'services/ocr_engine/test_offline_bundle.py'
+      - 'services/ocr_engine/validate_workflow_syntax.py'
+      - 'services/ocr_engine/test_workflow_syntax.py'
+      - 'services/ocr_engine/test_hosted_build_flow.py'
+      - 'services/ocr_engine/generate_platform_lock.py'
+      - '.github/workflows/ocr-engine-tests.yml'
+      - 'services/ocr_engine/deployment_config.schema.json'
+      - 'services/ocr_engine/model_manifest.json'
+      - 'services/ocr_engine/model_distribution/**'
+      - 'services/ocr_engine/README.md'
+      - '.github/workflows/ocr-persistence-tests.yml'
+permissions:
+  contents: read
+jobs:
+  persistence-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install persistence test dependency only
+        run: python -m pip install cryptography==46.0.3
+      - name: Run encrypted SQLite and independent process restart tests
+        run: python -m unittest discover -s services/ocr_engine -p 'test_secure_store.py' -v
+      - name: Verify model license and attribution bundle
+        run: python -m unittest services.ocr_engine.test_model_distribution -v
+      - name: Verify read-only startup preflight
+        run: python -m unittest services.ocr_engine.test_startup_selfcheck -v
+      - name: Verify offline bundle input gates (synthetic fixtures only)
+        run: python -m unittest services.ocr_engine.test_offline_bundle -v
+      - name: Validate OCR workflow YAML and embedded shell blocks
+        run: |
+          python -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python services/ocr_engine/validate_workflow_syntax.py
+          python -m unittest services.ocr_engine.test_workflow_syntax -v
+          python -m unittest services.ocr_engine.test_hosted_build_flow -v

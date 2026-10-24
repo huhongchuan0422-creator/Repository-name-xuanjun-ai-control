@@ -1,0 +1,224 @@
+name: OCR Engine Tests
+on:
+  workflow_dispatch:
+    inputs:
+      build_enabled:
+        description: "Explicitly enable creation of a real offline OCR archive"
+        required: true
+        type: boolean
+        default: false
+      source_sha:
+        description: "Exact commit SHA; must equal this workflow run's GITHUB_SHA"
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - 'services/ocr_engine/ocr_core.py'
+      - 'services/ocr_engine/api.py'
+      - 'services/ocr_engine/test_api.py'
+      - 'services/ocr_engine/test_model_distribution.py'
+      - 'services/ocr_engine/model_distribution/**'
+      - 'services/ocr_engine/README.md'
+      - 'docs/development/XUANJUN_OCR_API_V1_20261024.yaml'
+      - 'services/ocr_engine/run_chinese_http_e2e.py'
+      - 'services/ocr_engine/run_synthetic_inference.py'
+      - 'services/ocr_engine/requirements.txt'
+      - 'services/ocr_engine/model_manifest.json'
+      - 'services/ocr_engine/generate_platform_lock.py'
+      - 'services/ocr_engine/validate_workflow_syntax.py'
+      - 'services/ocr_engine/test_workflow_syntax.py'
+      - '.github/workflows/ocr-engine-tests.yml'
+      - 'tests/test_ocr_core.py'
+  push:
+    branches: [main]
+    paths:
+      - 'services/ocr_engine/**'
+      - 'tests/test_ocr_core.py'
+      - '.github/workflows/ocr-engine-tests.yml'
+permissions:
+  contents: read
+jobs:
+  build-offline-ocr-artifact:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_enabled == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      OCR_BASE_IMAGE: python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199
+      OCR_BASE_CONFIG_SHA256: c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee
+      OCR_TARGET_PLATFORM: linux-x86_64-cp311
+    steps:
+      - name: Initialize non-secret build diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          : > "$RUNNER_TEMP/ocr-diagnostics/build.log"
+      - name: Validate explicit source, branch and target
+        shell: bash
+        env:
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          test "$GITHUB_REF" = "refs/heads/docs/self-hosted-ocr-architecture-20261024"
+          test "$INPUT_SOURCE_SHA" = "$GITHUB_SHA"
+          test "$GITHUB_SHA" = "${{ github.sha }}"
+          test "$OCR_TARGET_PLATFORM" = "linux-x86_64-cp311"
+          printf 'SOURCE_SHA=%s\nTARGET_PLATFORM=%s\n' "$GITHUB_SHA" "$OCR_TARGET_PLATFORM"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - name: Validate workflow YAML and all embedded shell blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          python -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python services/ocr_engine/validate_workflow_syntax.py
+      - name: Pull and verify exact official base image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          docker pull --platform linux/amd64 "$OCR_BASE_IMAGE"
+          actual_id="$(docker image inspect --format '{{.Id}}' "$OCR_BASE_IMAGE" | sed 's/^sha256://')"
+          test "$actual_id" = "$OCR_BASE_CONFIG_SHA256"
+          docker image inspect --format '{{json .RepoDigests}}' "$OCR_BASE_IMAGE"
+          docker run --rm --platform linux/amd64 "$OCR_BASE_IMAGE" python -c 'import platform,sys; print("python="+platform.python_version()); print("implementation="+platform.python_implementation()); print("machine="+platform.machine()); assert sys.version_info[:2] == (3,11); assert platform.machine() == "x86_64"'
+          docker run --rm --platform linux/amd64 "$OCR_BASE_IMAGE" sh -lc 'getconf GNU_LIBC_VERSION; ldd --version | head -n1'
+      - name: Resolve and hash the complete target wheelhouse inside the pinned base
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          mkdir -p "$RUNNER_TEMP/ocr-wheelhouse" "$RUNNER_TEMP/ocr-model-cache" "$RUNNER_TEMP/ocr-build"
+          docker run --rm --platform linux/amd64 \
+            -e OCR_BASE_IMAGE="$OCR_BASE_IMAGE" \
+            -e OCR_BASE_MANIFEST_SHA256=8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199 \
+            -e OCR_BASE_CONFIG_SHA256="$OCR_BASE_CONFIG_SHA256" \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse" -v "$RUNNER_TEMP/ocr-build:/build" \
+            "$OCR_BASE_IMAGE" sh -lc '
+              set -eu
+              python -m pip download --index-url https://pypi.org/simple --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
+              python /src/services/ocr_engine/generate_platform_lock.py /src /wheelhouse /build/requirements-lock-linux-x86_64-cp311.json
+            '
+      - name: Fetch fixed model assets and verify the three published SHA256 pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          d="$RUNNER_TEMP/ocr-model-cache"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx" -o "$d/PP-OCRv6_det_small.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx" -o "$d/PP-OCRv6_rec_small.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx" -o "$d/ch_ppocr_mobile_v2.0_cls_mobile.onnx"
+          (cd "$d" && printf '%s  %s\n' '090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f' 'PP-OCRv6_det_small.onnx' '6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884' 'PP-OCRv6_rec_small.onnx' 'e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c' 'ch_ppocr_mobile_v2.0_cls_mobile.onnx' | sha256sum -c -)
+      - name: Install and import-check only from the offline wheelhouse in the same pinned base
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          docker run --rm --network none --platform linux/amd64 \
+            -v "$RUNNER_TEMP/ocr-wheelhouse:/wheelhouse:ro" -v "$GITHUB_WORKSPACE:/src:ro" \
+            "$OCR_BASE_IMAGE" sh -lc '
+              set -eu
+              python -m pip install --no-index --find-links=/wheelhouse -r /src/services/ocr_engine/requirements.txt
+              python -m pip check
+              python -c "import fastapi,uvicorn,onnxruntime,rapidocr,cv2,numpy,cryptography; print(\"OFFLINE_IMPORT_CHECK=PASS\")"
+            '
+      - name: Build the verified archive (no service start or inference)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          exec > >(tee -a "$RUNNER_TEMP/ocr-diagnostics/build.log") 2>&1
+          python services/ocr_engine/build_offline_bundle.py \
+            --target-platform "$OCR_TARGET_PLATFORM" \
+            --lock-json "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" \
+            --wheelhouse "$RUNNER_TEMP/ocr-wheelhouse" \
+            --model-cache "$RUNNER_TEMP/ocr-model-cache" \
+            --output "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" \
+            --execute-build
+          sha256sum "$RUNNER_TEMP/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz" "$RUNNER_TEMP/ocr-build/requirements-lock-linux-x86_64-cp311.json" > "$RUNNER_TEMP/ocr-build/SHA256SUMS"
+      - name: Record non-secret build/runtime diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr-diagnostics"
+          {
+            echo "source_sha=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "target_platform=$OCR_TARGET_PLATFORM"
+            echo "base_image=$OCR_BASE_IMAGE"
+            docker image inspect --format '{{json .RepoDigests}}' "$OCR_BASE_IMAGE" 2>&1 || true
+            echo "runtime_probe=NOT_RUN_IN_FAILURE_DIAGNOSTICS; recorded during normal verified-base step only"
+          } > "$RUNNER_TEMP/ocr-diagnostics/build-runtime.log"
+          find "$RUNNER_TEMP/ocr-build" -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null > "$RUNNER_TEMP/ocr-diagnostics/output-inventory.txt" || true
+      - name: Upload failure diagnostics (never presented as a successful package)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-ocr-build-diagnostics-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/ocr-diagnostics/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload verified package only after successful build and archive verification
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xuanjun-ocr-linux-x86_64-cp311-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/ocr-build/xuanjun-ocr-linux-x86_64-cp311.tar.gz
+            ${{ runner.temp }}/ocr-build/requirements-lock-linux-x86_64-cp311.json
+            ${{ runner.temp }}/ocr-build/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+  ocr-unit-api:
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: services/ocr_engine/requirements.txt
+      - name: Install pinned OCR and API dependencies
+        run: python -m pip install -r services/ocr_engine/requirements.txt
+      - name: Fetch pinned official model files and verify published SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/ocr-models"
+          mkdir -p "$d"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx" -o "$d/det.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx" -o "$d/rec.onnx"
+          curl --fail --location --silent --show-error --max-time 180 "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx" -o "$d/cls.onnx"
+          echo "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f  $d/det.onnx" | sha256sum -c -
+          echo "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884  $d/rec.onnx" | sha256sum -c -
+          echo "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c  $d/cls.onnx" | sha256sum -c -
+          echo "OCR_DET_MODEL_PATH=$d/det.onnx" >> "$GITHUB_ENV"
+          echo "OCR_REC_MODEL_PATH=$d/rec.onnx" >> "$GITHUB_ENV"
+          echo "OCR_CLS_MODEL_PATH=$d/cls.onnx" >> "$GITHUB_ENV"
+          echo "OCR_MODEL_SHA256={\"det\":\"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f\",\"rec\":\"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884\",\"cls\":\"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c\"}" >> "$GITHUB_ENV"
+      - name: Install CJK font on GitHub-hosted runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Execute Chinese synthetic image to HTTP and encrypted SQLite end-to-end
+        run: python -m services.ocr_engine.run_chinese_http_e2e
+      - name: Execute real local OCR inference on generated synthetic image
+        run: python -m services.ocr_engine.run_synthetic_inference
+      - name: Run parser and input-guard tests
+        run: python -m unittest discover -s services/ocr_engine -p 'test_*.py' -v
+      - name: Run governance-registered OCR tests
+        run: python -m unittest discover -s tests -p 'test_ocr_core.py' -v

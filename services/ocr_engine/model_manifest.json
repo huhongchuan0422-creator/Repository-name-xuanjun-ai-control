@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "engine": {
+    "name": "RapidOCR",
+    "version": "3.9.2",
+    "source": "https://github.com/RapidAI/RapidOCR",
+    "source_license": "Apache-2.0",
+    "source_license_evidence": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/LICENSE"
+  },
+  "model_set": {
+    "name": "RapidAI/RapidOCR PP-OCRv6 small ONNX + PP-OCRv4 textline orientation classifier",
+    "source_revision": "v3.9.2",
+    "source_manifest": "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/python/rapidocr/default_models.yaml",
+    "model_license_notes": "Authoritative fixed upstream notice verified at https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md (Git blob SHA 3f66af490abe83df801bfb8d1ea80eed7b0048ae). Sections 4-7 state covered Section 6 artifacts are Apache-2.0, commercial use is not restricted, converted artifacts use same terms, and redistribution must include Apache-2.0 license, applicable copyright/attribution notices, prominent notices for modified files, and applicable upstream NOTICE contents. The three Section 6 hashes match this manifest exactly. Commercial license-source uncertainty is resolved for these listed artifacts; release packaging compliance remains pending until the required notice/license bundle is assembled and verified.",
+    "model_license_evidence": [
+      "https://github.com/RapidAI/RapidOCR/blob/v3.9.2/README.md",
+      "https://github.com/RapidAI/RapidOCR/discussions/736",
+      "https://github.com/RapidAI/RapidOCR/issues/739"
+    ],
+    "files": {
+      "det": {
+        "filename": "PP-OCRv6_det_small.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/det/PP-OCRv6_det_small.onnx",
+        "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+      },
+      "rec": {
+        "filename": "PP-OCRv6_rec_small.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv6/rec/PP-OCRv6_rec_small.onnx",
+        "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+      },
+      "cls": {
+        "filename": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "url": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.9.2/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+        "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+      }
+    }
+  },
+  "verification": {
+    "source_notice_verified": true,
+    "source_notice_git_blob_id": "3f66af490abe83df801bfb8d1ea80eed7b0048ae",
+    "section_6_hashes_match_manifest": true,
+    "bytes_downloaded_and_rehashed_in_hosted_run_40007712096": true,
+    "real_english_synthetic_inference_in_hosted_run_40007712096": true,
+    "chinese_license_http_sqlite_chain_in_hosted_run_40007712096": true,
+    "extended_chinese_license_and_id_front_run_40008456567": "IN_PROGRESS_LAST_OBSERVED_AT_CJK_FONT_INSTALL; NO_FINAL_RESULT_AVAILABLE",
+    "actual_chinese_id_front_inference": "VERIFIED_IN_HOSTED_RUN_40008433722",
+    "distribution_notice_and_license_files_added": true,
+    "release_archive_packaging_verified": false,
+    "commercial_use_source_basis": "UPSTREAM_FIXED_NOTICE_VERIFIED_FOR_SECTION_6_ARTIFACTS",
+    "release_status": "SOURCE_LICENSE_VERIFIED_PACKAGING_CHECK_PENDING",
+    "actual_chinese_business_license_inference": "VERIFIED_IN_HOSTED_RUN_40008433722",
+    "independent_os_process_restart": "NOT_YET_EXECUTED; test added at 9d4fe688abf186abea8106d9b28915eceffd09a2; persistence-only workflow trigger needs an eligible run"
+  },
+  "model_license_evidence": [
+    "https://github.com/RapidAI/RapidOCR/blob/4a3070f304467e6d426e78a82afea5cb1181f305/python/MODEL_LICENSES.md",
+    "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx",
+    "https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx",
+    "https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE",
+    "https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/model_list.md"
+  ]
+}

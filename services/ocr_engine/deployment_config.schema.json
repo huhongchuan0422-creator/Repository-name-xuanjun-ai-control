@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Xuanjun OCR Offline Runtime Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "OCR_SQLITE_PATH",
+    "OCR_ENCRYPTION_KEY",
+    "OCR_DET_MODEL_PATH",
+    "OCR_REC_MODEL_PATH",
+    "OCR_CLS_MODEL_PATH",
+    "OCR_MODEL_SHA256"
+  ],
+  "properties": {
+    "OCR_SQLITE_PATH": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to an existing protected directory's SQLite file. Startup self-check never creates the database."
+    },
+    "OCR_ENCRYPTION_KEY": {
+      "type": "string",
+      "minLength": 1,
+      "writeOnly": true,
+      "description": "Externally provisioned Fernet key. Never store in source control, schema instances, logs, or chat. Self-check validates format only and never generates a key."
+    },
+    "OCR_DET_MODEL_PATH": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to pre-staged detector ONNX model; no runtime download."
+    },
+    "OCR_REC_MODEL_PATH": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to pre-staged recognizer ONNX model; no runtime download."
+    },
+    "OCR_CLS_MODEL_PATH": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to pre-staged angle classifier ONNX model; no runtime download."
+    },
+    "OCR_MODEL_SHA256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "det",
+        "rec",
+        "cls"
+      ],
+      "properties": {
+        "det": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rec": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "cls": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "description": "Logical object shape for det/rec/cls SHA-256 pins. The runtime environment variable OCR_MODEL_SHA256 must contain this object serialized as a JSON string; no automatic schema-to-environment loader is implemented."
+    },
+    "OCR_BINDING_CALLBACKS_READY": {
+      "type": "boolean",
+      "const": false,
+      "description": "For offline-preparation only. This schema does not configure or authorize production callbacks."
+    }
+  }
+}
