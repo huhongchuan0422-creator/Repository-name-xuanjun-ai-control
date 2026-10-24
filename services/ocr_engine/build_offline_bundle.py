@@ -65,6 +65,8 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
             raise BundleError("LOCK_RUNTIME_VERSION_MISMATCH")
         if lock.get("base_image") != "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199":
             raise BundleError("LOCK_BASE_IMAGE_MISMATCH")
+        if lock.get("base_image_manifest_sha256") != "8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199":
+            raise BundleError("LOCK_BASE_MANIFEST_MISMATCH")
         if lock.get("base_image_config_sha256") != "c8bff6acecbf3f8b9f87bc3193032b39ead42bcc39fb76a4875ebd89975874ee":
             raise BundleError("LOCK_BASE_CONFIG_MISMATCH")
         if not isinstance(lock.get("glibc_version"), str) or not lock["glibc_version"].startswith("glibc "):
