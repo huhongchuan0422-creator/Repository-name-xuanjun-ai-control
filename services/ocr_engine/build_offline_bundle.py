@@ -136,6 +136,16 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
         temp_path = Path(temp.name)
     try:
         with tarfile.open(temp_path, "w:gz") as archive:
+            # Include the exact service source needed to run this package; no unrelated tests or secrets.
+            source_files = [
+                (HERE / "api.py", "services/ocr_engine/api.py"),
+                (HERE / "ocr_core.py", "services/ocr_engine/ocr_core.py"),
+                (HERE / "secure_store.py", "services/ocr_engine/secure_store.py"),
+                (HERE / "startup_selfcheck.py", "services/ocr_engine/startup_selfcheck.py"),
+            ]
+            for path, arcname in source_files:
+                regular_file(path, "OCR_SOURCE")
+                archive.add(str(path), arcname=arcname, recursive=False)
             for path, arcname in (
                 (Path(MODEL_MANIFEST), "model_manifest.json"),
                 (Path(REQUIREMENTS), "requirements.txt"),
