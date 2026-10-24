@@ -836,7 +836,7 @@ class Supervisor(object):
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
             return self._authority_ticket(self._task(task_id))
 
-    def _validate_writer_locked(self, ticket, caller):
+    def _validate_writer_locked(self, ticket, caller, lock_provider_id):
         now = self.clock()
         caller = self._caller(caller)
         if not isinstance(ticket, dict):
@@ -849,6 +849,8 @@ class Supervisor(object):
             raise ValueError('WRITER_AUTHORITY_NOT_VALID')
         if task['state'] not in ACTIVE:
             raise ValueError('TASK_NOT_ACTIVE_FOR_WRITE')
+        if lock_provider_id != task['authority_lock_provider_id']:
+            raise ValueError('LOCK_PROVIDER_MISMATCH')
         if (caller['caller_id'] != task['authority_caller_id']
                 or caller['run_id'] != task['authority_run_id']
                 or caller['session_id'] != task['authority_session_id']
@@ -866,7 +868,8 @@ class Supervisor(object):
                         (now, task['task_id']))
         return task, now
 
-    def _validate_inflight_result_locked(self, ticket, caller, operation_id):
+    def _validate_inflight_result_locked(self, ticket, caller, operation_id,
+                                         lock_provider_id):
         now = self.clock()
         caller = self._caller(caller)
         if not isinstance(ticket, dict):
@@ -877,6 +880,8 @@ class Supervisor(object):
             raise ValueError('STALE_WRITER_TICKET')
         if task['authority_state'] not in ('VALID', 'REVOKING'):
             raise ValueError('INFLIGHT_RESULT_AUTHORITY_NOT_VALID')
+        if lock_provider_id != task['authority_lock_provider_id']:
+            raise ValueError('LOCK_PROVIDER_MISMATCH')
         if (caller['caller_id'] != task['authority_caller_id']
                 or caller['run_id'] != task['authority_run_id']
                 or caller['session_id'] != task['authority_session_id']
@@ -891,7 +896,7 @@ class Supervisor(object):
             raise ValueError('OPERATION_NOT_INFLIGHT')
         return task, row, now
 
-    def prepare_operation(self, ticket, caller, operation):
+    def prepare_operation(self, ticket, caller, operation, lock_provider_id):
         required = {'operation_id', 'event_id', 'resource_key',
                     'operation_kind', 'expected_before', 'requested_after',
                     'request_sha256', 'operation_marker'}
@@ -903,7 +908,8 @@ class Supervisor(object):
                 raise ValueError('EXACT_OPERATION_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task, now = self._validate_writer_locked(ticket, caller)
+            task, now = self._validate_writer_locked(
+                ticket, caller, lock_provider_id)
             if operation['resource_key'] not in json.loads(
                     task['resource_scope_json']):
                 raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
@@ -928,10 +934,11 @@ class Supervisor(object):
                caller_sha, payload, 'PREPARED', now, now))
             return {'duplicate': False, 'state': 'PREPARED'}
 
-    def begin_dispatch(self, ticket, caller, operation_id):
+    def begin_dispatch(self, ticket, caller, operation_id, lock_provider_id):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task, now = self._validate_writer_locked(ticket, caller)
+            task, now = self._validate_writer_locked(
+                ticket, caller, lock_provider_id)
             row = self.db.execute(
                 'SELECT * FROM writer_operations WHERE operation_id=?',
                 (operation_id,)).fetchone()
@@ -993,11 +1000,12 @@ class Supervisor(object):
                         (row['operation_id'], body, sha, now))
         return {'duplicate': False}
 
-    def confirm_operation(self, ticket, caller, operation_id, receipt):
+    def confirm_operation(self, ticket, caller, operation_id, receipt,
+                          lock_provider_id):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task, row, now = self._validate_inflight_result_locked(
-                ticket, caller, operation_id)
+                ticket, caller, operation_id, lock_provider_id)
             self._validate_operation_receipt(row, 'CONFIRMED', receipt)
             self.db.execute("""UPDATE writer_operations SET state='CONFIRMED',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
@@ -1008,11 +1016,12 @@ class Supervisor(object):
             self._append_receipt_locked(row, 'CONFIRMED', receipt, now)
             return {'state': 'CONFIRMED'}
 
-    def mark_operation_unknown(self, ticket, caller, operation_id, evidence):
+    def mark_operation_unknown(self, ticket, caller, operation_id, evidence,
+                               lock_provider_id):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task, row, now = self._validate_inflight_result_locked(
-                ticket, caller, operation_id)
+                ticket, caller, operation_id, lock_provider_id)
             self.db.execute("""UPDATE writer_operations SET state='UNKNOWN',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
               AND state='DISPATCHING'""",
