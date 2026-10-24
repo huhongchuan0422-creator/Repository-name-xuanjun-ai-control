@@ -185,7 +185,9 @@ class OfflineBundleInputTests(unittest.TestCase):
         apt=(debs/"apt-lists"); apt.mkdir()
         apt_index=apt/"bookworm-main-Packages"; apt_index.write_bytes(b"synthetic apt index")
         package=debs/"libxcb1_1.0_amd64.deb"; package.write_bytes(b"synthetic deb payload")
+        source_content="Types: deb\\nURIs: https://deb.debian.org/debian\\nSuites: bookworm bookworm-updates\\nComponents: main\\n"
         lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
+              "apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_content.encode()).hexdigest(),"content":source_content},
               "packages":[{"filename":package.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(package.read_bytes()).hexdigest()}],
               "apt_lists":[{"path":apt_index.name,"bytes":apt_index.stat().st_size,"sha256":hashlib.sha256(apt_index.read_bytes()).hexdigest()}]}
         (debs/"system-deb-lock.json").write_text(json.dumps(lock))
