@@ -151,3 +151,57 @@ Root must resolve the next exact product/preview candidate via the original
 reviewed source/build path before a separately approved preview. Current health
 runtimeSHA/freshness are UNKNOWN and preview remains HOLD. OCR production
 permission/store/runtime availability remain independent and disabled.
+
+## Concentrated root-review corrections after ba1b / f8cc
+
+The root feedback is an isolated local journal/synthetic-Docker reproduction,
+not a UK server incident. f8cc's incomplete new-health UNKNOWN handling is
+preserved and extended to stale/incomplete non-ready reports too. This delta
+changes only checkpoint source, its tests and this note; the accepted f131
+image/receipt, workflow, planner, business/OCR and permissions remain unchanged.
+
+1. **Durable intent is never a writer-state permit.** Before each mutation the
+   coordinator now verifies its exact compiled argv and, AFTER the journal write,
+   checks phase-specific old/new ID+image and running states. The live binding
+   reader's running boolean is explicitly compared with that phase; it is no
+   longer normalized to the initial running=True value. NEW_RUN requires old
+   stopped and socket absent; every recovery rename/restore/start requires new
+   stopped, old stopped and socket absent. An unexpected resurrection, socket or
+   identity change durably enters HOLD without the blocked mutation or retry.
+   Final commit/recovery also checks the writer pair after its checkpoint.
+   These are observations at defined boundaries, not atomic control over another
+   external root actor or a Docker transaction.
+2. **Legacy recovery health is fresh evidence too.** Read the actual bounded
+   health response first, then recheck clock/live binding; require exact integer
+   HTTP200, fixed original URL, READY/process-DB scope, production=false and an
+   integer observed_at within600s/+30s. Recheck the stopped new writer again
+   after the response and after publishing rollback completion. Missing/expired
+   response evidence is HOLD, never ROLLED_BACK. A legacy old runtime need not
+   claim the new runtimeSHA/stamp. A future protected reader must prove the
+   response timestamp; it cannot refresh cached data by assigning time at
+   confirmation. No new live reader or server call is introduced here.
+3. **Validate all journal records before any repair or resume.** Each event is
+   read bounded/no-follow/root0600/single-link, parsed with exact canonical
+   structure and required fields, exact plan digest, finite phase, integer
+   sequence and valid new ID. Filenames must be a continuous1..N set; the event
+   sequence follows allowed phase transitions and retains the same known new ID.
+   The last full event must equal the checkpoint. Corrupt/partial JSON, extra or
+   missing files, symlinks, hardlinks, wrong mode, oversized/noncanonical records,
+   plan/sequence/phase/ID mismatch or missing checkpoint/active record fail closed
+   without creating replacement history. Existing old-format valid records use
+   the same canonical format; invalid history is retained for inspection, not
+   migrated or silently rebuilt. This is protected-journal validation, not a
+   cryptographic signature authenticating an independent root actor.
+
+Added negatives reproduce old revival after NEW_RUN intent; new revival after
+each recovery intent and after rollback health/final publication; socket or exact
+image change after intent; legacy observed_at=1 with now1000 and all wrong/missing
+time/URL/types; read-time expiry; malformed first event and the complete protected
+history matrix. Every matrix subcase uses a new private test root; no stopped
+journal is reset to PREPARED to obtain another test pass. Original lock, child
+process exclusion, atomic/fsync and default-disabled assertions remain intact.
+
+No site action, Docker execution, new credential/grant or production authority
+is obtained from these synthetic tests. Actual protected current bindings and
+reviewed host composition still remain required, with f131 product and later
+control-code versions strictly separated.
