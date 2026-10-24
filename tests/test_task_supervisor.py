@@ -579,16 +579,5 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(len(self.s.due_outbox(1002)),1)
 
 
-def load_tests(loader, tests, pattern):
-    # Temporary CI bridge: execute the dedicated fencing suite through the
-    # existing supervisor workflow without changing workflow scope.
-    try:
-        from tests import test_task_writer_fence as fence_tests
-    except ImportError:
-        import test_task_writer_fence as fence_tests
-    tests.addTests(loader.loadTestsFromModule(fence_tests))
-    return tests
-
-
 if __name__ == '__main__':
     unittest.main()
