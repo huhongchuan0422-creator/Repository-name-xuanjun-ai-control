@@ -61,7 +61,7 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
     if not lock.get("python_implementation") or not lock.get("python_version") or not lock.get("abi"):
         raise BundleError("LOCK_RUNTIME_ABI_METADATA_MISSING")
     if target_platform == "linux-x86_64-cp311":
-        if lock.get("python_implementation") != "CPython" or lock.get("python_version") != "3.11.17" or lock.get("abi") != "cp311":
+        if lock.get("python_implementation") != "CPython" or lock.get("python_version") != "3.11.17" or lock.get("abi") != "cp311" or not isinstance(lock.get("soabi"), str) or not lock.get("soabi").startswith("cpython-311-"):
             raise BundleError("LOCK_RUNTIME_VERSION_MISMATCH")
         if lock.get("base_image") != "python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199":
             raise BundleError("LOCK_BASE_IMAGE_MISMATCH")
@@ -144,6 +144,7 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
         "python_implementation": lock["python_implementation"],
         "python_version": lock["python_version"],
         "abi": lock["abi"],
+        "soabi": lock.get("soabi"),
         "target_tags": target_tags,
         "base_image": lock.get("base_image"),
         "base_image_manifest_sha256": lock.get("base_image_manifest_sha256"),
@@ -254,6 +255,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 "python_implementation": checked["python_implementation"],
                 "python_version": checked["python_version"],
                 "abi": checked["abi"],
+                "soabi": checked.get("soabi"),
                 "target_tags": checked["target_tags"],
                 "base_image": checked.get("base_image"),
                 "base_image_manifest_sha256": checked.get("base_image_manifest_sha256"),
