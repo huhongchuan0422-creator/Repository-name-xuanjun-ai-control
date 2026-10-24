@@ -114,6 +114,16 @@ class PreparationSteps(unittest.TestCase):
             return r
         with patch.object(s,'stopped'),patch.object(s,'copy_roots',side_effect=changing),self.assertRaises(s.Hold):s.snapshot({'all_writers_frozen_evidence_sha256':'a'*64})
         self.assertFalse(Path(s.BACKUP+'/private-manifest.json').exists());self.assertTrue(Path(s.BACKUP+'/snapshot').exists())
+    def test_expiry_after_readback_cannot_publish_backup_proof(self):
+        actual=s.copy_roots;expired=[False]
+        def copy(src,dst):
+            result=actual(src,dst)
+            if src==s.BACKUP+'/snapshot' and dst is None:expired[0]=True
+            return result
+        def gate():
+            if expired[0]:raise s.Hold('STAGE_APPROVAL_EXPIRED')
+        with patch.object(s,'stopped'),patch.object(s,'copy_roots',side_effect=copy),patch.object(s,'checkpoint',side_effect=gate),self.assertRaises(s.Hold):s.snapshot({'all_writers_frozen_evidence_sha256':'a'*64})
+        self.assertTrue(Path(s.BACKUP+'/snapshot').exists());self.assertFalse(Path(s.BACKUP+'/private-manifest.json').exists())
     def test_tree_denies_links_specials_public_files_and_budget(self):
         p=self.data/'data'/'bad';p.symlink_to('/etc/passwd')
         with self.assertRaises(s.Hold):s.copy_roots(s.DATA,None)

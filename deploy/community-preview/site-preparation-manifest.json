@@ -108,16 +108,16 @@
   },
   "files": {
     "scripts/community_preview_site_prepare.py": {
-      "bytes": 29092,
-      "sha256": "fdffdd9c1b601d6ba17161eb5922d8fea1c893651341d920bcb72378604e0b52"
+      "bytes": 29234,
+      "sha256": "807891f48b80ed336a7eab8dc6efd2906d0d15261488bc54eaabc157f6ebc810"
     },
     "deploy/community-preview/prepare-site.sh": {
       "bytes": 3338,
-      "sha256": "22dfdb5ab8c7fc844bf4c7a23a812f246196292e3071cbe5cea7306c224ea3c8"
+      "sha256": "42acf00874b10be40e8a3758eb1850f10d4023b1b6773933772472e291cbcd6f"
     },
     "tests/test_community_preview_preparation_steps.py": {
-      "bytes": 17439,
-      "sha256": "a3a0cd3b75866dab533b881c71dae1aa0db2397768aca6dcd53e1820706e200c"
+      "bytes": 18142,
+      "sha256": "900179dd266ca1f0bd9a373e146cdfe49e98a36b00d0272c6fe661d0f1c21f64"
     },
     "docs/development/COMMUNITY_SITE_PREPARATION_STEPS_20261024.md": {
       "bytes": 17610,

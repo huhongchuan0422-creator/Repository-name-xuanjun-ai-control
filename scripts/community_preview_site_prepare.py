@@ -81,7 +81,9 @@ def directory(path):
     finally:os.close(fd)
 def private_parent(path):
     fd=directory(path);s=os.fstat(fd)
-    need(s.st_uid==UID and (not s.st_mode&0o022 if path==BASE else stat.S_IMODE(s.st_mode)==0o700),'PRIVATE_ROOT_PARENT');return fd
+    try:
+        need(s.st_uid==UID and (not s.st_mode&0o022 if path==BASE else stat.S_IMODE(s.st_mode)==0o700),'PRIVATE_ROOT_PARENT');return fd
+    except BaseException:os.close(fd);raise
 
 def read(path,limit,*,root=True):
     parent=directory(os.path.dirname(path))
@@ -225,6 +227,7 @@ def install():
                 finally:os.close(fd)
             create_file(root,'manifest.json',manifest)
         finally:os.close(root)
+        checkpoint()
         fd=new_dir(base,'update-journal');os.close(fd)
     finally:os.close(base)
     return {'stage':'install','carrier_manifest_sha256':CARRIER_MANIFEST,'update_executed':False}
@@ -295,6 +298,7 @@ def _load_fixed_archive(body,fmt,expected):
         # EXCL intent prevents an uncertain/partial import from being repeated.
         capture(DOCKER+['image','load','--input',INPUT+'/community-backend-image.tar.gz'],timeout=120)
         need(capture(DOCKER+['image','inspect','--format',fmt,NEW_IMAGE]).strip()==expected,'LOADED_IMAGE_UNKNOWN')
+        checkpoint()
         create_file(parent,'image-load-observed.json',canonical({'image':NEW_IMAGE,'source':PRODUCT,'loaded_at':int(time.time())}))
     finally:os.close(parent)
     return {'stage':'image-load','image':NEW_IMAGE,'service_changed':False}
@@ -400,7 +404,8 @@ def snapshot(permit):
         'all_writers_frozen_evidence_sha256':permit['all_writers_frozen_evidence_sha256'],'trees':records})
     need(len(raw)<=8*1024*1024,'MANIFEST_LIMIT')
     parent=private_parent(BACKUP)
-    try:create_file(parent,'private-manifest.json',raw)
+    try:
+        checkpoint();create_file(parent,'private-manifest.json',raw)
     finally:os.close(parent)
     return {'stage':'snapshot','manifest_sha256':sha(raw),'bytes':sum(x['bytes'] for x in records.values()),
             'recovery_verified':False,'downgrade_verified':False}
@@ -475,6 +480,7 @@ def validate_clones(permit):
         result={'stage':'validate-clones','snapshot_manifest_sha256':sha(raw),'logical_evidence_sha256':sha(canonical(old)),
             'tested_at':int(time.time()),'restore_original_host':True,'downgrade_logical_equality':True,
             'production_acceptance':False,'rollback_health_acceptance':False}
+        checkpoint()
         create_file(parent,'clone-results.json',canonical(result))
         return result
     finally:os.close(parent)
