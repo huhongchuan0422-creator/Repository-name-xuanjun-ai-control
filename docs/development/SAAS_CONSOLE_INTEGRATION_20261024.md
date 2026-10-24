@@ -82,3 +82,31 @@ This is source/isolation evidence, not Hosted, real browser E2E, production depl
 7. Formal whole-project acceptance / CUS-014: `HOLD`; never reuse `change_retest`.
 8. `change_submit_idempotent` backend merge/deployment: `NOT_DEPLOYED`.
 9. Finance/order/entitlement/subscription/maintenance interfaces outside this slice: `HOLD` where the final specification has no production evidence.
+
+
+## Exact backend 1b48e5fe real-Python-HTTP isolation entry
+
+Backend contract anchor for this continuation is commit `1b48e5fe8015afd9035ff269f9b432d9a68223b2`, tree `b0c0147aeef69d00e6edbaef7e436e5699403cf3`. It adds `change_submit_idempotent` to the real PR122 HTTP operation map and hosted change-submit coverage. The SaaS UI still does not enable automatic candidate submission or resend UNKNOWN results.
+
+Executable integration entry:
+
+```sh
+XJ_PR122_BACKEND_ROOT=/absolute/path/to/exact-1b48e5fe-checkout \
+  sh clients/saas-console/tests/run_real_python_backend_integration.sh
+```
+
+The Python entry refuses to run unless `git rev-parse HEAD` of `XJ_PR122_BACKEND_ROOT` is exactly `1b48e5fe8015afd9035ff269f9b432d9a68223b2`. It imports the repository's actual `Center`, `App`, `HTTPServer`, signed snapshot/import code and existing `HttpTests` fixture. No Node/fetch fake service is used by that test.
+
+Synthetic-only journey covered by the executable entry:
+- HTTP login -> secure cookie + CSRF response;
+- `GET me` and tenant/project isolation;
+- signed TRUSTED_CUSTOMER_FRONTEND `import_snapshot` -> `previews/{project}`;
+- actual private preview GET -> `served` / `preview_serves` evidence;
+- project Q&A POST/readback;
+- legacy change submit -> same-case read-only `changes/{project}` readback;
+- real `change_submit_idempotent` replay returns identical case/event and same-key changed-body returns 409;
+- signed V2 delivery snapshot -> authoritative V2 listing -> `change_updates` -> exact `change_retest` -> RETEST readback with `automatic_charge:false`.
+
+Current execution status in this ChatGPT runtime: **NOT_EXECUTED**. The runtime has no mounted checkout of the repository and outbound Git/GitHub clone is unavailable, so the exact 1b48 backend modules and their transitive imports cannot be loaded into local Python. This is an environment/input absence, not a backend PASS/FAIL. The existing V5 Node/fetch/local-HTTP results remain isolated frontend evidence only and are not reclassified as backend connectivity.
+
+Minimum missing local input to execute the test: one filesystem checkout whose HEAD is exactly `1b48e5fe8015afd9035ff269f9b432d9a68223b2`. No credentials, customer data, server access, deployment permission or payment environment is required.
