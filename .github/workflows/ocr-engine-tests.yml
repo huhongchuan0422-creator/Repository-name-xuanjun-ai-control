@@ -85,7 +85,7 @@ jobs:
               set -eu
               python -m pip download --only-binary=:all: --dest /wheelhouse -r /src/services/ocr_engine/requirements.txt
               python - <<'PY'
-import hashlib,json,os,platform,sys
+import hashlib,json,os,platform,sys,sysconfig
 from pathlib import Path
 from pip._vendor.packaging.tags import sys_tags
 req=Path("/src/services/ocr_engine/requirements.txt")
@@ -98,7 +98,8 @@ lock={
  "target_platform":"linux-x86_64-cp311",
  "python_implementation":platform.python_implementation(),
  "python_version":platform.python_version(),
- "abi":sys.implementation.cache_tag,
+ "abi":"cp311",
+ "soabi":sysconfig.get_config_var("SOABI"),
  "base_image":os.environ["OCR_BASE_IMAGE"],
  "base_image_manifest_sha256":os.environ["OCR_BASE_MANIFEST_SHA256"],
  "base_image_config_sha256":os.environ["OCR_BASE_CONFIG_SHA256"],
