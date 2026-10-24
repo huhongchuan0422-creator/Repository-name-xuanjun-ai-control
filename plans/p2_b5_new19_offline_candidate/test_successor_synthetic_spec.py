@@ -195,7 +195,8 @@ class SyntheticSpecTests(unittest.TestCase):
                     (target/'register.lock').chmod(0o600)
                 allowed=set(files)|{spec['fixed_paths']['receiver_root'],
                                    c53.DB,c53.LOCK,c53.DB+'-wal',
-                                   c53.DB+'-shm',entry.SOURCE,entry.ROOT,entry.SPEC,
+                                   c53.DB+'-shm',c53.DB+'-journal',
+                                   entry.SOURCE,entry.ROOT,entry.SPEC,
                                    entry.BINDER,entry.MANIFEST,
                                    *c53.BASES}
                 allowed.update((WitnessStore.__init__.__globals__['ROOT'],
