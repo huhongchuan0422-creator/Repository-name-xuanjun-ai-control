@@ -6,9 +6,9 @@
       "sha256": "1cf1249412e81fdea89f55834f52dbe531ce1fbe4e7093f4b171314cc075fd11"
     },
     {
-      "bytes": 80572,
+      "bytes": 81347,
       "path": "successor_controller/pr17_b5_successor_backend.py",
-      "sha256": "14cb6889cbde5f881ddf82505311efb592a7db888f9115f4faeb27bf74cd62f4"
+      "sha256": "3c101c5575580d472d4b8ea44634c1c8fef87a2da7082bd90f344115a7e6b88b"
     },
     {
       "bytes": 3302,
@@ -41,9 +41,9 @@
       "sha256": "6cb26e1e48a13101916cb71c2783c8a6ccbf518312edb8ae18d7715ec14ea4a2"
     },
     {
-      "bytes": 30018,
+      "bytes": 30455,
       "path": "successor_controller/pr17_b5_successor_witness.py",
-      "sha256": "72f412013e76348cee313df21399d263ee706289ea8e3670c8bc57fcbc43ce42"
+      "sha256": "ab916f3cd1b9f9e6a6ed2810d21fda96bf992666968d5a413464745b8897d5d1"
     },
     {
       "bytes": 10389,
