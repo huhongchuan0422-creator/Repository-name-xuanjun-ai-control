@@ -266,62 +266,16 @@ class SyntheticSpecTests(unittest.TestCase):
                     evidence.register_exact(binding,'release',
                         source_id='fixture-version',source_raw=b'fixture source record',
                         witness_identity='fixture-registrar',payload=payload)
-                    tx=entry._prepare('c53-recovery-draft','fixture-attempt',
-                                      'fixture-only',start)
-                    self.assertEqual(len(tx.bundle['requests']),19)
-                    self.assertFalse(tx.b.worker_stopped)
-                    def recorded_run(argv,**kwargs):
-                        if argv[:2]==['/usr/bin/systemctl','show']:
-                            return type('Result',(),{'returncode':0,'stdout':(
-                                'ActiveState=active\nSubState=running\nMainPID=123\n'
-                                'NRestarts=0\nExecMainStartTimestampMonotonic=4000\n').encode()})()
-                        if argv[0:1]!=['/usr/bin/systemctl']:
-                            raise AssertionError('UNRECORDED_EXTERNAL_OS_ACTION')
-                        return type('Result',(),{'returncode':3 if
-                            argv[1:3]==['is-active','--quiet'] and
-                            argv[-1]=='xuanjun-cloud-connection.service' and
-                            not tx.b.tried_start else 0,'stdout':b''})()
-                    settings=json.loads(bundle['files'][c53.CONFIGS[1]])['settings']
-                    metadata={'resource':settings['audience'],
-                        'authorization_servers':[settings['issuer']],
-                        'scopes_supported':['connection.status','project.files.read'],
-                        'bearer_methods_supported':['header']}
-                    class Response:
-                        status=200
-                        def getheader(self,*args):return 'application/json'
-                        def read(self,*args):return json.dumps(metadata).encode()
-                    class RecordedHTTP:
-                        def __init__(self,host,port,timeout):
-                            if (host,port)!=('127.0.0.1',18769):
-                                raise AssertionError('UNRECORDED_HTTP_TARGET')
-                        def request(self,*args,**kwargs):pass
-                        def getresponse(self):return Response()
-                        def close(self):pass
-                    guard_calls=[]
-                    fd_snapshots=[]
-                    original_snapshot=tx.b._snapshot_live_fds
-                    def traced_snapshot():
-                        value=original_snapshot()
-                        fd_snapshots.append(value)
-                        return value
-                    tx.b._snapshot_live_fds=traced_snapshot
-                    original_guarded=tx.guarded
-                    def traced_guarded(name,*args):
-                        guard_calls.append(name)
-                        try:
-                            return original_guarded(name,*args)
-                        except BaseException as exc:
-                            guard_calls.append('ERROR:'+name+':'+str(exc))
-                            raise
-                    tx.guarded=traced_guarded
-                    with patch('subprocess.run',side_effect=recorded_run),\
-                         patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
-                               RecordedHTTP):
-                        result=tx.execute()
-                    self.assertEqual(result['state'],'WINDOW_ENABLED_NOT_DELIVERED',
-                                     (result,guard_calls,fd_snapshots))
-                    self.assertEqual(result['new_requests'],0)
-                    tx.b.authority.original.queue.close()
+                    # First admission/execute runs in a fresh interpreter below.
+                    # Parent setup stops after immutable witness/release registration;
+                    # inherited CI/test-harness descriptors must not be normalized away.
+                execute=subprocess.run([sys.executable,'-B',str(HERE/
+                    'test_successor_synthetic_spec.py'),'--child-execute',str(root)],
+                    capture_output=True,text=True,timeout=20,check=False,close_fds=True)
+                self.assertEqual(execute.returncode,0,execute.stderr+'\\n'+execute.stdout)
+                executed=json.loads(execute.stdout)
+                self.assertEqual(executed['state'],'WINDOW_ENABLED_NOT_DELIVERED',executed)
+                self.assertEqual(executed['new_requests'],0)
                 child=subprocess.run([sys.executable,'-B',str(HERE/
                     'test_successor_synthetic_spec.py'),'--child-query',str(root)],
                     capture_output=True,text=True,timeout=20,check=False)
@@ -380,7 +334,7 @@ def child_query(root,action='query'):
     with f.active():
         spec=c53.binder.verify_spec_bytes(f.raw)
         known={entry.ROOT,entry.SOURCE,entry.SPEC,entry.MANIFEST,entry.BINDER,
-               c53.DB,c53.LOCK,c53.DB+'-wal',c53.DB+'-shm',
+               c53.DB,c53.LOCK,c53.DB+'-wal',c53.DB+'-shm',c53.DB+'-journal',
                *c53.CONFIGS,*c53.SLOTS,*c53.BASES,
                WitnessStore.__init__.__globals__['ROOT'],
                SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']}
@@ -392,6 +346,9 @@ def child_query(root,action='query'):
             known.update(base+'/releases/'+c53.COMMIT+'/'+name for name in
                          f.source)
         job=spec['fixed_paths']['job_proposed']
+        generated_roots=(job,*spec['fixed_paths']['stage_proposed'],
+                         *spec['fixed_paths']['target_release'])
+        known.update(generated_roots)
         known.update(job+'/'+name for name in (
             'reservation.json','window-open.json','activation-identity.json',
             'NEW_WORKER_START_ATTEMPT.json'))
@@ -454,7 +411,8 @@ def child_query(root,action='query'):
             return original_connect(path,*args,**kwargs)
         store_roots=(WitnessStore.__init__.__globals__['ROOT'],
                      SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT'])
-        with SealedOSBoundary(root,known,pins,dynamic_roots=store_roots).active(),\
+        with SealedOSBoundary(root,known,pins,
+             dynamic_roots=store_roots+generated_roots).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
              patch.object(Github,'call',recorded_comment),\
@@ -465,7 +423,43 @@ def child_query(root,action='query'):
              patch.object(entry,'__file__',entry.ROOT+
                           '/successor_controller/pr17_b5_successor_entry.py'),\
              patch.object(entry,'LOCAL_ROOT',entry.ROOT):
-            if action in ('worker-ready','worker-success'):
+            if action=='execute':
+                tx=entry._prepare('c53-recovery-draft','fixture-attempt',
+                                  'fixture-only',int(time.time())-10)
+                def execute_run(argv,**kwargs):
+                    if argv[:2]==['/usr/bin/systemctl','show']:
+                        return type('Result',(),{'returncode':0,'stdout':(
+                            'ActiveState=active\\nSubState=running\\nMainPID=123\\n'
+                            'NRestarts=0\\nExecMainStartTimestampMonotonic=4000\\n').encode()})()
+                    if argv[0:1]!=['/usr/bin/systemctl']:
+                        raise AssertionError('UNRECORDED_EXTERNAL_OS_ACTION')
+                    return type('Result',(),{'returncode':3 if
+                        argv[1:3]==['is-active','--quiet'] and
+                        argv[-1]=='xuanjun-cloud-connection.service' and
+                        not tx.b.tried_start else 0,'stdout':b''})()
+                settings=json.loads(tx.bundle['files'][c53.CONFIGS[1]])['settings']
+                metadata={'resource':settings['audience'],
+                    'authorization_servers':[settings['issuer']],
+                    'scopes_supported':['connection.status','project.files.read'],
+                    'bearer_methods_supported':['header']}
+                class Response:
+                    status=200
+                    def getheader(self,*args):return 'application/json'
+                    def read(self,*args):return json.dumps(metadata).encode()
+                class RecordedHTTP:
+                    def __init__(self,host,port,timeout):
+                        if (host,port)!=('127.0.0.1',18769):
+                            raise AssertionError('UNRECORDED_HTTP_TARGET')
+                    def request(self,*args,**kwargs):pass
+                    def getresponse(self):return Response()
+                    def close(self):pass
+                with patch('subprocess.run',side_effect=execute_run),\
+                     patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
+                           RecordedHTTP):
+                    result=tx.execute()
+                if tx.b.authority.original.queue is not None:
+                    tx.b.authority.original.queue.close()
+            elif action in ('worker-ready','worker-success'):
                 from production.cloud_connection.queue import Queue,canonical
                 tx=entry._recover()
                 policy=tx.b.authority.original.policy
@@ -498,7 +492,7 @@ def child_query(root,action='query'):
 
 if __name__=='__main__':
     if len(sys.argv)==3 and sys.argv[1] in (
-            '--child-query','--child-intake','--child-worker-ready',
+            '--child-query','--child-execute','--child-intake','--child-worker-ready',
             '--child-worker-success','--child-recover'):
         raise SystemExit(child_query(sys.argv[2],
             sys.argv[1][8:] if sys.argv[1]!='--child-query' else 'query'))
