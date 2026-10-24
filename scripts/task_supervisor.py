@@ -441,7 +441,8 @@ class Supervisor(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
-            if task['state'] != 'READY' or not self._dependencies_done(task):
+            if (task['state'] != 'READY' or task['authority_state'] != 'NONE'
+                    or not self._dependencies_done(task)):
                 raise ValueError('TASK_NOT_READY')
             if task['owner'] != owner or task['entry'] != entry:
                 raise ValueError('ASSIGNED_RESPONSIBILITY_MISMATCH')
@@ -501,6 +502,17 @@ class Supervisor(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
+            if (task['authority_state'] == 'REVOKING'
+                    and kind in ('STARTED','PROGRESS','TERMINAL',
+                                 'HANDOFF_REQUESTED','HANDOFF_ACKNOWLEDGED')):
+                raise ValueError('REVOKING_OLD_ATTEMPT_MUTATION_FORBIDDEN')
+            if (task['authority_state'] in ('REVOKED', UNKNOWN)
+                    and kind in ('STARTED','PROGRESS','TERMINAL',
+                                 'HANDOFF_REQUESTED','HANDOFF_ACKNOWLEDGED')):
+                raise ValueError('INACTIVE_AUTHORITY_MUTATION_FORBIDDEN')
+            if (task['authority_state'] == 'VALID'
+                    and kind == 'HANDOFF_ACKNOWLEDGED'):
+                raise ValueError('FENCED_HANDOFF_REQUIRES_REVOCATION')
             # Exact replays are idempotent even when a newer event has since
             # advanced last_event_at.  Conflicting reuse still fails closed.
             encoded = canonical(payload)
@@ -717,6 +729,8 @@ class Supervisor(object):
             raise ValueError('STALE_WRITER_TICKET')
         if task['authority_state'] != 'VALID':
             raise ValueError('WRITER_AUTHORITY_NOT_VALID')
+        if task['state'] not in ACTIVE:
+            raise ValueError('TASK_NOT_ACTIVE_FOR_WRITE')
         if (caller['run_id'] != task['authority_run_id']
                 or caller['session_id'] != task['authority_session_id']
                 or caller['gateway_id'] != task['authority_gateway_id']):
