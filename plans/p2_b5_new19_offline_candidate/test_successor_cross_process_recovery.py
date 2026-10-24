@@ -185,6 +185,22 @@ os.kill(os.getpid(),signal.SIGKILL)
         self.assertEqual((failed.returncode,result['code']),
                          (2,'RECOVERY_CUSTODY_SUCCESS_CHANGED'))
 
+    def test_failure_checkpoint_persists_hold_across_fresh_process(self):
+        for r in self.bundle['requests']:
+            rid=self.intent(r);self.write('ready-'+rid,b'1')
+        (self.root/'progress').write_text('19')
+        for number,phase in enumerate(('WAIT_19_SUCCESS','CHECK_19_SUCCESS',
+                         'ONE_CUSTODY','READY_FOR_B5_HTTP_NOT_RECEIVED',
+                         'FAILURE_READY_FOR_B5_HTTP_NOT_RECEIVED'),2):
+            self.write('checkpoint-%03d.json'%number,c53.canon({
+                'schema':1,'sequence':number,'phase':phase,
+                'release_commit':c53.COMMIT,'project':c53.PROJ})+b'\n')
+        first,a=self.child();second,b=self.child()
+        self.assertEqual((first.returncode,second.returncode),(2,2))
+        self.assertEqual((a['code'],b['code']),
+                         ('RECOVERY_CHECKPOINT_PHASE',
+                          'RECOVERY_CHECKPOINT_PHASE'))
+
     def test_same_ids_changed_request_rejected(self):
         self.bundle['requests'][0]['arguments']['object_ref']='other'
         (self.root/'bundle.json').write_text(json.dumps(self.bundle))
