@@ -1,0 +1,12 @@
+{
+  "action": "PR99_RECEIVED_HANDOFF_RESOLUTION_V1",
+  "files": {
+    "RESOLUTION_README.md": "c01b83f9e645637b35353434368f349d7386d799a527d3f3173c277e43cd182f",
+    "resolve_received_handoff.py": "10d24ddfea39347930115a4dc57e81b0b41461c10bd71e70b7f7d15afeb3fea4",
+    "test_handoff_resolution.py": "2a80793d81286abbe024bceef7b4b404a5437c6e5adb894576d2dcf863348126"
+  },
+  "new_tests": 10,
+  "old_tests": "INHERITED_NOT_RERUN",
+  "schema_version": 1,
+  "scope": "READ_ALREADY_RECEIVED_COPIES_ONLY_NOT_INSTALL_OR_NEW_CAPTURE"
+}

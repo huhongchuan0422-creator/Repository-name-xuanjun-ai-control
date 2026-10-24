@@ -1,0 +1,98 @@
+{
+  "authoritative_writer": "UNKNOWN",
+  "enforced_fence": "UNKNOWN",
+  "hosts": [
+    {
+      "authoritative_writer": "UNKNOWN",
+      "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+      "enforced_fence": "UNKNOWN",
+      "host": "domestic",
+      "host_commands": 1,
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh070erzr1zgwzk",
+      "nonterminal_invocations": [],
+      "receipt": {
+        "business_requests": 0,
+        "database_opened": false,
+        "fence_enforced": false,
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "inflight_drained": false,
+        "nonce": "f559026492dd4d4ea1ba8afaed287a38",
+        "observed_at": "2026-10-18T12:07:19.306309Z",
+        "processes": [
+          {
+            "handles": [
+              {
+                "category": "DATABASE",
+                "device": 64771,
+                "fd": 3,
+                "inode": 1845988,
+                "writable": true
+              }
+            ],
+            "matched_units": [
+              "windows-interaction-http.service"
+            ],
+            "pid": 90354,
+            "start_ticks": 91354061
+          },
+          {
+            "handles": [
+              {
+                "category": "DATABASE",
+                "device": 64771,
+                "fd": 5,
+                "inode": 837402,
+                "writable": true
+              },
+              {
+                "category": "DATABASE",
+                "device": 64771,
+                "fd": 6,
+                "inode": 837402,
+                "writable": true
+              }
+            ],
+            "matched_units": [
+              "provider-neutral-domestic-bridge.service"
+            ],
+            "pid": 188767,
+            "start_ticks": 178248493
+          }
+        ],
+        "scope": "EXACT_EXISTING_DOMESTIC_HANDLE_OWNER_METADATA",
+        "service_actions": 0,
+        "units": [
+          {
+            "active": "active",
+            "pid": 188767,
+            "unit": "provider-neutral-domestic-bridge.service"
+          },
+          {
+            "active": "active",
+            "pid": 90354,
+            "unit": "windows-interaction-http.service"
+          }
+        ]
+      },
+      "run_command_attempted": true,
+      "service_actions": 0,
+      "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+      "sts": "PASS_CURRENT"
+    }
+  ],
+  "migration_started": false,
+  "production_actions": 0,
+  "production_cutover": false,
+  "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION",
+  "evidence": {
+    "source_commit": "a729a946a9211addd321b9347f3f375053e2b98f",
+    "tree": "1a38c2cde0ddc7646320d5bd8dad3be13785f231",
+    "run": 39125963077,
+    "job": 117671048852,
+    "validation_run": 39125912196,
+    "validation_job": 117670878570,
+    "scope": "EXACT_EXISTING_DOMESTIC_PROCESS_IDENTITY_NOT_DRAIN_OR_FENCE"
+  }
+}

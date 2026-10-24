@@ -1,0 +1,13 @@
+{
+  "M99_dynamic": "NOT_RUN",
+  "files": {
+    ".github/workflows/pr99-source-only.yml": "ba9b0600af6f5b273a7f2d450ef419e2f0691d3c6ea608d774d4dca451ec1443",
+    "evidence/pr99-service-handoff/aliyun-execution/source_only_contract.py": "9e2d2369cacfd539b49252ad40f00ed8a6e09d350d977a578520d32e351260c2",
+    "evidence/pr99-service-handoff/aliyun-execution/source_only_host.py": "505f86e034a44f61d948ad69cad3a6b0bf5c6d617793e77d86aecdab31a509bb",
+    "evidence/pr99-service-handoff/aliyun-execution/source_only_inventory.py": "7cd6f555552718e6fc5cb650bf849370d86a5838c5848888cd30df3a0f6ad7be"
+  },
+  "production_entry": false,
+  "scheduler_inherited_invoke": "t-jpn70exlhv86xa8",
+  "scheduler_rescan": false,
+  "source_result": "PRIOR_FAILED_ATTEMPT_DID_NOT_RETURN_NO_ACCEPTED_SOURCE_CHECKPOINT"
+}

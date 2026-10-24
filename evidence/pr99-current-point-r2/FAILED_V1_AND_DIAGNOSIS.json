@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "origin": "OWNER_KOREA_ROOT_AND_TOKYO_ROOT_TERMINAL_RECEIPTS",
+  "approval_comment_id": 6216441589,
+  "korea_failure_sha256": "44f232571ce267f6a5cf9c801b1fba366fd9fa8f4a82d01aa592c249592bd35d",
+  "tokyo_failure_sha256": "9c23719696b63b0ca4552eb67ffd99948a62c9cec9af0a4774e4890f8a21565b",
+  "tokyo_reason": "SOURCE_FILE_SET_DRIFT",
+  "tokyo_python311_exists": true,
+  "prepare_started": {
+    "present": true,
+    "bytes": 37,
+    "uid": 0,
+    "mode": "0600"
+  },
+  "failure_receipt": {
+    "present": true,
+    "bytes": 104,
+    "uid": 0,
+    "mode": "0600"
+  },
+  "tokyo_absent_at_owner_sample": [
+    "receipt.json",
+    "payload/database/trading.db",
+    "payload.enc"
+  ],
+  "retry_allowed": false,
+  "runner_diagnosis": {
+    "run": 38909367025,
+    "job": 117001011398,
+    "receipt": {
+      "approved_count": 1363,
+      "business_database_opened": false,
+      "business_http_requests": 0,
+      "delivery_commit": "789b0a292a0ba7964494b3b24b0496322375d99a",
+      "epoch": 1792157894,
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "production_changes": 0,
+      "public_github_manifest_downloads": 1,
+      "root_private_stage_read": false,
+      "schema_version": 1,
+      "service_actions": 0,
+      "source_file_contents_read": false,
+      "status": "FAILED_ATTEMPT_SOURCE_SET_DIAGNOSIS_ONLY",
+      "sudo_calls": 0,
+      "uid": 1001,
+      "visible_added": [],
+      "visible_current_count": 1363,
+      "visible_missing": [],
+      "walk_errors": [
+        {
+          "errno": 13,
+          "path": "backup/WEBSITE_WECOM_AND_DUAL_CHANNEL_REFERRAL_COMPLETION_V1_20261008T003826/tokyo-system"
+        },
+        {
+          "errno": 13,
+          "path": "backup/XUANJUN_CUSTOMER_BRAIN_R10_FINAL_AUTHORITY_GAP_REPAIR_V1_20261007T225500"
+        },
+        {
+          "errno": 13,
+          "path": "backup/XUANJUN_WECOM_NOVEL_APP_IDENTITY_SECRET_READY_20261007T1818"
+        },
+        {
+          "errno": 13,
+          "path": "backup/gpt56_timeout_alignment_20261005T0115+0800"
+        },
+        {
+          "errno": 13,
+          "path": "backup/wecom_notification_gate_20261008_pre_audit_fix"
+        }
+      ]
+    }
+  },
+  "claim_limits": [
+    "Nonroot visible names unchanged; five historical inaccessible subtrees reported",
+    "Root complete added-path set not independently read",
+    "No successful current recovery point or transfer proven",
+    "Existing 1363-row selection includes436 historical backup files; not full current-only tree"
+  ]
+}

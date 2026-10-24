@@ -1,0 +1,294 @@
+"""Fixed Owner start code staging, no activation or automatic retry."""
+import base64
+import concurrent.futures
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+HOSTS=(('domestic',CN,'cn-shanghai','3a22c458934142eea89ec6e3bf481a57','iZvt5t8tlrm8oiZ'),)
+
+
+class Hold(Exception):
+    pass
+
+
+def safe(value):
+    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+
+
+def quote(value):
+    return urllib.parse.quote(str(value), safe='~')
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def rpc(endpoint, version, action, credentials, **params):
+    # Endpoint and action are fixed by this program, never accepted from a task.
+    if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+        raise Hold('ENDPOINT_REJECTED')
+    key, secret, token = credentials
+    values = dict(params, Action=action, Version=version, Format='JSON',
+                  AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                  SignatureNonce=uuid.uuid4().hex,
+                  Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    if token:
+        values['SecurityToken'] = token
+    canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+    signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+    values['Signature'] = base64.b64encode(signature).decode()
+    request = urllib.request.Request('https://' + endpoint + '/',
+        data=urllib.parse.urlencode(values).encode(),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+            raw = response.read(262145)
+    except urllib.error.HTTPError as error:
+        try:
+            data = json.loads(error.read(262145))
+            code = safe(data.get('Code'))
+        except Exception:
+            code = 'HTTP_' + str(error.code)
+        raise Hold(code) from None
+    except Exception:
+        # Never print a URL/body, key, temporary token, or raw exception.
+        raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+    if len(raw) > 262144:
+        raise Hold('RESPONSE_TOO_LARGE')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        raise Hold('INVALID_API_RESPONSE') from None
+    if not isinstance(data, dict):
+        raise Hold('INVALID_API_RESPONSE')
+    if 'Code' in data:
+        raise Hold(safe(data['Code']))
+    return data
+
+
+# This recovery does not import, publish or run the M99-R1 repair candidate.
+# Only this exact inert code staging is authorized. Historical attempts are never replayed.
+import zlib
+
+TEST_START_SOURCE='"""PR99 Owner-direct domestic production entry. No reviewer or permit wait.\nRequires a real final checkpoint, prepared dedicated identity, and root-held exact technical start inputs. Never starts from the preliminary r1/r2 copied data. No route edits.\n"""\nimport fcntl\nimport hashlib\nimport http.client\nimport json\nimport os\nimport pwd\nimport grp\nimport re\nimport stat\nimport socket\nimport subprocess\nimport time\nfrom pathlib import Path\n\nHOST=\'iZvt5t8tlrm8oiZ\'\nRELEASE=Path(\'/opt/xuanjun-migration-s07/releases/domestic-final-v1\')\nROOT=RELEASE/\'rootfs\'\nINPUTS=Path(\'/etc/xuanjun-pr99/domestic-final.start-inputs.json\')\nSTATE=Path(\'/var/lib/xuanjun-pr99-s09-production-start-v1\')\nSYSTEMD=Path(\'/etc/systemd/system\')\nUNITS={\'portal\':(\'scripts/secure_secrets_portal_server.py serve --host 127.0.0.1 --port 18080\',18080), \'contact\':(\'-m ai_service.wecom_customer_contact_service\',18781),\'customer-service\':(\'-m ai_service.wecom_customer_service\',18780)}\n\ndef require(ok,code):\n if not ok:raise RuntimeError(code)\ndef sha(b):return hashlib.sha256(b).hexdigest()\ndef canonical(v):return (json.dumps(v,sort_keys=True,indent=2)+\'\\n\').encode()\ndef read(p,limit=67108864,runtime_uid=None,runtime_gid=None):\n p=Path(p)\n for a in reversed((p,*p.parents)):\n  s=a.lstat();require(not stat.S_ISLNK(s.st_mode),\'INPUT_SYMLINK\')\n  if runtime_uid is not None and (a==ROOT or a.is_relative_to(ROOT)):\n   require(s.st_uid in (0,runtime_uid) and not s.st_mode&0o002 and (not s.st_mode&0o020 or s.st_gid==runtime_gid),\'RUNTIME_INPUT_OWNER_MODE\')\n  else:require(s.st_uid==0 and not s.st_mode&0o022,\'ROOT_INPUT_PATH\')\n fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)\n try:\n  before=os.fstat(fd);require(stat.S_ISREG(before.st_mode) and before.st_nlink==1 and before.st_size<=limit,\'FILE_TYPE_SIZE\')\n  with os.fdopen(os.dup(fd),\'rb\') as f:b=f.read(limit+1)\n  after=os.fstat(fd);require((before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns) and len(b)==before.st_size,\'FILE_DRIFT\')\n  return b\n finally:os.close(fd)\ndef create(p,b,mode=0o600):\n fd=os.open(p,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,mode)\n with os.fdopen(fd,\'wb\') as f:f.write(b);f.flush();os.fsync(f.fileno())\n d=os.open(Path(p).parent,os.O_RDONLY|os.O_DIRECTORY)\n try:os.fsync(d)\n finally:os.close(d)\nclass KnownEffectFailure(RuntimeError):\n pass\nclass EffectUnknown(RuntimeError):\n pass\n\ndef ctl(*args):\n r=subprocess.run([\'/usr/bin/systemctl\',*args],capture_output=True,timeout=20)\n if r.returncode!=0:\n  values=dict(l.split(\'=\',1) for l in r.stdout.decode(\'utf-8\',\'strict\').splitlines() if \'=\' in l)\n  missing=(len(args)==4 and args[0]==\'show\' and args[-1]==\'--no-pager\' and r.returncode==1 and values.get(\'ActiveState\')==\'inactive\' and values.get(\'MainPID\')==\'0\' and values.get(\'LoadState\',\'not-found\')==\'not-found\')\n  if not missing:raise KnownEffectFailure(\'SYSTEMCTL_FAILED\')\n return r.stdout.decode()\ndef stopped(name):\n v=dict(l.split(\'=\',1) for l in ctl(\'show\',name,\'--property=ActiveState,MainPID\',\'--no-pager\').splitlines() if \'=\' in l)\n return v.get(\'MainPID\')==\'0\' and v.get(\'ActiveState\') in (\'inactive\',\'failed\')\ndef unit_name(role):return \'xuanjun-pr99-domestic-\'+role+\'.service\'\ndef units(account):\n require(account==\'xuanjun-s07\',\'DEDICATED_IDENTITY_NAME\')\n common=\'\'\'\\nEnvironment=PYTHONPATH=/opt/trading-system PYTHONDONTWRITEBYTECODE=1\nEnvironment=WECOM_CONTACT_HOST=127.0.0.1 WECOM_CONTACT_PORT=18781\nEnvironment=WECOM_KF_HOST=127.0.0.1 WECOM_KF_PORT=18780\nBindReadOnlyPaths=/usr /lib /lib64\nPrivateDevices=yes\nPrivateTmp=yes\nProtectSystem=strict\nReadWritePaths=/opt/trading-system/runtime\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nRestrictSUIDSGID=yes\nUMask=0077\nRestart=on-failure\nRestartSec=5\nTimeoutStopSec=15\nKillMode=control-group\nStandardOutput=null\nStandardError=null\n\'\'\'\n return {unit_name(role):(\'[Unit]\\nDescription=PR99 approved domestic \'+role+\'\\nStartLimitIntervalSec=60\\nStartLimitBurst=3\\n\\n[Service]\\nType=simple\\nUser=\'+account+\'\\nGroup=\'+account+\'\\nRootDirectory=\'+str(ROOT)+\'\\nWorkingDirectory=/opt/trading-system\\nExecStart=/venv/bin/python \'+cmd+common).encode() for role,(cmd,_) in UNITS.items()}\ndef validate_final_receipts(p,fence_raw,checkpoint_raw,assignment_raw,now):\n # These technical proof bytes must match the exact root-held start inputs.\n # Structure alone is never evidence that a writer was actually fenced.\n require(p.get(\'source_writer_fence_receipt_sha256\')==sha(fence_raw),\'SOURCE_FENCE_PROOF\')\n require(p.get(\'final_checkpoint_receipt_sha256\')==sha(checkpoint_raw),\'FINAL_CHECKPOINT_PROOF\')\n require(p.get(\'canonical_writer_assignment_sha256\')==sha(assignment_raw),\'WRITER_ASSIGNMENT_PROOF\')\n fence=json.loads(fence_raw);checkpoint=json.loads(checkpoint_raw);assignment=json.loads(assignment_raw)\n require(all(type(x) is dict for x in (fence,checkpoint,assignment)),\'FINAL_RECEIPT_SCHEMA\')\n inventory=p.get(\'writer_inventory_sha256\');epoch=p.get(\'writer_epoch\')\n require(type(inventory) is str and re.fullmatch(\'[0-9a-f]{64}\',inventory) and type(epoch) is int and epoch>0,\'WRITER_BINDING_REQUIRED\')\n require(fence.get(\'action\')==\'PR99_SOURCE_WRITER_FENCE_V1\' and\n         fence.get(\'source_host\')==\'iZ6wee8q9z4t03hvqumwfhZ\' and\n         fence.get(\'writer_inventory_sha256\')==inventory and fence.get(\'writer_epoch\')==epoch and\n         fence.get(\'writers_stopped\') is True and fence.get(\'inflight_drained\') is True and\n         fence.get(\'unresolved_shared_writers\')==[],\'SOURCE_WRITER_NOT_FENCED\')\n observed=fence.get(\'observed_at\');captured=checkpoint.get(\'captured_at\')\n require(type(observed) is int and type(captured) is int and now-7200<=observed<=captured<=now,\'FINAL_RECEIPT_TIME\')\n files=p.get(\'final_data_file_hashes\');all_files=p.get(\'file_hashes\',{})\n require(type(files) is dict and files and all(type(n) is str and type(v) is str and\n         re.fullmatch(\'[0-9a-f]{64}\',v) and all_files.get(n)==v for n,v in files.items()),\'FINAL_DATA_BINDING\')\n require(checkpoint.get(\'class\')==\'FINAL_CANONICAL_CHECKPOINT\' and checkpoint.get(\'source_fence_sha256\')==sha(fence_raw)\n         and checkpoint.get(\'files\')==files and checkpoint.get(\'database_integrity\')==\'PASS\'\n         and type(p.get(\'database_schema_sha256\')) is str and re.fullmatch(\'[0-9a-f]{64}\',p[\'database_schema_sha256\'])\n         and checkpoint.get(\'database_schema_sha256\')==p[\'database_schema_sha256\'],\'FINAL_CHECKPOINT_SEMANTICS\')\n require(assignment.get(\'action\')==\'PR99_CANONICAL_WRITER_ASSIGNMENT_V1\' and assignment.get(\'target_host\')==HOST\n         and assignment.get(\'release\')==str(RELEASE) and assignment.get(\'checkpoint_sha256\')==sha(checkpoint_raw)\n         and assignment.get(\'writer_inventory_sha256\')==inventory and assignment.get(\'writer_epoch\')==epoch\n         and assignment.get(\'target_identity\')==\'xuanjun-s07\' and assignment.get(\'source_writer_resumed\') is False\n         and assignment.get(\'scope\')==list(UNITS),\'WRITER_ASSIGNMENT_SEMANTICS\')\n return True\n\ndef admit():\n require(os.geteuid()==0 and os.uname().nodename==HOST,\'HOST_ROOT\')\n require(stat.S_IMODE(INPUTS.lstat().st_mode)==0o600,\'PRIVATE_ADMISSION\')\n p=json.loads(read(INPUTS,2000000));now=int(time.time())\n require(p[\'action\']==\'PR99_FINAL_DOMESTIC_START_V1\' and p[\'host\']==HOST and p[\'source_sha256\']==sha(read(Path(__file__))), \'EXACT_START_ADMISSION\')\n require(type(p[\'issued_at\']) is int and type(p[\'expires_at\']) is int and p[\'issued_at\']<=now<p[\'expires_at\']<=p[\'issued_at\']+7200,\'ADMISSION_EXPIRED\')\n validate_owner_authority(p)\n require(p[\'release\']==str(RELEASE) and p[\'checkpoint_class\']==\'FINAL_CANONICAL_CHECKPOINT\',\'NO_PRELIMINARY_DATA\')\n require(p[\'source_writer_fence_receipt_sha256\']==sha(read(RELEASE/\'source-writer-fence.receipt.json\',200000)),\'SOURCE_FENCE_PROOF\')\n require(p[\'final_checkpoint_receipt_sha256\']==sha(read(RELEASE/\'final-checkpoint.receipt.json\',200000)),\'FINAL_CHECKPOINT_PROOF\')\n require(p[\'canonical_writer_assignment_sha256\']==sha(read(RELEASE/\'canonical-writer-assignment.json\',200000)),\'WRITER_ASSIGNMENT_PROOF\')\n validate_final_receipts(p,read(RELEASE/\'source-writer-fence.receipt.json\',200000),\n                         read(RELEASE/\'final-checkpoint.receipt.json\',200000),\n                         read(RELEASE/\'canonical-writer-assignment.json\',200000),now)\n # Owner removed the review/permit wait; the remaining inputs bind actual data and effects.\n # This controller never creates those receipts or treats fixture flags as proof.\n account=pwd.getpwnam(\'xuanjun-s07\');group=grp.getgrnam(\'xuanjun-s07\');require(account.pw_uid==p[\'uid\'] and account.pw_gid==group.gr_gid==p[\'gid\'] and p[\'uid\'] not in (0,65534),\'PREPARED_DEDICATED_IDENTITY\')\n expected=p[\'file_hashes\'];require(100<=len(expected)<=12000,\'FINAL_FILE_SET\')\n observed={};observed_links={};total=0\n for current,dirs,files in os.walk(ROOT,followlinks=False):\n  for name in list(dirs):\n   q=Path(current)/name\n   if q.is_symlink():\n    require(q.relative_to(ROOT).as_posix()==\'venv/lib64\' and os.readlink(q)==\'lib\',\'FINAL_DIRECTORY_LINK\')\n    observed_links[\'venv/lib64\']=\'lib\';dirs.remove(name)\n  for name in files:\n   path=Path(current)/name;rel=path.relative_to(ROOT).as_posix()\n   if path.is_symlink():\n    require(rel in (\'venv/bin/python\',\'venv/bin/python3\',\'venv/bin/python3.11\',\'venv/lib64\'),\'FINAL_LINK\')\n    require(p[\'links\'].get(rel)==os.readlink(path),\'FINAL_LINK_TARGET\');observed_links[rel]=os.readlink(path);continue\n   raw=read(path,runtime_uid=p[\'uid\'],runtime_gid=p[\'gid\']);total+=len(raw);require(total<=536870912,\'FINAL_BYTE_BOUND\');observed[rel]=sha(raw)\n require(observed==expected and observed_links==p[\'links\'],\'FINAL_EXACT_HASH_SET\')\n payload=units(\'xuanjun-s07\');require({n:sha(b) for n,b in payload.items()}==p[\'unit_hashes\'],\'EXACT_UNIT_HASHES\')\n return p,payload\n\ndef health(port):\n c=http.client.HTTPConnection(\'127.0.0.1\',port,timeout=2)\n try:c.request(\'GET\',\'/healthz\');r=c.getresponse();r.read(65536);return r.status\n except (OSError,http.client.HTTPException):return None\n finally:c.close()\ndef rollback_owned(payload,effect=None):\n # Stop only own, exact-byte units. Data is never restored or deleted, and the\n # source writer is never resumed: its reconciliation authority is external.\n for name,b in payload.items():\n  path=SYSTEMD/name\n  require(os.path.lexists(path),\'ROLLBACK_MISSING_OWNED_UNIT\')\n  require(read(path)==b,\'ROLLBACK_FOREIGN_UNIT\')\n for name in payload:\n  if (SYSTEMD/name).exists():\n   if effect is None:ctl(\'stop\',name)\n   else:effect(\'stop:\'+name,lambda name=name:ctl(\'stop\',name))\n   require(stopped(name),\'ROLLBACK_STILL_RUNNING\')\n require(all(health(port) is None for _,port in UNITS.values()),\'ROLLBACK_LISTENER_REMAINS\')\n return {\'status\':\'OWNED_APPS_STOPPED_DATA_PRESERVED\',\'source_writer_resumed\':False,\'route_changed\':False}\nclass EffectJournal:\n """Append-only operation records in the ORIGINAL one-use production STATE.\n A missing terminal result means UNKNOWN, including a crash before dispatch.\n This is not a new admission or migration progress ledger.\n """\n def __init__(self):self.sequence=0\n def effect(self,operation,action):\n  stem=\'effect-\'+str(self.sequence).zfill(4);self.sequence+=1\n  create(STATE/(stem+\'.intent.json\'),canonical({\'operation\':operation}))\n  try:result=action()\n  except KnownEffectFailure:\n   create(STATE/(stem+\'.result.json\'),canonical({\'status\':\'FAILED\'}));raise\n  except BaseException:\n   # Do not serialize raw exceptions, command output or private input.\n   raise EffectUnknown(\'EFFECT_UNKNOWN_QUERY_ONLY_NO_REPLAY\') from None\n  try:create(STATE/(stem+\'.result.json\'),canonical({\'status\':\'SUCCEEDED\'}))\n  except BaseException:raise EffectUnknown(\'RESULT_WRITE_UNKNOWN_QUERY_ONLY_NO_REPLAY\') from None\n  return result\n\ndef ports_available():\n handles=[]\n try:\n  for _,port in UNITS.values():\n   sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM);handles.append(sock)\n   sock.bind((\'127.0.0.1\',port))\n  return True\n except OSError:return False\n finally:\n  for sock in handles:sock.close()\n\ndef supervised(name):\n values=dict(l.split(\'=\',1) for l in ctl(\'show\',name,\'--property=ActiveState,MainPID\',\'--no-pager\').splitlines() if \'=\' in l)\n return values.get(\'ActiveState\')==\'active\' and values.get(\'MainPID\',\'\').isdigit() and int(values[\'MainPID\'])>0\n\ndef verify_units(payload):\n r=subprocess.run([\'/usr/bin/systemd-analyze\',\'verify\',*[str(SYSTEMD/n) for n in payload]],capture_output=True,timeout=30)\n if r.returncode!=0:raise KnownEffectFailure(\'SYSTEMD_VERIFY_FAILED\')\n\ndef validate_effect_sequence(operations,payload):\n """Validate the only sequence this helper can emit, including nested rollback.\n Read-only recovery never treats a filename sequence as semantic evidence.\n """\n if operations and operations[0][\'operation\']==\'retire-stopped-candidate\':\n  require(operations[0][\'status\']==\'SUCCEEDED\' or len(operations)==1,\'OPERATION_AFTER_UNRESOLVED_RETIREMENT\')\n  operations=operations[1:]\n forward=[\'create:\'+n for n in payload]+[\'daemon-reload\']+[\'start:\'+n for n in payload]\n index=0\n while index<len(operations) and operations[index][\'operation\']!=\'rollback-owned\':\n  require(index<len(forward) and operations[index][\'operation\']==forward[index],\'OPERATION_SEMANTIC_SEQUENCE\')\n  if index:require(operations[index-1][\'status\']==\'SUCCEEDED\',\'OPERATION_AFTER_UNRESOLVED\')\n  index+=1\n if index==len(operations):return\n if index:require(operations[index-1][\'status\']!=\'UNKNOWN\',\'ROLLBACK_AFTER_UNKNOWN\')\n rollback=operations[index];children=operations[index+1:]\n created=[row[\'operation\'][len(\'create:\'):] for row in operations[:index]\n          if row[\'operation\'].startswith(\'create:\') and row[\'status\']==\'SUCCEEDED\']\n expected=[\'stop:\'+name for name in created]\n require(len(children)<=len(expected),\'ROLLBACK_OPERATION_COUNT\')\n for number,row in enumerate(children):\n  require(row[\'operation\']==expected[number],\'ROLLBACK_OPERATION_SEQUENCE\')\n  if number:require(children[number-1][\'status\']==\'SUCCEEDED\',\'ROLLBACK_AFTER_UNRESOLVED\')\n if rollback[\'status\']==\'SUCCEEDED\':\n  require(len(children)==len(expected) and all(row[\'status\']==\'SUCCEEDED\' for row in children),\'ROLLBACK_RESULT_CONFLICT\')\n\ndef query_only():\n """Read-only original-state query; never starts, stops, repairs or deletes.\n Does not renew admission. All outputs exclude private data and raw command output.\n """\n require(os.geteuid()==0 and os.uname().nodename==HOST,\'HOST_ROOT\')\n # Require original root-owned private state before opening its existing lock.\n st=STATE.lstat();require(stat.S_ISDIR(st.st_mode) and st.st_uid==0 and stat.S_IMODE(st.st_mode)==0o700,\'STATE_IDENTITY\')\n fd=os.open(STATE/\'lock\',os.O_RDONLY|os.O_NOFOLLOW)\n with os.fdopen(fd,\'rb\') as lock:\n  fcntl.flock(lock,fcntl.LOCK_SH|fcntl.LOCK_NB)\n  intent=json.loads(read(STATE/\'intent.json\',2000000))\n  payload=units(\'xuanjun-s07\')\n  require(intent[\'source_sha256\']==sha(read(Path(__file__))),\'QUERY_SOURCE_DRIFT\')\n  require(intent[\'unit_hashes\']=={n:sha(b) for n,b in payload.items()},\'QUERY_UNIT_BINDING\')\n  operations=[];unknown=False\n  paths=sorted(STATE.glob(\'effect-*.intent.json\'))\n  require([p.name for p in paths]==[\'effect-\'+str(i).zfill(4)+\'.intent.json\' for i in range(len(paths))],\'OPERATION_SEQUENCE\')\n  allowed_results={p.name.replace(\'.intent.json\',\'.result.json\') for p in paths}\n  require(all(p.name in allowed_results for p in STATE.glob(\'effect-*.result.json\')),\'ORPHAN_OPERATION_RESULT\')\n  for path in paths:\n   record=json.loads(read(path,20000));require(type(record) is dict and set(record)=={\'operation\'},\'OPERATION_INTENT_SCHEMA\')\n   operation=record[\'operation\'];require(type(operation) is str,\'OPERATION_NAME_TYPE\')\n   result_path=path.with_name(path.name.replace(\'.intent.json\',\'.result.json\'))\n   status=\'UNKNOWN\'\n   if os.path.lexists(result_path):\n    record=json.loads(read(result_path,20000));require(type(record) is dict and set(record)=={\'status\'},\'OPERATION_RESULT_SCHEMA\')\n    status=record[\'status\'];require(status in (\'SUCCEEDED\',\'FAILED\'),\'OPERATION_RESULT\')\n   unknown|=status==\'UNKNOWN\';operations.append({\'operation\':operation,\'status\':status})\n  validate_effect_sequence(operations,payload)\n  services={}\n  for name,b in payload.items():\n   path=SYSTEMD/name\n   if os.path.lexists(path):require(read(path)==b,\'QUERY_FOREIGN_UNIT\')\n   services[name]={\'unit_present\':os.path.lexists(path),\'stopped\':stopped(name)}\n  return {\'status\':\'UNKNOWN_QUERY_ONLY_NO_REPLAY\' if unknown else \'OBSERVED_ONLY_NO_RESUME\',\n          \'operations\':operations,\'services\':services,\'production_cutover\':False,\'retry_allowed\':False}\n\ndef _start():\n # Owner authority is explicit; exact final files/Fence/assignment remain required facts.\n p,payload=admit();candidate=inspect_stopped_candidate();STATE.mkdir(mode=0o700)\n d=os.open(STATE.parent,os.O_RDONLY|os.O_DIRECTORY)\n try:os.fsync(d)\n finally:os.close(d)\n fd=os.open(STATE/\'lock\',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)\n with os.fdopen(fd,\'w\') as lock:\n  fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)\n  require(inspect_stopped_candidate()[\'kind\']==candidate[\'kind\'],\'CANDIDATE_CHANGED\')\n  require(ports_available() and all(health(port) is None for _,port in UNITS.values()),\'PORT_ALREADY_OCCUPIED\')\n  create(STATE/\'intent.json\',canonical({\'start_inputs_sha256\':sha(read(INPUTS)),\'source_sha256\':sha(read(Path(__file__))),\n      \'unit_hashes\':p[\'unit_hashes\'],\'source_writer_fence_receipt_sha256\':p[\'source_writer_fence_receipt_sha256\']}))\n  created={};journal=EffectJournal()\n  journal.effect(\'retire-stopped-candidate\',lambda:retire_stopped_candidate(p,candidate))\n  try:\n   for n,b in payload.items():\n    journal.effect(\'create:\'+n,lambda n=n,b=b:create(SYSTEMD/n,b,0o644));created[n]=b\n   journal.effect(\'daemon-reload\',lambda:ctl(\'daemon-reload\'))\n   verify_units(payload)\n   require(int(time.time())<p[\'expires_at\'],\'ADMISSION_EXPIRED_BEFORE_START\')\n   require(admit()[0]==p,\'PRESTART_DRIFT\')\n   for n in payload:\n    require(int(time.time())<p[\'expires_at\'],\'ADMISSION_EXPIRED_BEFORE_START\')\n    journal.effect(\'start:\'+n,lambda n=n:ctl(\'start\',n))\n   deadline=time.monotonic()+30;statuses={}\n   while time.monotonic()<deadline:\n    statuses={role:health(port) for role,(_,port) in UNITS.items()}\n    if all(v==200 for v in statuses.values()) and all(supervised(n) for n in payload):break\n    time.sleep(.5)\n   require(set(statuses)==set(UNITS) and all(v==200 for v in statuses.values()) and all(supervised(n) for n in payload),\'START_HEALTH_OR_SUPERVISION_FAILED\')\n   result={\'status\':\'THREE_APPS_STARTED_NO_TRAFFIC_CUTOVER\',\'health\':statuses,\'services_installed\':True,\'production_cutover\':False,\'upstream_auth_acceptance\':\'PENDING\',\'final_data_restored_on_failure\':False}\n   create(STATE/\'receipt.json\',canonical(result));return result\n  except EffectUnknown:\n   # In-flight start/stop/daemon actions must not race a compensating command.\n   create(STATE/\'failure.json\',canonical({\'status\':\'EFFECT_UNKNOWN_QUERY_ONLY_NO_REPLAY\',\'retry_allowed\':False}));raise\n  except BaseException:\n   # Known failure: journal containment too. Existing rollback only touches exact\n   # owned unit bytes, never resumes a source writer or restores data.\n   try:r=journal.effect(\'rollback-owned\',lambda:rollback_owned(created,effect=journal.effect))\n   except BaseException:r={\'status\':\'ROLLBACK_UNKNOWN_PRESERVE_NO_RETRY\'}\n   create(STATE/\'failure.json\',canonical(r));raise\n\n\nFROZEN_STOPPED=\'"""PR99 exact-byte, stopped-unit installation and conflict-safe rollback.\\nNo start/enable/restart, route edit, data restore, user creation or cloud call.\\nHost execution requires a separate root-held, independently issued admission.\\n"""\\nimport argparse\\nimport fcntl\\nimport hashlib\\nimport json\\nimport os\\nimport re\\nimport stat\\nimport subprocess\\nimport time\\nfrom pathlib import Path\\n\\nHOST = \\\'iZvt5t8tlrm8oiZ\\\'\\nRELEASE = \\\'/opt/xuanjun-migration-s07/releases/domestic-r2\\\'\\nSTATE = \\\'/var/lib/xuanjun-pr99-s09-stopped-install-v1\\\'\\nADMISSION = \\\'/etc/xuanjun-pr99/s09-stopped-install.admission.json\\\'\\nNAMES = tuple(\\\'xuanjun-pr99-domestic-\\\' + r + \\\'.service\\\' for r in (\\\'portal\\\', \\\'contact\\\', \\\'customer-service\\\'))\\nORIGINAL = (\\\'secure-secrets-portal.service\\\', \\\'xuanjun-wecom-customer-contact.service\\\', \\\'xuanjun-wecom-customer-service.service\\\')\\nPROTECTED = ORIGINAL + (\\\'provider-neutral-domestic-bridge.service\\\', \\\'winctl.service\\\', \\\'nginx.service\\\')\\n\\n\\ndef require(ok, code):\\n    if not ok:\\n        raise RuntimeError(code)\\n\\n\\ndef digest(data):\\n    return hashlib.sha256(data).hexdigest()\\n\\n\\ndef encode(value):\\n    return (json.dumps(value, sort_keys=True, indent=2) + \\\'\\\\n\\\').encode()\\n\\n\\ndef read_regular(path, limit=100000, private=False):\\n    path = Path(path)\\n    for parent in reversed(path.parents):\\n        require(not parent.is_symlink(), \\\'SYMLINK_PARENT\\\')\\n    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)\\n    try:\\n        before = os.fstat(fd)\\n        require(stat.S_ISREG(before.st_mode) and before.st_uid == 0 and before.st_nlink == 1, \\\'FILE_IDENTITY\\\')\\n        require(not before.st_mode & 0o022, \\\'WRITABLE_INPUT\\\')\\n        if private:\\n            require(not before.st_mode & 0o077, \\\'PRIVATE_INPUT_MODE\\\')\\n        data = os.read(fd, limit + 1)\\n        after = os.fstat(fd)\\n        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)\\n        require(len(data) <= limit and identity(before) == identity(after), \\\'INPUT_CHANGED_OR_OVERSIZE\\\')\\n        return data\\n    finally:\\n        os.close(fd)\\n\\n\\ndef write_exclusive(path, data, mode=0o600):\\n    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)\\n    try:\\n        with os.fdopen(fd, \\\'wb\\\', closefd=False) as stream:\\n            stream.write(data)\\n            stream.flush()\\n            os.fsync(fd)\\n    finally:\\n        os.close(fd)\\n    directory = os.open(Path(path).parent, os.O_RDONLY | os.O_DIRECTORY)\\n    try:\\n        os.fsync(directory)\\n    finally:\\n        os.close(directory)\\n\\n\\ndef unit_bytes():\\n    commands = (\\n        \\\'scripts/secure_secrets_portal_server.py serve --host 127.0.0.1 --port 18080\\\',\\n        \\\'-m ai_service.wecom_customer_contact_service\\\',\\n        \\\'-m ai_service.wecom_customer_service\\\',\\n    )\\n    result = {}\\n    for name, command in zip(NAMES, commands):\\n        # Quarantine is mandatory. These units cannot reach the real bridge.\\n        result[name] = (\\\'\\\'\\\'[Unit]\\nDescription=PR99 quarantined domestic candidate\\nConditionPathExists={release}/callback-restart-acceptance-v1/receipt.json\\n\\n[Service]\\nType=simple\\nUser=65534\\nGroup=65534\\nRootDirectory={release}/rootfs\\nWorkingDirectory=/opt/trading-system\\nExecStart=/venv/bin/python {command}\\nEnvironment=PYTHONPATH=/opt/trading-system PYTHONDONTWRITEBYTECODE=1\\nEnvironment=WECOM_CONTACT_HOST=127.0.0.1 WECOM_CONTACT_PORT=18781\\nEnvironment=WECOM_KF_HOST=127.0.0.1 WECOM_KF_PORT=18780\\nBindReadOnlyPaths=/usr /lib /lib64\\nPrivateDevices=yes\\nPrivateNetwork=yes\\nPrivateTmp=yes\\nProtectSystem=strict\\nReadWritePaths=/opt/trading-system/runtime /home /tmp\\nNoNewPrivileges=yes\\nCapabilityBoundingSet=\\nRestrictSUIDSGID=yes\\nUMask=0077\\nRestart=no\\nTimeoutStopSec=15\\nKillMode=control-group\\nStandardOutput=null\\nStandardError=null\\n\\\'\\\'\\\'.format(release=RELEASE, command=command)).encode()\\n    return result\\n\\n\\ndef manifest():\\n    return {\\\'schema\\\': 1, \\\'action\\\': \\\'INSTALL_STOPPED_QUARANTINE_ONLY\\\', \\\'host\\\': HOST,\\n            \\\'release\\\': RELEASE, \\\'unit_hashes\\\': {n: digest(b) for n, b in unit_bytes().items()},\\n            \\\'activation_supported\\\': False, \\\'production_cutover\\\': False}\\n\\n\\ndef systemctl(*args):\\n    result = subprocess.run([\\\'/usr/bin/systemctl\\\', *args], capture_output=True, timeout=20)\\n    require(result.returncode == 0, \\\'SYSTEMCTL_FAILED_PRESERVE\\\')\\n    return result.stdout.decode()\\n\\n\\ndef snapshot():\\n    result = {u: systemctl(\\\'show\\\', u, \\\'--property=LoadState,ActiveState,SubState,MainPID,FragmentPath\\\', \\\'--no-pager\\\') for u in PROTECTED}\\n    for name in (\\\'/var/www/wenwenwenyiyiyi.work/current\\\', \\\'/opt/trading-system\\\'):\\n        p = Path(name)\\n        if p.is_symlink():\\n            result[name] = {\\\'link\\\': os.readlink(p)}\\n        elif p.exists():\\n            s = p.stat()\\n            result[name] = {\\\'dev\\\': s.st_dev, \\\'ino\\\': s.st_ino, \\\'mode\\\': s.st_mode, \\\'uid\\\': s.st_uid, \\\'gid\\\': s.st_gid}\\n        else:\\n            result[name] = None\\n    return result\\n\\n\\ndef stopped(name):\\n    value = systemctl(\\\'show\\\', name, \\\'--property=ActiveState,MainPID\\\', \\\'--no-pager\\\')\\n    fields = dict(line.split(\\\'=\\\', 1) for line in value.splitlines() if \\\'=\\\' in line)\\n    return fields.get(\\\'MainPID\\\') == \\\'0\\\' and fields.get(\\\'ActiveState\\\') in (\\\'inactive\\\', \\\'failed\\\')\\n\\n\\ndef admission(action, source):\\n    raw = read_regular(ADMISSION, private=True)\\n    permit = json.loads(raw)\\n    require(permit[\\\'schema\\\'] == 1 and permit[\\\'host\\\'] == HOST, \\\'ADMISSION_HOST\\\')\\n    require(permit[\\\'action\\\'] == action and permit[\\\'source_sha256\\\'] == digest(source), \\\'ADMISSION_ACTION_SOURCE\\\')\\n    require(permit[\\\'manifest_sha256\\\'] == digest(encode(manifest())), \\\'ADMISSION_MANIFEST\\\')\\n    now = int(time.time())\\n    require(type(permit[\\\'issued_at\\\']) is int and type(permit[\\\'expires_at\\\']) is int, \\\'ADMISSION_TIME_TYPE\\\')\\n    require(permit[\\\'issued_at\\\'] <= now < permit[\\\'expires_at\\\'] <= permit[\\\'issued_at\\\'] + 7200, \\\'ADMISSION_EXPIRED\\\')\\n    require(re.fullmatch(r\\\'[a-zA-Z0-9_-]{16,80}\\\', permit[\\\'nonce\\\']) is not None, \\\'ADMISSION_NONCE\\\')\\n    require(type(permit[\\\'independent_review_comment_id\\\']) is int and permit[\\\'independent_review_comment_id\\\'] > 0, \\\'INDEPENDENT_REVIEW_REFERENCE\\\')\\n    # A local file is not itself independent review evidence. Its provisioning\\n    # through the original reviewed authority is a separate mandatory host gate.\\n    return permit, digest(raw)\\n\\n\\ndef install(units_dir, state, permit, permit_hash):\\n    units = unit_bytes()\\n    before = snapshot()\\n    for original in ORIGINAL:\\n        require(\\\'LoadState=not-found\\\' in before[original], \\\'ORIGINAL_UNIT_PRESENT\\\')\\n    for name in NAMES:\\n        require(not os.path.lexists(units_dir / name), \\\'TARGET_UNIT_PRESENT\\\')\\n        require(stopped(name), \\\'TARGET_NOT_STOPPED\\\')\\n    receipt = json.loads(read_regular(Path(RELEASE) / \\\'callback-restart-acceptance-v1/receipt.json\\\', private=True))\\n    require(receipt[\\\'status\\\'] == \\\'R2_CALLBACK_REJECTION_RESTART_CLEANUP_PASS_NOT_PRODUCTION\\\' and receipt[\\\'application_processes_stopped\\\'] is True, \\\'COPY_ACCEPTANCE_MISSING\\\')\\n    write_exclusive(state / \\\'before.json\\\', encode(before))\\n    write_exclusive(state / \\\'intent.json\\\', encode({\\\'permit_sha256\\\': permit_hash, \\\'nonce\\\': permit[\\\'nonce\\\'], \\\'manifest\\\': manifest()}))\\n    created = []\\n    try:\\n        for name, data in units.items():\\n            write_exclusive(units_dir / name, data, 0o644)\\n            created.append(name)\\n            write_exclusive(state / (name + \\\'.created\\\'), encode({\\\'sha256\\\': digest(data)}))\\n        systemctl(\\\'daemon-reload\\\')\\n        require(all(stopped(n) for n in NAMES), \\\'UNIT_NOT_STOPPED\\\')\\n        require(snapshot() == before, \\\'PROTECTED_CHANGED\\\')\\n        write_exclusive(state / \\\'receipt.json\\\', encode({\\\'status\\\': \\\'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION\\\', \\\'manifest\\\': manifest(), \\\'protected_state_unchanged\\\': True, \\\'starts\\\': 0, \\\'enables\\\': 0}))\\n    except BaseException:\\n        # Never delete an unrecognised or running unit, even after partial failure.\\n        write_exclusive(state / \\\'failure.json\\\', encode({\\\'status\\\': \\\'HOLD_PRESERVE\\\', \\\'created\\\': created}))\\n        raise\\n\\n\\ndef rollback(units_dir, state, permit, permit_hash):\\n    intent = json.loads(read_regular(state / \\\'intent.json\\\', private=True))\\n    require(intent[\\\'manifest\\\'] == manifest(), \\\'ROLLBACK_MANIFEST\\\')\\n    require(not (state / \\\'rollback.intent.json\\\').exists(), \\\'ROLLBACK_ALREADY_CONSUMED\\\')\\n    before = snapshot()\\n    targets = []\\n    for name, data in unit_bytes().items():\\n        p = units_dir / name\\n        if os.path.lexists(p):\\n            require(read_regular(p) == data and stopped(name), \\\'ROLLBACK_CONFLICT_OR_RUNNING\\\')\\n            # Only units whose transaction intent predates creation may be removed.\\n            marker = json.loads(read_regular(state / (name + \\\'.created\\\'), private=True))\\n            require(marker[\\\'sha256\\\'] == digest(data), \\\'ROLLBACK_OWNERSHIP\\\')\\n            targets.append(name)\\n    write_exclusive(state / \\\'rollback.intent.json\\\', encode({\\\'nonce\\\': permit[\\\'nonce\\\'], \\\'permit_sha256\\\': permit_hash, \\\'targets\\\': targets}))\\n    for name in targets:\\n        require(read_regular(units_dir / name) == unit_bytes()[name] and stopped(name), \\\'ROLLBACK_CHANGED\\\')\\n        (units_dir / name).unlink()\\n    systemctl(\\\'daemon-reload\\\')\\n    require(snapshot() == before, \\\'PROTECTED_CHANGED\\\')\\n    write_exclusive(state / \\\'rollback.receipt.json\\\', encode({\\\'status\\\': \\\'OWNED_STOPPED_UNITS_REMOVED\\\', \\\'removed\\\': targets, \\\'production_cutover\\\': False}))\\n\\n\\ndef main():\\n    parser = argparse.ArgumentParser()\\n    parser.add_argument(\\\'action\\\', choices=(\\\'manifest\\\', \\\'install-stopped\\\', \\\'rollback-stopped\\\'))\\n    args = parser.parse_args()\\n    if args.action == \\\'manifest\\\':\\n        print(encode(manifest()).decode(), end=\\\'\\\')\\n        return\\n    require(os.geteuid() == 0 and os.uname().nodename == HOST, \\\'HOST_ROOT\\\')\\n    os.umask(0o077)\\n    source = read_regular(Path(__file__), 100000)\\n    permit, permit_hash = admission(args.action, source)\\n    state = Path(STATE)\\n    if args.action == \\\'install-stopped\\\':\\n        state.mkdir(mode=0o700)  # one attempt; never replay or merge state\\n    require(stat.S_IMODE(state.lstat().st_mode) == 0o700 and state.lstat().st_uid == 0 and not state.is_symlink(), \\\'STATE_IDENTITY\\\')\\n    lock = os.open(state / \\\'lock\\\', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)\\n    try:\\n        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\\n        if args.action == \\\'install-stopped\\\':\\n            install(Path(\\\'/etc/systemd/system\\\'), state, permit, permit_hash)\\n        else:\\n            rollback(Path(\\\'/etc/systemd/system\\\'), state, permit, permit_hash)\\n    finally:\\n        os.close(lock)\\n\\n\\nif __name__ == \\\'__main__\\\':\\n    main()\\n\'\n\nOWNER_AUTHORITY={\'mode\':\'OWNER_DIRECT\',\'instruction_at\':\'2026-10-19T00:29:13+08:00\',\'scope\':\'PR99_DOMESTIC_MIGRATION\'}\n\ndef validate_owner_authority(p):\n require(p.get(\'owner_authority\')==OWNER_AUTHORITY,\'OWNER_AUTHORITY_BINDING\')\n require(type(p.get(\'nonce\'))is str and re.fullmatch(\'[A-Za-z0-9_-]{16,80}\',p[\'nonce\']),\'OWNER_INPUT_NONCE\')\n # A reviewer ID cannot replace Owner authority and is not required.\n return True\n\ndef stopped_library():\n require(sha(FROZEN_STOPPED.encode())==\'99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315\',\'ORIGINAL_STOPPED_SOURCE\')\n n={\'__name__\':\'original_stopped_definitions\'}\n exec(compile(FROZEN_STOPPED,\'original_stopped_definitions\',\'exec\'),n)\n n[\'PROTECTED\']=tuple(sorted(set(n[\'PROTECTED\'])|{\'windows-interaction-http.service\'}))\n n[\'systemctl\']=ctl\n return n\n\ndef inspect_stopped_candidate():\n n=stopped_library();names=n[\'NAMES\'];state=Path(n[\'STATE\'])\n present=[os.path.lexists(SYSTEMD/name) for name in names]\n if not any(present):\n  if os.path.lexists(state):\n   # Previously installed candidates may only be absent after the exact\n   # original terminal rollback; unexplained deletion is never adopted.\n   receipt=json.loads(n[\'read_regular\'](state/\'rollback.receipt.json\',private=True))\n   require(receipt.get(\'status\')==\'OWNED_STOPPED_UNITS_REMOVED\' and set(receipt.get(\'removed\',[]))==set(names),\'ORIGINAL_REMOVAL_UNKNOWN\')\n  require(all(stopped(name) for name in names),\'TARGET_STILL_RUNNING\')\n  return {\'kind\':\'NO_CANDIDATE\',\'library\':n}\n require(all(present),\'PARTIAL_OR_FOREIGN_CANDIDATE\')\n receipt=json.loads(n[\'read_regular\'](state/\'receipt.json\',private=True))\n require(receipt.get(\'status\')==\'QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION\' and receipt.get(\'manifest\')==n[\'manifest\']() and receipt.get(\'starts\')==receipt.get(\'enables\')==0,\'ORIGINAL_STOPPED_RECEIPT\')\n require(not os.path.lexists(state/\'rollback.intent.json\'),\'ORIGINAL_RETIREMENT_ALREADY_CONSUMED\')\n for name,data in n[\'unit_bytes\']().items():\n  require(n[\'read_regular\'](SYSTEMD/name)==data and stopped(name),\'FOREIGN_OR_RUNNING_CANDIDATE\')\n  marker=json.loads(n[\'read_regular\'](state/(name+\'.created\'),private=True))\n  require(marker.get(\'sha256\')==n[\'digest\'](data),\'ORIGINAL_CANDIDATE_OWNERSHIP\')\n return {\'kind\':\'EXACT_OWNED_STOPPED_CANDIDATE\',\'library\':n}\n\ndef retire_stopped_candidate(p,candidate):\n require(inspect_stopped_candidate()[\'kind\']==candidate[\'kind\'],\'CANDIDATE_CHANGED_BEFORE_RETIREMENT\')\n if candidate[\'kind\']==\'NO_CANDIDATE\':return {\'status\':\'NO_CANDIDATE_TO_RETIRE\'}\n require(candidate[\'kind\']==\'EXACT_OWNED_STOPPED_CANDIDATE\',\'CANDIDATE_KIND\')\n n=candidate[\'library\'];state=Path(n[\'STATE\'])\n # The original rollback removes ONLY its exact stopped bytes and records\n # its own before/after protected snapshots. It does not stop any service.\n n[\'rollback\'](SYSTEMD,state,{\'nonce\':p[\'nonce\']},sha(canonical(p[\'owner_authority\'])))\n receipt=json.loads(n[\'read_regular\'](state/\'rollback.receipt.json\',private=True))\n require(receipt.get(\'status\')==\'OWNED_STOPPED_UNITS_REMOVED\' and set(receipt.get(\'removed\',[]))==set(n[\'NAMES\']),\'ORIGINAL_RETIREMENT_TERMINAL_RECEIPT\')\n return receipt\n\ndef start():\n from contextlib import ExitStack\n require(os.geteuid()==0 and os.uname().nodename==HOST,\'HOST_ROOT\')\n n=stopped_library();state=Path(n[\'STATE\'])\n # Borrow the exact existing stopped-install lock across final admission,\n # removal and production installation. No second candidate claim is made.\n with ExitStack() as stack:\n  if os.path.lexists(state):\n   s=state.lstat();require(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and stat.S_IMODE(s.st_mode)==0o700,\'ORIGINAL_STOPPED_STATE\')\n   fd=os.open(state/\'lock\',os.O_RDWR|os.O_NOFOLLOW|os.O_CLOEXEC)\n   stack.callback(os.close,fd)\n   s=os.fstat(fd);require(stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o600,\'ORIGINAL_STOPPED_LOCK\')\n   fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)\n  return _start()\n\nif __name__==\'__main__\':\n import sys\n os.umask(0o077)\n if sys.argv[1:]==[\'query-only\']:result=query_only()\n elif sys.argv[1:]==[\'start\']:result=start()\n else:raise SystemExit(\'EXPECTED_START_OR_QUERY_ONLY\')\n print(json.dumps(result,sort_keys=True))\n'
+HOST_PROGRAM='"""Install the hash-pinned, inert Owner start helper. No activation or data copy."""\nimport datetime\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\nimport urllib.request\n\nPARENT=Path(\'/opt/xuanjun-migration-s07/bin\')\nTARGET=PARENT/\'owner_production_start.py\'\nSOURCE_SHA=\'7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40\'\nSOURCE_URL=\'https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/370cc24a4b8c07dc0100ff2c89f9dd6e53a0c243/evidence/pr99-service-handoff/owner-start/owner_production_start.py\'\nPROTECTED=(\'nginx.service\',\'provider-neutral-domestic-bridge.service\',\'windows-interaction-http.service\')\n\n\ndef need(ok,code):\n    if not ok:raise RuntimeError(code)\n\n\ndef states():\n    result={}\n    for name in PROTECTED:\n        p=subprocess.run([\'/usr/bin/systemctl\',\'show\',name,\'--property=LoadState,ActiveState,SubState,MainPID\',\'--no-pager\'],capture_output=True,timeout=10)\n        need(p.returncode==0 and len(p.stdout)<=8192,\'PROTECTED_STATE_UNKNOWN\')\n        result[name]=p.stdout.decode(\'utf-8\',\'strict\')\n    return result\n\n\ndef stage_file(directory,raw):\n    need(hashlib.sha256(raw).hexdigest()==SOURCE_SHA,\'START_SOURCE_DRIFT\')\n    d=directory.lstat()\n    need(stat.S_ISDIR(d.st_mode) and d.st_uid==os.geteuid() and not d.st_mode&0o022,\'CODE_DIRECTORY_IDENTITY\')\n    target=directory/\'owner_production_start.py\';created=False\n    if not os.path.lexists(target):\n        fd=os.open(target,os.O_RDWR|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW|os.O_CLOEXEC,0o600)\n        try:\n            offset=0\n            while offset<len(raw):\n                size=os.write(fd,raw[offset:]);need(size>0,\'PARTIAL_CODE_PRESERVE\');offset+=size\n            os.fsync(fd);need(os.pread(fd,len(raw)+1,0)==raw,\'CODE_WRITE_DRIFT\')\n            os.fchmod(fd,0o400);os.fsync(fd)\n        finally:os.close(fd)\n        fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)\n        try:os.fsync(fd)\n        finally:os.close(fd)\n        created=True\n    fd=os.open(target,os.O_RDONLY|os.O_NOFOLLOW|os.O_CLOEXEC)\n    try:\n        before=os.fstat(fd)\n        need(stat.S_ISREG(before.st_mode) and before.st_nlink==1 and before.st_uid==os.geteuid() and\n             stat.S_IMODE(before.st_mode)==0o400 and before.st_size==len(raw),\'EXISTING_CODE_IDENTITY_CONFLICT\')\n        observed=os.read(fd,len(raw)+1);after=os.fstat(fd)\n        need(observed==raw and (before.st_dev,before.st_ino,before.st_mtime_ns,before.st_ctime_ns)==\n             (after.st_dev,after.st_ino,after.st_mtime_ns,after.st_ctime_ns),\'EXISTING_CODE_BYTES_CONFLICT\')\n    finally:os.close(fd)\n    return created\n\n\ndef observe(expected,nonce):\n    need(os.geteuid()==0 and os.uname().nodename==expected==\'iZvt5t8tlrm8oiZ\',\'FIXED_DOMESTIC_ROOT\')\n    class NoRedirect(urllib.request.HTTPRedirectHandler):\n        def redirect_request(self,*a,**kw):return None\n    with urllib.request.build_opener(NoRedirect()).open(SOURCE_URL,timeout=20) as response:raw=response.read(34426)\n    need(len(raw)==34425 and hashlib.sha256(raw).hexdigest()==SOURCE_SHA,\'START_SOURCE_DRIFT\')\n    before=states()\n    for parent in reversed(PARENT.parents):\n        s=parent.lstat();need(stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,\'CODE_PARENT_IDENTITY\')\n    directory_created=False\n    if not os.path.lexists(PARENT):PARENT.mkdir(mode=0o700);directory_created=True\n    created=stage_file(PARENT,raw)\n    ns={\'__name__\':\'installed_owner_start_definitions\',\'__file__\':str(TARGET)}\n    exec(compile(raw,str(TARGET),\'exec\'),ns)\n    unit_bytes=ns[\'units\'](\'xuanjun-s07\')\n    need(len(unit_bytes)==3 and all(b\'User=xuanjun-s07\' in b and b\'domestic-final-v1/rootfs\' in b for b in unit_bytes.values()),\'INSTALLED_START_DEFINITION_BINDING\')\n    need(before==states(),\'PROTECTED_STATE_CHANGED_NO_FURTHER_ACTION\')\n    return {\'scope\':\'PR99_STAGE_OWNER_START_PROGRAM_ONLY\',\'hostname\':expected,\'nonce\':nonce,\n      \'observed_at\':datetime.datetime.utcnow().isoformat()+\'Z\',\'path\':str(TARGET),\'source_sha256\':SOURCE_SHA,\n      \'bytes\':len(raw),\'mode\':0o400,\'created\':created,\'directory_created\':directory_created,\'compiled\':True,\n      \'protected_state_unchanged\':True,\'service_actions\':0,\'start_called\':False,\'writer_acquired\':False,\n      \'production_data_copied\':False,\'production_started\':False,\'route_changed\':False,\n      \'production_state_exists\':os.path.lexists(\'/var/lib/xuanjun-pr99-s09-production-start-v1\')}\n\n\nif __name__==\'__main__\':\n    try:print(json.dumps(observe(EXPECTED,NONCE),sort_keys=True),flush=True)\n    except BaseException as error:\n        import re\n        code=str(error)\n        print(json.dumps({\'status\':\'OWNER_START_STAGE_HOLD\',\'error_type\':type(error).__name__,\n          \'code\':code if re.fullmatch(\'[A-Z0-9_]{1,160}\',code) else \'PRIVATE_DETAIL_WITHHELD\',\'retry_allowed\':False}),flush=True)\n        raise SystemExit(2)\n'
+ACTIVE = ('Pending','Running','Stopping')
+TERMINAL = frozenset(('Invalid','Aborted','Success','Failed','Error','Timeout','Cancelled','Terminated'))
+ID = re.compile(r'[A-Za-z0-9_-]{1,180}')
+ALLOWED_ACTIONS = {'AssumeRole','DescribeCommandInvocations','RunCommand','DescribeInvocationResult'}
+original_rpc = rpc
+
+
+def bounded_rpc(endpoint, version, action, credentials, **params):
+    if action not in ALLOWED_ACTIONS:
+        raise Hold('RPC_ACTION_REJECTED')
+    return original_rpc(endpoint, version, action, credentials, **params)
+
+
+def project_invocations(data, instance, status):
+    if type(data) is not dict or type(data.get('TotalCount')) is not int or data['TotalCount'] < 0:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    entries = data.get('CommandInvocations')
+    if type(entries) is not list or len(entries) > 50:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    projected=[]
+    for item in entries:
+        if type(item) is not dict or type(item.get('InvokeId')) is not str or not ID.fullmatch(item['InvokeId']):
+            raise Hold('INVOCATION_ID_REJECTED')
+        peers=item.get('InvokeInstances')
+        if type(peers) is not list:
+            raise Hold('INVOCATION_PEERS_SCHEMA')
+        selected=[p for p in peers if type(p) is dict and p.get('InstanceId') == instance]
+        if len(selected)!=1:
+            raise Hold('INVOCATION_TARGET_NOT_PROVEN')
+        actual=selected[0].get('InvocationStatus')
+        if actual not in ACTIVE and actual not in TERMINAL:
+            raise Hold('INVOCATION_STATUS_UNKNOWN')
+        # Never retain CommandContent, Output, ErrorInfo, Parameters or any other raw fields.
+        projected.append({'invoke_id':item['InvokeId'],'status':actual})
+    return data['TotalCount'],projected
+
+
+def active_invocations(host, credentials, call=bounded_rpc):
+    name,role,region,instance,expected=host
+    endpoint='swas.'+region+'.aliyuncs.com'
+    rows=[]
+    for status in ACTIVE:
+        expected_total=None
+        for page in range(1,6):
+            response=call(endpoint,'2020-06-01','DescribeCommandInvocations',credentials,
+                RegionId=region,InstanceId=instance,InvocationStatus=status,
+                PageNumber=page,PageSize=50)
+            total,items=project_invocations(response,instance,status)
+            if expected_total is not None and total!=expected_total:
+                raise Hold('INVOCATION_LIST_CHANGED_RECHECK_REQUIRED')
+            expected_total=total
+            rows.extend(items)
+            if page*50>=total:break
+            if not items:raise Hold('INVOCATION_PAGINATION_INCOMPLETE')
+        else:
+            raise Hold('INVOCATION_PAGINATION_BOUND_HOLD')
+    # This is an observed API list, not a fence or exclusive Writer assignment.
+    return sorted({r['invoke_id']:r for r in rows}.values(),key=lambda x:x['invoke_id'])
+
+
+def shell_for(expected,nonce):
+    program='EXPECTED='+repr(expected)+'\nNONCE='+repr(nonce)+'\n'+HOST_PROGRAM
+    payload=base64.b64encode(zlib.compress(program.encode(),9)).decode()
+    digest=hashlib.sha256(program.encode()).hexdigest()
+    bootstrap="import base64,zlib,hashlib; b=zlib.decompress(base64.b64decode("+repr(payload)+")); assert hashlib.sha256(b).hexdigest()=="+repr(digest)+"; exec(compile(b,'<pr99-owner-start-code-stage>','exec'))"
+    shell="#!/bin/sh\nset -eu\n/usr/bin/python3.11 -I -B - <<'PR99_READONLY'\n"+bootstrap+"\nPR99_READONLY\n"
+    if len(shell.encode())>11000:raise Hold('COMMAND_LENGTH')
+    return shell
+
+
+"""Strict public metadata boundary for the fixed observer, not an admission."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+def validate_observation(d,expected,nonce):
+    def need(ok):
+        if not ok:raise ValueError('OWNER_START_STAGE_CONTRACT')
+    need(type(d)is dict and set(d)==set('scope hostname nonce observed_at path source_sha256 bytes mode created directory_created compiled protected_state_unchanged service_actions start_called writer_acquired production_data_copied production_started route_changed production_state_exists'.split()))
+    need(d['scope']=='PR99_STAGE_OWNER_START_PROGRAM_ONLY' and d['hostname']==expected and d['nonce']==nonce)
+    need(type(d['observed_at'])is str and re.fullmatch('[0-9T:.Z-]{19,40}',d['observed_at']))
+    need(d['path']=='/opt/xuanjun-migration-s07/bin/owner_production_start.py' and d['source_sha256']=='7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40')
+    need(type(d['bytes'])is int and d['bytes']==34425 and type(d['mode'])is int and d['mode']==256)
+    for k in ('created','directory_created','production_state_exists'):need(type(d[k])is bool)
+    for k in ('compiled','protected_state_unchanged'):need(d[k]is True)
+    for k in ('start_called','writer_acquired','production_data_copied','production_started','route_changed'):need(d[k]is False)
+    need(type(d['service_actions'])is int and d['service_actions']==0)
+    return d
+
+def decode_receipt(output,expected,nonce):
+    try:
+        if type(output)is not str or len(output.encode())>=16000:raise ValueError()
+        try:d=json.loads(output)
+        except ValueError:d=json.loads(base64.b64decode(output,validate=True))
+        return validate_observation(d,expected,nonce)
+    except Exception:raise Hold('OWNER_START_STAGE_OUTPUT_REJECTED') from None
+
+
+
+
+def probe_current(host,master):
+    name,role,region,instance,expected=host
+    row={'host':name,'instance_id':instance,'status':'HOLD','host_commands':0,'run_command_attempted':False,'service_actions':0,
+         'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN'}
+    try:
+        c=bounded_rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,
+            RoleArn=role,RoleSessionName='pr99-resume-'+uuid.uuid4().hex[:16],DurationSeconds=900)['Credentials']
+        credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+        if not all(type(v) is str and v and '\r' not in v and '\n' not in v for v in credentials):
+            raise Hold('CREDENTIAL_RESPONSE_INVALID')
+        for value in credentials:print('::add-mask::'+value,flush=True)
+        row['sts']='PASS_CURRENT'
+        row['nonterminal_invocations']=active_invocations(host,credentials)
+        row['cloud_query']='PASS_CURRENT_OBSERVATION_NOT_FENCE'
+        if any(x['status'] in ACTIVE for x in row['nonterminal_invocations']):
+            raise Hold('EXISTING_INFLIGHT_PRESERVED_NO_NEW_HOST_COMMAND')
+        nonce=uuid.uuid4().hex
+        shell=shell_for(expected,nonce)
+        # Local job claim stops repeat dispatch in this process; no production state is created.
+        # A lost InvokeId remains UNKNOWN. Workflow reruns are rejected before credentials.
+        claim=Path('pr99-stage-owner-start-'+name+'.once')
+        with claim.open('x') as f:
+            f.write(json.dumps({'host':name,'nonce':nonce,'state':'OWNER_START_CODE_STAGE_INTENT'}))
+            f.flush();os.fsync(f.fileno())
+        row.update(run_command_attempted=True,host_commands='UNKNOWN_UNTIL_TERMINAL_RECEIPT')
+        out=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','RunCommand',credentials,
+            RegionId=region,InstanceId=instance,Type='RunShellScript',
+            WorkingUser='root',WorkingDir='/root',Timeout=55,
+            Name='pr99-stage-owner-start-v1',CommandContent=shell)
+        invoke=out.get('InvokeId')
+        if type(invoke) is not str or not ID.fullmatch(invoke):
+            raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+        row.update(invoke_id=invoke)
+        print('PR99_OWNER_STAGE_INVOKE='+json.dumps({'host':name,'invoke_id':invoke}),flush=True)
+        deadline=time.monotonic()+100
+        while time.monotonic()<deadline:
+            response=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','DescribeInvocationResult',credentials,
+                RegionId=region,InstanceId=instance,InvokeId=invoke)
+            detail=response.get('InvocationResult')
+            if type(detail) is not dict or detail.get('InstanceId')!=instance or detail.get('InvokeId')!=invoke:
+                raise Hold('RESULT_IDENTITY_UNKNOWN_NO_RETRY')
+            state=detail.get('InvocationStatus')
+            if state in ACTIVE:time.sleep(5);continue
+            row['invocation_status']=safe(state)
+            if state!='Success' or detail.get('ExitCode')!=0:
+                raise Hold('CODE_STAGE_FAILED_NO_RETRY')
+            row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
+            if row['receipt']['protected_state_unchanged'] is not True:raise Hold('PROTECTED_STATE_CHANGED_NO_FURTHER_ACTION')
+            row['host_commands']=1
+            row['status']='OWNER_START_HELPER_STAGED_NOT_STARTED'
+            return row
+        raise Hold('CODE_STAGE_RESULT_UNKNOWN_NO_RETRY')
+    except Hold as e:row['error_code']=safe(str(e))
+    except Exception:row['error_code']='UNEXPECTED_UNKNOWN_NO_RETRY'
+    return row
+
+
+def self_test():
+    import tempfile
+    n={'__name__':'stage_fixture'};exec(compile(HOST_PROGRAM,'stage_fixture','exec'),n)
+    raw=TEST_START_SOURCE.encode()
+    assert len(raw)==34425 and hashlib.sha256(raw).hexdigest()==n['SOURCE_SHA']
+    with tempfile.TemporaryDirectory() as directory:
+        p=Path(directory)
+        assert n['stage_file'](p,raw)is True
+        assert n['stage_file'](p,raw)is False
+        target=p/'owner_production_start.py';target.chmod(0o600);target.write_bytes(b'partial')
+        try:n['stage_file'](p,raw)
+        except RuntimeError:pass
+        else:raise AssertionError('PARTIAL_CODE_OVERWRITTEN')
+        assert target.read_bytes()==b'partial'
+    assert len(shell_for(HOSTS[0][4],'a'*32).encode())<16000
+    d={'scope':'PR99_STAGE_OWNER_START_PROGRAM_ONLY','hostname':HOSTS[0][4],'nonce':'a'*32,'observed_at':'2026-10-19T01:00:00Z',
+      'path':'/opt/xuanjun-migration-s07/bin/owner_production_start.py','source_sha256':n['SOURCE_SHA'],'bytes':34425,'mode':256,
+      'created':True,'directory_created':True,'compiled':True,'protected_state_unchanged':True,'service_actions':0,
+      'start_called':False,'writer_acquired':False,'production_data_copied':False,'production_started':False,'route_changed':False,'production_state_exists':False}
+    assert decode_receipt(json.dumps(d),HOSTS[0][4],'a'*32)==d
+    for change in (lambda x:x.update(start_called=True),lambda x:x.update(private='TOKEN'),lambda x:x.update(mode=511)):
+        bad=json.loads(json.dumps(d));change(bad)
+        try:decode_receipt(json.dumps(bad),HOSTS[0][4],'a'*32)
+        except Hold:pass
+        else:raise AssertionError('UNSAFE_RECEIPT_ACCEPTED')
+    print('PR99_OWNER_START_STAGE_EXACT_BYTES_CONFLICT_NO_ACTIVATION_PASS_NO_CLOUD',flush=True)
+
+def main():
+    if os.environ.get('PR99_MODE')=='SELF_TEST':
+        self_test();return 0
+    if os.environ.get('GITHUB_RUN_ATTEMPT')!='1':
+        raise Hold('WORKFLOW_RERUN_FORBIDDEN')
+    head=os.environ.get('PR99_HEAD','')
+    if not re.fullmatch('[0-9a-f]{40}',head) or os.environ.get('PR99_LABEL')!='pr99-stage-owner-start-'+head[:12]:
+        raise Hold('EXACT_WRITER_OBSERVATION_LABEL_REQUIRED')
+    master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+    if not all(master[:2]):raise Hold('MISSING_ORIGINAL_REPOSITORY_SECRETS')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        rows=list(pool.map(lambda host:probe_current(host,master),HOSTS))
+    receipt={'status':'OWNER_START_CODE_STAGE_BATCH_NOT_PRODUCTION','hosts':rows,
+        'production_service_actions':0,'production_cutover':False,'authoritative_writer':'UNKNOWN',
+        'enforced_fence':'UNKNOWN','migration_started':False}
+    print('PR99_OWNER_STAGE_RECEIPT='+json.dumps(receipt,sort_keys=True),flush=True)
+    return 0 if all(r['status']=='OWNER_START_HELPER_STAGED_NOT_STARTED' for r in rows) else 2
+
+
+if __name__=='__main__':
+    try:raise SystemExit(main())
+    except Hold as error:
+        print('PR99_OWNER_STAGE_HOLD='+safe(str(error)),flush=True)
+        raise SystemExit(2)

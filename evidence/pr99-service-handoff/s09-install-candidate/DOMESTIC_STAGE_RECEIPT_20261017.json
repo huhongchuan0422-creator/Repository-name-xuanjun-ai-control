@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "status": "DOMESTIC_RELEASE_STAGED_NOT_PRODUCTION_INSTALLED",
+  "code": {
+    "run": 39001447378,
+    "job": 117305049170,
+    "invoke_id": "t-sh070a0uibttwqo",
+    "source_commit": "d3ee85415959b6db07aab8302a2679c67e062627",
+    "source_files": 124,
+    "completed_at": "2026-10-17T12:08:52+08:00",
+    "helper_sha256": "3778c9c96fd478c58d509be05d76b52f41da1ebd3c203beefe67c69a740e7915"
+  },
+  "runtime": {
+    "run": 39002237032,
+    "job": 117307415381,
+    "invoke_id": "t-sh070a1ykb562o0",
+    "source_commit": "739f889438d1a1c2914858e35393ccda6bde1bb7",
+    "files": 2906,
+    "bytes": 114962378,
+    "links": 4,
+    "completed_at": "2026-10-17T12:21:27+08:00",
+    "helper_sha256": "a7bc6636cf629047d777951e6399bce47997f0063cb3aa17aa0d0ce99d0c0041",
+    "copy_hashes": "PASS"
+  },
+  "target": "/opt/xuanjun-migration-s07/releases/domestic-r1",
+  "protected_state_unchanged": true,
+  "service_actions": 0,
+  "services_installed": false,
+  "production_cutover": false,
+  "final_cutover_snapshot": false,
+  "effective_production_env_verified": false,
+  "business_api_requests": 0,
+  "database_opened": false,
+  "attempts_consumed_no_replay": true,
+  "remaining_major_nodes": 6
+}

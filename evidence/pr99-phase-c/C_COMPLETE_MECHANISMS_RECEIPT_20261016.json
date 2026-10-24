@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "status": "OFFLINE_MECHANISM_CANDIDATE_DEVELOPER_VERIFIED_NOT_PRODUCTION_APPROVED",
+  "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+  "ci": {
+    "status": "PASS",
+    "tests": 134,
+    "skipped": 0,
+    "python": "3.11.17",
+    "run": 38874982348,
+    "job": 116887738948,
+    "exact_checkout": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4"
+  },
+  "artifact": {
+    "id": 12035120742,
+    "zip_sha256": "b1ea59d05c8da17ddb037cc4699a75d2b2d5b4f58cf54e7ba0a6e6d2572c43e9",
+    "tar_sha256": "898263578775de2d0486f2d2c18986192305a8edbe213279c5c4d7b4e35cc520",
+    "zip_bytes": 117881,
+    "tar_bytes": 117314,
+    "bound_files": 44,
+    "runtime_files": 30,
+    "entries": 45,
+    "reproduction": "BYTE_IDENTICAL",
+    "verification_origin": "DEVELOPER_ACTUAL_BYTES_NOT_INDEPENDENT_AUDIT",
+    "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+    "source_commit": "e9052b4e9d7de8a3cf27b3ab5282a19d120878b4",
+    "developer_download_verified": true,
+    "independent_review": "CONSOLIDATED_OFFLINE_REVIEW_REQUEST_PENDING"
+  },
+  "actual_temporary_unit_parse": {
+    "run": 38874822582,
+    "job": 116887220927,
+    "delivery_commit": "d971c17344e3afb00b22fc5125206f3cfda52c2b",
+    "unit_count": 4,
+    "exit": 0,
+    "diagnostics": [],
+    "unit_sha256": "3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107",
+    "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+    "root": false,
+    "generators_enabled": false,
+    "service_actions": 0,
+    "scope": "PARSER_ONLY_NOT_PID1_RUNTIME_SANDBOX_OR_WATCHDOG"
+  },
+  "source_contracts": {
+    "run": 38871973602,
+    "job": 116877943391,
+    "delivery_commit": "5830a6e6f69744132fb74b341abb9929ae1632d6",
+    "source_files": 50,
+    "required_tables": 15,
+    "source_compatible_declarations": 13,
+    "unresolved_source_declarations": [
+      "algo_order_snapshots",
+      "protective_order_snapshots"
+    ],
+    "actual_database_opened": false,
+    "claim": "SOURCE_DECLARATIONS_NOT_ACTUAL_DB_SCHEMA"
+  },
+  "production_actions": {
+    "root_install": 0,
+    "nft_load": 0,
+    "service_start": 0,
+    "provider_requests": 0,
+    "credentials_read": 0,
+    "business_database_open": 0,
+    "business_export": 0,
+    "writer_switch": 0,
+    "dns_change": 0,
+    "tokyo_shutdown": 0
+  },
+  "remaining": [
+    "Independent consolidated C source/artifact review",
+    "Real readonly SecretRef/provider-permission evidence and root custody",
+    "Three distinct signing identities and mTLS identities/private endpoint",
+    "Actual source account/schema including 2 unresolved declarations and continuous refresh deployment",
+    "Exact window/resource budget and one-use permits/private anchors",
+    "Korea real root installation/fence counters/PID1 watchdog/OOM/GET/window acceptance"
+  ],
+  "phase_b": "INHERIT_6209166651_NO_REINSTALL_NO_185_RERUN",
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD"
+}

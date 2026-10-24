@@ -1,0 +1,130 @@
+{
+  "scope": "PR99_ORIGINAL_CATALOGUE_AND_HELD_FD_CONTROLLER_NEW_SOURCE_NOT_LIVE_ACCEPTANCE",
+  "code_commit": "210bcf02eb53ace39420c6b3eb5d2bcda3c711ac",
+  "code_tree": "50ef767de1c980ab0b4e68c9c813b2238d004027",
+  "ci": {
+    "run": 39139479365,
+    "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/39139479365",
+    "jobs": [
+      {
+        "python": "3.11",
+        "job": 117710747116,
+        "tests": 45,
+        "result": "PASS",
+        "artifact": 12140468584
+      },
+      {
+        "python": "3.12",
+        "job": 117710747444,
+        "tests": 45,
+        "result": "PASS",
+        "artifact": 12141490347
+      }
+    ],
+    "logs_read": true,
+    "duplicate_inherited_tests_removed": true,
+    "completed_at_utc": "2026-10-18T15:13:17Z"
+  },
+  "candidate_artifact": {
+    "archive_bytes": 66090,
+    "archive_members": 10,
+    "archive_sha256": "39539b35e1b0d443bfab12a0a8cadde9eda38bbff2c766b16570ac4a76fdf613",
+    "code_commit": "210bcf02eb53ace39420c6b3eb5d2bcda3c711ac",
+    "code_tree": "50ef767de1c980ab0b4e68c9c813b2238d004027",
+    "hosted_run_id": "39139479365",
+    "m99_dynamic": "NOT_RUN",
+    "ordinary_tests": 45,
+    "production_actions": 0,
+    "scope": "REVIEW_CANDIDATE_NOT_PRODUCTION_ADMITTED",
+    "source_sha256": {
+      "README.md": "d006333ba87737c5a469f4111d8cbeb4e8297cc06c1ed809ede5889169cec823",
+      "catalogue_binding.py": "3d154721abcec42878b69338864d23be74a48e6812b336b89fd8a335262ae15e",
+      "dependency-pins.json": "3d560bdcfa7cf7f7068634ec12204b6c73352159086472574557b28d9c4e69a2",
+      "existing_fd_controller.py": "efad1c756c37f7de6dc8edae7ec1f0dacdebe36ca281ebdfdc3c0792ca98de77",
+      "held_proof.py": "4752c379ada3d02a8633a2e218b028e69cb61c3a94f2f4dc2d27151e1749adb2",
+      "package_candidate.py": "6f768b6bf8e7ae9f28b5cbdaa4c6f9f34432f70c10c1f7ec883769a36d2e0a7c",
+      "source_fence.py": "dab9897547dbee7876e4998228d4b5885d887993973f0f9682ee1772d722fb82",
+      "stage_history.py": "21d43b33c19943044826c935c94feaae9fb93a0c6c53affdd1445716d2adb8db",
+      "test_runtime_controller.py": "f97c39fff8964b9b614cfec9a64cdeb4dcd7f6310755fcbf2ecf0e78741193fe"
+    },
+    "unchanged_original_dependencies": {
+      "final_materials.py": "1d87911f8bb43dde5f9865a98e07abba05faf0862b940c726cc6c64a2de7605b",
+      "migration_transaction.py": "d0dcf9ed435fadad7ea01f176662707b7d9f06a99658a38b323f09bd7cc51d83",
+      "production_start.py": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",
+      "production_transport.py": "625fa7adf78e545ffa99c84329b3929fb6a7ee907eaebe6f122fa9261c140b16",
+      "stopped_transaction.py": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315"
+    }
+  },
+  "outer_actions_artifact": {
+    "bytes": 20873,
+    "sha256": "cbe5588f4d095e78fe45035f3c45d0863d79a97590c144530d071278343424eb"
+  },
+  "new_code": [
+    "Verified effective configuration records explicitly bind data objects and writer/activator edges; recursive membership and retained shared conflicts are checked",
+    "ExistingFdController borrows original Journal/lock/dirfds; no new claim/lock/Writer/epoch or alternative PathGuard; exact extension source digest also required",
+    "Original INTENT is query-only after restart; strict stage/previous receipt chain; UNKNOWN cannot trigger replay or automatic continuation",
+    "New independent pure stage-history validator for published original format, not a copy or release of restricted candidate history",
+    "LinuxFenceBackend fixed systemd/cgroup and immutable flag interfaces; independent real drain required before any stop; no fallback or unfreeze",
+    "HeldProof writes only original pre-held exclusive output descriptor; partial results preserved; query cannot invent proof"
+  ],
+  "test_boundaries": [
+    "Ordinary temporary files and fixture authorizers only",
+    "Linux control/ioctl calls mocked; no live systemctl or immutable flag applied",
+    "No original PathGuard, directory ancestor replacement, M99 or bwrap entry executed",
+    "No current authoritative catalogue, signed drain, host fence, production recovery or installation demonstrated"
+  ],
+  "unresolved_first_two": [
+    {
+      "node": "Actual effective configuration to complete authoritative data catalogue and every writer/activator",
+      "status": "NOT_CLOSED",
+      "remaining": "Supply actual complete role configurations, data identities/children, idle/manual/scheduled/shared write-source edges and original verifiable coverage records; current code validates such records but does not manufacture them",
+      "responsibility": "ORIGINAL_PR99_EXECUTOR"
+    },
+    {
+      "node": "Unique Writer, enforced Fence, drain and durable original controller host integration",
+      "status": "NOT_CLOSED",
+      "remaining": "Admit original guard/controller and exact extension source; connect actual source drain and existing output/dirfds; validate in approved environment, including failure/restart and capture chain; fixture callbacks cannot be production authority",
+      "responsibility": "ORIGINAL_PR99_EXECUTOR_WITH_ORIGINAL_ADMISSION_AND_INDEPENDENT_REVIEW"
+    }
+  ],
+  "external_dependencies": {
+    "restricted_40_file_publish_raw_error": "NOT_FOUND_NO_RETRY",
+    "normal_release_basis": "NOT_OBTAINED",
+    "m99_dynamic": "NOT_RUN",
+    "known_isolation_error": "bwrap: loopback: Failed to create NETLINK_ROUTE socket: Operation not permitted",
+    "normal_route": "Original restriction platform recovery/normal admission, then original independent incremental review; no account/API/environment workaround",
+    "support_request_sent": false,
+    "formal_migration_permit": "NOT_ISSUED"
+  },
+  "production": {
+    "host_commands_this_delta": 0,
+    "service_actions": 0,
+    "production_writer_acquired": false,
+    "migration_started": false,
+    "cutover": false,
+    "background_migration_tasks": false,
+    "tokyo_domestic_bridge_windows_preserved": true,
+    "remaining_major_nodes": 6
+  },
+  "skipped_host_jobs": [
+    {
+      "run": 39139479263,
+      "job": 117710747356,
+      "name": "inspection",
+      "result": "SKIPPED"
+    },
+    {
+      "run": 39139479294,
+      "job": 117710789817,
+      "name": "recover-readonly",
+      "result": "SKIPPED"
+    }
+  ],
+  "prior_accepted_wal": {
+    "commit": "d5bc04c6e03d558b122341120f37d038dba87155",
+    "ci_run": 39129030692,
+    "tests_per_python": 41,
+    "unchanged_inherited": true
+  },
+  "checkpoint_at_utc": "2026-10-18T15:14:47Z"
+}

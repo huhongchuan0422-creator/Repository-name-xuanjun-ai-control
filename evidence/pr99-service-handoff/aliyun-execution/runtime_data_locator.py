@@ -1,0 +1,296 @@
+"""Two-host PR99 writer-descriptor observation. No command input or automatic dispatch retry."""
+import base64
+import concurrent.futures
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+HOSTS = (('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),('domestic',CN,'cn-shanghai','3a22c458934142eea89ec6e3bf481a57','iZvt5t8tlrm8oiZ'))
+
+
+class Hold(Exception):
+    pass
+
+
+def safe(value):
+    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+
+
+def quote(value):
+    return urllib.parse.quote(str(value), safe='~')
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def rpc(endpoint, version, action, credentials, **params):
+    # Endpoint and action are fixed by this program, never accepted from a task.
+    if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+        raise Hold('ENDPOINT_REJECTED')
+    key, secret, token = credentials
+    values = dict(params, Action=action, Version=version, Format='JSON',
+                  AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                  SignatureNonce=uuid.uuid4().hex,
+                  Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    if token:
+        values['SecurityToken'] = token
+    canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+    signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+    values['Signature'] = base64.b64encode(signature).decode()
+    request = urllib.request.Request('https://' + endpoint + '/',
+        data=urllib.parse.urlencode(values).encode(),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+            raw = response.read(262145)
+    except urllib.error.HTTPError as error:
+        try:
+            data = json.loads(error.read(262145))
+            code = safe(data.get('Code'))
+        except Exception:
+            code = 'HTTP_' + str(error.code)
+        raise Hold(code) from None
+    except Exception:
+        # Never print a URL/body, key, temporary token, or raw exception.
+        raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+    if len(raw) > 262144:
+        raise Hold('RESPONSE_TOO_LARGE')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        raise Hold('INVALID_API_RESPONSE') from None
+    if not isinstance(data, dict):
+        raise Hold('INVALID_API_RESPONSE')
+    if 'Code' in data:
+        raise Hold(safe(data['Code']))
+    return data
+
+
+# This recovery does not import, publish or run the M99-R1 repair candidate.
+# Only this exact new read-only scope is authorized. Historical attempts are never replayed.
+import zlib
+
+HOST_PROGRAM='"""Fixed metadata-only locator. No database opens, source imports or effects."""\nimport datetime\nimport hashlib\nimport json\nimport os\nimport re\nimport stat\nimport subprocess\nimport urllib.parse\n\nSCOPES={\n \'iZ6wee8q9z4t03hvqumwfhZ\':(\n (\'secure-secrets-portal.service\',\'TRADING_DATABASE_URL\',\'URL\'),\n (\'xuanjun-wecom-customer-contact.service\',\'TRADING_DATABASE_URL\',\'URL\'),\n (\'xuanjun-wecom-customer-service.service\',\'TRADING_DATABASE_URL\',\'URL\')),\n \'iZvt5t8tlrm8oiZ\':(\n (\'windows-interaction-http.service\',\'WINDOWS_INTERACTION_STATE_DB\',\'PATH\'),\n (\'provider-neutral-domestic-bridge.service\',\'DOMESTIC_BRIDGE_CUSTOMER_STATE\',\'PATH\')),\n}\n\ndef bounded_read(path,limit):\n    fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_CLOEXEC)\n    try:\n        raw=b\'\'\n        while len(raw)<=limit:\n            chunk=os.read(fd,min(65536,limit+1-len(raw)))\n            if not chunk:break\n            raw+=chunk\n        if len(raw)>limit:raise ValueError(\'INPUT_BOUND\')\n        return raw\n    finally:os.close(fd)\n\ndef start_ticks(pid):\n    raw=bounded_read(\'/proc/\'+str(pid)+\'/stat\',8192)\n    return int(raw[raw.rfind(b\')\')+2:].split()[19])\n\ndef locate(value,kind,cwd):\n    if type(value)is not str or not value or \'\\x00\' in value:return \'UNRESOLVED\',None\n    if kind==\'URL\':\n        m=re.match(r\'^sqlite(?:\\+pysqlite)?:///\',value)\n        if not m:return \'NON_SQLITE_OR_UNSUPPORTED_URL\',None\n        value=value[m.end():]\n        if \'?\' in value or \'#\' in value or value.startswith(\'file:\'):return \'URI_OPTIONS_UNRESOLVED\',None\n        value=urllib.parse.unquote(value)\n        if not value or value==\':memory:\':return \'NON_FILE_SQLITE\',None\n    if not value.startswith(\'/\'):\n        if not cwd.startswith(\'/\'):return \'RELATIVE_CWD_UNRESOLVED\',None\n        value=os.path.join(cwd,value)\n    if \'\\x00\' in value:return \'UNRESOLVED\',None\n    return \'FILE_CANDIDATE\',os.path.normpath(value)\n\ndef descriptor(path):\n    try:s=os.lstat(path)\n    except FileNotFoundError:return {\'state\':\'MISSING\'}\n    except OSError:return {\'state\':\'METADATA_UNREADABLE\'}\n    if stat.S_ISLNK(s.st_mode):return {\'state\':\'SYMLINK_UNRESOLVED\'}\n    if not stat.S_ISREG(s.st_mode):return {\'state\':\'NOT_REGULAR\'}\n    return {\'state\':\'REGULAR_METADATA_CANDIDATE\',\'device\':s.st_dev,\'inode\':s.st_ino,\'uid\':s.st_uid,\'gid\':s.st_gid,\'mode\':stat.S_IMODE(s.st_mode),\'bytes\':s.st_size,\'nlink\':s.st_nlink}\n\ndef observe_unit(unit,key,kind):\n    row={\'unit\':unit,\'environment_key\':key,\'status\':\'UNKNOWN\',\'pid\':0,\'start_ticks\':0,\'data\':[]}\n    try:\n        result=subprocess.run([\'/bin/systemctl\',\'show\',unit,\'--property=LoadState,ActiveState,MainPID\'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=6,check=False)\n        if result.returncode or len(result.stdout)>8192:row[\'status\']=\'UNIT_QUERY_UNKNOWN\';return row\n        fields=dict(x.split(\'=\',1) for x in result.stdout.decode().splitlines() if \'=\' in x)\n        if fields.get(\'LoadState\')!=\'loaded\' or fields.get(\'ActiveState\')!=\'active\':row[\'status\']=\'UNIT_NOT_ACTIVE\';return row\n        pid=int(fields[\'MainPID\']);assert pid>0\n        ticks=start_ticks(pid);row.update(pid=pid,start_ticks=ticks)\n        if os.readlink(\'/proc/\'+str(pid)+\'/root\')!=\'/\':row[\'status\']=\'NONHOST_PROCESS_ROOT_UNKNOWN\';return row\n        cwd=os.readlink(\'/proc/\'+str(pid)+\'/cwd\')\n        environment=bounded_read(\'/proc/\'+str(pid)+\'/environ\',1048576)\n        values=[x[len(key)+1:] for x in environment.split(b\'\\0\') if x.startswith(key.encode()+b\'=\')]\n        if not values:row[\'status\']=\'INITIAL_ENVIRONMENT_KEY_NOT_SET_UNKNOWN\';return row\n        if len(values)!=1:row[\'status\']=\'DUPLICATE_ENVIRONMENT_KEY_UNKNOWN\';return row\n        value=values[0].decode(\'utf-8\',\'strict\')\n        status,path=locate(value,kind,cwd);row[\'status\']=status\n        if path is not None:\n            row[\'data\']=[{\'part\':part,\'metadata\':descriptor(path+suffix)} for part,suffix in ((\'MAIN\',\'\'),(\'WAL\',\'-wal\'),(\'SHM\',\'-shm\'))]\n        # Process/active service binding must still be the same after private input use.\n        current=subprocess.run([\'/bin/systemctl\',\'show\',unit,\'--property=MainPID\',\'--value\'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=6,check=False)\n        if current.returncode or current.stdout.strip()!=str(pid).encode() or start_ticks(pid)!=ticks:\n            row[\'data\']=[];row[\'status\']=\'PID_BINDING_CHANGED_UNKNOWN\'\n        return row\n    except Exception:\n        row[\'data\']=[];row[\'status\']=\'PRIVATE_INPUT_OR_IDENTITY_UNKNOWN\';return row\n\ndef observe(expected,nonce):\n    assert os.geteuid()==0 and os.uname().nodename==expected and expected in SCOPES\n    return {\'scope\':\'PR99_INITIAL_PROCESS_ENV_DATA_METADATA_NOT_AUTHORITY\',\'hostname\':expected,\'nonce\':nonce,\n        \'observed_at\':datetime.datetime.utcnow().isoformat()+\'Z\',\'units\':[observe_unit(*x) for x in SCOPES[expected]],\n        \'private_environment_values_disclosed\':False,\'database_opened\':False,\'business_source_imports\':0,\n        \'service_actions\':0,\'business_requests\':0,\'authoritative_writer\':\'UNKNOWN\',\'enforced_fence\':\'UNKNOWN\',\n        \'limitations\':[\'INITIAL_ENV_ONLY_NOT_RUNTIME_OR_DEFAULT_CONFIG\',\'NO_DATABASE_FORMAT_OR_AUTHORITY_PROOF\',\'ANCESTOR_LINKS_NOT_ADMITTED_PATHGUARD\',\'IDLE_OTHER_AND_SCHEDULED_WRITERS_NOT_PROVEN\',\'NO_FENCE_DRAIN_OR_STOP\']}\n\nif __name__==\'__main__\':\n    print(json.dumps(observe(EXPECTED,NONCE),sort_keys=True),flush=True)\n'
+ACTIVE = ('Pending','Running','Stopping')
+TERMINAL = frozenset(('Invalid','Aborted','Success','Failed','Error','Timeout','Cancelled','Terminated'))
+ID = re.compile(r'[A-Za-z0-9_-]{1,180}')
+ALLOWED_ACTIONS = {'AssumeRole','DescribeCommandInvocations','RunCommand','DescribeInvocationResult'}
+original_rpc = rpc
+
+
+def bounded_rpc(endpoint, version, action, credentials, **params):
+    if action not in ALLOWED_ACTIONS:
+        raise Hold('RPC_ACTION_REJECTED')
+    return original_rpc(endpoint, version, action, credentials, **params)
+
+
+def project_invocations(data, instance, status):
+    if type(data) is not dict or type(data.get('TotalCount')) is not int or data['TotalCount'] < 0:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    entries = data.get('CommandInvocations')
+    if type(entries) is not list or len(entries) > 50:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    projected=[]
+    for item in entries:
+        if type(item) is not dict or type(item.get('InvokeId')) is not str or not ID.fullmatch(item['InvokeId']):
+            raise Hold('INVOCATION_ID_REJECTED')
+        peers=item.get('InvokeInstances')
+        if type(peers) is not list:
+            raise Hold('INVOCATION_PEERS_SCHEMA')
+        selected=[p for p in peers if type(p) is dict and p.get('InstanceId') == instance]
+        if len(selected)!=1:
+            raise Hold('INVOCATION_TARGET_NOT_PROVEN')
+        actual=selected[0].get('InvocationStatus')
+        if actual not in ACTIVE and actual not in TERMINAL:
+            raise Hold('INVOCATION_STATUS_UNKNOWN')
+        # Never retain CommandContent, Output, ErrorInfo, Parameters or any other raw fields.
+        projected.append({'invoke_id':item['InvokeId'],'status':actual})
+    return data['TotalCount'],projected
+
+
+def active_invocations(host, credentials, call=bounded_rpc):
+    name,role,region,instance,expected=host
+    endpoint='swas.'+region+'.aliyuncs.com'
+    rows=[]
+    for status in ACTIVE:
+        expected_total=None
+        for page in range(1,6):
+            response=call(endpoint,'2020-06-01','DescribeCommandInvocations',credentials,
+                RegionId=region,InstanceId=instance,InvocationStatus=status,
+                PageNumber=page,PageSize=50)
+            total,items=project_invocations(response,instance,status)
+            if expected_total is not None and total!=expected_total:
+                raise Hold('INVOCATION_LIST_CHANGED_RECHECK_REQUIRED')
+            expected_total=total
+            rows.extend(items)
+            if page*50>=total:break
+            if not items:raise Hold('INVOCATION_PAGINATION_INCOMPLETE')
+        else:
+            raise Hold('INVOCATION_PAGINATION_BOUND_HOLD')
+    # This is an observed API list, not a fence or exclusive Writer assignment.
+    return sorted({r['invoke_id']:r for r in rows}.values(),key=lambda x:x['invoke_id'])
+
+
+def shell_for(expected,nonce):
+    program='EXPECTED='+repr(expected)+'\nNONCE='+repr(nonce)+'\n'+HOST_PROGRAM
+    payload=base64.b64encode(zlib.compress(program.encode(),9)).decode()
+    digest=hashlib.sha256(program.encode()).hexdigest()
+    bootstrap="import base64,zlib,hashlib; b=zlib.decompress(base64.b64decode("+repr(payload)+")); assert hashlib.sha256(b).hexdigest()=="+repr(digest)+"; exec(compile(b,'<pr99-readonly-recovery>','exec'))"
+    shell="#!/bin/sh\nset -eu\n/usr/bin/python3.11 -I -B - <<'PR99_READONLY'\n"+bootstrap+"\nPR99_READONLY\n"
+    if len(shell.encode())>6000:raise Hold('COMMAND_LENGTH')
+    return shell
+
+
+"""Strict public metadata boundary for the fixed observer, not an admission."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+"""Public projection boundary: technical names/counts/hashes only, never authority."""
+def validate_observation(d,expected,nonce):
+    def need(ok):
+        if not ok:raise ValueError('RUNTIME_DATA_CONTRACT')
+    def fields(v,keys):need(type(v)is dict and set(v)==set(keys.split()))
+    def integer(v,max_value=2**64):need(type(v)is int and 0<=v<max_value)
+    fields(d,'scope hostname nonce observed_at units private_environment_values_disclosed database_opened business_source_imports service_actions business_requests authoritative_writer enforced_fence limitations')
+    need(d['scope']=='PR99_INITIAL_PROCESS_ENV_DATA_METADATA_NOT_AUTHORITY' and d['hostname']==expected and d['nonce']==nonce)
+    need(type(d['observed_at'])is str and re.fullmatch('[0-9T:.Z-]{19,40}',d['observed_at']))
+    need(d['private_environment_values_disclosed'] is False and d['database_opened'] is False)
+    for k in ('business_source_imports','service_actions','business_requests'):need(type(d[k])is int and d[k]==0)
+    need(d['authoritative_writer']==d['enforced_fence']=='UNKNOWN')
+    need(d['limitations']==['INITIAL_ENV_ONLY_NOT_RUNTIME_OR_DEFAULT_CONFIG','NO_DATABASE_FORMAT_OR_AUTHORITY_PROOF','ANCESTOR_LINKS_NOT_ADMITTED_PATHGUARD','IDLE_OTHER_AND_SCHEDULED_WRITERS_NOT_PROVEN','NO_FENCE_DRAIN_OR_STOP'])
+    scopes={'iZ6wee8q9z4t03hvqumwfhZ':(('secure-secrets-portal.service','TRADING_DATABASE_URL'),('xuanjun-wecom-customer-contact.service','TRADING_DATABASE_URL'),('xuanjun-wecom-customer-service.service','TRADING_DATABASE_URL')),'iZvt5t8tlrm8oiZ':(('windows-interaction-http.service','WINDOWS_INTERACTION_STATE_DB'),('provider-neutral-domestic-bridge.service','DOMESTIC_BRIDGE_CUSTOMER_STATE'))}
+    need(type(d['units'])is list and len(d['units'])==len(scopes[expected]))
+    for row,(unit,key) in zip(d['units'],scopes[expected]):
+        fields(row,'unit environment_key status pid start_ticks data');need(row['unit']==unit and row['environment_key']==key)
+        need(row['status'] in ('UNKNOWN','UNIT_QUERY_UNKNOWN','UNIT_NOT_ACTIVE','NONHOST_PROCESS_ROOT_UNKNOWN','INITIAL_ENVIRONMENT_KEY_NOT_SET_UNKNOWN','DUPLICATE_ENVIRONMENT_KEY_UNKNOWN','UNRESOLVED','NON_SQLITE_OR_UNSUPPORTED_URL','URI_OPTIONS_UNRESOLVED','NON_FILE_SQLITE','RELATIVE_CWD_UNRESOLVED','FILE_CANDIDATE','PID_BINDING_CHANGED_UNKNOWN','PRIVATE_INPUT_OR_IDENTITY_UNKNOWN'))
+        integer(row['pid']);integer(row['start_ticks']);need(type(row['data'])is list)
+        need(len(row['data'])==(3 if row['status']=='FILE_CANDIDATE' else 0))
+        for part,item in zip(('MAIN','WAL','SHM'),row['data']):
+            fields(item,'part metadata');need(item['part']==part);m=item['metadata']
+            need(type(m)is dict and m.get('state') in ('MISSING','METADATA_UNREADABLE','SYMLINK_UNRESOLVED','NOT_REGULAR','REGULAR_METADATA_CANDIDATE'))
+            fields(m,'state device inode uid gid mode bytes nlink' if m['state']=='REGULAR_METADATA_CANDIDATE' else 'state')
+            if m['state']=='REGULAR_METADATA_CANDIDATE':
+                for key in ('device','inode','uid','gid','mode','bytes','nlink'):integer(m[key])
+    return d
+
+def decode_receipt(output,expected,nonce):
+    if type(output)is not str or len(output)>18000:raise Hold('RUNTIME_OUTPUT_BOUND')
+    try:
+        try:value=json.loads(output)
+        except ValueError:value=json.loads(base64.b64decode(output,validate=True))
+        return validate_observation(value,expected,nonce)
+    except Exception:raise Hold('RUNTIME_DATA_OUTPUT_REJECTED') from None
+
+def probe_current(host,master):
+    name,role,region,instance,expected=host
+    row={'host':name,'instance_id':instance,'status':'HOLD','host_commands':0,'run_command_attempted':False,'service_actions':0,
+         'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN'}
+    try:
+        c=bounded_rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,
+            RoleArn=role,RoleSessionName='pr99-resume-'+uuid.uuid4().hex[:16],DurationSeconds=900)['Credentials']
+        credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+        if not all(type(v) is str and v and '\r' not in v and '\n' not in v for v in credentials):
+            raise Hold('CREDENTIAL_RESPONSE_INVALID')
+        for value in credentials:print('::add-mask::'+value,flush=True)
+        row['sts']='PASS_CURRENT'
+        row['nonterminal_invocations']=active_invocations(host,credentials)
+        row['cloud_query']='PASS_CURRENT_OBSERVATION_NOT_FENCE'
+        if any(x['status'] in ACTIVE for x in row['nonterminal_invocations']):
+            raise Hold('EXISTING_INFLIGHT_PRESERVED_NO_NEW_HOST_COMMAND')
+        nonce=uuid.uuid4().hex
+        shell=shell_for(expected,nonce)
+        # Local job claim stops repeat dispatch in this process; no production state is created.
+        # A lost InvokeId remains UNKNOWN. Workflow reruns are rejected before credentials.
+        claim=Path('pr99-runtime-data-'+name+'.once')
+        with claim.open('x') as f:
+            f.write(json.dumps({'host':name,'nonce':nonce,'state':'READONLY_DISPATCH_INTENT'}))
+            f.flush();os.fsync(f.fileno())
+        row.update(run_command_attempted=True,host_commands='UNKNOWN_UNTIL_TERMINAL_RECEIPT')
+        out=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','RunCommand',credentials,
+            RegionId=region,InstanceId=instance,Type='RunShellScript',
+            WorkingUser='root',WorkingDir='/root',Timeout=55,
+            Name='pr99-runtime-data-v1',CommandContent=shell)
+        invoke=out.get('InvokeId')
+        if type(invoke) is not str or not ID.fullmatch(invoke):
+            raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+        row.update(invoke_id=invoke)
+        print('PR99_RUNTIME_DATA_INVOKE='+json.dumps({'host':name,'invoke_id':invoke}),flush=True)
+        deadline=time.monotonic()+100
+        while time.monotonic()<deadline:
+            response=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','DescribeInvocationResult',credentials,
+                RegionId=region,InstanceId=instance,InvokeId=invoke)
+            detail=response.get('InvocationResult')
+            if type(detail) is not dict or detail.get('InstanceId')!=instance or detail.get('InvokeId')!=invoke:
+                raise Hold('RESULT_IDENTITY_UNKNOWN_NO_RETRY')
+            state=detail.get('InvocationStatus')
+            if state in ACTIVE:time.sleep(5);continue
+            row['invocation_status']=safe(state)
+            if state!='Success' or detail.get('ExitCode')!=0:
+                raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')
+            row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
+            row['host_commands']=1
+            row['status']='WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN'
+            return row
+        raise Hold('READONLY_RESULT_UNKNOWN_NO_RETRY')
+    except Hold as e:row['error_code']=safe(str(e))
+    except Exception:row['error_code']='UNEXPECTED_UNKNOWN_NO_RETRY'
+    return row
+
+
+def self_test():
+    n={'__name__':'locator_definitions'};exec(compile(HOST_PROGRAM,'runtime-data-locator','exec'),n)
+    assert n['locate']('sqlite:////private-secret/db.sqlite','URL','/tmp')==('FILE_CANDIDATE','/private-secret/db.sqlite')
+    assert n['locate']('sqlite:///db.sqlite','URL','/private-secret')==('FILE_CANDIDATE','/private-secret/db.sqlite')
+    assert n['locate']('postgresql://private-secret@host/db','URL','/')==('NON_SQLITE_OR_UNSUPPORTED_URL',None)
+    assert n['locate']('sqlite:///file:secret?mode=rw','URL','/')==('URI_OPTIONS_UNRESOLVED',None)
+    assert n['locate']('sqlite:///:memory:','URL','/')==('NON_FILE_SQLITE',None)
+    scopes=n['SCOPES'];expected='iZ6wee8q9z4t03hvqumwfhZ'
+    valid={'scope':'PR99_INITIAL_PROCESS_ENV_DATA_METADATA_NOT_AUTHORITY','hostname':expected,'nonce':'a'*32,'observed_at':'2026-10-18T13:00:00Z','units':[{'unit':u,'environment_key':k,'status':'FILE_CANDIDATE','pid':10,'start_ticks':20,'data':[{'part':part,'metadata':{'state':'MISSING'}} for part in ('MAIN','WAL','SHM')]} for u,k,kind in scopes[expected]],'private_environment_values_disclosed':False,'database_opened':False,'business_source_imports':0,'service_actions':0,'business_requests':0,'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN','limitations':['INITIAL_ENV_ONLY_NOT_RUNTIME_OR_DEFAULT_CONFIG','NO_DATABASE_FORMAT_OR_AUTHORITY_PROOF','ANCESTOR_LINKS_NOT_ADMITTED_PATHGUARD','IDLE_OTHER_AND_SCHEDULED_WRITERS_NOT_PROVEN','NO_FENCE_DRAIN_OR_STOP']}
+    assert decode_receipt(json.dumps(valid),expected,'a'*32)==valid
+    assert decode_receipt(base64.b64encode(json.dumps(valid).encode()).decode(),expected,'a'*32)==valid
+    mutations=(lambda x:x.update(private='SECRET'),lambda x:x.update(enforced_fence='PASS'),lambda x:x.update(service_actions=True),lambda x:x.update(private_environment_values_disclosed=True),lambda x:x['units'][0].update(path='/private-secret'),lambda x:x['units'][0].update(unit='other.service'),lambda x:x['units'][0]['data'][0]['metadata'].update(path='/private-secret'),lambda x:x['units'][0].update(status='UNKNOWN'),lambda x:x.update(database_opened=True))
+    for mutate in mutations:
+        bad=json.loads(json.dumps(valid));mutate(bad)
+        try:decode_receipt(json.dumps(bad),expected,'a'*32)
+        except Hold:pass
+        else:raise AssertionError('PRIVATE_OR_FALSE_AUTHORITY_ACCEPTED')
+    assert len(HOSTS)==2 and set(scopes)=={h[4] for h in HOSTS}
+    for h in HOSTS:shell_for(h[4],'f'*32)
+    print('PR99_RUNTIME_LOCATOR_5_PATH_CASES_9_REJECTIONS_AND_LEGACY_ENCODING_PASS_NO_CLOUD',flush=True)
+
+def main():
+    if os.environ.get('PR99_MODE')=='SELF_TEST':
+        self_test();return 0
+    if os.environ.get('GITHUB_RUN_ATTEMPT')!='1':
+        raise Hold('WORKFLOW_RERUN_FORBIDDEN')
+    head=os.environ.get('PR99_HEAD','')
+    if not re.fullmatch('[0-9a-f]{40}',head) or os.environ.get('PR99_LABEL')!='pr99-runtime-data-'+head[:12]:
+        raise Hold('EXACT_WRITER_OBSERVATION_LABEL_REQUIRED')
+    master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+    if not all(master[:2]):raise Hold('MISSING_ORIGINAL_REPOSITORY_SECRETS')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        rows=list(pool.map(lambda host:probe_current(host,master),HOSTS))
+    receipt={'status':'WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION','hosts':rows,
+        'production_actions':0,'production_cutover':False,'authoritative_writer':'UNKNOWN',
+        'enforced_fence':'UNKNOWN','migration_started':False}
+    print('PR99_RUNTIME_DATA_RECEIPT='+json.dumps(receipt,sort_keys=True),flush=True)
+    return 0 if all(r['status']=='WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN' for r in rows) else 2
+
+
+if __name__=='__main__':
+    try:raise SystemExit(main())
+    except Hold as error:
+        print('PR99_RUNTIME_DATA_HOLD='+safe(str(error)),flush=True)
+        raise SystemExit(2)

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "BASELINE_KEY_CUSTODY_AND_DECRYPT_STREAM_PASS",
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+  "epoch": 1792150812,
+  "host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "cipher_bytes": 1320571760,
+  "cipher_sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
+  "plaintext_tar_sha256": "1784372b17b3466ad4de946e03fc1a1866abccdab791fc871db08b827757154a",
+  "key_file_mode": "0600",
+  "key_value_printed": false,
+  "plaintext_saved": false,
+  "archive_extracted": false,
+  "api_credentials_used": false,
+  "service_actions": 0
+}

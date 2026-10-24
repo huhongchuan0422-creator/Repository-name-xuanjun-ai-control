@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "OWNER_KOREA_SUDO_ROOT_TERMINAL_RESULT_SELECTED_FIELDS_NOT_ASSISTANT_HOST_LOGIN",
+  "reported_local_time": "2026-10-17T00:01:10+08:00 (message context only)",
+  "source_commit": "51c23aaa0666f1a056deea5bf70a5bba4b5a23d3",
+  "script_sha256": "10d24ddfea39347930115a4dc57e81b0b41461c10bd71e70b7f7d15afeb3fea4",
+  "status": "RECEIVED_HANDOFF_RESOLUTION_PASS",
+  "source_snapshot_aggregate_sha256": "7e9859b04806aba717cbd7414d2aff52c041d810c78d5be902168898ae8300de",
+  "resolved_entries": {
+    "portal": {"entry": "scripts/secure_secrets_portal_server.py", "files": 77, "closure_sha256": "622a0723974cbf27209a9ad75d5d2a621a7414270c66dc8be8f4e5c25e2fdd02"},
+    "wecom_contact": {"entry": "ai_service/wecom_customer_contact_service.py", "files": 75, "closure_sha256": "06937f3a724ed47c5f543c4e209ce7f58d660d0735b6242067059c7a13fbb6ae"},
+    "wecom_service": {"entry": "ai_service/wecom_customer_service.py", "files": 74, "closure_sha256": "d873a08ceaf6a436c9ddfd37499016b5f1dd26dc29465b70e47d8a4847f59795"},
+    "restricted_shim": {"entry": "deploy/bin/run_restricted_rpc_openai_shim_candidate.py", "files": 1, "dynamic_loading_calls": 2},
+    "model_executor": {"entry": "ai_service/internal_provider_neutral_bridge.py", "files": 73, "dynamic_loading_calls": 2}
+  },
+  "three_domestic_roles_missing_static_modules": [],
+  "three_domestic_roles_third_party_names": ["cryptography", "requests", "sqlalchemy"],
+  "three_domestic_roles_each_dynamic_loading_calls": 2,
+  "not_in_received_source": ["/opt/xuanjun-novel-wecom/wecom_novel_ingress.py", "/usr/local/sbin/xj-tokyo-vpn-guard"],
+  "ssh_contracts_observed_in_copied_unit_arguments": [
+    {"unit": "domestic-model-rpc-tunnel.service", "ssh_destination": "47.101.152.210", "R": ["127.0.0.1:19444 -> source-client127.0.0.1:20443"]},
+    {"unit": "korea-novel-model-rpc-tunnel.service", "ssh_destination": "43.108.99.66", "L": ["source-client127.0.0.1:18761 -> destination127.0.0.1:18760"], "R": ["destination127.0.0.1:19444 -> source-client127.0.0.1:20443"]},
+    {"unit": "provider-neutral-tokyo-tunnel.service", "ssh_destination": "47.101.152.210", "L": ["source-client127.0.0.1:19443 -> destination127.0.0.1:18443"]}
+  ],
+  "ssh_limit": "Copied arguments only, not effective SSH configuration or authentication equivalence. proxy_configuration_present also flags -F; does not prove ProxyJump.",
+  "full_runtime_closure_proven": false,
+  "application_imports": 0,
+  "service_actions": 0,
+  "network_requests": 0,
+  "database_opened": false,
+  "key_files_opened": false,
+  "environment_files_opened": false,
+  "production_cutover": false,
+  "tokyo_retirement": "HOLD"
+}

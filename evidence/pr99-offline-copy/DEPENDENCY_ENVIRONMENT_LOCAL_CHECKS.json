@@ -1,0 +1,21 @@
+{
+  "passed": 11,
+  "checks": [
+    "valid_exact_source_versions",
+    "remote_metadata_syntax",
+    "wrong_host_rejected",
+    "wrong_python_rejected",
+    "missing_dependency_rejected",
+    "option_injection_version_rejected",
+    "url_package_name_rejected",
+    "duplicate_conflicting_alias_rejected",
+    "real_child_command_success_logged",
+    "real_child_failure_propagated_log_preserved",
+    "frozen_environment_final_read_access_mode"
+  ],
+  "server_execution": false,
+  "real_dependency_install_tested": false,
+  "real_korea_netns_import_tested": false,
+  "sha256": "e3b820dc7230240308be62b9f9237473738804c345cb892c93f9121860289b13",
+  "bytes": 13001
+}

@@ -1,0 +1,172 @@
+name: Tokyo Korea authorized migration inspection
+on:
+  pull_request:
+    paths:
+      - .github/workflows/tokyo-korea-migration-inspection.yml
+      - migration-prep/**
+permissions:
+  contents: read
+concurrency:
+  group: tokyo-korea-migration-inspection
+  cancel-in-progress: false
+jobs:
+  inspection:
+    # Shared production runners remain in a public-repository Default pool.
+    # Candidate development must not schedule them again.  A separately
+    # authorized G1 operation removes them through SSH/OpenClaw.
+    if: ${{ false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: xuanjun-tokyo-readonly
+            host: iZ6wee8q9z4t03hvqumwfhZ
+          - label: xuanjun-korea-binance
+            host: iZmj7a5kwr75qc1tul4kf9Z
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: Invoke installed fixed host helper without repository checkout
+        env:
+          XJ_EXPECTED_HOST: ${{ matrix.host }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          test "$(hostname -s)" = "$XJ_EXPECTED_HOST"
+          test "$(id -un)" = githubrunner
+          XJ_HELPER=/usr/local/sbin/xuanjun-migration-inspect-v1
+          test -f "$XJ_HELPER"
+          test ! -L "$XJ_HELPER"
+          test "$(stat -c %u "$XJ_HELPER")" = 0
+          test "$(stat -c %a "$XJ_HELPER")" = 755
+          printf '%s  %s\n' '61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2' "$XJ_HELPER" | sha256sum -c -
+          for XJ_PARENT in /usr /usr/local /usr/local/sbin /usr/bin /usr/sbin /etc /etc/sudoers.d; do
+            test -d "$XJ_PARENT"
+            test ! -L "$XJ_PARENT"
+            test "$(stat -c %u "$XJ_PARENT")" = 0
+            XJ_MODE=$(stat -c %a "$XJ_PARENT")
+            (( (8#$XJ_MODE & 0022) == 0 ))
+            stat -c 'PARENT=%n UID=%u MODE=%a' "$XJ_PARENT"
+          done
+          /usr/bin/sudo -n -l >/dev/null
+          echo EFFECTIVE_SUDO_LIST_READ=YES
+          echo GLOBAL_RUNNER_ACCESS_POLICY=NOT_VERIFIED
+          echo FULL_SUDOERS_POLICY_AUDIT=NOT_VERIFIED
+          /usr/bin/sudo -n "$XJ_HELPER"
+          echo MIGRATION_EXECUTED=NO
+          echo ORDER_WRITE_ENABLED=NO
+  hosted-policy-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        id: phase-c-python
+        with:
+          python-version: '3.11'
+      - name: Identify isolated channel-only change
+        id: change-scope
+        shell: bash
+        run: |
+          python -I -B - <<'PY'
+          import os,subprocess
+          allowed={'.github/workflows/tokyo-korea-migration-inspection.yml','migration-prep/korea/phase_c_channel.py','migration-prep/korea/grant_phase_c_channel.py','migration-prep/korea/test_phase_c_channel.py','migration-prep/korea/PHASE_C_CHANNEL.md','tests/test_pr99_phase_c_channel.py','governance/features.json','docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md'}
+          changed=set(subprocess.check_output(['git','diff','--name-only','HEAD^','HEAD'],text=True).splitlines())
+          channel_only=bool(changed) and changed<=allowed and any(p.endswith('phase_c_channel.py') for p in changed)
+          runtime_changed=any(p.startswith('migration-prep/') and p not in allowed for p in changed)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('channel_only='+str(channel_only).lower()+'\n')
+              f.write('runtime_changed='+str(runtime_changed).lower()+'\n')
+          print('FROZEN_RUNTIME_CHANGED='+str(runtime_changed))
+          print('CHANNEL_ONLY='+str(channel_only)+' PRODUCTION_INSPECTION_REMAINS_DISABLED')
+          PY
+      - name: Fixed channel isolated tests with actual sudoers syntax parser
+        if: steps.change-scope.outputs.channel_only == 'true'
+        env:
+          XJ_TEST_PYTHON: ${{ steps.phase-c-python.outputs.python-path }}
+        shell: bash
+        run: |
+          sudo -n -- "$XJ_TEST_PYTHON" -I -B - <<'PY'
+          import os,shutil,sys,unittest
+          assert os.geteuid()==0 and shutil.which('visudo')
+          sys.path.insert(0,'migration-prep')
+          s=unittest.defaultTestLoader.loadTestsFromName('korea.test_phase_c_channel')
+          r=unittest.TextTestRunner(verbosity=2).run(s)
+          print('CHANNEL_TESTS=%d SKIPPED=%d LIVE_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped))
+          PY
+      - name: Bind exact small channel review archive
+        if: steps.change-scope.outputs.channel_only == 'true'
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path.cwd()
+          paths=['migration-prep/korea/phase_c_channel.py','migration-prep/korea/grant_phase_c_channel.py','migration-prep/korea/test_phase_c_channel.py','migration-prep/korea/PHASE_C_CHANNEL.md','.github/workflows/tokyo-korea-migration-inspection.yml','migration-prep/korea/phase_c/root_handoff.py','tests/test_pr99_phase_c_channel.py','governance/features.json','docs/development/TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1.md']
+          files={p:(root/p).read_bytes() for p in paths}
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          assert sha(files['migration-prep/korea/phase_c/root_handoff.py'])=='12bec6d209b1e53bda515bc6d08dcce785338ebed0fa9aa88ba23504ac973c35'
+          binding=dict(schema_version=1,source_commit=os.environ['XJ_EXPECTED_HEAD'],frozen_phase_c_source='e9052b4e9d7de8a3cf27b3ab5282a19d120878b4',production_execution=False,files={p:sha(b) for p,b in files.items()})
+          files['CHANNEL_BINDING.json']=(json.dumps(binding,sort_keys=True,indent=2)+'\n').encode()
+          out=pathlib.Path('/tmp/pr99-channel-review');out.mkdir(mode=0o700)
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,b in sorted(files.items()):
+                  info=tarfile.TarInfo(p);info.size=len(b);info.mode=0o400;info.mtime=0;info.uid=info.gid=0
+                  t.addfile(info,io.BytesIO(b))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          (out/'PR99_PHASE_C_CHANNEL_REVIEW.tar.gz').write_bytes(raw)
+          receipt=dict(source_commit=os.environ['XJ_EXPECTED_HEAD'],tar_sha256=sha(raw),bound_files=len(binding['files']),entries=len(files),production_execution=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: steps.change-scope.outputs.channel_only == 'true'
+        with:
+          name: pr99-phase-c-fixed-channel-review
+          path: /tmp/pr99-channel-review/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Phase-C synthetic adapter tests (no production runner; no provider)
+        if: steps.change-scope.outputs.runtime_changed == 'true'
+        env:
+          XJ_TEST_PYTHON: ${{ steps.phase-c-python.outputs.python-path }}
+        shell: bash
+        run: |
+          sudo -n -- "$XJ_TEST_PYTHON" -I -B - <<'PY'
+          import sys, unittest
+          sys.path.insert(0, 'migration-prep')
+          suite = unittest.defaultTestLoader.discover('migration-prep/korea/phase_c', pattern='test_*.py')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          print('PHASE_C_TESTS=%d SKIPPED=%d PRODUCTION_ACTIONS=0' % (result.testsRun, len(result.skipped)))
+          raise SystemExit(not result.wasSuccessful() or bool(result.skipped))
+          PY
+      - name: Build exact Phase-C offline adapter review artifact
+        if: steps.change-scope.outputs.runtime_changed == 'true'
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          mkdir -m 0700 /tmp/pr99-phase-c-review
+          python -I -B - "$XJ_EXPECTED_HEAD" <<'PY' > /tmp/pr99-phase-c-review/BUILD_RECEIPT.json
+          import json, pathlib, sys
+          sys.path.insert(0, 'migration-prep')
+          from korea.phase_c.artifact import build
+          print(json.dumps(build(pathlib.Path.cwd(), sys.argv[1], '/tmp/pr99-phase-c-review/PR99_PHASE_C_OFFLINE_REVIEW.tar.gz'), sort_keys=True))
+          PY
+          cat /tmp/pr99-phase-c-review/BUILD_RECEIPT.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: steps.change-scope.outputs.runtime_changed == 'true'
+        with:
+          name: pr99-phase-c-offline-review
+          path: /tmp/pr99-phase-c-review/
+          if-no-files-found: error
+          retention-days: 7

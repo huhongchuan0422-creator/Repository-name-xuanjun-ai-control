@@ -1,0 +1,18 @@
+{
+  "coverage_status": "HOLD",
+  "discovery_count": 95,
+  "discovery_sha256": "c80ccec7548264dce4322413d423a9a98869a3cb0f1675d27f91906a64068b65",
+  "path_class_counts": {
+    "FORMAL": 12,
+    "LEGACY": 17,
+    "MANUAL_SCRIPT": 58,
+    "PROTECTION": 8
+  },
+  "production_mutation": false,
+  "reason": "Discovery is complete for the two declared roots, but runtime fence integration/quarantine evidence has not been applied.",
+  "roots": [
+    "/opt/trading-system",
+    "/home/admin/.openclaw/workspace/binance-eth-trader"
+  ],
+  "schema_version": 1
+}
