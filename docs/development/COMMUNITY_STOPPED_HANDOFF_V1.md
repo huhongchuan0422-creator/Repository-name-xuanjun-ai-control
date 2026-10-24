@@ -120,13 +120,21 @@ stage_bc draft remains outside this integrated path and must not be overwritten.
 
 The real controller source binding is byte-exact: after the final cleanup ownership fix,
 `scripts/community_preview_update_checkpoint.py` SHA256 is
-`06cd05bc3e3b49aae3c87a2bf8488cfda4f6f900ff10af3b897baf85cdd3198d` and
+`e9029ca3e0c36fb1656995fcbe77f46739ee7abfc490adbd0cf4808f0e41b826` and
 `community_preview_update_composition.PINS[controller]` must equal that value. Any later
 controller byte change requires a fresh pin and the complete related regression set.
-Cleanup ownership is one-shot: every owned descriptor field is cleared before invoking
-`close`; an exceptional close records unproven cleanup and HOLD while later owned handles
-are still processed. The consumed integer is never retained for a blind retry because the
-same number may already refer to an unrelated replacement resource.
+Cleanup ownership is one-shot and cleanup uncertainty is terminal. Journal, Session,
+LiveBindings and Composition clear each owned descriptor/object field before invoking
+`close`; an exceptional close sets persistent `cleanup_unproven`, continues the first
+pass across the remaining owned handles, and every later close call stays HOLD without
+retrying any consumed integer. This covers both pre-effect close failure and the case
+where an exceptional close already released the fd and its integer was recycled to an
+unrelated replacement resource. Composition and compose-exception cleanup attempt
+Journal and LiveBindings independently and aggregate cleanup UNKNOWN instead of
+short-circuiting the second owner. Journal.from_original_parent explicitly retains a
+successfully constructed Journal until its temporary parent descriptor is closed; if
+that temporary close is unproven it attempts Journal cleanup and returns only
+JOURNAL_PARENT_CLEANUP_UNKNOWN, never the constructed object.
 
 Future Owner/coordinator inputs once, before exact stage approval:
 new protected v2 installation and actual hashes; fresh fixed old/current and route

@@ -121,7 +121,7 @@ class Session:
         self.journal=None;self.old_checkpoint=None;self.old_clone=None;self.old_component=None
         self.owner=None;self.thread=threading.get_ident();self.last=None
         self.braw=None;self.craw=None;self.freeze=None;self.bdone=False;self.approved_stamp=None
-        self.started=time.monotonic();self.captured={};self.recovering=False
+        self.started=time.monotonic();self.captured={};self.recovering=False;self.cleanup_unproven=False
     def acquire(self,recover=False):
         self.owner=operator();self.recovering=recover
         # Parent was installed by A; never mkdir/chmod it.
@@ -395,6 +395,7 @@ class Session:
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
         return self.consume(proof,True)
     def close(self):
+        if self.cleanup_unproven:raise u.Hold('BC_CLEANUP_UNKNOWN')
         unproven_close=False
         s._ACTIVE=None
         if self.old_checkpoint is not None:s.checkpoint=self.old_checkpoint
@@ -407,12 +408,14 @@ class Session:
         for name in ('backup','entry','lease','parent'):
             fd=getattr(self,name)
             if fd is None:continue
-            # Drop ownership before invoking close.  Never retry a possibly
+            # Drop ownership before invoking close. Never retry a possibly
             # consumed/recycled descriptor number after an exceptional close.
             setattr(self,name,None)
             try:os.close(fd)
             except BaseException:unproven_close=True
-        need(not unproven_close,'BC_CLEANUP_UNKNOWN')
+        if unproven_close:
+            self.cleanup_unproven=True
+            raise u.Hold('BC_CLEANUP_UNKNOWN')
 
 class VerifiedHandoff:
     def __init__(self,session,proof,journal):

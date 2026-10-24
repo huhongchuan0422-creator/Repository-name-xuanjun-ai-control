@@ -296,13 +296,27 @@ print('PARENT_ALIVE',flush=True)
                 replacement.write_bytes(path.read_bytes());replacement.chmod(0o600);os.replace(str(replacement),str(path))
         with patch.object(u.Journal,'write',publish),self.assertRaises(Exception):self.session.update()
         self.assertEqual(self.calls,[])
-    def test_cleanup_error_after_effective_close_drops_ownership_and_releases_later_fds(self):
+    def test_cleanup_error_after_effective_close_drops_ownership_and_stays_terminal_unknown(self):
         fds=[self.session.entry,self.session.lease,self.session.parent];real=os.close;seen=[]
         def close(fd):
             seen.append(fd);real(fd)
             if fd==fds[0]:raise OSError('SYNTHETIC_AFTER_CLOSE')
         with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
-        self.assertEqual(seen,fds);self.assertIsNone(self.session.entry);self.assertIsNone(self.session.lease);self.assertIsNone(self.session.parent)
+        self.assertEqual(seen,fds);self.assertTrue(self.session.cleanup_unproven)
+        self.assertIsNone(self.session.entry);self.assertIsNone(self.session.lease);self.assertIsNone(self.session.parent)
+        before=len(seen)
+        with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
+        self.assertEqual(len(seen),before);self.session.cleanup_unproven=False
+    def test_cleanup_pre_effect_failure_does_not_retry_open_fd_and_stays_terminal_unknown(self):
+        target=self.session.entry;real=os.close;seen=[]
+        def close(fd):
+            seen.append(fd)
+            if fd==target:raise OSError('SYNTHETIC_PRE_EFFECT')
+            return real(fd)
+        with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
+        os.fstat(target);before=len(seen)
+        with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
+        self.assertEqual(len(seen),before);real(target);self.session.cleanup_unproven=False
     def test_cleanup_exception_never_retries_recycled_fd_on_second_cleanup(self):
         target=self.session.entry;real=os.close;seen=[];replacement=[None];raised=[False]
         def close(fd):
@@ -317,8 +331,8 @@ print('PARENT_ALIVE',flush=True)
         with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
         self.assertEqual(seen.count(target),1);self.assertIsNone(self.session.entry)
         before=len(seen)
-        with patch.object(h.os,'close',side_effect=close):self.session.close()
-        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0])
+        with patch.object(h.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'CLEANUP_UNKNOWN'):self.session.close()
+        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0]);self.session.cleanup_unproven=False
     def test_same_name_different_plan_and_source_pin_change_reject(self):
         self.prepare_b_and_c();self.session.update()
         candidate=copy.deepcopy(self.session.journal.plan)
@@ -518,11 +532,21 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
                 raise OSError('SYNTHETIC_CLOSE_UNKNOWN_AFTER_RECYCLE')
             return real(fd)
         with patch.object(u.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'JOURNAL_CLEANUP_UNKNOWN'):j.close()
-        self.assertEqual(seen.count(fds[0]),1);self.assertIn(fds[1],seen);self.assertIn(fds[2],seen)
+        self.assertTrue(j.cleanup_unproven);self.assertEqual(seen.count(fds[0]),1);self.assertIn(fds[1],seen);self.assertIn(fds[2],seen)
         self.assertIsNone(j.fd);self.assertIsNone(j.lock);self.assertIsNone(j.parent)
         before=len(seen)
-        with patch.object(u.os,'close',side_effect=close):j.close()
-        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0]);self.session.journal=None
+        with patch.object(u.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'JOURNAL_CLEANUP_UNKNOWN'):j.close()
+        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0]);j.cleanup_unproven=False;self.session.journal=None
+    def test_journal_cleanup_pre_effect_failure_stays_terminal_unknown_without_retry(self):
+        self.prepare_b_and_c();self.session.update();j=self.session.journal;target=j.fd;real=os.close;seen=[]
+        def close(fd):
+            seen.append(fd)
+            if fd==target:raise OSError('SYNTHETIC_PRE_EFFECT')
+            return real(fd)
+        with patch.object(u.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'JOURNAL_CLEANUP_UNKNOWN'):j.close()
+        os.fstat(target);before=len(seen)
+        with patch.object(u.os,'close',side_effect=close),self.assertRaisesRegex(u.Hold,'JOURNAL_CLEANUP_UNKNOWN'):j.close()
+        self.assertEqual(len(seen),before);real(target);j.cleanup_unproven=False;self.session.journal=None
 
     def test_unknown_second_update_is_explicit_inspect_only_and_preserves_files(self):
         self.prepare_b_and_c();self.on_run=lambda:'UNKNOWN'
@@ -635,6 +659,19 @@ session.close();print('REAL_LOADER_B_OK')
         result=self.original_capture([sys.executable,'-I','-B','-S','-c','print("BOUNDED_LOCAL_PROBE")'],3)
         self.assertEqual(result.strip(),b'BOUNDED_LOCAL_PROBE')
         self.assertEqual(self.calls,[])
+
+    def test_main_cleanup_unknown_is_child2_and_never_success_acceptance(self):
+        fake=type('FakeSession',(),{})()
+        fake.acquire=lambda recover=False:None
+        fake.run_b=lambda:None
+        fake.update=lambda:{'phase':'COMMITTED'}
+        fake.recover=lambda:{'phase':'ROLLED_BACK_PREVIEW_HOLD'}
+        fake.close=lambda:(_ for _ in ()).throw(u.Hold('BC_CLEANUP_UNKNOWN'))
+        out=io.StringIO()
+        with patch.object(h,'Session',return_value=fake),contextlib.redirect_stdout(out):
+            self.assertEqual(h.main(['--owner-bc']),2)
+        row=json.loads(out.getvalue().strip());self.assertEqual(row['state'],'BC_RESULT');self.assertEqual(row['child_exit'],2)
+        self.assertEqual(row['result']['phase'],'HOLD_CLEANUP_UNKNOWN');self.assertFalse(row['production_acceptance'])
 
 if __name__=='__main__':unittest.main()
 

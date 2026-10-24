@@ -63,7 +63,7 @@ class Journal:
             if type(handoff_binding) is not dict or set(handoff_binding)!={'approval_sha256','handoff_sha256'} or not all(plan.exact_hex(v,64) for v in handoff_binding.values()):raise Hold('EXACT_HANDOFF_BINDING_REQUIRED')
         elif handoff_binding is not None or lease_fd is not None:raise Hold('LEGACY_JOURNAL_NO_HANDOFF_ARGUMENTS')
         if candidate!=rebuilt:raise Hold('EXACT_COMPILED_PLAN_REQUIRED')
-        self.plan=candidate;self.parent=os.dup(parent_fd);self.fd=None;self.lock=None;self.poisoned=False;self.owner=threading.get_ident()
+        self.plan=candidate;self.parent=os.dup(parent_fd);self.fd=None;self.lock=None;self.poisoned=False;self.owner=threading.get_ident();self.cleanup_unproven=False
         try:
             if lease_fd is None:
                 self.lock=os.open('community-update.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=self.parent)
@@ -112,8 +112,19 @@ class Journal:
         # Future approved host composition only. Do not create/chmod the parent.
         original.secure_directory(JOURNAL_PARENT)
         fd=os.open(JOURNAL_PARENT,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
-        try:return cls(fd,candidate)
-        finally:os.close(fd)
+        journal=None;error=None;temp_close_unproven=False
+        try:journal=cls(fd,candidate)
+        except BaseException as exc:error=exc
+        temp=fd;fd=None
+        try:os.close(temp)
+        except BaseException:temp_close_unproven=True
+        if temp_close_unproven:
+            if journal is not None:
+                try:journal.close()
+                except BaseException:pass
+            raise Hold('JOURNAL_PARENT_CLEANUP_UNKNOWN') from error
+        if error is not None:raise error
+        return journal
     def validate_record(self,value):
         keys={'plan_sha256','phase','new_id','sequence'}
         if self.handoff_binding is not None:keys|={'approval_sha256','handoff_sha256'}
@@ -176,18 +187,21 @@ class Journal:
             self.state=value
         except BaseException:self.poisoned=True;raise
     def close(self):
+        if self.cleanup_unproven:raise Hold('JOURNAL_CLEANUP_UNKNOWN')
         unproven_close=False
         for name in ('fd','lock','parent'):
             value=getattr(self,name,None)
             if value is None:continue
-            # Transfer ownership away BEFORE close().  A close error does not
+            # Transfer ownership away BEFORE close(). A close error does not
             # prove the integer still denotes our resource; it may already have
-            # been consumed and recycled to an unrelated fd.  Never retain or
+            # been consumed and recycled to an unrelated fd. Never retain or
             # retry the number after invoking close once.
             setattr(self,name,None)
             try:os.close(value)
             except BaseException:unproven_close=True
-        if unproven_close:raise Hold('JOURNAL_CLEANUP_UNKNOWN')
+        if unproven_close:
+            self.cleanup_unproven=True
+            raise Hold('JOURNAL_CLEANUP_UNKNOWN')
 
 
 class OriginalTransport:

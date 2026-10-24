@@ -237,6 +237,58 @@ class CompositionScope(unittest.TestCase):
         self.assertNotIn('original.main(',Path(c.__file__).read_text())
         self.assertNotIn('docker load',Path(c.__file__).read_text())
 
+    def test_live_bindings_cleanup_exception_is_terminal_and_never_retries_recycled_fd(self):
+        b=self.binding();target=b.backup_fd;real=os.close;seen=[];replacement=[None];raised=[False]
+        def close(fd):
+            seen.append(fd)
+            if fd==target and not raised[0]:
+                raised[0]=True;real(fd)
+                new=os.open('/dev/null',os.O_RDONLY)
+                if new!=target:os.dup2(new,target);real(new)
+                replacement[0]=target
+                raise OSError('SYNTHETIC_BINDING_CLOSE_AFTER_RECYCLE')
+            return real(fd)
+        with patch.object(c.os,'close',side_effect=close),self.assertRaisesRegex(c.controller.Hold,'LIVE_BINDINGS_CLEANUP_UNKNOWN'):b.close()
+        self.assertTrue(b.cleanup_unproven);self.assertIsNone(b.backup_fd);before=len(seen)
+        with patch.object(c.os,'close',side_effect=close),self.assertRaisesRegex(c.controller.Hold,'LIVE_BINDINGS_CLEANUP_UNKNOWN'):b.close()
+        self.assertEqual(len(seen),before);os.fstat(replacement[0]);real(replacement[0]);b.cleanup_unproven=False
+    def test_composition_close_attempts_bindings_after_journal_failure_and_stays_terminal(self):
+        calls=[]
+        class J:
+            def close(self):calls.append('journal');raise c.controller.Hold('JOURNAL_CLEANUP_UNKNOWN')
+        class B:
+            def close(self):calls.append('bindings')
+        obj=c.Composition.__new__(c.Composition);obj.journal=J();obj.bindings=B();obj.cleanup_unproven=False
+        with self.assertRaisesRegex(c.controller.Hold,'COMPOSITION_CLEANUP_UNKNOWN'):obj.close()
+        self.assertEqual(calls,['journal','bindings']);self.assertTrue(obj.cleanup_unproven)
+        with self.assertRaisesRegex(c.controller.Hold,'COMPOSITION_CLEANUP_UNKNOWN'):obj.close()
+        self.assertEqual(calls,['journal','bindings'])
+    def test_compose_exception_attempts_bindings_after_journal_cleanup_failure(self):
+        a=self.approval();raw=json.dumps(a).encode();receipt=Path('deploy/community-preview/f131-image-receipt.json').read_bytes()
+        def body(path,sha):
+            if path==c.APPROVAL:return raw
+            if path.endswith('f131-image-receipt.json'):return receipt
+            return b'protected verified source'
+        bindings=Mock();bindings.return_value=dict(a['current']);bindings.close=Mock()
+        journal=Mock();journal.state={'phase':'PREPARED'};journal.close=Mock(side_effect=c.controller.Hold('JOURNAL_CLEANUP_UNKNOWN'))
+        def jf(candidate):journal.plan=candidate;return journal
+        with patch.object(c,'protected_body',side_effect=body),patch.object(c.original,'read_root_file',return_value=(raw,0o600)),\
+             patch.object(c,'LiveBindings',return_value=bindings),patch.object(c.controller.Journal,'from_original_parent',side_effect=jf),\
+             patch.object(c,'BoundHttpsHealth',side_effect=RuntimeError('POST_JOURNAL_FAIL')):
+            with self.assertRaisesRegex(c.controller.Hold,'COMPOSE_CLEANUP_UNKNOWN'):
+                c.compose(approval_sha256='b'*64,backup_fd=self.fd,execution_enabled=True)
+        journal.close.assert_called_once();bindings.close.assert_called_once()
+    def test_from_original_parent_temp_close_failure_cleans_constructed_journal_and_holds(self):
+        d=self.root/'journal-parent-close';d.mkdir(mode=0o700);fd=os.open(str(d),os.O_RDONLY|os.O_DIRECTORY);real=os.close;seen=[]
+        def close(value):seen.append(value);raise OSError('SYNTHETIC_TEMP_PARENT_CLOSE')
+        with patch.object(c.controller,'JOURNAL_PARENT',str(d)),patch.object(c.controller.original,'secure_directory'),\
+             patch.object(c.controller.os,'open',return_value=fd),patch.object(c.controller.Journal,'__init__',return_value=None),\
+             patch.object(c.controller.Journal,'close') as cleanup,patch.object(c.controller.os,'close',side_effect=close):
+            with self.assertRaisesRegex(c.controller.Hold,'JOURNAL_PARENT_CLEANUP_UNKNOWN'):
+                c.controller.Journal.from_original_parent({})
+            self.assertEqual(seen,[fd]);cleanup.assert_called_once()
+        real(fd)
+
 
 def reopen_process(root,stage):
     """Independent process: real files/journal/composition/controller, fake Docker.
@@ -330,6 +382,8 @@ def reopen_process(root,stage):
     checkpoints=list(parent.glob('*/checkpoint.json'))
     if checkpoints:outcome['checkpoint']=json.loads(checkpoints[0].read_text())
     outcome['actions']=len(model['actions']);print(json.dumps(outcome))
+
+
 
 
 class CompositionReopen(unittest.TestCase):

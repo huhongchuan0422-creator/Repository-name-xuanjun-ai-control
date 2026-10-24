@@ -21,7 +21,7 @@ REFERENCE_UID=0  # fixed production root owner; no argument/environment override
 APPROVAL='/opt/xuanjun-community-preview/update-approval.json'  # proposed, never created
 PRODUCT='f13155ed63a3137d41766ee587d9b4b96a81477f'
 CONTROL='a9324156f94040bb6ff0243815bb91abe2f67b2a'
-PINS={controller:'06cd05bc3e3b49aae3c87a2bf8488cfda4f6f900ff10af3b897baf85cdd3198d',
+PINS={controller:'e9029ca3e0c36fb1656995fcbe77f46739ee7abfc490adbd0cf4808f0e41b826',
       plan:'81c01a2f94ff71c0af4555b9026a60db0b5ce226a158601e1cf1b6aa4b646fae',
       original:'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee',
       observation:'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3'}
@@ -288,9 +288,15 @@ def observe_current(*,backup_fd):
 
 class LiveBindings:
     def __init__(self,current,backup_fd,approval_check):
-        self.current=dict(current);self.backup_fd=os.dup(backup_fd);self.approval_check=approval_check
+        self.current=dict(current);self.backup_fd=os.dup(backup_fd);self.approval_check=approval_check;self.cleanup_unproven=False
     def close(self):
-        if self.backup_fd is not None:os.close(self.backup_fd);self.backup_fd=None
+        if self.cleanup_unproven:raise controller.Hold('LIVE_BINDINGS_CLEANUP_UNKNOWN')
+        fd=self.backup_fd;self.backup_fd=None
+        if fd is None:return
+        try:os.close(fd)
+        except BaseException:
+            self.cleanup_unproven=True
+            raise controller.Hold('LIVE_BINDINGS_CLEANUP_UNKNOWN')
     def __call__(self):
         root_host();self.approval_check();c=self.current
         live=read_current(c['container_id'],c['image_id'],self.backup_fd)
@@ -302,10 +308,22 @@ class LiveBindings:
 
 class Composition:
     def __init__(self,journal,bindings,transport):
-        self.journal=journal;self.bindings=bindings
+        self.journal=journal;self.bindings=bindings;self.cleanup_unproven=False
         self.update=controller.Update(journal,transport,execution_enabled=True)
     def close(self):
-        self.journal.close();self.bindings.close()
+        if self.cleanup_unproven:raise controller.Hold('COMPOSITION_CLEANUP_UNKNOWN')
+        unknown=False
+        journal=self.journal;self.journal=None
+        bindings=self.bindings;self.bindings=None
+        if journal is not None:
+            try:journal.close()
+            except BaseException:unknown=True
+        if bindings is not None:
+            try:bindings.close()
+            except BaseException:unknown=True
+        if unknown:
+            self.cleanup_unproven=True
+            raise controller.Hold('COMPOSITION_CLEANUP_UNKNOWN')
 
 
 def exact_stage_names(candidate,new_id=None):
@@ -414,9 +432,15 @@ def compose(*,approval_sha256,backup_fd,execution_enabled=False):
             recovery_admission(journal,transport,bindings)
         else:raise controller.Hold('EXISTING_PHASE_INSPECT_ONLY_NO_AUTOMATIC_RESUME')
         return Composition(journal,bindings,transport)
-    except BaseException:
-        if journal is not None:journal.close()
-        bindings.close();raise
+    except BaseException as error:
+        cleanup_unknown=False
+        if journal is not None:
+            try:journal.close()
+            except BaseException:cleanup_unknown=True
+        try:bindings.close()
+        except BaseException:cleanup_unknown=True
+        if cleanup_unknown:raise controller.Hold('COMPOSE_CLEANUP_UNKNOWN') from error
+        raise
 
 def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
     """Stopped-handoff full prefix inventory for every durable phase."""
