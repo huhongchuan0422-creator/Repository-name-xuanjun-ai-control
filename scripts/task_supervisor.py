@@ -686,33 +686,47 @@ class Supervisor(object):
 
     def _authority_ticket(self, task):
         return {
-            'schema': 1, 'task_id': task['task_id'],
+            'schema': 2,
+            'task_id': task['task_id'],
             'writer_scope': task['writer_scope'],
-            'attempt_id': task['attempt_id'], 'lease_id': task['lease_id'],
-            'fence': task['fence'], 'epoch': task['epoch'],
+            'attempt_id': task['attempt_id'],
+            'lease_id': task['lease_id'],
+            'fence': task['fence'],
+            'epoch': task['epoch'],
             'valid_until': task['authority_valid_until'],
             'checkpoint_sha256': task['checkpoint_sha256'],
             'spec_sha256': task['spec_sha256'],
+            'assigned_caller_id': task['authority_caller_id'],
             'assigned_run_id': task['authority_run_id'],
             'assigned_session_id': task['authority_session_id'],
             'gateway_id': task['authority_gateway_id'],
+            'resource_scope_digest': task['resource_scope_digest'],
             'resource_keys': json.loads(task['resource_scope_json']),
         }
 
     @staticmethod
     def _scope_digest(resource_keys):
         return hashlib.sha256(canonical(
-            sorted(set(resource_keys))).encode('utf-8')).hexdigest()
+            list(sorted(resource_keys))).encode('utf-8')).hexdigest()
 
     @staticmethod
     def _exact_resource_keys(resource_keys):
-        if (not isinstance(resource_keys, list) or not resource_keys
-                or any(not isinstance(x, str) or not x.strip()
-                       for x in resource_keys)):
+        if not isinstance(resource_keys, list) or not resource_keys:
             raise ValueError('RESOURCE_SCOPE_REQUIRED')
-        if len(resource_keys) != len(set(resource_keys)):
+        normalized = []
+        for value in resource_keys:
+            if (not isinstance(value, str) or not value
+                    or value != value.strip()
+                    or any(ord(ch) < 33 or ord(ch) == 127 for ch in value)
+                    or '\\x00' in value
+                    or not re.fullmatch(r'[A-Za-z0-9._:/@+\\-]+', value)
+                    or '//' in value
+                    or any(part in ('', '.', '..') for part in value.split('/'))):
+                raise ValueError('CANONICAL_RESOURCE_KEY_REQUIRED')
+            normalized.append(value)
+        if len(normalized) != len(set(normalized)):
             raise ValueError('DUPLICATE_RESOURCE_KEY')
-        return tuple(sorted(resource_keys))
+        return tuple(sorted(normalized))
 
     def ticket_resource_keys(self, ticket):
         if not isinstance(ticket, dict):
@@ -728,16 +742,20 @@ class Supervisor(object):
             raise ValueError('TRUSTED_CALLER_CONTEXT_REQUIRED')
         return caller
 
-    def claim_writer(self, task_id, attempt_id, owner, entry, run_id,
-                     session_id, lease_id, gateway_id, resource_keys,
-                     valid_until, now=None):
-        now = self.clock() if now is None else now
+    @staticmethod
+    def _ticket_sha(ticket):
+        return hashlib.sha256(canonical(ticket).encode('utf-8')).hexdigest()
+
+    def claim_writer(self, task_id, attempt_id, owner, entry, caller,
+                     lease_id, resource_keys, valid_until):
+        now = self.clock()
+        caller = self._caller(caller)
         keys = self._exact_resource_keys(resource_keys)
         if (not finite(now) or not finite(valid_until) or now >= valid_until
                 or any(not isinstance(x, str) or not x for x in
-                       (attempt_id, owner, entry, run_id, session_id,
-                        lease_id, gateway_id))):
+                       (attempt_id, owner, entry, lease_id))):
             raise ValueError('EXACT_EXECUTION_AUTHORITY_REQUIRED')
+        scope_digest = self._scope_digest(keys)
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
@@ -758,18 +776,24 @@ class Supervisor(object):
             self.db.execute('''UPDATE tasks SET state='RECEIVED',owner=?,entry=?,
               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
               max_fence=?,max_epoch=?,authority_state='VALID',
-              authority_valid_until=?,authority_run_id=?,authority_session_id=?,
-              authority_gateway_id=?,resource_scope_json=?,last_trusted_time=?,
-              received_at=?,last_event_at=?,updated_at=?
+              authority_valid_until=?,authority_caller_id=?,
+              authority_run_id=?,authority_session_id=?,
+              authority_gateway_id=?,resource_scope_json=?,
+              resource_scope_digest=?,coverage_digest=?,
+              receiver_ack_json='{}',receiver_ack_sha256=?,
+              last_trusted_time=?,received_at=?,last_event_at=?,updated_at=?
               WHERE task_id=? AND authority_state='NONE' ''',
-              (owner, entry, run_id, session_id, attempt_id, lease_id, fence,
-               epoch, fence, epoch, valid_until, run_id, session_id, gateway_id,
-               canonical(list(keys)), now, now, now, now, task_id))
+              (owner, entry, caller['run_id'], caller['session_id'], attempt_id,
+               lease_id, fence, epoch, fence, epoch, valid_until,
+               caller['caller_id'], caller['run_id'], caller['session_id'],
+               caller['gateway_id'], canonical(list(keys)), scope_digest,
+               UNKNOWN, UNKNOWN, now, now, now, now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
             return self._authority_ticket(self._task(task_id))
 
-    def _validate_writer_locked(self, ticket, caller, now):
+    def _validate_writer_locked(self, ticket, caller):
+        now = self.clock()
         caller = self._caller(caller)
         if not isinstance(ticket, dict):
             raise ValueError('EXACT_WRITER_TICKET_REQUIRED')
@@ -781,7 +805,8 @@ class Supervisor(object):
             raise ValueError('WRITER_AUTHORITY_NOT_VALID')
         if task['state'] not in ACTIVE:
             raise ValueError('TASK_NOT_ACTIVE_FOR_WRITE')
-        if (caller['run_id'] != task['authority_run_id']
+        if (caller['caller_id'] != task['authority_caller_id']
+                or caller['run_id'] != task['authority_run_id']
                 or caller['session_id'] != task['authority_session_id']
                 or caller['gateway_id'] != task['authority_gateway_id']):
             raise ValueError('CALLER_CONTEXT_MISMATCH')
@@ -795,10 +820,10 @@ class Supervisor(object):
             raise ValueError('WRITER_TICKET_EXPIRED')
         self.db.execute('UPDATE tasks SET last_trusted_time=? WHERE task_id=?',
                         (now, task['task_id']))
-        return task
+        return task, now
 
-    def _validate_inflight_result_locked(self, ticket, caller,
-                                         operation_id, now):
+    def _validate_inflight_result_locked(self, ticket, caller, operation_id):
+        now = self.clock()
         caller = self._caller(caller)
         if not isinstance(ticket, dict):
             raise ValueError('EXACT_WRITER_TICKET_REQUIRED')
@@ -808,12 +833,11 @@ class Supervisor(object):
             raise ValueError('STALE_WRITER_TICKET')
         if task['authority_state'] not in ('VALID', 'REVOKING'):
             raise ValueError('INFLIGHT_RESULT_AUTHORITY_NOT_VALID')
-        if (caller['run_id'] != task['authority_run_id']
+        if (caller['caller_id'] != task['authority_caller_id']
+                or caller['run_id'] != task['authority_run_id']
                 or caller['session_id'] != task['authority_session_id']
                 or caller['gateway_id'] != task['authority_gateway_id']):
             raise ValueError('CALLER_CONTEXT_MISMATCH')
-        if not finite(now):
-            raise ValueError('FINITE_TIME_REQUIRED')
         row = self.db.execute(
             'SELECT * FROM writer_operations WHERE operation_id=?',
             (operation_id,)).fetchone()
@@ -821,10 +845,9 @@ class Supervisor(object):
                 or row['attempt_id'] != task['attempt_id']
                 or row['state'] not in ('DISPATCHING', 'UNKNOWN')):
             raise ValueError('OPERATION_NOT_INFLIGHT')
-        return task, row
+        return task, row, now
 
-    def prepare_operation(self, ticket, caller, operation, now=None):
-        now = self.clock() if now is None else now
+    def prepare_operation(self, ticket, caller, operation):
         required = {'operation_id', 'event_id', 'resource_key',
                     'operation_kind', 'expected_before', 'requested_after',
                     'request_sha256', 'operation_marker'}
@@ -836,13 +859,12 @@ class Supervisor(object):
                 raise ValueError('EXACT_OPERATION_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task = self._validate_writer_locked(ticket, caller, now)
+            task, now = self._validate_writer_locked(ticket, caller)
             if operation['resource_key'] not in json.loads(
                     task['resource_scope_json']):
                 raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
             payload = canonical(operation)
-            ticket_sha = hashlib.sha256(
-                canonical(ticket).encode('utf-8')).hexdigest()
+            ticket_sha = self._ticket_sha(ticket)
             caller_sha = hashlib.sha256(
                 canonical(self._caller(caller)).encode('utf-8')).hexdigest()
             existing = self.db.execute('''SELECT * FROM writer_operations
@@ -853,8 +875,7 @@ class Supervisor(object):
                 if (len(existing) == 1 and existing[0]['payload_json'] == payload
                         and existing[0]['ticket_sha256'] == ticket_sha
                         and existing[0]['caller_sha256'] == caller_sha):
-                    return {'duplicate': True,
-                            'state': existing[0]['state']}
+                    return {'duplicate': True, 'state': existing[0]['state']}
                 raise ValueError('OPERATION_IDENTITY_CONFLICT')
             self.db.execute('''INSERT INTO writer_operations
               VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
@@ -863,11 +884,10 @@ class Supervisor(object):
                caller_sha, payload, 'PREPARED', now, now))
             return {'duplicate': False, 'state': 'PREPARED'}
 
-    def begin_dispatch(self, ticket, caller, operation_id, now=None):
-        now = self.clock() if now is None else now
+    def begin_dispatch(self, ticket, caller, operation_id):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task = self._validate_writer_locked(ticket, caller, now)
+            task, now = self._validate_writer_locked(ticket, caller)
             row = self.db.execute(
                 'SELECT * FROM writer_operations WHERE operation_id=?',
                 (operation_id,)).fetchone()
@@ -881,54 +901,83 @@ class Supervisor(object):
                 raise ValueError('OPERATION_NOT_PREPARED')
             return {'state': 'DISPATCHING'}
 
-    def _append_receipt_locked(self, operation_id, receipt, now):
-        if not isinstance(receipt, dict) or not receipt:
+    @staticmethod
+    def _validate_operation_receipt(row, outcome, receipt):
+        if not isinstance(receipt, dict):
             raise ValueError('FINAL_RECEIPT_REQUIRED')
+        required = {'schema','outcome','operation_id','resource_key',
+                    'operation_marker','attribution'}
+        if set(receipt) != required or receipt.get('schema') != 1:
+            raise ValueError('FINAL_RECEIPT_SCHEMA_REQUIRED')
+        operation = json.loads(row['payload_json'])
+        if (receipt['outcome'] != outcome
+                or receipt['operation_id'] != row['operation_id']
+                or receipt['resource_key'] != row['resource_key']
+                or receipt['operation_marker'] != operation['operation_marker']):
+            raise ValueError('FINAL_RECEIPT_BINDING_MISMATCH')
+        attribution = receipt['attribution']
+        if (not isinstance(attribution, dict)
+                or set(attribution) != {'kind','before','after'}):
+            raise ValueError('FINAL_RECEIPT_ATTRIBUTION_REQUIRED')
+        if outcome == 'CONFIRMED':
+            if (attribution['kind'] not in ('FAKE_TXN','GIT_CAS')
+                    or attribution['before'] != operation['expected_before']
+                    or attribution['after'] != operation['requested_after']):
+                raise ValueError('CONFIRMED_ATTRIBUTION_REQUIRED')
+        elif outcome == 'NOT_APPLIED':
+            if (attribution['kind'] != 'READBACK'
+                    or attribution['before'] != operation['expected_before']
+                    or attribution['after'] != operation['expected_before']):
+                raise ValueError('NOT_APPLIED_ATTRIBUTION_REQUIRED')
+        elif outcome == 'CONFLICT':
+            if attribution['kind'] != 'READBACK':
+                raise ValueError('CONFLICT_ATTRIBUTION_REQUIRED')
+        return receipt
+
+    def _append_receipt_locked(self, row, outcome, receipt, now):
+        self._validate_operation_receipt(row, outcome, receipt)
         body = canonical(receipt)
         sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
         existing = self.db.execute(
             'SELECT * FROM writer_receipts WHERE operation_id=?',
-            (operation_id,)).fetchone()
+            (row['operation_id'],)).fetchone()
         if existing is not None:
             if existing['receipt_sha256'] == sha and existing['receipt_json'] == body:
                 return {'duplicate': True}
             raise ValueError('FINAL_RECEIPT_CONFLICT')
         self.db.execute('INSERT INTO writer_receipts VALUES (?,?,?,?)',
-                        (operation_id, body, sha, now))
+                        (row['operation_id'], body, sha, now))
         return {'duplicate': False}
 
-    def confirm_operation(self, ticket, caller, operation_id, receipt,
-                          now=None):
-        now = self.clock() if now is None else now
+    def confirm_operation(self, ticket, caller, operation_id, receipt):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task, row = self._validate_inflight_result_locked(
-                ticket, caller, operation_id, now)
+            task, row, now = self._validate_inflight_result_locked(
+                ticket, caller, operation_id)
+            self._validate_operation_receipt(row, 'CONFIRMED', receipt)
             self.db.execute("""UPDATE writer_operations SET state='CONFIRMED',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
               AND state='DISPATCHING'""",
               (now, operation_id, task['task_id'], task['attempt_id']))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('OPERATION_NOT_DISPATCHING')
-            self._append_receipt_locked(operation_id, receipt, now)
+            self._append_receipt_locked(row, 'CONFIRMED', receipt, now)
             return {'state': 'CONFIRMED'}
 
-    def mark_operation_unknown(self, ticket, caller, operation_id, evidence,
-                               now=None):
-        now = self.clock() if now is None else now
+    def mark_operation_unknown(self, ticket, caller, operation_id, evidence):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            task, row = self._validate_inflight_result_locked(
-                ticket, caller, operation_id, now)
+            task, row, now = self._validate_inflight_result_locked(
+                ticket, caller, operation_id)
             self.db.execute("""UPDATE writer_operations SET state='UNKNOWN',
               updated_at=? WHERE operation_id=? AND task_id=? AND attempt_id=?
               AND state='DISPATCHING'""",
               (now, operation_id, task['task_id'], task['attempt_id']))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
-                row = self.db.execute(
+                current = self.db.execute(
                     'SELECT state FROM writer_operations WHERE operation_id=?',
                     (operation_id,)).fetchone()
-                if row is None or row['state'] != 'UNKNOWN':
+                if current is None or current['state'] != 'UNKNOWN':
                     raise ValueError('OPERATION_NOT_DISPATCHING')
             evidence_id = hashlib.sha256(canonical({
                 'operation_id': operation_id, 'evidence': evidence
@@ -940,8 +989,8 @@ class Supervisor(object):
             return {'state': 'UNKNOWN'}
 
     def reconcile_operation(self, operation_id, context, outcome, evidence,
-                            receipt=None, now=None):
-        now = self.clock() if now is None else now
+                            receipt=None):
+        now = self.clock()
         required = {'role', 'evidence_id', 'caller_id'}
         if (not isinstance(context, dict) or set(context) != required
                 or context['role'] != 'RECONCILER'
@@ -978,13 +1027,14 @@ class Supervisor(object):
                 return {'duplicate': False, 'state': 'UNKNOWN'}
             if receipt is None:
                 raise ValueError('FINAL_RECEIPT_REQUIRED')
+            self._validate_operation_receipt(row, outcome, receipt)
             self.db.execute('''UPDATE writer_operations SET state=?,updated_at=?
               WHERE operation_id=? AND state IN
               ('PREPARED','DISPATCHING','UNKNOWN')''',
               (outcome, now, operation_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('RECONCILE_CAS_FAILED')
-            self._append_receipt_locked(operation_id, receipt, now)
+            self._append_receipt_locked(row, outcome, receipt, now)
             return {'duplicate': False, 'state': outcome}
 
     def unresolved_operations(self, task_id):
@@ -997,17 +1047,22 @@ class Supervisor(object):
     def _controller(caller):
         if (not isinstance(caller, dict)
                 or set(caller) != {'role','caller_id'}
-                or caller['role'] != 'REVOCATION_CONTROLLER'
+                or caller['role'] not in
+                   ('REVOCATION_CONTROLLER','SOURCE_INVENTORY_CONTROLLER')
                 or not isinstance(caller['caller_id'], str)
                 or not caller['caller_id']):
             raise ValueError('TRUSTED_REVOCATION_CONTROLLER_REQUIRED')
+        return caller
 
-    def begin_revocation(self, task_id, caller, now=None):
+    def begin_revocation(self, task_id, caller):
         self._controller(caller)
-        now = self.clock() if now is None else now
+        now = self.clock()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
+            if task['authority_state'] == 'REVOKING':
+                return self._exact_resource_keys(
+                    json.loads(task['resource_scope_json']))
             if task['authority_state'] != 'VALID':
                 raise ValueError('VALID_AUTHORITY_REQUIRED')
             keys = self._exact_resource_keys(
@@ -1021,26 +1076,101 @@ class Supervisor(object):
               updated_at=? WHERE task_id=?""", (now, task_id))
             return keys
 
-    def recover_unknown_to_revoking(self, task_id, caller, evidence, now=None):
-        self._controller(caller)
-        if not isinstance(evidence, dict) or not evidence:
-            raise ValueError('UNKNOWN_RECOVERY_EVIDENCE_REQUIRED')
-        now = self.clock() if now is None else now
+    def recover_unknown_from_inventory(self, task_id, caller, inventory):
+        caller = self._controller(caller)
+        if caller['role'] != 'SOURCE_INVENTORY_CONTROLLER':
+            raise ValueError('TRUSTED_SOURCE_INVENTORY_CONTROLLER_REQUIRED')
+        required = {'schema','source','provider_id','evidence_id','task_id',
+                    'old_attempt_id','resource_keys','resource_scope_digest'}
+        if (not isinstance(inventory, dict) or set(inventory) != required
+                or inventory.get('schema') != 1
+                or inventory.get('source') != 'TRUSTED_SOURCE_INVENTORY'
+                or inventory.get('task_id') != task_id):
+            raise ValueError('TRUSTED_SOURCE_INVENTORY_REQUIRED')
+        keys = self._exact_resource_keys(inventory['resource_keys'])
+        scope_digest = self._scope_digest(keys)
+        if inventory['resource_scope_digest'] != scope_digest:
+            raise ValueError('SOURCE_INVENTORY_SCOPE_DIGEST_MISMATCH')
+        now = self.clock()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
-            if task['authority_state'] != UNKNOWN:
+            if task['authority_state'] != UNKNOWN or task['state'] != 'HOLD':
                 raise ValueError('UNKNOWN_AUTHORITY_REQUIRED')
+            if inventory['old_attempt_id'] != task['attempt_id']:
+                raise ValueError('SOURCE_INVENTORY_ATTEMPT_MISMATCH')
+            conflicts = self.db.execute(
+                'SELECT resource_key FROM resource_claims WHERE resource_key IN (%s)'
+                % ','.join('?' for _ in keys), keys).fetchall()
+            if conflicts:
+                raise ValueError('RESOURCE_SCOPE_CONFLICT')
+            for key in keys:
+                self.db.execute('''INSERT INTO resource_claims
+                  VALUES (?,?,?,?,?,?,?)''',
+                  (key, task_id, task['attempt_id'],
+                   task['max_fence'], task['max_epoch'], 'REVOKING', now))
+            evidence_body = canonical(inventory)
+            self.db.execute('''INSERT INTO authority_recovery_evidence
+              VALUES (?,?,?,?,?)''',
+              (task_id, task['attempt_id'], inventory['evidence_id'],
+               evidence_body, now))
             self.db.execute("""UPDATE tasks SET authority_state='REVOKING',
-              state='HOLD',updated_at=? WHERE task_id=? AND authority_state=?""",
-              (now, task_id, UNKNOWN))
+              resource_scope_json=?,resource_scope_digest=?,updated_at=?
+              WHERE task_id=? AND authority_state=?""",
+              (canonical(list(keys)), scope_digest, now, task_id, UNKNOWN))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('UNKNOWN_RECOVERY_CAS_FAILED')
-            return {'state': 'REVOKING', 'evidence': canonical(evidence)}
+            return {'state': 'REVOKING',
+                    'resource_scope_digest': scope_digest}
 
-    def record_resource_invalidation(self, task_id, resource_key, receipt,
-                                     now=None):
-        now = self.clock() if now is None else now
+    def record_revocation_drain(self, task_id, provider_id, receipt):
+        now = self.clock()
+        required = {'schema','kind','capability','task_id','old_attempt_id',
+                    'provider_id','resource_scope_digest','outcome'}
+        if (not isinstance(receipt, dict) or set(receipt) != required
+                or receipt.get('schema') != 1
+                or receipt.get('kind') != 'LOCAL_DRAIN'
+                or receipt.get('capability') != 'LOCAL_ONLY'
+                or receipt.get('outcome') != 'DRAINED'
+                or receipt.get('task_id') != task_id
+                or receipt.get('provider_id') != provider_id):
+            raise ValueError('LOCAL_DRAIN_RECEIPT_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self._task(task_id)
+            if task['authority_state'] != 'REVOKING':
+                raise ValueError('REVOKING_AUTHORITY_REQUIRED')
+            if (receipt['old_attempt_id'] != task['attempt_id']
+                    or receipt['resource_scope_digest']
+                       != task['resource_scope_digest']):
+                raise ValueError('LOCAL_DRAIN_BINDING_MISMATCH')
+            body = canonical(receipt)
+            sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+            existing = self.db.execute('''SELECT * FROM revocation_drains
+              WHERE task_id=? AND attempt_id=?''',
+              (task_id, task['attempt_id'])).fetchone()
+            if existing is not None:
+                if existing['receipt_sha256'] == sha:
+                    return {'duplicate': True}
+                raise ValueError('LOCAL_DRAIN_RECEIPT_CONFLICT')
+            self.db.execute('INSERT INTO revocation_drains VALUES (?,?,?,?,?,?)',
+                (task_id, task['attempt_id'], provider_id, body, sha, now))
+            return {'duplicate': False, 'receipt_sha256': sha}
+
+    def record_resource_invalidation(self, task_id, receipt):
+        now = self.clock()
+        required = {'schema','kind','capability','adapter_id','provider_id',
+                    'task_id','old_attempt_id','old_lease_id','old_fence',
+                    'old_epoch','ticket_sha256','spec_sha256',
+                    'resource_scope_digest','resource_key','outcome',
+                    'evidence_id'}
+        if (not isinstance(receipt, dict) or set(receipt) != required
+                or receipt.get('schema') != 1
+                or receipt.get('kind') != 'RESOURCE_INVALIDATION'
+                or receipt.get('capability') != 'LOCAL_ONLY'
+                or receipt.get('outcome') != 'INVALIDATED'
+                or receipt.get('task_id') != task_id):
+            raise ValueError('RESOURCE_INVALIDATION_RECEIPT_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
@@ -1048,11 +1178,21 @@ class Supervisor(object):
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
             keys = self._exact_resource_keys(
                 json.loads(task['resource_scope_json']))
+            resource_key = receipt['resource_key']
             if resource_key not in keys:
                 raise ValueError('RESOURCE_OUTSIDE_WRITER_SCOPE')
-            if (not isinstance(receipt, dict)
-                    or receipt.get('outcome') != 'INVALIDATED'):
-                raise ValueError('RESOURCE_INVALIDATION_RECEIPT_REQUIRED')
+            expected_ticket = self._authority_ticket(task)
+            expected = {
+                'old_attempt_id': task['attempt_id'],
+                'old_lease_id': task['lease_id'],
+                'old_fence': task['fence'],
+                'old_epoch': task['epoch'],
+                'ticket_sha256': self._ticket_sha(expected_ticket),
+                'spec_sha256': task['spec_sha256'],
+                'resource_scope_digest': task['resource_scope_digest'],
+            }
+            if any(receipt[k] != v for k, v in expected.items()):
+                raise ValueError('RESOURCE_INVALIDATION_BINDING_MISMATCH')
             body = canonical(receipt)
             sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
             existing = self.db.execute('''SELECT * FROM
@@ -1066,10 +1206,10 @@ class Supervisor(object):
             self.db.execute('''INSERT INTO resource_invalidation_receipts
               VALUES (?,?,?,?,?,?)''',
               (task_id, task['attempt_id'], resource_key, body, sha, now))
-            return {'duplicate': False}
+            return {'duplicate': False, 'receipt_sha256': sha}
 
-    def complete_revocation(self, task_id, now=None):
-        now = self.clock() if now is None else now
+    def complete_revocation(self, task_id):
+        now = self.clock()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
@@ -1077,6 +1217,11 @@ class Supervisor(object):
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
             if self.unresolved_operations(task_id):
                 raise ValueError('REVOCATION_NOT_COMPLETED')
+            drain = self.db.execute('''SELECT * FROM revocation_drains
+              WHERE task_id=? AND attempt_id=?''',
+              (task_id, task['attempt_id'])).fetchone()
+            if drain is None:
+                raise ValueError('LOCAL_DRAIN_REQUIRED')
             keys = self._exact_resource_keys(
                 json.loads(task['resource_scope_json']))
             rows = [dict(r) for r in self.db.execute('''SELECT * FROM
@@ -1085,10 +1230,20 @@ class Supervisor(object):
               (task_id, task['attempt_id']))]
             if [r['resource_key'] for r in rows] != list(keys):
                 raise ValueError('RESOURCE_COVERAGE_INCOMPLETE')
-            coverage = hashlib.sha256(canonical([
-                {'resource_key': r['resource_key'],
-                 'receipt_sha256': r['receipt_sha256']} for r in rows
-            ]).encode('utf-8')).hexdigest()
+            coverage_object = {
+                'task_id': task_id,
+                'old_attempt_id': task['attempt_id'],
+                'old_lease_id': task['lease_id'],
+                'old_fence': task['fence'],
+                'old_epoch': task['epoch'],
+                'spec_sha256': task['spec_sha256'],
+                'resource_scope_digest': task['resource_scope_digest'],
+                'receipts': [
+                    {'resource_key': r['resource_key'],
+                     'receipt_sha256': r['receipt_sha256']} for r in rows],
+            }
+            coverage = hashlib.sha256(
+                canonical(coverage_object).encode('utf-8')).hexdigest()
             self.db.execute("""UPDATE tasks SET authority_state='REVOKED',
               authority_valid_until=NULL,coverage_digest=?,updated_at=?
               WHERE task_id=? AND authority_state='REVOKING'""",
@@ -1097,17 +1252,21 @@ class Supervisor(object):
                 raise ValueError('REVOCATION_CAS_FAILED')
             self.db.execute("""UPDATE resource_claims SET state='REVOKED',
               updated_at=? WHERE task_id=?""", (now, task_id))
-            return {'state': 'REVOKED', 'coverage_digest': coverage}
+            return {'state': 'REVOKED',
+                    'resource_scope_digest': task['resource_scope_digest'],
+                    'coverage_digest': coverage}
 
-    def record_receiver_ack(self, task_id, ack, now=None):
-        now = self.clock() if now is None else now
-        required = {'task_id','old_attempt_id','new_attempt_id','new_owner',
-                    'new_entry','new_run_id','new_session_id','new_lease_id',
-                    'new_gateway_id','resource_scope_digest','spec_sha256',
+    def record_receiver_ack(self, task_id, ack):
+        now = self.clock()
+        required = {'schema','task_id','old_attempt_id','new_attempt_id',
+                    'new_owner','new_entry','new_caller_id','new_run_id',
+                    'new_session_id','new_lease_id','new_gateway_id',
+                    'resource_scope_digest','coverage_digest','spec_sha256',
                     'checkpoint_sha256'}
         if (not isinstance(ack, dict) or set(ack) != required
+                or ack.get('schema') != 1
                 or any(not isinstance(ack[x], str) or not ack[x]
-                       for x in required)):
+                       for x in required if x != 'schema')):
             raise ValueError('EXACT_RECEIVER_ACK_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
@@ -1115,21 +1274,32 @@ class Supervisor(object):
             if task['authority_state'] != 'REVOKED':
                 raise ValueError('REVOKED_AUTHORITY_REQUIRED')
             expected = {
-                'task_id': task_id, 'old_attempt_id': task['attempt_id'],
-                'resource_scope_digest': task['coverage_digest'],
+                'task_id': task_id,
+                'old_attempt_id': task['attempt_id'],
+                'resource_scope_digest': task['resource_scope_digest'],
+                'coverage_digest': task['coverage_digest'],
                 'spec_sha256': task['spec_sha256'],
                 'checkpoint_sha256': task['checkpoint_sha256']}
             if any(ack[k] != v for k, v in expected.items()):
                 raise ValueError('RECEIVER_ACK_BINDING_MISMATCH')
             body = canonical(ack)
             sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
+            if task['receiver_ack_sha256'] != UNKNOWN:
+                if (task['receiver_ack_sha256'] == sha
+                        and task['receiver_ack_json'] == body):
+                    return {'duplicate': True,
+                            'receiver_ack_sha256': sha}
+                raise ValueError('RECEIVER_ACK_CONFLICT')
             self.db.execute('''UPDATE tasks SET receiver_ack_json=?,
-              receiver_ack_sha256=?,updated_at=? WHERE task_id=?''',
-              (body, sha, now, task_id))
-            return {'receiver_ack_sha256': sha}
+              receiver_ack_sha256=?,updated_at=? WHERE task_id=? AND
+              receiver_ack_sha256=?''',
+              (body, sha, now, task_id, UNKNOWN))
+            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
+                raise ValueError('RECEIVER_ACK_CAS_FAILED')
+            return {'duplicate': False, 'receiver_ack_sha256': sha}
 
-    def takeover_claim(self, task_id, ack, valid_until, now=None):
-        now = self.clock() if now is None else now
+    def takeover_claim(self, task_id, ack, valid_until):
+        now = self.clock()
         if not finite(now) or not finite(valid_until) or now >= valid_until:
             raise ValueError('FRESH_AUTHORITY_DEADLINE_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
@@ -1140,7 +1310,9 @@ class Supervisor(object):
             if (task['authority_state'] != 'REVOKED'
                     or task['receiver_ack_sha256'] != ack_sha
                     or task['receiver_ack_json'] != body
-                    or ack.get('resource_scope_digest') != task['coverage_digest']):
+                    or ack.get('resource_scope_digest')
+                       != task['resource_scope_digest']
+                    or ack.get('coverage_digest') != task['coverage_digest']):
                 raise ValueError('TAKEOVER_PREREQUISITES_INCOMPLETE')
             keys = self._exact_resource_keys(
                 json.loads(task['resource_scope_json']))
@@ -1155,15 +1327,17 @@ class Supervisor(object):
             self.db.execute('''UPDATE tasks SET state='RECEIVED',owner=?,entry=?,
               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=?,epoch=?,
               max_fence=?,max_epoch=?,authority_state='VALID',
-              authority_valid_until=?,authority_run_id=?,authority_session_id=?,
-              authority_gateway_id=?,last_trusted_time=?,received_at=?,
-              last_event_at=?,updated_at=?
+              authority_valid_until=?,authority_caller_id=?,
+              authority_run_id=?,authority_session_id=?,
+              authority_gateway_id=?,receiver_ack_json='{}',
+              receiver_ack_sha256=?,coverage_digest=?,last_trusted_time=?,
+              received_at=?,last_event_at=?,updated_at=?
               WHERE task_id=? AND authority_state='REVOKED' ''',
               (ack['new_owner'], ack['new_entry'], ack['new_run_id'],
                ack['new_session_id'], ack['new_attempt_id'], ack['new_lease_id'],
-               fence, epoch, fence, epoch, valid_until, ack['new_run_id'],
-               ack['new_session_id'], ack['new_gateway_id'], now, now, now,
-               now, task_id))
+               fence, epoch, fence, epoch, valid_until, ack['new_caller_id'],
+               ack['new_run_id'], ack['new_session_id'], ack['new_gateway_id'],
+               UNKNOWN, UNKNOWN, now, now, now, now, task_id))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('TAKEOVER_CAS_FAILED')
             self.db.execute('''UPDATE resource_claims SET attempt_id=?,
