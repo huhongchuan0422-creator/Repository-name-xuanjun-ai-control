@@ -1,0 +1,58 @@
+SAAS REAL PYTHON BACKEND INTEGRATION STATUS — 2026-10-24
+
+Frontend branch before this continuation:
+  feature/chatgpt-saas-console-20261024
+  HEAD 36685dd4d879a852ff7509ed878a1b45432967f3
+  Tree 56eb4401f25d3fac2bc915f8e83815b68cfb8922
+
+Required backend:
+  Commit 1b48e5fe8015afd9035ff269f9b432d9a68223b2
+  Tree   b0c0147aeef69d00e6edbaef7e436e5699403cf3
+
+Repository source verification through GitHub connector:
+  PASS — scripts/pr122_customer_http.py readable at exact backend commit.
+  PASS — scripts/pr122_customer_core.py readable at exact backend commit.
+  PASS — scripts/pr122_customer_changes.py readable at exact backend commit.
+  PASS — scripts/pr122_customer_preview.py / change authority / existing HTTP fixtures readable.
+  PASS — change_submit_idempotent is present in the real HTTP operation map at 1b48e5fe.
+  PASS — existing repository HttpTests use actual Python HTTPServer + App + Center + SQLite.
+
+Local execution prerequisites:
+  /mnt/data contained no full repository checkout and no scripts/pr122_customer_http.py.
+  Attempted isolated git checkout:
+    git clone --filter=blob:none --no-checkout https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control.git
+  Actual runtime result:
+    fatal: unable to access 'https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control.git/':
+    Could not resolve host: github.com
+
+Real Python backend journey:
+  NOT_EXECUTED
+  Reason: exact backend checkout and transitive Python source tree are not mounted; outbound clone is unavailable.
+  This is not a backend PASS or FAIL.
+
+Executable entry prepared:
+  clients/saas-console/tests/real_python_backend_integration.py
+  clients/saas-console/tests/run_real_python_backend_integration.sh
+
+Required input to execute:
+  XJ_PR122_BACKEND_ROOT=<filesystem checkout whose git HEAD is exactly 1b48e5fe8015afd9035ff269f9b432d9a68223b2>
+
+Planned executable coverage uses only synthetic fixture identities/tenants:
+  HTTP login + CSRF + HttpOnly cookie semantics
+  GET me
+  project/tenant isolation
+  signed import_snapshot
+  trusted preview listing/render/served evidence
+  Q&A write/readback
+  legacy feedback submit + same-case readback
+  actual change_submit_idempotent replay/conflict behavior
+  signed V2 delivery
+  current V2 preview
+  change_updates
+  exact change_retest
+  RETEST state readback
+
+Existing V5 frontend isolation suite:
+  24/24 PASS, 0 FAIL
+  REUSED ONLY.
+  It is NOT counted as proof that the 1b48e5fe Python backend ran or connected.
