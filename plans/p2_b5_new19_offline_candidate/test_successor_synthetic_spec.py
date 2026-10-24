@@ -504,6 +504,8 @@ def child_query(root,action='query',execute_start=None):
         actual=os.uname()
         synthetic=type(actual)((actual.sysname,c53.HOST,
             actual.release,actual.version,actual.machine))
+        service_active={'xuanjun-cloud-connection.service':True,
+                        'xuanjun-cloud-oauth-resource.service':True}
         def recorded_status(argv,**kwargs):
             if argv[:2]==['/usr/bin/systemctl','show']:
                 return type('Result',(),{'returncode':0,'stdout':(
@@ -511,13 +513,13 @@ def child_query(root,action='query',execute_start=None):
                     'NRestarts=0\nExecMainStartTimestampMonotonic=4000\n').encode()})()
             if argv[:3]==['/usr/bin/systemctl','is-active','--quiet']:
                 unit=argv[-1]
-                if unit in ('xuanjun-cloud-connection.service',
-                             'xuanjun-cloud-oauth-resource.service'):
-                    return type('Result',(),{'returncode':0,'stdout':b''})()
+                if unit in service_active:
+                    return type('Result',(),{'returncode':
+                        0 if service_active[unit] else 3,'stdout':b''})()
             if len(argv)==3 and argv[0]=='/usr/bin/systemctl' and argv[1] in (
-                    'stop','start','restart') and argv[2] in (
-                    'xuanjun-cloud-connection.service',
-                    'xuanjun-cloud-oauth-resource.service'):
+                    'stop','start','restart') and argv[2] in service_active:
+                if argv[1]=='stop':service_active[argv[2]]=False
+                else:service_active[argv[2]]=True
                 return type('Result',(),{'returncode':0,'stdout':b''})()
             raise AssertionError('UNRECORDED_CHILD_OS_ACTION')
         class ResourceResponse:
