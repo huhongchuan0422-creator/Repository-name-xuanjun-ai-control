@@ -71,7 +71,27 @@ def validate_deb_cache(deb_cache):
     actual = {p.name for p in root.glob("*.deb")}
     if actual != seen:
         raise BundleError("DEB_MEMBER_SET_MISMATCH")
-    return verified, lock_path
+    apt_root = root / "apt-lists"
+    apt_entries = lock.get("apt_lists")
+    if apt_root.is_symlink() or not apt_root.is_dir() or not isinstance(apt_entries, list) or not apt_entries:
+        raise BundleError("APT_INDEX_LOCK_MISSING")
+    verified_apt = []
+    apt_seen = set()
+    for item in apt_entries:
+        if not isinstance(item,dict) or not all(k in item for k in ("path","bytes","sha256")):
+            raise BundleError("APT_INDEX_ENTRY_INVALID")
+        rel = item["path"]
+        if not isinstance(rel,str) or Path(rel).is_absolute() or ".." in Path(rel).parts or rel in apt_seen:
+            raise BundleError("APT_INDEX_PATH_INVALID")
+        apt_seen.add(rel)
+        path = regular_file(apt_root/rel,"APT_INDEX")
+        if path.stat().st_size != item["bytes"] or sha256_file(path) != item["sha256"]:
+            raise BundleError("APT_INDEX_SHA256_MISMATCH:"+rel)
+        verified_apt.append((path,"system-apt-lists/"+rel))
+    actual_apt = {str(p.relative_to(apt_root)) for p in apt_root.rglob("*") if p.is_file() and not p.is_symlink()}
+    if actual_apt != apt_seen:
+        raise BundleError("APT_INDEX_MEMBER_SET_MISMATCH")
+    return verified, lock_path, verified_apt
 
 def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requirements_path=REQUIREMENTS,
                     manifest_path=MODEL_MANIFEST, license_path=LICENSE, notice_path=NOTICE,
@@ -226,7 +246,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
     checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
                               requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
                               license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
-    verified_debs, deb_lock_path = validate_deb_cache(system_deb_cache)
+    verified_debs, deb_lock_path, verified_apt = validate_deb_cache(system_deb_cache)
     archive_manifest = {k:v for k,v in checked.items() if not k.startswith("verified_")}
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
@@ -246,7 +266,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
         frozen["models/" + item["filename"]] = item["sha256"]
     for item in checked["wheels"]:
         frozen["wheelhouse/" + item["filename"]] = item["sha256"]
-    for path, arcname in verified_debs:
+    for path, arcname in verified_debs + verified_apt:
         frozen[arcname] = sha256_file(path)
     if deb_lock_path:
         frozen["system-deb-lock.json"] = sha256_file(deb_lock_path)
@@ -264,7 +284,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
     }
     current_paths.update({"models/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_models"]})
     current_paths.update({"wheelhouse/" + arcname.split("/",1)[1]: path for path,arcname in checked["verified_wheels"]})
-    current_paths.update({arcname:path for path,arcname in verified_debs})
+    current_paths.update({arcname:path for path,arcname in verified_debs + verified_apt})
     if deb_lock_path:
         current_paths["system-deb-lock.json"] = deb_lock_path
     for arcname, expected_sha in frozen.items():
@@ -294,7 +314,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path,
                 (Path(CONFIG_SCHEMA), "deployment_config.schema.json"),
             ):
                 archive.add(str(path), arcname=arcname, recursive=False)
-            for path, arcname in checked["verified_models"] + checked["verified_wheels"] + verified_debs:
+            for path, arcname in checked["verified_models"] + checked["verified_wheels"] + verified_debs + verified_apt:
                 archive.add(str(path), arcname=arcname, recursive=False)
             if deb_lock_path:
                 archive.add(str(deb_lock_path), arcname="system-deb-lock.json", recursive=False)
