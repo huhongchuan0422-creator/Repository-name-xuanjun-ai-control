@@ -37,7 +37,7 @@ def main():
             kind=next((kind for kind,att in docs if att==attachment_id), None)
             revision='1'
             if expected_application_revision is not None and str(expected_application_revision)!=revision: revision='2'
-            return {'authorized': expected is not None and expected==supplied_sha256 and attachment_id not in revoked_attachments and kind==document_type and revision=='1', 'content_sha256': expected or '', 'document_type':kind, 'application_revision':revision}
+            return {'authorized': expected is not None and expected==supplied_sha256 and attachment_id not in revoked_attachments and kind==document_type and revision=='1', 'content_sha256': expected or '', 'document_type':kind, 'application_revision':revision, 'provider_version':'1.2.0'}
         def make_client():
             store=SecureSQLiteJobStore(db,key)
             app=create_app(authenticate=lambda token: principal if token=='synthetic-token' else (_ for _ in ()).throw(ValueError('bad token')),
@@ -57,13 +57,13 @@ def main():
                 print('E2E_DOCUMENT='+kind); print('E2E_FIELDS='+repr(fields))
                 if not fields or payload.get('authenticity_verified') is not False or payload.get('requires_human_confirmation') is not True: raise SystemExit('OCR_OR_REVIEW_GUARD_FAILED:'+kind)
                 confirm_headers={'Authorization':'Bearer synthetic-token','Idempotency-Key':'confirm-'+kind+'-00001'}
-                body={'revision':1,'fields':{k:v['value'] for k,v in fields.items()}}
+                body={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{k:v['value'] for k,v in fields.items()}}
                 confirmed=client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
                 if confirmed.status_code!=200: raise SystemExit('CONFIRM_FAILED:'+kind+':'+str(confirmed.status_code)+':'+confirmed.text)
                 replay=client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers=confirm_headers,json=body)
                 if replay.status_code!=200 or replay.json()!=confirmed.json(): raise SystemExit('CONFIRM_REPLAY_FAILED:'+kind)
                 readback=client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer synthetic-token'})
-                if readback.status_code!=200 or readback.json().get('confirmed_fields')!=body['fields'] or readback.json().get('confirmation_revision')!=1: raise SystemExit('CONFIRMED_FIELDS_READBACK_FAILED:'+kind)
+                if readback.status_code!=200 or readback.json().get('confirmed_fields')!=body['fields'] or readback.json().get('confirmation_revision')!=1 or readback.json().get('confirmed_binding',{}).get('provider_version')!='1.2.0': raise SystemExit('CONFIRMED_FIELDS_READBACK_FAILED:'+kind)
                 results.append((kind,attachment,job_id,img,headers,body,confirm_headers,confirmed.json()))
         with make_client() as restarted:
             for kind,attachment,job_id,img,headers,body,confirm_headers,confirm_response in results:
