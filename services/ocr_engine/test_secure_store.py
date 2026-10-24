@@ -120,6 +120,24 @@ class SecureStoreTests(unittest.TestCase):
             self.store.create('tenant-a','user-a','app-a','business_license','9'*64,'provider-key-0001','synthetic-attachment','1','1.3.0')
         saved=self.store.get(first['job_id'],'tenant-a')
         self.assertEqual(saved['provider_version'],'1.2.0')
+    def test_confirmation_transaction_binds_provider_and_rolls_back_on_mismatch(self):
+        job=self.store.create('tenant-a','user-a','app-a','business_license','7'*64,'tuple-confirm-key-01','synthetic-attachment','1','1.2.0')
+        self.store.claim(job['job_id']); self.store.update(job['job_id'],status='needs_review',fields={'company_name':{'value':'synthetic'}})
+        with self.assertRaisesRegex(ValueError,'OCR_PROVIDER_VERSION_CONFLICT'):
+            self.store.confirm(job['job_id'],'tenant-a',1,{'company_name':'reviewed'},'tuple-confirm-key-01','1','1.3.0')
+        after=self.store.get(job['job_id'],'tenant-a')
+        self.assertEqual(after['status'],'needs_review')
+        self.assertNotIn('confirmed_binding',after)
+        confirmed=self.store.confirm(job['job_id'],'tenant-a',1,{'company_name':'reviewed'},'tuple-confirm-key-01','1','1.2.0')
+        self.assertEqual(confirmed['confirmed_binding']['application_revision'],'1')
+        self.assertEqual(confirmed['confirmed_binding']['provider_version'],'1.2.0')
+        events=self.store.audit_events(job['job_id'],'tenant-a')
+        confirmation=[event for event in events if event.get('event')=='USER_CONFIRMATION']
+        self.assertEqual(len(confirmation),1)
+        self.assertEqual(confirmation[0]['confirmed_binding']['provider_version'],'1.2.0')
+        replay=self.store.confirm(job['job_id'],'tenant-a',1,{'company_name':'reviewed'},'tuple-confirm-key-01','1','1.2.0')
+        self.assertEqual(replay['confirmed_binding'],confirmed['confirmed_binding'])
+        self.assertEqual(replay['confirmed_fields'],confirmed['confirmed_fields'])
     def test_frozen_binding_fields_cannot_be_changed_by_update(self):
         job=self.store.create('tenant-a','user-a','app-a','business_license','8'*64,'frozen-fields-key-01','synthetic-attachment','1','1.2.0')
         for field,value in [('attachment_id','other'),('document_type','id_front'),('application_revision','2'),('provider_version','1.3.0')]:
