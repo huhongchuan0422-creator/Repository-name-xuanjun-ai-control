@@ -203,6 +203,8 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(read.status_code,200,read.text)
         self.assertEqual(read.json().get('confirmed_fields'),body['fields'])
         self.assertEqual(read.json().get('confirmation_revision'),1)
+        self.assertEqual(read.json().get('provider_version'),'1.2.0')
+        self.assertTrue(read.json().get('shared_writeback_eligible'))
     def test_provider_version_change_denies_get_confirm_delete(self):
         r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
         self.current_provider_version='1.3.0'
@@ -220,6 +222,30 @@ class ApiTests(unittest.TestCase):
         from services.ocr_engine.api import _valid_provider_version
         for value in (True, -1, '01', '1..2', ' 1.2', 1.5):
             with self.subTest(value=value): self.assertFalse(_valid_provider_version(value))
+    def test_get_then_provider_change_blocks_confirmation(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        seen=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(seen.status_code,200,seen.text)
+        self.assertEqual(seen.json().get('application_revision'),'1')
+        self.assertEqual(seen.json().get('provider_version'),'1.2.0')
+        self.current_provider_version='1.3.0'
+        response=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'get-confirm-provider-race-01'},json={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'x'}})
+        self.assertEqual(response.status_code,403,response.text)
+    def test_legacy_job_without_provider_version_remains_reviewable_but_not_shared_writeback(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        store=self.client.app.state.ocr_job_store
+        with store._connect() as db:
+            row=db.execute('SELECT ciphertext FROM ocr_jobs WHERE job_id=?',(job_id,)).fetchone()
+            payload=store._open(row['ciphertext']); payload.pop('provider_version',None)
+            db.execute('UPDATE ocr_jobs SET ciphertext=? WHERE job_id=?',(store._seal(payload),job_id))
+        read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
+        self.assertEqual(read.status_code,200,read.text)
+        self.assertIsNone(read.json().get('provider_version'))
+        self.assertFalse(read.json().get('shared_writeback_eligible'))
+        body={'revision':1,'application_revision':'1','provider_version':None,'fields':{'company_name':'human reviewed legacy value'}}
+        confirmed=self.client.post('/api/v1/ocr/jobs/'+job_id+'/confirm',headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'legacy-confirm-key-0001'},json=body)
+        self.assertEqual(confirmed.status_code,200,confirmed.text)
+        self.assertFalse(confirmed.json().get('shared_writeback_eligible'))
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
