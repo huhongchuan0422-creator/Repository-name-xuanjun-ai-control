@@ -420,7 +420,7 @@ try:
  try:
   dbs=[h.center.db]+list(h.persistence.handles)
   for db in dbs:
-   assert db.execute('PRAGMA integrity_check').fetchall()==[('ok',)]
+   assert [tuple(row) for row in db.execute('PRAGMA integrity_check').fetchall()]==[('ok',)]
    assert not db.execute('PRAGMA foreign_key_check').fetchall()
   h.center.check_integrity()
   records=[]

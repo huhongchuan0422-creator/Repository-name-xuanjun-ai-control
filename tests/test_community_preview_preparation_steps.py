@@ -166,6 +166,27 @@ class PreparationSteps(unittest.TestCase):
         c.assert_not_called()
         with patch.object(s.time,'time',return_value=s.EXPIRES),patch.object(s,'read') as r,self.assertRaises(s.Hold):s.image_load()
         r.assert_not_called()
+    def test_clone_program_real_sqlite_row_factory_and_private_digest_only(self):
+        import sys
+        db=sqlite3.connect(':memory:');db.row_factory=sqlite3.Row
+        db.execute('CREATE TABLE sample(v TEXT)');db.execute("INSERT INTO sample VALUES('SYNTHETIC_PRIVATE_VALUE')");db.commit()
+        class CenterFixture:
+            def check_integrity(owner):
+                self.assertEqual(db.execute('PRAGMA integrity_check').fetchone()[0],'ok')
+        center=CenterFixture();center.db=db
+        host=types.SimpleNamespace(center=center,persistence=types.SimpleNamespace(handles=[]),close=db.close)
+        class HostFacade:
+            @staticmethod
+            def open(*args):
+                self.assertEqual(args,('/var/lib/xuanjun-community-preview/config/host.json','/var/lib/xuanjun-community-preview/config/center-keys.json','/var/lib/xuanjun-community-preview/config/wechat.json'))
+                return host
+        # The host/Center facade is synthetic; actual SQLite and exact production
+        # clone program execute. This is NOT actual-image or real-identity proof.
+        output=io.StringIO()
+        with patch.dict(sys.modules,{'scripts.community_platform_host':types.SimpleNamespace(PlatformHost=HostFacade)}),contextlib.redirect_stdout(output):
+            exec(compile(s.CLONE_CODE,'<exact-clone-program>','exec'),{})
+        value=json.loads(output.getvalue());self.assertTrue(value['original_host_open']);self.assertEqual(value['stores'][0][0][0],'sample')
+        self.assertNotIn('SYNTHETIC_PRIVATE_VALUE',output.getvalue())
     def test_fixed_image_import_durable_intent_unknown_never_retries(self):
         with patch.object(s,'daemon_capacity'),patch.object(s,'image_present',return_value=False),patch.object(s,'capture',side_effect=s.Hold('COMMAND_UNKNOWN_NO_RETRY')) as run:
             with self.assertRaises(s.Hold):s._load_fixed_archive(b'SYNTHETIC','fmt',b'expected')
