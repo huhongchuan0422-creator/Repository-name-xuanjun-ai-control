@@ -543,6 +543,12 @@ class Transaction:
                 with self.b.successor_evidence_action('B5_EXPOSURE_CLOSE'):
                     self.guarded('verify_b5_http_provenance',proof,self.bundle,self.spec)
                     self.guarded('approve_precise_b5_exposure_close',self.bundle,self.spec)
+                    # Durable same-attempt pre-intent before the first
+                    # connection-service stop. If this checkpoint is uncertain,
+                    # the close leaf is never entered. Recovery's existing
+                    # phase whitelist rejects CLOSE_ATTEMPT, so another process
+                    # cannot reinterpret this as a fresh close context.
+                    self.note('CLOSE_ATTEMPT')
                     self.guarded('close_b5_exposure_success_successor_only')
         except BaseException:
             # Persist the same attempt's uncertainty. Recovery accepts no
