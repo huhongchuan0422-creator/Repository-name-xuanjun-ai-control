@@ -169,12 +169,24 @@ class SupervisorTests(unittest.TestCase):
             db.commit()
         finally:
             db.close()
+        sidecars=[self.path+x for x in ('-wal','-shm','-journal')]
+        before_stat=os.stat(self.path)
         with open(self.path,'rb') as stream:
             before=stream.read()
+        before_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                            if os.path.exists(p) else None) for p in sidecars}
         with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
             Supervisor(self.path,lambda:self.now)
+        after_stat=os.stat(self.path)
         with open(self.path,'rb') as stream:
             self.assertEqual(before,stream.read())
+        self.assertEqual((before_stat.st_ino,before_stat.st_size,
+                          before_stat.st_mtime_ns),
+                         (after_stat.st_ino,after_stat.st_size,
+                          after_stat.st_mtime_ns))
+        after_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                           if os.path.exists(p) else None) for p in sidecars}
+        self.assertEqual(before_sidecars,after_sidecars)
         Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
         self.s=Supervisor(self.path,lambda:self.now)
         self.assertEqual(self.s._task('t1')['authority_state'],'NONE')
