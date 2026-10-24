@@ -123,15 +123,19 @@ class SecureSQLiteJobStore:
             return changed == 1
 
     def create(self, tenant_id: str, subject: str, onboarding_id: str,
-               doc_type: str, digest: str, idempotency_key: str = "", attachment_id: str = "", application_revision: str = "") -> dict:
+               doc_type: str, digest: str, idempotency_key: str = "", attachment_id: str = "", application_revision: str = "", provider_version=None) -> dict:
         if not idempotency_key:
             raise ValueError("OCR_IDEMPOTENCY_REQUIRED")
         if not application_revision:
             raise ValueError("OCR_APPLICATION_REVISION_REQUIRED")
+        if provider_version is not None and (isinstance(provider_version, bool) or not isinstance(provider_version, (str, int)) or str(provider_version).strip() == "" or str(provider_version) != str(provider_version).strip() or (isinstance(provider_version, int) and provider_version < 0)):
+            raise ValueError("OCR_PROVIDER_VERSION_INVALID")
+        if isinstance(provider_version, str) and not __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}", provider_version):
+            raise ValueError("OCR_PROVIDER_VERSION_INVALID")
         tenant_key = self._index(tenant_id)
         subject_key = self._index(tenant_id + "/" + subject)
         idem_key = self._index(tenant_id + "/" + idempotency_key)
-        payload_hash = self._index("/".join((tenant_id, subject, onboarding_id, attachment_id, doc_type, digest, application_revision)))
+        payload_hash = self._index(json.dumps([tenant_id, subject, onboarding_id, attachment_id, doc_type, digest, application_revision, provider_version], ensure_ascii=False, separators=(",", ":")))
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT payload_hash, ciphertext FROM ocr_jobs WHERE tenant_key=? AND idem_key=?",
@@ -145,7 +149,7 @@ class SecureSQLiteJobStore:
                 return payload
             job = {"job_id": str(uuid.uuid4()), "tenant_id": tenant_id, "subject": subject,
                    "onboarding_application_id": onboarding_id, "attachment_id": attachment_id, "document_type": doc_type, "application_revision": application_revision,
-                   "document_sha256": digest, "status": "queued", "fields": {},
+                   "document_sha256": digest, "provider_version": provider_version, "status": "queued", "fields": {},
                    "requires_human_confirmation": True, "authenticity_verified": False,
                    "contract_version": "1.0.0"}
             db.execute("INSERT INTO ocr_jobs(job_id,tenant_key,subject_key,idem_key,payload_hash,state,ciphertext) VALUES(?,?,?,?,?,?,?)",
@@ -192,7 +196,8 @@ class SecureSQLiteJobStore:
         return self._modify(job_id, None, action) is not None
 
     def update(self, job_id: str, **changes):
-        forbidden = {"tenant_id", "subject", "onboarding_application_id", "document_sha256", "job_id",
+        forbidden = {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_type",
+                     "application_revision", "provider_version", "document_sha256", "job_id",
                      "confirmed_fields", "confirmation_revision", "authenticity_verified"}
         if forbidden.intersection(changes):
             raise ValueError("OCR_IMMUTABLE_FIELD")
@@ -206,12 +211,18 @@ class SecureSQLiteJobStore:
         if self._modify(job_id, None, action) is None:
             raise KeyError("OCR_JOB_NOT_FOUND")
 
-    def confirm(self, job_id: str, tenant_id: str, revision: int, fields: dict, idempotency_key: str = ""):
+    def confirm(self, job_id: str, tenant_id: str, revision: int, fields: dict, idempotency_key: str = "",
+                seen_application_revision=None, seen_provider_version=None):
         if not idempotency_key:
             raise ValueError("OCR_CONFIRM_IDEMPOTENCY_REQUIRED")
+        for value, label in ((seen_application_revision, "APPLICATION"), (seen_provider_version, "PROVIDER")):
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (str, int)) or str(value).strip() == "" or str(value) != str(value).strip() or (isinstance(value, int) and value < 0)):
+                raise ValueError("OCR_" + label + "_VERSION_INVALID")
+        if isinstance(seen_provider_version, str) and not __import__("re").fullmatch(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){0,3}", seen_provider_version):
+            raise ValueError("OCR_PROVIDER_VERSION_INVALID")
         tenant_key = self._index(tenant_id)
         idem_key = self._index(tenant_id + "/" + idempotency_key)
-        payload_hash = self._index(json.dumps({"revision": revision, "fields": fields}, ensure_ascii=False, sort_keys=True))
+        payload_hash = self._index(json.dumps({"revision": revision, "fields": fields, "seen_application_revision": seen_application_revision, "seen_provider_version": seen_provider_version}, ensure_ascii=False, sort_keys=True))
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             replay = db.execute("SELECT payload_hash,response_ciphertext FROM ocr_confirm_idempotency WHERE tenant_key=? AND job_id=? AND idem_key=?",
@@ -232,11 +243,27 @@ class SecureSQLiteJobStore:
             if job["status"] not in {"needs_review", "confirmed"}:
                 db.execute("ROLLBACK")
                 raise ValueError("OCR_JOB_NOT_READY")
+            if job.get("application_revision") is None:
+                db.execute("ROLLBACK")
+                raise ValueError("OCR_APPLICATION_BINDING_MISSING")
+            if seen_application_revision is not None and str(seen_application_revision) != str(job["application_revision"]):
+                db.execute("ROLLBACK")
+                raise ValueError("OCR_APPLICATION_REVISION_CONFLICT")
+            if seen_provider_version is not None and str(seen_provider_version) != str(job.get("provider_version")):
+                db.execute("ROLLBACK")
+                raise ValueError("OCR_PROVIDER_VERSION_CONFLICT")
             if revision <= job.get("confirmation_revision", 0):
                 db.execute("ROLLBACK")
                 raise ValueError("STALE_CONFIRMATION_REVISION")
             job["confirmed_fields"] = dict(fields)
             job["confirmation_revision"] = revision
+            job["confirmed_binding"] = {
+                "application_revision": job["application_revision"],
+                "provider_version": job.get("provider_version"),
+                "document_type": job["document_type"],
+                "attachment_id": job["attachment_id"],
+                "content_sha256": job["document_sha256"],
+            }
             job["status"] = "confirmed"
             db.execute("UPDATE ocr_jobs SET ciphertext=?,state=?,updated_unix=unixepoch() WHERE job_id=? AND tenant_key=?",
                        (self._seal(job), "confirmed", job_id, tenant_key))
@@ -244,7 +271,8 @@ class SecureSQLiteJobStore:
             db.execute("INSERT INTO ocr_confirm_idempotency VALUES(?,?,?,?,?)",
                        (tenant_key, job_id, idem_key, payload_hash, self._seal(response)))
             audit = {"event": "USER_CONFIRMATION", "job_id": job_id, "revision": revision,
-                     "fields": dict(fields), "subject_key": job.get("subject")}
+                     "fields": dict(fields), "subject_key": job.get("subject"),
+                     "confirmed_binding": dict(job["confirmed_binding"])}
             db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job_id), "confirmed"))
             db.execute("INSERT INTO ocr_audit_details(audit_id,tenant_key,job_id,event_type,event_ciphertext) VALUES(?,?,?,?,?)",
                        (str(uuid.uuid4()), tenant_key, job_id, "USER_CONFIRMATION", self._seal(audit)))
