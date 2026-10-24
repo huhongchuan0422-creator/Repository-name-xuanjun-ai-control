@@ -41,7 +41,7 @@ def regular_file(path, label):
 
 def validate_deb_cache(deb_cache):
     if deb_cache is None:
-        return [], None
+        return [], None, []
     root = Path(deb_cache)
     if root.is_symlink() or not root.is_dir():
         raise BundleError("DEB_CACHE_NOT_DIRECTORY")
