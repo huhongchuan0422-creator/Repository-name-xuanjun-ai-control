@@ -306,20 +306,113 @@ class WriterFenceTests(unittest.TestCase):
             "SELECT 1 FROM writer_receipts WHERE operation_id='op1'"
         ).fetchone())
 
-    def test_offline_git_cas_binds_branch_head_tree_blob_and_marker(self):
+    def test_offline_git_cas_binds_commit_and_canonical_segments(self):
+        head0='0'*40; tree0='1'*40; blob0='2'*40
+        tree1='3'*40; blob1='4'*40; commit1='5'*40
         operation=OfflineGitCAS.operation(
-            'git-op','git-event','git:repo/feature-x','repo','feature-x',
-            'head0','tree0','blob0','tree1','blob1','marker-1')
-        good={'repo':'repo','branch':'feature-x','commit':'commit1',
-              'parent':'head0','tree':'tree1','blob':'blob1','marker':'marker-1'}
-        self.assertEqual(
-            OfflineGitCAS.validate(operation,good)['outcome'],'CONFIRMED')
-        for field,value in (('parent','other'),('tree','other'),
-                            ('blob','other'),('marker','other'),
-                            ('branch','other')):
+            'git-op','git-event','git:owner/repo/feature/x',
+            'owner/repo','feature/x',head0,tree0,blob0,tree1,blob1,'marker-1')
+        good={'repo':'owner/repo','branch':'feature/x','commit':commit1,
+              'parent':head0,'tree':tree1,'blob':blob1,'marker':'marker-1'}
+        receipt=OfflineGitCAS.validate(operation,good)
+        self.assertEqual(receipt['outcome'],'CONFIRMED')
+        self.assertEqual(receipt['observed_revision'],commit1)
+
+        for field,value in (('parent','6'*40),('tree','6'*40),
+                            ('blob','6'*40),('marker','other'),
+                            ('branch','feature/y')):
             bad=dict(good);bad[field]=value
             self.assertEqual(
                 OfflineGitCAS.validate(operation,bad)['outcome'],'CONFLICT')
+
+        for bad_commit in ('', 'not-a-commit', 'A'*40, '5'*39):
+            bad=dict(good);bad['commit']=bad_commit
+            with self.assertRaisesRegex(
+                    ValueError,'CANONICAL_GIT_READBACK_REQUIRED'):
+                OfflineGitCAS.validate(operation,bad)
+
+        for repo_name,branch_name in (
+                ('owner//repo','feature/x'),
+                ('owner/../repo','feature/x'),
+                ('owner/repo','feature//x'),
+                ('owner/repo','feature/../x')):
+            with self.assertRaisesRegex(
+                    ValueError,'CANONICAL_GIT_IDENTITY_REQUIRED'):
+                OfflineGitCAS.operation(
+                    'x','y','git:owner/repo/feature/x',repo_name,branch_name,
+                    head0,tree0,blob0,tree1,blob1,'marker-1')
+
+    def test_git_observed_revision_is_persisted_and_immutable(self):
+        head0='0'*40; tree0='1'*40; blob0='2'*40
+        tree1='3'*40; blob1='4'*40; commit1='5'*40; commit2='6'*40
+        ticket=self.claim(resources=['git:owner/repo/feature/x'])
+        operation=OfflineGitCAS.operation(
+            'git-op','git-event','git:owner/repo/feature/x',
+            'owner/repo','feature/x',head0,tree0,blob0,tree1,blob1,'marker-1')
+        self.fence.prepare(ticket,self.caller(),operation)
+        good={'repo':'owner/repo','branch':'feature/x','commit':commit1,
+              'parent':head0,'tree':tree1,'blob':blob1,'marker':'marker-1'}
+        receipt=OfflineGitCAS.validate(operation,good)
+        with self.fence.commit_lease(ticket,self.caller(),'git-op') as lease:
+            lease.confirmed(receipt)
+        stored=self.s.db.execute(
+            "SELECT receipt_json FROM writer_receipts WHERE operation_id='git-op'"
+        ).fetchone()
+        self.assertEqual(json.loads(stored[0])['observed_revision'],commit1)
+
+        changed=dict(good);changed['commit']=commit2
+        changed_receipt=OfflineGitCAS.validate(operation,changed)
+        row=self.s.db.execute(
+            "SELECT * FROM writer_operations WHERE operation_id='git-op'"
+        ).fetchone()
+        self.s.db.execute('BEGIN IMMEDIATE')
+        with self.assertRaisesRegex(ValueError,'FINAL_RECEIPT_CONFLICT'):
+            with self.s.db:
+                self.s._append_receipt_locked(
+                    row,'CONFIRMED',changed_receipt,self.now)
+
+    @unittest.skipUnless(hasattr(os, 'fork'), 'requires os.fork')
+    def test_os_exit_releases_shared_lock_but_unresolved_effect_holds(self):
+        ticket=self.claim();operation=self.op()
+        self.fence.prepare(ticket,self.caller(),operation)
+        self.fence.close();self.s.close()
+
+        read_fd,write_fd=os.pipe()
+        pid=os.fork()
+        if pid == 0:
+            try:
+                os.close(read_fd)
+                db=Supervisor(self.path,lambda:1001.0)
+                fence=Fence(db,self.lock_root)
+                with fence.commit_lease(ticket,self.caller(),'op1'):
+                    os.write(write_fd,b'1')
+                    os._exit(23)
+            except Exception:
+                os._exit(24)
+
+        os.close(write_fd)
+        signal=os.read(read_fd,1)
+        os.close(read_fd)
+        waited,status=os.waitpid(pid,0)
+        self.assertEqual(waited,pid)
+        self.assertEqual(signal,b'1')
+        self.assertTrue(os.WIFEXITED(status))
+        self.assertEqual(os.WEXITSTATUS(status),23)
+
+        self.s=Supervisor(self.path,lambda:self.now)
+        self.fence=Fence(self.s,self.lock_root)
+        held=self.fence.locks.acquire(
+            ticket['resource_keys'],exclusive=True,timeout=0.2)
+        self.fence.locks.release(held)
+
+        rows=self.s.unresolved_operations('t1')
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['state'],'DISPATCHING')
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'owner'}
+        self.fence.begin_revocation('t1',controller)
+        with self.assertRaisesRegex(ValueError,'REVOCATION_NOT_COMPLETED'):
+            self.s.complete_revocation('t1')
+        self.assertEqual(self.s._task('t1')['authority_state'],'REVOKING')
 
     def test_kill_restart_preserves_dispatching_as_unresolved(self):
         ticket=self.claim();operation=self.op()
