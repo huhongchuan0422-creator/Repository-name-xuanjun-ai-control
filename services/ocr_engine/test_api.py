@@ -263,7 +263,7 @@ class ApiTests(unittest.TestCase):
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
-        payload={"revision":1,"fields":{"company_name":"Human confirmed"}}
+        payload={"revision":1,"application_revision":"1","provider_version":"1.2.0","fields":{"company_name":"Human confirmed"}}
         self.assertEqual(self.client.post(url,headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"confirm-key-00001"},json=payload).status_code,200)
         self.assertEqual(self.client.post(url,headers={"Authorization":"Bearer tenant-a-token","Idempotency-Key":"confirm-key-00002"},json=payload).status_code,409)
 if __name__ == "__main__": unittest.main()
