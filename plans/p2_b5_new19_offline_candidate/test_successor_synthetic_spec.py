@@ -582,8 +582,6 @@ def child_query(root,action='query',execute_start=None):
                 (spec['fixed_paths']['receiver_root'],)).active(),\
              patch.object(sqlite3,'connect',side_effect=connect),\
              patch('subprocess.run',side_effect=recorded_status),\
-             patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
-                   RecordedResourceHTTP),\
              patch.object(Github,'call',recorded_comment),\
              patch.object(os,'uname',return_value=synthetic),\
              patch.object(os,'geteuid',return_value=0),\
@@ -715,7 +713,9 @@ def child_query(root,action='query',execute_start=None):
                     except BaseException as exc:
                         guard_calls.append('ERROR:'+name+':'+str(exc));raise
                 tx.guarded=traced_close
-                result=tx.close_after_b5_http(proof)
+                with patch('pr17_b5_successor_fixed_io.http.client.HTTPConnection',
+                           RecordedResourceHTTP):
+                    result=tx.close_after_b5_http(proof)
                 result=dict(result,_guard_calls=guard_calls)
                 if original.queue is not None:original.queue.close()
             elif action=='recover-trace':
