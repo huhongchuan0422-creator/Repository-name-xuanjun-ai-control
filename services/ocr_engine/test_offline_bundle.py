@@ -6,6 +6,7 @@ import zipfile
 import os
 from unittest import mock
 import services.ocr_engine.build_offline_bundle as builder
+from services.ocr_engine.build_offline_bundle import validate_deb_cache
 from pathlib import Path
 from services.ocr_engine.build_offline_bundle import BundleError, validate_inputs
 
@@ -178,6 +179,29 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("ocr-deb-cache",text)
         self.assertIn("apt-get install -y --download-only",text)
         self.assertIn("dpkg-deb",text)
+
+    def test_deb_runtime_closure_lock_is_hash_bound(self):
+        debs=self.root/"debs"; debs.mkdir()
+        package=debs/"libxcb1_1.0_amd64.deb"; package.write_bytes(b"synthetic deb payload")
+        lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
+              "packages":[{"filename":package.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(package.read_bytes()).hexdigest()}]}
+        (debs/"system-deb-lock.json").write_text(json.dumps(lock))
+        with mock.patch.object(builder.subprocess,"check_output",return_value="libxcb1\\n1.0\\namd64\\n"):
+            verified,lock_path=validate_deb_cache(debs)
+        self.assertEqual(len(verified),1)
+        self.assertEqual(verified[0][1],"system-debs/"+package.name)
+        self.assertEqual(lock_path,debs/"system-deb-lock.json")
+        package.write_bytes(b"tampered deb")
+        with mock.patch.object(builder.subprocess,"check_output",return_value="libxcb1\\n1.0\\namd64\\n"):
+            with self.assertRaisesRegex(BundleError,"DEB_SHA256_MISMATCH"): validate_deb_cache(debs)
+    def test_candidate_artifact_is_always_uploaded_but_not_release(self):
+        workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
+        text=workflow.read_text(encoding="utf-8")
+        self.assertIn("xuanjun-ocr-candidate-inputs-not-release-",text)
+        self.assertIn("Upload reusable candidate inputs and their digest manifest",text)
+        self.assertIn("Upload verified package only after successful build",text)
+        self.assertIn("if: success()",text)
+        self.assertIn("ocr-deb-cache/**",text)
 
     def test_notice_missing_model_attribution_rejected(self):
         self.notice.write_text("Apache License only")
