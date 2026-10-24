@@ -1,0 +1,38 @@
+{
+  "purpose": "ROOT_SCOPE_ACCEPTED_HOSTED_IMAGE_RECEIPT_NOT_SITE_APPROVAL",
+  "product_source_sha": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+  "product_tree": "c31a9b1df006eeacd78ae3f9921073f3fe77d2c3",
+  "build_run_id": 40059478387,
+  "build_job_id": 120769700068,
+  "push_evidence_run_id": 40058542631,
+  "source_artifact": {
+    "id": 12547170894,
+    "bytes": 991730,
+    "outer_sha256": "2a1250b4e8568c317b4d647aee43e351e57e5e690e4aef28a118b63ae839af35",
+    "inner_zip_sha256": "125ec8633e173d582d5ca5cd3dccc21d2d97104723fb61a136911c48e12d47d1"
+  },
+  "image_artifact": {
+    "id": 12546452389,
+    "bytes": 57016858,
+    "outer_sha256": "c902a0663793cb3b99c4c5ab3156d4e9d1054d519d05403347ba20fdebbc061e",
+    "inner_tar_bytes": 57365044,
+    "inner_tar_sha256": "eb7045414ced005a56158ac7eb54519098ec8a9e9da5589f939a0b3717d74875",
+    "expires_at": "2026-10-27T03:44:30Z"
+  },
+  "release_image_id": "sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a",
+  "repo_digest": null,
+  "oci_revision": "f13155ed63a3137d41766ee587d9b4b96a81477f",
+  "stamp_mode": "0444",
+  "user": "10001:1008",
+  "root_verified_layer_hashes": 11,
+  "verify_tests": [
+    10,
+    14,
+    12
+  ],
+  "nonroot_import": "PASS",
+  "root_artifact_review": "SCOPE_PASS",
+  "site_execution_approved": false,
+  "site_executed": false,
+  "ocr_enabled": false
+}

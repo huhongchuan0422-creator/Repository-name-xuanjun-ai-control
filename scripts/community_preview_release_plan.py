@@ -45,12 +45,14 @@ def current_identity(value):
 
 def source_evidence(value):
     keys={'source_sha','tree_sha','source_zip_sha256','artifact_id','artifact_sha256','run_id','ocr_source_sha'}
-    require(type(value) is dict and set(value)==keys,'EXACT_SOURCE_EVIDENCE_REQUIRED')
+    require(type(value) is dict and set(value) in (keys,keys|{'push_evidence_run_id'}),'EXACT_SOURCE_EVIDENCE_REQUIRED')
     require(exact_hex(value['source_sha'],40) and exact_hex(value['tree_sha'],40),'SOURCE_TREE_REQUIRED')
     for key in ('source_zip_sha256','artifact_sha256'):
         require(exact_hex(value[key],64),'SOURCE_DIGEST_REQUIRED')
     for key in ('artifact_id','run_id'):
         require(type(value[key]) is int and value[key]>0,'SOURCE_RUN_ARTIFACT_REQUIRED')
+    if 'push_evidence_run_id' in value:
+        require(type(value['push_evidence_run_id']) is int and value['push_evidence_run_id']>0,'PUSH_EVIDENCE_RUN_REQUIRED')
     require(value['ocr_source_sha']==OCR_SHA,'LOCKED_OCR_DEPENDENCY_REQUIRED')
     return dict(value)
 
@@ -99,7 +101,7 @@ def prepare(source,current=None,image=None):
         manual_preview=dict(workflow='.github/workflows/chatgpt-community-wechat-sp-offline.yml',
             branch='feature/chatgpt-community-wechat-sp-offline-20261017',preview_enabled=False,
             preview_source_sha=source['source_sha'],preview_target='uk-path-candidate',
-            preview_evidence_run_id=str(source['run_id']),entry_page='pages/home/index',scene=None,
+            preview_evidence_run_id=str(source.get('push_evidence_run_id',source['run_id'])),entry_page='pages/home/index',scene=None,
             next_enable_requires='ROOT_REVIEW_AND_EXPLICIT_OWNER_PREVIEW_AUTHORIZATION'),
         actions=[])
     if missing:return report
