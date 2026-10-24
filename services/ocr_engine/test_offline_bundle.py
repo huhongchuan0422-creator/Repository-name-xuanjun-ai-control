@@ -362,10 +362,13 @@ class OfflineBundleInputTests(unittest.TestCase):
     def test_candidate_export_copies_only_whitelisted_readable_inputs(self):
         root=self.root/"candidate-root"
         (root/"ocr-deb-cache"/"apt-lists"/"partial").mkdir(parents=True)
-        (root/"ocr-deb-cache"/"apt-lists"/"Packages").write_bytes(b"index")
+        index_path=root/"ocr-deb-cache"/"apt-lists"/"Packages"; index_path.write_bytes(b"index")
         (root/"ocr-deb-cache"/"apt-lists"/"lock").write_bytes(b"lock")
         (root/"ocr-deb-cache"/"partial.deb.tmp").write_bytes(b"partial")
-        (root/"ocr-deb-cache"/"libxcb1.deb").write_bytes(b"deb")
+        deb_path=root/"ocr-deb-cache"/"libxcb1.deb"; deb_path.write_bytes(b"deb")
+        lock_data={"packages":[{"filename":"libxcb1.deb","sha256":hashlib.sha256(deb_path.read_bytes()).hexdigest()}],
+                   "apt_lists":[{"path":"Packages","bytes":index_path.stat().st_size,"sha256":hashlib.sha256(index_path.read_bytes()).hexdigest()}]}
+        (root/"ocr-deb-cache"/"system-deb-lock.json").write_text(json.dumps(lock_data))
         os.chmod(root/"ocr-deb-cache"/"apt-lists"/"lock",0o000)
         dest=root/"ocr-candidate-inputs"/"payload"
         manifest=root/"ocr-candidate-inputs"/"candidate-input-manifest.json"
