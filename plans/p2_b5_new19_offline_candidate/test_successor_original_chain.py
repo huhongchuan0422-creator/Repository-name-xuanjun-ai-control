@@ -36,8 +36,8 @@ class Auth:
 
 class OriginalLifecycle(unittest.TestCase):
     def setUp(self):
-        parent='/root' if os.geteuid()==0 else os.environ.get('B5_PROTECTED_TEST_PARENT')
-        if not parent:self.skipTest('protected nonroot parent unavailable')
+        parent=('/root' if os.geteuid()==0 else
+                os.environ.get('B5_PROTECTED_TEST_PARENT',tempfile.gettempdir()))
         temp=tempfile.TemporaryDirectory(dir=parent);self.addCleanup(temp.cleanup)
         root=pathlib.Path(temp.name)
         self.root=root
