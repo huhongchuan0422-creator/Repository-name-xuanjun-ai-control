@@ -187,6 +187,9 @@ def stopped():
     checkpoint()
     c=component()
     need(c.inspect_bound(OLD_ID,OLD_IMAGE)['running'] is False,'FIXED_OLD_NOT_STOPPED')
+    named=capture(DOCKER+['container','inspect','--format','{{json .Id}}\n{{json .Image}}\n{{json .State.Running}}','xuanjun-community-preview'])
+    rows=[exact_json(x) for x in named.splitlines()]
+    need(len(rows)==3 and type(rows[2]) is bool and rows==[OLD_ID,OLD_IMAGE,False],'ORIGINAL_NAME_NOT_BOUND_TO_STOPPED_OLD')
     try:os.lstat('/run/xuanjun-community-preview/preview.sock')
     except FileNotFoundError:pass
     else:raise Hold('WRITER_SOCKET_STILL_EXISTS')

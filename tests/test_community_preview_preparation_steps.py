@@ -102,6 +102,14 @@ class PreparationSteps(unittest.TestCase):
         with patch.object(s,'component',return_value=fake),self.assertRaisesRegex(s.Hold,'NOT_STOPPED'):
             s.snapshot({'all_writers_frozen_evidence_sha256':'a'*64})
         self.assertFalse(Path(s.BACKUP).exists())
+    def test_freeze_guard_rejects_old_retained_id_when_current_name_changed(self):
+        fake=types.SimpleNamespace(inspect_bound=lambda *a:{'running':False})
+        for row,allowed in (([s.OLD_ID,s.OLD_IMAGE,False],True),(['a'*64,s.NEW_IMAGE,True],False),([s.OLD_ID,s.OLD_IMAGE,0],False)):
+            raw=b'\n'.join(s.canonical(v) for v in row)
+            with patch.object(s,'component',return_value=fake),patch.object(s,'capture',return_value=raw),patch.object(s.os,'lstat',side_effect=FileNotFoundError):
+                if allowed:s.stopped()
+                else:
+                    with self.assertRaisesRegex(s.Hold,'ORIGINAL_NAME_NOT_BOUND'):s.stopped()
     def test_snapshot_existing_partial_preserved_not_reused(self):
         self.snapshot();raw=Path(s.BACKUP+'/private-manifest.json').read_bytes()
         with patch.object(s,'stopped'),self.assertRaises(FileExistsError):s.snapshot({'all_writers_frozen_evidence_sha256':'a'*64})

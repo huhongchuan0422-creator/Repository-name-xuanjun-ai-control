@@ -6,7 +6,7 @@ case "$1" in install|image-load|snapshot|validate-clones) ;; *) exit 2;; esac
 exec /usr/bin/python3 -I -B -S - "$1" "$2" <<'PREPARE'
 import hashlib,json,os,re,stat,sys,time
 BASE='/opt/xuanjun-community-preview'
-EXPECTED='81e35414ede2098c78dfbcd7ee16a9cef6c0f63d3f81f7dbd4e640ad85da793d'
+EXPECTED='6b8c05a01b05b4e8ee1bea06bd3af23f1be90804190504926d7e61057d205932'
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 def need(v):
  if not v:raise SystemExit('HOLD_PROTECTED_BOOTSTRAP')
