@@ -192,8 +192,10 @@ class OfflineBundleInputTests(unittest.TestCase):
               "apt_lists":[{"path":apt_index.name,"bytes":apt_index.stat().st_size,"sha256":hashlib.sha256(apt_index.read_bytes()).hexdigest()}]}
         (debs/"system-deb-lock.json").write_text(json.dumps(lock))
         with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
-            verified,lock_path,verified_apt=validate_deb_cache(debs)
+            verified,lock_path,verified_apt,lock_snapshot,lock_sha=validate_deb_cache(debs)
         self.assertEqual(len(verified),1)
+        self.assertEqual(lock_snapshot,(debs/"system-deb-lock.json").read_bytes())
+        self.assertEqual(lock_sha,hashlib.sha256(lock_snapshot).hexdigest())
         self.assertEqual(verified[0][1],"system-debs/"+package.name)
         self.assertEqual(len(verified_apt),1)
         self.assertEqual(verified_apt[0][1],"system-apt-lists/"+apt_index.name)
@@ -202,6 +204,44 @@ class OfflineBundleInputTests(unittest.TestCase):
         with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
             with self.assertRaisesRegex(BundleError,"DEB_SHA256_MISMATCH"): validate_deb_cache(debs)
 
+    def test_deb_lock_change_after_validation_is_not_retrusted(self):
+        debs=self.root/"debs"; debs.mkdir()
+        apt=debs/"apt-lists"; apt.mkdir()
+        apt_index=apt/"Packages"; apt_index.write_bytes(b"index")
+        package=debs/"libxcb1_1.0_amd64.deb"; package.write_bytes(b"deb")
+        source_content="Types: deb\nURIs: https://deb.debian.org/debian\nSuites: bookworm\nComponents: main\n"
+        lock={"base_image":"python:3.11-slim-bookworm@sha256:8fb0b110b022c70cbe09d3ff1fb313654f31f9c814abb0d48180af56d906a199",
+              "apt_source":{"path":"debian.sources","sha256":hashlib.sha256(source_content.encode()).hexdigest(),"content":source_content},
+              "packages":[{"filename":package.name,"package":"libxcb1","version":"1.0","architecture":"amd64","sha256":hashlib.sha256(package.read_bytes()).hexdigest()}],
+              "apt_lists":[{"path":"Packages","bytes":apt_index.stat().st_size,"sha256":hashlib.sha256(apt_index.read_bytes()).hexdigest()}]}
+        lock_path=debs/"system-deb-lock.json"; lock_path.write_text(json.dumps(lock))
+        with mock.patch.object(builder.subprocess,"check_output",side_effect=["libxcb1","1.0","amd64"]):
+            _,_,_,snapshot,digest=validate_deb_cache(debs)
+        lock_path.write_text(json.dumps({**lock,"packages":[]}))
+        self.assertNotEqual(hashlib.sha256(lock_path.read_bytes()).hexdigest(),digest)
+        self.assertNotEqual(lock_path.read_bytes(),snapshot)
+    def test_candidate_manifest_classifies_model_by_actual_pinned_sha(self):
+        manifest=Path(__file__).with_name("model_manifest.json")
+        data=json.loads(manifest.read_text(encoding="utf-8"))
+        expected={v["filename"]:v["sha256"] for v in data["model_set"]["files"].values()}
+        self.assertEqual(len(expected),3)
+        script=Path(__file__).with_name("write_candidate_input_manifest.py").read_text(encoding="utf-8")
+        self.assertIn("actual == trusted_model_hashes[path.name]",script)
+        self.assertIn("downloaded-and-self-hashed-only-not-trusted-by-model-manifest",script)
+    def test_runtime_check_requires_ldd_closure_and_single_opencv_distribution(self):
+        script=Path(__file__).with_name("verify_offline_runtime.py").read_text(encoding="utf-8")
+        self.assertIn("ldd",script)
+        self.assertIn("not found",script)
+        self.assertIn("opencv-python-headless",script)
+        self.assertIn("pip"," ".join(script.split()))
+    def test_workflow_uses_scripts_instead_of_inline_python_heredocs(self):
+        workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
+        text=workflow.read_text(encoding="utf-8")
+        self.assertIn("generate_deb_runtime_lock.py",text)
+        self.assertIn("verify_offline_runtime.py",text)
+        self.assertIn("write_candidate_input_manifest.py",text)
+        self.assertNotIn("python - <<'PY'",text)
+        self.assertIn("ocr-build/**",text)
     def test_candidate_artifact_is_always_uploaded_but_not_release(self):
         workflow=Path(__file__).resolve().parents[2]/".github"/"workflows"/"ocr-engine-tests.yml"
         text=workflow.read_text(encoding="utf-8")
