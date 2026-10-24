@@ -26,8 +26,55 @@ REQUIRED_TABLES = {
     "ocr_audit", "ocr_audit_details", "ocr_key_check",
 }
 
+EXPECTED_COLUMNS = {
+    "ocr_jobs": [("job_id","TEXT",0,1,None),("tenant_key","TEXT",1,0,None),("subject_key","TEXT",1,0,None),("idem_key","TEXT",1,0,None),("payload_hash","TEXT",1,0,None),("state","TEXT",1,0,None),("ciphertext","BLOB",1,0,None),("updated_unix","INTEGER",1,0,"unixepoch()")],
+    "ocr_confirm_idempotency": [("tenant_key","TEXT",1,1,None),("job_id","TEXT",1,2,None),("idem_key","TEXT",1,3,None),("payload_hash","TEXT",1,0,None),("response_ciphertext","BLOB",1,0,None)],
+    "ocr_rate_window": [("tenant_key","TEXT",1,1,None),("window_start","INTEGER",1,2,None),("hits","INTEGER",1,0,None)],
+    "ocr_audit": [("id","INTEGER",0,1,None),("job_key","TEXT",1,0,None),("event","TEXT",1,0,None),("time_unix","INTEGER",1,0,"unixepoch()")],
+    "ocr_audit_details": [("audit_id","TEXT",0,1,None),("tenant_key","TEXT",1,0,None),("job_id","TEXT",1,0,None),("event_type","TEXT",1,0,None),("event_ciphertext","BLOB",1,0,None),("created_unix","INTEGER",1,0,"unixepoch()")],
+    "ocr_key_check": [("check_value","TEXT",1,0,None)],
+}
+REQUIRED_INDEXES = {
+    "idx_ocr_tenant": ("ocr_jobs", False, ("tenant_key",)),
+    "idx_ocr_audit_job": ("ocr_audit_details", False, ("tenant_key","job_id")),
+}
+
+def _norm_default(value):
+    return None if value is None else str(value).strip().strip("()").lower()
+
+def _index_columns(db, index_name):
+    return tuple(row[2] for row in db.execute("PRAGMA index_info(" + json.dumps(index_name) + ")"))
+
+def check_database_schema(db):
+    try:
+        table_sql = {r[0]: (r[1] or "") for r in db.execute("SELECT name,sql FROM sqlite_master WHERE type='table'")}
+        if not REQUIRED_TABLES.issubset(table_sql):
+            return False, "OCR_DATABASE_SCHEMA_NOT_READY"
+        all_indexes = {}
+        for table, expected in EXPECTED_COLUMNS.items():
+            rows = db.execute("PRAGMA table_info(" + table + ")").fetchall()
+            actual = [(r[1],str(r[2]).upper(),int(r[3]),int(r[5]),_norm_default(r[4])) for r in rows]
+            wanted = [(n,t,nn,pk,_norm_default(d)) for n,t,nn,pk,d in expected]
+            if actual != wanted:
+                return False, "OCR_DATABASE_COLUMN_CONTRACT_MISMATCH:" + table
+            for row in db.execute("PRAGMA index_list(" + table + ")").fetchall():
+                all_indexes[row[1]] = (table,bool(row[2]),_index_columns(db,row[1]))
+        if "AUTOINCREMENT" not in table_sql["ocr_audit"].upper():
+            return False, "OCR_DATABASE_AUDIT_PK_CONSTRAINT_MISMATCH"
+        if "UNIQUE(TENANT_KEY,IDEM_KEY)" not in table_sql["ocr_jobs"].replace(" ","").upper():
+            return False, "OCR_DATABASE_JOB_UNIQUE_CONSTRAINT_MISSING"
+        for name, expected in REQUIRED_INDEXES.items():
+            if all_indexes.get(name) != expected:
+                return False, "OCR_DATABASE_REQUIRED_INDEX_MISMATCH:" + name
+        unique = {(table,cols) for table,is_unique,cols in all_indexes.values() if is_unique}
+        required = {("ocr_jobs",("tenant_key","idem_key")),("ocr_confirm_idempotency",("tenant_key","job_id","idem_key")),("ocr_rate_window",("tenant_key","window_start")),("ocr_audit_details",("audit_id",))}
+        if not required.issubset(unique):
+            return False, "OCR_DATABASE_UNIQUE_CONSTRAINTS_MISMATCH"
+        return True, "OCR_DATABASE_SCHEMA_VERIFIED"
+    except (sqlite3.Error, TypeError, ValueError, KeyError):
+        return False, "OCR_DATABASE_SCHEMA_READ_FAILED"
+
 def check_existing_database(db_path, key_bytes):
-    """Read-only check of an existing protected DB; never creates or migrates it."""
     path = Path(db_path)
     if not path.is_absolute() or path.is_symlink() or not path.is_file():
         return False, "OCR_DATABASE_NOT_READY"
@@ -35,20 +82,17 @@ def check_existing_database(db_path, key_bytes):
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
             return False, "OCR_DATABASE_PERMISSIONS_UNSAFE"
-        uri = path.as_uri() + "?mode=ro"
-        db = sqlite3.connect(uri, uri=True, timeout=2)
+        db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=2)
         try:
             result = db.execute("PRAGMA integrity_check").fetchone()
             if not result or result[0] != "ok":
                 return False, "OCR_DATABASE_INTEGRITY_CHECK_FAILED"
-            tables = {row[0] for row in db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'")}
-            if not REQUIRED_TABLES.issubset(tables):
-                return False, "OCR_DATABASE_SCHEMA_NOT_READY"
+            schema_ok, schema_reason = check_database_schema(db)
+            if not schema_ok:
+                return False, schema_reason
             rows = db.execute("SELECT check_value FROM ocr_key_check").fetchall()
             signing_key = hashlib.sha256(b"xuanjun-ocr-index-v1:" + key_bytes).digest()
             expected = hmac.new(signing_key, b"encryption-key-check-v1", hashlib.sha256).hexdigest()
-            # The store records this derived key check as an HMAC-style opaque digest.
             if len(rows) != 1 or not isinstance(rows[0][0], str) or not hmac.compare_digest(rows[0][0], expected):
                 return False, "OCR_DATABASE_KEY_BINDING_MISMATCH"
             return True, "EXISTING_PROTECTED_DATABASE_READY"
@@ -57,7 +101,42 @@ def check_existing_database(db_path, key_bytes):
     except (OSError, sqlite3.Error, ValueError, TypeError):
         return False, "OCR_DATABASE_READ_ONLY_CHECK_FAILED"
 
-def load_bindings(environ=None):
+def _decode_mount_path(value):
+    return value.replace("\\040"," ").replace("\\011","\\t").replace("\\012","\\n").replace("\\134","\\\\")
+
+def readonly_mount_for(path, mountinfo_text=None):
+    try:
+        target = Path(path).resolve(strict=True)
+        text = Path("/proc/self/mountinfo").read_text(encoding="utf-8") if mountinfo_text is None else mountinfo_text
+        matches = []
+        for line in text.splitlines():
+            fields = line.split()
+            if "-" not in fields or len(fields) < 7:
+                continue
+            sep = fields.index("-")
+            if sep < 6 or sep + 3 >= len(fields):
+                continue
+            mountpoint = Path(_decode_mount_path(fields[4]))
+            try:
+                target.relative_to(mountpoint)
+            except ValueError:
+                continue
+            options = set(fields[5].split(",")) | set(fields[sep+3].split(","))
+            matches.append((len(str(mountpoint)), "ro" in options))
+        return max(matches, key=lambda item:item[0])[1] if matches else False
+    except (OSError, ValueError, IndexError):
+        return False
+
+def _safe_root_owned(path, is_dir):
+    try:
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode) or (is_dir and not stat.S_ISDIR(info.st_mode)) or (not is_dir and not stat.S_ISREG(info.st_mode)):
+            return False
+        return info.st_uid == 0 and not (info.st_mode & 0o022)
+    except OSError:
+        return False
+
+def load_bindings(environ=None, mountinfo_text=None, mount_checker=None):
     env = os.environ if environ is None else environ
     module_name = env.get("OCR_TRUSTED_BINDINGS_MODULE", "")
     integration_path = env.get("OCR_INTEGRATION_PATH", "")
@@ -79,11 +158,20 @@ def load_bindings(environ=None):
     if not supplied_root.is_dir():
         raise RuntimeError("OCR_INTEGRATION_PATH_INVALID")
     root = supplied_root.resolve(strict=True)
+    if not _safe_root_owned(root, True):
+        raise RuntimeError("OCR_INTEGRATION_ROOT_OWNER_OR_MODE_UNSAFE")
+    checker = readonly_mount_for if mount_checker is None else mount_checker
+    if not checker(root, mountinfo_text):
+        raise RuntimeError("OCR_INTEGRATION_ROOT_MOUNT_NOT_READ_ONLY")
     if module_name in sys.modules:
         raise RuntimeError("OCR_TRUSTED_BINDINGS_MODULE_ALREADY_LOADED")
     candidate = root / (module_name + ".py")
     if candidate.is_symlink() or not candidate.is_file():
         raise RuntimeError("OCR_TRUSTED_BINDINGS_SOURCE_NOT_REGULAR")
+    if not _safe_root_owned(candidate, False):
+        raise RuntimeError("OCR_TRUSTED_BINDINGS_SOURCE_OWNER_OR_MODE_UNSAFE")
+    if not checker(candidate, mountinfo_text):
+        raise RuntimeError("OCR_TRUSTED_BINDINGS_SOURCE_MOUNT_NOT_READ_ONLY")
     origin = candidate.resolve(strict=True)
     try:
         origin.relative_to(root)
