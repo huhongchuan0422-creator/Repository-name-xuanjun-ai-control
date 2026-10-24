@@ -9,8 +9,8 @@
   "normalization": false,
   "files": {
     "scripts/community_preview_three_diagnostics.py": {
-      "bytes": 5483,
-      "sha256": "683289f3436e3bb61f266b0058c2104c3902e49d9206ca5cb88f1c9a61317817",
+      "bytes": 5825,
+      "sha256": "e017435f50c4851a85fbb085a86d81cbb430b7925d312ebcd413c83d157ce98a",
       "mode": "0644"
     },
     "scripts/community_preview_root_loader.py": {
@@ -24,13 +24,13 @@
       "mode": "0644"
     },
     "deploy/community-preview/three-reasons-readonly.py": {
-      "bytes": 51434,
-      "sha256": "5885210b7f75517847bc5580a6cc45363891f931cabded4623fb85be1c5e2172",
+      "bytes": 51776,
+      "sha256": "ad8574311811266dd484fd0e9528f4062cd957d1e431e4e5663c9699dbf69eeb",
       "mode": "0644"
     },
     "deploy/community-preview/three-reasons-readonly.sh": {
-      "bytes": 51782,
-      "sha256": "1da3183964a1125291c63a504d70def99b75740d2329e02323a204c688d014fc",
+      "bytes": 52124,
+      "sha256": "60170b642a6693d60001b956f35f19b44a92085d7e6223f7ea28ef080959f621",
       "mode": "0644"
     },
     "deploy/community-preview/control-oci2330-v1.zip": {
@@ -49,8 +49,8 @@
       "mode": "0644"
     },
     "tests/test_community_preview_site_prepare.py": {
-      "bytes": 7812,
-      "sha256": "074f941edcf1bf568a49ce649a7ab05ad53fa9a7a4bd92fcd1d495a85e074c88",
+      "bytes": 7917,
+      "sha256": "b52bb4d5f38f7fbba67521bd612d8b2ab9ce85e8e77b5785f6db07e8e71b93c1",
       "mode": "0644"
     },
     "docs/development/COMMUNITY_POST_RECEIPT_PREPARATION_20261024.md": {

@@ -61,6 +61,7 @@ class SitePreparation(unittest.TestCase):
     def test_bounded_reason_enums_never_expose_unknown_error_text(self):
         self.assertEqual(diag.reason(RuntimeError('SECRET=/private/key')),'UNCLASSIFIED_UNKNOWN')
         self.assertEqual(diag.reason(diag.base.v.Hold('COMMAND_REJECTED')),'COMMAND_REJECTED')
+        self.assertEqual(diag.reason(RuntimeError('CONTAINER_SCOPE_CHANGED')),'CONTAINER_SCOPE_CHANGED')
         with patch.object(diag.base.v,'capture',side_effect=diag.base.v.Hold('COMMAND_TIMEOUT')):
             r=diag.one('CURRENT',diag.projected_current)
         self.assertEqual(r['stage'],'CURRENT_NAME_ID_LOOKUP');self.assertEqual(r['reason'],'COMMAND_TIMEOUT')
