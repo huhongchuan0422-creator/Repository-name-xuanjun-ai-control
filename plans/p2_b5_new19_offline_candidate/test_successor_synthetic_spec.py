@@ -200,6 +200,7 @@ class SyntheticSpecTests(unittest.TestCase):
                                    *c53.BASES}
                 allowed.update((WitnessStore.__init__.__globals__['ROOT'],
                                 SuccessorEvidenceStore.__init__.__globals__['SUCCESSOR_ROOT']))
+                allowed.update(base+'/current' for base in c53.BASES)
                 pins={path:(target.stat().st_dev,target.stat().st_ino)
                       for path in files if (target:=root/path.lstrip('/')).exists()}
                 pins[c53.DB]=(spec['observed_baseline']['db']['dev'],
