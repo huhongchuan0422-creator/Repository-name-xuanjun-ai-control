@@ -10,6 +10,7 @@ import services.ocr_engine.build_offline_bundle as builder
 from services.ocr_engine.build_offline_bundle import validate_deb_cache
 from pathlib import Path
 from services.ocr_engine.build_offline_bundle import BundleError, validate_inputs
+from services.ocr_engine.verify_offline_runtime import verify_shared_libraries
 
 class OfflineBundleInputTests(unittest.TestCase):
     def setUp(self):
@@ -272,6 +273,20 @@ class OfflineBundleInputTests(unittest.TestCase):
         self.assertIn("digest == trusted_model_hashes[path.name]",script)
         self.assertIn('"sha256":digest',script)
         self.assertIn("downloaded-and-self-hashed-only-not-trusted-by-model-manifest",script)
+    def test_ldd_nonzero_one_fails_even_without_missing_text(self):
+        candidate=self.root/"cv2.abi3.so"; candidate.write_bytes(b"fake ELF placeholder")
+        result=subprocess.CompletedProcess(["ldd",str(candidate)],1,"not a dynamic executable\\n","")
+        with self.assertRaisesRegex(RuntimeError,"LDD_FAILED"):
+            verify_shared_libraries([candidate],runner=lambda *a,**k:result)
+    def test_ldd_missing_library_fails(self):
+        candidate=self.root/"cv2.abi3.so"; candidate.write_bytes(b"fake ELF placeholder")
+        result=subprocess.CompletedProcess(["ldd",str(candidate)],0,"libxcb.so.1 => not found\\n","")
+        with self.assertRaisesRegex(RuntimeError,"SHARED_LIBRARY_NOT_FOUND"):
+            verify_shared_libraries([candidate],runner=lambda *a,**k:result)
+    def test_ldd_zero_with_complete_closure_passes(self):
+        candidate=self.root/"cv2.abi3.so"; candidate.write_bytes(b"fake ELF placeholder")
+        result=subprocess.CompletedProcess(["ldd",str(candidate)],0,"libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x1)\\n","")
+        self.assertEqual(verify_shared_libraries([candidate],runner=lambda *a,**k:result),{candidate.name})
     def test_runtime_check_requires_ldd_closure_and_single_opencv_distribution(self):
         script=Path(__file__).with_name("verify_offline_runtime.py").read_text(encoding="utf-8")
         self.assertIn("ldd",script)
