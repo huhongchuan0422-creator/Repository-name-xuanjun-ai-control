@@ -194,9 +194,9 @@
     },
     {
       "bundle_path": "reused-6825/pr17_b5_deployment_composition.py",
-      "bytes": 14968,
+      "bytes": 15798,
       "release_path": "reused-6825/pr17_b5_deployment_composition.py",
-      "sha256": "6a28d418c4f5dce14321e23cee98916b639666121953c5dd6bcbeba491f78756"
+      "sha256": "352b2297d325c1d90057a1223bad2f742e48eaa71cf8aaa1b58c56339b3a3ab2"
     },
     {
       "bundle_path": "reused-6825/pr17_b5_maintenance_runtime.py",
@@ -212,9 +212,9 @@
     },
     {
       "bundle_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
-      "bytes": 75304,
+      "bytes": 75983,
       "release_path": "reused-6825/pr17_c53_r2_host_backend_candidate.py",
-      "sha256": "3ba08a4ec9e5cdba6884cc5b38c3254a3e83f5bdba4916bc5da17b0d8107197d"
+      "sha256": "b83e7410b8330b1ac199476355743415dcc42dc208903c7417f9437c5866df68"
     },
     {
       "bundle_path": "reused-6825/pr17_c53_r2_review_transaction.py",
@@ -236,9 +236,9 @@
     },
     {
       "bundle_path": "reused-6825/pr17_c53_r2_local_adapter.py",
-      "bytes": 3957,
+      "bytes": 5213,
       "release_path": "reused-6825/pr17_c53_r2_local_adapter.py",
-      "sha256": "e19f065720099850ecf6e178b690d12aafae0e7e2008a9b22890f3d691f01e54"
+      "sha256": "a4e6d7e4b2de7de78e693877b29f2df940301658dac2787b0f0a6373b61b097c"
     },
     {
       "bundle_path": "reused-6825/pr17_c53_r2_local_pinned_source_loader.py",
@@ -254,9 +254,9 @@
     },
     {
       "bundle_path": "test_old_policy_dependency_reader.py",
-      "bytes": 13250,
+      "bytes": 14827,
       "release_path": null,
-      "sha256": "7c07e5aa7b54a6d223b14eb6b31ca3a52b135c3c8c0de4ef180dd5427f36ff56"
+      "sha256": "be25de98cb1fe53b4b3ce3ec8706d145b27d103a695ce733687f2d86e4e432b9"
     },
     {
       "bundle_path": "test_original_capability_preflight.py",
@@ -272,9 +272,15 @@
     },
     {
       "bundle_path": "README.md",
-      "bytes": 1626,
+      "bytes": 3607,
       "release_path": null,
-      "sha256": "01ad62a4a68e0afcb6f72aa31cf4992fe7f1743dd75d864e666198438829eb98"
+      "sha256": "f313766127ac1983ca28faff0879b76f9a8636353934a39f11c0fe4caf745a07"
+    },
+    {
+      "bundle_path": "test_adapter_closeout_scope.py",
+      "bytes": 3561,
+      "release_path": null,
+      "sha256": "86a18b81a8ffd340fe3ee1ca1aa7b4e54702e0b62ca957a0d242f09aa831e523"
     }
   ],
   "known_hold": "LIVE_WAL_PRECHECK_SHM_READER_MARK_UNDECIDED",

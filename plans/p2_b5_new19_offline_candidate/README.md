@@ -29,3 +29,24 @@ independent review, and installation are not established by this commit. In
 particular the earlier runtime code pin and release manifest cannot be reused
 for these changed bytes. A reviewed complete release and external binder must
 be generated only from the final exact source and actual commit identity.
+
+## Complete chain boundary for this draft
+
+| Step | Existing entry | Current outcome |
+| --- | --- | --- |
+| Prestart | `ExistingRequestAuthority.preflight_original_capabilities` → A reader | Fixed source and DB pin; live WAL returns HOLD before SQLite connection. |
+| Reservation/activation | `Transaction.execute` → original backend CAS, lock and checkpoint | No live six-slot, two-current or original DB evidence in this candidate. |
+| Intake | `OriginalComposition.send_once` → durable intent → original `Github.call` or enrolled publisher → original Queue READY | No enrolled production maintenance caller or authenticated publisher in this candidate. SENT and UNKNOWN must never be posted again. |
+| Success/custody/body | original Queue `bound_job`, Receiver custody, `OAuthProjectResource.read` | Requires 19 real SUCCESS/InvokeId, current files grant and request-local Authorization; fixture evidence does not supply them. |
+| Close/restore | exact job approval → stop → observer release → lock/DBFD → fixed close or precise restore | The original authority's `approve_precise_pre_start_restore` and `approve_c53_b5_exposure_close` still HOLD; maintenance witness does not authorize those scopes. |
+
+The only source-local fixes in this revision are final scan-deadline checks,
+fixed-job journal read scope, and detaching/closing the owned observer before
+closeout reopens the original DB. A failed observer close is UNKNOWN. No
+production approval source, token transfer, second transport or grant was
+created. The original `oauth_http.create_resource_app` has request-local
+Authorization, but this candidate has no registered caller that conveys that
+request context to the maintenance process. The old c53 release constant and
+pin cannot authorize these new bytes. Freeze a new binder only after a full
+source review and the actual release commit; the fixed 19 SUCCESS results are
+post-start observations, never a prerequisite for prestart admission.

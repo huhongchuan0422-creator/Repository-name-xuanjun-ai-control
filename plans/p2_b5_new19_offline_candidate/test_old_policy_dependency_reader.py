@@ -159,6 +159,39 @@ class ReaderTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN'):
                 self.precheck()
 
+    def test_final_protected_read_crosses_deadline_before_verified_return(self):
+        self.backend.lock_fd=None;self.backend.worker_stopped=False
+        original_read=self.backend.legacy.read
+        real_clock=__import__('time').monotonic
+        shift={'seconds':0,'reads':0}
+        def read(path):
+            if path==c53.CONFIGS[0]:
+                shift['reads']+=1
+                if shift['reads']==2:shift['seconds']=6
+            return original_read(path)
+        self.backend.legacy.read=read
+        with mock.patch('pr17_c53_r2_host_backend_candidate.time.monotonic',
+                        side_effect=lambda:real_clock()+shift['seconds']):
+            with self.assertRaisesRegex(Exception,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN'):
+                self.precheck()
+        self.assertEqual(shift['reads'],2)
+
+    def test_locked_final_protected_read_cannot_verify_after_deadline(self):
+        original_read=self.backend.legacy.read
+        real_clock=__import__('time').monotonic
+        shift={'seconds':0,'reads':0}
+        def read(path):
+            if path==c53.CONFIGS[0]:
+                shift['reads']+=1
+                if shift['reads']==2:shift['seconds']=6
+            return original_read(path)
+        self.backend.legacy.read=read
+        with mock.patch('pr17_c53_r2_host_backend_candidate.time.monotonic',
+                        side_effect=lambda:real_clock()+shift['seconds']):
+            with self.assertRaisesRegex(Exception,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN'):
+                self.observe()
+        self.assertEqual(shift['reads'],2)
+
     def test_live_unknown_fetch_or_bad_hash_holds(self):
         unknown=dict(self.old,request_id='not-in-old-binding')
         self.insert(unknown,'UNKNOWN')

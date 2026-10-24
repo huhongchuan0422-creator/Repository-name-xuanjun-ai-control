@@ -120,6 +120,24 @@ class OriginalComposition:
         del old_resource
         return True
 
+    def release_observer_for_closeout(self):
+        """Release this composition's read observer before the locked DB reopen."""
+        if self.runtime_phase != 'observe' or type(self.queue) is not Queue or \
+                type(self.resource) is not OAuthProjectResource or \
+                self.resource.db is not self.queue.db:
+            raise Hold('CLOSEOUT_OBSERVER_PHASE_UNKNOWN')
+        old_queue,old_resource=self.queue,self.resource
+        self.queue,self.resource=None,None
+        self.runtime_phase='closeout_detached'
+        try:old_queue.close()
+        except BaseException:
+            self.runtime_phase='uncertain'
+            try:old_queue.db.close()
+            except BaseException:pass
+            raise Hold('CLOSEOUT_OBSERVER_CLOSE_UNKNOWN') from None
+        del old_resource
+        return True
+
     def verify_binding(self, catalog_raw=None, catalog_sha=None, request_ids=None,
                        recipient=None, project=None, active=True):
         p = self.policy

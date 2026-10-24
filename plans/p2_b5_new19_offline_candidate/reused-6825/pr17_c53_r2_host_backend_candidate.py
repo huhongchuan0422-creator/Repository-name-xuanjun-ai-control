@@ -639,6 +639,7 @@ class R2HostBackend:
         from urllib.parse import quote
         path=c53.DB if _fixture_path is None else _fixture_path
         held=None;parent=None;db=None
+        deadline=time.monotonic()+5.0
         try:
             parent=(self.legacy.state_directory() if _fixture_path is None else
                     os.open(os.path.dirname(path),os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW))
@@ -694,7 +695,7 @@ class R2HostBackend:
                         'a9da8c2cf0d012fff81cb8e35da09d044d82f31991e5ae24ad5cdd9ba800d2f3',
                         'OLD_POLICY_PRECHECK_SCHEMA')
             before=db.execute('PRAGMA data_version').fetchone()
-            result=self._classify_old_policy_dependencies(db,ids,project)
+            result=self._classify_old_policy_dependencies(db,ids,project,deadline)
             after=db.execute('PRAGMA data_version').fetchone()
             c53.require(before==after,'OLD_POLICY_PRECHECK_DB_CHANGED')
             current=os.fstat(held)
@@ -716,6 +717,7 @@ class R2HostBackend:
             db.execute('COMMIT')
             c53.require(result['dependent_active']==0 and result['unresolved']==0,
                         'OLD_POLICY_PRECHECK_DEPENDENCY')
+            c53.require(time.monotonic()<deadline,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN')
             return dict(result,phase='PRECHECK_OBSERVATION')
         except BaseException:
             if db is not None and db.in_transaction:db.execute('ROLLBACK')
@@ -736,11 +738,12 @@ class R2HostBackend:
                     'OLD_POLICY_LOCKED_DEPENDENCY')
         return dict(result,phase='LOCKED_REOBSERVATION')
 
-    def _classify_old_policy_dependencies(self, db, ids, project):
+    def _classify_old_policy_dependencies(self, db, ids, project, deadline=None):
         """One strict classifier for A and B; no expiry revalidation on fetch."""
         from production.cloud_connection.queue import canonical, decode, FIELDS, TARGETS
         from production.cloud_connection.fixed_actions import ApprovedObjectsPolicy
-        deadline=time.monotonic()+5.0
+        if deadline is None:deadline=time.monotonic()+5.0
+        c53.require(time.monotonic()<deadline,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN')
         def progress():return int(time.monotonic()>=deadline)
         db.set_progress_handler(progress,1000)
         try:return self._classify_old_policy_bounded(db,ids,project,deadline,
@@ -841,6 +844,7 @@ class R2HostBackend:
                     'OLD_POLICY_QUEUE_CHANGED')
         fields={'project':project,'dependent_active':dependent,'unresolved':0,
                 'active_rows':count,'old_binding_sha256':hook['metadata_sha256'] if hook else None}
+        c53.require(time.monotonic()<deadline,'OLD_POLICY_SCAN_DEADLINE_UNKNOWN')
         return dict(fields,verified=True,source='ORIGINAL_PROTECTED_OBSERVATION',
                     evidence_sha256=c53.sha(c53.canon(fields)))
 
@@ -1076,6 +1080,11 @@ class R2HostBackend:
                              'xuanjun-cloud-connection.service'],10,(3,))
         self.worker_stopped=True
         try:
+            from pr17_c53_r2_authority_adapter import ExistingRequestAuthority
+            c53.require(type(self.authority) is ExistingRequestAuthority and
+                        self.authority.original is not None,
+                        'CLOSEOUT_ORIGINAL_OBSERVER_UNKNOWN')
+            self.authority.original.release_observer_for_closeout()
             self.acquire_original_lock_once()
             self.legacy.check_original_database()
             for suffix in ('-wal','-shm','-journal'):

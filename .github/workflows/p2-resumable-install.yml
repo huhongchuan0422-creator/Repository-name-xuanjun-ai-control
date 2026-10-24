@@ -5,11 +5,13 @@ on:
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'plans/p2_b5_new19_offline_candidate/**'
       - '.github/workflows/p2-resumable-install.yml'
   pull_request:
     paths:
       - 'production/p2_install/**'
       - 'tests/p2_install/**'
+      - 'plans/p2_b5_new19_offline_candidate/**'
       - '.github/workflows/p2-resumable-install.yml'
 permissions:
   contents: read
@@ -28,3 +30,9 @@ jobs:
       - run: python -B tests/p2_install/test_journal.py -v
       - name: B6 offline persistence and preactivation scope tests
         run: python -B tests/p2_install/test_b6_persistence.py -v
+      - name: B5 offline reader and closeout scope tests
+        run: |
+          python -B plans/p2_b5_new19_offline_candidate/test_old_policy_dependency_reader.py -v
+          python -B plans/p2_b5_new19_offline_candidate/test_adapter_closeout_scope.py -v
+          python -B plans/p2_b5_new19_offline_candidate/test_original_capability_preflight.py -v
+          python -B plans/p2_b5_new19_offline_candidate/test_canonical_prestart_proof.py -v

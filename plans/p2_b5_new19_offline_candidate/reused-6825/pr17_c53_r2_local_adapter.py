@@ -22,15 +22,35 @@ def single_thread():
 
 class ProtectedReads:
     """Stable protected read; backend before/new/CAS owns runtime identity."""
-    def __init__(self, legacy, private_bytes):
+    def __init__(self, legacy, private_bytes, journal_job=None, request_ids=()):
         self.legacy = legacy
         self.private_bytes = private_bytes
+        self.journal_job = journal_job
+        self.request_ids = tuple(request_ids)
 
     def __getattr__(self, name):
         return getattr(self.legacy, name)
 
     def read(self, path):
-        c53.require(path in PATHS, 'ADAPTER_READ_SCOPE')
+        allowed = path in PATHS
+        if self.journal_job is not None:
+            c53.require(self.journal_job ==
+                        '/opt/xuanjun-cloud-connection/l2-c53-recovery-once' and
+                        len(self.request_ids) == 19 and
+                        len(set(self.request_ids)) == 19,
+                        'ADAPTER_JOURNAL_BINDING')
+            fixed = ('reservation.json', 'window-open.json',
+                     'activation-identity.json', 'NEW_WORKER_START_ATTEMPT.json')
+            journal = self.journal_job + '/'
+            allowed = allowed or path in tuple(journal + name for name in fixed)
+            allowed = allowed or path in tuple(
+                journal + 'checkpoint-%03d.json' % number
+                for number in range(1, 65))
+            allowed = allowed or path in tuple(
+                journal + 'intake-' + rid + suffix
+                for rid in self.request_ids
+                for suffix in ('.intent.json', '.sent.json'))
+        c53.require(allowed, 'ADAPTER_READ_SCOPE')
         before = self.private_bytes(path, LIMIT, contents=False)
         raw = self.private_bytes(path, LIMIT, contents=True)
         legacy_raw, identity = self.legacy.read(path)
@@ -84,7 +104,11 @@ def prepare_local_adapter(*, spec_raw, source_root, legacy_io,
     for path in PATHS:
         c53.require(reads.read(path)[0] == observed[path], 'ADAPTER_BASELINE_CHANGED')
     single_thread()
+    backend_reads = ProtectedReads(
+        legacy_io, private_bytes,
+        journal_job=spec['fixed_paths']['job_proposed'],
+        request_ids=spec['batch']['draft_request_ids'])
     return prepare_bound_transaction(
         spec_raw=spec_raw, observed_bytes=observed, source_blobs=sources,
         batch_id=batch_id, approval_ref=approval_ref, window_start=window_start,
-        legacy_io=ProtectedReads(legacy_io, private_bytes), authority=authority)
+        legacy_io=backend_reads, authority=authority)
