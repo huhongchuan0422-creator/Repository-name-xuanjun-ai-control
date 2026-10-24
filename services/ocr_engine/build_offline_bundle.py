@@ -150,7 +150,9 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
     }
 
 def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path):
-    checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir)
+    checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
+                              requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
+                              license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
     output = Path(output_path)
     if not output.is_absolute() or output.exists() or output.is_symlink():
         raise BundleError("OUTPUT_MUST_BE_ABSOLUTE_AND_NOT_EXIST")
@@ -165,7 +167,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
     # Freeze digests before archive creation; verify the actual archive against this snapshot.
     frozen = {}
     frozen_sources = [
-        (Path(MODEL_MANIFEST), "model_manifest.json"),
+        (Path(MODEL_MANIFEST), "services/ocr_engine/model_manifest.json"),
         (Path(REQUIREMENTS), "requirements.txt"),
         (Path(LICENSE), "LICENSE-2.0.txt"),
         (Path(NOTICE), "NOTICE.md"),
@@ -193,7 +195,7 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
                 regular_file(path, "OCR_SOURCE")
                 archive.add(str(path), arcname=arcname, recursive=False)
             for path, arcname in (
-                (Path(MODEL_MANIFEST), "model_manifest.json"),
+                (Path(MODEL_MANIFEST), "services/ocr_engine/model_manifest.json"),
                 (Path(REQUIREMENTS), "requirements.txt"),
                 (Path(LICENSE), "LICENSE-2.0.txt"),
                 (Path(NOTICE), "NOTICE.md"),
