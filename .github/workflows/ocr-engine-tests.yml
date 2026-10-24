@@ -75,6 +75,7 @@ jobs:
           test "$OCR_TARGET_PLATFORM" = "linux-x86_64-cp311"
           printf 'SOURCE_SHA=%s\nTARGET_PLATFORM=%s\n' "$GITHUB_SHA" "$OCR_TARGET_PLATFORM"
       - uses: actions/checkout@v4
+        id: source-checkout
         with:
           ref: ${{ inputs.source_sha }}
           persist-credentials: false
@@ -187,13 +188,13 @@ jobs:
           } > "$RUNNER_TEMP/ocr-diagnostics/build-runtime.log"
           find "$RUNNER_TEMP/ocr-build" -maxdepth 1 -type f -printf '%f %s bytes\n' 2>/dev/null > "$RUNNER_TEMP/ocr-diagnostics/output-inventory.txt" || true
       - name: Freeze candidate input inventory for failure reuse (not a release package)
-        if: always()
+        if: always() && steps.source-checkout.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
           python services/ocr_engine/write_candidate_input_manifest.py "$RUNNER_TEMP" "$RUNNER_TEMP/ocr-candidate-inputs/candidate-input-manifest.json"
       - name: Upload reusable candidate inputs and their digest manifest (never a success package)
-        if: always()
+        if: always() && steps.source-checkout.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: xuanjun-ocr-candidate-inputs-not-release-${{ github.sha }}-${{ github.run_id }}
