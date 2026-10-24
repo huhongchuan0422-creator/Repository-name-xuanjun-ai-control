@@ -172,6 +172,16 @@ class Update:
             self.t.inspect(c['container_id'],c['image_id'],False);self.guard()
         except Exception:
             j.write('HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',new_id);raise Hold('VERIFY_UNKNOWN') from None
+        completed=(type(health) is dict and type(health.get('http_status')) is int
+                   and health.get('url')==plan.URL and type(health.get('status')) is str
+                   and health.get('scope')=='PROCESS_AND_DATABASE_CONNECTIVITY'
+                   and health.get('production_acceptance') is False)
+        stamped=(completed and type(health.get('runtime_source_sha')) is str
+                 and plan.exact_hex(health['runtime_source_sha'],40)
+                 and health.get('version_source')=='IMAGE_BUILD_STAMP'
+                 and type(health.get('observed_at')) is int and now-600<=health['observed_at']<=now+30)
+        if not completed or health['status']=='READY' and not stamped:
+            j.write('HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',new_id);raise Hold('HEALTH_EVIDENCE_UNKNOWN')
         if not plan.exact_health(health,p['source']['source_sha'],p['image']['oci_revision'],now):
             j.write('KNOWN_FAILURE',new_id);raise Hold('KNOWN_FAILURE_RECOVERY_REQUIRED')
         j.write('COMMITTED',new_id);return dict(j.state)

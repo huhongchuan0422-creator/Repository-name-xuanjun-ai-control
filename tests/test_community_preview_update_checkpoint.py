@@ -66,7 +66,7 @@ class Checkpoints(unittest.TestCase):
         with self.assertRaises(u.Hold):self.update().run()
         self.assertEqual(len(self.calls),before)
     def test_known_health_failure_then_restart_and_safe_serial_recovery(self):
-        self.t.health=lambda:{'status':'NOT_READY'}
+        self.t.health=lambda:dict(self.health(),status='NOT_READY')
         with self.assertRaisesRegex(u.Hold,'RECOVERY_REQUIRED'):self.update().run()
         self.j.close();self.j=u.Journal(self.parent,self.p);self.addCleanup(self.j.close)
         self.t.health=self.health;self.assertEqual(self.update().recover()['phase'],'ROLLED_BACK_PREVIEW_HOLD')
@@ -110,7 +110,7 @@ class Checkpoints(unittest.TestCase):
         values=iter([live+.5,live+.25]);v=self.update(clock=lambda:next(values));v.guard()
         with self.assertRaises(u.Hold):v.guard()
     def test_new_stop_unknown_cannot_start_old(self):
-        self.t.health=lambda:{'status':'NOT_READY'}
+        self.t.health=lambda:dict(self.health(),status='NOT_READY')
         with self.assertRaises(u.Hold):self.update().run()
         u.original.mutate.side_effect=u.original.Unknown('STOP_UNKNOWN')
         with self.assertRaises(u.Hold):self.update().recover()
@@ -169,3 +169,10 @@ class Checkpoints(unittest.TestCase):
         with patch.object(u.original,'command',side_effect=collide):
             with self.assertRaises(u.Hold):self.update().run()
         self.assertEqual(self.calls,[])
+    def test_missing_or_stale_runtime_health_cannot_become_recovery_permission(self):
+        self.t.health=lambda:dict(self.health(),runtime_source_sha=None)
+        with self.assertRaisesRegex(u.Hold,'HEALTH_EVIDENCE_UNKNOWN'):self.update().run()
+        self.assertEqual(self.j.state['phase'],'HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT')
+        before=len(self.calls)
+        with self.assertRaises(u.Hold):self.update().recover()
+        self.assertEqual(len(self.calls),before)
