@@ -85,7 +85,8 @@ SHA准确（固定pin在源码）。原f131 receipt也固定digest；测试不�
 根仍须审未来原root调用载体及其源码安装目录/所有者；当前现场安装位置/bytes UNKNOWN，
 不能把本工作区root测试权限当服务器安装完成。
 
-compose先验证真实current、已加载release image准确ID/OCI/User、无恢复名字冲突，再打开
+compose先验证真实current，再打开并验证完整同attempt journal；PREPARED核已加载release
+image及首次名字无冲突，KNOWN_FAILURE核持久新ID和恢复名称归属（见末节）。沿
 controller的固定journal父目录 /opt/xuanjun-community-preview/update-journal。父链no-follow/
 root0700/固定fd；**不创建父目录**。父目录不存在则拒绝，不走/tmp或其他路径替代。
 只有未来精准授权并调用compose才会写lock/active/attempt/events/checkpoint；本轮零现场写入。
@@ -131,3 +132,45 @@ root0700/固定fd；**不创建父目录**。父目录不存在则拒绝，不�
 f131产品不相等，不能拿旧Run给新SHA准入，不回退分支、不弱化门禁。Owner后续批准同版产品/
 预览候选前，默认preview_enabled=false；不dispatch、SDK/self-hosted、上传、部署或生产OCR启用。
 生产ocr:use/store/真实引擎仍独立HOLD，不能用审批或fixture补权限。
+
+## 1f714 集中独审修复：首次/恢复准入分流
+
+根的复现是独立临时journal与合成Docker/health，不是UK现场故障。旧composition在
+打开已有journal前强制old running=True、无rollback名字，使合法KNOWN_FAILURE
+（oldFalse/newTrue）在恢复前被错误挡住。本次只修改composition、对应测试、本说明及
+结构清单中的composition文件SHA；a932 controller、pins、双health/fileprojection、
+f131产品镜像及原workflow保持原样。
+
+现在先读受保护current身份（不预设running），再用原Journal完整验证同plan/attempt、
+active记录、连续全部events/checkpoint和排他锁，随后按已验证phase判断：
+
+- PREPARED：旧容器仍须running=True；原image_and_names_ready首次门禁完整保留，另核固定
+  NAME确归批准旧ID，候选rollback/failed名字不存在。新journal只由原代码创建PREPARED，
+  composition不修复/重造已有历史，也不建立父目录。首次准入失败可能已留下PREPARED
+  lock/active/journal，但不会产生Docker mutation；不得据此清空记录再试。
+- KNOWN_FAILURE：仅完整journal持久的准确new_id可作为恢复对象，必须不同于旧ID。
+  原旧ID/image/隔离/配置/备份绑定须相符且旧已停；新ID须准确固定f131 image/隔离、真实
+  bool running（可已停），已加载image的ID/OCI/User须准确。固定NAME必须属于该new_id，
+  该attempt唯一rollback名字必须属于旧ID，failed名字仍不存在。窄名字/ID投影限64项/
+  16384B/8s，拒绝重复ID/name及异常结构；读后再核绑定、双方ID/image和名称。
+  只返回可显式调用原controller.recover的对象，不自动调用恢复、不重试stop/run。
+- 其余phase（UNKNOWN、任何durable intent、COMMITTED、ROLLED_BACK等）：仅检查/HOLD，
+  不自动恢复或继续未完成mutation。损坏/缺失journal或错attempt保持原样拒绝。
+
+原controller在每个恢复mutation的durable intent之后仍复核新停/旧停/准确ID image/socket；
+最终health读后及最终checkpoint后仍证新停。单writer锁与审批/备份600秒有效期不放宽，
+旧版本health缺远端时间仍HOLD。名称归属是明确边界的观察，不宣称独立外部root actor无法
+在最后观察之后改名/改变状态，不把本地组合称Docker原子事务。
+
+新增验收以**独立Python进程**分别完成首次KNOWN_FAILURE与关闭后同approval/attempt
+重开恢复，实际原Journal锁/fsync/history和原controller/composition执行；临时受保护
+文件投影也是真实读取，只有host/权限来源、Docker和health为隔离合成夹具。覆盖new已停
+不重复stop、旧复活、新image错误、NAME/rollback/failed归属错误、错attempt、UNKNOWN/
+损坏history、审批过期、PREPARED首次门禁保留，拒绝时Docker mutation零新增且既有journal
+bytes不变。原16项作为本受影响composition模块回归复用，a932旧46项和业务/模型/图不重跑。
+
+边界澄清：Docker CLI/daemon在内部可能读取完整inspect对象（含Env），不能声称它内部
+从未接触Env；传给Python/日志的只有固定白名单模板，源码不索取/解析/输出Env。
+新鲜current/备份恢复及降级证明/root安装载体逐文件hash/固定approval与journal状态/
+镜像加载及准确名称仍须逐项具证，不能无条件一次更新。未执行任何服务器、现场命令发送、
+加载、停启、目录建立、部署、新权限或生产OCR/微信上传。

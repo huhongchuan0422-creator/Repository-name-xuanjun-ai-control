@@ -212,6 +212,54 @@ class Composition:
         self.journal.close();self.bindings.close()
 
 
+def exact_stage_names(candidate,new_id=None):
+    """Bounded names/IDs only; never a full Docker JSON/Env projection."""
+    fmt='{"id":{{json .ID}},"name":{{json .Names}}}'
+    rows=observation.capture(plan.DOCKER+['container','ls','--all','--no-trunc','--format',fmt,
+        '--filter','name=^/xuanjun-community-preview'],timeout=8,budget=16384).splitlines()
+    require(len(rows)<=64,'CONTAINER_NAMES_UNKNOWN')
+    names={};ids=set()
+    for row in rows:
+        value=observation.exact_json(row)
+        require(type(value) is dict and set(value)=={'id','name'} and plan.exact_hex(value['id'],64)
+            and type(value['name']) is str and re.fullmatch('xuanjun-community-preview[A-Za-z0-9_.-]*',value['name']) is not None,
+            'CONTAINER_NAME_FRAME_UNKNOWN')
+        require(value['name'] not in names and value['id'] not in ids,'DUPLICATE_CONTAINER_NAME_OR_ID')
+        names[value['name']]=value['id'];ids.add(value['id'])
+    old=candidate['current']['container_id']
+    if new_id is None:
+        require(names.get(plan.NAME)==old and candidate['rollback_name'] not in names
+            and candidate['failed_name'] not in names,'INITIAL_CONTAINER_NAMES_CHANGED')
+    else:
+        require(names.get(plan.NAME)==new_id and names.get(candidate['rollback_name'])==old
+            and candidate['failed_name'] not in names,'RECOVERY_CONTAINER_NAME_OWNERSHIP_CHANGED')
+
+
+def recovery_admission(journal,transport,bindings):
+    """Only a fully validated same-plan KNOWN_FAILURE can admit recover().
+
+    Other durable intents, UNKNOWN and terminal records remain inspect-only;
+    this does not resume/retry a mutation or rewrite the original history.
+    """
+    p=journal.plan;new_id=journal.state['new_id']
+    require(journal.state['phase']=='KNOWN_FAILURE' and plan.exact_hex(new_id,64)
+            and new_id!=p['current']['container_id'],'KNOWN_FAILURE_EXACT_NEW_RECEIPT_REQUIRED')
+    require(bindings()['running'] is False,'RECOVERY_OLD_WRITER_MUST_BE_STOPPED')
+    transport.inspect(p['current']['container_id'],p['current']['image_id'],False)
+    # A known new writer may already be stopped; original recover proves state
+    # before deciding whether its single stop is needed. No unknown bool coercion.
+    inspect_bound(new_id,p['image']['image_id'])
+    fmt='{{json .Id}}\n{{json (index .Config.Labels "org.opencontainers.image.revision")}}\n{{json .Config.User}}'
+    rows=observation.capture(plan.DOCKER+['image','inspect','--format',fmt,p['image']['image_id']],timeout=8,budget=4096).splitlines()
+    require([observation.exact_json(v) for v in rows]==[p['image']['image_id'],PRODUCT,'10001:1008'],
+            'RECOVERY_LOADED_IMAGE_CHANGED')
+    exact_stage_names(p,new_id)
+    require(bindings()['running'] is False,'RECOVERY_OLD_WRITER_MUST_BE_STOPPED')
+    transport.inspect(p['current']['container_id'],p['current']['image_id'],False)
+    inspect_bound(new_id,p['image']['image_id'])
+    exact_stage_names(p,new_id)
+
+
 def compose(*,approval_sha256,backup_fd,execution_enabled=False):
     """Future original root caller only. No shipped CLI turns this on.
 
@@ -256,10 +304,18 @@ def compose(*,approval_sha256,backup_fd,execution_enabled=False):
     bindings=LiveBindings(c,backup_fd,approval_check)
     journal=None
     try:
-        live=bindings();require(live['running'] is True,'ORIGINAL_OLD_WRITER_NOT_RUNNING')
+        live=bindings()  # protected identity is live; running is phase-dependent
         transport=controller.OriginalTransport(bindings,actual_health)
-        transport.image_and_names_ready(candidate)  # NO image loading
-        journal=controller.Journal.from_original_parent(candidate)  # NO parent creation
+        # Validate the existing complete protected history and same-attempt lock
+        # BEFORE applying first-run gates. Journal never creates its parent.
+        journal=controller.Journal.from_original_parent(candidate)
+        if journal.state['phase']=='PREPARED':
+            require(live['running'] is True,'ORIGINAL_OLD_WRITER_NOT_RUNNING')
+            transport.image_and_names_ready(candidate)  # original FIRST-run gate only
+            exact_stage_names(candidate)
+        elif journal.state['phase']=='KNOWN_FAILURE':
+            recovery_admission(journal,transport,bindings)
+        else:raise controller.Hold('EXISTING_PHASE_INSPECT_ONLY_NO_AUTOMATIC_RESUME')
         return Composition(journal,bindings,transport)
     except BaseException:
         if journal is not None:journal.close()

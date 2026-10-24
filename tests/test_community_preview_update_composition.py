@@ -41,6 +41,7 @@ class CompositionScope(unittest.TestCase):
         self.fd=os.open(str(p),os.O_RDONLY);self.addCleanup(os.close,self.fd)
         self.c=fixture.current();self.info=old.info(self.c['image_id'],self.c['container_id'])
         self.info.update(ports={},published={},devices=[],capadd=[])
+        self.names={c.plan.NAME:self.c['container_id']}
         self.readlink=os.readlink
         # Map only the actual private fixture file path, not reusable fd numbers.
         backup_fixture_path=str(p)
@@ -53,6 +54,8 @@ class CompositionScope(unittest.TestCase):
                 if argv[-1]==c.plan.NAME:return '\n'.join(json.dumps(self.info[k]) for k in ('id','image'))
                 fields=c.original.INSPECT_FIELDS+[('ports',''),('published',''),('devices',''),('capadd','')]
                 return '\n'.join(json.dumps(self.info[k]) for k,_ in fields)
+            if argv[3:5]==['container','ls']:
+                return '\n'.join(json.dumps(dict(name=n,id=i)) for n,i in self.names.items())
             if argv[3:5]==['image','inspect']:
                 return '\n'.join(json.dumps(v) for v in (self.c['image_id'],c.plan.OBSERVED_OCI,'10001:1008'))
             return frame(health())
@@ -160,7 +163,8 @@ class CompositionScope(unittest.TestCase):
             return b'protected verified source'
         with patch.object(c,'protected_body',side_effect=body),patch.object(c.original,'read_root_file',return_value=(raw,0o600)),\
              patch.object(c,'LiveBindings') as bindings,patch.object(c.controller.OriginalTransport,'image_and_names_ready') as image,\
-             patch.object(c.controller.Journal,'from_original_parent') as journal:
+             patch.object(c.controller.Journal,'from_original_parent') as journal,patch.object(c,'exact_stage_names'):
+            journal.return_value.state={'phase':'PREPARED'}
             bindings.return_value.return_value=dict(a['current'])
             result=c.compose(approval_sha256='b'*64,backup_fd=self.fd,execution_enabled=True)
             return result,journal,image,bindings
@@ -190,7 +194,10 @@ class CompositionScope(unittest.TestCase):
         def mutate(argv,timeout):
             actions.append(argv)
             if argv[3]=='stop':self.info['running']=False;self.info['status']='exited'
-            if argv[3]=='run':new_running[0]=True;return new_id
+            if argv[3]=='rename':
+                self.names={n:i for n,i in self.names.items() if i!=argv[-2]};self.names[argv[-1]]=argv[-2]
+            if argv[3]=='run':
+                new_running[0]=True;self.names[c.plan.NAME]=new_id;return new_id
             return ''
         def inspect(cid):
             if cid==self.c['container_id']:return dict(self.info)
@@ -226,3 +233,175 @@ class CompositionScope(unittest.TestCase):
         self.assertFalse(any(isinstance(n,ast.If) and '__name__' in ast.unparse(n.test) for n in tree.body))
         self.assertNotIn('original.main(',Path(c.__file__).read_text())
         self.assertNotIn('docker load',Path(c.__file__).read_text())
+
+
+def reopen_process(root,stage):
+    """Independent process: real files/journal/composition/controller, fake Docker.
+
+    All authority/host/remote observations below are isolated synthetic fixtures.
+    No real Docker, URL, socket, account or server is accessed.
+    """
+    from contextlib import ExitStack
+    root=Path(root);model_path=root/'docker-fixture.json'
+    model=json.loads(model_path.read_text());uid=os.getuid()
+    backup_path='/opt/xuanjun-community-preview/existing-reviewed-reference.json'
+    backup_file=root/backup_path.lstrip('/');backup_file.parent.mkdir(parents=True,exist_ok=True)
+    if not backup_file.exists():backup_file.write_bytes(b'synthetic reference only');backup_file.chmod(0o600)
+    for path in c.observation.META_PATHS.values():
+        p=root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True)
+        if path in (c.plan.ROOT+'/config',c.plan.ROOT+'/data',c.plan.RUN):p.mkdir(exist_ok=True)
+        elif not p.exists():p.write_bytes(b'private fixture not read');p.chmod(0o600)
+    for path in c.observation.ROUTE_PATHS.values():
+        p=root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True)
+        if not p.exists():p.write_bytes(b'unchanged fixture route');p.chmod(0o600)
+    parent=root/'journal';parent.mkdir(mode=0o700,exist_ok=True)
+    approval_file=root/'approval.json';receipt_path=Path('deploy/community-preview/f131-image-receipt.json')
+    real_readlink=os.readlink
+    def capture(argv,**kwargs):
+        if argv[3:5]==['container','inspect']:
+            ref=argv[-1];cid=model['names'].get(ref,ref);obj=model['objects'][cid]
+            if argv[-2]=='{{json .Id}}\n{{json .Image}}':return '\n'.join(json.dumps(obj[k]) for k in ('id','image'))
+            return '\n'.join(json.dumps(obj[k]) for k,_ in c.original.INSPECT_FIELDS+[('ports',''),('published',''),('devices',''),('capadd','')])
+        if argv[3:5]==['image','inspect']:
+            return '\n'.join(json.dumps(v) for v in (argv[-1],c.plan.OBSERVED_OCI if argv[-1]==model['old_image'] else c.PRODUCT,'10001:1008'))
+        if argv[3:5]==['container','ls']:
+            return '\n'.join(json.dumps(dict(name=n,id=i)) for n,i in sorted(model['names'].items()))
+        h=health()
+        if stage=='first':h['status']='MAINTENANCE'
+        elif stage=='recover':h.update(runtime_source_sha=None,version_source=None)
+        return frame(h)
+    def command(argv):
+        if argv[3:5]==['image','inspect']:return capture(argv)
+        return '\n'.join(model['names'])
+    def inspect(cid):return copy.deepcopy(model['objects'][cid])
+    def mutate(argv,timeout):
+        model['actions'].append(argv)
+        if argv[3] in ('stop','start'):
+            obj=model['objects'][argv[-1]];obj['running']=argv[3]=='start';obj['status']='running' if obj['running'] else 'exited'
+        elif argv[3]=='rename':
+            cid=argv[-2];model['names']={n:i for n,i in model['names'].items() if i!=cid};model['names'][argv[-1]]=cid
+        elif argv[3]=='run':
+            cid='9'*64;obj=old.info(model['new_image'],cid,True);obj.update(ports={},published={},devices=[],capadd=[])
+            model['objects'][cid]=obj;model['names'][c.plan.NAME]=cid
+        model_path.write_text(json.dumps(model));model_path.chmod(0o600)
+        return '9'*64 if argv[3]=='run' else ''
+    def body(path,sha):
+        raw=approval_file.read_bytes() if path==c.APPROVAL else Path(path).read_bytes()
+        c.require(hashlib.sha256(raw).hexdigest()==sha,'FIXTURE_EXACT_APPROVED_SOURCE_OR_FILE_REQUIRED')
+        return raw
+    fd=os.open(str(backup_file),os.O_RDONLY);result=None
+    with ExitStack() as stack:
+        for target,name,value in ((c.observation,'ROOT_ANCHOR',str(root)),(c.observation,'ROOT_UID',uid),
+            (c.observation,'PROJECT_UID',uid),(c,'REFERENCE_UID',uid),(c,'now',lambda:1000),
+            (c.controller,'OWNER_UID',uid),(c.controller,'JOURNAL_PARENT',str(parent)),
+            (c.os,'getuid',lambda:0),(c.os,'geteuid',lambda:0),(c.os,'uname',lambda:Mock(nodename=c.plan.HOST)),
+            (c.os,'readlink',lambda path:backup_path if real_readlink(path)==str(backup_file) else real_readlink(path)),
+            (c.observation,'capture',capture),(c.original,'command',command),(c.original,'inspect',inspect),
+            (c.original,'mutate',mutate),(c,'protected_body',body)):
+            stack.enter_context(patch.object(target,name,value))
+        # Only the temporary journal parent's /tmp ancestors use the isolated
+        # owner policy. Original root parent protection is unchanged in source.
+        stack.enter_context(patch.object(c.original,'secure_directory'))
+        if not approval_file.exists():
+            current=c.observe_current(backup_fd=fd)
+            a=dict(format=1,host=c.plan.HOST,control_source_sha=c.CONTROL,product_source_sha=c.PRODUCT,
+                composition_sha256=hashlib.sha256(Path(c.__file__).read_bytes()).hexdigest(),receipt_sha256=c.RECEIPT_SHA,
+                current=current,issued_at=999,expires_at=1500,backup_verified_at=999,
+                downgrade_compatibility_reviewed=True,actions=c.ACTIONS)
+            approval_file.write_text(json.dumps(a));approval_file.chmod(0o600)
+        try:
+            digest=hashlib.sha256(approval_file.read_bytes()).hexdigest()
+            result=c.compose(approval_sha256=digest,backup_fd=fd,execution_enabled=True)
+            result.update.clock=lambda:1000
+            if stage=='first':result.update.run()
+            elif stage=='recover':result.update.recover()
+            elif stage=='mark_unknown':result.journal.write(c.controller.HOLD_PHASE,result.journal.state['new_id'])
+            outcome=dict(result='ACCEPTED',phase=result.journal.state['phase'])
+        except Exception as error:
+            outcome=dict(result='HOLD',reason=str(error))
+        finally:
+            if result is not None:result.close()
+            os.close(fd)
+    model_path.write_text(json.dumps(model));model_path.chmod(0o600)
+    checkpoints=list(parent.glob('*/checkpoint.json'))
+    if checkpoints:outcome['checkpoint']=json.loads(checkpoints[0].read_text())
+    outcome['actions']=len(model['actions']);print(json.dumps(outcome))
+
+
+class CompositionReopen(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
+        current=fixture.current();obj=old.info(current['image_id'],current['container_id']);obj.update(ports={},published={},devices=[],capadd=[])
+        self.path=self.root/'docker-fixture.json'
+        self.save(dict(old_image=current['image_id'],new_image='sha256:571b7c6e23135943172171e64851bfe7f8151ba7eba9d5590158c5c99409545a',
+            objects={current['container_id']:obj},names={c.plan.NAME:current['container_id']},actions=[]))
+    def save(self,value):self.path.write_text(json.dumps(value));self.path.chmod(0o600)
+    def child(self,stage):
+        import subprocess,sys
+        # Source/test imports only; each invocation is a fresh independent Python
+        # process and actual flock/fsync/history is reopened, never mocked/reset.
+        code='from test_community_preview_update_composition import reopen_process;import sys;reopen_process(sys.argv[1],sys.argv[2])'
+        r=subprocess.run([sys.executable,'-B','-c',code,str(self.root),stage],capture_output=True,text=True,timeout=15,
+                         env=dict(os.environ,PYTHONPATH='.:tests'))
+        self.assertEqual(r.returncode,0,r.stderr);return json.loads(r.stdout)
+    def first(self):
+        r=self.child('first');self.assertEqual(r['result'],'HOLD');self.assertEqual(r['reason'],'KNOWN_FAILURE_RECOVERY_REQUIRED')
+        self.assertEqual(r['checkpoint']['phase'],'KNOWN_FAILURE');self.assertEqual(r['checkpoint']['new_id'],'9'*64)
+        self.assertEqual(r['actions'],3);return r
+    def journal_bytes(self):return {str(p.relative_to(self.root)):p.read_bytes() for p in (self.root/'journal').rglob('*') if p.is_file()}
+    def rejected_unchanged(self,expected):
+        before=self.journal_bytes();actions=len(json.loads(self.path.read_text())['actions'])
+        r=self.child('probe');self.assertEqual(r['result'],'HOLD');self.assertIn(expected,r['reason'])
+        self.assertEqual(r['actions'],actions);self.assertEqual(self.journal_bytes(),before);return r
+    def test_independent_process_known_failure_reopen_and_real_serial_recovery(self):
+        self.first();approved=(self.root/'approval.json').read_bytes()
+        r=self.child('recover');self.assertEqual(r['result'],'ACCEPTED');self.assertEqual(r['phase'],'ROLLED_BACK_PREVIEW_HOLD')
+        self.assertEqual((self.root/'approval.json').read_bytes(),approved)
+        m=json.loads(self.path.read_text());self.assertFalse(m['objects']['9'*64]['running'])
+        self.assertTrue(m['objects'][fixture.current()['container_id']]['running'])
+        self.assertEqual([a[3] for a in m['actions']],['stop','rename','run','stop','rename','rename','start'])
+        self.rejected_unchanged('EXISTING_PHASE_INSPECT_ONLY')
+    def test_already_stopped_known_new_writer_reopens_without_duplicate_stop(self):
+        self.first();m=json.loads(self.path.read_text());m['objects']['9'*64].update(running=False,status='exited');self.save(m)
+        r=self.child('recover');self.assertEqual(r['phase'],'ROLLED_BACK_PREVIEW_HOLD')
+        self.assertEqual([a[3] for a in json.loads(self.path.read_text())['actions']],['stop','rename','run','rename','rename','start'])
+    def test_wrong_current_or_rollback_name_ownership_denies_without_mutation(self):
+        self.first();original=json.loads(self.path.read_text())
+        for target in ('current','rollback','failed'):
+            m=copy.deepcopy(original);rollback=next(n for n in m['names'] if n!=c.plan.NAME)
+            if target=='current':m['names'][c.plan.NAME]='8'*64
+            elif target=='rollback':m['names'][rollback]='8'*64
+            else:
+                failed=rollback.replace('-before-','-failed-');m['names'][failed]='8'*64
+            self.save(m)
+            with self.subTest(target=target):self.rejected_unchanged('RECOVERY_CONTAINER_NAME_OWNERSHIP_CHANGED')
+        self.save(original)
+    def test_wrong_new_image_or_old_revived_denies_without_mutation(self):
+        self.first();original=json.loads(self.path.read_text())
+        m=copy.deepcopy(original);m['objects']['9'*64]['image']=m['old_image'];self.save(m)
+        self.rejected_unchanged('EXACT_CONTAINER_STATE_REQUIRED')
+        m=copy.deepcopy(original);m['objects'][fixture.current()['container_id']]['running']=True;self.save(m)
+        self.rejected_unchanged('RECOVERY_OLD_WRITER_MUST_BE_STOPPED')
+    def test_wrong_attempt_valid_live_binding_cannot_replace_active_record(self):
+        self.first();m=json.loads(self.path.read_text());oldid=fixture.current()['container_id'];obj=m['objects'].pop(oldid)
+        obj['id']='8'*64;m['objects']['8'*64]=obj;m['names']={n:('8'*64 if i==oldid else i) for n,i in m['names'].items()};self.save(m)
+        p=self.root/'approval.json';a=json.loads(p.read_text());a['current']['container_id']='8'*64;p.write_text(json.dumps(a));p.chmod(0o600)
+        self.rejected_unchanged('OTHER_ATTEMPT_OR_PARTIAL_ACTIVE_RECORD')
+    def test_unknown_and_corrupt_complete_history_are_inspect_only(self):
+        self.first();r=self.child('mark_unknown');self.assertEqual(r['phase'],c.controller.HOLD_PHASE)
+        self.rejected_unchanged('EXISTING_PHASE_INSPECT_ONLY')
+        event=next((self.root/'journal').glob('*/event-000001.json'));event.write_bytes(b'{partial')
+        self.rejected_unchanged('CORRUPT_EVENT_INSPECT_ONLY')
+    def test_prepared_reopen_preserves_original_running_and_name_collision_gates(self):
+        r=self.child('probe');self.assertEqual(r['phase'],'PREPARED');self.assertEqual(r['actions'],0)
+        m=json.loads(self.path.read_text());original=copy.deepcopy(m)
+        m['objects'][fixture.current()['container_id']]['running']=False;self.save(m)
+        self.rejected_unchanged('ORIGINAL_OLD_WRITER_NOT_RUNNING')
+        m=original
+        rollback=c.plan.NAME+'-before-'+c.PRODUCT[:12]+'-'+fixture.current()['container_id'][:12]
+        m['names'][rollback]='8'*64;self.save(m)
+        self.rejected_unchanged('EXISTING_RECOVERY_NAME_INSPECT_ONLY')
+
+    def test_reopen_expired_approval_refuses_before_journal_and_mutation(self):
+        self.first();p=self.root/'approval.json';a=json.loads(p.read_text());a['expires_at']=999;p.write_text(json.dumps(a));p.chmod(0o600)
+        self.rejected_unchanged('APPROVAL_OR_BACKUP_EXPIRED')
