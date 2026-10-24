@@ -105,6 +105,37 @@ class StageBoundaryTests(unittest.TestCase):
         self.assertIn(('restore','PRE_START_RESTORE',
                        ('/etc/xuanjun-cloud-executor/connection.json',)),effects)
 
+    def test_close_lease_exit_unknown_persists_failure_checkpoint(self):
+        checkpoints=[];effects=[]
+        class Authority:
+            evidence_store=object()
+        class Backend:
+            authority=Authority()
+            def checkpoint(self,phase):checkpoints.append(phase)
+            @contextlib.contextmanager
+            def successor_evidence_action(self,kind):
+                try:
+                    yield
+                finally:
+                    if kind=='b5_http':
+                        raise transaction.Hold(
+                            'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN')
+            def verify_b5_http_provenance(self,*args):effects.append('proof')
+            def approve_precise_b5_exposure_close(self,*args):effects.append('approve')
+            def close_b5_exposure_success_successor_only(self):effects.append('close')
+        candidate=transaction.Transaction(self.spec,self.bundle,Backend())
+        candidate.stage='READY_FOR_B5_HTTP_NOT_RECEIVED'
+        proof={'state':'B5_HTTP_BYTES_VALIDATED_SOURCE_ATTESTATION_PENDING',
+               'bytes':93592,'objects':19,'close_approval':'NOT_PROVEN',
+               'proof_sha256':'b'*64}
+        with self.assertRaisesRegex(
+                transaction.Hold,'SUCCESSOR_EVIDENCE_LEASE_CONTINUITY_UNKNOWN'):
+            candidate.close_after_b5_http(proof)
+        self.assertEqual(checkpoints,
+                         ['FAILURE_READY_FOR_B5_HTTP_NOT_RECEIVED'])
+        self.assertEqual(candidate.stage,'READY_FOR_B5_HTTP_NOT_RECEIVED')
+        self.assertEqual(effects,['proof','approve','close'])
+
     def test_successor_factory_type_and_close_sources_fail_closed(self):
         candidate=transaction.Transaction(self.spec,self.bundle,self.backend)
         self.backend.authority=object.__new__(ExistingRequestAuthority)
