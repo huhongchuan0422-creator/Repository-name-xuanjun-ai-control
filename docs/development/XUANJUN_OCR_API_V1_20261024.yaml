@@ -85,6 +85,835 @@ paths:
                     type: object
                     additionalProperties: {type: string}
                   confirmation_revision: {type: integer, minimum: 1}
+                  application_revision: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields, application_revision, provider_version]
+              properties:
+                revision: {type: integer, minimum: 1}
+                application_revision: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields and the exact application/provider version tuple recorded and returned; shared writeback eligibility is false if provider_version is absent}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision, application/provider version tuple, or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  binding_contract: APPLICATION_REVISION_AND_OPTIONAL_PROVIDER_VERSION_FROZEN
+  legacy_jobs_missing_provider_version: REVIEW_COMPATIBLE_SHARED_WRITEBACK_DISABLED
+  production_identity_callbacks: NOT_CONNECTED
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}]}
+                  provider_version: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}, {type: 'null'}]}
+                  confirmed_binding:
+                    type: object
+                    properties:
+                      application_revision: {oneOf: [{type: string}, {type: integer}]}
+                      provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
+                      document_type: {type: string, enum: [business_license, id_front]}
+                      attachment_id: {type: string}
+                      content_sha256: {type: string, pattern: '^[0-9a-f]{64}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}
+                  shared_writeback_eligible: {type: boolean}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}]}
+                provider_version: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}]}
+                  provider_version: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}, {type: 'null'}]}
+                  confirmed_binding:
+                    type: object
+                    properties:
+                      application_revision: {oneOf: [{type: string}, {type: integer}]}
+                      provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
+                      document_type: {type: string, enum: [business_license, id_front]}
+                      attachment_id: {type: string}
+                      content_sha256: {type: string, pattern: '^[0-9a-f]{64}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}
+                  shared_writeback_eligible: {type: boolean}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}, {type: 'null'}]}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}]}
+                  provider_version: {oneOf: [{type: string, pattern: '^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,3}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}, {type: integer, minimum: 0}, {type: 'null'}]}
+                  confirmed_binding:
+                    type: object
+                    properties:
+                      application_revision: {oneOf: [{type: string}, {type: integer}]}
+                      provider_version: {oneOf: [{type: string}, {type: integer}, {type: 'null'}]}
+                      document_type: {type: string, enum: [business_license, id_front]}
+                      attachment_id: {type: string}
+                      content_sha256: {type: string, pattern: '^[0-9a-f]{64}
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      required: [value, confidence, requires_review, source]
+                      properties:
+                        value: {type: string}
+                        confidence: {type: number, minimum: 0, maximum: 1}
+                        requires_review: {type: boolean}
+                        source: {type: string, const: ocr}
+                  warnings: {type: array, items: {type: string}}
+                  error_code: {type: string}
+                  requires_human_confirmation: {type: boolean, const: true}
+                  authenticity_verified: {type: boolean, const: false}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+    delete:
+      operationId: deleteOcrJob
+      summary: Delete OCR job payload
+      description: >
+        Rechecks current application and attachment authorization, including attachment content SHA-256, document type, and the stored authoritative application revision. Deletes encrypted job
+        payload and confirmed fields, while retaining encrypted ocr_audit_details records (which include
+        confirmation field values) and encrypted confirmation idempotency response records. This is
+        not merely a non-sensitive tombstone and does not promise complete erasure from backups or
+        external retention layers.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+      responses:
+        '204': {description: Job payload deleted; audit tombstone retained}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Current application or attachment authorization revoked}
+        '404': {description: Job not found or not visible to this subject}
+  /ocr/jobs/{job_id}/confirm:
+    post:
+      operationId: confirmOcrFields
+      summary: Store user-reviewed field values
+      description: Confirmation must be immutable/audited; retrying recognition must never overwrite user-confirmed values. Recheck current application and attachment authorization against the stored attachment ID, content SHA-256, document type, and authoritative application revision before accepting confirmation.
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema: {type: string}
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, minLength: 16, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, fields]
+              properties:
+                revision: {type: integer, minimum: 1}
+                fields:
+                  type: object
+                  additionalProperties: {type: string}
+      responses:
+        '200': {description: User-confirmed fields recorded and audited}
+        '400': {description: Invalid schema or stale revision}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Tenant/job access denied or current application/attachment authorization revoked}
+        '409': {description: Conflicting confirmation revision or idempotency payload}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+x-implementation-status:
+  gateway: PROTOTYPE_NOT_PRODUCTION_READY
+  model-inference: VERIFIED_ON_SYNTHETIC_CHINESE_BUSINESS_LICENSE_AND_ID_FRONT_RUN_40008433722
+  deployment: NOT_DEPLOYED
+  notes:
+    - storefront_photo, interior_photo, and cashier_photo must be rejected as non-OCR evidence.
+    - Only business_license and id_front are accepted by the current implementation. id_back, bank_card, food_business_license, other_permit, storefront_photo, interior_photo, and cashier_photo are rejected.
+    - All outputs are suggestions and never prove identity or authenticity.
+}
+                  shared_writeback_eligible: {type: boolean}
                   fields:
                     type: object
                     additionalProperties:
