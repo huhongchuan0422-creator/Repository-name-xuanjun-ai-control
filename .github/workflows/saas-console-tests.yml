@@ -1,0 +1,56 @@
+name: SaaS Console Tests
+
+on:
+  push:
+    branches:
+      - feature/chatgpt-saas-console-20261024
+    paths:
+      - 'clients/saas-console/**'
+      - '.github/workflows/saas-console-tests.yml'
+  pull_request:
+    paths:
+      - 'clients/saas-console/**'
+      - '.github/workflows/saas-console-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: clients/saas-console/package.json
+
+      - name: Syntax check
+        working-directory: clients/saas-console
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check src/api.js
+          node --check src/journey.js
+          node --check src/main.js
+          node --check src/submission.js
+          node --check tests/api.test.js
+          node --check tests/contract-journey.test.js
+          node --check tests/http-integration.test.js
+          node --check tests/main.test.js
+          node --check tests/prototype-map.test.js
+          node --check tests/submission.test.js
+
+      - name: Run SaaS console tests
+        working-directory: clients/saas-console
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm test
