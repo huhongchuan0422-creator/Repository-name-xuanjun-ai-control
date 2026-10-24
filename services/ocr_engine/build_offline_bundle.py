@@ -106,10 +106,10 @@ def validate_inputs(target_platform, lock_path, wheelhouse, model_dir, requireme
             raise BundleError("WHEEL_INTERNAL_METADATA_INVALID:" + name)
         if not internal_tags:
             raise BundleError("WHEEL_INTERNAL_TAGS_MISSING:" + name)
-        if not (internal_tags & target_tag_set) and "py3-none-any" not in internal_tags:
-            raise BundleError("WHEEL_INTERNAL_TARGET_TAG_MISMATCH:" + name)
         if not (internal_tags & filename_tags):
             raise BundleError("WHEEL_FILENAME_INTERNAL_TAG_MISMATCH:" + name)
+        if not (internal_tags & target_tag_set) and "py3-none-any" not in internal_tags:
+            raise BundleError("WHEEL_INTERNAL_TARGET_TAG_MISMATCH:" + name)
         verified_wheels.append((path, "wheelhouse/" + name))
     model_files = manifest.get("model_set", {}).get("files", {})
     if set(model_files) != set(REQUIRED_MODELS):
@@ -158,9 +158,6 @@ def publish_no_clobber(temp_path, output_path):
     os.unlink(str(temp_path))
 
 def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path):
-    checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
-                              requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
-                              license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
     output = Path(output_path)
     if not output.is_absolute() or output.exists() or output.is_symlink():
         raise BundleError("OUTPUT_MUST_BE_ABSOLUTE_AND_NOT_EXIST")
@@ -168,6 +165,9 @@ def build_bundle(target_platform, lock_path, wheelhouse, model_dir, output_path)
         raise BundleError("OUTPUT_PARENT_MUST_ALREADY_EXIST_AND_NOT_BE_SYMLINK")
     if output.parent.stat().st_mode & 0o022:
         raise BundleError("OUTPUT_PARENT_PERMISSIONS_UNSAFE")
+    checked = validate_inputs(target_platform, lock_path, wheelhouse, model_dir,
+                              requirements_path=REQUIREMENTS, manifest_path=MODEL_MANIFEST,
+                              license_path=LICENSE, notice_path=NOTICE, config_schema_path=CONFIG_SCHEMA)
     archive_manifest = {k:v for k,v in checked.items() if not k.startswith("verified_")}
     archive_manifest["requirements_lock"] = "requirements-lock.json"
     archive_manifest["license_file"] = "LICENSE-2.0.txt"
