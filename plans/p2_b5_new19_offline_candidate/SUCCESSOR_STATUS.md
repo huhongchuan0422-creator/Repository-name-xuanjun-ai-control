@@ -10,7 +10,7 @@ authorize this version. `SUCCESSOR_CONTROLLER_SOURCE_MANIFEST.json` records
 the source bytes in this candidate. The new release gate checks a separately
 approved binder SHA, all controller source bytes, and both current targets
 again at preflight, publish, start and recover. The external binder data
-points to controller commit `2875cb3761edcabfac0ca09bef2d3c441ae53521`
+points to controller commit `91ffc8b77304c4ee2e32dfdf057017fe3d2faa6a`
 and is a source identity candidate only. Its independently protected approval
 pin and production reader have not been issued. Default-off protected record
 consumers exist, but no real UK registration has occurred. The factory uses the matching
@@ -53,10 +53,10 @@ test or a hash supplied by the caller cannot substitute for either fact.
 | Original UK source custodian | Current A5 archive and L14 installed file identity, path, owner, size and SHA, with no substitution of historical A5 by live L14. | Source freshness before new batch UNKNOWN; neither this repository commit nor a catalog date proves it. |
 
 The current controller source commit is
-`2875cb3761edcabfac0ca09bef2d3c441ae53521`, the manifest SHA256 is
-`9d0d615bc4ecd949170f0ce5132070cef3ed82690890d560e8d7cc59593316fa`,
+`91ffc8b77304c4ee2e32dfdf057017fe3d2faa6a`, the manifest SHA256 is
+`b75f5e3eddb51b1c15e93ebf5dce74e5b49772b34d857668d9843f5fe302c65b`,
 and the 1,011-byte external binder SHA256 is
-`684e39b01e0248b1f28b64d6dabbf31fcdd0cebda0dbc36bb0518e068369641b`.
+`bc81de627a7c540abd011a1125e159f764a6d1969f63c3115b305fc1fd66a01f`.
 The binder file only describes code identity. Its SHA in this document or a
 test is not a production approval. The normal OAuth tool's definition does
 not prove that 19 SUCCESS jobs, custody, or live files grant exist.

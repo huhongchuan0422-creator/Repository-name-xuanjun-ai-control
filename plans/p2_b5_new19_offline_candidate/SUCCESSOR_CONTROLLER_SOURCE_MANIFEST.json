@@ -1,9 +1,9 @@
 {
   "files": [
     {
-      "bytes": 35718,
+      "bytes": 35800,
       "path": "successor_controller/pr17_b5_successor_authority.py",
-      "sha256": "21a583b0e2891e19d7277c9b200a1895523bad3cbe723537018ae9f55a1b7f96"
+      "sha256": "1cf1249412e81fdea89f55834f52dbe531ce1fbe4e7093f4b171314cc075fd11"
     },
     {
       "bytes": 80572,
@@ -41,9 +41,9 @@
       "sha256": "6cb26e1e48a13101916cb71c2783c8a6ccbf518312edb8ae18d7715ec14ea4a2"
     },
     {
-      "bytes": 29839,
+      "bytes": 30018,
       "path": "successor_controller/pr17_b5_successor_witness.py",
-      "sha256": "fa98fa7953d979f8a565cc45c81c8cdd3f089d20ae0ea1dec015091251a7808f"
+      "sha256": "72f412013e76348cee313df21399d263ee706289ea8e3670c8bc57fcbc43ce42"
     },
     {
       "bytes": 10389,
