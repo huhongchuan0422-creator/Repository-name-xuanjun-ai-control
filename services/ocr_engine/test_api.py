@@ -288,6 +288,35 @@ class ApiTests(unittest.TestCase):
         read=self.client.get('/api/v1/ocr/jobs/'+job_id,headers={'Authorization':'Bearer tenant-a-token'})
         self.assertEqual(read.status_code,200,read.text)
         self.assertFalse(read.json().get('shared_writeback_eligible'))
+    def test_idempotency_replay_returns_original_confirmation_snapshot_a_b_a(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        url='/api/v1/ocr/jobs/'+job_id+'/confirm'
+        headers_a={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'snapshot-key-a-0001'}
+        body_a={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'FIRST'}}
+        first=self.client.post(url,headers=headers_a,json=body_a)
+        self.assertEqual(first.status_code,200,first.text)
+        self.assertEqual(first.json()['confirmed_fields'],{'company_name':'FIRST'})
+        headers_b={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'snapshot-key-b-0001'}
+        body_b={'revision':2,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'SECOND'}}
+        second=self.client.post(url,headers=headers_b,json=body_b)
+        self.assertEqual(second.status_code,200,second.text)
+        self.assertEqual(second.json()['confirmed_fields'],{'company_name':'SECOND'})
+        replay=self.client.post(url,headers=headers_a,json=body_a)
+        self.assertEqual(replay.status_code,200,replay.text)
+        self.assertEqual(replay.json(),first.json())
+        self.assertEqual(replay.json()['revision'],1)
+        self.assertEqual(replay.json()['confirmed_fields'],{'company_name':'FIRST'})
+        self.assertEqual(replay.json()['confirmed_binding'],first.json()['confirmed_binding'])
+    def test_revoked_source_blocks_confirmation_idempotency_replay(self):
+        r=self.submit(); self.assertEqual(r.status_code,202,r.text); job_id=r.json()['job_id']
+        url='/api/v1/ocr/jobs/'+job_id+'/confirm'
+        headers={'Authorization':'Bearer tenant-a-token','Idempotency-Key':'revoked-replay-key-01'}
+        body={'revision':1,'application_revision':'1','provider_version':'1.2.0','fields':{'company_name':'FIRST'}}
+        first=self.client.post(url,headers=headers,json=body)
+        self.assertEqual(first.status_code,200,first.text)
+        self.revoked_apps.add('synthetic-app')
+        replay=self.client.post(url,headers=headers,json=body)
+        self.assertEqual(replay.status_code,403,replay.text)
     def test_confirmation_revision_conflict(self):
         r=self.submit(); job_id=r.json()["job_id"]
         url="/api/v1/ocr/jobs/"+job_id+"/confirm"
