@@ -53,3 +53,19 @@ test('same delivery shares one retest latch across ACCEPT and FEEDBACK',async()=
 });
 
 test('successful start clears stale signed-out status',async()=>{const d=doc(),s=ss(),api=apiBase({me:async()=>({projects:[{id:'A',title:'A',role:'OWNER'}]})});const app=createConsoleApp({document:d,storage:ss(),session:s,api});d.m.get('status').textContent='登录已失效，请重新登录。';await app.start();assert.equal(d.m.get('status').textContent,'')});
+
+test('updates GET preview 403 keeps read context and preserves csrf when me succeeds',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','stale');const a={id:'A',title:'A',role:'OWNER'};
+ const api=apiBase({me:async()=>({projects:[a]})});const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const c={generation:app.generation,project:'A',write:false};await app.handleError(Object.assign(Error('preview denied'),{status:403}),c);
+ assert.equal(s.getItem('xj_csrf'),'stale');assert.equal(d.m.get('login').hidden,true);assert.match(d.m.get('identity-note').textContent,/读取权限/);
+});
+
+test('updates POST 403 after successful preview refresh uses write context and clears stale csrf',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','stale');let previewCalls=0,updateCalls=0;
+ const a={id:'A',title:'A',role:'OWNER'},old={path:'/index.html',sha256:v,url:'/customer/center/preview/A/'+key+'/'+v},fresh={path:'/index.html',sha256:v2,url:'/customer/center/preview/A/'+key+'/'+v2};
+ const api=apiBase({previews:async()=>({pages:[previewCalls++?fresh:old]}),updates:async()=>{updateCalls++;throw Object.assign(Error('csrf required'),{status:403})},me:async()=>({projects:[a]})});
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const button=find(d.m.get('previews'),x=>x.tagName==='button'&&x.textContent==='刷新并查询新版交付');assert.ok(button);await button.onclick();
+ assert.equal(updateCalls,1);assert.equal(s.getItem('xj_csrf'),null);assert.equal(d.m.get('login').hidden,false);assert.match(d.m.get('identity-note').textContent,/CSRF已清除/);
+});

@@ -1,7 +1,7 @@
 SaaS CORE BROWSER ACCEPTANCE — 2026-10-24
 
 Scope:
-  UI_ONLY_BROWSER + REAL_E7F_PYTHON_HTTP_ISOLATION
+  UI_ONLY_RENDER + REAL_E7F_PYTHON_HTTP_NON_BROWSER_ISOLATION
   NOT Hosted, NOT production, NOT real customer data, NOT payment, NOT deployment.
   Full frozen 276-screen matrix: NOT CLAIMED.
 
@@ -23,10 +23,11 @@ Browser:
   Chromium 144.0.7559.96
   Python Playwright from existing environment.
   Direct page.goto blocked by administrator policy (ERR_BLOCKED_BY_ADMINISTRATOR).
-  Exact current SaaS source rendered with page.set_content.
-  Browser fetch is exposed-binding proxied to the real loopback e7f Python HTTP service.
-  Session cookie remains proxy-side to preserve HttpOnly behavior.
-  Therefore browser UI + real backend HTTP isolation is PASS; Hosted/browser-network path is NOT_VERIFIED.
+  Direct page.goto is BLOCKED by administrator policy: net::ERR_BLOCKED_BY_ADMINISTRATOR.
+  Per owner instruction, no alternate address, proxy, routing hook or other browser-network workaround is accepted as browser-route verification.
+  The previously generated 48 Chromium screenshots used page.set_content and are retained only as UI_ONLY_RENDER evidence.
+  The 156 e7f Python HTTP requests used a test harness/proxy and are retained only as NON_BROWSER_HTTP_INTEGRATION evidence.
+  Browser route/navigation E2E status: BLOCKED / NOT_VERIFIED.
 
 Viewports:
   360x844
@@ -41,7 +42,7 @@ Evidence:
   horizontal overflow states after fix: 0
   visible buttons under 44px after fix: 0
 
-Journey exercised in every viewport:
+UI-only rendered journey states captured in every viewport:
   01 login
   02 project list
   03 project-a current V1
@@ -67,9 +68,14 @@ Real UI defects found and fixed:
   2. mobile controls caused 2–4px horizontal overflow.
      Fix: border-box sizing + mobile full-width buttons remove right margin.
 
-Frontend regression after fixes:
+Frontend regression after V8 updates split:
   node --test tests/*.test.js
-  30/30 PASS, 0 FAIL
+  32/32 PASS, 0 FAIL
+
+Independent real e7f Python HTTP contract check:
+  valid owner cookie + stale CSRF -> POST change_updates = 403
+  same valid owner cookie, no CSRF -> GET me = 200
+  This is NON_BROWSER_HTTP_CONTRACT evidence only.
 
 Evidence package:
   xuanjun-saas-core-browser-acceptance-e7f-v7.tar.gz

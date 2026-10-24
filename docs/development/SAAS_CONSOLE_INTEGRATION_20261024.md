@@ -145,41 +145,36 @@ V6 frontend/source isolation regression: **29/29 PASS, 0 FAIL**. New targeted co
 This remains frontend/source isolation evidence. The exact Python backend integration entry bound to `1b48e5fe8015afd9035ff269f9b432d9a68223b2` remains `NOT_EXECUTED` in this runtime because no complete backend checkout exists in `/mnt/data` and outbound GitHub clone is unavailable. Existing Node/local-HTTP PASS results are not counted as real Python backend connectivity.
 
 
-## V7 core browser acceptance with exact e7f artifact
+## V7 UI-only render evidence + e7f non-browser HTTP isolation
 
-Backend input was taken from GitHub Actions Run `40104761192`, Artifact `12564730638` using the existing GitHub connection. Artifact verification:
+Backend input was taken from GitHub Actions Run `40104761192`, Artifact `12564730638` and verified as source `e7f75975c4ab4eedba68306212a2bac6c067a1c3`, tree `d001cfd9855ed3a7758f6286db5cae7d45cce403`, ZIP SHA256 `06d29ed7bfab4b61f366e0cd239409172267075ab7c8726b5180788d19ae5095`, review TAR SHA256 `872609867966dd3ffddbb28ab59fb73ba5b26966eb6b8bbf3e14e265403aa148`, CUSTOMER_MANIFEST SHA256 `f6fe299464ac6c1b0317ebc7489b1762aaa9acd3547a6a41248d3b05443366d1`, 102/102 closure PASS, `REVIEW_ONLY_NOT_DEPLOYED`.
 
-- backend source `e7f75975c4ab4eedba68306212a2bac6c067a1c3`
-- backend tree `d001cfd9855ed3a7758f6286db5cae7d45cce403`
-- ZIP SHA256 `06d29ed7bfab4b61f366e0cd239409172267075ab7c8726b5180788d19ae5095`
-- review-only TAR SHA256 `872609867966dd3ffddbb28ab59fb73ba5b26966eb6b8bbf3e14e265403aa148`
-- CUSTOMER_MANIFEST SHA256 `f6fe299464ac6c1b0317ebc7489b1762aaa9acd3547a6a41248d3b05443366d1`
-- manifest closure: 102/102 files verified
-- state: `REVIEW_ONLY_NOT_DEPLOYED`
+Correct fixture startup is `python -B -m tests.pr122_customer_browser_server` from the extracted customer-center root.
 
-The corrected fixture startup is `python -B -m tests.pr122_customer_browser_server` from the extracted customer-center root. The artifact's Node browser script could not run in this environment because the Node `playwright` module is absent. Python Playwright and Chromium 144.0.7559.96 are available. Direct Chromium navigation is blocked by host policy (`ERR_BLOCKED_BY_ADMINISTRATOR`), so browser acceptance uses `page.set_content` for the exact current SaaS source and an exposed-binding fetch proxy to the real loopback e7f Python HTTP service. The backend session cookie remains proxy-side; CSRF is handled by the application. This is isolated browser + real Python backend evidence, not Hosted/production/customer-site network E2E.
+Chromium direct navigation is blocked by host administration policy with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. This browser dependency is therefore stopped and remains `BLOCKED / NOT_VERIFIED`. No alternate address, proxy, route interception or other browser-network workaround is accepted as browser-route verification.
 
-Four viewports were exercised: 360×844, 390×844, 768×1024, 1440×900. Each viewport produced 12 evidence screenshots (48 total) covering login, project list, project A V1, real private-preview bytes, Q&A readback, feedback + same-case readback, V2 delivery, version retest, project-B isolation, UNKNOWN marker, read-only case reconciliation, and explicit scope-marker clearing. The browser run made 156 actual e7f Python HTTP requests, with 0 console/page errors.
+The previously generated 48 Chromium screenshots at 360×844, 390×844, 768×1024 and 1440×900 used `page.set_content`; they are retained only as `UI_ONLY_RENDER` evidence for responsive layout and interaction state. The 156 e7f Python HTTP calls used a test harness/proxy and are retained only as `NON_BROWSER_HTTP_INTEGRATION` evidence. Neither is browser navigation E2E.
 
-Actual V1 preview SHA256:
-`66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5`
+Actual V1 preview SHA256: `66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5`.
+Actual V2 delivery SHA256: `ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940`.
 
-Actual V2 delivery SHA256:
-`ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940`
+UI-only rendering found and fixed stale post-login status text and 2–4px mobile overflow. These source fixes remain valid and are covered by Node regression; they do not convert the blocked browser route into PASS.
 
-The first browser pass found two UI defects: stale pre-login error text remained after successful authentication, and mobile controls produced 2–4px horizontal overflow. V7 fixes only those defects: successful `start()` clears stale status text, all controls use border-box sizing, and mobile full-width buttons remove their right margin. Re-run result: 0 horizontal-overflow states, 0 visible buttons below 44px, 0 browser console/page errors.
+## V8 change_updates read/write 403 split
 
-UNKNOWN recovery was exercised by committing a real `change_submit` to the e7f backend and then returning a simulated 503 only to the browser. The UI did not resend. It performed a real read-only `changes/project-a` reconciliation and only then allowed explicit clearing of that project/page/version marker.
+`updates()` is split into two error domains:
 
-Evidence package SHA256:
-`23bb87df618f8e34bb2f433ff31f4d1bfcd7030a559043370bf6bc473848f430`
+1. authoritative `GET previews/{project}` / `currentPage()` uses `{generation,project,write:false}`;
+2. only the subsequent `POST change_updates` uses `{generation,project,write:true}`.
 
-Evidence report SHA256:
-`2f02c5a6c3995267be7e40cde8f252b9db2f19f768eff719a2a20ba9aeecf4d3`
+Therefore a read-side 403 followed by successful `GET me` preserves the current tab CSRF, while a write-side `change_updates` 403 followed by successful `GET me` clears stale `xj_csrf`, refreshes authorized projects and exposes explicit re-login. Generation/project guards are preserved across both phases.
 
-Screenshot manifest SHA256:
-`9857fc446ce0ebef1f0dc0287b1e50b5b08fe6da113abc629a48be082ecba107`
+Independent real e7f Python HTTP contract verification:
+- valid owner cookie + stale CSRF -> `POST /customer/center/api/change_updates` = HTTP 403;
+- same valid owner cookie without CSRF -> `GET /customer/center/api/me` = HTTP 200 and returns `project-a`.
 
-Frontend Node regression after the two UI fixes: **30/30 PASS**.
+This is non-browser HTTP contract evidence. No browser navigation was retried after the administrator-policy refusal.
 
-This run does **not** claim the frozen 276-screen matrix, production deployment, real customer identity, real payment, Hosted TLS path, or formal whole-project acceptance. `change_retest` remains version retest only.
+Frontend regression after the two contrast tests: **32/32 PASS, 0 FAIL**.
+
+Still NOT_VERIFIED/HOLD: browser route/navigation E2E, Hosted TLS/network path, full frozen 276-screen matrix, production deployment, real customer identity/data, payment, and formal whole-project acceptance.

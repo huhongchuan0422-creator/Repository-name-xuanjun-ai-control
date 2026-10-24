@@ -1,0 +1,31 @@
+SaaS FRONTEND V8 TARGETED/REGRESSION — 2026-10-24
+
+Parent frontend: 8a2f52088996e25d176dfbe07ce5aa3b0caab719
+
+Change:
+  updates() split into read GET preview context and write POST change_updates context.
+
+Real e7f Python HTTP contract:
+  valid owner cookie + stale CSRF:
+    POST /customer/center/api/change_updates -> 403
+  same valid owner cookie without CSRF:
+    GET /customer/center/api/me -> 200
+    project-a visible
+  Evidence class: NON_BROWSER_HTTP_CONTRACT
+
+Frontend:
+  node --test tests/*.test.js
+  tests 32
+  pass 32
+  fail 0
+
+New contrast tests:
+  updates GET preview 403 keeps read context and preserves CSRF when me succeeds
+  updates POST 403 after successful preview refresh uses write context and clears stale CSRF
+
+Browser boundary:
+  Chromium direct page.goto -> net::ERR_BLOCKED_BY_ADMINISTRATOR
+  Browser navigation action stopped.
+  No alternate address/proxy/tool route is counted as browser verification.
+  Browser E2E: BLOCKED / NOT_VERIFIED
+  Existing 48 screenshots: UI_ONLY_RENDER only.
