@@ -546,12 +546,34 @@ class SuccessorEvidenceStore(WitnessStore):
               self._now_bound(binding) >= row['observed_at'],
               'SUCCESSOR_EVIDENCE_BINDING')
         self._payload(kind, row['payload'], binding)
+    def active_action_fds(self, binding, kinds):
+        """Return only the FDs held by the exact active evidence action stack."""
+        pin=self._binding(binding)
+        check(type(kinds) is tuple and kinds and
+              all(type(kind) is str and kind in self.NAMES for kind in kinds),
+              'SUCCESSOR_EVIDENCE_LEASE_SCOPE')
+        stack=getattr(self._lease,'actions',None)
+        check(type(stack) is list and
+              tuple(row[3] for row in stack)==kinds and
+              all(row[2]==pin for row in stack),
+              'SUCCESSOR_EVIDENCE_LEASE_REQUIRED')
+        result=[]
+        for fd,lock,_,_ in stack:
+            for current in (fd,lock):
+                try:os.fstat(current)
+                except OSError:
+                    raise Hold('SUCCESSOR_EVIDENCE_LEASE_FD_UNKNOWN') from None
+                result.append(current)
+        check(len(result)==2*len(kinds) and len(set(result))==len(result),
+              'SUCCESSOR_EVIDENCE_LEASE_FD_DUPLICATE')
+        return tuple(result)
+
     @contextlib.contextmanager
     def action_exact(self, binding, kind):
         """A successful revoke waits for this action; later actions cannot start."""
         pin=self._binding(binding)
         check(kind in self.NAMES, 'SUCCESSOR_EVIDENCE_SCOPE')
-        fd=self._open();lock=None
+        fd=self._open();lock=None;stack=None;lease=None
         try:
             lock=self._lock(fd, False, binding)
             names=set(os.listdir(fd))
@@ -561,7 +583,17 @@ class SuccessorEvidenceStore(WitnessStore):
             check('revoked.json' not in names,'SUCCESSOR_EVIDENCE_REVOKED')
             row,_=self._read(fd,self.NAMES[kind])
             self._validate_row(row,pin,binding,kind)
-            yield
+            stack=getattr(self._lease,'actions',None)
+            if stack is None:
+                stack=[];self._lease.actions=stack
+            lease=(fd,lock,pin,kind);stack.append(lease)
+            try:
+                yield
+            finally:
+                check(stack and stack[-1] is lease,
+                      'SUCCESSOR_EVIDENCE_LEASE_ORDER')
+                stack.pop()
+                if not stack:del self._lease.actions
         finally:
             if lock is not None:os.close(lock)
             os.close(fd)
