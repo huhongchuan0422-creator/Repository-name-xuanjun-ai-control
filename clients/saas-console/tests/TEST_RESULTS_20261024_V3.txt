@@ -1,0 +1,110 @@
+
+> test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: me is GET with cookie, no fabricated actor
+ok 1 - me is GET with cookie, no fabricated actor
+  ---
+  duration_ms: 1.180764
+  type: 'test'
+  ...
+# Subtest: updates uses POST with exact schema and csrf
+ok 2 - updates uses POST with exact schema and csrf
+  ---
+  duration_ms: 1.054424
+  type: 'test'
+  ...
+# Subtest: submit transport ambiguity is not silently retried
+ok 3 - submit transport ambiguity is not silently retried
+  ---
+  duration_ms: 0.767701
+  type: 'test'
+  ...
+# Subtest: preview allows only original private routes
+ok 4 - preview allows only original private routes
+  ---
+  duration_ms: 0.245191
+  type: 'test'
+  ...
+# Subtest: retest uses server revision, delivery digest and action
+ok 5 - retest uses server revision, delivery digest and action
+  ---
+  duration_ms: 0.361166
+  type: 'test'
+  ...
+# Subtest: real endpoint journey: me -> project -> private listing -> context -> submit -> updates -> retest
+ok 6 - real endpoint journey: me -> project -> private listing -> context -> submit -> updates -> retest
+  ---
+  duration_ms: 4.106667
+  type: 'test'
+  ...
+# Subtest: expired/revoked access and cross-tenant project denied by backend
+ok 7 - expired/revoked access and cross-tenant project denied by backend
+  ---
+  duration_ms: 0.627078
+  type: 'test'
+  ...
+# Subtest: version drift rejects context, submit and retest
+ok 8 - version drift rejects context, submit and retest
+  ---
+  duration_ms: 0.308456
+  type: 'test'
+  ...
+# Subtest: duplicate click and lost response reuse one key and return same case/event
+ok 9 - duplicate click and lost response reuse one key and return same case/event
+  ---
+  duration_ms: 0.478814
+  type: 'test'
+  ...
+# Subtest: same key different body conflicts locally and backend rejects 409
+ok 10 - same key different body conflicts locally and backend rejects 409
+  ---
+  duration_ms: 0.502219
+  type: 'test'
+  ...
+# Subtest: legacy mode never retries ambiguous request, even after reload
+ok 11 - legacy mode never retries ambiguous request, even after reload
+  ---
+  duration_ms: 0.397331
+  type: 'test'
+  ...
+# Subtest: candidate endpoint missing: explicit 404, no fallback to legacy POST
+ok 12 - candidate endpoint missing: explicit 404, no fallback to legacy POST
+  ---
+  duration_ms: 0.318842
+  type: 'test'
+  ...
+# Subtest: random key validation, new explicit intent, unknown locked pending
+ok 13 - random key validation, new explicit intent, unknown locked pending
+  ---
+  duration_ms: 0.279493
+  type: 'test'
+  ...
+# Subtest: actual HTTP journey uses 4dc response shapes through project -> preview -> feedback -> case -> update -> retest -> Q&A
+ok 14 - actual HTTP journey uses 4dc response shapes through project -> preview -> feedback -> case -> update -> retest -> Q&A
+  ---
+  duration_ms: 49.351401
+  type: 'test'
+  ...
+# Subtest: actual HTTP boundary rejects cross-tenant, revoke/expiry and version drift
+ok 15 - actual HTTP boundary rejects cross-tenant, revoke/expiry and version drift
+  ---
+  duration_ms: 12.576854
+  type: 'test'
+  ...
+# Subtest: legacy UI path loses response after server accepted: result stays unknown and does not resend
+ok 16 - legacy UI path loses response after server accepted: result stays unknown and does not resend
+  ---
+  duration_ms: 7.147362
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 182.683022
