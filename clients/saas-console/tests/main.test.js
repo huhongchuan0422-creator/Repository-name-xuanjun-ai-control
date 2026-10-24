@@ -54,11 +54,22 @@ test('same delivery shares one retest latch across ACCEPT and FEEDBACK',async()=
 
 test('successful start clears stale signed-out status',async()=>{const d=doc(),s=ss(),api=apiBase({me:async()=>({projects:[{id:'A',title:'A',role:'OWNER'}]})});const app=createConsoleApp({document:d,storage:ss(),session:s,api});d.m.get('status').textContent='登录已失效，请重新登录。';await app.start();assert.equal(d.m.get('status').textContent,'')});
 
-test('updates GET preview 403 keeps read context and preserves csrf when me succeeds',async()=>{
- const d=doc(),s=ss();s.setItem('xj_csrf','stale');const a={id:'A',title:'A',role:'OWNER'};
- const api=apiBase({me:async()=>({projects:[a]})});const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
- const c={generation:app.generation,project:'A',write:false};await app.handleError(Object.assign(Error('preview denied'),{status:403}),c);
- assert.equal(s.getItem('xj_csrf'),'stale');assert.equal(d.m.get('login').hidden,true);assert.match(d.m.get('identity-note').textContent,/读取权限/);
+test('updates GET preview 403 follows refresh button wiring, preserves csrf, and never calls change_updates',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','stale');let previewCalls=0,updateCalls=0,submitCalls=0,meCalls=0;
+ const a={id:'A',title:'A',role:'OWNER'},old={path:'/index.html',sha256:v,url:'/customer/center/preview/A/'+key+'/'+v};
+ const api=apiBase({
+  previews:async()=>{previewCalls++;if(previewCalls===1)return{pages:[old]};throw Object.assign(Error('preview denied'),{status:403})},
+  updates:async()=>{updateCalls++;return{updates:[]}},
+  submit:async()=>{submitCalls++;return{id:'unexpected'}},
+  me:async()=>{meCalls++;return{projects:[a]}}
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ assert.equal(previewCalls,1);assert.equal(app.current.id,'A');
+ const button=find(d.m.get('previews'),x=>x.tagName==='button'&&x.textContent==='刷新并查询新版交付');assert.ok(button);
+ await button.onclick();
+ assert.equal(previewCalls,2);assert.equal(meCalls,1);assert.equal(updateCalls,0);assert.equal(submitCalls,0);
+ assert.equal(s.getItem('xj_csrf'),'stale');assert.equal(d.m.get('login').hidden,true);
+ assert.equal(app.current,null);assert.match(d.m.get('identity-note').textContent,/读取权限/);
 });
 
 test('updates POST 403 after successful preview refresh uses write context and clears stale csrf',async()=>{
@@ -68,4 +79,10 @@ test('updates POST 403 after successful preview refresh uses write context and c
  const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
  const button=find(d.m.get('previews'),x=>x.tagName==='button'&&x.textContent==='刷新并查询新版交付');assert.ok(button);await button.onclick();
  assert.equal(updateCalls,1);assert.equal(s.getItem('xj_csrf'),null);assert.equal(d.m.get('login').hidden,false);assert.match(d.m.get('identity-note').textContent,/CSRF已清除/);
+});
+
+test('updates refresh wiring source guard rejects write-context mutation on preview phase',async()=>{
+ const fs=await import('node:fs');
+ const source=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+ assert.match(source,/async function updates\(row,p,oldPage,g\)\{const rc=\{generation:g,project:p\.id,write:false\}/);
 });

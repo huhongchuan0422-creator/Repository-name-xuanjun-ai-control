@@ -1,0 +1,62 @@
+SaaS FRONTEND GET403 WIRING REGRESSION — 2026-10-24
+
+Parent frontend:
+  3501662f409195e1831211691eb31b3da189514b
+  Tree 70f0a52938bbcfa8eb72b7b329972e112d87c620
+
+Business source:
+  UNCHANGED
+
+Test-only correction:
+  Replaced the former direct handleError(write:false) test with the real UI wiring:
+    open project A with V1 preview succeeds
+    click “刷新并查询新版交付”
+    second previews/currentPage GET returns 403
+    read-only GET me returns 200
+  Assertions:
+    xj_csrf remains stale/preserved
+    change_updates is never called
+    change_submit is never called
+    project error handling stays on the correct project generation
+    project detail is cleared only by the active read-denial path
+    login remains hidden because this is not a write-CSRF failure
+
+Mutation validation:
+  Temporary local test copy only; NOT committed to product source.
+  Mutated:
+    const rc={generation:g,project:p.id,write:false}
+  to:
+    const rc={generation:g,project:p.id,write:true}
+
+  Same real button-chain test result under mutation:
+    FAIL as required
+    assertion: expected xj_csrf 'stale', actual null
+    mutation test exit: 1
+
+  Correct source restored.
+  Same targeted wiring test after restore:
+    PASS
+
+Full frontend regression after syncing local test workspace to the current remote source:
+  node --test tests/*.test.js
+  tests 33
+  pass 33
+  fail 0
+  cancelled 0
+  skipped 0
+  todo 0
+
+The first full-regression attempt used a stale local test-workspace main.js that predated the already-merged V7 note('') login-status fix and produced one unrelated failure. No remote/product source was changed. After synchronizing the local copy to the current 3501662 source, the full regression is 33/33 PASS.
+
+Browser:
+  NOT RERUN
+  Chromium direct page.goto remains blocked:
+    net::ERR_BLOCKED_BY_ADMINISTRATOR
+  No proxy/alternate-address/tool workaround used.
+  Existing 48 images remain UI_ONLY_RENDER only.
+  Browser navigation/E2E remains BLOCKED / NOT_VERIFIED.
+
+Actions for parent commit 3501662:
+  workflow_runs = []
+  Actions count: 0
+  Therefore no Hosted CI claim is made.
