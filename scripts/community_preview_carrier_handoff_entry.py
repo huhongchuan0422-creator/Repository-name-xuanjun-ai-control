@@ -313,6 +313,7 @@ def run(operation):
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     post_b=operation.startswith('post-b-');base_operation=operation[7:] if post_b else operation
     approval_name=POST_B_APPROVAL_NAME if post_b else APPROVAL_NAME
+    approval_operation=operation if post_b else base_operation
     identify_admin()
     _verify_runtime_sources()
     with contextlib.ExitStack() as stack:
