@@ -313,6 +313,7 @@ class Session:
         self.approved_stamp=self.b['carrier_manifest_sha256']
         need(self.approved_stamp==resume['carrier_manifest_sha256']==self.pins(),
              'B_SOURCE_BINDING_CHANGED')
+        self.resume_absent=(u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
         self.freeze_live()
         self.resume_guard()
         return resume
@@ -770,6 +771,7 @@ def main(argv=None):
     group=parser.add_mutually_exclusive_group()
     group.add_argument('--owner-bc',action='store_true')
     group.add_argument('--resume-b-partial',action='store_true')
+    group.add_argument('--resume-c-before-confirmation',action='store_true')
     group.add_argument('--recover-known-failure',action='store_true')
     group.add_argument('--resume-c-before-confirmation',action='store_true')
     args=parser.parse_args(argv)
