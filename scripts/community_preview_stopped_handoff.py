@@ -376,7 +376,8 @@ class Session:
         return value
 
     def _fixed_c_resume_plan(self,candidate,semantic):
-        evidence_sha=s.sha(s.canonical(semantic))
+        stable_semantic=self._without_observed_at(semantic)
+        evidence_sha=s.sha(s.canonical(stable_semantic))
         if exists_private(C_RESUME_PLAN):
             saved,_=document(C_RESUME_PLAN,4*1024*1024)
             need(set(saved)=={'format','host','mode','attempt','carrier_manifest_sha256',
@@ -673,10 +674,15 @@ class Session:
              and rows[0]['original_host_open'] is True and rows[0]['center_integrity'] is True
              and type(rows[0]['stores']) is list and rows[0]['stores']
              and s.sha(s.canonical(rows[0]))==result['logical_evidence_sha256'],'CLONE_BODY_MISMATCH')
-        if active:
+        if active and not getattr(self,'c_preconfirm_mode',False):
             f=s.exact_json(self.freeze)
             need(f['issued_at']<=result['tested_at']<=c.now() and c.now()-600<=result['tested_at'],
                  'RESTORE_PROOF_STALE')
+        elif active:
+            # Completed B clone timestamps are immutable historical evidence.
+            # Current stopped/container identity is independently rechecked;
+            # do not rewrite timestamps or rerun B/clone work.
+            need(result['tested_at']<=c.now(),'CLONE_RESULT_FROM_FUTURE')
         records={}
         intent,ib=document(b_records()['B-intent'])
         if self.resume_mode:
