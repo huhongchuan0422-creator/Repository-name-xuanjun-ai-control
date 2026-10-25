@@ -871,9 +871,18 @@ class GatewayKernel(object):
             elif row['state'] in ('FAILURE', 'CANCELLED',
                                   'CAPABILITY_UNAVAILABLE'):
                 blocker = 'TASK_TERMINAL_' + row['state']
+            runtime_status = row['state']
+            if dependency_blockers and row['state'] == 'READY':
+                runtime_status = 'WAITING_DEPENDENCY'
+            elif row['state'] == 'READY' and row['authority_state'] == 'NONE':
+                runtime_status = 'WAITING_AUTHORIZATION'
+            elif (row['state'] in ('RECEIVED', 'STARTED', 'RUNNING')
+                  and row['last_real_progress_at'] is None):
+                runtime_status = 'LIVENESS_UNKNOWN'
             tasks.append({
                 'task_id': row['task_id'], 'project_id': row['project_id'],
                 'node_id': row['node_id'], 'state': row['state'],
+                'runtime_status': runtime_status,
                 'authority_state': row['authority_state'],
                 'attempt_id': row['attempt_id'], 'epoch': row['epoch'],
                 'checkpoint_sha256': row['checkpoint_sha256'],
@@ -885,6 +894,22 @@ class GatewayKernel(object):
                 'board_id': row['board_id'],
                 'responsible_party': row['owner'],
                 'task_responsible_party': row['owner'],
+                'run_id': row['run_id'],
+                'session_id': row['session_id'],
+                'writer_identity': row['authority_caller_id'],
+                'authority_valid_until': row['authority_valid_until'],
+                'received_at': row['received_at'],
+                'started_at': row['started_at'],
+                'last_real_progress_at': row['last_real_progress_at'],
+                'last_event_at': row['last_event_at'],
+                'writer_stopped': row['writer_stopped'],
+                'effects_reconciled': row['effects_reconciled'],
+                # The canonical ledger has no independently verified per-task
+                # process/session liveness adapter yet.  Never infer either
+                # value from task state or from a finished chat turn.
+                'process_state': UNKNOWN,
+                'session_state': UNKNOWN,
+                'executor_instance_id': UNKNOWN,
                 'next_action': row['next_action'],
                 'blocker': blocker,
                 'resources': json.loads(row['resources_json']),
@@ -959,7 +984,11 @@ class GatewayKernel(object):
                     'next_action': task['next_action'],
                     'evidence_ref': evidence,
                 })
-        return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+        projection_time = self.db.execute('''SELECT MAX(t.last_event_at)
+          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
+          WHERE m.tenant_id=?''', (tenant_id,)).fetchone()[0]
+        return {'schema': 3, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+                'observed_at': projection_time,
                 'boards': boards, 'anomalies': anomalies,
                 'tasks': tasks, 'timeline': events,
                 'production_status': 'NOT_IMPLEMENTED'}
@@ -1084,6 +1113,35 @@ class TestOnlyExecutor(object):
         self.gateway.save_checkpoint(
             self.context, task_id, attempt_id, checkpoint_id,
             {'terminal_state': 'SUCCESS'}, [], 'RECONCILED', resources, now)
+        controller = {'role': 'REVOCATION_CONTROLLER',
+                      'caller_id': 'test-executor-finalizer'}
+        self.fence.begin_revocation(task_id, controller)
+        self.fence.drain(task_id, controller, timeout=1)
+        self.fence.invalidate_source_resources(task_id, 'terminal-release')
+        self.supervisor.complete_revocation(task_id)
+        self.gateway.release_revoked_resources(
+            self.context, task_id, attempt_id, checkpoint_id,
+            'test-terminal-release', now, resume_ready=False)
+        return result
+
+    def complete_failure(self, task_id, attempt_id, evidence_ref, now=None):
+        """Persist a real TEST_ONLY failure and safely release its claim."""
+        self.gateway.assert_task_context(self.context, task_id)
+        now = self.clock() if now is None else now
+        result = self.supervisor.record(
+            task_id, attempt_id, 'terminal-' + attempt_id, 'TERMINAL', now,
+            'TEST_RUN', evidence_ref,
+            {'state': 'FAILURE', 'artifact_sha256': UNKNOWN,
+             'writer_stopped': True,
+             'effects_reconciled': True,
+             'next_action': 'INVESTIGATE_FAILURE',
+             'completion_evidence': []})
+        task = self.supervisor._task(task_id)
+        resources = json.loads(task['resource_scope_json'])
+        checkpoint_id = 'terminal-checkpoint-' + attempt_id
+        self.gateway.save_checkpoint(
+            self.context, task_id, attempt_id, checkpoint_id,
+            {'terminal_state': 'FAILURE'}, [], 'RECONCILED', resources, now)
         controller = {'role': 'REVOCATION_CONTROLLER',
                       'caller_id': 'test-executor-finalizer'}
         self.fence.begin_revocation(task_id, controller)

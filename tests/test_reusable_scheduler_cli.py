@@ -34,7 +34,7 @@ class SchedulerCliTests(unittest.TestCase):
             'register', '--tenant', 'tenant-demo', '--graph', EXAMPLE)
         self.assertFalse(registered['duplicate'])
         projection = self.run_cli('project', '--tenant', 'tenant-demo')
-        self.assertEqual(projection['schema'], 2)
+        self.assertEqual(projection['schema'], 3)
         self.assertEqual(len(projection['boards']), 7)
         self.assertEqual(len(projection['tasks']), 2)
         self.assertEqual(len(projection['anomalies']), 1)
@@ -53,6 +53,22 @@ class SchedulerCliTests(unittest.TestCase):
         second = self.run_cli('project', '--tenant', 'tenant-a')
         self.assertEqual(first, second)
         self.assertEqual(len(second['tasks']), 3)
+
+    def test_app_demo_is_multi_project_dynamic_and_restart_rebuilds(self):
+        first = self.run_cli('app-demo', '--tenant', 'tenant-app',
+                             '--lock-root', os.path.join(self.root, 'locks'))
+        second = self.run_cli('project', '--tenant', 'tenant-app')
+        self.assertEqual(first, second)
+        self.assertGreaterEqual(len({x['project_id'] for x in
+                                    second['tasks']}), 4)
+        states = {x['task_id']: x['runtime_status']
+                  for x in second['tasks']}
+        self.assertEqual(states['customer-failed'], 'FAILURE')
+        self.assertEqual(states['finance-awaiting'],
+                         'WAITING_AUTHORIZATION')
+        self.assertEqual(states['ecosystem-waiting'],
+                         'WAITING_DEPENDENCY')
+        self.assertEqual(states['operations-unknown'], 'LIVENESS_UNKNOWN')
 
 
 if __name__ == '__main__':

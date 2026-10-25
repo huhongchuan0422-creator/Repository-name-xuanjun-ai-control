@@ -92,6 +92,61 @@ def run_demo(gateway, authority, tenant, lock_root):
         fence.close()
 
 
+def app_demo_graph(graph_id, tenant, project, specs):
+    tasks = []
+    for task_id, board, owner, output, dependencies in specs:
+        tasks.append({
+            'task_id': task_id, 'node_id': 'node-' + task_id,
+            'stage': 'TEST_ONLY', 'owner': owner, 'entry': 'TEST_ONLY',
+            'checkpoint_sha256': 'a' * 64, 'spec_sha256': 'b' * 64,
+            'input_version': 'input-v1', 'output_version': output,
+            'priority': 40, 'preemptible': True,
+            'module_id': 'xuanjun.scheduler.kernel', 'board_id': board,
+            'resources': ['fake:' + task_id],
+            'dependencies': dependencies,
+            'completion_evidence': [{'evidence_ref': 'evid-' + task_id}],
+        })
+    return {'graph_id': graph_id, 'tenant_id': tenant,
+            'project_id': project, 'graph_version': 'v1', 'tasks': tasks}
+
+
+def run_app_demo(gateway, authority, tenant, lock_root):
+    """Create a multi-project TEST_ONLY application dataset."""
+    run_demo(gateway, authority, tenant, lock_root)
+    context = authority.issue(tenant, 'local-app-demo')
+    graphs = [
+        app_demo_graph('app-customer', tenant, 'project-customer', [
+            ('customer-failed', 'customer', 'customer-owner', 'v1', []),
+            ('finance-awaiting', 'finance', 'finance-owner', 'v1', []),
+        ]),
+        app_demo_graph('app-maintenance', tenant, 'project-maintenance', [
+            ('maintenance-source', 'maintenance', 'maintainer', 'm-v1', []),
+            ('ecosystem-waiting', 'shared-ecosystem', 'ecosystem-owner',
+             'e-v1', [{'task_id': 'maintenance-source', 'version': 'm-v1',
+                       'evidence_ref': 'evid-maintenance-source'}]),
+        ]),
+        app_demo_graph('app-operations', tenant, 'project-operations', [
+            ('operations-unknown', 'operations', 'operator', 'o-v1', []),
+        ]),
+    ]
+    for graph in graphs:
+        gateway.register_graph(context, graph)
+    fence = Fence(gateway.supervisor, lock_root)
+    executor = TestOnlyExecutor(gateway, fence, context)
+    try:
+        executor.start('customer-failed', 'customer-failed-1',
+                       ['fake:customer-failed'], time.time() + 600)
+        executor.complete_failure('customer-failed', 'customer-failed-1',
+                                  'test-customer-failure')
+        # Start without a progress fact: projection must say liveness UNKNOWN,
+        # not infer a running process from the task state.
+        executor.start('operations-unknown', 'operations-unknown-1',
+                       ['fake:operations-unknown'], time.time() + 600)
+        return gateway.projection(context)
+    finally:
+        fence.close()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
@@ -104,6 +159,9 @@ def main(argv=None):
     demo = sub.add_parser('demo')
     demo.add_argument('--tenant', required=True)
     demo.add_argument('--lock-root', required=True)
+    app_demo = sub.add_parser('app-demo')
+    app_demo.add_argument('--tenant', required=True)
+    app_demo.add_argument('--lock-root', required=True)
     register = sub.add_parser('register')
     register.add_argument('--tenant', required=True)
     register.add_argument('--principal', default='local-registrar')
@@ -130,6 +188,9 @@ def main(argv=None):
         elif args.command == 'demo':
             value = run_demo(gateway, authority, args.tenant,
                              os.path.realpath(args.lock_root))
+        elif args.command == 'app-demo':
+            value = run_app_demo(gateway, authority, args.tenant,
+                                 os.path.realpath(args.lock_root))
         elif args.command == 'register':
             context = authority.issue(args.tenant, args.principal)
             with open(args.graph, 'r') as stream:

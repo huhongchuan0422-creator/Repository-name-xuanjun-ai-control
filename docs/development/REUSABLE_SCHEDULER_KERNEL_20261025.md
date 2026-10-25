@@ -38,13 +38,28 @@ python3 scripts/reusable_scheduler_cli.py \
   --test-authority-key 0123456789abcdef0123456789abcdef \
   recover-unstarted --tenant tenant-a \
   --lock-root /tmp/xuanjun-scheduler-locks
+python3 scripts/reusable_scheduler_cli.py \
+  --db /tmp/xuanjun-task-center.sqlite \
+  --test-authority-key 0123456789abcdef0123456789abcdef \
+  app-demo --tenant tenant-app --lock-root /tmp/xuanjun-task-center-locks
+python3 scripts/task_center_app.py \
+  --db /tmp/xuanjun-task-center.sqlite \
+  --test-authority-key 0123456789abcdef0123456789abcdef \
+  --tenant tenant-app --host 127.0.0.1 --port 8765
+# 停止：同一前台终端按 Ctrl-C；没有远程停止或写入端点。
 ```
 
-CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
-`demo` 在同一数据库执行 TEST_ONLY 闭环；随后 `project` 是一次独立进程重启读取。
+除显式 `task_center_app.py` 外，CLI 只读写指定本地 TEST_ONLY 数据库，
+不创建常驻服务。Web 应用只允许回环地址、只提供 GET 静态文件和
+`/api/projection`；每次请求从同一个 Supervisor SQLite 构建投影，POST 返回
+405，不存在真实派单、暂停、恢复或生产控制端点。
+`demo` 在同一数据库执行 TEST_ONLY 闭环；`app-demo` 增加多项目、失败、
+等待授权、等待依赖和“有任务状态但进程事实未知”的应用数据；随后
+`project` 或 Web 应用是独立进程重启读取。
 `register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
 `examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
-`digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
+`digital-twin-data.js` 只供双击文件时的 `SNAPSHOT_ONLY` 降级查看；通过本地
+Web 应用访问时页面读取 `/api/projection`，不以导出文件维护第二份状态。
 `recover-unstarted` 只能在已经确认旧 TEST_ONLY 进程退出后运行；它复用原 Fence
 的 drain、资源失效覆盖和 rollback，不猜测进程存活，也不签发新 Writer。
 
@@ -71,10 +86,13 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不�
 ## 数字孪生界面
 
 - 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
-- 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
-- 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
+- 点击板块进入工作台，按项目分组并可按项目、状态和负责人筛选；项目页继续
+  下钻任务，点击异常直接进入绑定的板块/项目/任务卡点。
+- 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、
+  下一动作和证据要求；会话、执行进程和实例没有独立证明时明确为 `UNKNOWN`。
 - 异常详情分别显示任务负责人、解除责任方、事实影响和证据；不再把受阻任务 owner 自动当成问题解决方。
-- hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
+- hash 路由保留板块、项目与筛选条件；界面健康和异常均来自
+  `projection(schema=3)`，不是 `app.js` 硬编码成功状态。
 - 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
 
 ## SaaS 模块契约
@@ -86,6 +104,17 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不�
 
 租户上下文必须由服务端可信入口断言。本包以 HMAC TEST authority 验证这一边界；仅提交 `tenant_id` 会被拒绝。生产身份提供者和密钥管理不在本包内。
 
+## P2/P3 接入准备（只读契约）
+
+`task_center_execution_contract.ExternalReceiptContract` 只校验并规范化已观察到的
+P2/P3 回执，不写账、不 ACK、不派发。字段固定为 `source, tenant_id,
+task_id, attempt_id, input_version, event_id, phase, status, evidence_ref,
+permission_scope`。阶段只允许 `SENT / ACK / RESULT / ACCEPTANCE`，并保持互不
+等价。可信租户上下文、任务归属和输入版本全部匹配后只返回
+`VALIDATED_NOT_CONSUMED`；跨租户、错版本或未知来源在任何写入前拒绝。
+P2/P3 尚未完成真实安装验收，因此生产 adapter、凭据、登记和执行接线均为
+`NOT_IMPLEMENTED / NOT_EXECUTED`，本模块不会成为 P2/P3 或社区/B5 的新前置。
+
 ## 已知剩余项
 
 - PR143 尚为 Draft，本包不是合并或生产许可。
@@ -93,3 +122,4 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不�
 - `release_revoked_resources` 仅在同库已存在 checkpoint、零在途、对账完成、完整 revocation coverage 时释放 LOCAL_ONLY claim；生产资源释放需原资源系统回执。
 - 图注册已先做完整结构/环验证；当前 Supervisor 单任务注册 API 仍是逐任务提交，进程在注册中途崩溃时需要后续原生批量注册事务完善。
 - 七板块投影与界面均为 TEST_ONLY 设计/模拟；生产数据采集、实时进程探测和真实控制入口仍为 `NOT_IMPLEMENTED`。
+- P2/P3 生产回执 adapter 与真实登记未实现；当前仅有严格 TEST_ONLY 契约校验。
