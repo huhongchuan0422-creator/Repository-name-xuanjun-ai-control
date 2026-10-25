@@ -242,13 +242,16 @@ class WholeEntry(unittest.TestCase):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
         original=h.Session._c_resume_approval;seen=[]
+        output=io.StringIO()
         def owner_approves(session,plan):
             if not Path(h.C_RESUME_APPROVAL).exists():
-                seen.append(json.loads(output.getvalue().splitlines()[-1]))
+                printed=json.loads(output.getvalue().splitlines()[-1])
+                self.assertEqual(printed['plan_sha256'],plan['plan_sha256'])
+                self.assertEqual(printed['plan'],plan)
+                seen.append(printed)
                 candidate=self._register_c_resume_approval_from_persisted_plan(session)
                 self.assertEqual(candidate['plan_sha256'],plan['plan_sha256'])
             return original(session,plan)
-        output=io.StringIO()
         with patch.object(h.Session,'_c_resume_approval',owner_approves),contextlib.redirect_stdout(output):
             result=q.resume_c_before_confirmation()
         candidate=h.document(h.C_RESUME_PLAN)[0]['plan']
