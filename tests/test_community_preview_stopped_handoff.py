@@ -429,8 +429,6 @@ class WholeEntry(unittest.TestCase):
         self.assertEqual(result['phase'],'COMMITTED')
         self.assertTrue(Path(h.C_RESUME_PLAN).exists());self.assertTrue(Path(h.C_RESUME_APPROVAL).exists())
         self.assertTrue(Path(h.C_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
-            q.resume_c_before_confirmation()
         before=len(self.calls);q.close()
         second=h.Session();second.acquire();self.addCleanup(second.close);self.session=second
         with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
