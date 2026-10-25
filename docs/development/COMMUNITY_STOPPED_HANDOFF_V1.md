@@ -1,3 +1,17 @@
+## C preconfirmation recovery — distinct current plan and approval
+
+The B-complete recovery entry remains `scripts/community_preview_stopped_handoff.py --resume-c-before-confirmation`. It does not rerun snapshot or clones. The historical B-resume admission, old B approval, old freeze, old permit and three clone results remain byte-for-byte evidence. Their original validity windows are schema-checked but are not renewed or treated as current C authorization. The current carrier/source pin is checked independently; the historical B carrier manifest digest is bound to the original B-resume record and is not required to equal a later C source carrier manifest.
+
+After verifying completed B evidence and current stopped/no-C-side-effect state, the caller computes a C plan and persists the exact full plan at `/opt/xuanjun-community-preview/backup-2330-to-f131-v1/c-preconfirmation-resume-plan.json`. The full JSON plan and `plan_sha256` are printed for Owner review. The plan record is EXCL and bound to attempt, current carrier pin, B evidence digest, exact plan bytes/hash and a maximum 600-second request window. On process restart, the same persisted plan is reused only if its digest and non-time evidence still match; it is never silently replaced. A changed non-time observation or expired request holds and requires an explicit new owner-directed request, not automatic overwrite.
+
+A separate fresh approval file is required: `/opt/xuanjun-community-preview/bc-c-resume-approval.json`. Exactly nine fields: `format=1`, `host`, `mode=STOPPED_HANDOFF_V1`, `attempt`, `carrier_manifest_sha256` (the **current** source carrier digest), `plan_sha256` (the exact printed/persisted plan), `issued_at`, `expires_at`, `actions=[STOPPED_HANDOFF_RENAME_RUN, KNOWN_FAILURE_SERIAL_RECOVERY, JOURNAL_WRITES]`. It must use the existing protected-document reader and canonical JSON; all bindings must match, and `issued_at <= now <= expires_at <= issued_at+600`. Only the Owner/authorized approval registrar may create it after reviewing the full plan. The prior `bc-c-approval.json` containing the old d507 digest is retained untouched and is never accepted for this new plan.
+
+After the fresh record is read, the original exact TTY confirmation is still required. The same approval bytes/identity, plan record, B evidence, lease/ENTRY and stopped-container inventory are rechecked immediately before proof creation and the existing C transaction. EOF, mismatch, timeout, revoked/replaced approval, UNKNOWN inventory, missing B evidence, existing proof/active-attempt/checkpoint, or plan evidence drift means HOLD. No C operation is executed by source review/CI.
+
+Hosted source anchor before this change: `743687bb58206f72c6ea67ebc5ffa17fc7522696`; Run `40197181853` failed at the test fixture's `s.sha(self.freeze)` receiving a non-bytes value. This candidate corrects the fixture by configuring the persisted B context before reading evidence, adds expired historical B/freeze and distinct old/new carrier bindings, and adds a full-plan/fresh-approval test. Exact current Hosted result must be obtained before acceptance. `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 ## Same-attempt C preconfirmation resume (source candidate)
 
 For the specific state where the original B-resume completed, its snapshot/private manifest/three clone results and B records remain valid, but the first C TTY confirmation exited before proof/active-attempt/checkpoint creation, the new narrow entry is:
