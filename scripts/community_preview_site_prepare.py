@@ -359,12 +359,27 @@ def _load_fixed_archive(body,fmt,expected):
 
 def bounded_names(fd):
     names=[]
-    # fd-based scandir is required from the existing interpreter; absence HOLDs
-    # before writes. No path expansion or unbounded listdir allocation.
-    with os.scandir(fd) as rows:
-        for row in rows:
-            need(len(names)<MAX_FILES,'TREE_COUNT');names.append(row.name)
-    return sorted(names)
+    # Python 3.6 on the fixed host does not support os.scandir(fd). Enumerate
+    # through procfs' descriptor alias instead: the open fd pins the directory,
+    # and identity is checked before and after enumeration. Never fall back to
+    # listdir(fd), which allocates an unbounded full listing.
+    try:
+        before=os.fstat(fd)
+        need(stat.S_ISDIR(before.st_mode),'TREE_ENUMERATION_UNKNOWN')
+        proc_path='/proc/self/fd/'+str(fd)
+        bound=os.stat(proc_path)
+        need(stat.S_ISDIR(bound.st_mode) and identity(before)==identity(bound),'TREE_ENUMERATION_UNKNOWN')
+        with os.scandir(proc_path) as rows:
+            for row in rows:
+                need(len(names)<MAX_FILES,'TREE_COUNT');names.append(row.name)
+        after=os.fstat(fd);path_after=os.stat(proc_path)
+        need(identity(before)==identity(after)==identity(path_after),'DIRECTORY_CHANGED')
+        return sorted(names)
+    except Hold:
+        raise
+    except (OSError,TypeError,ValueError):
+        # Only a bounded reason escapes; do not leak host paths or exception data.
+        raise Hold('TREE_ENUMERATION_UNKNOWN') from None
 
 def tree(source,destination=None):
     """Whole fixed tree, dirfd/no-follow, streaming bounds; preserve owners/modes.
