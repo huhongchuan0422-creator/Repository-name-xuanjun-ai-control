@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import socketserver
+import sqlite3
 import tempfile
 import threading
 import time
@@ -170,6 +171,53 @@ class ModelOrchestrationTests(unittest.TestCase):
         row=self.supervisor.db.execute('''SELECT price_state FROM model_providers
           WHERE provider_id='price-transition' ''').fetchone()
         self.assertEqual(row['price_state'],'KNOWN_FREE')
+
+    def test_provider_and_model_price_transitions_are_transactional(self):
+        self.provider('race-price');blocked=[];attempted=[]
+        def inject_model(action,table,*_args):
+            if (not attempted and action==sqlite3.SQLITE_READ and
+                    table=='model_catalog'):
+                attempted.append(True);other=sqlite3.connect(self.db,timeout=0)
+                try:
+                    other.execute('''INSERT INTO model_catalog VALUES
+                      (?,?,?,?,?,?,?,?)''',('tenant-a','race-price','late-free',
+                      '["code"]',1,'KNOWN_FREE',0,0));other.commit()
+                except sqlite3.OperationalError as exc:blocked.append(str(exc))
+                finally:other.close()
+            return sqlite3.SQLITE_OK
+        self.supervisor.db.set_authorizer(inject_model)
+        try:self.provider('race-price',price='KNOWN_PAID')
+        finally:self.supervisor.db.set_authorizer(None)
+        self.assertTrue(any('locked' in item for item in blocked),blocked)
+        verify=sqlite3.connect(self.db)
+        try:self.assertEqual(verify.execute('''SELECT COUNT(*) FROM model_catalog
+          WHERE provider_id='race-price' ''').fetchone()[0],0)
+        finally:verify.close()
+
+    def test_model_insert_and_provider_price_change_are_transactional(self):
+        # The inverse path is serialized too: a concurrent provider price
+        # change cannot race a free model insert.
+        self.provider('race-model');blocked=[];attempted=[]
+        def raise_price(action,table,*_args):
+            if (not attempted and action==sqlite3.SQLITE_READ and
+                    table=='model_providers'):
+                attempted.append(True);other=sqlite3.connect(self.db,timeout=0)
+                try:
+                    other.execute('''UPDATE model_providers SET
+                      price_state='KNOWN_PAID' WHERE tenant_id='tenant-a'
+                      AND provider_id='race-model' ''');other.commit()
+                except sqlite3.OperationalError as exc:blocked.append(str(exc))
+                finally:other.close()
+            return sqlite3.SQLITE_OK
+        self.supervisor.db.set_authorizer(raise_price)
+        try:self.model('race-model','free-safe')
+        finally:self.supervisor.db.set_authorizer(None)
+        self.assertTrue(any('locked' in item for item in blocked),blocked)
+        verify=sqlite3.connect(self.db)
+        try:self.assertEqual(verify.execute('''SELECT price_state FROM
+          model_providers WHERE provider_id='race-model' ''').fetchone()[0],
+          'KNOWN_FREE')
+        finally:verify.close()
 
     def test_benchmark_calls_share_persistent_provider_rate_limit(self):
         self.control.upsert_provider({'provider_id':'limited','display_name':'limited',

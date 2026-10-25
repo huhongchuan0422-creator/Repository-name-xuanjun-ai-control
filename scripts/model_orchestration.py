@@ -365,30 +365,30 @@ class ModelControl(object):
             raise ValueError('SAFE_PROVIDER_URL_REQUIRED')
         if not (loopback_http or safe_https):
             raise ValueError('SAFE_PROVIDER_URL_REQUIRED')
-        existing = self.db.execute('''SELECT * FROM model_providers
-          WHERE tenant_id=? AND provider_id=?''',
-          (self.tenant_id,value['provider_id'])).fetchone()
-        if value['price_state']=='KNOWN_PAID':
-            incompatible=self.db.execute('''SELECT 1 FROM model_catalog WHERE
-              tenant_id=? AND provider_id=? AND (price_state!='KNOWN_PAID' OR
-              input_unit_cost IS NULL OR output_unit_cost IS NULL) LIMIT 1''',(
-              self.tenant_id,value['provider_id'])).fetchone()
-            if incompatible is not None:
-                raise ValueError('PAID_PROVIDER_MODELS_REQUIRE_EXPLICIT_COSTS')
-        if existing is None and self.db.execute('''SELECT COUNT(*) FROM
-          model_providers WHERE tenant_id=?''',(self.tenant_id,)).fetchone()[0] >= 10:
-            raise ValueError('PROVIDER_LIMIT_10')
-        cipher = existing['secret_cipher'] if existing else None
-        mask = existing['secret_mask'] if existing else None
-        if secret is not None:
-            if not isinstance(secret,str) or len(secret)<8 or '\n' in secret or '\r' in secret:
-                raise ValueError('VALID_PROVIDER_SECRET_REQUIRED')
-            cipher = self.fernet.encrypt(secret.encode('utf-8'))
-            mask = '••••' + secret[-4:]
-        version = (existing['config_version'] + 1) if existing else 1
-        created = existing['created_at'] if existing else now
         self.db.execute('BEGIN IMMEDIATE')
-        with self.db:
+        try:
+            existing = self.db.execute('''SELECT * FROM model_providers
+              WHERE tenant_id=? AND provider_id=?''',
+              (self.tenant_id,value['provider_id'])).fetchone()
+            if value['price_state']=='KNOWN_PAID':
+                incompatible=self.db.execute('''SELECT 1 FROM model_catalog WHERE
+                  tenant_id=? AND provider_id=? AND (price_state!='KNOWN_PAID' OR
+                  input_unit_cost IS NULL OR output_unit_cost IS NULL) LIMIT 1''',(
+                  self.tenant_id,value['provider_id'])).fetchone()
+                if incompatible is not None:
+                    raise ValueError('PAID_PROVIDER_MODELS_REQUIRE_EXPLICIT_COSTS')
+            if existing is None and self.db.execute('''SELECT COUNT(*) FROM
+              model_providers WHERE tenant_id=?''',(self.tenant_id,)).fetchone()[0] >= 10:
+                raise ValueError('PROVIDER_LIMIT_10')
+            cipher = existing['secret_cipher'] if existing else None
+            mask = existing['secret_mask'] if existing else None
+            if secret is not None:
+                if not isinstance(secret,str) or len(secret)<8 or '\n' in secret or '\r' in secret:
+                    raise ValueError('VALID_PROVIDER_SECRET_REQUIRED')
+                cipher = self.fernet.encrypt(secret.encode('utf-8'))
+                mask = '••••' + secret[-4:]
+            version = (existing['config_version'] + 1) if existing else 1
+            created = existing['created_at'] if existing else now
             self.db.execute('''INSERT OR REPLACE INTO model_providers VALUES
               (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
               (self.tenant_id,value['provider_id'],value['display_name'],
@@ -399,6 +399,9 @@ class ModelControl(object):
                created,now))
             self._audit(principal,'PROVIDER_UPSERT',value['provider_id'],
                         {'config_version':version,'secret_replaced':secret is not None},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         return {'provider_id':value['provider_id'],'config_version':version,
                 'secret_mask':mask,'secret_configured':cipher is not None}
 
@@ -456,19 +459,24 @@ class ModelControl(object):
                 value['input_unit_cost'] is None or
                 value['output_unit_cost'] is None):
             raise ValueError('KNOWN_PAID_UNIT_COSTS_REQUIRED')
-        provider=self.db.execute('''SELECT price_state FROM model_providers
-          WHERE tenant_id=? AND provider_id=?''',(self.tenant_id,
-          value['provider_id'])).fetchone()
-        if provider is None:raise ValueError('PROVIDER_REQUIRED')
-        if (provider['price_state']=='KNOWN_PAID' and
-                value['price_state']!='KNOWN_PAID'):
-            raise ValueError('PAID_PROVIDER_MODEL_MUST_BE_KNOWN_PAID')
-        self.db.execute('''INSERT OR REPLACE INTO model_catalog VALUES
-          (?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(value['provider_id'],'provider_id'),
-          _text(value['model_id'],'model_id'),canonical(sorted(set(value['capabilities']))),
-          int(value['enabled']),value['price_state'],value['input_unit_cost'],
-          value['output_unit_cost']))
-        self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            provider=self.db.execute('''SELECT price_state FROM model_providers
+              WHERE tenant_id=? AND provider_id=?''',(self.tenant_id,
+              value['provider_id'])).fetchone()
+            if provider is None:raise ValueError('PROVIDER_REQUIRED')
+            if (provider['price_state']=='KNOWN_PAID' and
+                    value['price_state']!='KNOWN_PAID'):
+                raise ValueError('PAID_PROVIDER_MODEL_MUST_BE_KNOWN_PAID')
+            self.db.execute('''INSERT OR REPLACE INTO model_catalog VALUES
+              (?,?,?,?,?,?,?,?)''',(self.tenant_id,
+              _text(value['provider_id'],'provider_id'),
+              _text(value['model_id'],'model_id'),
+              canonical(sorted(set(value['capabilities']))),int(value['enabled']),
+              value['price_state'],value['input_unit_cost'],value['output_unit_cost']))
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         return {'provider_id':value['provider_id'],'model_id':value['model_id']}
 
     def create_role(self, value):
