@@ -89,6 +89,7 @@ jobs:
                    b'scripts/community_preview_carrier_handoff_call.py',
                    b'tests/test_community_preview_carrier_handoff_admission.py',
                    b'tests/test_community_preview_carrier_handoff_call.py',
+                   b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md',
                    b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               f.write('resume_only='+str(set(rows)<=allowed).lower()+'\n')
@@ -232,12 +233,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_admission.py 2>&1 | tee community-parse.log
+          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py 2>&1 | tee community-parse.log
           python -B - <<'PY' 2>&1 | tee -a community-parse.log
           import ast
           from pathlib import Path
           for name in ('scripts/community_preview_carrier_handoff_admission.py',
-                       'tests/test_community_preview_carrier_handoff_admission.py'):
+                       'scripts/community_preview_carrier_handoff_call.py',
+                       'tests/test_community_preview_carrier_handoff_admission.py',
+                       'tests/test_community_preview_carrier_handoff_call.py'):
               raw=Path(name).read_bytes()
               ast.parse(raw.decode('utf-8'),filename=name)
               print('AST_PARSE_PASS',name,'bytes='+str(len(raw)))
@@ -653,6 +656,7 @@ jobs:
             scripts/community_preview_carrier_handoff_call.py
             tests/test_community_preview_carrier_handoff_admission.py
             tests/test_community_preview_carrier_handoff_call.py
+            docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
           retention-days: 14
       - name: Preserve stopped handoff proposal evidence (no site execution)
