@@ -86,14 +86,21 @@ class OpenAICompatibleAdapter(object):
                     address.is_link_local or address.is_multicast or
                     address.is_reserved or address.is_unspecified):
                 raise ProviderError('UNSAFE_DESTINATION','PRIVATE_DNS_RESULT',False)
-            vetted.append(str(address))
-        ip=vetted[0]
+            vetted.append(item)
+        selected=vetted[0]
+        def connect_selected(timeout_value):
+            family,socktype,proto,_,sockaddr=selected
+            raw=socket.socket(family,socktype,proto)
+            try:
+                raw.settimeout(timeout_value);raw.connect(sockaddr);return raw
+            except Exception:
+                raw.close();raise
         class PinnedHTTP(http.client.HTTPConnection):
             def connect(connection):
-                connection.sock=socket.create_connection((ip,port),connection.timeout)
+                connection.sock=connect_selected(connection.timeout)
         class PinnedHTTPS(http.client.HTTPSConnection):
             def connect(connection):
-                raw=socket.create_connection((ip,port),connection.timeout)
+                raw=connect_selected(connection.timeout)
                 connection.sock=connection._context.wrap_socket(
                   raw,server_hostname=parsed.hostname)
         cls=PinnedHTTPS if parsed.scheme=='https' else PinnedHTTP
