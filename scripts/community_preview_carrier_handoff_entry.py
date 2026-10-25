@@ -21,6 +21,11 @@ ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 APPROVAL_NAME='carrier-handoff-approval.json'
 APPROVAL_MAX=16384
 APPROVAL_TTL_MAX=600
+SCRIPTS_DIR=PARENT+'/control-stopped-v1/scripts'
+MODULE_PINS={
+    'community_preview_carrier_handoff_admission.py':'c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386',
+    'community_preview_carrier_handoff_call.py':'a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc'
+}
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 OPERATIONS=('execute','status','rollback')
 ROOT_UID=0  # Production invariant, overridden only in isolated fixture tests.
@@ -75,6 +80,45 @@ def _read_fd_exact(fd,limit):
     require(len(body)==st.st_size and h.ident(os.fstat(fd))==h.ident(st),
             'INPUT_CHANGED')
     return bytes(body)
+
+def _verify_runtime_sources():
+    """Verify the exact fixed carrier files before transaction entry."""
+    require(os.path.abspath(getattr(h,'__file__',''))==
+            SCRIPTS_DIR+'/community_preview_carrier_handoff_admission.py',
+            'HANDOFF_MODULE_PATH_MISMATCH')
+    require(os.path.abspath(getattr(call,'__file__',''))==
+            SCRIPTS_DIR+'/community_preview_carrier_handoff_call.py',
+            'HANDOFF_CALL_PATH_MISMATCH')
+    for name,wanted in MODULE_PINS.items():
+        fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,
+                   dir_fd=_open_fixed_scripts_dir())
+        try:
+            st=os.fstat(fd)
+            require(stat.S_ISREG(st.st_mode) and st.st_uid==ROOT_UID
+                    and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1,
+                    'HANDOFF_MODULE_IDENTITY_OR_MODE')
+            raw=_read_fd_exact(fd,262144)
+            require(h.sha(raw)==wanted,'HANDOFF_MODULE_SHA_MISMATCH')
+            dfd=_open_fixed_scripts_dir()
+            try:
+                require(h.ident(st)==h.ident(os.stat(name,dir_fd=dfd,follow_symlinks=False)),
+                        'HANDOFF_MODULE_PATH_REPLACED')
+            finally:os.close(dfd)
+        finally:os.close(fd)
+
+def _open_fixed_scripts_dir():
+    fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        for part in ('opt','xuanjun-community-preview','control-stopped-v1','scripts'):
+            nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
+            os.close(fd);fd=nxt
+            st=os.fstat(fd)
+            require(stat.S_ISDIR(st.st_mode) and st.st_uid==ROOT_UID
+                    and stat.S_IMODE(st.st_mode)==0o700,'HANDOFF_MODULE_PARENT_PROTECTION')
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
 
 def _canonical(raw):
     def pairs(rows):
@@ -145,6 +189,7 @@ def run(operation, old_archive_bytes, new_archive_bytes):
     """Fixed original-entry caller; current approval is read from the protected record."""
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     identify_admin()
+    _verify_runtime_sources()
     require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
             'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
     with contextlib.ExitStack() as stack:
