@@ -238,6 +238,11 @@ def status(parent,jfd,uid,old_entries,new_entries):
     retained=childstat(parent,RETAINED)
     if current is None or stage is None:
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
+    need(j['old_tree_sha']==sha(canonical({x:sha(y) for x,y in old_entries.items()}))
+         and j['new_tree_sha']==sha(canonical({x:sha(y) for x,y in new_entries.items()}))
+         and sha(old_entries['manifest.json'])==OLD_MANIFEST
+         and sha(new_entries['manifest.json'])==NEW_MANIFEST,
+         'JOURNAL_TREE_DIGEST_MISMATCH')
     old_id=j['old_identity'];new_id=j['stage_identity']
     if dirident(current)==new_id and dirident(stage)==old_id:
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
