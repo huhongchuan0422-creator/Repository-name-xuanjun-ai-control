@@ -32,6 +32,11 @@ NEW_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
 MAX_ZIP=4*1024*1024
 MAX_FILE=131072
 MAX_FILES=100
+ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
+HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
+               'b_approval':'bc-b-approval.json',
+               'freeze':'writer-freeze-reference.json',
+               'old_stage_permit':'site-prepare-approval.json'}
 
 class Hold(RuntimeError):pass
 
@@ -116,7 +121,7 @@ def members(raw,manifest_sha,archive_sha):
                  and meta['uid']==0 and meta['mode']=='0600','CANDIDATE_MEMBER_SHA')
         return contents
 
-def capture_history(refs,uid):
+def capture_history(refs,uid,carrier_parent=None,journal_parent=None):
     need(type(refs) is dict and set(refs)=={'b_intent','b_approval','freeze','old_stage_permit'},
          'HISTORICAL_BINDINGS_REQUIRED')
     result={}
@@ -124,6 +129,11 @@ def capture_history(refs,uid):
         ref=refs[key]
         need(type(ref) in (tuple,list) and len(ref)==5,'HISTORY_REFERENCE_SCHEMA')
         pfd,name,expected_parent,expected_file,expected_sha=ref
+        if carrier_parent is not None and journal_parent is not None:
+            wanted_parent=journal_parent if key=='b_intent' else carrier_parent
+            need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
+                 'HISTORY_PARENT_ROLE_MISMATCH')
+            need(name==HISTORY_NAMES[key],'HISTORY_PATH_NOT_FIXED')
         pst=os.fstat(pfd)
         need(stat.S_ISDIR(pst.st_mode) and pst.st_uid==uid
              and not(stat.S_IMODE(pst.st_mode)&0o022)
@@ -341,12 +351,12 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
                  and pre.get('entry_identity')==expected_entry_identity
                  and pre.get('lock_identity')==expected_lock_identity,
                  'PREINTENT_BINDING_UNKNOWN')
-            need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid),
+            need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid,parent,jfd),
                  'PREINTENT_HISTORY_CHANGED')
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     verified_old_inventory(old_entries)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
-    current_history=capture_history(history_refs,uid)
+    current_history=capture_history(history_refs,uid,parent,jfd)
     j=journal(jfd,uid)
     need(j['journal_parent_identity']==expected_journal_identity
          and j['entry_identity']==expected_entry_identity
@@ -433,7 +443,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         need(sha(old_entries['manifest.json'])==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
         new_entries=members(new_archive,NEW_MANIFEST,NEW_ARCHIVE)
         need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
-        history=capture_history(history_refs,uid)
+        history=capture_history(history_refs,uid,parent,jfd)
         pre=dict(format=1,attempt=attempt,old_identity=old_id,
                  old_manifest=OLD_MANIFEST,new_manifest=NEW_MANIFEST,
                  entry_identity=expected_entry_identity,
@@ -466,7 +476,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         tree(parent,STAGE,uid,new_entries,stage_id)
         need(journal(jfd,uid)==j,'INTENT_CHANGED')
         _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
-        need(capture_history(history_refs,uid)==history,'HISTORY_CHANGED_BEFORE_SWITCH')
+        need(capture_history(history_refs,uid,parent,jfd)==history,'HISTORY_CHANGED_BEFORE_SWITCH')
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,
              'HANDOFF_CONFLICT_BEFORE_SWITCH')
         if fault:fault('before_switch')
@@ -497,13 +507,13 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
     lease=_locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     try:
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,'ROLLBACK_CONFLICT')
-        capture_history(history_refs,uid)
+        capture_history(history_refs,uid,parent,jfd)
         need(childstat(jfd,ROLLBACK_INTENT) is None
              and childstat(jfd,ROLLBACK_RESULT) is None,'ROLLBACK_ALREADY_ATTEMPTED')
         result=status(parent,jfd,uid,old_entries,new_entries,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
         binding=journal(jfd,uid)
-        history=capture_history(history_refs,uid)
+        history=capture_history(history_refs,uid,parent,jfd)
         intent={'format':1,'attempt':binding['attempt'],
                 'history_sha256':sha(canonical(history)),
                 'old_identity':binding['old_identity'],
@@ -514,10 +524,10 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
         need(childstat(jfd,'active-attempt.json') is None
              and childstat(parent,RETAINED) is None
              and ident(os.fstat(entryfd))==expected_entry_identity
-             and sha(canonical(capture_history(history_refs,uid)))==intent['history_sha256'],
+             and sha(canonical(capture_history(history_refs,uid,parent,jfd)))==intent['history_sha256'],
              'ROLLBACK_BOUNDARY_CHANGED')
         _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
-        need(capture_history(history_refs,uid)==history,'ROLLBACK_HISTORY_CHANGED')
+        need(capture_history(history_refs,uid,parent,jfd)==history,'ROLLBACK_HISTORY_CHANGED')
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,
              'ROLLBACK_CONFLICT')
         result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs)
