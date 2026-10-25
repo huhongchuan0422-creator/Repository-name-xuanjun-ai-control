@@ -255,6 +255,7 @@ class Session:
     def configure_resumed_b_context(self):
         """Bind the existing completed B evidence without running either B stage."""
         self.resume_mode=True
+        self.c_preconfirm_mode=True
         self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE
         self.stage_permit_path=B_RESUME_STAGE_PERMIT
         self.resume_raw=self.bind_resume_reference(resume_record_path())
@@ -303,7 +304,11 @@ class Session:
              'PRIOR_B_EVIDENCE_MISMATCH')
         self.braw=self.bind_resume_reference(self.b_path)
         self.b=s.exact_json(self.braw)
-        window(self.b)
+        # Historical B-resume authority is evidence only; preserve its original
+        # bounded lifetime, but do not reuse it as current C permission.
+        need(type(self.b.get('issued_at')) is int and type(self.b.get('expires_at')) is int
+             and self.b['issued_at']<=self.b['expires_at']<=self.b['issued_at']+600,
+             'HISTORICAL_B_RESUME_AUTHORITY_INVALID')
         need(self.braw==s.canonical(self.b)
              and set(self.b)=={'format','host','mode','attempt','carrier_manifest_sha256',
                 'issued_at','expires_at','old_b_intent_sha256','old_b_approval_sha256',
@@ -418,7 +423,7 @@ class Session:
         if self.resume_raw is not None:need(raw(resume_record_path())==self.resume_raw,'B_RESUME_RECORD_REPLACED')
         if self.craw is not None:
             v,b=document(C_APPROVAL);need(b==self.craw,'C_APPROVAL_REVOKED');window(v)
-        elif self.braw is not None:
+        elif self.braw is not None and not getattr(self,'c_preconfirm_mode',False):
             v,b=document(self.b_path);need(b==self.braw,'B_APPROVAL_REVOKED');window(v)
             need(v['carrier_manifest_sha256']==stamp,'B_SOURCE_BINDING_CHANGED')
         if self.freeze is not None:
@@ -433,7 +438,7 @@ class Session:
              and f['format']==1 and f['host']==p.HOST and f['old_id']==s.OLD_ID and f['old_image']==s.OLD_IMAGE
              and f['roots']==[s.DATA+'/data',s.DATA+'/config'] and f['all_writers_frozen'] is True
              and p.exact_hex(f['owner_review_reference_sha256'],64),'ORIGINAL_FREEZE_EVIDENCE_REQUIRED')
-        window(f)
+        if not getattr(self,'c_preconfirm_mode',False):window(f)
     def stopped(self):
         self.boundary();self.freeze_live();s.stopped();self.boundary()
     def b_stage(self,stage,snapshot_sha=None):
