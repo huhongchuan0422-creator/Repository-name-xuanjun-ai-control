@@ -213,3 +213,56 @@ Observed V2:
 The run is real Python `HTTPServer/App/Center/SQLite` against the verified e7 artifact, not the Node stub. It remains isolated fixture evidence, not Hosted production/customer acceptance.
 
 Chromium navigation remains `BLOCKED / NOT_VERIFIED` because direct `page.goto` is administratively rejected with `net::ERR_BLOCKED_BY_ADMINISTRATOR`. This task does not retry through proxy, setContent or alternate browser routing.
+
+
+## V11 original SaaS JS client → exact e7 loopback HTTP
+
+This closes the distinction between the earlier backend-only Python integration and the actual SaaS JavaScript client.
+
+The executable `clients/saas-console/tests/e7-js-client-integration.mjs` imports the repository's actual:
+- `src/api.js` blob `8383bee41d2abec68ca580469388e1399cbdab03`;
+- `src/journey.js` blob `adf27901abf2fe1311d6742367c4fdb1db4a5a7c`;
+- `src/submission.js` blob `fdcb1dd74d61010e320445a138c4570ba530f1e3`.
+
+Before execution it verifies all 102 files in the e7 artifact manifest and requires backend commit `e7f75975c4ab4eedba68306212a2bac6c067a1c3` / tree `d001cfd9855ed3a7758f6286db5cae7d45cce403`.
+
+Exact local command:
+
+```sh
+cd clients/saas-console
+XJ_PR122_E7_ROOT=/mnt/data/saas_e7/customer-center/customer-center \
+  node tests/e7-js-client-integration.mjs
+```
+
+Actual exit code: `0`.
+
+The JS client path exercised:
+1. `makeApi.login` with the real Host/Origin boundary and Secure/HttpOnly/SameSite cookie;
+2. `ProjectJourney.projects` / `project`;
+3. `ProjectJourney.saveMaterial` against e7 `api/save`, then checklist revision refresh;
+4. cross-project read denial with the exact generic Chinese HTTP 403 response;
+5. `ProjectJourney.project` returns the current version-bound preview URL;
+6. the same client transport performs a real GET of the bound V1 HTML body and verifies `Welcome to Xuanjun` plus the server feedback binding;
+7. `feedbackContext` + `submitLegacy` + same-case `changes`;
+8. reviewer/test-fixture-only assessment + small-edit candidate + TEST_ONLY publication, not a SaaS customer capability;
+9. `currentPage` obtains V2;
+10. a real GET of the V2 bound HTML body verifies `Welcomes to Xuanjun`;
+11. `updates` + `retest` + final RETEST event;
+12. logout followed by `me` yields the generic Chinese HTTP 403 invalid-session boundary.
+
+Observed:
+- save revision: `1`;
+- V1: `66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5`;
+- V2: `ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940`;
+- V1 rendered body SHA256: `f8920932b0dc5e36ecfd75ddbddf28c246d17831248c446edc17220e06a61d17`;
+- V2 rendered body SHA256: `78ef713dccc80fcb86a31cd4ab650f8530112f4c5961bd361f3ee29c3f86dddf`;
+- Chinese 403: `权限不足、凭据失效或请求不符合要求`;
+- retest: `RETEST_ACCEPTED`.
+
+The first real execution correctly failed with HTTP 400 because the Node transport harness omitted `Content-Length`; after adding that transport header the same client chain passed. Product `api.js`, `ProjectJourney`, and e7 backend source were not changed for that transport fix.
+
+Raw stdout/exit evidence is retained in `clients/saas-console/tests/E7_JS_CLIENT_INTEGRATION_STDOUT_20261024.txt`.
+
+Hosted CI only syntax-checks this artifact-bound integration entry because the e7 review artifact is not part of the repository checkout. A Hosted syntax PASS must not be described as Hosted e7 HTTP execution. Existing frontend `npm test` remains a separate source/isolation gate.
+
+Browser route/navigation remains `BLOCKED / NOT_VERIFIED` due `net::ERR_BLOCKED_BY_ADMINISTRATOR`; no proxy, `setContent`, alternate address, or alternate browser tool is used to convert that refusal into browser E2E evidence.

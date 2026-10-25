@@ -1,0 +1,19 @@
+COMMAND:
+XJ_PR122_E7_ROOT=/mnt/data/saas_e7/customer-center/customer-center node tests/e7-js-client-integration.mjs
+
+EXIT_CODE=0
+
+STDOUT:
+{"status":"PASS","scope":"SAAS_JS_CLIENT_TO_E7_LOOPBACK","frontend":{"api":"8383bee41d2abec68ca580469388e1399cbdab03","journey":"adf27901abf2fe1311d6742367c4fdb1db4a5a7c","submission":"fdcb1dd74d61010e320445a138c4570ba530f1e3"},"backend":{"commit":"e7f75975c4ab4eedba68306212a2bac6c067a1c3","tree":"d001cfd9855ed3a7758f6286db5cae7d45cce403","manifest_files":102},"transport":{"host":"wenwenwenyiyiyi.work","origin":"https://wenwenwenyiyiyi.work","secure_cookie":true,"csrf":true},"save_revision":1,"v1":"66096dc90025694f3cdfd46a4cd3e583777a01ac6618672945914455f66484c5","v2":"ce256a5afa8c26e4bec807edc09005cbaef17e717c50d0130996affb35783940","preview_v1_body_sha256":"f8920932b0dc5e36ecfd75ddbddf28c246d17831248c446edc17220e06a61d17","preview_v2_body_sha256":"78ef713dccc80fcb86a31cd4ab650f8530112f4c5961bd361f3ee29c3f86dddf","preview_v1_has_text":true,"preview_v2_has_text":true,"cross_project_403":"权限不足、凭据失效或请求不符合要求","post_logout_403":"权限不足、凭据失效或请求不符合要求","retest":"RETEST_ACCEPTED","browser":"NOT_VERIFIED"}
+
+STDERR:
+<empty>
+
+STDOUT_SHA256=e11cfa782188fa6e555ef09249bfa8da529149e5ef2ec5d66a5af373ab7b5835
+STDERR_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SCRIPT_SHA256=1bc68975a94843a79892dc83a4a61434d1d55245e1d54d2a67b65e0a179abfc4
+
+NOTES:
+- First execution against the real e7 HTTP fixture returned HTTP 400 Chinese generic error because the test transport omitted Content-Length.
+- The transport harness was corrected to send Content-Length; product src/api.js and ProjectJourney were not changed.
+- Browser E2E remains NOT_VERIFIED; Chromium page.goto is still blocked by administrator policy and was not retried or bypassed.
