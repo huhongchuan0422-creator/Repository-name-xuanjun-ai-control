@@ -466,9 +466,13 @@ class GatewayKernel(object):
                       (dep['consumer_task_id'],)).fetchone()[0]
                     if remaining == 0:
                         self.db.execute('''UPDATE tasks SET
-                          next_action='RESUME_ADMISSION_REQUIRED',updated_at=?
+                          next_action='RESUME_ADMISSION_REQUIRED',
+                          receipt_deadline=?,started_deadline=?,
+                          progress_deadline=?,terminal_deadline=?,
+                          handoff_deadline=?,updated_at=?
                           WHERE task_id=? AND state='READY' ''',
-                          (now, dep['consumer_task_id']))
+                          (now + 300, now + 600, now + 900, now + 3600,
+                           now + 900, now, dep['consumer_task_id']))
             self.db.execute('''UPDATE gateway_inbox
               SET state='CONSUMED_ACK',acked_at=?
               WHERE tenant_id=? AND producer_task_id=?
@@ -752,14 +756,28 @@ class GatewayKernel(object):
             self.db.execute('''DELETE FROM resource_claims WHERE task_id=?
               AND attempt_id=? AND state='REVOKED' ''',
               (task_id, attempt_id))
+            interrupted = self.db.execute('''UPDATE gateway_resume_grants
+              SET state='INTERRUPTED' WHERE task_id=?
+              AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
+            interrupted_count = self.db.execute(
+                'SELECT changes()').fetchone()[0]
+            next_action = ('REISSUE_RESUME_GRANT' if interrupted_count
+                           else 'CLAIM_TEST_ONLY_EXECUTOR')
             self.db.execute('''UPDATE tasks SET state='READY',
               authority_state='NONE',authority_valid_until=NULL,
               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
-              epoch=NULL,next_action='RECHECK_RESUME_ADMISSION',
+              epoch=NULL,next_action=?,
               writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
               WHERE task_id=? AND authority_state='REVOKED' ''',
-              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, now, task_id))
-        return {'state': 'READY', 'claim_state': 'ROLLED_BACK'}
+              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, next_action, now, task_id))
+            self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
+              VALUES (?,?,?,?,?,?)''',
+              (task_id, attempt_id, 'unstarted-recovery:' + attempt_id,
+               'UNSTARTED_CLAIM_RECOVERED',
+               'NO_STARTED_EVENT_RESOURCE_COVERAGE_RECONCILED', now))
+        return {'state': 'READY', 'claim_state': 'ROLLED_BACK',
+                'interrupted_grants': interrupted_count,
+                'next_action': next_action}
 
     def preemption_decision(self, context, running_task_id, waiting_task_id):
         """Pure policy verdict; it never stops a process or transfers a lock."""
@@ -843,6 +861,16 @@ class GatewayKernel(object):
               attempt_id,checkpoint_id,effects_state,resources_json,created_at
               FROM gateway_checkpoints WHERE task_id=? ORDER BY created_at''',
               (row['task_id'],))]
+            dependency_blockers = [dep for dep in deps
+                                   if dep['state'] != 'RECEIVED']
+            blocker = None
+            if dependency_blockers:
+                blocker = 'DEPENDENCY_WAIT'
+            elif row['state'] == 'HOLD':
+                blocker = 'TASK_HOLD'
+            elif row['state'] in ('FAILURE', 'CANCELLED',
+                                  'CAPABILITY_UNAVAILABLE'):
+                blocker = 'TASK_TERMINAL_' + row['state']
             tasks.append({
                 'task_id': row['task_id'], 'project_id': row['project_id'],
                 'node_id': row['node_id'], 'state': row['state'],
@@ -856,9 +884,9 @@ class GatewayKernel(object):
                 'module_id': row['module_id'], 'dependencies': deps,
                 'board_id': row['board_id'],
                 'responsible_party': row['owner'],
+                'task_responsible_party': row['owner'],
                 'next_action': row['next_action'],
-                'blocker': ('DEPENDENCY_WAIT' if any(
-                    dep['state'] != 'RECEIVED' for dep in deps) else None),
+                'blocker': blocker,
                 'resources': json.loads(row['resources_json']),
                 'checkpoints': checkpoints,
             })
@@ -884,20 +912,52 @@ class GatewayKernel(object):
                                       'NO_DATA' if not board_tasks else
                                       'STABLE')})
             for task in blocked:
+                unresolved_dependencies = [dep for dep in
+                                           task['dependencies']
+                                           if dep['state'] != 'RECEIVED']
+                resolver = UNKNOWN
+                evidence = []
+                depends_on = []
+                if task['blocker'] == 'DEPENDENCY_WAIT':
+                    depends_on = [dep['producer_task_id'] for dep in
+                                  unresolved_dependencies]
+                    owners = {self.supervisor._task(task_id)['owner']
+                              for task_id in depends_on}
+                    if len(owners) == 1:
+                        resolver = next(iter(owners))
+                    evidence = [dep['required_evidence_ref'] for dep in
+                                unresolved_dependencies]
+                    impact = 'DEPENDENT_TASK_NOT_STARTABLE'
+                else:
+                    terminal = [event for event in events
+                                if event['task_id'] == task['task_id']
+                                and event['kind'] in
+                                ('TERMINAL', 'SUPERVISION_ACTION')]
+                    evidence = [event['evidence_ref'] for event in terminal
+                                if event['evidence_ref']]
+                    impact = {
+                        'TASK_HOLD': 'TASK_EXECUTION_HELD',
+                        'TASK_TERMINAL_FAILURE': 'TASK_TERMINATED_FAILURE',
+                        'TASK_TERMINAL_CANCELLED': 'TASK_TERMINATED_CANCELLED',
+                        'TASK_TERMINAL_CAPABILITY_UNAVAILABLE':
+                            'TASK_CAPABILITY_UNAVAILABLE',
+                    }.get(task['blocker'], UNKNOWN)
+                if not evidence:
+                    evidence = [UNKNOWN]
                 anomalies.append({
-                    'anomaly_id': 'dependency:' + task['task_id'],
+                    'anomaly_id': task['blocker'].lower() + ':' +
+                                  task['task_id'],
                     'board_id': board_id, 'project_id': task['project_id'],
                     'task_id': task['task_id'], 'node_id': task['node_id'],
                     'missing': task['blocker'],
-                    'depends_on': [dep['producer_task_id'] for dep in
-                                   task['dependencies']
-                                   if dep['state'] != 'RECEIVED'],
-                    'impact': 'TASK_START_BLOCKED',
-                    'responsible_party': task['responsible_party'],
+                    'depends_on': depends_on,
+                    'impact': impact,
+                    'responsible_party': resolver,
+                    'task_responsible_party':
+                        task['task_responsible_party'],
+                    'resolution_responsible_party': resolver,
                     'next_action': task['next_action'],
-                    'evidence_ref': [dep['required_evidence_ref'] for dep in
-                                     task['dependencies']
-                                     if dep['state'] != 'RECEIVED'],
+                    'evidence_ref': evidence,
                 })
         return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
                 'boards': boards, 'anomalies': anomalies,
@@ -908,7 +968,8 @@ class GatewayKernel(object):
 class TestOnlyExecutor(object):
     """Explicit local adapter that drives real Supervisor/Fence transitions."""
 
-    def __init__(self, gateway, fence, context, clock=None):
+    def __init__(self, gateway, fence, context, clock=None,
+                 start_claim_hook=None):
         if not isinstance(fence, Fence):
             raise ValueError('SOURCE_ONLY_FENCE_REQUIRED')
         self.gateway = gateway
@@ -916,6 +977,40 @@ class TestOnlyExecutor(object):
         self.fence = fence
         self.context = context
         self.clock = clock or gateway.clock
+        self.start_claim_hook = start_claim_hook
+
+    def recover_incomplete_starts(self, now=None):
+        """Converge proven-dead TEST_ONLY claims with no STARTED event.
+
+        The caller invokes this only after the prior local process has exited.
+        Existing Fence drain and source invalidation receipts remain the safety
+        proof; this method neither guesses process liveness nor creates a new
+        authority system.
+        """
+        now = self.clock() if now is None else _finite(now, 'time')
+        tenant_id = self.gateway.tenants.verify(self.context)
+        rows = list(self.gateway.db.execute('''SELECT t.task_id,t.attempt_id
+          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
+          WHERE m.tenant_id=? AND t.state='RECEIVED'
+          AND t.authority_state='VALID' AND NOT EXISTS(
+            SELECT 1 FROM events e WHERE e.task_id=t.task_id
+            AND e.attempt_id=t.attempt_id AND e.kind='STARTED')
+          ORDER BY t.task_id''', (tenant_id,)))
+        recovered = []
+        for row in rows:
+            controller = {'role': 'REVOCATION_CONTROLLER',
+                          'caller_id': 'test-restart-recovery'}
+            self.fence.begin_revocation(row['task_id'], controller)
+            self.fence.drain(row['task_id'], controller, timeout=1)
+            self.fence.invalidate_source_resources(
+                row['task_id'], 'restart-unstarted')
+            self.supervisor.complete_revocation(row['task_id'])
+            receipt = self.gateway.rollback_unstarted_claim(
+                self.context, row['task_id'], row['attempt_id'], now=now)
+            receipt.update({'task_id': row['task_id'],
+                            'attempt_id': row['attempt_id']})
+            recovered.append(receipt)
+        return recovered
 
     def _caller(self, name):
         return {'caller_id': 'test-writer-' + name,
@@ -934,6 +1029,8 @@ class TestOnlyExecutor(object):
         ticket = self.fence.claim(
             task_id, attempt_id, task['owner'], task['entry'], caller,
             'lease-' + attempt_id, resources, valid_until)
+        if self.start_claim_hook is not None:
+            self.start_claim_hook(task_id, attempt_id, ticket)
         try:
             now = self.clock()
             if resume_grant_id is not None:

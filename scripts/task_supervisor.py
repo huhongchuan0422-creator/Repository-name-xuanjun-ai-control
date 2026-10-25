@@ -1885,7 +1885,13 @@ class Supervisor(object):
                         and task['next_action'] == 'WAIT_DEPENDENCIES'):
                     continue
                 if task['state'] == 'READY':
-                    base = task['created_at']
+                    # Dependency time is not dispatch latency.  Once the
+                    # Gateway consumes the exact dependency ACK it updates the
+                    # canonical next action and updated_at; supervision starts
+                    # from that durable unlock fact, not graph creation.
+                    base = (task['updated_at'] if task['next_action'] ==
+                            'RESUME_ADMISSION_REQUIRED'
+                            else task['created_at'])
                 elif task['state'] == 'RECEIVED':
                     base = task['received_at']
                 elif task['state'] in ('STARTED','RUNNING'):

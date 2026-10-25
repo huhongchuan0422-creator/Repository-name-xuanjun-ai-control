@@ -33,6 +33,11 @@ python3 scripts/reusable_scheduler_cli.py \
   --test-authority-key 0123456789abcdef0123456789abcdef \
   export-ui --tenant tenant-a \
   --output demos/task-center-digital-twin/digital-twin-data.js
+python3 scripts/reusable_scheduler_cli.py \
+  --db /tmp/xuanjun-scheduler-test.sqlite \
+  --test-authority-key 0123456789abcdef0123456789abcdef \
+  recover-unstarted --tenant tenant-a \
+  --lock-root /tmp/xuanjun-scheduler-locks
 ```
 
 CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
@@ -40,6 +45,8 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不�
 `register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
 `examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
 `digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
+`recover-unstarted` 只能在已经确认旧 TEST_ONLY 进程退出后运行；它复用原 Fence
+的 drain、资源失效覆盖和 rollback，不猜测进程存活，也不签发新 Writer。
 
 ## 事实阶段
 
@@ -57,12 +64,16 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不�
 - inbox、消费回执和依赖引用使用 `tenant + producer task + producer attempt + event` 完整身份，同名事件可跨任务合法并存。
 - claim 后 grant CAS 遇过期/撤销时执行本地 fence revocation，并把未开始 claim 收敛回 READY；不会留下 VALID 半启动或重复消费。
 - Gateway 每次从持久依赖表计算合法等待集合并显式传给原 `Supervisor.scan`；仅 READY 且仍等待的任务免于“未接单超时”，活跃任务不能被豁免。
+- claim 提交后进程退出形成的 `RECEIVED + VALID + 无 STARTED` 持久中间态，可在确认旧进程退出后经 `recover-unstarted` 收敛；旧 grant 标为 `INTERRUPTED`，资源 claim 清除，且不写伪造 STARTED。
+- 依赖等待时长不计入派发超时。完整版本/证据 ACK 被消费时，任务的解锁事实和监督期限在同一事务更新；不会刷新 resume grant 或复用过期许可。
+- 七板块健康同时识别依赖等待、HOLD、FAILURE、CANCELLED 和 CAPABILITY_UNAVAILABLE；任务负责人和解除责任方分字段，证据不足时为 `UNKNOWN`。
 
 ## 数字孪生界面
 
 - 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
 - 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
 - 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
+- 异常详情分别显示任务负责人、解除责任方、事实影响和证据；不再把受阻任务 owner 自动当成问题解决方。
 - hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
 - 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
 

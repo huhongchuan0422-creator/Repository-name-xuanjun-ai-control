@@ -3,6 +3,7 @@ from __future__ import print_function
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -477,6 +478,141 @@ class KernelTests(unittest.TestCase):
         self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
         self.assertEqual({row['task_id']: row['status'] for row in
             self.gateway.monitor(self.a)}['task-a'], 'WAITING_DEPENDENCY')
+
+    def test_restart_converges_claim_before_grant_consume_without_started(self):
+        self.register_wait_graph()
+        self.gateway.save_waiting_checkpoint(
+            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
+            ['fake:shared'], 1001)
+        outbox = self.start_complete_b()
+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
+        self.gateway.acknowledge_event(
+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
+        grant = self.gateway.issue_resume_grant(
+            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
+        self.fence.close(); self.supervisor.close()
+        scripts = os.path.realpath(os.path.join(
+            os.path.dirname(__file__), '..', 'scripts'))
+        child = r'''
+import os,sys
+sys.path.insert(0,sys.argv[1])
+from task_supervisor import Supervisor
+from task_writer_fence import Fence
+from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
+clock=lambda:1020.0
+s=Supervisor(sys.argv[2],clock)
+a=TestTenantAuthority(b'k'*32)
+g=GatewayKernel(s,a,clock)
+f=Fence(s,sys.argv[3])
+e=TestOnlyExecutor(g,f,a.issue('tenant-a','owner-a'),clock,
+                   start_claim_hook=lambda *_:os._exit(73))
+e.start('task-a','attempt-a-crash',['fake:shared'],2000,
+        'checkpoint-a0',sys.argv[4])
+'''
+        completed = subprocess.run(
+            [sys.executable, '-c', child, scripts, self.path,
+             self.lock_root, grant['grant_id']], check=False)
+        self.assertEqual(completed.returncode, 73)
+        self.now = 1030
+        self.supervisor = Supervisor(self.path, lambda: self.now)
+        self.gateway = GatewayKernel(
+            self.supervisor, self.authority, lambda: self.now)
+        self.fence = Fence(self.supervisor, self.lock_root)
+        task = self.supervisor._task('task-a')
+        self.assertEqual((task['state'], task['authority_state']),
+                         ('RECEIVED', 'VALID'))
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          gateway_resume_grants WHERE grant_id=?''',
+          (grant['grant_id'],)).fetchone()[0], 'ELIGIBLE')
+        recovered = self.executor().recover_incomplete_starts(now=self.now)
+        self.assertEqual(len(recovered), 1)
+        self.assertEqual(recovered[0]['interrupted_grants'], 1)
+        task = self.supervisor._task('task-a')
+        self.assertEqual((task['state'], task['authority_state'],
+                          task['next_action']),
+                         ('READY', 'NONE', 'REISSUE_RESUME_GRANT'))
+        self.assertEqual(self.supervisor.db.execute(
+            "SELECT COUNT(*) FROM resource_claims WHERE task_id='task-a'"
+        ).fetchone()[0], 0)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          events WHERE task_id='task-a' AND kind='STARTED' ''').fetchone()[0], 0)
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          gateway_resume_grants WHERE grant_id=?''',
+          (grant['grant_id'],)).fetchone()[0], 'INTERRUPTED')
+        self.assertEqual(self.executor().recover_incomplete_starts(now=1031), [])
+
+    def test_long_dependency_wait_unlocks_fresh_dispatch_clock_and_starts(self):
+        self.register_wait_graph()
+        self.gateway.save_waiting_checkpoint(
+            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
+            ['fake:shared'], 1001)
+        self.now = 10000
+        exe = self.executor()
+        exe.start('task-b', 'attempt-b-long',
+                  ['fake:resource-task-b'], 20000)
+        exe.complete_success('task-b', 'attempt-b-long', 'f' * 64,
+                             [{'evidence_ref': 'evid-b-v3'}], 10001)
+        outbox = self.supervisor.db.execute('''SELECT outbox_id,event_id FROM
+          outbox WHERE task_id='task-b' ''').fetchone()
+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 10002)
+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 10003)
+        self.gateway.acknowledge_event(
+            self.a, 'task-b', 'attempt-b-long', outbox['event_id'], 10004)
+        actions = self.gateway.scan(self.a, now=10005)
+        self.assertNotIn('task-a', {row['task_id'] for row in actions})
+        task = self.supervisor._task('task-a')
+        self.assertEqual(task['updated_at'], 10004)
+        self.assertEqual(task['receipt_deadline'], 10304)
+        grant = self.gateway.issue_resume_grant(
+            self.a, 'task-a', 'checkpoint-a0', 11000, 10006)
+        self.now = 10007
+        started = self.executor().start(
+            'task-a', 'attempt-a-long', ['fake:shared'], 11000,
+            'checkpoint-a0', grant['grant_id'])
+        self.assertEqual(started['state'], 'STARTED')
+
+    def test_projection_reports_hold_failure_and_distinct_resolver(self):
+        producer = self.task('task-b', 'b-v1', board='acceptance-delivery')
+        producer['owner'] = 'acceptance-owner'
+        consumer = self.task('task-a', 'a-v1', dependencies=[{
+            'task_id': 'task-b', 'version': 'b-v1',
+            'evidence_ref': 'acceptance-proof'}])
+        consumer['owner'] = 'development-owner'
+        held = self.task('task-h', 'h-v1', board='operations')
+        failed = self.task('task-f', 'f-v1', board='customer')
+        self.gateway.register_graph(self.a, self.graph(
+            tasks=[producer, consumer, held, failed]), now=1000)
+        self.now = 1001
+        self.executor().start('task-f', 'attempt-f1',
+                              ['fake:resource-task-f'], 3000)
+        self.supervisor.record(
+            'task-f', 'attempt-f1', 'failed-f1', 'TERMINAL', 1002,
+            'TEST_RUN', 'failure-proof', {
+                'state': 'FAILURE', 'artifact_sha256': UNKNOWN,
+                'writer_stopped': UNKNOWN, 'effects_reconciled': UNKNOWN,
+                'next_action': 'INSPECT_FAILURE',
+                'completion_evidence': []})
+        self.gateway.scan(self.a, now=2000)
+        value = self.gateway.projection(self.a)
+        anomalies = {row['task_id']: row for row in value['anomalies']}
+        self.assertEqual(anomalies['task-a']['task_responsible_party'],
+                         'development-owner')
+        self.assertEqual(anomalies['task-a']['resolution_responsible_party'],
+                         'acceptance-owner')
+        self.assertEqual(anomalies['task-a']['impact'],
+                         'DEPENDENT_TASK_NOT_STARTABLE')
+        self.assertEqual(anomalies['task-f']['impact'],
+                         'TASK_TERMINATED_FAILURE')
+        self.assertEqual(anomalies['task-f']['resolution_responsible_party'],
+                         UNKNOWN)
+        self.assertEqual(anomalies['task-h']['impact'],
+                         'TASK_EXECUTION_HELD')
+        self.assertEqual(anomalies['task-h']['evidence_ref'][0],
+                         'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+        boards = {row['board_id']: row for row in value['boards']}
+        self.assertEqual(boards['operations']['health'], 'BLOCKED')
+        self.assertEqual(boards['customer']['health'], 'BLOCKED')
 
     def test_multi_project_cross_board_partial_flow_and_tenant_projection(self):
         ops = self.task('task-a', 'brief-v1', board='operations')

@@ -112,6 +112,10 @@ def main(argv=None):
     export.add_argument('--tenant', required=True)
     export.add_argument('--principal', default='local-viewer')
     export.add_argument('--output', required=True)
+    recover = sub.add_parser('recover-unstarted')
+    recover.add_argument('--tenant', required=True)
+    recover.add_argument('--principal', default='local-recovery-controller')
+    recover.add_argument('--lock-root', required=True)
     args = parser.parse_args(argv)
     if args.command is None:
         parser.error('a command is required')
@@ -131,7 +135,7 @@ def main(argv=None):
             with open(args.graph, 'r') as stream:
                 graph = json.load(stream)
             value = gateway.register_graph(context, graph)
-        else:
+        elif args.command == 'export-ui':
             context = authority.issue(args.tenant, args.principal)
             value = gateway.projection(context)
             output = os.path.realpath(args.output)
@@ -144,6 +148,14 @@ def main(argv=None):
                      'tenant_id': value['tenant_id'],
                      'tasks': len(value['tasks']),
                      'anomalies': len(value['anomalies'])}
+        else:
+            context = authority.issue(args.tenant, args.principal)
+            fence = Fence(supervisor, os.path.realpath(args.lock_root))
+            try:
+                value = {'recovered': TestOnlyExecutor(
+                    gateway, fence, context).recover_incomplete_starts()}
+            finally:
+                fence.close()
         print(json.dumps(value, ensure_ascii=False,
                          sort_keys=True, indent=2))
     finally:

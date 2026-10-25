@@ -1,29 +1,11 @@
 window.XUANJUN_TWIN_DATA = {
-  "anomalies": [
-    {
-      "anomaly_id": "dependency:delivery-node",
-      "board_id": "acceptance-delivery",
-      "depends_on": [
-        "qa-node"
-      ],
-      "evidence_ref": [
-        "qa-report-demo"
-      ],
-      "impact": "TASK_START_BLOCKED",
-      "missing": "DEPENDENCY_WAIT",
-      "next_action": "WAIT_DEPENDENCIES",
-      "node_id": "delivery",
-      "project_id": "project-demo",
-      "responsible_party": "developer",
-      "task_id": "delivery-node"
-    }
-  ],
+  "anomalies": [],
   "boards": [
     {
       "active_count": 0,
-      "blocked_count": 1,
+      "blocked_count": 0,
       "board_id": "acceptance-delivery",
-      "health": "BLOCKED",
+      "health": "STABLE",
       "task_count": 1
     },
     {
@@ -55,11 +37,11 @@ window.XUANJUN_TWIN_DATA = {
       "task_count": 0
     },
     {
-      "active_count": 0,
+      "active_count": 1,
       "blocked_count": 0,
       "board_id": "research-development",
-      "health": "STABLE",
-      "task_count": 1
+      "health": "ACTIVE",
+      "task_count": 2
     },
     {
       "active_count": 0,
@@ -74,36 +56,79 @@ window.XUANJUN_TWIN_DATA = {
   "schema": 2,
   "tasks": [
     {
-      "attempt_id": "UNKNOWN",
-      "authority_state": "NONE",
-      "blocker": "DEPENDENCY_WAIT",
-      "board_id": "acceptance-delivery",
-      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "checkpoints": [],
-      "dependencies": [
+      "attempt_id": "demo-a-attempt",
+      "authority_state": "VALID",
+      "blocker": null,
+      "board_id": "research-development",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
         {
-          "event_id": null,
-          "producer_task_id": "qa-node",
-          "required_evidence_ref": "qa-report-demo",
-          "required_version": "accepted-v1",
-          "state": "WAITING"
+          "attempt_id": "demo-a-prior",
+          "checkpoint_id": "demo-a-checkpoint",
+          "created_at": 1792914219.1551578,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:shared\"]"
         }
       ],
-      "epoch": null,
-      "input_version": "accepted-v1",
+      "dependencies": [
+        {
+          "event_attempt_id": "demo-b-attempt",
+          "event_id": "terminal-demo-b-attempt",
+          "producer_task_id": "demo-b",
+          "required_evidence_ref": "evid-demo-b",
+          "required_version": "b-v1",
+          "state": "RECEIVED"
+        }
+      ],
+      "epoch": 1,
+      "input_version": "input-v1",
       "module_id": "xuanjun.scheduler.kernel",
-      "next_action": "WAIT_DEPENDENCIES",
-      "node_id": "delivery",
-      "output_version": "delivery-v1",
+      "next_action": "RESUME_ADMISSION_REQUIRED",
+      "node_id": "node-demo-a",
+      "output_version": "a-v1",
       "preemptible": true,
       "priority": 100,
-      "project_id": "project-demo",
+      "project_id": "demo-project",
       "resources": [
-        "fake:delivery/demo"
+        "fake:shared"
       ],
-      "responsible_party": "developer",
-      "state": "READY",
-      "task_id": "delivery-node"
+      "responsible_party": "test-executor",
+      "state": "STARTED",
+      "task_id": "demo-a",
+      "task_responsible_party": "test-executor"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "authority_state": "REVOKED",
+      "blocker": null,
+      "board_id": "acceptance-delivery",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
+        {
+          "attempt_id": "demo-b-attempt",
+          "checkpoint_id": "terminal-checkpoint-demo-b-attempt",
+          "created_at": 1792914219.174842,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:demo-b\"]"
+        }
+      ],
+      "dependencies": [],
+      "epoch": 1,
+      "input_version": "input-v1",
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "DEPENDENCIES_RECHECK",
+      "node_id": "node-demo-b",
+      "output_version": "b-v1",
+      "preemptible": true,
+      "priority": 50,
+      "project_id": "demo-project",
+      "resources": [
+        "fake:demo-b"
+      ],
+      "responsible_party": "test-executor",
+      "state": "SUCCESS",
+      "task_id": "demo-b",
+      "task_responsible_party": "test-executor"
     },
     {
       "attempt_id": "UNKNOWN",
@@ -111,25 +136,107 @@ window.XUANJUN_TWIN_DATA = {
       "blocker": null,
       "board_id": "research-development",
       "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "checkpoints": [],
+      "checkpoints": [
+        {
+          "attempt_id": "demo-c-attempt",
+          "checkpoint_id": "demo-c-checkpoint",
+          "created_at": 1792914219.2738826,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:shared\"]"
+        }
+      ],
       "dependencies": [],
       "epoch": null,
-      "input_version": "candidate-v1",
+      "input_version": "input-v1",
       "module_id": "xuanjun.scheduler.kernel",
-      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
-      "node_id": "qa-acceptance",
-      "output_version": "accepted-v1",
-      "preemptible": true,
-      "priority": 50,
-      "project_id": "project-demo",
+      "next_action": "RESUME_FROM_CHECKPOINT",
+      "node_id": "node-demo-c",
+      "output_version": "c-v1",
+      "preemptible": false,
+      "priority": 10,
+      "project_id": "demo-project",
       "resources": [
-        "fake:qa/demo"
+        "fake:shared"
       ],
-      "responsible_party": "qa",
+      "responsible_party": "test-executor",
       "state": "READY",
-      "task_id": "qa-node"
+      "task_id": "demo-c",
+      "task_responsible_party": "test-executor"
     }
   ],
-  "tenant_id": "tenant-demo",
-  "timeline": []
+  "tenant_id": "tenant-a",
+  "timeline": [
+    {
+      "attempt_id": "demo-c-attempt",
+      "event_id": "received-demo-c-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-c-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792914219.1604135,
+      "task_id": "demo-c"
+    },
+    {
+      "attempt_id": "demo-c-attempt",
+      "event_id": "started-demo-c-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-c-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792914219.1604135,
+      "task_id": "demo-c"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "received-demo-b-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-b-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792914219.1680598,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "started-demo-b-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-b-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792914219.1680598,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "demo-b-progress",
+      "evidence_kind": "TEST_RUN",
+      "evidence_ref": "demo-test-run",
+      "kind": "PROGRESS",
+      "observed_at": 1792914219.1724398,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "terminal-demo-b-attempt",
+      "evidence_kind": "TEST_RUN",
+      "evidence_ref": "test-terminal-demo-b-attempt",
+      "kind": "TERMINAL",
+      "observed_at": 1792914219.174842,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-a-attempt",
+      "event_id": "received-demo-a-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-a-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792914219.3061314,
+      "task_id": "demo-a"
+    },
+    {
+      "attempt_id": "demo-a-attempt",
+      "event_id": "started-demo-a-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-a-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792914219.3061314,
+      "task_id": "demo-a"
+    }
+  ]
 };
