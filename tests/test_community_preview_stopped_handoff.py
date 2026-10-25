@@ -1004,6 +1004,9 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
     def test_builder_exposes_resume_wrapper_without_changing_default_acceptance(self):
         archive,manifest,commands=build.build()
         self.assertIn('resume-b-partial',commands);self.assertIn(b'--resume-b-partial',commands['resume-b-partial'])
+        self.assertIn('resume-c-before-confirmation',commands)
+        self.assertIn(b'--resume-c-before-confirmation',commands['resume-c-before-confirmation'])
+        self.assertIn(b'BC_OUTER_NOT_ACCEPTANCE',commands['resume-c-before-confirmation'])
         self.assertIn(b'BC_OUTER_NOT_ACCEPTANCE',commands['resume-b-partial'])
 
     def test_builder_binding_checks_builder_loader_and_source_set(self):
