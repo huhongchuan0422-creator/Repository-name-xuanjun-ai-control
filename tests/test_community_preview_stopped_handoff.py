@@ -218,7 +218,8 @@ class WholeEntry(unittest.TestCase):
         self.write(h.C_APPROVAL,s.canonical(old_approval))
         record=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
             carrier_manifest_sha256=q.approved_stamp,evidence_sha256=s.sha(s.canonical(semantic)),
-            plan=candidate,plan_sha256=s.sha(s.canonical(candidate)),
+            plan=candidate,plan_sha256=candidate['plan_sha256'],
+            plan_document_sha256=s.sha(s.canonical(candidate)),
             issued_at=self.clock,expires_at=self.clock+600)
         self.write(h.C_RESUME_PLAN,s.canonical(record))
         approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
