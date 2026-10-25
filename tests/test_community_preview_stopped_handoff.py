@@ -742,7 +742,29 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         with patch.object(q,'candidate',side_effect=bind),patch.object(u.Update,'replace_and_verify',known),self.assertRaisesRegex(u.Hold,'KNOWN_FAILURE'):
             q.update()
         self.assertEqual(q.journal.state['phase'],'KNOWN_FAILURE')
-        q.close();r=h.Session();r.acquire(recover=True);self.addCleanup(r.close)
+        q.close()
+        # The old permit was absent at admission. It must remain absent
+        # across a new recover lease, even if introduced after C failed.
+        mutation_count=len(self.calls)
+        self.write(s.PERMIT,b'UNEXPECTED_OLD_PERMIT')
+        blocked=h.Session();blocked.acquire(recover=True);self.addCleanup(blocked.close)
+        with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):
+            blocked.recover()
+        self.assertEqual(len(self.calls),mutation_count)
+        blocked.close();Path(s.PERMIT).unlink()
+
+        # Inject after configure_resumed_recovery has rebound the history,
+        # but before the recovery action confirmation/consume boundary.
+        blocked=h.Session();blocked.acquire(recover=True);self.addCleanup(blocked.close)
+        def late_old_permit(action,digest):
+            self.write(s.PERMIT,b'LATE_UNEXPECTED_OLD_PERMIT')
+        with patch.object(h,'acknowledge',side_effect=late_old_permit):
+            with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):
+                blocked.recover()
+        self.assertEqual(len(self.calls),mutation_count)
+        blocked.close();Path(s.PERMIT).unlink()
+
+        r=h.Session();r.acquire(recover=True);self.addCleanup(r.close)
         old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
             scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
             runtime_source_sha=None,version_source=None,observed_at=self.clock)
