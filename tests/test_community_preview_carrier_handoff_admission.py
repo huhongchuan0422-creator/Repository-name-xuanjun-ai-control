@@ -118,8 +118,6 @@ class HandoffAdmission(unittest.TestCase):
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
             refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
         os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
-        st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
-        refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         backup_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:
             bodies={'backup_manifest':h.canonical(dict(format=1,mode=h.POST_B_MODE,attempt=h.ORIGINAL_ATTEMPT,
@@ -131,6 +129,8 @@ class HandoffAdmission(unittest.TestCase):
                 item=os.stat(name,dir_fd=backup_fd,follow_symlinks=False)
                 refs[key]=(backup_fd,name,h.parent_ident(os.fstat(backup_fd)),h.ident(item),h.sha(body))
         finally:os.close(backup_fd)
+        st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
+        refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         return refs
 
     def post_b_fixture(self):
