@@ -41,6 +41,16 @@ ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt'}
 REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
 ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','backup_dir'}
+POST_B_MODE='POST_B_CARRIER_HANDOFF_V1'
+POST_B_STATE='post-b-carrier-handoff-intent-v1.json'
+POST_B_PREINTENT='post-b-carrier-handoff-preintent-v1.json'
+POST_B_ROLLBACK_INTENT='post-b-carrier-handoff-rollback-intent-v1.json'
+POST_B_ROLLBACK_RESULT='post-b-carrier-handoff-rollback-result-v1.json'
+POST_B_STAGE='control-stopped-v1.post-b-handoff-stage-v1'
+POST_B_RETAINED='control-stopped-v1.post-b-handoff-retained-old-v1'
+POST_B_REQUIRED={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit',
+                 'b_approval','freeze','resume_approval','resume_freeze','backup_dir','c_approval'}
+POST_B_ABSENT={'active_attempt'}
 HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
                'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
                'snapshot_permit':ORIGINAL_ATTEMPT+'-snapshot-permit.json',
@@ -135,9 +145,20 @@ def members(raw,manifest_sha,archive_sha):
                  and meta['uid']==0 and meta['mode']=='0600','CANDIDATE_MEMBER_SHA')
         return contents
 
-def capture_history(refs,uid,carrier_parent=None,journal_parent=None):
+def history_policy(mode=None):
+    if mode is None:return REQUIRED_HISTORY,ABSENT_HISTORY
+    need(mode==POST_B_MODE,'HANDOFF_MODE_DENIED')
+    return POST_B_REQUIRED,POST_B_ABSENT
+
+def transaction_names(mode=None):
+    if mode is None:return STATE,PREINTENT,ROLLBACK_INTENT,ROLLBACK_RESULT,STAGE,RETAINED
+    need(mode==POST_B_MODE,'HANDOFF_MODE_DENIED')
+    return POST_B_STATE,POST_B_PREINTENT,POST_B_ROLLBACK_INTENT,POST_B_ROLLBACK_RESULT,POST_B_STAGE,POST_B_RETAINED
+
+def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
     need(type(refs) is dict and set(refs)==set(HISTORY_NAMES),
          'HISTORICAL_BINDINGS_REQUIRED')
+    required,absent_keys=history_policy(mode)
     result={}
     for key in sorted(refs):
         ref=refs[key]
@@ -148,8 +169,8 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None):
             need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
                  'HISTORY_PARENT_ROLE_MISMATCH')
             need(name==HISTORY_NAMES[key],'HISTORY_PATH_NOT_FIXED')
-            if key in REQUIRED_HISTORY:need(expected_file is not None and expected_sha is not None,'REQUIRED_HISTORY_MISSING')
-            if key in ABSENT_HISTORY:need(expected_file is None and expected_sha is None,'EXPECTED_ABSENCE_BINDING_REQUIRED')
+            if key in required:need(expected_file is not None and expected_sha is not None,'REQUIRED_HISTORY_MISSING')
+            if key in absent_keys:need(expected_file is None and expected_sha is None,'EXPECTED_ABSENCE_BINDING_REQUIRED')
         pst=os.fstat(pfd)
         need(stat.S_ISDIR(pst.st_mode) and pst.st_uid==uid
              and not(stat.S_IMODE(pst.st_mode)&0o022)
