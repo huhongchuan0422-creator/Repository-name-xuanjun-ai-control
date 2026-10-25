@@ -51,6 +51,15 @@ POST_B_RETAINED='control-stopped-v1.post-b-handoff-retained-old-v1'
 POST_B_REQUIRED={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit',
                  'b_approval','freeze','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','c_approval'}
 POST_B_ABSENT={'active_attempt'}
+POST_B_OLD_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
+POST_B_OLD_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
+POST_B_NEW_MANIFEST='f7118e9a45c77cf260ae516864635d45af4a9159055da3f9ab983ff4ca95f99e'
+POST_B_NEW_ARCHIVE='8556531d52b81ca87f3346f2d098de7aea50cf7838106482aadcc86188c374eb'
+
+def manifest_pins(mode=None):
+    if mode is None:return OLD_MANIFEST,OLD_ARCHIVE,NEW_MANIFEST,NEW_ARCHIVE
+    need(mode==POST_B_MODE,'HANDOFF_MODE_DENIED')
+    return POST_B_OLD_MANIFEST,POST_B_OLD_ARCHIVE,POST_B_NEW_MANIFEST,POST_B_NEW_ARCHIVE
 HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
                'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
                'snapshot_permit':ORIGINAL_ATTEMPT+'-snapshot-permit.json',
@@ -401,12 +410,13 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
     if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
     if childstat(jfd,state_name) is None:
         if childstat(jfd,preintent_name) is not None:
-            pre_raw=readfile(jfd,preintent_name,uid,8192)
+            old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
+    pre_raw=readfile(jfd,preintent_name,uid,8192)
             try:pre=json.loads(pre_raw.decode('utf8'))
             except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
             need(type(pre) is dict and set(pre)=={'format','attempt','old_identity','old_manifest','new_manifest','entry_identity','parent_identity','journal_parent_identity','lock_identity','history','old_tree_sha','new_tree_sha'}
                  and type(pre.get('format')) is int and pre.get('format')==1
-                 and pre_raw==canonical(pre) and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST
+                 and pre_raw==canonical(pre) and pre.get('old_manifest')==old_manifest and pre.get('new_manifest')==new_manifest
                  and pre.get('parent_identity')==expected_parent_identity
                  and pre.get('journal_parent_identity')==expected_journal_identity
                  and pre.get('entry_identity')==expected_entry_identity
@@ -415,7 +425,7 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
             need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid,parent,jfd,mode),
                  'PREINTENT_HISTORY_CHANGED')
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
-    verified_old_inventory(old_entries)
+    verified_old_inventory(old_entries,mode)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     current_history=capture_history(history_refs,uid,parent,jfd,mode)
     j=journal(jfd,uid,state_name)
@@ -447,8 +457,8 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
     need(j.get('history')==current_history,'HISTORY_CHANGED_SINCE_INTENT')
     need(j['old_tree_sha']==sha(canonical({x:sha(y) for x,y in old_entries.items()}))
          and j['new_tree_sha']==sha(canonical({x:sha(y) for x,y in new_entries.items()}))
-         and sha(old_entries['manifest.json'])==OLD_MANIFEST
-         and sha(new_entries['manifest.json'])==NEW_MANIFEST,
+         and sha(old_entries['manifest.json'])==old_manifest
+         and sha(new_entries['manifest.json'])==new_manifest,
          'JOURNAL_TREE_DIGEST_MISMATCH')
     old_id=j['old_identity'];new_id=j['stage_identity']
     rb_intent=childstat(jfd,rollback_intent_name)
@@ -503,8 +513,9 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         need(childstat(jfd,'active-attempt.json') is None,'ACTIVE_BUSINESS_ATTEMPT')
         verified_old_inventory(old_entries)
         old_id=tree(parent,TARGET,uid,old_entries)
-        need(sha(old_entries['manifest.json'])==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
-        new_entries=members(new_archive,NEW_MANIFEST,NEW_ARCHIVE)
+        need(sha(old_entries['manifest.json'])==old_manifest,'OLD_MANIFEST_CHANGED')
+        old_manifest,old_archive,new_manifest,new_archive_sha=manifest_pins(mode)
+        new_entries=members(new_archive,new_manifest,new_archive_sha)
         need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
         history=capture_history(history_refs,uid,parent,jfd,mode)
         pre=dict(format=1,attempt=attempt,old_identity=old_id,
