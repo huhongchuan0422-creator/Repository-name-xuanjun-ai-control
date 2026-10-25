@@ -80,8 +80,8 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     require(callable(authority_checker),'INSTALL_WRITER_AUTHORITY_REQUIRED')
     identify_admin()
-    require(authority_checker(operation,h.HOST,ATTEMPT) is True,
-            'CURRENT_INSTALL_WRITER_APPROVAL_REQUIRED')
+    approved=authority_checker(operation,h.HOST,ATTEMPT)
+    require(approved is True,'CURRENT_INSTALL_WRITER_APPROVAL_REQUIRED')
     require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
             'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
     # Complete pinned archive/manifests must be verified before any transaction.
@@ -117,7 +117,7 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
         h.capture_history(refs,0,parent,journal)
         ctx=SimpleNamespace(
-            host_id=h.HOST,authority_check=lambda:authority_checker(operation,h.HOST,ATTEMPT) is True,
+            host_id=h.HOST,authority_check=lambda:approved is True,
             parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=0,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
