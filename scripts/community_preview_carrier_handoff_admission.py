@@ -182,6 +182,11 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
             need(expected_sha is None and st is None,'HISTORY_ABSENCE_CHANGED')
             result[key]={'name':name,'parent_identity':expected_parent,'file_identity':None,'sha256':None}
             continue
+        if key=='backup_dir':
+            need(st is not None and stat.S_ISDIR(st.st_mode) and dirident(st)==expected_file
+                 and expected_sha is None,'HISTORY_BACKUP_DIR_CHANGED')
+            result[key]={'name':name,'parent_identity':expected_parent,'file_identity':expected_file,'sha256':None}
+            continue
         need(st is not None and ident(st)==expected_file,'HISTORY_FILE_IDENTITY_CHANGED')
         raw=readfile(pfd,name,uid,8*1024*1024)
         after=childstat(pfd,name)
