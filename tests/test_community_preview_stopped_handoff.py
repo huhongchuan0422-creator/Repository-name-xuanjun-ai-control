@@ -175,11 +175,6 @@ class WholeEntry(unittest.TestCase):
             old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),old_stage_permit_sha256=None,
             resume_freeze_sha256=s.sha(s.canonical(fresh)),actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
         self.write(h.B_RESUME_APPROVAL,s.canonical(resume))
-        if not Path(h.C_APPROVAL).exists():
-            old_c=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
-                carrier_manifest_sha256=self.session.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
-                issued_at=1,expires_at=2,actions=h.C_ACTIONS)
-            self.write(h.C_APPROVAL,s.canonical(old_c))
         return intent,old_braw,old_freeze_raw,resume
     def fresh_session(self):
         self.session.close()
@@ -199,6 +194,12 @@ class WholeEntry(unittest.TestCase):
         self.seed_partial_resume()
         q=self.fresh_session();q.resume_b_partial()
         self.assertTrue(q.bdone);self.assertEqual(set(q.captured),set(h.CLONES))
+        if not Path(h.C_APPROVAL).exists():
+            old_c=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+                carrier_manifest_sha256=self.session.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
+                issued_at=1,expires_at=2,actions=h.C_ACTIONS)
+            self.write(h.C_APPROVAL,s.canonical(old_c))
+
         historical_paths=[h.B_RESUME_APPROVAL,h.resume_record_path(),h.B_APPROVAL,s.FREEZE,
             s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json']+list(h.paths().values())+list(h.b_records().values())
         historical={path:Path(path).read_bytes() for path in historical_paths if Path(path).exists()}
