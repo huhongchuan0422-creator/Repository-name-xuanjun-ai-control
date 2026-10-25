@@ -237,6 +237,30 @@ class WholeEntry(unittest.TestCase):
         self.assertTrue(Path(h.PROOF).exists())
         self.assertTrue(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
 
+    def test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        old_c=Path(h.C_APPROVAL).read_bytes()
+        Path(h.C_RESUME_PLAN).unlink()
+        Path(h.C_RESUME_APPROVAL).unlink()
+        original=h.Session._c_resume_approval
+        def owner_approves(session,plan):
+            if not Path(h.C_RESUME_APPROVAL).exists():
+                record,_=h.document(h.C_RESUME_PLAN)
+                approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+                    carrier_manifest_sha256=session.pins(),plan_sha256=record['plan_sha256'],
+                    issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+                self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+            return original(session,plan)
+        output=io.StringIO()
+        with patch.object(h.Session,'_c_resume_approval',owner_approves),contextlib.redirect_stdout(output):
+            result=q.resume_c_before_confirmation()
+        self.assertIn('"plan":',output.getvalue())
+        self.assertIn(candidate['attempt'],output.getvalue())
+        self.assertEqual(result['phase'],'COMMITTED')
+        self.assertEqual(Path(h.C_APPROVAL).read_bytes(),old_c)
+        self.assertTrue(Path(h.C_RESUME_PLAN).exists())
+        self.assertTrue(Path(h.C_RESUME_APPROVAL).exists())
+
     def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
         bad,_=h.document(h.C_RESUME_APPROVAL)
