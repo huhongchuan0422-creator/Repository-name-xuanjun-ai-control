@@ -1,5 +1,9 @@
 # 任务中心后台与多模型统一调度 R5（TEST_ONLY）
 
+> 历史 R5 启动说明保留作审计记录。当前后台测试版的服务端会话、默认关闭
+> 出站及回滚步骤见 `TASK_CENTER_TEST_BACKEND_20261025.md`；不要再把下文临时
+> Header token 页面当作当前使用入口。
+
 ## 定位与边界
 
 本候选沿用原 `Supervisor`、`GatewayKernel`、SQLite、outbox、checkpoint、

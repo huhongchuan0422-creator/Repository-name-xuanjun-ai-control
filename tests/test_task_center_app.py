@@ -155,7 +155,7 @@ class TaskCenterAppTests(unittest.TestCase):
         self.assertNotIn('fixture-secret-value',encoded)
         self.assertIn('••••alue',encoded)
         status,_,body=self.get('/admin.html')
-        self.assertEqual(status,200);self.assertIn(b'adminToken',body)
+        self.assertEqual(status,200);self.assertIn(b'sessionIdentity',body)
 
     def test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects(self):
         bad={'project_id':'project-zero','task_id':'task-zero',

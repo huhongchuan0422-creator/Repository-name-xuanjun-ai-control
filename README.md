@@ -30,6 +30,9 @@ The TEST_ONLY provider/model/role administration and persistent model scheduler
 extension is documented in
 [TASK_CENTER_MODEL_ORCHESTRATION_R5_20261025.md](docs/development/TASK_CENTER_MODEL_ORCHESTRATION_R5_20261025.md).
 It adds no production credential, paid call, deployment, or second task ledger.
+The current loopback backend test candidate, server-side session entry,
+health/stop/rollback commands and exact HOLD boundaries are documented in
+[TASK_CENTER_TEST_BACKEND_20261025.md](docs/development/TASK_CENTER_TEST_BACKEND_20261025.md).
 
 ## Mandatory development execution rules
 

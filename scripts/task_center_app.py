@@ -14,6 +14,7 @@ import sqlite3
 import stat
 import sys
 import threading
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -26,6 +27,7 @@ from execution_policy_gateway import ExecutionPolicyGateway
 from connection_management import ConnectionManager
 from codex_execution_adapter import (CodexExecutionControl,
                                      CodexAppServerTransport)
+from task_center_session_auth import FileTestIdentityProvider, SessionStore
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -37,6 +39,9 @@ ASSETS = {
     '/styles.css': ('styles.css', 'text/css; charset=utf-8'),
     '/admin.html': ('admin.html', 'text/html; charset=utf-8'),
     '/admin.js': ('admin.js', 'application/javascript; charset=utf-8'),
+    '/login.html': ('login.html', 'text/html; charset=utf-8'),
+    '/login.js': ('login.js', 'application/javascript; charset=utf-8'),
+    '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
 }
 
 PROJECTION_TABLES = frozenset((
@@ -178,30 +183,70 @@ class CodexWorkerLoop(object):
 
 def build_handler(db_path, authority_key, tenant_id, principal_id,
                   model_master_key=None, admin_token=None, actor_tokens=None,
-                  codex_transports=None):
+                  codex_transports=None, identity_provider=None,
+                  session_store=None, outbound_enabled=False):
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
     class TaskCenterHandler(BaseHTTPRequestHandler):
         server_version = 'XuanjunTaskCenter/1.0-TEST_ONLY'
 
         def log_message(self, fmt, *args):
-            sys.stderr.write('task-center-app: ' + fmt % args + '\n')
+            # Never log query strings (OAuth codes/state) or request bodies.
+            sys.stderr.write('task-center-app: %s %s\n' %
+                             (self.command, self.path.split('?', 1)[0]))
 
-        def _send(self, status, body, content_type):
+        def _send(self, status, body, content_type, extra_headers=None):
             self.send_response(status)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(body)))
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Content-Security-Policy',
                              "default-src 'self'; object-src 'none'; "
                              "frame-ancestors 'none'")
+            for name, value in (extra_headers or []):
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(body)
 
         def do_GET(self):
+            if not self._host_allowed():
+                self._send(421,_json_bytes({'error':'LOOPBACK_HOST_REQUIRED'}),
+                  'application/json; charset=utf-8');return
             path = self.path.split('?', 1)[0]
+            if path == '/healthz':
+                self._send(200, _json_bytes({'state':'UP','mode':'TEST_ONLY',
+                  'outbound':'DISABLED' if not outbound_enabled else
+                  'TEST_FIXTURE_ONLY'}),'application/json; charset=utf-8');return
+            if path == '/readyz':
+                try:
+                    connection=_read_only_connection(db_path,PROJECTION_TABLES)
+                    connection.close()
+                    self._send(200,_json_bytes({'state':'READY','mode':'TEST_ONLY',
+                      'identity_adapter':('CONFIGURED' if identity_provider else
+                      'NOT_CONFIGURED')}),'application/json; charset=utf-8')
+                except Exception as exc:
+                    self._send(503,_json_bytes({'state':'NOT_READY',
+                      'detail':str(exc)}),'application/json; charset=utf-8')
+                return
+            if path == '/api/session':
+                session=self._session()
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),
+                      'application/json; charset=utf-8');return
+                self._send(200,_json_bytes({'principal_id':session['principal_id'],
+                  'tenant_id':session['tenant_id'],'roles':session['roles'],
+                  'expires_at':session['expires_at']}),
+                  'application/json; charset=utf-8');return
+            if (session_store is not None and path in ('/','/index.html',
+                    '/admin.html') and self._session() is None):
+                self.send_response(302);self.send_header('Location','/login.html')
+                self.send_header('Cache-Control','no-store');self.end_headers();return
             if path == '/api/projection':
+                if session_store is not None and self._session() is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),
+                      'application/json; charset=utf-8');return
                 try:
                     self._send(200, _json_bytes(read_only_projection(
                                db_path, authority_key, tenant_id,
@@ -235,11 +280,36 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 self._send(200, stream.read(), asset[1])
 
         def do_POST(self):
+            if not self._host_allowed() or not self._origin_allowed():
+                self._send(403,_json_bytes({'error':'SAME_ORIGIN_REQUIRED'}),
+                  'application/json; charset=utf-8');return
             path = self.path.split('?',1)[0]
+            if path == '/api/session/login':
+                return self._login()
+            if path == '/api/session/logout':
+                session=self._session();token=self._session_token()
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),
+                      'application/json; charset=utf-8');return
+                if not session_store.verify_csrf(session,
+                        self.headers.get('X-CSRF-Token')):
+                    self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),
+                      'application/json; charset=utf-8');return
+                session_store.revoke(token)
+                self._send(200,_json_bytes({'state':'LOGGED_OUT'}),
+                  'application/json; charset=utf-8', [('Set-Cookie',
+                  session_store.COOKIE+'=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'),
+                  ('Set-Cookie',session_store.CSRF_COOKIE+
+                   '=; Path=/; SameSite=Strict; Max-Age=0')]);return
             if path != '/api/admin/model-control':
                 self._send(405,b'read only\n','text/plain; charset=utf-8');return
             if not self._admin_allowed():
                 self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
+                           'application/json; charset=utf-8');return
+            session=self._session()
+            if session is not None and not session_store.verify_csrf(session,
+                    self.headers.get('X-CSRF-Token')):
+                self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),
                            'application/json; charset=utf-8');return
             try:
                 length=int(self.headers.get('Content-Length','0'))
@@ -271,11 +341,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=ConnectionManager(control.gateway,control.context,
                           model_master_key).begin_oauth(value['connection_id'])
                     elif action=='COMPLETE_OAUTH':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=ConnectionManager(control.gateway,control.context,
                           model_master_key).complete_oauth(value['connection_id'],
                           value['flow_id'],value['state'],value['code'],
                           value['issuer'],value['redirect_uri'])
                     elif action=='REFRESH_OAUTH':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=ConnectionManager(control.gateway,control.context,
                           model_master_key).refresh(value['connection_id'])
                     elif action=='REVOKE_CONNECTION':
@@ -403,10 +475,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=control.register_benchmark_suite(
                           value['suite_version'],value['cases'])
                     elif action=='RUN_BENCHMARK':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=control.run_benchmark(value['provider_id'],
                           value['model_id'],value['suite_version'],
                           allow_paid=bool(value.get('allow_paid',False)))
                     elif action=='RUN_SCHEDULER_ONCE':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=ModelScheduler(control).run_once()
                     elif action=='CREATE_CODEX_INTENT':
                         result=CodexExecutionControl(control.gateway,
@@ -420,9 +494,11 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=CodexExecutionControl(control.gateway,
                           control.context).reconcile_restart()
                     elif action=='RUN_CODEX_ADAPTER_ONCE':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=CodexExecutionControl(control.gateway,
                           control.context).dispatch_once(codex_transports)
                     elif action=='RUN_CODEX_CANCEL_ONCE':
+                        if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=CodexExecutionControl(control.gateway,
                           control.context).dispatch_cancel_once(codex_transports)
                     elif action=='SUBMIT_CANDIDATE':
@@ -477,6 +553,22 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           value['query_id'],value['source_kind'],
                           value['source_version'],value['query'],
                           value['result_digest'])
+                    elif action=='QUERY_CANONICAL_ASSET':
+                        policy=ExecutionPolicyGateway(control.gateway,
+                          control.context)
+                        asset_key=value['asset_key'];version=value['source_version']
+                        row=supervisor.db.execute('''SELECT content_json FROM
+                          canonical_asset_registry WHERE tenant_id=? AND
+                          asset_key=? AND source_version=?''',(tenant_id,
+                          asset_key,version)).fetchone()
+                        observed=(json.loads(row['content_json']) if row else
+                                  {'matches':[]})
+                        query={'lookup':{'asset_key':asset_key},
+                          'observed_result':observed,
+                          'evidence_ref':'canonical-db://%s@%s'%(asset_key,version)}
+                        digest=hashlib.sha256(canonical(observed).encode()).hexdigest()
+                        result=policy.record_asset_query(value['task_id'],
+                          value['query_id'],'CANONICAL_DB',version,query,digest)
                     elif action=='UPSERT_CANONICAL_ASSET':
                         result=ExecutionPolicyGateway(control.gateway,
                           control.context).upsert_canonical_asset(
@@ -523,11 +615,18 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'detail':str(exc)}),'application/json; charset=utf-8')
 
         def _admin_allowed(self):
+            session=self._session()
+            if session is not None:
+                return 'TASK_CENTER_ADMIN' in session['roles']
+            if session_store is not None:return False
             supplied=self.headers.get('X-Test-Admin-Token')
             return (admin_token is not None and supplied is not None and
                     __import__('hmac').compare_digest(admin_token,supplied))
 
         def _actor_principal(self):
+            session=self._session()
+            if session is not None:return session['principal_id']
+            if session_store is not None:return None
             supplied=self.headers.get('X-Test-Actor-Token')
             if supplied is None:return None
             for token,actor in actor_tokens.items():
@@ -535,12 +634,62 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     return actor
             return None
 
+        def _session_token(self):
+            if session_store is None:return None
+            cookie=SimpleCookie();cookie.load(self.headers.get('Cookie',''))
+            item=cookie.get(session_store.COOKIE)
+            return item.value if item is not None else None
+
+        def _host_allowed(self):
+            supplied=self.headers.get('Host','')
+            allowed={'127.0.0.1:%d'%self.server.server_port,
+                     'localhost:%d'%self.server.server_port,
+                     '[::1]:%d'%self.server.server_port}
+            return supplied in allowed
+
+        def _origin_allowed(self):
+            origin=self.headers.get('Origin')
+            if origin is None:return True
+            supplied=self.headers.get('Host','')
+            return origin=='http://'+supplied
+
+        def _session(self):
+            return (session_store.get(self._session_token())
+                    if session_store is not None else None)
+
+        def _login(self):
+            if identity_provider is None or session_store is None:
+                self._send(503,_json_bytes({'error':'LOGIN_NOT_CONFIGURED'}),
+                  'application/json; charset=utf-8');return
+            try:
+                length=int(self.headers.get('Content-Length','0'))
+                if length<2 or length>8192:raise ValueError('BODY_LIMIT')
+                value=json.loads(self.rfile.read(length).decode('utf-8'))
+                if set(value)!={'username','password'}:raise ValueError('EXACT_LOGIN_REQUIRED')
+                identity=identity_provider.verify(value['username'],value['password'])
+                if identity is None:raise ValueError('INVALID_CREDENTIALS')
+                token,csrf,expires=session_store.create(identity)
+                self._send(200,_json_bytes({'state':'AUTHENTICATED',
+                  'principal_id':identity['principal_id'],'roles':identity['roles'],
+                  'csrf_token':csrf,'expires_at':expires}),
+                  'application/json; charset=utf-8', [('Set-Cookie',
+                  '%s=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d'%(
+                  session_store.COOKIE,token,session_store.ttl_seconds)),
+                  ('Set-Cookie','%s=%s; Path=/; SameSite=Strict; Max-Age=%d'%(
+                  session_store.CSRF_COOKIE,csrf,session_store.ttl_seconds))])
+            except Exception as exc:
+                self._send(401,_json_bytes({'error':type(exc).__name__,
+                  'detail':str(exc)}),'application/json; charset=utf-8')
+
         def _model_control(self):
             if model_master_key is None:raise ValueError('MODEL_ADMIN_DISABLED')
             supervisor=Supervisor(db_path)
             authority=TestTenantAuthority(authority_key)
             gateway=GatewayKernel(supervisor,authority)
-            context=authority.issue(tenant_id,'admin:'+principal_id)
+            session=self._session()
+            current=(session['principal_id'] if session is not None else
+                     principal_id)
+            context=authority.issue(tenant_id,'admin:'+current)
             return supervisor,ModelControl(gateway,context,model_master_key)
 
     return TaskCenterHandler
@@ -548,7 +697,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
 def make_server(db_path, authority_key, tenant_id, principal_id,
                 host='127.0.0.1', port=8765, model_master_key=None,
-                admin_token=None, actor_tokens=None,codex_transports=None):
+                admin_token=None, actor_tokens=None,codex_transports=None,
+                identity_provider=None,session_store=None,
+                outbound_enabled=True):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
@@ -569,7 +720,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         finally:supervisor.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
-                            admin_token, actor_tokens,codex_transports)
+                            admin_token, actor_tokens,codex_transports,
+                            identity_provider,session_store,outbound_enabled)
     server=HTTPServer((host, port), handler)
     server.codex_worker=None
     if codex_transports:
@@ -590,6 +742,9 @@ def main(argv=None):
     parser.add_argument('--admin-token-file')
     parser.add_argument('--actor-token-file')
     parser.add_argument('--codex-app-server-command-json')
+    parser.add_argument('--test-identity-file')
+    parser.add_argument('--session-ttl-seconds',type=int,default=1800)
+    parser.add_argument('--allow-loopback-fixture-outbound',action='store_true')
     args = parser.parse_args(argv)
     key = args.test_authority_key.encode('utf-8')
     model_key = (load_master_key(args.model_master_key_file)
@@ -599,8 +754,6 @@ def main(argv=None):
         admin_token=_read_owned_secret_file(args.admin_token_file,
           'ADMIN_TOKEN').strip()
         if len(admin_token) < 16:raise ValueError('VALID_ADMIN_TOKEN_REQUIRED')
-    if (model_key is None) != (admin_token is None):
-        raise ValueError('MODEL_KEY_AND_ADMIN_TOKEN_REQUIRED_TOGETHER')
     actor_tokens={}
     if args.actor_token_file:
         configured=json.loads(_read_owned_secret_file(args.actor_token_file,
@@ -612,11 +765,28 @@ def main(argv=None):
         actor_tokens={token:principal for principal,token in configured.items()}
     codex_transports={}
     if args.codex_app_server_command_json:
+        if not args.allow_loopback_fixture_outbound:
+            raise ValueError('CODEX_TRANSPORT_REQUIRES_FIXTURE_OUTBOUND_FLAG')
         command=json.loads(args.codex_app_server_command_json)
         codex_transports['CODEX_APP_SERVER']=CodexAppServerTransport(command=command)
+    identity_provider=None;session_store=None
+    if args.test_identity_file:
+        identity_provider=FileTestIdentityProvider(args.test_identity_file)
+        def connect():
+            db=sqlite3.connect(os.path.realpath(args.db),timeout=5)
+            db.row_factory=sqlite3.Row
+            return db
+        session_store=SessionStore(connect,args.tenant,args.session_ttl_seconds)
+    if model_key is None and (admin_token is not None or identity_provider is not None):
+        raise ValueError('MODEL_KEY_REQUIRED_FOR_ADMIN_ACCESS')
+    if model_key is not None and admin_token is None and identity_provider is None:
+        raise ValueError('ADMIN_TOKEN_OR_IDENTITY_REQUIRED')
+    if identity_provider is not None and (admin_token is not None or actor_tokens):
+        raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
-                         actor_tokens,codex_transports)
+                         actor_tokens,codex_transports,identity_provider,
+                         session_store,args.allow_loopback_fixture_outbound)
     receipt = {'state': 'STARTED', 'mode': 'TEST_ONLY',
                'url': 'http://%s:%d/' % server.server_address,
                'db': os.path.realpath(args.db), 'tenant_id': args.tenant,
@@ -625,6 +795,11 @@ def main(argv=None):
                                                 'DISABLED'),
                'model_admin_api': ('TEST_ONLY_ENABLED' if model_key else
                                    'DISABLED'),
+               'authentication': ('INJECTED_TEST_IDENTITY' if identity_provider
+                                  else 'LEGACY_TEST_TOKEN'),
+               'real_outbound': ('TEST_FIXTURE_ONLY' if
+                                  args.allow_loopback_fixture_outbound else
+                                  'DISABLED'),
                'production_status': 'NOT_IMPLEMENTED'}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)
