@@ -282,7 +282,7 @@ def journal(jfd,uid):
     try:v=json.loads(b.decode('utf8'))
     except (UnicodeError,ValueError):raise Hold('JOURNAL_JSON_UNKNOWN')
     fields={'format','attempt','old_manifest','new_manifest','old_identity','stage_identity',
-            'old_tree_sha','new_tree_sha','history','entry_identity','journal_parent_identity'}
+            'old_tree_sha','new_tree_sha','history','entry_identity','journal_parent_identity','preintent_sha256'}
     need(type(v) is dict and set(v)==fields and type(v['format']) is int
          and v['format']==1 and type(v['attempt']) is str
          and v['old_manifest']==OLD_MANIFEST and v['new_manifest']==NEW_MANIFEST
@@ -330,7 +330,10 @@ def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identi
             try:pre=json.loads(pre_raw.decode('utf8'))
             except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
             need(pre_raw==canonical(pre) and pre.get('format')==1
-                 and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST,
+                 and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST
+                 and pre.get('parent_identity')==expected_parent_identity
+                 and pre.get('journal_parent_identity')==expected_journal_identity
+                 and pre.get('entry_identity')==expected_entry_identity,
                  'PREINTENT_BINDING_UNKNOWN')
             need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid),
                  'PREINTENT_HISTORY_CHANGED')
@@ -348,7 +351,13 @@ def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identi
          and pre['old_identity']==j['old_identity']
          and pre['old_manifest']==OLD_MANIFEST
          and pre['new_manifest']==NEW_MANIFEST
-         and pre.get('history')==current_history,'PREINTENT_CHAIN_CHANGED')
+         and pre.get('history')==current_history
+         and pre.get('parent_identity')==expected_parent_identity
+         and pre.get('journal_parent_identity')==expected_journal_identity
+         and pre.get('entry_identity')==expected_entry_identity
+         and pre.get('old_tree_sha')==j['old_tree_sha']
+         and pre.get('new_tree_sha')==j['new_tree_sha']
+         and j['preintent_sha256']==sha(pre_raw),'PREINTENT_CHAIN_CHANGED')
     current=childstat(parent,TARGET)
     stage=childstat(parent,STAGE)
     retained=childstat(parent,RETAINED)
@@ -373,10 +382,11 @@ def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identi
         if rb_intent is not None:
             intent_raw=readfile(jfd,ROLLBACK_INTENT,uid,8192)
             intent=json.loads(intent_raw.decode('utf8'))
-            need(intent_raw==canonical(intent) and set(intent)=={'format','attempt','old_identity','new_identity','old_tree_sha','new_tree_sha'}
+            need(intent_raw==canonical(intent) and set(intent)=={'format','attempt','history_sha256','old_identity','new_identity','old_tree_sha','new_tree_sha'}
                  and intent['format']==1 and intent['attempt']==j['attempt']
                  and intent['old_identity']==old_id and intent['new_identity']==new_id
-                 and intent['old_tree_sha']==j['old_tree_sha'] and intent['new_tree_sha']==j['new_tree_sha'],
+                 and intent['old_tree_sha']==j['old_tree_sha'] and intent['new_tree_sha']==j['new_tree_sha']
+                 and intent['history_sha256']==sha(canonical(current_history)),
                  'ROLLBACK_INTENT_BINDING')
             if rb_result is None:state='ROLLBACK_APPLIED_RESULT_UNKNOWN'
             else:
@@ -427,7 +437,8 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
            'old_tree_sha':sha(canonical({x:sha(y) for x,y in old_entries.items()})),
            'new_tree_sha':sha(canonical({x:sha(y) for x,y in new_entries.items()})),
            'history':history,'entry_identity':expected_entry_identity,
-           'journal_parent_identity':dirident(os.fstat(jfd))}
+           'journal_parent_identity':dirident(os.fstat(jfd)),
+           'preintent_sha256':sha(canonical(pre))}
         writefile(jfd,STATE,canonical(j),uid)
         if fault:fault('intent_fsynced')
         need(parent_ident(os.fstat(parent))==expected_parent_identity
@@ -473,7 +484,9 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_parent_iden
         result=status(parent,jfd,uid,old_entries,new_entries,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
         binding=journal(jfd,uid)
+        history=capture_history(history_refs,uid)
         intent={'format':1,'attempt':binding['attempt'],
+                'history_sha256':sha(canonical(history)),
                 'old_identity':binding['old_identity'],
                 'new_identity':binding['stage_identity'],
                 'old_tree_sha':binding['old_tree_sha'],
@@ -481,7 +494,8 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_parent_iden
         writefile(jfd,ROLLBACK_INTENT,canonical(intent),uid)
         need(childstat(jfd,'active-attempt.json') is None
              and childstat(parent,RETAINED) is None
-             and ident(os.fstat(entryfd))==expected_entry_identity,
+             and ident(os.fstat(entryfd))==expected_entry_identity
+             and sha(canonical(capture_history(history_refs,uid)))==intent['history_sha256'],
              'ROLLBACK_BOUNDARY_CHANGED')
         result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_BOUNDARY_CHANGED')
