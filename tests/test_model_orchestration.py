@@ -297,6 +297,14 @@ class ModelOrchestrationTests(unittest.TestCase):
         acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
         self.executor.complete_success('demo-b','attempt-b','c'*64,
           json.loads(self.supervisor._task('demo-b')['completion_json']))
+        self.supervisor.db.execute('''UPDATE delivery_candidates SET
+          artifact_sha256=? WHERE candidate_id=?''',('a'*64,
+          revised['candidate_id']));self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'CANONICAL_ARTIFACT_MISMATCH'):
+            acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
+        self.supervisor.db.execute('''UPDATE delivery_candidates SET
+          artifact_sha256=? WHERE candidate_id=?''',('c'*64,
+          revised['candidate_id']));self.supervisor.db.commit()
         # A crash between canonical completion and candidate update is
         # recoverable: validation accepts the same terminal attempt.
         acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')

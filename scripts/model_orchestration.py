@@ -765,6 +765,8 @@ class ModelControl(object):
                   task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
         if not current:
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        if task['state']=='SUCCESS':
+            self._require_terminal_artifact(row)
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
@@ -792,6 +794,7 @@ class ModelControl(object):
         if (task['attempt_id']!=row['attempt_id'] or task['state']!='SUCCESS'
                 or task['authority_state']!='REVOKED'):
             raise ValueError('CANONICAL_TASK_SUCCESS_REQUIRED')
+        self._require_terminal_artifact(row)
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
@@ -818,6 +821,17 @@ class ModelControl(object):
           {'task_id':row['task_id'],'attempt_id':row['attempt_id']},now)
         self.db.commit()
         return {'candidate_id':candidate_id,'state':'ACCEPTED'}
+
+    def _require_terminal_artifact(self, candidate):
+        rows=self.db.execute('''SELECT payload_json FROM outbox WHERE task_id=?
+          AND attempt_id=?''',(candidate['task_id'],candidate['attempt_id']))
+        for row in rows:
+            try:payload=json.loads(row['payload_json'])
+            except Exception:continue
+            if (payload.get('state')=='SUCCESS' and
+                    payload.get('artifact_sha256')==candidate['artifact_sha256']):
+                return
+        raise ValueError('CANONICAL_ARTIFACT_MISMATCH')
 
     def set_module(self,module_id,version,enabled,now=None):
         self._admin();now=self.clock() if now is None else now

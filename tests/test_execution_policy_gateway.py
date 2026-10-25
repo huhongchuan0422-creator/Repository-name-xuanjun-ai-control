@@ -183,6 +183,20 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CHANGE_ATTEMPT'):
             self.policy.request_action(self.action(scope='DEPLOY',change_id='old-change'))
 
+    def test_same_preflight_body_can_be_recorded_for_new_attempt(self):
+        self.policy.record_unit(self.unit)
+        first=self.policy.record_preflight('demo-b',['registry'],'FOUND',
+          'existing-source','asset-v1',False,'reuse checked','evidence')
+        self.supervisor.db.execute('''UPDATE tasks SET attempt_id=?,
+          authority_caller_id=? WHERE task_id='demo-b' ''',(
+          'attempt-b-2','test-writer-attempt-b-2'))
+        self.supervisor.db.commit()
+        second=self.policy.record_preflight('demo-b',['registry'],'FOUND',
+          'existing-source','asset-v1',False,'reuse checked','evidence')
+        self.assertNotEqual(first['check_id'],second['check_id'])
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          asset_preflight_checks WHERE task_id='demo-b' ''').fetchone()[0],2)
+
     def test_executor_role_cannot_approve_scope_change(self):
         self.prepare();self.policy.propose_change('role-change','demo-b',
           'asset-v1',['DEPLOY'],'x')

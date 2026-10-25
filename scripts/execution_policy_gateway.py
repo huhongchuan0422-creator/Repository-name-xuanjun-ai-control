@@ -110,9 +110,10 @@ class ExecutionPolicyGateway(object):
             raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
         body={'checked':checked,'outcome':outcome,'reused_asset':reused_asset,
           'reused_version':reused_version,'need_new':bool(need_new),
-          'reason':_text(reason,'reason'),'evidence_ref':_text(evidence_ref,'evidence_ref')}
+          'reason':_text(reason,'reason'),'evidence_ref':_text(evidence_ref,'evidence_ref'),
+          'attempt_id':task['attempt_id'],'writer_principal':task['authority_caller_id']}
         check_id=hashlib.sha256(canonical(body).encode()).hexdigest()
-        self.db.execute('''INSERT INTO asset_preflight_checks(
+        self.db.execute('''INSERT OR IGNORE INTO asset_preflight_checks(
           tenant_id,task_id,check_id,attempt_id,writer_principal,checked_json,
           outcome,reused_asset,reused_version,need_new,reason,evidence_ref,
           observed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
