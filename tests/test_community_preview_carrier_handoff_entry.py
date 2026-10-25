@@ -122,14 +122,21 @@ class ApprovalRecord(unittest.TestCase):
         self.assertIn('UNKNOWN_INSPECT_ONLY',output.getvalue())
         self.assertIn('"accepted":false',output.getvalue())
 
-    def test_post_b_uses_distinct_approval_name_and_fixed_operation(self):
-        value=dict(self.value,operation='post-b-execute')
+    def test_post_b_uses_distinct_approval_name_and_exact_candidate_pins(self):
+        pins=(h.POST_B_OLD_ARCHIVE,h.POST_B_OLD_MANIFEST,
+              entry.POST_B_NEW_ARCHIVE_SHA256,entry.POST_B_NEW_MANIFEST_SHA256)
+        value=dict(self.value,operation='post-b-execute',
+            old_archive_sha256=pins[0],old_manifest_sha256=pins[1],
+            new_archive_sha256=pins[2],new_manifest_sha256=pins[3])
         os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
         h.writefile(self.parent,entry.POST_B_APPROVAL_NAME,h.canonical(value),self.uid)
         with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
             with __import__('contextlib').ExitStack() as stack:
-                fd,raw,identity=entry._approval_fd(self.parent,'post-b-execute',self.old,self.new,self.uid,stack,entry.POST_B_APPROVAL_NAME)
+                fd,raw,identity=entry._approval_fd(self.parent,'post-b-execute',self.old,self.new,
+                    self.uid,stack,entry.POST_B_APPROVAL_NAME,pins=pins)
                 self.assertEqual(raw,h.canonical(value));self.assertTrue(identity)
+                self.assertTrue(entry._recheck_approval(self.parent,fd,raw,identity,'post-b-execute',
+                    self.old,self.new,self.uid,entry.POST_B_APPROVAL_NAME,pins=pins))
         self.assertIn('post-b-execute',entry.OPERATIONS)
         self.assertNotEqual(entry.POST_B_APPROVAL_NAME,entry.APPROVAL_NAME)
 
