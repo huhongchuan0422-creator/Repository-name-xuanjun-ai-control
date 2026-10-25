@@ -318,7 +318,7 @@ jobs:
             git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c
             git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
-            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py
+            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
             PYTHONPATH=.:tests python -B -m unittest \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_permit_appearing_after_admission_is_hold \
@@ -340,7 +340,7 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_default_off_and_no_forged_b_done \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval \
-              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval \
+              test_community_preview_stopped_handoff.WholeEntry.test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
