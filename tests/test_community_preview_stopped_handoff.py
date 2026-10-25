@@ -249,7 +249,7 @@ class WholeEntry(unittest.TestCase):
         bad,_=h.document(h.C_APPROVAL)
         self.write(h.C_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
         before=len(self.calls)
-        with self.assertRaisesRegex(u.Hold,'EXACT_C_APPROVAL_REQUIRED'):
+        with self.assertRaisesRegex(u.Hold,'ORIGINAL_C_PLAN_EVIDENCE_MISSING'):
             q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
         bad,_=h.document(h.C_APPROVAL)
@@ -257,6 +257,21 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaises(u.Hold):q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
+
+    def test_c_preconfirmation_observed_at_drift_holds_without_forging_original_plan(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        before=len(self.calls)
+        real=c.read_current
+        def drift(*args,**kwargs):
+            value=real(*args,**kwargs)
+            value=dict(value,observed_at=value['observed_at']+1)
+            return value
+        with patch.object(c,'read_current',side_effect=drift):
+            with self.assertRaisesRegex(u.Hold,'ORIGINAL_C_PLAN_EVIDENCE_MISSING'):
+                q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+        self.assertFalse(Path(h.PROOF).exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
 
     def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
