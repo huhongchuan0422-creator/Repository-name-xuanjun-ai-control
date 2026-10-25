@@ -413,12 +413,23 @@ class WholeEntry(unittest.TestCase):
 
     def test_c_preconfirmation_duplicate_call_after_commit_is_rejected(self):
         q,historical=self._prepare_completed_b_before_c_proof()
-        with patch.object(h,'acknowledge',return_value=None):
+        original=h.Session._c_resume_approval
+        output=io.StringIO()
+        def owner_approves(session,plan):
+            if not Path(h.C_RESUME_APPROVAL).exists():
+                printed=json.loads(output.getvalue().splitlines()[-1])
+                self.assertEqual(printed['plan_sha256'],plan['plan_sha256'])
+                candidate=self._register_c_resume_approval_from_persisted_plan(session)
+                self.assertEqual(candidate['plan_sha256'],plan['plan_sha256'])
+            return original(session,plan)
+        with patch.object(h.Session,'_c_resume_approval',owner_approves), \
+             patch.object(h,'acknowledge',return_value=None),contextlib.redirect_stdout(output):
             result=q.resume_c_before_confirmation()
         self.assertEqual(result['phase'],'COMMITTED')
-        self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        
-        candidate=self._register_c_resume_approval_from_persisted_plan(q)
+        self.assertTrue(Path(h.C_RESUME_PLAN).exists());self.assertTrue(Path(h.C_RESUME_APPROVAL).exists())
+        self.assertTrue(Path(h.C_APPROVAL).exists())
+        with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
+            q.resume_c_before_confirmation()
         before=len(self.calls);q.close()
         second=h.Session();second.acquire();self.addCleanup(second.close);self.session=second
         with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
