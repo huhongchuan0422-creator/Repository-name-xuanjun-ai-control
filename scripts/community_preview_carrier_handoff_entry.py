@@ -53,7 +53,7 @@ def _open_regular(parent,name,stack):
     fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
     stack.callback(os.close,fd)
     st=os.fstat(fd)
-    require(stat.S_ISREG(st.st_mode) and st.st_uid==0
+    require(stat.S_ISREG(st.st_mode) and st.st_uid==ROOT_UID
             and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1
             and h.ident(st)==h.ident(os.stat(name,dir_fd=parent,follow_symlinks=False)),
             'ROOT_SINGLE_LINK_0600_IDENTITY_REQUIRED')
@@ -99,7 +99,7 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
         lease=os.open(h.LOCK,os.O_RDWR|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=journal)
         stack.callback(os.close,lease)
         ls=os.fstat(lease)
-        require(stat.S_ISREG(ls.st_mode) and ls.st_uid==0
+        require(stat.S_ISREG(ls.st_mode) and ls.st_uid==ROOT_UID
                 and stat.S_IMODE(ls.st_mode)==0o600 and ls.st_nlink==1
                 and h.ident(ls)==h.ident(os.stat(h.LOCK,dir_fd=journal,follow_symlinks=False)),
                 'ORIGINAL_LOCK_IDENTITY_CHANGED')
@@ -113,7 +113,7 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
                 refs[key]=(home,name,h.parent_ident(os.fstat(home)),None,None)
                 continue
             require(stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode)==0o600
-                    and st.st_uid==0 and st.st_nlink==1,'HISTORY_UNEXPECTED_OBJECT')
+                    and st.st_uid==ROOT_UID and st.st_nlink==1,'HISTORY_UNEXPECTED_OBJECT')
             body=h.readfile(home,name,ROOT_UID,8*1024*1024)
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
         h.capture_history(refs,ROOT_UID,parent,journal)
