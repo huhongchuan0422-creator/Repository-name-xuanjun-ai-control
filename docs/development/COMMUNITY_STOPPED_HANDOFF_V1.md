@@ -1,3 +1,15 @@
+## Exact post-B candidate retrieval (no live installation)
+
+After the narrow Hosted run is **SUCCESS**, retrieve the same run's artifact by its actual run ID:
+```bash
+gh run download <SUCCESSFUL_RUN_ID> --repo huhongchuan0422-creator/Repository-name-xuanjun-ai-control --name community-post-b-c-resume-source --dir post-b-c-resume-source
+```
+Do not substitute the earlier `community-stopped-handoff-v1` artifact from a failed run. The new artifact contains `post-b-c-resume-delivery-index.json`, the exact newly built `control-stopped-v1.zip` and manifest, generated `resume-c-before-confirmation.sh`, source dependencies, tests and this runbook. Check that the index `commit` equals the successful run's HEAD, the indexed Tree matches that commit, every indexed file size/SHA matches, and `install_authorized=false`. Reject missing/extra/mismatched files and preserve the downloaded artifact read-only.
+
+The generated `resume-c-before-confirmation.sh` is the **post-install C continuation wrapper**. It is not a carrier installer. The existing `install-stopped-v1.sh` / `community_preview_bc_install.py` are the original first-install route and must **not** be used to replace the already-installed 005c carrier. The currently reviewed code does not yet contain a separately implemented and tested post-B atomic carrier switch/rollback entry that safely replaces the existing carrier while preserving the completed B evidence. Therefore this artifact is a verified source/carrier candidate only; there is no authorized install/switch command to run from it yet. The original installation owner must not improvise file overlays or reuse the pre-B caller. This limitation is explicit rather than disguising source packaging as a completed installation path.
+
+---
+
 ## Post-B source delivery and C known-failure continuation
 
 The new post-B recovery code is a different entry from the pre-B carrier swap. Do **not** apply the pre-backup carrier-handoff absence assumptions to this already completed B attempt. The existing B snapshot and three clone results are read-only evidence; do not run `--resume-b-partial`, rebuild the snapshot, rerun clones, overwrite the original `bc-c-approval.json`, or replace the historical B manifest digest.
