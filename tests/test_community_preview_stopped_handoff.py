@@ -19,6 +19,12 @@ from scripts import community_preview_update_composition as c
 from scripts import community_preview_release_plan as p
 import test_community_preview_upgrade as old
 
+A_SOURCE_COMMIT='1d639347f404f952998b3b414a95e48f66571c3c'
+def frozen_a_source():
+    path=os.environ.get('COMMUNITY_TEST_A_ENTRY_FILE')
+    if path:return Path(path).read_bytes()
+    return subprocess.check_output(['git','show',A_SOURCE_COMMIT+':scripts/community_preview_site_prepare.py'])
+
 class WholeEntry(unittest.TestCase):
     tty_actual=False
     def setUp(self):
@@ -27,7 +33,7 @@ class WholeEntry(unittest.TestCase):
         self.stack=contextlib.ExitStack();self.addCleanup(self.stack.close)
         self.clock=1000;self.running=False;self.new=False;self.legacy_running=False;self.calls=[];self.reads=[]
         self.names={p.NAME:s.OLD_ID};self.on_intent=None;self.on_run=None
-        uid=os.getuid();gid=os.getgid();site_prepare_source=Path(s.__file__).read_bytes()
+        uid=os.getuid();gid=os.getgid();site_prepare_source=frozen_a_source()
         base=self.root/'opt/xuanjun-community-preview';base.mkdir(parents=True,mode=0o700)
         data=self.root/'var/lib/xuanjun-community-preview'
         (data/'data').mkdir(parents=True,mode=0o700);(data/'config').mkdir(mode=0o700)
@@ -44,6 +50,8 @@ class WholeEntry(unittest.TestCase):
                 FREEZE=str(base/'writer-freeze-reference.json'),BACKUP=str(base/'backup-2330-to-f131-v1'),
                 DATA=str(data),ROOT_ANCHOR=str(self.root),UID=uid,ROOT_GID=gid,ALLOWED_GIDS=(gid,1008))),
             (h,dict(CONTROL=str(base/'control-stopped-v1'),B_APPROVAL=str(base/'bc-b-approval.json'),
+                B_RESUME_APPROVAL=str(base/'bc-b-resume-approval.json'),RESUME_FREEZE=str(base/'writer-freeze-resume-reference.json'),
+                B_RESUME_STAGE_PERMIT=str(base/'site-prepare-resume-approval.json'),
                 C_APPROVAL=str(base/'bc-c-approval.json'),MANIFEST=str(base/'control-stopped-v1/manifest.json'),
                 PROOF=str(base/'backup-2330-to-f131-v1/stopped-handoff-v1.json'))),
             (u,dict(JOURNAL_PARENT=str(journal),OWNER_UID=uid)),
@@ -148,6 +156,25 @@ class WholeEntry(unittest.TestCase):
         elif action=='start':self.running=True
         else:raise AssertionError('UNRECORDED_MUTATION')
         return ''
+    def seed_partial_resume(self):
+        # Preserve the original failed-attempt evidence, then create only fresh
+        # resume authority/freeze on separate paths. No old record is rewritten.
+        old_b,old_braw=h.document(h.B_APPROVAL);old_freeze,old_freeze_raw=h.document(s.FREEZE,16384)
+        intent=dict(format=1,mode=h.MODE,attempt=h.attempt(),approval_sha256=s.sha(old_braw),freeze_sha256=s.sha(old_freeze_raw))
+        self.write(h.b_records()['B-intent'],s.canonical(intent))
+        self.clock=1700
+        fresh=dict(old_freeze,issued_at=1700,expires_at=2300,owner_review_reference_sha256='f'*64)
+        self.write(h.RESUME_FREEZE,s.canonical(fresh))
+        resume=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),carrier_manifest_sha256=self.session.pins(),
+            issued_at=1700,expires_at=2300,old_b_intent_sha256=s.sha(s.canonical(intent)),
+            old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),old_stage_permit_sha256=None,
+            resume_freeze_sha256=s.sha(s.canonical(fresh)),actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
+        self.write(h.B_RESUME_APPROVAL,s.canonical(resume))
+        return intent,old_braw,old_freeze_raw,resume
+    def fresh_session(self):
+        self.session.close()
+        q=h.Session();q.acquire();self.addCleanup(q.close);self.session=q;return q
+
     def prepare_b_and_c(self):
         self.session.run_b()
         real=self.session.candidate
@@ -556,6 +583,77 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         after={str(q):q.read_bytes() for q in Path(u.JOURNAL_PARENT).rglob('*') if q.is_file()}
         self.assertEqual(before,after);self.assertEqual(len(self.calls),calls);self.assertTrue(Path(h.PROOF).exists());self.assertFalse(Path(s.PERMIT).exists())
 
+    def test_partial_resume_reacquires_lock_preserves_old_evidence_and_finishes_b(self):
+        intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume();old_intent=Path(h.b_records()['B-intent']).read_bytes()
+        q=self.fresh_session();q.resume_b_partial()
+        self.assertTrue(q.bdone);self.assertEqual(set(q.captured),set(h.CLONES))
+        self.assertEqual(Path(h.b_records()['B-intent']).read_bytes(),old_intent)
+        self.assertEqual(Path(h.B_APPROVAL).read_bytes(),old_braw);self.assertEqual(Path(s.FREEZE).read_bytes(),old_freeze_raw)
+        record,_=h.document(h.resume_record_path())
+        self.assertEqual(record['old_b_intent_sha256'],s.sha(old_intent))
+        self.assertEqual(record['resume_approval_sha256'],s.sha(Path(h.B_RESUME_APPROVAL).read_bytes()))
+        self.assertTrue(Path(s.BACKUP,'private-manifest.json').exists());self.assertTrue(Path(s.BACKUP,'clone-results.json').exists())
+    def test_partial_resume_requires_new_lock_and_rejects_concurrent_executor(self):
+        self.seed_partial_resume();other=h.Session()
+        try:
+            with self.assertRaises((BlockingIOError,OSError,u.Hold)):other.acquire()
+            self.assertFalse(Path(h.resume_record_path()).exists())
+        finally:
+            try:other.close()
+            except Exception:pass
+    def test_partial_resume_rejects_duplicate_record_and_crash_preserves_it(self):
+        self.seed_partial_resume();q=self.fresh_session()
+        with patch.object(q,'b_stage',side_effect=RuntimeError('SYNTHETIC_CRASH')),self.assertRaises(RuntimeError):q.resume_b_partial()
+        raw=Path(h.resume_record_path()).read_bytes();self.assertTrue(raw)
+        q.close();r=h.Session();r.acquire();self.addCleanup(r.close)
+        with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):r.resume_admission()
+        self.assertEqual(Path(h.resume_record_path()).read_bytes(),raw)
+    def test_partial_resume_rejects_old_identity_or_new_authority_mismatch(self):
+        intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume();q=self.fresh_session()
+        bad=dict(resume,old_b_intent_sha256='0'*64);self.write(h.B_RESUME_APPROVAL,s.canonical(bad))
+        with self.assertRaisesRegex(u.Hold,'B_RESUME_EVIDENCE_BINDING_CHANGED'):q.resume_admission()
+        self.write(h.B_RESUME_APPROVAL,s.canonical(resume));self.write(s.FREEZE,old_freeze_raw+b' ')
+        with self.assertRaises(Exception):q.resume_admission()
+    def test_partial_resume_rejects_any_snapshot_clone_proof_or_c_journal_state(self):
+        self.seed_partial_resume();q=self.fresh_session()
+        conflict_paths=[h.b_records()['snapshot-result'],h.b_records()['snapshot-permit'],h.b_records()['validate-clones-result'],
+            h.b_records()['validate-clones-permit'],s.BACKUP,h.C_APPROVAL,h.B_RESUME_STAGE_PERMIT,
+            u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+h.attempt()]
+        for path in conflict_paths:
+            target=Path(path)
+            if path in (s.BACKUP,u.JOURNAL_PARENT+'/'+h.attempt()):target.mkdir(parents=True,mode=0o700)
+            else:self.write(path,b'{}')
+            try:
+                with self.subTest(path=path),self.assertRaisesRegex(u.Hold,'B_PARTIAL_OUTPUT_PRESENT|B_PARTIAL_STATE_CONFLICT'):
+                    q.resume_admission()
+            finally:
+                if target.is_dir():target.rmdir()
+                elif target.exists():target.unlink()
+    def test_partial_resume_preserves_old_stage_permit_and_uses_new_excl_path(self):
+        intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume()
+        old_permit=dict(format=1,host=p.HOST,stage='snapshot',entry_sha256=h.A_ENTRY_SHA,issued_at=1000,expires_at=1100,
+            all_writers_frozen_evidence_sha256=s.sha(old_freeze_raw),snapshot_manifest_sha256=None)
+        self.write(s.PERMIT,s.canonical(old_permit));resume=dict(resume,old_stage_permit_sha256=s.sha(s.canonical(old_permit)))
+        self.write(h.B_RESUME_APPROVAL,s.canonical(resume));old_raw=Path(s.PERMIT).read_bytes()
+        q=self.fresh_session();q.resume_b_partial()
+        self.assertEqual(Path(s.PERMIT).read_bytes(),old_raw);self.assertFalse(Path(h.B_RESUME_STAGE_PERMIT).exists())
+        record,_=h.document(h.resume_record_path());self.assertEqual(record['old_stage_permit_sha256'],s.sha(old_raw))
+    def test_partial_resume_old_expired_approval_is_never_reused(self):
+        self.seed_partial_resume();q=self.fresh_session();Path(h.B_RESUME_APPROVAL).unlink()
+        with self.assertRaises(FileNotFoundError):q.resume_admission()
+        old,_=h.document(h.B_APPROVAL);self.assertLess(old['expires_at'],self.clock)
+    def test_partial_resume_c_plan_must_bind_new_real_plan(self):
+        self.seed_partial_resume();q=self.fresh_session();q.resume_b_partial();semantic=q.evidence(True)
+        q.backup=h.open_private(s.BACKUP+'/clone-results.json');candidate=q.candidate(semantic)
+        bad=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],carrier_manifest_sha256=q.pins(),
+            plan_sha256='0'*64,issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_APPROVAL,s.canonical(bad))
+        with self.assertRaisesRegex(u.Hold,'EXACT_C_APPROVAL_REQUIRED'):q.c_approval(candidate)
+    def test_builder_exposes_resume_wrapper_without_changing_default_acceptance(self):
+        archive,manifest,commands=build.build()
+        self.assertIn('resume-b-partial',commands);self.assertIn(b'--resume-b-partial',commands['resume-b-partial'])
+        self.assertIn(b'BC_OUTER_NOT_ACCEPTANCE',commands['resume-b-partial'])
+
     def test_builder_binding_checks_builder_loader_and_source_set(self):
         head='a'*40;original=build.subprocess.check_output
         paths=build.BUILD_INPUTS|{('scripts/community_preview_bc_loader.py' if n=='loader.py' else n) for n in build.EXPECTED_SOURCE_FILES}
@@ -621,7 +719,12 @@ s.BASE=str(base);s.ENTRY=str(base/'site-prepare-v1.py');s.PERMIT=str(base/'site-
 h.B_APPROVAL=str(base/'bc-b-approval.json');h.C_APPROVAL=str(base/'bc-c-approval.json');h.PROOF=str(base/'backup-2330-to-f131-v1/stopped-handoff-v1.json')
 u.JOURNAL_PARENT=str(journal);u.OWNER_UID=uid;c.REFERENCE_UID=uid
 clock=[1000];c.root_host=lambda:None;c.now=lambda:clock[0];s.time.time=lambda:clock[0];s.space=lambda *a,**k:None;h.operator=lambda:(uid,gid);h.acknowledge=lambda *a:None
-A=entries['scripts/community_preview_site_prepare.py'];Path(s.ENTRY).write_bytes(A);Path(s.ENTRY).chmod(0o600)
+a_path=os.environ.get('COMMUNITY_TEST_A_ENTRY_FILE')
+if a_path:A=Path(a_path).read_bytes()
+else:
+ import subprocess
+ A=subprocess.check_output(['git','show','1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py'],cwd=repo)
+Path(s.ENTRY).write_bytes(A);Path(s.ENTRY).chmod(0o600)
 freeze=dict(format=1,host=p.HOST,old_id=s.OLD_ID,old_image=s.OLD_IMAGE,roots=[s.DATA+'/data',s.DATA+'/config'],issued_at=1000,expires_at=1600,all_writers_frozen=True,owner_review_reference_sha256='e'*64)
 Path(s.FREEZE).write_bytes(s.canonical(freeze));Path(s.FREEZE).chmod(0o600)
 carrier_sha=s.sha(manifest)

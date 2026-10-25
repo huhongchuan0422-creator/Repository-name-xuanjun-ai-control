@@ -48,7 +48,7 @@ module=ns['load'](MANIFEST_SHA)
 raise SystemExit(module.main([ACTION]))
 """
     commands={}
-    for name,action in (('owner-bc','--owner-bc'),('recover-known-failure','--recover-known-failure')):
+    for name,action in (('owner-bc','--owner-bc'),('resume-b-partial','--resume-b-partial'),('recover-known-failure','--recover-known-failure')):
         code=bootstrap.replace('LOADER_SHA',repr(loader_sha)).replace('MANIFEST_SHA',repr(manifest_sha)).replace('ACTION',repr(action))
         commands[name]=("""# SOURCE REVIEW ONLY; separate exact B/C approval required.
 # Require Python BC_RESULT plus matching SUDO_CHILD_EXIT. Shell rc0 is NOT PASS.
