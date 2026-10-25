@@ -71,7 +71,7 @@ class HandoffAdmission(unittest.TestCase):
                                                           NEW_ARCHIVE=h.sha(self.archive)))
         h.build_tree(self.parent,self.old,self.uid,name=h.TARGET)
         self.history_bodies={
-            'b_intent':('original-B-intent.json',b'PRESERVED_OLD_B_INTENT',self.jfd),
+            'b_intent':(h.HISTORY_NAMES['b_intent'],b'PRESERVED_OLD_B_INTENT',self.jfd),
             'b_approval':('bc-b-approval.json',b'EXPIRED_OLD_B_APPROVAL',self.parent),
             'freeze':('writer-freeze-reference.json',b'OLD_FREEZE_EVIDENCE',self.parent),
             'old_stage_permit':('site-prepare-approval.json',b'EXPIRED_OLD_STAGE_PERMIT',self.parent)}
