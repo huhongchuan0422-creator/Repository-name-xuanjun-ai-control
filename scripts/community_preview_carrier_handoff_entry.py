@@ -96,12 +96,20 @@ def _open_regular(parent,name,stack):
 def _read_fd_exact(fd,limit):
     st=os.fstat(fd)
     require(stat.S_ISREG(st.st_mode) and 0<st.st_size<=limit,'INPUT_SIZE_INVALID')
+    # Repeated validation must read the same already-open FD from byte zero.
+    # Do not reopen the pathname: the FD/path identity is checked by its caller.
+    try:
+        pos=os.lseek(fd,0,os.SEEK_SET)
+    except OSError:
+        raise h.Hold('INPUT_SEEK_FAILED')
+    require(pos==0 and h.ident(os.fstat(fd))==h.ident(st),'INPUT_CHANGED')
     body=bytearray()
     while len(body)<=limit:
         chunk=os.read(fd,min(65536,limit-len(body)+1))
         if not chunk:break
         body.extend(chunk)
-    require(len(body)==st.st_size and h.ident(os.fstat(fd))==h.ident(st),
+    after=os.fstat(fd)
+    require(len(body)==st.st_size and h.ident(after)==h.ident(st),
             'INPUT_CHANGED')
     return bytes(body)
 
