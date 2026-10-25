@@ -1,3 +1,24 @@
+## Same-attempt C preconfirmation resume (source candidate)
+
+For the specific state where the original B-resume completed, its snapshot/private manifest/three clone results and B records remain valid, but the first C TTY confirmation exited before proof/active-attempt/checkpoint creation, the new narrow entry is:
+
+```bash
+sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/control-stopped-v1/scripts/community_preview_stopped_handoff.py --resume-c-before-confirmation
+```
+
+This command is **not authorized by this document** and was not run on the UK host. It must be invoked only by the original unique installation owner after fresh host/admin identity, original lock/ENTRY, B evidence, current stopped-container inventory, no proof/active/checkpoint, and exact C approval are independently verified. It never reruns snapshot or clones. It rebuilds the candidate plan from retained evidence and requires the existing current C approval to bind the exact plan hash; it then requires the original exact interactive TTY confirmation again before creating proof or entering the existing transaction. EOF, timeout, mismatch, expired/revoked approval, missing/changed evidence, active C markers, or unknown container inventory holds before mutation. If C has started or any proof/active/checkpoint exists, do not use this entry; use the existing inspect/recovery path for that same attempt. It does not fabricate KNOWN_FAILURE or issue/renew approvals.
+
+New scoped isolated tests:
+- `test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once`
+- `test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation`
+- `test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds`
+- `test_c_preconfirmation_duplicate_call_after_commit_is_rejected`
+- `test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover`
+
+The existing real-PTY acknowledgement test continues to cover exact input, EOF and timeout. Current source has not yet been confirmed by a new Hosted result for this scope; do not treat previous carrier/60-test PASS as evidence for these new tests. `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 # Issue76 fixed handoff — current delivery index (2026-10-25)
 
 This section supersedes stale caller sizes/hashes and historical pending-CI wording below. Source review anchor: commit `bd2fe0859b95fdc19aec25ce993a829043718570`, Tree `4e77e8c05c4a3e2aee74088cce566046cfbd29ae`. Hosted Run `40185248009` reported 60/60 and COMPLIANCE_PASS; the one-FD repeated-read defect was the prior 58-test failure and is fixed in that source-pass anchor. The present change is documentation-only; no code/test/workflow changes.
