@@ -1,6 +1,8 @@
 ## 2026-10-25 — old-to-new carrier handoff candidate (NOT ACCEPTED)
 
-Current source-only branch candidate: `1e1ebbecca5ed3c0e66ba020491c81efe7f194a6` (latest branch HEAD at time of this note; Tree and Hosted result must be checked against the final HEAD).
+Current source-code candidate (before this documentation-only update): `eca61484c1e9de271001089b28b8078dbb97c818`.
+- Tree SHA reconstructed from the eac base tree and exact current blobs for all changed paths: `54dd96b05f74296f58775e969b21199cf7976f5d`.
+- Latest push-triggered Hosted run/log/artifact: NOT_VERIFIED through the available connector; empty PR-only run results are not evidence that no push run exists.
 
 - Installed historical carrier: archive SHA256 `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`, manifest SHA256 `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
 - New fixed candidate: archive SHA256 `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`, manifest SHA256 `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
