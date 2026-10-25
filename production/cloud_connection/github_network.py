@@ -7,6 +7,7 @@ import http.client
 import math
 import multiprocessing
 import os
+import socket
 import signal
 import ssl
 import time
@@ -20,6 +21,31 @@ from flask import g
 from requests import Response
 from requests.structures import CaseInsensitiveDict
 from .queue import Hold
+
+# Child-to-parent error protocol is one byte of status and one fixed enum.
+WIRE_REASONS=frozenset(('DNS','TLS','TIMEOUT','HTTP_STATUS','REDIRECT',
+                        'LIMIT','OTHER'))
+
+
+def _wire_reason(error):
+    if isinstance(error, socket.gaierror): return 'DNS'
+    if isinstance(error, (ssl.SSLError, ssl.CertificateError)): return 'TLS'
+    if isinstance(error, (TimeoutError, socket.timeout)): return 'TIMEOUT'
+    if isinstance(error, urllib.error.HTTPError):
+        return 'REDIRECT' if 300 <= error.code < 400 else 'HTTP_STATUS'
+    if isinstance(error, urllib.error.URLError):
+        reason=error.reason
+        if isinstance(reason, socket.gaierror): return 'DNS'
+        if isinstance(reason, (ssl.SSLError, ssl.CertificateError)): return 'TLS'
+        if isinstance(reason, (TimeoutError, socket.timeout)): return 'TIMEOUT'
+    if isinstance(error, Hold):
+        code=error.args[0] if len(error.args)==1 else None
+        return {'GITHUB_REDIRECT_FORBIDDEN':'REDIRECT',
+                'GITHUB_HTTP_STATUS':'HTTP_STATUS',
+                'GITHUB_HEADER_LIMIT':'LIMIT',
+                'GITHUB_BODY_LIMIT':'LIMIT'}.get(code,'OTHER')
+    return 'OTHER'
+
 
 TARGETS={
     ('POST','https://github.com/login/oauth/access_token'):16384,
@@ -51,9 +77,9 @@ def _wire(channel,url,method,data,headers,limit,budget,ca_file):
             raw=response.read(limit+1)
             if len(raw)>limit:raise Hold('GITHUB_BODY_LIMIT')
         channel.send_bytes(b'1'+raw)
-    except BaseException:
-        # No raw upstream payload, request, token, code or exception leaves here.
-        channel.send_bytes(b'0')
+    except BaseException as error:
+        # Fixed ASCII only, no raw upstream data or exception text crosses Pipe.
+        channel.send_bytes(b'0'+_wire_reason(error).encode('ascii'))
     finally:channel.close()
 
 
@@ -93,8 +119,13 @@ class GithubNetwork:
             child.start();sending.close()
             remaining=deadline-time.monotonic()
             if remaining<=0 or not receiving.poll(remaining):raise Hold('GITHUB_TOTAL_DEADLINE')
-            raw=receiving.recv_bytes(limit+2)
-            if time.monotonic()>=deadline or raw[:1]!=b'1':raise Hold('GITHUB_WIRE_FAILURE')
+            raw=receiving.recv_bytes(max(limit+1, 1+max(map(len, WIRE_REASONS))))
+            if time.monotonic()>=deadline:raise Hold('GITHUB_TOTAL_DEADLINE')
+            if raw[:1]==b'0':
+                reason=raw[1:].decode('ascii') if all(c<128 for c in raw[1:]) else ''
+                if reason not in WIRE_REASONS:reason='OTHER'
+                raise Hold('GITHUB_WIRE_'+reason)
+            if raw[:1]!=b'1':raise Hold('GITHUB_WIRE_OTHER')
             response=Response()
             response.status_code=200;response.url=prepared.url;response.request=prepared
             response.headers=CaseInsensitiveDict({'Content-Type':'application/json'})

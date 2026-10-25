@@ -290,6 +290,30 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
             if request.args or request.mimetype != 'application/x-www-form-urlencoded': abort(400)
             if 'resource' in request.form and request.form['resource'] != audience: abort(400)
 
+    # Only immutable diagnostic identifiers cross the callback response.
+    CALLBACK_REASONS=frozenset(('STATE','OAUTH_DENIED','TOKEN_PARSE',
+        'DNS','TLS','TIMEOUT','HTTP_STATUS','REDIRECT','LIMIT','DEADLINE','OTHER'))
+
+    def diagnostic_reason(error, stage):
+        code=error.args[0] if isinstance(error, Hold) and len(error.args)==1 else None
+        if code == 'GITHUB_TOTAL_DEADLINE':return 'DEADLINE'
+        if isinstance(code,str) and code.startswith('GITHUB_WIRE_'):
+            reason=code[len('GITHUB_WIRE_'):]
+            return reason if reason in CALLBACK_REASONS else 'OTHER'
+        # Never include attacker-controlled OAuth error descriptions or codes.
+        name=type(error).__name__
+        module=type(error).__module__
+        if module.startswith('authlib.'):
+            if name in ('MismatchingStateError','MissingStateError','InvalidStateError'):
+                return 'STATE'
+            if name in ('OAuthError','AccessDeniedError'):
+                return 'OAUTH_DENIED' if getattr(error,'error',None)=='access_denied' else 'OTHER'
+            if name in ('InvalidTokenError','MissingTokenError'):
+                return 'TOKEN_PARSE'
+        if stage=='TOKEN_EXCHANGE' and isinstance(error, (ValueError, json.JSONDecodeError)):
+            return 'TOKEN_PARSE'
+        return 'OTHER'
+
     @app.after_request
     def no_secrets_cached(response):
         response.headers['Cache-Control'] = 'no-store'
@@ -308,6 +332,9 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
                     'FLOW_VALID', 'TOKEN_EXCHANGE', 'USER_HTTP', 'USER_SHAPE',
                     'SUBJECT_ALLOWED', 'DEADLINE', 'FLOW_BIND')):
             response.headers['X-Xuanjun-OAuth-Stage'] = g.oauth_callback_stage
+            reason=g.get('oauth_callback_reason')
+            if reason in CALLBACK_REASONS:
+                response.headers['X-Xuanjun-OAuth-Reason'] = reason
             if response.mimetype == 'text/html':
                 response.set_data(response.get_data() +
                     ('<p>OAuth stage: ' + g.oauth_callback_stage + '</p>\n').encode('ascii'))
@@ -408,7 +435,8 @@ def create_app(config, connect, session_secret, github_secret, enabled=False, cl
             if subject(sub) is None: abort(403)
             g.oauth_callback_stage = 'DEADLINE'
             if time.monotonic()>=g.github_deadline:raise Hold('GITHUB_TOTAL_DEADLINE')
-        except Exception:
+        except Exception as error:
+            g.oauth_callback_reason=diagnostic_reason(error,g.oauth_callback_stage)
             abort(401)
         finally:
             g.pop('github_deadline',None);g.pop('github_network',None)
