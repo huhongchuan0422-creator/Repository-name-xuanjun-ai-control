@@ -168,6 +168,45 @@ class HandoffAdmission(unittest.TestCase):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
 
+    def test_post_b_original_entry_call_admission_exchange_status_rollback(self):
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        from scripts import community_preview_carrier_handoff_entry as entry
+        now=1800000000
+        pins=(h.POST_B_OLD_ARCHIVE,h.POST_B_OLD_MANIFEST,h.POST_B_NEW_ARCHIVE,h.POST_B_NEW_MANIFEST)
+        def approve(operation):
+            value=dict(format=1,host=h.HOST,operation=operation,attempt=entry.ATTEMPT,
+                old_archive_sha256=pins[0],old_manifest_sha256=pins[1],
+                new_archive_sha256=pins[2],new_manifest_sha256=pins[3],
+                issued_at=now-1,expires_at=now+300)
+            try:os.unlink(entry.POST_B_APPROVAL_NAME,dir_fd=self.parent)
+            except FileNotFoundError:pass
+            h.writefile(self.parent,entry.POST_B_APPROVAL_NAME,h.canonical(value),self.uid)
+        def protected(path,stack):
+            fd=os.dup(self.jfd if path==entry.JOURNAL else self.parent)
+            stack.callback(os.close,fd);return fd
+        def open_entry(parent,name,stack):
+            fd=os.dup(self.entry);stack.callback(os.close,fd);return fd
+        def archive(parent,name,expected_sha,uid):
+            return self.archive if name==entry.POST_B_OLD_INPUT_NAME else candidate_archive
+        with patch.object(entry,'ROOT_UID',self.uid),patch.object(entry,'identify_admin',return_value=self.uid), \
+             patch.object(entry,'_verify_runtime_sources',return_value=True), \
+             patch.object(entry,'_protected_path_directory',side_effect=protected), \
+             patch.object(entry,'_open_regular',side_effect=open_entry), \
+             patch.object(entry,'_read_fixed_archive',side_effect=archive), \
+             patch.object(entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')), \
+             patch.object(entry.time,'time',return_value=now):
+            approve('post-b-execute')
+            result=entry.run('post-b-execute')
+            self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+            self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_STATE))
+            approve('post-b-status')
+            status=entry.run('post-b-status')
+            self.assertEqual(status['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+            approve('post-b-rollback')
+            rolled=entry.run('post-b-rollback')
+            self.assertEqual(rolled['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+            self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_RESULT))
+
     def test_post_b_requires_completed_b_and_preserves_old_c_approval(self):
         refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
         saved=h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid)
