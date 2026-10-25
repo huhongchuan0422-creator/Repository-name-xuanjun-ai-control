@@ -233,8 +233,9 @@ jobs:
           set -euo pipefail
           : > community-tests.log
           python3 - <<'FIXTURE' 2>&1 | tee -a community-tests.log
-          import hashlib,io,json,os,urllib.request,zipfile
+          import hashlib,io,json,os,urllib.request,urllib.error,zipfile
           from pathlib import Path
+          from scripts.community_preview_carrier_handoff_admission import github_artifact_opener
           repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
           specs=[
             ('old',12572781194,'a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956',
@@ -250,8 +251,13 @@ jobs:
               url='https://api.github.com/repos/'+repo+'/actions/artifacts/'+str(aid)+'/zip'
               req=urllib.request.Request(url,headers={'Authorization':'Bearer '+token,
                   'Accept':'application/vnd.github+json','User-Agent':'issue76-fixture-verifier'})
-              with urllib.request.urlopen(req,timeout=30) as response:
-                  body=response.read(2*1024*1024+1)
+              try:
+                  with github_artifact_opener().open(req,timeout=30) as response:
+                      body=response.read(2*1024*1024+1)
+              except urllib.error.HTTPError as error:
+                  raise SystemExit('ARTIFACT_DOWNLOAD_HTTP_'+str(error.code))
+              except Exception as error:
+                  raise SystemExit('ARTIFACT_DOWNLOAD_FAILED_'+type(error).__name__)
               if len(body)>2*1024*1024 or hashlib.sha256(body).hexdigest()!=outer_sha:
                   raise SystemExit(label+'_OUTER_ARTIFACT_SHA_MISMATCH')
               with zipfile.ZipFile(io.BytesIO(body)) as outer:
