@@ -58,6 +58,51 @@ class ApprovalRecord(unittest.TestCase):
             with self.assertRaises(OSError):
                 entry._read_fixed_archive(self.parent,entry.NEW_INPUT_NAME,h.NEW_ARCHIVE,self.uid)
 
+    def test_verified_source_bytes_are_loaded_from_fixed_path(self):
+        import sys
+        import scripts
+        from pathlib import Path
+        old_h=entry.h;old_call=entry.call
+        old_h_mod=sys.modules.get('scripts.community_preview_carrier_handoff_admission')
+        old_call_mod=sys.modules.get('scripts.community_preview_carrier_handoff_call')
+        old_h_attr=getattr(scripts,'community_preview_carrier_handoff_admission',None)
+        old_call_attr=getattr(scripts,'community_preview_carrier_handoff_call',None)
+        source_h=Path(old_h.__file__).read_bytes()
+        source_call=Path(old_call.__file__).read_bytes()
+        root=tempfile.TemporaryDirectory();self.addCleanup(root.cleanup)
+        scripts_dir=os.path.join(root.name,'scripts');os.mkdir(scripts_dir,0o700)
+        for name,raw in (( 'community_preview_carrier_handoff_admission.py',source_h),
+                         ( 'community_preview_carrier_handoff_call.py',source_call)):
+            with open(os.path.join(scripts_dir,name),'wb') as stream:stream.write(raw)
+            os.chmod(os.path.join(scripts_dir,name),0o600)
+        def open_dir():
+            return os.open(scripts_dir,os.O_RDONLY|os.O_DIRECTORY)
+        try:
+            with patch.object(entry,'ROOT_UID',self.uid),patch.object(entry,'SCRIPTS_DIR',scripts_dir),\
+                 patch.object(entry,'_open_fixed_scripts_dir',side_effect=open_dir),\
+                 patch.object(entry,'MODULE_PINS',{
+                     'community_preview_carrier_handoff_admission.py':h.sha(source_h),
+                     'community_preview_carrier_handoff_call.py':h.sha(source_call)}):
+                self.assertTrue(entry._verify_runtime_sources())
+                self.assertEqual(entry.h.__file__,os.path.join(scripts_dir,'community_preview_carrier_handoff_admission.py'))
+                self.assertEqual(entry.call.__file__,os.path.join(scripts_dir,'community_preview_carrier_handoff_call.py'))
+        finally:
+            entry.h=old_h;entry.call=old_call
+            if old_h_mod is None:sys.modules.pop('scripts.community_preview_carrier_handoff_admission',None)
+            else:sys.modules['scripts.community_preview_carrier_handoff_admission']=old_h_mod
+            if old_call_mod is None:sys.modules.pop('scripts.community_preview_carrier_handoff_call',None)
+            else:sys.modules['scripts.community_preview_carrier_handoff_call']=old_call_mod
+            if old_h_attr is None:delattr(scripts,'community_preview_carrier_handoff_admission')
+            else:setattr(scripts,'community_preview_carrier_handoff_admission',old_h_attr)
+            if old_call_attr is None:delattr(scripts,'community_preview_carrier_handoff_call')
+            else:setattr(scripts,'community_preview_carrier_handoff_call',old_call_attr)
+
+    def test_wrong_runtime_module_sha_holds_before_exec(self):
+        with patch.object(entry,'MODULE_PINS',dict(entry.MODULE_PINS,
+                 **{'community_preview_carrier_handoff_admission.py':'0'*64})):
+            with self.assertRaisesRegex(h.Hold,'HANDOFF_MODULE_SHA_MISMATCH'):
+                entry._verify_runtime_sources()
+
     def test_valid_exact_short_lived_record(self):
         raw,identity=self.validate()
         self.assertEqual(raw,h.canonical(self.value))
