@@ -366,7 +366,7 @@ class Session:
     @staticmethod
     def _without_observed_at(value):
         if type(value) is dict:
-            return {k:Session._without_observed_at(v) for k,v in value.items() if k!='observed_at'}
+            return {k:Session._without_observed_at(v) for k,v in value.items() if k not in ('observed_at','plan_sha256')}
         if type(value) is list:return [Session._without_observed_at(v) for v in value]
         return value
 
