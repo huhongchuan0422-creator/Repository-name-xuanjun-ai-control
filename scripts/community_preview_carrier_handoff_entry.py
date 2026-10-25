@@ -26,7 +26,7 @@ NEW_INPUT_NAME='control-stopped-v1-005c.zip'
 INPUT_MAX=4*1024*1024
 APPROVAL_MAX=16384
 APPROVAL_TTL_MAX=600
-SCRIPTS_DIR=PARENT+'/control-stopped-v1/scripts'
+SCRIPTS_DIR=PARENT
 MODULE_PINS={
     'community_preview_carrier_handoff_admission.py':'c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386',
     'community_preview_carrier_handoff_call.py':'a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc'
@@ -137,12 +137,16 @@ def _verify_runtime_sources():
 def _open_fixed_scripts_dir():
     fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
-        for part in ('opt','xuanjun-community-preview','control-stopped-v1','scripts'):
+        for index,part in enumerate(('opt','xuanjun-community-preview')):
             nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
             os.close(fd);fd=nxt
             st=os.fstat(fd)
             require(stat.S_ISDIR(st.st_mode) and st.st_uid==ROOT_UID
-                    and stat.S_IMODE(st.st_mode)==0o700,'HANDOFF_MODULE_PARENT_PROTECTION')
+                    and not (st.st_mode & 0o022),
+                    'HANDOFF_MODULE_PARENT_PROTECTION')
+            if index==1:
+                require(stat.S_IMODE(st.st_mode)==0o700,
+                        'HANDOFF_MODULE_PARENT_MODE')
         return fd
     except BaseException:
         os.close(fd)
