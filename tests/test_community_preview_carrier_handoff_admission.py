@@ -15,21 +15,20 @@ class HandoffAdmission(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         base=self.tmp.name
-        for name in ('carrier','journal'):
-            os.mkdir(os.path.join(base,name),0o700)
+        os.mkdir(os.path.join(base,'carrier'),0o700)
         self.parent=os.open(os.path.join(base,'carrier'),os.O_RDONLY|os.O_DIRECTORY)
-        self.jfd=os.open(os.path.join(base,'journal'),os.O_RDONLY|os.O_DIRECTORY)
+        os.mkdir('update-journal',0o700,dir_fd=self.parent)
+        self.jfd=os.open('update-journal',os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         self.addCleanup(os.close,self.parent);self.addCleanup(os.close,self.jfd)
         self.uid=os.getuid()
         fd=os.open('community-update.lock',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600,dir_fd=self.jfd)
         os.close(fd)
-        self.entry_path=os.path.join(base,'entry')
-        with open(self.entry_path,'wb') as file:file.write(b'A_ENTRY_FIXTURE')
-        os.chmod(self.entry_path,0o600)
-        self.entry=os.open(self.entry_path,os.O_RDONLY|os.O_NOFOLLOW)
+        h.writefile(self.parent,h.ENTRY_NAME,b'A_ENTRY_FIXTURE',self.uid)
+        self.entry=os.open(h.ENTRY_NAME,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.parent)
         self.addCleanup(os.close,self.entry)
         self.entry_id=h.ident(os.fstat(self.entry))
         self.parent_id=h.parent_ident(os.fstat(self.parent))
+        self.journal_id=h.dirident(os.fstat(self.jfd))
         old_archive_path=os.environ.get('HANDOFF_OLD_ARCHIVE')
         new_archive_path=os.environ.get('HANDOFF_NEW_ARCHIVE')
         if old_archive_path and new_archive_path:
@@ -68,19 +67,30 @@ class HandoffAdmission(unittest.TestCase):
                                                           NEW_MANIFEST=h.sha(self.new['manifest.json']),
                                                           NEW_ARCHIVE=h.sha(self.archive)))
         h.build_tree(self.parent,self.old,self.uid,name=h.TARGET)
+        self.history_bodies={
+            'b_intent':('original-B-intent.json',b'PRESERVED_OLD_B_INTENT',self.jfd),
+            'b_approval':('bc-b-approval.json',b'EXPIRED_OLD_B_APPROVAL',self.parent),
+            'freeze':('writer-freeze-reference.json',b'OLD_FREEZE_EVIDENCE',self.parent),
+            'old_stage_permit':('site-prepare-approval.json',b'EXPIRED_OLD_STAGE_PERMIT',self.parent)}
+        self.history_refs={}
+        for key,(name,body,pfd) in self.history_bodies.items():
+            h.writefile(pfd,name,body,self.uid)
+            st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
+            self.history_refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
 
     def enterContext(self,context):
         obj=context.__enter__();self.addCleanup(context.__exit__,None,None,None);return obj
 
     def execute(self,fault=None):
         return h.execute(self.parent,self.jfd,self.entry,self.old,self.archive,self.uid,
-                         self.parent_id,self.entry_id,'isolated-attempt-0001',fault=fault)
+                         self.parent_id,self.journal_id,self.entry_id,'isolated-attempt-0001',
+                         history_refs=self.history_refs,fault=fault)
 
     def test_legal_exchange_and_owned_rollback(self):
         self.assertEqual(self.execute()['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
-        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
-        self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)['state'],
+        self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_INTENT))
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_RESULT))
@@ -96,13 +106,13 @@ class HandoffAdmission(unittest.TestCase):
 
     def test_wrong_identity_holds_without_stage(self):
         with self.assertRaisesRegex(h.Hold,'PARENT_IDENTITY_CHANGED'):
-            h.execute(self.parent,self.jfd,self.entry,self.old,self.archive,self.uid,[],self.entry_id,'isolated-attempt-0001')
+            h.execute(self.parent,self.jfd,self.entry,self.old,self.archive,self.uid,[],self.journal_id,self.entry_id,'isolated-attempt-0001',history_refs=self.history_refs)
         self.assertIsNone(h.childstat(self.jfd,h.STATE))
 
     def test_wrong_candidate_sha_holds(self):
         with self.assertRaisesRegex(h.Hold,'CANDIDATE_ARCHIVE_SHA'):h.execute(
             self.parent,self.jfd,self.entry,self.old,b'bad',self.uid,self.parent_id,
-            self.entry_id,'isolated-attempt-0001')
+            self.journal_id,self.entry_id,'isolated-attempt-0001',history_refs=self.history_refs)
         self.assertIsNone(h.childstat(self.jfd,h.STATE))
 
     def test_preintent_is_durable_before_stage_and_reopen_is_inspect_only(self):
@@ -180,9 +190,8 @@ class HandoffAdmission(unittest.TestCase):
         finally:fcntl.flock(second,fcntl.LOCK_UN);os.close(second)
 
     def test_original_evidence_unmodified(self):
-        fd=os.open('original-B-intent',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600,dir_fd=self.jfd)
-        os.write(fd,b'HISTORICAL_INTENT');os.close(fd)
+        before=self.history_bodies['b_intent'][1]
         self.execute()
-        self.assertEqual(h.readfile(self.jfd,'original-B-intent',self.uid),b'HISTORICAL_INTENT')
+        self.assertEqual(h.readfile(self.jfd,self.history_bodies['b_intent'][0],self.uid),before)
 
 if __name__=='__main__':unittest.main()
