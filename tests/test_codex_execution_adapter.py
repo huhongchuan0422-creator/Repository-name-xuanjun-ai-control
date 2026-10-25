@@ -227,6 +227,16 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.assertEqual(self.control.projection()[0]['error_kind'],
           'CODEX_CONNECTION_OR_QUOTA_HOLD')
 
+    def test_available_but_not_included_or_free_quota_is_rejected(self):
+        ModelControl(self.gateway,self.context,self.master).set_quota_status(
+          'codex-fixture','AVAILABLE','METERED_API_ELIGIBLE',
+          verified_at=time.time(),unavailable_reason=None)
+        with self.assertRaisesRegex(ValueError,'QUOTA_UNKNOWN_OR_UNAVAILABLE'):
+            self.control.create_intent('demo-b','CODEX_SDK','metered-disallowed',
+              self.context_body)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          codex_execution_intents''').fetchone()[0],0)
+
     def test_cancel_during_send_keeps_late_ids_and_converges_cancelled(self):
         intent=self.control.create_intent('demo-b','CODEX_SDK','cancel-race',
           self.context_body)

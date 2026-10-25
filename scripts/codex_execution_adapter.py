@@ -175,6 +175,16 @@ class CodexExecutionControl(object):
           r.phase='EXECUTOR' AND r.writer_allowed=1 AND r.enabled=1''',(
           self.tenant_id,task_id,attempt_id,principal)).fetchone() is not None
 
+    @staticmethod
+    def _quota_allows_zero_new_spend(row,now):
+        if row is None:return False
+        source=row['quota_source']
+        attributable=(source in ('EXISTING_SUBSCRIPTION_INCLUDED',
+          'VERIFIED_FREE_TIER') or (isinstance(source,str) and
+          source.startswith('TEST_ONLY_INCLUDED_')))
+        return (row['quota_state']=='AVAILABLE' and attributable and
+          row['verified_at'] is not None and now-row['verified_at']<=3600)
+
     def create_intent(self,task_id,transport_kind,idempotency_key,context,now=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
@@ -224,14 +234,13 @@ class CodexExecutionControl(object):
         connection=self.db.execute('''SELECT provider_id,purpose,status,
           config_version FROM service_connections WHERE tenant_id=? AND
           connection_id=?''',(self.tenant_id,context['connection_id'])).fetchone()
-        quota=self.db.execute('''SELECT quota_state,verified_at FROM
+        quota=self.db.execute('''SELECT quota_state,quota_source,verified_at FROM
           model_quota_status WHERE tenant_id=? AND provider_id=?''',(
           self.tenant_id,context['provider_id'])).fetchone()
         if (connection is None or connection['provider_id']!=context['provider_id'] or
                 connection['purpose']!='CODEX_EXECUTION' or connection['status']!='ACTIVE'):
             raise ValueError('ACTIVE_CODEX_CONNECTION_REQUIRED')
-        if (quota is None or quota['quota_state']!='AVAILABLE' or
-                quota['verified_at'] is None or now-quota['verified_at']>3600):
+        if not self._quota_allows_zero_new_spend(quota,now):
             raise ValueError('CODEX_QUOTA_UNKNOWN_OR_UNAVAILABLE')
         seed=canonical({'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'idempotency':idempotency_key})
@@ -340,15 +349,14 @@ class CodexExecutionControl(object):
             connection=self.db.execute('''SELECT status,config_version,provider_id,
               purpose FROM service_connections WHERE tenant_id=? AND connection_id=?''',(
               self.tenant_id,row['connection_id'])).fetchone()
-            quota=self.db.execute('''SELECT quota_state,verified_at FROM
+            quota=self.db.execute('''SELECT quota_state,quota_source,verified_at FROM
               model_quota_status WHERE tenant_id=? AND provider_id=?''',(
               self.tenant_id,row['provider_id'])).fetchone()
             if (connection is None or connection['status']!='ACTIVE' or
                     connection['purpose']!='CODEX_EXECUTION' or
                     connection['provider_id']!=row['provider_id'] or
                     connection['config_version']!=row['connection_config_version'] or
-                    quota is None or quota['quota_state']!='AVAILABLE' or
-                    quota['verified_at'] is None or now-quota['verified_at']>3600):
+                    not self._quota_allows_zero_new_spend(quota,now)):
                 self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
                   error_kind='CODEX_CONNECTION_OR_QUOTA_HOLD',updated_at=? WHERE
                   tenant_id=? AND intent_id=?''',(now,self.tenant_id,row['intent_id']))
