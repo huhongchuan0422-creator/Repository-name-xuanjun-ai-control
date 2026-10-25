@@ -322,7 +322,7 @@ def run(operation):
         old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
         new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
         approval_fd,approval_raw,approval_identity=_approval_fd(
-            parent,base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack,approval_name)
+            parent,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack,approval_name)
         h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
         h.members(new_archive_bytes,h.NEW_MANIFEST,h.NEW_ARCHIVE)
         require(h.dirident(os.fstat(journal))==h.dirident(os.stat(
@@ -359,7 +359,7 @@ def run(operation):
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
-                approval_identity,base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name),
+                approval_identity,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name),
             parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=ROOT_UID,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
