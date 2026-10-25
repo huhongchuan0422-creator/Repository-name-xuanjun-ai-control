@@ -211,7 +211,18 @@ class WholeEntry(unittest.TestCase):
         self.addCleanup(reopened.close);self.session=reopened
         self.assertFalse(reopened.bdone)
         self.assertIsNone(reopened.journal)
-        return reopened,candidate
+        # Rebuild from retained evidence in the new process. A newly approved
+        # plan is a test fixture only; production may not replace the Owner's
+        # historical approval without a separate explicit approval.
+        reopened.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        semantic2=reopened.evidence(True)
+        candidate2=reopened.candidate(semantic2)
+        os.close(reopened.backup);reopened.backup=None
+        approval2=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate2['attempt'],
+            carrier_manifest_sha256=reopened.pins(),plan_sha256=candidate2['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_APPROVAL,s.canonical(approval2))
+        return reopened,candidate2
 
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
