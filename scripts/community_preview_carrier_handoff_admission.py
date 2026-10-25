@@ -407,11 +407,11 @@ def _locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_jour
 def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs=None,mode=None):
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
+    old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
     if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
     if childstat(jfd,state_name) is None:
         if childstat(jfd,preintent_name) is not None:
-            old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
-    pre_raw=readfile(jfd,preintent_name,uid,8192)
+            pre_raw=readfile(jfd,preintent_name,uid,8192)
             try:pre=json.loads(pre_raw.decode('utf8'))
             except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
             need(type(pre) is dict and set(pre)=={'format','attempt','old_identity','old_manifest','new_manifest','entry_identity','parent_identity','journal_parent_identity','lock_identity','history','old_tree_sha','new_tree_sha'}
@@ -439,8 +439,8 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
          and type(pre.get('format')) is int and pre.get('format')==1
          and pre_raw==canonical(pre) and pre['attempt']==j['attempt']
          and pre['old_identity']==j['old_identity']
-         and pre['old_manifest']==OLD_MANIFEST
-         and pre['new_manifest']==NEW_MANIFEST
+         and pre['old_manifest']==old_manifest
+         and pre['new_manifest']==new_manifest
          and pre.get('history')==current_history
          and pre.get('parent_identity')==expected_parent_identity
          and pre.get('journal_parent_identity')==expected_journal_identity
@@ -449,53 +449,41 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
          and pre.get('old_tree_sha')==j['old_tree_sha']
          and pre.get('new_tree_sha')==j['new_tree_sha']
          and j['preintent_sha256']==sha(pre_raw),'PREINTENT_CHAIN_CHANGED')
-    current=childstat(parent,TARGET)
-    stage=childstat(parent,stage_name)
-    retained=childstat(parent,retained_name)
-    if current is None or stage is None:
-        return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
+    current=childstat(parent,TARGET);stage=childstat(parent,stage_name);retained=childstat(parent,retained_name)
+    if current is None or stage is None:return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     need(j.get('history')==current_history,'HISTORY_CHANGED_SINCE_INTENT')
     need(j['old_tree_sha']==sha(canonical({x:sha(y) for x,y in old_entries.items()}))
          and j['new_tree_sha']==sha(canonical({x:sha(y) for x,y in new_entries.items()}))
          and sha(old_entries['manifest.json'])==old_manifest
-         and sha(new_entries['manifest.json'])==new_manifest,
-         'JOURNAL_TREE_DIGEST_MISMATCH')
+         and sha(new_entries['manifest.json'])==new_manifest,'JOURNAL_TREE_DIGEST_MISMATCH')
     old_id=j['old_identity'];new_id=j['stage_identity']
-    rb_intent=childstat(jfd,rollback_intent_name)
-    rb_result=childstat(jfd,rollback_result_name)
+    rb_intent=childstat(jfd,rollback_intent_name);rb_result=childstat(jfd,rollback_result_name)
     need(rb_result is None or rb_intent is not None,'ORPHAN_ROLLBACK_RESULT')
     if retained is not None:return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     if dirident(current)==new_id and dirident(stage)==old_id:
         need(rb_result is None,'ROLLBACK_RESULT_STATE_CONFLICT')
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
         if rb_intent is not None:state='ROLLBACK_NOT_APPLIED_RESULT_UNKNOWN'
-        tree(parent,TARGET,uid,new_entries,new_id)
-        tree(parent,stage_name,uid,old_entries,old_id)
+        tree(parent,TARGET,uid,new_entries,new_id);tree(parent,stage_name,uid,old_entries,old_id)
     elif dirident(current)==old_id and dirident(stage)==new_id and retained is None:
         state='PREPARED_OR_REVERTED'
         if rb_intent is not None:
-            intent_raw=readfile(jfd,rollback_intent_name,uid,8192)
-            intent=json.loads(intent_raw.decode('utf8'))
+            intent_raw=readfile(jfd,rollback_intent_name,uid,8192);intent=json.loads(intent_raw.decode('utf8'))
             need(intent_raw==canonical(intent) and set(intent)=={'format','attempt','history_sha256','old_identity','new_identity','old_tree_sha','new_tree_sha'}
                  and intent['format']==1 and intent['attempt']==j['attempt']
                  and intent['old_identity']==old_id and intent['new_identity']==new_id
                  and intent['old_tree_sha']==j['old_tree_sha'] and intent['new_tree_sha']==j['new_tree_sha']
-                 and intent['history_sha256']==sha(canonical(current_history)),
-                 'ROLLBACK_INTENT_BINDING')
+                 and intent['history_sha256']==sha(canonical(current_history)),'ROLLBACK_INTENT_BINDING')
             if rb_result is None:state='ROLLBACK_APPLIED_RESULT_UNKNOWN'
             else:
-                result_raw=readfile(jfd,rollback_result_name,uid,8192)
-                result=json.loads(result_raw.decode('utf8'))
+                result_raw=readfile(jfd,rollback_result_name,uid,8192);result=json.loads(result_raw.decode('utf8'))
                 need(result_raw==canonical(result) and set(result)=={'format','attempt','result','rollback_intent_sha256'}
                      and result['format']==1 and result['attempt']==j['attempt']
                      and result['result']=='OLD_RESTORED_NEW_RETAINED'
-                     and result['rollback_intent_sha256']==sha(intent_raw),
-                     'ROLLBACK_RESULT_BINDING')
+                     and result['rollback_intent_sha256']==sha(intent_raw),'ROLLBACK_RESULT_BINDING')
                 state='ROLLED_BACK_OLD_TARGET_RESTORED_NEW_RETAINED'
-        tree(parent,TARGET,uid,old_entries,old_id)
-        tree(parent,stage_name,uid,new_entries,new_id)
-    else:
-        return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
+        tree(parent,TARGET,uid,old_entries,old_id);tree(parent,stage_name,uid,new_entries,new_id)
+    else:return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     return {'state':state,'retry_safe':False,'attempt':j['attempt']}
 
 def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_parent_identity,
