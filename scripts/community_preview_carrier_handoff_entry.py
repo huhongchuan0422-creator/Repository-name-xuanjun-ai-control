@@ -54,8 +54,8 @@ SCRIPTS_DIR=PARENT
 MODULE_PINS={
     # Updated together with this fixed entry after isolated review. Runtime still
     # requires these exact bytes; post-B adds no alternate import/execution path.
-    'community_preview_carrier_handoff_admission.py':'a9e1a1a3fe4ce8436fecf71d6bbb5d7f930c61bc',
-    'community_preview_carrier_handoff_call.py':'52d6db8d4a45b64c5a0de6202920da9f0033666c'
+    'community_preview_carrier_handoff_admission.py':'0a80536765a3f5da4c31286d09ba896df6ccfc90f6d772c70ba12ee5b1f349ff',
+    'community_preview_carrier_handoff_call.py':'940652bdf1e94d66c0dba5f841c7bf92a5b55ca14e0297dc48d483fc159b0fa0'
 }
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 OPERATIONS=('execute','status','rollback','post-b-execute','post-b-status','post-b-rollback')
@@ -286,9 +286,10 @@ def main(argv=None):
     try:
         result=run(operation)
         state=result.get('state') if isinstance(result,dict) else None
-        if operation=='execute':
+        base_operation=operation[7:] if operation.startswith('post-b-') else operation
+        if base_operation=='execute':
             accepted=state=='SWAPPED_OLD_RETAINED_IN_STAGE' and result.get('retry_safe') is False
-        elif operation=='rollback':
+        elif base_operation=='rollback':
             accepted=state=='ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED' and result.get('retry_safe') is False
         else:
             accepted=state in ('NO_HANDOFF_JOURNAL','PREPARED_OR_REVERTED',
@@ -357,7 +358,7 @@ def run(operation):
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
-                approval_identity,operation,old_archive_bytes,new_archive_bytes,ROOT_UID),
+                approval_identity,base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name),
             parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=ROOT_UID,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
