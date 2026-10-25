@@ -111,6 +111,17 @@ class ApprovalRecord(unittest.TestCase):
             with self.assertRaisesRegex(h.Hold,'HANDOFF_MODULE_SHA_MISMATCH'):
                 entry._verify_runtime_sources()
 
+    def test_cli_status_unknown_is_not_success(self):
+        from contextlib import redirect_stdout
+        import io
+        output=io.StringIO()
+        with patch.object(entry,'run',return_value={'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}),\
+             redirect_stdout(output):
+            code=entry.main(['status'])
+        self.assertEqual(code,3)
+        self.assertIn('UNKNOWN_INSPECT_ONLY',output.getvalue())
+        self.assertIn('"accepted":false',output.getvalue())
+
     def test_cli_has_no_approval_bypass_switch(self):
         with patch.object(entry,'run') as run:
             self.assertEqual(entry.main(['--approve']),2)
