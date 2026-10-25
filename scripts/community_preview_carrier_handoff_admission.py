@@ -205,11 +205,12 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
                      'file_identity':expected_file,'sha256':expected_sha}
     return result
 
-def verified_old_inventory(expected):
+def verified_old_inventory(expected,mode=None):
+    old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
     need(type(expected) is dict and 'manifest.json' in expected,
          'OLD_INVENTORY_REQUIRED')
     manifest_raw=expected['manifest.json']
-    need(sha(manifest_raw)==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
+    need(sha(manifest_raw)==old_manifest,'OLD_MANIFEST_CHANGED')
     try:m=json.loads(manifest_raw.decode('utf8'))
     except (ValueError,UnicodeError):raise Hold('OLD_MANIFEST_INVALID')
     need(manifest_raw==canonical(m) and type(m) is dict
@@ -349,7 +350,8 @@ def exchange(parent,a,b):
     if fn(parent,a.encode('ascii'),parent,b.encode('ascii'),2)!=0:
         raise Hold('ATOMIC_EXCHANGE_UNKNOWN_'+str(ctypes.get_errno()))
 
-def journal(jfd,uid,state_name=STATE):
+def journal(jfd,uid,state_name=STATE,mode=None):
+    old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
     b=readfile(jfd,state_name,uid,8192)
     try:v=json.loads(b.decode('utf8'))
     except (UnicodeError,ValueError):raise Hold('JOURNAL_JSON_UNKNOWN')
@@ -357,7 +359,7 @@ def journal(jfd,uid,state_name=STATE):
             'old_tree_sha','new_tree_sha','history','entry_identity','journal_parent_identity','lock_identity','preintent_sha256'}
     need(type(v) is dict and set(v)==fields and type(v['format']) is int
          and v['format']==1 and type(v['attempt']) is str
-         and v['old_manifest']==OLD_MANIFEST and v['new_manifest']==NEW_MANIFEST
+         and v['old_manifest']==old_manifest and v['new_manifest']==new_manifest
          and b==canonical(v),'JOURNAL_SCHEMA_OR_BINDING')
     return v
 
@@ -428,7 +430,7 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
     verified_old_inventory(old_entries,mode)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     current_history=capture_history(history_refs,uid,parent,jfd,mode)
-    j=journal(jfd,uid,state_name)
+    j=journal(jfd,uid,state_name,mode)
     need(j['journal_parent_identity']==expected_journal_identity
          and j['entry_identity']==expected_entry_identity
          and j['lock_identity']==expected_lock_identity,'JOURNAL_OWNER_BINDING_CHANGED')
@@ -536,7 +538,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
              'FINAL_LEASE_OR_PARENT_CHANGED')
         tree(parent,TARGET,uid,old_entries,old_id)
         tree(parent,stage_name,uid,new_entries,stage_id)
-        need(journal(jfd,uid,state_name)==j,'INTENT_CHANGED')
+        need(journal(jfd,uid,state_name,mode)==j,'INTENT_CHANGED')
         _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
         need(capture_history(history_refs,uid,parent,jfd,mode)==history,'HISTORY_CHANGED_BEFORE_SWITCH')
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,retained_name) is None,
@@ -576,7 +578,7 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
              and childstat(jfd,rollback_result_name) is None,'ROLLBACK_ALREADY_ATTEMPTED')
         result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs,mode=mode)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
-        binding=journal(jfd,uid,state_name)
+        binding=journal(jfd,uid,state_name,mode)
         history=capture_history(history_refs,uid,parent,jfd,mode)
         intent={'format':1,'attempt':binding['attempt'],
                 'history_sha256':sha(canonical(history)),
@@ -598,7 +600,7 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
         need(result['state']=='ROLLBACK_NOT_APPLIED_RESULT_UNKNOWN'
              and childstat(jfd,rollback_intent_name) is not None
              and childstat(jfd,rollback_result_name) is None
-             and journal(jfd,uid,state_name)==binding
+             and journal(jfd,uid,state_name,mode)==binding
              and capture_history(history_refs,uid,parent,jfd,mode)==history,
              'ROLLBACK_BOUNDARY_CHANGED')
         rollback_attempted=True
