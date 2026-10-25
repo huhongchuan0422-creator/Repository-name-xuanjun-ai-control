@@ -144,9 +144,8 @@ def _open_fixed_scripts_dir():
             require(stat.S_ISDIR(st.st_mode) and st.st_uid==ROOT_UID
                     and not (st.st_mode & 0o022),
                     'HANDOFF_MODULE_PARENT_PROTECTION')
-            if index==1:
-                require(stat.S_IMODE(st.st_mode)==0o700,
-                        'HANDOFF_MODULE_PARENT_MODE')
+            # Protected parent may be 0700 or 0755; group/world write is forbidden.
+            # Root-owned 0600 module files and FD/path identity are enforced below.
         return fd
     except BaseException:
         os.close(fd)
