@@ -219,7 +219,7 @@ class WholeEntry(unittest.TestCase):
             issued_at=1,expires_at=2,actions=h.C_ACTIONS)
         self.write(h.C_APPROVAL,s.canonical(old_approval))
         record=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
-            carrier_manifest_sha256=q.approved_stamp,evidence_sha256=s.sha(s.canonical(semantic)),
+            carrier_manifest_sha256=q.approved_stamp,evidence_sha256=s.sha(s.canonical(h.Session._without_observed_at(semantic))),
             plan=candidate,plan_sha256=candidate['plan_sha256'],
             plan_document_sha256=s.sha(s.canonical(candidate)),
             issued_at=self.clock,expires_at=self.clock+600)
@@ -333,6 +333,40 @@ class WholeEntry(unittest.TestCase):
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
         self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+
+    def test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        original=u.Update.replace_and_verify
+        def known(updater):
+            updater.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+                scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+                runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=self.clock)
+            return original(updater)
+        before_calls=len(self.calls)
+        with patch.object(h,'acknowledge',return_value=None),\
+             patch.object(u.Update,'replace_and_verify',known),\
+             self.assertRaisesRegex(u.Hold,'KNOWN_FAILURE'):
+            q.resume_c_before_confirmation()
+        self.assertTrue(Path(h.PROOF).exists())
+        proof=h.document(h.PROOF)[0]
+        self.assertEqual(proof['approval_kind'],'C_RESUME_APPROVAL')
+        self.assertEqual(proof['plan']['plan_sha256'],candidate['plan_sha256'])
+        self.assertTrue(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+        self.assertGreater(len(self.calls),before_calls)
+        q.close()
+        reopened=h.Session();reopened.acquire(recover=True)
+        self.addCleanup(reopened.close);self.session=reopened
+        with patch.object(h,'acknowledge',return_value=None):
+            result=reopened.recover()
+        self.assertIn(result['phase'],('ROLLED_BACK_PREVIEW_HOLD','COMMITTED'))
+        self.assertEqual(reopened.journal.plan['plan_sha256'],candidate['plan_sha256'])
+        self.assertEqual(proof['approval_sha256'],s.sha(Path(h.C_RESUME_APPROVAL).read_bytes()))
+        self.assertEqual(Path(h.C_APPROVAL).read_bytes(),
+            s.canonical(dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
+                carrier_manifest_sha256=q.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
+                issued_at=1,expires_at=2,actions=h.C_ACTIONS)))
+        self.assertNotIn('snapshot',[x[3] for x in self.calls[before_calls:]])
+        self.assertNotIn('clone',[x[3] for x in self.calls[before_calls:]])
 
     def test_known_failure_recovery_uses_new_c_resume_approval_provenance(self):
         q=self.fresh_session()
