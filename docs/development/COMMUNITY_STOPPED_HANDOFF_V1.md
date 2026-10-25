@@ -14,6 +14,8 @@ New scoped isolated tests:
 - `test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds`
 - `test_c_preconfirmation_duplicate_call_after_commit_is_rejected`
 - `test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover`
+- `test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof`
+- `test_real_pty_production_ack_prompt_then_input_eof_timeout`
 
 The existing real-PTY acknowledgement test continues to cover exact input, EOF and timeout. Current source has not yet been confirmed by a new Hosted result for this scope; do not treat previous carrier/60-test PASS as evidence for these new tests. `REAL_PYTHON_3_6_8=NOT_RUN`.
 
