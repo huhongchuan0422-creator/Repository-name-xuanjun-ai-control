@@ -20,10 +20,11 @@ Private control-plane repository for XuanJun AI / XuanJun Yunhui engineering orc
 The local-only reusable development-task scheduler and digital-twin projection
 candidate is documented in
 [REUSABLE_SCHEDULER_KERNEL_20261025.md](docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md).
-It reuses the canonical Supervisor SQLite ledger, does not deploy a service,
-and is limited to development-task governance for the original seven
-workstreams. It is not a business-request router and contains no OCR business
-adapter.
+It reuses the canonical Supervisor SQLite ledger and includes a local offline
+seven-board digital-twin view (operations, customer, R&D,
+acceptance/delivery, maintenance, shared ecosystem, finance). It does not
+deploy a service, is not a business-request router, and contains no OCR
+business adapter.
 
 ## Mandatory development execution rules
 

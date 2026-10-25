@@ -37,7 +37,8 @@ class KernelTests(unittest.TestCase):
 
     @staticmethod
     def task(task_id, output, dependencies=None, priority=10,
-             preemptible=True, resources=None, evidence='evidence-v1'):
+             preemptible=True, resources=None, evidence='evidence-v1',
+             board='research-development'):
         return {
             'task_id': task_id, 'node_id': 'node-' + task_id,
             'stage': 'development', 'owner': 'developer', 'entry': 'WORK',
@@ -46,6 +47,7 @@ class KernelTests(unittest.TestCase):
             'input_version': 'input-v1', 'output_version': output,
             'priority': priority, 'preemptible': preemptible,
             'module_id': 'xuanjun.scheduler.kernel',
+            'board_id': board,
             'resources': resources or ['fake:resource-' + task_id],
             'dependencies': dependencies or [],
             'completion_evidence': [{'evidence_ref': evidence}],
@@ -149,7 +151,8 @@ class KernelTests(unittest.TestCase):
         duplicate = self.gateway.acknowledge_event(self.a, outbox['event_id'], 1017)
         self.assertTrue(duplicate['duplicate'])
         self.supervisor.db.execute("""UPDATE gateway_dependencies
-          SET required_version='b-v4',state='WAITING',event_id=NULL
+          SET required_version='b-v4',state='WAITING',event_attempt_id=NULL,
+          event_id=NULL
           WHERE consumer_task_id='task-a'""")
         self.supervisor.db.commit()
         # Replayed old event remains ACKed and cannot satisfy a new version.
@@ -174,7 +177,7 @@ class KernelTests(unittest.TestCase):
         decision = self.gateway.preemption_decision(
             self.a, 'task-c', 'task-a')
         self.assertEqual(decision['decision'], 'WAIT_NEXT_SAFE_POINT')
-        with self.assertRaisesRegex(ValueError, 'TASK_NOT_READY|CLAIMABLE'):
+        with self.assertRaisesRegex(ValueError, 'DEPENDENCY_CONSUMED_ACK'):
             exe.start('task-a', 'attempt-a1', ['fake:shared'], 3000)
         self.gateway.save_checkpoint(self.a, 'task-c', 'attempt-c1',
             'checkpoint-c1', {'work': 'saved'}, ['external-write'], UNKNOWN,
@@ -315,6 +318,192 @@ class KernelTests(unittest.TestCase):
             {'xuanjun.scheduler.kernel', 'xuanjun.digital-twin.projection'})
         self.assertTrue(all(json.loads(x['contract_json'])['lifecycle'] ==
                             'TEST_ONLY' for x in rows))
+
+    def test_cross_tenant_progress_and_terminal_reject_before_any_write(self):
+        self.gateway.register_graph(self.a, self.graph(), now=1000)
+        self.now = 1001
+        self.executor().start('task-a', 'attempt-a1',
+                              ['fake:resource-task-a'], 2000)
+        before = {name: self.supervisor.db.execute(
+            'SELECT COUNT(*) FROM ' + name).fetchone()[0]
+            for name in ('tasks', 'events', 'outbox', 'gateway_checkpoints')}
+        wrong = self.executor(self.b)
+        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
+            wrong.progress('task-a', 'attempt-a1', 'wrong-progress', 'x', 1002)
+        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
+            wrong.complete_success('task-a', 'attempt-a1', 'f' * 64,
+                                   [{'evidence_ref': 'evidence-v1'}], 1003)
+        after = {name: self.supervisor.db.execute(
+            'SELECT COUNT(*) FROM ' + name).fetchone()[0]
+            for name in before}
+        self.assertEqual(before, after)
+        self.assertEqual(self.supervisor._task('task-a')['state'], 'STARTED')
+
+    def test_start_requires_ack_matching_evidence_and_resume_grant(self):
+        self.register_wait_graph()
+        self.gateway.save_waiting_checkpoint(
+            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
+            ['fake:shared'], 1001)
+        outbox = self.start_complete_b()
+        exe = self.executor()
+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK'):
+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000)
+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
+        self.gateway.acknowledge_event(
+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
+        with self.assertRaisesRegex(ValueError, 'RESUME_GRANT'):
+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000,
+                      checkpoint_id='checkpoint-a0')
+        grant = self.gateway.issue_resume_grant(
+            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
+        self.gateway.revoke_dependency(self.a, 'task-b', 'qa-revoked', 1017)
+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK|ALREADY_USED'):
+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000,
+                      checkpoint_id='checkpoint-a0',
+                      resume_grant_id=grant['grant_id'])
+        self.assertEqual(self.supervisor.db.execute(
+            "SELECT COUNT(*) FROM resource_claims WHERE state='VALID'"
+        ).fetchone()[0], 0)
+
+    def test_wrong_dependency_evidence_never_unlocks_start(self):
+        producer = self.task('task-b', 'b-v3', evidence='actual-evidence')
+        consumer = self.task('task-a', 'a-v1', dependencies=[{
+            'task_id': 'task-b', 'version': 'b-v3',
+            'evidence_ref': 'required-other-evidence'}],
+            resources=['fake:shared'])
+        self.gateway.register_graph(
+            self.a, self.graph(tasks=[producer, consumer]), now=1000)
+        exe = self.executor()
+        self.now = 1010
+        exe.start('task-b', 'attempt-b1', ['fake:resource-task-b'], 2000)
+        self.now = 1013
+        exe.complete_success('task-b', 'attempt-b1', 'f' * 64,
+                             [{'evidence_ref': 'actual-evidence'}], self.now)
+        outbox = self.supervisor.db.execute(
+            "SELECT outbox_id,event_id FROM outbox WHERE task_id='task-b'"
+        ).fetchone()
+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
+        ack = self.gateway.acknowledge_event(
+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
+        self.assertEqual(ack['matched_dependencies'], 0)
+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK'):
+            self.executor().start('task-a', 'attempt-a1',
+                                  ['fake:shared'], 2000)
+
+    def test_claim_requires_exact_registered_resource_set(self):
+        self.gateway.register_graph(self.a, self.graph(), now=1000)
+        exe = self.executor()
+        for resources in ([], ['fake:wrong'],
+                          ['fake:resource-task-a', 'fake:extra']):
+            with self.assertRaisesRegex(ValueError, 'REGISTERED_RESOURCE'):
+                exe.start('task-a', 'attempt-a1', resources, 2000)
+        self.assertEqual(self.supervisor.db.execute(
+            'SELECT COUNT(*) FROM resource_claims').fetchone()[0], 0)
+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
+
+    def test_complete_event_identity_allows_same_attempt_event_per_task(self):
+        one = self.task('task-a', 'v1', resources=['fake:a'])
+        two = self.task('task-b', 'v1', resources=['fake:b'])
+        self.gateway.register_graph(
+            self.a, self.graph(tasks=[one, two]), now=1000)
+        exe = self.executor()
+        outboxes = []
+        for task_id, resource in (('task-a', 'fake:a'), ('task-b', 'fake:b')):
+            self.now += 1
+            exe.start(task_id, 'same-attempt', [resource], 2000)
+            self.now += 1
+            exe.complete_success(task_id, 'same-attempt', 'f' * 64,
+                [{'evidence_ref': 'evidence-v1'}], self.now)
+            outboxes.append(self.supervisor.db.execute(
+                'SELECT * FROM outbox WHERE task_id=?', (task_id,)).fetchone())
+        for row in outboxes:
+            self.now += 1
+            self.gateway.mark_outbox_sent(
+                self.a, row['outbox_id'], 'sent-' + row['task_id'], self.now)
+            self.gateway.receive_outbox(self.a, row['outbox_id'], self.now)
+            self.gateway.acknowledge_event(
+                self.a, row['task_id'], 'same-attempt', row['event_id'],
+                self.now)
+        self.assertEqual(len(list(self.supervisor.db.execute(
+            'SELECT * FROM gateway_inbox'))), 2)
+        self.fence.close(); self.supervisor.close()
+        self.supervisor = Supervisor(self.path, lambda: self.now)
+        self.gateway = GatewayKernel(
+            self.supervisor, self.authority, lambda: self.now)
+        self.fence = Fence(self.supervisor, self.lock_root)
+        for row in outboxes:
+            self.assertTrue(self.gateway.receive_outbox(
+                self.a, row['outbox_id'], self.now)['duplicate'])
+
+    def test_resume_race_rolls_back_claim_and_does_not_consume_twice(self):
+        self.register_wait_graph()
+        self.gateway.save_waiting_checkpoint(
+            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
+            ['fake:shared'], 1001)
+        outbox = self.start_complete_b()
+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
+        self.gateway.acknowledge_event(
+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
+        grant = self.gateway.issue_resume_grant(
+            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
+        original = self.gateway.consume_resume_grant
+        def revoke_then_consume(*args, **kwargs):
+            self.gateway.revoke_dependency(
+                self.a, 'task-b', 'race-revoked', 1018)
+            return original(*args, **kwargs)
+        self.gateway.consume_resume_grant = revoke_then_consume
+        self.now = 1018
+        with self.assertRaisesRegex(ValueError, 'ALREADY_USED'):
+            self.executor().start(
+                'task-a', 'attempt-a1', ['fake:shared'], 2000,
+                checkpoint_id='checkpoint-a0',
+                resume_grant_id=grant['grant_id'])
+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
+        self.assertEqual(self.supervisor.db.execute(
+            "SELECT COUNT(*) FROM resource_claims WHERE state='VALID'"
+        ).fetchone()[0], 0)
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          gateway_resume_grants WHERE grant_id=?''',
+          (grant['grant_id'],)).fetchone()[0], 'REVOKED')
+
+    def test_gateway_scan_exempts_real_dependency_wait_from_ready_timeout(self):
+        self.register_wait_graph()
+        self.now = 10000
+        actions = self.gateway.scan(self.a, now=self.now)
+        self.assertNotIn('task-a', {row['task_id'] for row in actions})
+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
+        self.assertEqual({row['task_id']: row['status'] for row in
+            self.gateway.monitor(self.a)}['task-a'], 'WAITING_DEPENDENCY')
+
+    def test_multi_project_cross_board_partial_flow_and_tenant_projection(self):
+        ops = self.task('task-a', 'brief-v1', board='operations')
+        dev = self.task('task-b', 'build-v1', dependencies=[{
+            'task_id': 'task-a', 'version': 'brief-v1',
+            'evidence_ref': 'evidence-v1'}], board='research-development')
+        self.gateway.register_graph(
+            self.a, self.graph(tasks=[ops, dev]), now=1000)
+        finance_only = self.task('task-z', 'ledger-v1', board='finance')
+        self.gateway.register_graph(self.a, self.graph(
+            suffix='z', tasks=[finance_only]), now=1000)
+        customer_only = self.task('task-y', 'request-v1', board='customer')
+        self.gateway.register_graph(self.b, self.graph(
+            tenant='tenant-b', suffix='y', tasks=[customer_only]), now=1000)
+        pa = self.gateway.projection(self.a)
+        pb = self.gateway.projection(self.b)
+        self.assertEqual({task['project_id'] for task in pa['tasks']},
+                         {'project-a', 'project-z'})
+        self.assertEqual([task['task_id'] for task in pb['tasks']], ['task-y'])
+        counts = {board['board_id']: board['task_count']
+                  for board in pa['boards']}
+        self.assertEqual(counts['operations'], 1)
+        self.assertEqual(counts['research-development'], 1)
+        self.assertEqual(counts['finance'], 1)
+        self.assertEqual(counts['customer'], 0)
+        self.assertEqual(pa['anomalies'][0]['task_id'], 'task-b')
+        self.assertEqual(pa['anomalies'][0]['project_id'], 'project-a')
 
 
 if __name__ == '__main__':

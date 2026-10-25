@@ -17,6 +17,7 @@
       "priority": 50,
       "preemptible": true,
       "module_id": "xuanjun.scheduler.kernel",
+      "board_id": "research-development",
       "resources": ["fake:qa/demo"],
       "dependencies": [],
       "completion_evidence": [{"evidence_ref": "qa-report-demo"}]
@@ -34,6 +35,7 @@
       "priority": 100,
       "preemptible": true,
       "module_id": "xuanjun.scheduler.kernel",
+      "board_id": "acceptance-delivery",
       "resources": ["fake:delivery/demo"],
       "dependencies": [{
         "task_id": "qa-node",

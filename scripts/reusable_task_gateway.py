@@ -19,6 +19,9 @@ from task_writer_fence import Fence
 
 
 TEST_ONLY = 'TEST_ONLY'
+BOARDS = frozenset(('operations', 'customer', 'research-development',
+                    'acceptance-delivery', 'maintenance',
+                    'shared-ecosystem', 'finance'))
 MODULE_CONTRACTS = (
     {
         'module_id': 'xuanjun.scheduler.kernel', 'version': '1.0.0-test',
@@ -129,13 +132,14 @@ class GatewayKernel(object):
               node_id TEXT NOT NULL,input_version TEXT NOT NULL,
               output_version TEXT NOT NULL,priority INTEGER NOT NULL,
               preemptible INTEGER NOT NULL,module_id TEXT NOT NULL,
-              resources_json TEXT NOT NULL,
+              resources_json TEXT NOT NULL,board_id TEXT NOT NULL,
               FOREIGN KEY(task_id) REFERENCES tasks(task_id),
               FOREIGN KEY(graph_id) REFERENCES gateway_graphs(graph_id))''',
             '''CREATE TABLE IF NOT EXISTS gateway_dependencies(
               consumer_task_id TEXT NOT NULL,producer_task_id TEXT NOT NULL,
               required_version TEXT NOT NULL,required_evidence_ref TEXT NOT NULL,
-              state TEXT NOT NULL DEFAULT 'WAITING',event_id TEXT,
+              state TEXT NOT NULL DEFAULT 'WAITING',event_attempt_id TEXT,
+              event_id TEXT,
               updated_at REAL NOT NULL,
               PRIMARY KEY(consumer_task_id,producer_task_id),
               FOREIGN KEY(consumer_task_id) REFERENCES tasks(task_id),
@@ -146,7 +150,7 @@ class GatewayKernel(object):
               output_version TEXT NOT NULL,evidence_ref TEXT NOT NULL,
               state TEXT NOT NULL,received_at REAL NOT NULL,acked_at REAL,
               payload_sha256 TEXT NOT NULL,
-              PRIMARY KEY(tenant_id,event_id))''',
+              PRIMARY KEY(tenant_id,producer_task_id,producer_attempt_id,event_id))''',
             '''CREATE TABLE IF NOT EXISTS gateway_checkpoints(
               task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
               checkpoint_id TEXT NOT NULL,payload_json TEXT NOT NULL,
@@ -167,8 +171,10 @@ class GatewayKernel(object):
               created_at REAL NOT NULL,used_at REAL,
               FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
             '''CREATE TABLE IF NOT EXISTS gateway_delivery_receipts(
-              event_id TEXT NOT NULL,phase TEXT NOT NULL,evidence_ref TEXT NOT NULL,
-              observed_at REAL NOT NULL,PRIMARY KEY(event_id,phase))''',
+              task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,event_id TEXT NOT NULL,
+              phase TEXT NOT NULL,evidence_ref TEXT NOT NULL,
+              observed_at REAL NOT NULL,
+              PRIMARY KEY(task_id,attempt_id,event_id,phase))''',
             '''CREATE TABLE IF NOT EXISTS gateway_module_contracts(
               module_id TEXT NOT NULL,version TEXT NOT NULL,contract_json TEXT NOT NULL,
               contract_sha256 TEXT NOT NULL,PRIMARY KEY(module_id,version))''',
@@ -201,15 +207,18 @@ class GatewayKernel(object):
         task_required = {'task_id', 'node_id', 'stage', 'owner', 'entry',
                          'checkpoint_sha256', 'spec_sha256', 'input_version',
                          'output_version', 'priority', 'preemptible',
-                         'module_id', 'resources', 'dependencies',
+                         'module_id', 'resources', 'dependencies', 'board_id',
                          'completion_evidence'}
         ids = []
         for task in value['tasks']:
             if not isinstance(task, dict) or set(task) != task_required:
                 raise ValueError('EXACT_GRAPH_TASK_REQUIRED')
             for name in ('task_id', 'node_id', 'stage', 'owner', 'entry',
-                         'input_version', 'output_version', 'module_id'):
+                         'input_version', 'output_version', 'module_id',
+                         'board_id'):
                 _text(task[name], name)
+            if task['board_id'] not in BOARDS:
+                raise ValueError('CANONICAL_BOARD_REQUIRED')
             _sha(task['checkpoint_sha256'], 'checkpoint_sha256')
             _sha(task['spec_sha256'], 'spec_sha256')
             if (type(task['priority']) is not int or task['priority'] < 0
@@ -294,17 +303,17 @@ class GatewayKernel(object):
                  value['graph_version'], graph_sha, now))
             for task in value['tasks']:
                 self.db.execute('''INSERT INTO gateway_task_metadata
-                  VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                   (task['task_id'], value['graph_id'], tenant_id,
                    value['project_id'], task['node_id'], task['input_version'],
                    task['output_version'], task['priority'],
                    int(task['preemptible']), task['module_id'],
-                   canonical(sorted(task['resources']))))
+                   canonical(sorted(task['resources'])), task['board_id']))
                 for dep in task['dependencies']:
                     self.db.execute('''INSERT INTO gateway_dependencies
-                      VALUES (?,?,?,?,?,?,?)''',
+                      VALUES (?,?,?,?,?,?,?,?)''',
                       (task['task_id'], dep['task_id'], dep['version'],
-                       dep['evidence_ref'], 'WAITING', None, now))
+                       dep['evidence_ref'], 'WAITING', None, None, now))
         return {'duplicate': False, 'graph_sha256': graph_sha}
 
     def task_tenant(self, task_id):
@@ -320,6 +329,20 @@ class GatewayKernel(object):
             raise ValueError('CROSS_TENANT_ACCESS_REJECTED')
         return tenant_id
 
+    def canonical_resources(self, task_id):
+        row = self.db.execute('''SELECT resources_json FROM
+          gateway_task_metadata WHERE task_id=?''', (task_id,)).fetchone()
+        if row is None:
+            raise KeyError(task_id)
+        return json.loads(row['resources_json'])
+
+    def assert_claim_resources(self, context, task_id, resources):
+        self.assert_task_context(context, task_id)
+        if (not isinstance(resources, list)
+                or sorted(resources) != self.canonical_resources(task_id)):
+            raise ValueError('REGISTERED_RESOURCE_SCOPE_REQUIRED')
+        return list(self.canonical_resources(task_id))
+
     def mark_outbox_sent(self, context, outbox_id, evidence_ref, now=None):
         row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',
                               (outbox_id,)).fetchone()
@@ -331,8 +354,9 @@ class GatewayKernel(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
-              VALUES (?,?,?,?)''', (row['event_id'], 'SENT',
-                                    _text(evidence_ref, 'evidence_ref'), now))
+              VALUES (?,?,?,?,?,?)''', (row['task_id'], row['attempt_id'],
+                row['event_id'], 'SENT', _text(evidence_ref, 'evidence_ref'),
+                now))
         return result
 
     def receive_outbox(self, context, outbox_id, now=None):
@@ -360,8 +384,10 @@ class GatewayKernel(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             prior = self.db.execute('''SELECT * FROM gateway_inbox
-              WHERE tenant_id=? AND event_id=?''',
-              (tenant_id, row['event_id'])).fetchone()
+              WHERE tenant_id=? AND producer_task_id=?
+              AND producer_attempt_id=? AND event_id=?''',
+              (tenant_id, row['task_id'], row['attempt_id'],
+               row['event_id'])).fetchone()
             exact = (tenant_id, row['event_id'], row['task_id'],
                      row['attempt_id'], meta['output_version'], evidence_ref,
                      payload_sha)
@@ -380,14 +406,35 @@ class GatewayKernel(object):
                payload_sha))
         return {'duplicate': False, 'state': 'RECEIVED'}
 
-    def acknowledge_event(self, context, event_id, now=None):
+    def acknowledge_event(self, context, producer_task_id,
+                          producer_attempt_id=None, event_id=None, now=None):
+        # Compatibility for the original single-identity API is deliberately
+        # limited to an unambiguous row.  New callers pass the complete event
+        # identity: producer task + attempt + event.
+        if event_id is None:
+            if producer_attempt_id is not None:
+                if now is not None:
+                    raise ValueError('AMBIGUOUS_EVENT_ACK_ARGUMENTS')
+                now = producer_attempt_id
+            event_id = producer_task_id
+            producer_task_id = None
         tenant_id = self.tenants.verify(context)
         now = self.clock() if now is None else _finite(now, 'time')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            event = self.db.execute('''SELECT * FROM gateway_inbox
-              WHERE tenant_id=? AND event_id=?''',
-              (tenant_id, event_id)).fetchone()
+            if producer_task_id is None:
+                matches = list(self.db.execute('''SELECT * FROM gateway_inbox
+                  WHERE tenant_id=? AND event_id=?''',
+                  (tenant_id, event_id)))
+                if len(matches) != 1:
+                    raise ValueError('COMPLETE_EVENT_IDENTITY_REQUIRED')
+                event = matches[0]
+            else:
+                event = self.db.execute('''SELECT * FROM gateway_inbox
+                  WHERE tenant_id=? AND producer_task_id=?
+                  AND producer_attempt_id=? AND event_id=?''',
+                  (tenant_id, producer_task_id, producer_attempt_id,
+                   event_id)).fetchone()
             if event is None:
                 raise KeyError(event_id)
             if event['state'] == 'CONSUMED_ACK':
@@ -406,18 +453,32 @@ class GatewayKernel(object):
                         and dep['required_evidence_ref'] ==
                             event['evidence_ref']):
                     self.db.execute('''UPDATE gateway_dependencies
-                      SET state='RECEIVED',event_id=?,updated_at=?
+                      SET state='RECEIVED',event_attempt_id=?,event_id=?,
+                      updated_at=?
                       WHERE consumer_task_id=? AND producer_task_id=?''',
-                      (event_id, now, dep['consumer_task_id'],
+                      (event['producer_attempt_id'], event_id, now,
+                       dep['consumer_task_id'],
                        dep['producer_task_id']))
                     matched += 1
+                    remaining = self.db.execute('''SELECT COUNT(*) FROM
+                      gateway_dependencies WHERE consumer_task_id=?
+                      AND state!='RECEIVED' ''',
+                      (dep['consumer_task_id'],)).fetchone()[0]
+                    if remaining == 0:
+                        self.db.execute('''UPDATE tasks SET
+                          next_action='RESUME_ADMISSION_REQUIRED',updated_at=?
+                          WHERE task_id=? AND state='READY' ''',
+                          (now, dep['consumer_task_id']))
             self.db.execute('''UPDATE gateway_inbox
               SET state='CONSUMED_ACK',acked_at=?
-              WHERE tenant_id=? AND event_id=?''',
-              (now, tenant_id, event_id))
+              WHERE tenant_id=? AND producer_task_id=?
+              AND producer_attempt_id=? AND event_id=?''',
+              (now, tenant_id, event['producer_task_id'],
+               event['producer_attempt_id'], event_id))
             self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
-              VALUES (?,?,?,?)''',
-              (event_id, 'CONSUMED_ACK', event['payload_sha256'], now))
+              VALUES (?,?,?,?,?,?)''',
+              (event['producer_task_id'], event['producer_attempt_id'],
+               event_id, 'CONSUMED_ACK', event['payload_sha256'], now))
             return {'duplicate': False, 'state': 'CONSUMED_ACK',
                     'matched_dependencies': matched}
 
@@ -548,7 +609,10 @@ class GatewayKernel(object):
           LIMIT 1''' % placeholders, resources).fetchone()
         if conflicts is not None:
             raise ValueError('RESUME_RESOURCE_CONFLICT')
-        event_ids = [row['event_id'] for row in dependencies]
+        event_ids = [{'producer_task_id': row['producer_task_id'],
+                      'producer_attempt_id': row['event_attempt_id'],
+                      'event_id': row['event_id']}
+                     for row in dependencies]
         grant_body = {'task_id': task_id, 'checkpoint_id': checkpoint_id,
                       'dependency_event_ids': event_ids,
                       'valid_until': valid_until}
@@ -575,6 +639,44 @@ class GatewayKernel(object):
             raise ValueError('RESUME_GRANT_EXPIRED')
         return dict(row)
 
+    def assert_start_allowed(self, context, task_id, resources,
+                             checkpoint_id=None, resume_grant_id=None,
+                             now=None):
+        """Validate all Gateway facts before source authority is claimed."""
+        self.assert_claim_resources(context, task_id, resources)
+        now = self.clock() if now is None else _finite(now, 'time')
+        dependencies = list(self.db.execute('''SELECT * FROM
+          gateway_dependencies WHERE consumer_task_id=?
+          ORDER BY producer_task_id''', (task_id,)))
+        for dep in dependencies:
+            if (dep['state'] != 'RECEIVED' or not dep['event_attempt_id']
+                    or not dep['event_id']):
+                raise ValueError('DEPENDENCY_CONSUMED_ACK_REQUIRED')
+            producer = self.supervisor._task(dep['producer_task_id'])
+            meta = self.db.execute('''SELECT output_version FROM
+              gateway_task_metadata WHERE task_id=?''',
+              (dep['producer_task_id'],)).fetchone()
+            inbox = self.db.execute('''SELECT * FROM gateway_inbox
+              WHERE tenant_id=? AND producer_task_id=?
+              AND producer_attempt_id=? AND event_id=?
+              AND state='CONSUMED_ACK' LIMIT 1''',
+              (self.task_tenant(task_id), dep['producer_task_id'],
+               dep['event_attempt_id'], dep['event_id'])).fetchone()
+            if (producer['state'] != 'SUCCESS' or inbox is None
+                    or meta['output_version'] != dep['required_version']
+                    or inbox['output_version'] != dep['required_version']
+                    or inbox['evidence_ref'] != dep['required_evidence_ref']):
+                raise ValueError('DEPENDENCY_VERSION_EVIDENCE_REQUIRED')
+        checkpoint = self.db.execute('''SELECT 1 FROM gateway_checkpoints
+          WHERE task_id=? LIMIT 1''', (task_id,)).fetchone()
+        if checkpoint is not None or resume_grant_id is not None:
+            if not resume_grant_id or not checkpoint_id:
+                raise ValueError('APPLICABLE_RESUME_GRANT_REQUIRED')
+            self.validate_resume_grant(context, task_id, resume_grant_id,
+                                       checkpoint_id, now=now)
+        return {'dependencies': len(dependencies),
+                'resume_required': checkpoint is not None}
+
     def consume_resume_grant(self, context, task_id, grant_id, checkpoint_id,
                              now=None):
         self.assert_task_context(context, task_id)
@@ -591,11 +693,17 @@ class GatewayKernel(object):
                 self.db.execute('''UPDATE gateway_resume_grants
                   SET state='EXPIRED' WHERE grant_id=?''', (grant_id,))
                 raise ValueError('RESUME_GRANT_EXPIRED')
-            dependencies = list(self.db.execute('''SELECT state,event_id FROM
+            dependencies = list(self.db.execute('''SELECT state,
+              producer_task_id,event_attempt_id,event_id FROM
               gateway_dependencies WHERE consumer_task_id=?''', (task_id,)))
+            identities = [{'producer_task_id': dep['producer_task_id'],
+                           'producer_attempt_id': dep['event_attempt_id'],
+                           'event_id': dep['event_id']}
+                          for dep in dependencies]
             if (any(dep['state'] != 'RECEIVED' for dep in dependencies)
-                    or sorted(json.loads(row['dependency_event_ids_json'])) !=
-                       sorted(dep['event_id'] for dep in dependencies)):
+                    or sorted(json.loads(row['dependency_event_ids_json']),
+                              key=canonical) !=
+                       sorted(identities, key=canonical)):
                 raise ValueError('RESUME_DEPENDENCY_CHANGED')
             self.db.execute('''UPDATE gateway_resume_grants
               SET state='STARTED',used_at=? WHERE grant_id=?
@@ -622,9 +730,36 @@ class GatewayKernel(object):
             self.db.execute('''UPDATE gateway_resume_grants SET state=?
               WHERE grant_id=? AND state='STARTED' ''', (result, grant_id))
             self.db.execute('''INSERT INTO gateway_delivery_receipts
-              VALUES (?,?,?,?)''',
-              (grant_id, 'RESUME_' + result, evidence_ref, now))
+              VALUES (?,?,?,?,?,?)''',
+              (task_id, UNKNOWN, grant_id, 'RESUME_' + result,
+               evidence_ref, now))
         return {'grant_id': grant_id, 'started': True, 'result': result}
+
+    def rollback_unstarted_claim(self, context, task_id, attempt_id, now=None):
+        """Converge a fenced claim when resume admission failed pre-STARTED."""
+        self.assert_task_context(context, task_id)
+        now = self.clock() if now is None else _finite(now, 'time')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            task = self.supervisor._task(task_id)
+            started = self.db.execute('''SELECT 1 FROM events WHERE task_id=?
+              AND attempt_id=? AND kind='STARTED' LIMIT 1''',
+              (task_id, attempt_id)).fetchone()
+            if (task['attempt_id'] != attempt_id
+                    or task['authority_state'] != 'REVOKED'
+                    or started is not None):
+                raise ValueError('UNSTARTED_REVOKED_CLAIM_REQUIRED')
+            self.db.execute('''DELETE FROM resource_claims WHERE task_id=?
+              AND attempt_id=? AND state='REVOKED' ''',
+              (task_id, attempt_id))
+            self.db.execute('''UPDATE tasks SET state='READY',
+              authority_state='NONE',authority_valid_until=NULL,
+              run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
+              epoch=NULL,next_action='RECHECK_RESUME_ADMISSION',
+              writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
+              WHERE task_id=? AND authority_state='REVOKED' ''',
+              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, now, task_id))
+        return {'state': 'READY', 'claim_state': 'ROLLED_BACK'}
 
     def preemption_decision(self, context, running_task_id, waiting_task_id):
         """Pure policy verdict; it never stops a process or transfers a lock."""
@@ -656,6 +791,9 @@ class GatewayKernel(object):
                 '''SELECT consumer_task_id FROM gateway_dependencies
                    WHERE producer_task_id=?''', (producer_task_id,))]
             for task_id in task_ids:
+                self.db.execute('''UPDATE tasks SET
+                  next_action='WAIT_DEPENDENCIES',updated_at=?
+                  WHERE task_id=? AND state='READY' ''', (now, task_id))
                 self.db.execute('''UPDATE gateway_resume_grants
                   SET state='REVOKED' WHERE task_id=?
                   AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
@@ -682,17 +820,23 @@ class GatewayKernel(object):
                             'observed_at': now})
         return results
 
+    def scan(self, context, now=None):
+        """Run the canonical Supervisor scan with durable wait exemptions."""
+        self.tenants.verify(context)
+        return self.supervisor.scan(now=now)
+
     def projection(self, context):
         tenant_id = self.tenants.verify(context)
         tasks = []
         for row in self.db.execute('''SELECT t.*,m.project_id,m.node_id,
           m.input_version,m.output_version,m.priority,m.preemptible,m.module_id,
-          m.resources_json
+          m.resources_json,m.board_id
           FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
           WHERE m.tenant_id=? ORDER BY m.priority DESC,t.task_id''',
           (tenant_id,)):
             deps = [dict(x) for x in self.db.execute('''SELECT
-              producer_task_id,required_version,required_evidence_ref,state,event_id
+              producer_task_id,required_version,required_evidence_ref,state,
+              event_attempt_id,event_id
               FROM gateway_dependencies WHERE consumer_task_id=?
               ORDER BY producer_task_id''', (row['task_id'],))]
             checkpoints = [dict(x) for x in self.db.execute('''SELECT
@@ -710,6 +854,11 @@ class GatewayKernel(object):
                 'priority': row['priority'],
                 'preemptible': bool(row['preemptible']),
                 'module_id': row['module_id'], 'dependencies': deps,
+                'board_id': row['board_id'],
+                'responsible_party': row['owner'],
+                'next_action': row['next_action'],
+                'blocker': ('DEPENDENCY_WAIT' if any(
+                    dep['state'] != 'RECEIVED' for dep in deps) else None),
                 'resources': json.loads(row['resources_json']),
                 'checkpoints': checkpoints,
             })
@@ -718,7 +867,40 @@ class GatewayKernel(object):
           e.evidence_ref FROM events e JOIN gateway_task_metadata m
           ON m.task_id=e.task_id WHERE m.tenant_id=?
           ORDER BY e.observed_at,e.event_id''', (tenant_id,))]
-        return {'schema': 1, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+        boards = []
+        anomalies = []
+        for board_id in sorted(BOARDS):
+            board_tasks = [task for task in tasks
+                           if task['board_id'] == board_id]
+            blocked = [task for task in board_tasks if task['blocker']]
+            active = [task for task in board_tasks
+                      if task['state'] in ('RECEIVED', 'STARTED', 'RUNNING')]
+            boards.append({'board_id': board_id,
+                           'task_count': len(board_tasks),
+                           'active_count': len(active),
+                           'blocked_count': len(blocked),
+                           'health': ('BLOCKED' if blocked else
+                                      'ACTIVE' if active else
+                                      'NO_DATA' if not board_tasks else
+                                      'STABLE')})
+            for task in blocked:
+                anomalies.append({
+                    'anomaly_id': 'dependency:' + task['task_id'],
+                    'board_id': board_id, 'project_id': task['project_id'],
+                    'task_id': task['task_id'], 'node_id': task['node_id'],
+                    'missing': task['blocker'],
+                    'depends_on': [dep['producer_task_id'] for dep in
+                                   task['dependencies']
+                                   if dep['state'] != 'RECEIVED'],
+                    'impact': 'TASK_START_BLOCKED',
+                    'responsible_party': task['responsible_party'],
+                    'next_action': task['next_action'],
+                    'evidence_ref': [dep['required_evidence_ref'] for dep in
+                                     task['dependencies']
+                                     if dep['state'] != 'RECEIVED'],
+                })
+        return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+                'boards': boards, 'anomalies': anomalies,
                 'tasks': tasks, 'timeline': events,
                 'production_status': 'NOT_IMPLEMENTED'}
 
@@ -743,22 +925,34 @@ class TestOnlyExecutor(object):
 
     def start(self, task_id, attempt_id, resources, valid_until,
               checkpoint_id=None, resume_grant_id=None):
-        self.gateway.assert_task_context(self.context, task_id)
         now = self.clock()
-        if resume_grant_id is not None:
-            self.gateway.validate_resume_grant(
-                self.context, task_id, resume_grant_id, checkpoint_id,
-                now=now)
+        self.gateway.assert_start_allowed(
+            self.context, task_id, resources, checkpoint_id,
+            resume_grant_id, now=now)
         task = self.supervisor._task(task_id)
         caller = self._caller(attempt_id)
         ticket = self.fence.claim(
             task_id, attempt_id, task['owner'], task['entry'], caller,
             'lease-' + attempt_id, resources, valid_until)
-        now = self.clock()
-        if resume_grant_id is not None:
-            self.gateway.consume_resume_grant(
-                self.context, task_id, resume_grant_id, checkpoint_id,
-                now=now)
+        try:
+            now = self.clock()
+            if resume_grant_id is not None:
+                self.gateway.consume_resume_grant(
+                    self.context, task_id, resume_grant_id, checkpoint_id,
+                    now=now)
+        except Exception:
+            # A revocation/expiry between preflight and grant CAS must not
+            # leave a VALID source claim without a STARTED fact.
+            controller = {'role': 'REVOCATION_CONTROLLER',
+                          'caller_id': 'test-start-rollback'}
+            self.fence.begin_revocation(task_id, controller)
+            self.fence.drain(task_id, controller, timeout=1)
+            self.fence.invalidate_source_resources(task_id,
+                                                   'start-rollback')
+            self.supervisor.complete_revocation(task_id)
+            self.gateway.rollback_unstarted_claim(
+                self.context, task_id, attempt_id, now=self.clock())
+            raise
         self.supervisor.record(task_id, attempt_id,
             'received-' + attempt_id, 'RECEIVED', now,
             'PHASE_EXECUTION', 'test-received-' + attempt_id)
@@ -768,6 +962,7 @@ class TestOnlyExecutor(object):
         return {'ticket': ticket, 'caller': caller, 'state': 'STARTED'}
 
     def progress(self, task_id, attempt_id, event_id, evidence_ref, now=None):
+        self.gateway.assert_task_context(self.context, task_id)
         return self.supervisor.record(
             task_id, attempt_id, event_id, 'PROGRESS',
             self.clock() if now is None else now,
@@ -777,6 +972,7 @@ class TestOnlyExecutor(object):
 
     def complete_success(self, task_id, attempt_id, artifact_sha256,
                          completion_evidence, now=None):
+        self.gateway.assert_task_context(self.context, task_id)
         now = self.clock() if now is None else now
         result = self.supervisor.record(
             task_id, attempt_id, 'terminal-' + attempt_id, 'TERMINAL', now,

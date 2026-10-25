@@ -25,6 +25,8 @@ def demo_graph(tenant):
             'output_version': output, 'priority': priority,
             'preemptible': preemptible,
             'module_id': 'xuanjun.scheduler.kernel',
+            'board_id': ('acceptance-delivery' if task_id == 'demo-b' else
+                         'research-development'),
             'resources': resources, 'dependencies': dependencies or [],
             'completion_evidence': [{'evidence_ref': evidence}],
         }
@@ -66,7 +68,8 @@ def run_demo(gateway, authority, tenant, lock_root):
         gateway.mark_outbox_sent(context, outbox['outbox_id'],
                                  'test-transport-receipt')
         gateway.receive_outbox(context, outbox['outbox_id'])
-        gateway.acknowledge_event(context, outbox['event_id'])
+        gateway.acknowledge_event(
+            context, 'demo-b', 'demo-b-attempt', outbox['event_id'])
         gateway.save_checkpoint(
             context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
             {'cursor': 4}, [], 'RECONCILED', ['fake:shared'])
@@ -101,6 +104,14 @@ def main(argv=None):
     demo = sub.add_parser('demo')
     demo.add_argument('--tenant', required=True)
     demo.add_argument('--lock-root', required=True)
+    register = sub.add_parser('register')
+    register.add_argument('--tenant', required=True)
+    register.add_argument('--principal', default='local-registrar')
+    register.add_argument('--graph', required=True)
+    export = sub.add_parser('export-ui')
+    export.add_argument('--tenant', required=True)
+    export.add_argument('--principal', default='local-viewer')
+    export.add_argument('--output', required=True)
     args = parser.parse_args(argv)
     if args.command is None:
         parser.error('a command is required')
@@ -112,9 +123,27 @@ def main(argv=None):
         if args.command == 'project':
             context = authority.issue(args.tenant, args.principal)
             value = gateway.projection(context)
-        else:
+        elif args.command == 'demo':
             value = run_demo(gateway, authority, args.tenant,
                              os.path.realpath(args.lock_root))
+        elif args.command == 'register':
+            context = authority.issue(args.tenant, args.principal)
+            with open(args.graph, 'r') as stream:
+                graph = json.load(stream)
+            value = gateway.register_graph(context, graph)
+        else:
+            context = authority.issue(args.tenant, args.principal)
+            value = gateway.projection(context)
+            output = os.path.realpath(args.output)
+            with open(output, 'w') as stream:
+                stream.write('window.XUANJUN_TWIN_DATA = ')
+                stream.write(json.dumps(value, ensure_ascii=False,
+                                        sort_keys=True, indent=2))
+                stream.write(';\n')
+            value = {'output': output, 'schema': value['schema'],
+                     'tenant_id': value['tenant_id'],
+                     'tasks': len(value['tasks']),
+                     'anomalies': len(value['anomalies'])}
         print(json.dumps(value, ensure_ascii=False,
                          sort_keys=True, indent=2))
     finally:

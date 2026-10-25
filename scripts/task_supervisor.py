@@ -1877,6 +1877,13 @@ class Supervisor(object):
             rows = [dict(r) for r in self.db.execute(
                 "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]
             for task in rows:
+                # A Gateway-registered dependency wait is a durable canonical
+                # next action, not a missing writer receipt.  The Gateway only
+                # changes this marker after its version/evidence-bound ACK is
+                # consumed.  Active attempts are never exempt.
+                if (task['state'] == 'READY'
+                        and task['next_action'] == 'WAIT_DEPENDENCIES'):
+                    continue
                 if task['state'] == 'READY':
                     base = task['created_at']
                 elif task['state'] == 'RECEIVED':
@@ -2030,5 +2037,3 @@ class Supervisor(object):
               (attempts, next_at, error[:256], outbox_id))
             return {'delivered': False, 'attempts': attempts,
                     'next_attempt_at': next_at}
-
-
