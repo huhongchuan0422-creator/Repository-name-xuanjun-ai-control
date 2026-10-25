@@ -1,0 +1,13 @@
+{
+  "browser_check": "existing_authorized_capability_only",
+  "enabled": true,
+  "engine": "chromium",
+  "running": false,
+  "cdp_ready": false,
+  "page_ready": false,
+  "detected_browser": null,
+  "detected_executable_path": null,
+  "result": "BROWSER_UNVERIFIED",
+  "install_attempted": false,
+  "service_created": false
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "status": "LOCAL_TEST_ONLY_CANDIDATE_PASS",
+  "previous_candidate_sha256": "10dfefea04fae66a3f186d1ad4c1be5a2bc7445e4032026a56b5f809cc96ee91",
+  "implementation_commit": "9ce4bf87f2d0b2b6faa1b30e80941249edc47c7c",
+  "implementation_tree": "8758742e03cc11543af012f43ec020a0a8c7a5ce",
+  "completed": [
+    "six gateway safety gaps",
+    "complete event identity",
+    "canonical scan dependency wait",
+    "seven-board same-source projection",
+    "board workbench and task detail offline UI",
+    "arbitrary graph CLI",
+    "147 Python tests and one Node combination test"
+  ],
+  "not_executed": [
+    "3 SQLite v2 migration fixtures on SQLite 3.26.0",
+    "browser E2E and screenshots",
+    "deployment and production dispatch",
+    "real pause/resume/payment/OCR business operations"
+  ],
+  "in_flight": [],
+  "blockers": [
+    "No detected Chromium or Firefox executable",
+    "Production adapters remain NOT_IMPLEMENTED"
+  ],
+  "resume": "Read ACCEPTANCE_REPORT.md and RAW_TEST_LOG.txt; verify manifest; run commands in docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md"
+}
