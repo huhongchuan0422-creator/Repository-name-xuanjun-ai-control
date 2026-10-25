@@ -38,9 +38,9 @@ MAX_ZIP=4*1024*1024
 MAX_FILE=131072
 MAX_FILES=100
 ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
-JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt'}
+JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','resume_admission'}
 REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
-ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','backup_dir'}
+ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir'}
 POST_B_MODE='POST_B_CARRIER_HANDOFF_V1'
 POST_B_STATE='post-b-carrier-handoff-intent-v1.json'
 POST_B_PREINTENT='post-b-carrier-handoff-preintent-v1.json'
@@ -49,7 +49,7 @@ POST_B_ROLLBACK_RESULT='post-b-carrier-handoff-rollback-result-v1.json'
 POST_B_STAGE='control-stopped-v1.post-b-handoff-stage-v1'
 POST_B_RETAINED='control-stopped-v1.post-b-handoff-retained-old-v1'
 POST_B_REQUIRED={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit',
-                 'b_approval','freeze','resume_approval','resume_freeze','backup_dir','c_approval'}
+                 'b_approval','freeze','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','c_approval'}
 POST_B_ABSENT={'active_attempt'}
 HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
                'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
@@ -60,7 +60,7 @@ HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
                'b_approval':'bc-b-approval.json','freeze':'writer-freeze-reference.json',
                'old_stage_permit':'site-prepare-approval.json','c_approval':'bc-c-approval.json',
                'resume_approval':'bc-b-resume-approval.json','resume_freeze':'writer-freeze-resume-reference.json',
-               'resume_stage_permit':'site-prepare-resume-approval.json','backup_dir':'backup-2330-to-f131-v1'}
+               'resume_stage_permit':'site-prepare-resume-approval.json','resume_admission':ORIGINAL_ATTEMPT+'-B-resume-admission.json','backup_dir':'backup-2330-to-f131-v1'}
 
 class Hold(RuntimeError):pass
 
