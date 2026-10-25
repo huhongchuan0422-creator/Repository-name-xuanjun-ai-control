@@ -95,7 +95,7 @@ class HandoffAdmission(unittest.TestCase):
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_INTENT))
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_RESULT))
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
         finally:os.close(target)
@@ -121,7 +121,7 @@ class HandoffAdmission(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'PRESTAGE_STOP'):self.execute(fault)
         self.assertIsNotNone(h.childstat(self.jfd,h.PREINTENT))
         self.assertIsNone(h.childstat(self.parent,h.STAGE))
-        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'UNKNOWN_INSPECT_ONLY')
         with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
 
@@ -153,15 +153,15 @@ class HandoffAdmission(unittest.TestCase):
         self.execute()
         h.writefile(self.jfd,'active-attempt.json',b'INFLIGHT',self.uid)
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_CONFLICT'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
-        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_crash_after_intent_never_retries(self):
         def fault(where):
             if where=='intent_fsynced':raise RuntimeError('SYNTHETIC_CRASH')
         with self.assertRaisesRegex(RuntimeError,'SYNTHETIC_CRASH'):self.execute(fault)
-        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'PREPARED_OR_REVERTED')
         with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
 
@@ -169,7 +169,7 @@ class HandoffAdmission(unittest.TestCase):
         def fault(where):
             if where=='after_exchange':raise RuntimeError('SYNTHETIC_AFTER')
         with self.assertRaisesRegex(h.Hold,'POST_SWITCH_UNKNOWN_INSPECT_ONLY'):self.execute(fault)
-        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_foreign_replacement_refuses_rollback(self):
@@ -180,7 +180,7 @@ class HandoffAdmission(unittest.TestCase):
             try:os.write(file,b'BAD')
             finally:os.close(file)
         finally:os.close(fd)
-        with self.assertRaises(h.Hold):h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
+        with self.assertRaises(h.Hold):h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
 
     def test_contention_original_lock_holds(self):
         second=os.open(h.LOCK,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.jfd)
