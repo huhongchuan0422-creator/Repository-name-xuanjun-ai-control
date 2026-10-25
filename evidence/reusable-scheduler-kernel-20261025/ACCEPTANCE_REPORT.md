@@ -4,6 +4,7 @@
 
 - 原主线：`bd8048e891dd6f41451f9791f7d0769e81077c6e`。
 - 复用的 PR143 Draft 基线：`8aa66c43ebfa19a760e5270157e14464f2f46c1c`。
+- 实现 Commit：`c5484650a628d383b9f132ac8db347b0d953aa1c`；Tree：`2c0f9f2e6b94f91390849ac811c7e68f368d865c`。
 - 原 PR143 文件 `scripts/task_supervisor.py`、`scripts/task_writer_fence.py` 及其测试未修改。
 - 新增范围：同一 Supervisor SQLite 上的动态开发任务图、依赖版本/证据、消费 ACK、checkpoint、安全让出、恢复许可、只读孪生投影和 TEST_ONLY CLI。
 - Owner 范围纠正已执行：不存在 OCR 业务 adapter；本包不是业务请求调度平台，仅服务原7个开发子路。原7子路的正式 ID 由原 Task/Node Registry 提供，本包不硬编码或另造。

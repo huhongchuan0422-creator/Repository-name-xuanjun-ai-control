@@ -2,6 +2,8 @@
   "schema": 1,
   "status": "LOCAL_TEST_CANDIDATE",
   "base_commit": "8aa66c43ebfa19a760e5270157e14464f2f46c1c",
+  "implementation_commit": "c5484650a628d383b9f132ac8db347b0d953aa1c",
+  "implementation_tree": "2c0f9f2e6b94f91390849ac811c7e68f368d865c",
   "branch": "feature/reusable-scheduler-kernel-20261025",
   "completed": [
     "dynamic development task graph",
