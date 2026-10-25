@@ -682,7 +682,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Build exact post-B C-resume delivery index
-        if: success() && steps.scope.outputs.resume_only == 'true'
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
         run: |
           set -euo pipefail
           python - <<'INDEX'
@@ -729,7 +729,7 @@ jobs:
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
-        if: success() && steps.scope.outputs.resume_only == 'true'
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
         uses: actions/upload-artifact@v4
         with:
           name: community-post-b-c-resume-source
