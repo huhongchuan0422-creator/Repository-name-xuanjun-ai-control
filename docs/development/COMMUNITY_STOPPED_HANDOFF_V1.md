@@ -1,3 +1,15 @@
+## Post-B carrier exchange entry (source/isolated validation only)
+
+The post-B carrier update reuses the existing `community_preview_carrier_handoff_entry.py -> community_preview_carrier_handoff_call.py -> community_preview_carrier_handoff_admission.py` chain and the same TARGET, original ENTRY and writer lease. It does not use the target-absent first-install installer.
+
+Fixed operations are `post-b-execute`, `post-b-status`, and `post-b-rollback`. They require the separate protected `post-b-carrier-handoff-approval.json`; the original `carrier-handoff-approval.json` remains the pre-B authority and is not reused. Post-B transaction records are separately named `post-b-carrier-handoff-preintent-v1.json`, `post-b-carrier-handoff-intent-v1.json`, `post-b-carrier-handoff-rollback-intent-v1.json`, and `post-b-carrier-handoff-rollback-result-v1.json`. The exchange still uses the reviewed `renameat2(RENAME_EXCHANGE)` engine, EXCL staging, fsync, status reconciliation and UNKNOWN/no-retry behavior.
+
+Post-B admission requires the completed B intent, snapshot result/permit, validate-clones result/permit, B approval/freeze, B-resume approval/freeze, protected backup directory and historical C approval to remain bound, while C active-attempt must be absent. Status and rollback re-read the same protected history. Rollback is accepted only for the transaction's own swapped identities and its own post-B rollback intent/result chain. Source exchange approval is separate from `bc-c-resume-approval.json`; exchanging source bytes never approves C execution.
+
+This source task does not create a real approval or execute the UK host. `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 ## Exact post-B candidate retrieval (no live installation)
 
 After the narrow Hosted run is **SUCCESS**, retrieve the same run's artifact by its actual run ID:
