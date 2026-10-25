@@ -329,12 +329,15 @@ def run(operation):
     with contextlib.ExitStack() as stack:
         parent=_protected_path_directory(PARENT,stack)
         journal=_protected_path_directory(JOURNAL,stack)
-        old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
-        new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
+        pins=(h.NEW_ARCHIVE,h.NEW_MANIFEST,POST_B_NEW_ARCHIVE_SHA256,POST_B_NEW_MANIFEST_SHA256) if post_b else (h.OLD_ARCHIVE,h.OLD_MANIFEST,h.NEW_ARCHIVE,h.NEW_MANIFEST)
+        old_name=POST_B_OLD_INPUT_NAME if post_b else OLD_INPUT_NAME
+        new_name=POST_B_NEW_INPUT_NAME if post_b else NEW_INPUT_NAME
+        old_archive_bytes=_read_fixed_archive(parent,old_name,pins[0],ROOT_UID)
+        new_archive_bytes=_read_fixed_archive(parent,new_name,pins[2],ROOT_UID)
         approval_fd,approval_raw,approval_identity=_approval_fd(
-            parent,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack,approval_name)
-        h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
-        h.members(new_archive_bytes,h.NEW_MANIFEST,h.NEW_ARCHIVE)
+            parent,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack,approval_name,pins=pins)
+        h.members(old_archive_bytes,pins[1],pins[0])
+        h.members(new_archive_bytes,pins[3],pins[2])
         require(h.dirident(os.fstat(journal))==h.dirident(os.stat(
                     h.JOURNAL_DIR,dir_fd=parent,follow_symlinks=False)),
                 'JOURNAL_PARENT_PATH_CHANGED')
@@ -363,9 +366,9 @@ def run(operation):
                     and st.st_uid==ROOT_UID and st.st_nlink==1,'HISTORY_UNEXPECTED_OBJECT')
             body=h.readfile(home,name,ROOT_UID,8*1024*1024)
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
-        h.capture_history(refs,ROOT_UID,parent,journal)
+        h.capture_history(refs,ROOT_UID,parent,journal,h.POST_B_MODE if post_b else None)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
+                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name,pins=pins)
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
