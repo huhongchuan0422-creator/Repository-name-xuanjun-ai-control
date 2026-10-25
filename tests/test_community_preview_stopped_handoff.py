@@ -266,6 +266,20 @@ class WholeEntry(unittest.TestCase):
             second.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
 
+    def test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover(self):
+        class FakeSession:
+            def __init__(self):self.acquired=None;self.called=0;self.closed=False
+            def acquire(self,recover=False):self.acquired=recover
+            def resume_c_before_confirmation(self):self.called+=1;return {'phase':'COMMITTED'}
+            def close(self):self.closed=True
+        fake=FakeSession()
+        with patch.object(h,'Session',return_value=fake),contextlib.redirect_stdout(io.StringIO()):
+            code=h.main(['--resume-c-before-confirmation'])
+        self.assertEqual(code,0)
+        self.assertFalse(fake.acquired)
+        self.assertEqual(fake.called,1)
+        self.assertTrue(fake.closed)
+
     def test_actual_b_classes_same_lease_to_c_success_no_old_stop_start(self):
         self.prepare_b_and_c();result=self.session.update()
         self.assertEqual(result['phase'],'COMMITTED')
