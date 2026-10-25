@@ -336,6 +336,17 @@ class Session:
         self.resume_guard()
         return resume
 
+    def require_original_c_plan_binding(self,candidate):
+        # The original C approval contains only a digest, not the full plan.
+        # If live observations changed and the candidate digest differs, do not
+        # treat the newly computed plan as the already-approved historical plan.
+        approval,_=document(C_APPROVAL)
+        need(type(approval) is dict and approval.get('attempt')==attempt(),
+             'EXACT_C_APPROVAL_REQUIRED')
+        if approval.get('plan_sha256')!=candidate.get('plan_sha256'):
+            raise u.Hold('ORIGINAL_C_PLAN_EVIDENCE_MISSING')
+        return True
+
     def resume_c_before_confirmation(self):
         """Re-enter only the pre-proof C boundary for the same completed B attempt."""
         # A fresh process/session has bdone=False by design. Completed B is
@@ -358,6 +369,7 @@ class Session:
         c.exact_stopped_names(candidate,'PREPARED',None)
         for path in (proof_path,active_path,attempt_path):
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+        self.require_original_c_plan_binding(candidate)
         self.c_approval(candidate)
         self.boundary();self.stopped()
         acknowledge('STOPPED_UPDATE',candidate['plan_sha256'])
@@ -367,6 +379,7 @@ class Session:
         c.exact_stopped_names(candidate,'PREPARED',None)
         for path in (proof_path,active_path,attempt_path):
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+        self.require_original_c_plan_binding(candidate)
         self.c_approval(candidate)
         proof=dict(format=1,mode=MODE,host=p.HOST,attempt=attempt(),
              plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic)
