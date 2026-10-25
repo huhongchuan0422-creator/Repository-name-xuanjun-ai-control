@@ -1,3 +1,13 @@
+## Post-B source delivery and C known-failure continuation
+
+The new post-B recovery code is a different entry from the pre-B carrier swap. Do **not** apply the pre-backup carrier-handoff absence assumptions to this already completed B attempt. The existing B snapshot and three clone results are read-only evidence; do not run `--resume-b-partial`, rebuild the snapshot, rerun clones, overwrite the original `bc-c-approval.json`, or replace the historical B manifest digest.
+
+Before the original installation owner considers this candidate, the exact post-B source files must be delivered through the already approved release path to the installed stopped-handoff source location. Verify the source commit/tree and per-file SHA against the approved repository commit, then independently verify the fixed carrier/source identity and old B evidence. Do not overlay individual source files onto a running/installed carrier, use the pre-B installer, or change the existing target. No upload or installation is performed by this document/source change.
+
+The new full C plan is stored once at `/opt/xuanjun-community-preview/backup-2330-to-f131-v1/c-preconfirmation-resume-plan.json` using EXCL. The caller prints the exact plan and `plan_sha256`; Owner reviews that output and issues the separate nine-field `bc-c-resume-approval.json` described above. The old `bc-c-approval.json` and old d507 hash remain unchanged. The approval source is now recorded in the proof as `approval_kind=C_RESUME_APPROVAL`; subsequent KNOWN_FAILURE recovery must select the same new approval source and exact plan, not the old C approval. Only the original serialized recovery path may handle a proven KNOWN_FAILURE; UNKNOWN remains inspect-only and is never retried.
+
+---
+
 ## C preconfirmation recovery — distinct current plan and approval
 
 The B-complete recovery entry remains `scripts/community_preview_stopped_handoff.py --resume-c-before-confirmation`. It does not rerun snapshot or clones. The historical B-resume admission, old B approval, old freeze, old permit and three clone results remain byte-for-byte evidence. Their original validity windows are schema-checked but are not renewed or treated as current C authorization. The current carrier/source pin is checked independently; the historical B carrier manifest digest is bound to the original B-resume record and is not required to equal a later C source carrier manifest.
