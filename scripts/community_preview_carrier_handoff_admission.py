@@ -232,10 +232,16 @@ def journal(jfd,uid):
 
 def _locks(jfd,entryfd,uid,expected_entry_identity):
     checked_dir(jfd,uid)
+    entry_stat=os.fstat(entryfd)
+    need(stat.S_ISREG(entry_stat.st_mode) and entry_stat.st_uid==uid
+         and stat.S_IMODE(entry_stat.st_mode)==0o600 and entry_stat.st_nlink==1,
+         'ORIGINAL_ENTRY_UNTRUSTED')
     need(ident(os.fstat(entryfd))==expected_entry_identity,'ORIGINAL_ENTRY_IDENTITY_UNKNOWN')
     lease=os.open(LOCK,os.O_RDWR|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=jfd)
     try:
-        need(os.fstat(lease).st_uid==uid and stat.S_IMODE(os.fstat(lease).st_mode)==0o600,
+        lease_stat=os.fstat(lease)
+        need(stat.S_ISREG(lease_stat.st_mode) and lease_stat.st_nlink==1
+             and lease_stat.st_uid==uid and stat.S_IMODE(lease_stat.st_mode)==0o600,
              'ORIGINAL_LEASE_UNTRUSTED')
         need(ident(os.fstat(lease))==ident(os.stat(LOCK,dir_fd=jfd,follow_symlinks=False)),
              'ORIGINAL_LEASE_PATH_CHANGED')
@@ -245,6 +251,10 @@ def _locks(jfd,entryfd,uid,expected_entry_identity):
     except BaseException:os.close(lease);raise
 
 def status(parent,jfd,uid,old_entries,new_entries):
+    if childstat(jfd,STATE) is None:
+        if childstat(jfd,PREINTENT) is not None:
+            readfile(jfd,PREINTENT,uid,8192)
+        return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     j=journal(jfd,uid)
     pre_raw=readfile(jfd,PREINTENT,uid,8192)
     try:pre=json.loads(pre_raw.decode('utf8'))
@@ -281,6 +291,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
     """One-shot isolated transaction; caller supplies immutable old inventory and fd witnesses."""
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
+    checked_dir(parent,uid)
     need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
     lease=_locks(jfd,entryfd,uid,expected_entry_identity)
     try:
