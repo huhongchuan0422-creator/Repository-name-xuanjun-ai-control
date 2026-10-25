@@ -586,6 +586,45 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         after={str(q):q.read_bytes() for q in Path(u.JOURNAL_PARENT).rglob('*') if q.is_file()}
         self.assertEqual(before,after);self.assertEqual(len(self.calls),calls);self.assertTrue(Path(h.PROOF).exists());self.assertFalse(Path(s.PERMIT).exists())
 
+    def test_partial_resume_accepts_distinct_historical_and_new_carrier_sha(self):
+        old,_=h.document(h.B_APPROVAL)
+        old['carrier_manifest_sha256']='1'*64
+        self.write(h.B_APPROVAL,s.canonical(old))
+        self.seed_partial_resume()
+        q=self.fresh_session()
+        q.resume_b_partial()
+        self.assertTrue(q.bdone)
+        self.assertNotEqual(old['carrier_manifest_sha256'],q.approved_stamp)
+
+    def test_partial_resume_old_permit_appearing_after_admission_is_hold(self):
+        self.seed_partial_resume()
+        q=self.fresh_session();q.resume_admission()
+        self.write(s.PERMIT,b'UNEXPECTED_HISTORICAL_PERMIT')
+        with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):
+            q.boundary()
+
+    def test_partial_resume_prior_permit_changed_between_reads_rejected(self):
+        intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume()
+        old_b=s.exact_json(old_braw);old_freeze=s.exact_json(old_freeze_raw)
+        permit=dict(format=1,host=p.HOST,stage='snapshot',entry_sha256=h.A_ENTRY_SHA,
+            issued_at=1000,expires_at=1500,
+            all_writers_frozen_evidence_sha256=s.sha(old_freeze_raw),
+            snapshot_manifest_sha256=None)
+        good=s.canonical(permit);self.write(s.PERMIT,good)
+        resume['old_stage_permit_sha256']=s.sha(good)
+        self.write(h.B_RESUME_APPROVAL,s.canonical(resume))
+        q=self.fresh_session()
+        original=h.resume_reference
+        def swapped(path,limit=65536):
+            result=original(path,limit)
+            if path==s.PERMIT:
+                changed=dict(permit,expires_at=1400)
+                self.write(s.PERMIT,s.canonical(changed))
+            return result
+        with patch.object(h,'resume_reference',side_effect=swapped):
+            with self.assertRaisesRegex(u.Hold,'B_RESUME_REFERENCE_REPLACED'):
+                q.resume_admission()
+
     def test_partial_resume_reacquires_lock_preserves_old_evidence_and_finishes_b(self):
         intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume();old_intent=Path(h.b_records()['B-intent']).read_bytes()
         q=self.fresh_session();q.resume_b_partial()
