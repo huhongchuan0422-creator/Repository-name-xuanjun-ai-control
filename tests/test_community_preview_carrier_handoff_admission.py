@@ -113,7 +113,7 @@ class HandoffAdmission(unittest.TestCase):
 
     def test_changed_old_member_holds_before_intent(self):
         self.old['loader.py']=b'NOT_OLD_LOADER'
-        with self.assertRaisesRegex(h.Hold,'TREE_BYTES_CHANGED'):self.execute()
+        with self.assertRaisesRegex(h.Hold,'OLD_MEMBER_MANIFEST_BINDING'):self.execute()
         self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
 
     def test_manifest_unchanged_disk_and_inventory_mutated_holds(self):
