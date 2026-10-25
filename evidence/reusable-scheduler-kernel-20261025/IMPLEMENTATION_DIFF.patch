@@ -1,0 +1,1563 @@
+From c5484650a628d383b9f132ac8db347b0d953aa1c Mon Sep 17 00:00:00 2001
+From: OpenClaw <openclaw@local.invalid>
+Date: Sun, 25 Oct 2026 15:04:15 +0800
+Subject: [PATCH] feat(task-center): add reusable test-only scheduler kernel
+
+
+diff --git a/README.md b/README.md
+index 7b2d3f67..8f0b8811 100644
+--- a/README.md
++++ b/README.md
+@@ -17,0 +18,10 @@ Private control-plane repository for XuanJun AI / XuanJun Yunhui engineering orc
++## Reusable scheduler kernel (TEST_ONLY candidate)
++
++The local-only reusable development-task scheduler and digital-twin projection
++candidate is documented in
++[REUSABLE_SCHEDULER_KERNEL_20261025.md](docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md).
++It reuses the canonical Supervisor SQLite ledger, does not deploy a service,
++and is limited to development-task governance for the original seven
++workstreams. It is not a business-request router and contains no OCR business
++adapter.
++
+diff --git a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+new file mode 100644
+index 00000000..57014e54
+--- /dev/null
++++ b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+@@ -0,0 +1,52 @@
++# 可复用调度内核与数字孪生接线（TEST_ONLY）
++
++## 基线与边界
++
++- 源基线：`8aa66c43ebfa19a760e5270157e14464f2f46c1c`（PR143 Draft）。
++- 复用：`task_supervisor.py` 的唯一 `tasks/events/outbox`、Schema v3、Writer fence 与 LOCAL_ONLY 锁。
++- 新增表只保存图元数据、依赖版本要求、消费 ACK、checkpoint、恢复许可、模块契约和读取投影；不复制任务终态。
++- 生产 Gateway、真实 Executor、云账户、部署与凭据均为 `NOT_IMPLEMENTED / NOT_EXECUTED`。
++- 范围仅为原7个开发子路共用的开发任务、依赖、执行状态、验收和交接。七子路身份继续引用原定义，本包不新造子路、不调度业务请求。
++- OCR 业务接线已按 Owner 纠正明确排除；社区商家证照/OCR 仍由社区分账商家平台处理。调度中心只可承载“开发 OCR 模块”这类开发任务。
++
++## 本地运行
++
++```bash
++python3 -m unittest -v tests.test_reusable_task_gateway
++python3 scripts/reusable_scheduler_cli.py \
++  --db /tmp/xuanjun-scheduler-test.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  demo --tenant tenant-a --lock-root /tmp/xuanjun-scheduler-locks
++python3 scripts/reusable_scheduler_cli.py \
++  --db /tmp/xuanjun-scheduler-test.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  project --tenant tenant-a
++```
++
++CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
++`demo` 在同一数据库执行 TEST_ONLY 闭环；随后 `project` 是一次独立进程重启读取。
++接口图样例见 `examples/reusable-scheduler-task-graph.json`。
++
++## 事实阶段
++
++1. `Supervisor.record(TERMINAL)` 在一个 SQLite 事务中写任务终态、完成事件和 outbox。
++2. `mark_outbox_sent` 只记录 `SENT`；不代表消费。
++3. `receive_outbox` 持久去重后为 `RECEIVED`。
++4. `acknowledge_event` 校验租户、版本和证据后才写 `CONSUMED_ACK` 及依赖 `RECEIVED`。
++5. `issue_resume_grant` 为 `ELIGIBLE`；`consume_resume_grant` 为 `STARTED`；任务成功仍由独立 TERMINAL 回执确定。
++
++## SaaS 模块契约
++
++| module_id | 状态 | 说明 |
++|---|---|---|
++| `xuanjun.scheduler.kernel` | TEST_ONLY | 动态图、持久事件、checkpoint/resume |
++| `xuanjun.digital-twin.projection` | TEST_ONLY | 从同一 SQLite 重建只读投影 |
++
++租户上下文必须由服务端可信入口断言。本包以 HMAC TEST authority 验证这一边界；仅提交 `tenant_id` 会被拒绝。生产身份提供者和密钥管理不在本包内。
++
++## 已知剩余项
++
++- PR143 尚为 Draft，本包不是合并或生产许可。
++- 没有真实分布式锁、生产 Executor adapter 或外部消息投递 adapter。
++- `release_revoked_resources` 仅在同库已存在 checkpoint、零在途、对账完成、完整 revocation coverage 时释放 LOCAL_ONLY claim；生产资源释放需原资源系统回执。
++- 图注册已先做完整结构/环验证；当前 Supervisor 单任务注册 API 仍是逐任务提交，进程在注册中途崩溃时需要后续原生批量注册事务完善。
+diff --git a/evidence/reusable-scheduler-kernel-20261025/ACCEPTANCE_REPORT.md b/evidence/reusable-scheduler-kernel-20261025/ACCEPTANCE_REPORT.md
+new file mode 100644
+index 00000000..8f3bc6d2
+--- /dev/null
++++ b/evidence/reusable-scheduler-kernel-20261025/ACCEPTANCE_REPORT.md
+@@ -0,0 +1,39 @@
++# 可复用调度内核与数字孪生接线验收报告
++
++## 1. 受测基线与范围
++
++- 原主线：`bd8048e891dd6f41451f9791f7d0769e81077c6e`。
++- 复用的 PR143 Draft 基线：`8aa66c43ebfa19a760e5270157e14464f2f46c1c`。
++- 原 PR143 文件 `scripts/task_supervisor.py`、`scripts/task_writer_fence.py` 及其测试未修改。
++- 新增范围：同一 Supervisor SQLite 上的动态开发任务图、依赖版本/证据、消费 ACK、checkpoint、安全让出、恢复许可、只读孪生投影和 TEST_ONLY CLI。
++- Owner 范围纠正已执行：不存在 OCR 业务 adapter；本包不是业务请求调度平台，仅服务原7个开发子路。原7子路的正式 ID 由原 Task/Node Registry 提供，本包不硬编码或另造。
++
++## 2. 实际实现
++
++| 能力 | 实际结果 | 边界 |
++|---|---|---|
++| 动态图 | 任意无环开发任务图、版本依赖、优先级、资源及模块字段 | 图注册当前调用原单任务 API；崩溃中断的原生批量事务仍待补 |
++| 唯一状态源 | 任务状态继续位于原 `tasks/events/outbox`；扩展表仅存约束、ACK、checkpoint、grant 和投影元数据 | 没有生产双写 |
++| 持久事件 | TERMINAL、事件和 outbox 原子；SENT/RECEIVED/CONSUMED_ACK 分开 | 外部真实投递 adapter NOT_IMPLEMENTED |
++| 版本证据 | 依赖必须同时匹配 producer、output version、evidence ref | 旧版/乱序不解锁 |
++| Writer/资源 | 复用 PR143 LOCAL_ONLY fence；错误/未释放资源阻止恢复 | 分布式资源锁 NOT_IMPLEMENTED |
++| 等待恢复 | 原 task、prior attempt checkpoint、依赖 event、grant expiry、单次消费 | TEST_ONLY executor；生产 Executor NOT_IMPLEMENTED |
++| 租户隔离 | 服务端 HMAC TEST authority；裸 tenant_id、跨租户任务/事件拒绝 | 生产身份提供者 NOT_IMPLEMENTED |
++| 数字孪生 | 独立进程从同一 DB 重建任务、依赖、checkpoint、authority 与时间线 | 无浏览器 UI、无服务端部署 |
++| 模块契约 | `xuanjun.scheduler.kernel`、`xuanjun.digital-twin.projection` | 均为 TEST_ONLY |
++
++## 3. 验收结果
++
++- 新增集成：`11/11 PASS`。
++- 未变 PR143 可执行门禁与新增集成合并：`41/41 + 77/77 PASS`，退出码均为 `0`。
++- 单命令闭环与独立进程重启投影字节一致：`cmp EXIT_CODE=0`。
++- 覆盖：动态多任务图、两租户、重复、乱序、旧版本、重启、等待不误报超时、资源冲突、不可抢占、checkpoint 错配、跨租户拒绝、投影一致、恢复失败不冒成功。
++- 3 项未变 v2 migration fixture：宿主 SQLite 3.26 缺 `DROP COLUMN`，状态 `NOT_EXECUTED`，未冒 PASS。
++
++## 4. 未执行与剩余项
++
++- 生产部署、真实 dispatch、真实消息 adapter、真实云账户、凭据、权限变更：`NOT_EXECUTED`。
++- 生产 Gateway/Executor/分布式锁/身份提供者：`NOT_IMPLEMENTED`。
++- 社区、B5、P2、OCR 业务源码：未修改，也不是本框架前置条件。
++- 浏览器/生产数字孪生 UI 接线：本包只交可复算 JSON 投影；`BROWSER_UNVERIFIED`。
++- PR143 仍为 Draft；本包不能当合并、部署或生产验收许可。
+diff --git a/evidence/reusable-scheduler-kernel-20261025/CHECKPOINT.json b/evidence/reusable-scheduler-kernel-20261025/CHECKPOINT.json
+new file mode 100644
+index 00000000..db0a0e5f
+--- /dev/null
++++ b/evidence/reusable-scheduler-kernel-20261025/CHECKPOINT.json
+@@ -0,0 +1,34 @@
++{
++  "schema": 1,
++  "status": "LOCAL_TEST_CANDIDATE",
++  "base_commit": "8aa66c43ebfa19a760e5270157e14464f2f46c1c",
++  "branch": "feature/reusable-scheduler-kernel-20261025",
++  "completed": [
++    "dynamic development task graph",
++    "canonical SQLite event/outbox integration",
++    "durable inbox dedupe and version/evidence gate",
++    "checkpoint safe-yield and one-shot resume grant",
++    "trusted TEST_ONLY tenant context",
++    "restart-rebuild digital twin projection",
++    "scheduler and twin module contracts",
++    "scope correction removes OCR business adapter"
++  ],
++  "tests": {
++    "new_integration": "11/11 PASS",
++    "unchanged_supported_and_integration": "41/41 + 77/77 PASS",
++    "restart_projection": "PASS",
++    "unchanged_v2_migration_on_sqlite_3_26": "NOT_EXECUTED"
++  },
++  "inflight": [],
++  "blocked": [
++    "three unchanged v2 migration fixtures require SQLite DROP COLUMN support"
++  ],
++  "not_implemented": [
++    "production gateway/executor adapters",
++    "distributed resource locks",
++    "production identity provider",
++    "browser and deployed digital twin",
++    "atomic multi-task registration API in canonical Supervisor"
++  ],
++  "resume": "Read docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md and this checkpoint; verify manifest before continuing."
++}
+diff --git a/evidence/reusable-scheduler-kernel-20261025/RAW_TEST_LOG.txt b/evidence/reusable-scheduler-kernel-20261025/RAW_TEST_LOG.txt
+new file mode 100644
+index 00000000..d05342b5
+--- /dev/null
++++ b/evidence/reusable-scheduler-kernel-20261025/RAW_TEST_LOG.txt
+@@ -0,0 +1,73 @@
++REUSABLE SCHEDULER KERNEL RAW EXECUTION RECEIPT
++Observed: 2026-10-25 Asia/Shanghai
++Working tree base: 8aa66c43ebfa19a760e5270157e14464f2f46c1c
++Branch: feature/reusable-scheduler-kernel-20261025
++Environment:
++  Python 3.6.8
++  sqlite3 module 3.26.0
++  Linux 5.10.134-19.1.al8.x86_64 / OpenAnolis 3
++
++COMMAND 1
++python3 -m unittest -v tests.test_reusable_task_gateway
++
++RESULT
++test_atomic_terminal_outbox_and_sent_ack_are_distinct ... ok
++test_checkpoint_match_grant_once_expiry_and_revoke ... ok
++test_complete_resume_keeps_started_fact_and_records_failure ... ok
++test_cycle_and_duplicate_graph_conflict_rejected ... ok
++test_duplicate_delivery_and_out_of_order_old_version ... ok
++test_dynamic_graph_and_two_tenant_isolation ... ok
++test_expired_grant_and_restart_projection_consistency ... ok
++test_full_wait_do_c_b_event_safe_yield_resume_a ... ok
++test_only_scheduler_and_twin_module_contracts_exist ... ok
++test_resource_conflict_nonpreemptible_and_safe_release ... ok
++test_waiting_dependency_not_reported_timeout ... ok
++Ran 11 tests in 0.696s
++OK
++EXIT_CODE=0
++
++COMMAND 2
++umask 022; python3 -c "load SupervisorTests directly; exclude only test_v2_*"
++
++RESULT
++.........................................
++Ran 41 tests in 1.522s
++OK
++EXIT_CODE=0
++
++COMMAND 3
++python3 -m unittest -q \
++  tests.test_task_writer_fence.WriterFenceTests \
++  tests.test_entry_review_gate.CanonicalCompletionTests \
++  tests.test_task_supervisor_runtime \
++  tests.test_reusable_task_gateway
++
++RESULT
++Ran 77 tests in 2.899s
++OK
++EXIT_CODE=0
++
++COMMAND 4
++python3 scripts/reusable_scheduler_cli.py --db <temp>/ledger.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  demo --tenant tenant-a --lock-root <temp>/locks
++python3 scripts/reusable_scheduler_cli.py --db <same>/ledger.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  project --tenant tenant-a
++cmp <temp>/demo.json <temp>/restart.json
++
++RESULT
++tasks=3 timeline=8 states=demo-a:STARTED,demo-b:SUCCESS,demo-c:READY
++cmp EXIT_CODE=0
++
++BASELINE ENVIRONMENT LIMIT
++The three unchanged Supervisor v2 migration fixture tests were attempted by
++the aggregate run and stopped before product logic at:
++  sqlite3.OperationalError: near "DROP": syntax error
++Cause: host SQLite 3.26.0 does not implement ALTER TABLE ... DROP COLUMN.
++These three tests are NOT_EXECUTED on this host. No test was deleted, rewritten,
++or marked PASS. The changed/new scheduler paths do not use DROP COLUMN.
++
++Aggregate test command also initially exposed umask 0002 in four unchanged
++release-manifest fixtures. Re-running those fixtures with documented umask 0022
++produced 21/21 PASS; no source change was made for that environment condition.
+diff --git a/examples/reusable-scheduler-task-graph.json b/examples/reusable-scheduler-task-graph.json
+new file mode 100644
+index 00000000..fdb578c7
+--- /dev/null
++++ b/examples/reusable-scheduler-task-graph.json
+@@ -0,0 +1,46 @@
++{
++  "graph_id": "customer-delivery-demo-v1",
++  "tenant_id": "tenant-demo",
++  "project_id": "project-demo",
++  "graph_version": "v1",
++  "tasks": [
++    {
++      "task_id": "qa-node",
++      "node_id": "qa-acceptance",
++      "stage": "QA",
++      "owner": "qa",
++      "entry": "TEST_ONLY",
++      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++      "spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
++      "input_version": "candidate-v1",
++      "output_version": "accepted-v1",
++      "priority": 50,
++      "preemptible": true,
++      "module_id": "xuanjun.scheduler.kernel",
++      "resources": ["fake:qa/demo"],
++      "dependencies": [],
++      "completion_evidence": [{"evidence_ref": "qa-report-demo"}]
++    },
++    {
++      "task_id": "delivery-node",
++      "node_id": "delivery",
++      "stage": "DELIVERY",
++      "owner": "developer",
++      "entry": "TEST_ONLY",
++      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++      "spec_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "input_version": "accepted-v1",
++      "output_version": "delivery-v1",
++      "priority": 100,
++      "preemptible": true,
++      "module_id": "xuanjun.scheduler.kernel",
++      "resources": ["fake:delivery/demo"],
++      "dependencies": [{
++        "task_id": "qa-node",
++        "version": "accepted-v1",
++        "evidence_ref": "qa-report-demo"
++      }],
++      "completion_evidence": [{"evidence_ref": "delivery-receipt-demo"}]
++    }
++  ]
++}
+diff --git a/scripts/reusable_scheduler_cli.py b/scripts/reusable_scheduler_cli.py
+new file mode 100644
+index 00000000..cdded748
+--- /dev/null
++++ b/scripts/reusable_scheduler_cli.py
+@@ -0,0 +1,126 @@
++"""Local CLI for the reusable TEST_ONLY scheduler kernel."""
++from __future__ import print_function
++
++import argparse
++import json
++import os
++import sys
++import time
++
++sys.path.insert(0, os.path.dirname(__file__))
++from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
++                                    TestTenantAuthority)
++from task_supervisor import Supervisor
++from task_writer_fence import Fence
++
++
++def demo_graph(tenant):
++    def task(task_id, output, priority, resources, dependencies=None,
++             preemptible=True, evidence='evidence-v1'):
++        return {
++            'task_id': task_id, 'node_id': 'node-' + task_id,
++            'stage': 'TEST_ONLY', 'owner': 'test-executor',
++            'entry': 'TEST_ONLY', 'checkpoint_sha256': 'a' * 64,
++            'spec_sha256': 'b' * 64, 'input_version': 'input-v1',
++            'output_version': output, 'priority': priority,
++            'preemptible': preemptible,
++            'module_id': 'xuanjun.scheduler.kernel',
++            'resources': resources, 'dependencies': dependencies or [],
++            'completion_evidence': [{'evidence_ref': evidence}],
++        }
++    return {
++        'graph_id': 'demo-graph', 'tenant_id': tenant,
++        'project_id': 'demo-project', 'graph_version': 'v1',
++        'tasks': [
++            task('demo-b', 'b-v1', 50, ['fake:demo-b'],
++                 evidence='evid-demo-b'),
++            task('demo-a', 'a-v1', 100, ['fake:shared'], dependencies=[{
++                'task_id': 'demo-b', 'version': 'b-v1',
++                'evidence_ref': 'evid-demo-b'}]),
++            task('demo-c', 'c-v1', 10, ['fake:shared'],
++                 preemptible=False),
++        ],
++    }
++
++
++def run_demo(gateway, authority, tenant, lock_root):
++    context = authority.issue(tenant, 'local-demo')
++    gateway.register_graph(context, demo_graph(tenant))
++    gateway.save_waiting_checkpoint(
++        context, 'demo-a', 'demo-a-prior', 'demo-a-checkpoint',
++        {'cursor': 7}, ['fake:shared'])
++    fence = Fence(gateway.supervisor, lock_root)
++    executor = TestOnlyExecutor(gateway, fence, context)
++    try:
++        valid_until = time.time() + 600
++        executor.start('demo-c', 'demo-c-attempt', ['fake:shared'],
++                       valid_until)
++        executor.start('demo-b', 'demo-b-attempt', ['fake:demo-b'],
++                       valid_until)
++        executor.progress('demo-b', 'demo-b-attempt', 'demo-b-progress',
++                          'demo-test-run')
++        executor.complete_success('demo-b', 'demo-b-attempt', 'f' * 64,
++                                  [{'evidence_ref': 'evid-demo-b'}])
++        outbox = gateway.db.execute('''SELECT outbox_id,event_id FROM outbox
++          WHERE task_id='demo-b' ''').fetchone()
++        gateway.mark_outbox_sent(context, outbox['outbox_id'],
++                                 'test-transport-receipt')
++        gateway.receive_outbox(context, outbox['outbox_id'])
++        gateway.acknowledge_event(context, outbox['event_id'])
++        gateway.save_checkpoint(
++            context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
++            {'cursor': 4}, [], 'RECONCILED', ['fake:shared'])
++        controller = {'role': 'REVOCATION_CONTROLLER',
++                      'caller_id': 'test-gateway'}
++        fence.begin_revocation('demo-c', controller)
++        fence.drain('demo-c', controller, timeout=1)
++        fence.invalidate_source_resources('demo-c', 'demo-release')
++        gateway.supervisor.complete_revocation('demo-c')
++        gateway.release_revoked_resources(
++            context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
++            'demo-release')
++        grant = gateway.issue_resume_grant(
++            context, 'demo-a', 'demo-a-checkpoint', time.time() + 600)
++        executor.start('demo-a', 'demo-a-attempt', ['fake:shared'],
++                       time.time() + 600, 'demo-a-checkpoint',
++                       grant['grant_id'])
++        return gateway.projection(context)
++    finally:
++        fence.close()
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--db', required=True)
++    parser.add_argument('--test-authority-key', required=True,
++                        help='TEST_ONLY key, minimum 32 characters')
++    sub = parser.add_subparsers(dest='command')
++    project = sub.add_parser('project')
++    project.add_argument('--tenant', required=True)
++    project.add_argument('--principal', default='local-viewer')
++    demo = sub.add_parser('demo')
++    demo.add_argument('--tenant', required=True)
++    demo.add_argument('--lock-root', required=True)
++    args = parser.parse_args(argv)
++    if args.command is None:
++        parser.error('a command is required')
++    supervisor = Supervisor(args.db)
++    try:
++        authority = TestTenantAuthority(
++            args.test_authority_key.encode('utf-8'))
++        gateway = GatewayKernel(supervisor, authority)
++        if args.command == 'project':
++            context = authority.issue(args.tenant, args.principal)
++            value = gateway.projection(context)
++        else:
++            value = run_demo(gateway, authority, args.tenant,
++                             os.path.realpath(args.lock_root))
++        print(json.dumps(value, ensure_ascii=False,
++                         sort_keys=True, indent=2))
++    finally:
++        supervisor.close()
++    return 0
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())
+diff --git a/scripts/reusable_task_gateway.py b/scripts/reusable_task_gateway.py
+new file mode 100644
+index 00000000..e32e0f64
+--- /dev/null
++++ b/scripts/reusable_task_gateway.py
+@@ -0,0 +1,803 @@
++"""Reusable TEST_ONLY Task Gateway on the canonical Supervisor ledger.
++
++The module deliberately reuses ``task_supervisor.tasks/events/outbox`` as the
++single task and event authority.  Its tables contain graph requirements,
++durable consumer acknowledgements, checkpoints and read projections only.
++It grants no production dispatch, credential, tenant, or distributed-lock
++capability.
++"""
++from __future__ import print_function
++
++import hashlib
++import hmac
++import json
++import math
++import sqlite3
++
++from task_supervisor import Supervisor, UNKNOWN, canonical
++from task_writer_fence import Fence
++
++
++TEST_ONLY = 'TEST_ONLY'
++MODULE_CONTRACTS = (
++    {
++        'module_id': 'xuanjun.scheduler.kernel', 'version': '1.0.0-test',
++        'capabilities': ['dynamic-task-graph', 'durable-outbox',
++                         'safe-checkpoint-resume'],
++        'input_schema': 'TaskGraph.v1', 'output_schema': 'TaskResult.v1',
++        'tenant_source': 'trusted-server-context',
++        'resource_owner': 'canonical-supervisor-ledger',
++        'lifecycle': 'TEST_ONLY', 'compatibility': 'supervisor-schema-v3',
++    },
++    {
++        'module_id': 'xuanjun.digital-twin.projection',
++        'version': '1.0.0-test',
++        'capabilities': ['read-projection', 'restart-rebuild'],
++        'input_schema': 'CanonicalLedger.v3',
++        'output_schema': 'DigitalTwinProjection.v1',
++        'tenant_source': 'trusted-server-context',
++        'resource_owner': 'read-only-projection',
++        'lifecycle': 'TEST_ONLY', 'compatibility': 'scheduler-kernel-1.x',
++    },
++)
++
++
++def _digest(value):
++    return hashlib.sha256(canonical(value).encode('utf-8')).hexdigest()
++
++
++def _text(value, name):
++    if not isinstance(value, str) or not value.strip() or value != value.strip():
++        raise ValueError('NONEMPTY_%s_REQUIRED' % name.upper())
++    return value
++
++
++def _sha(value, name):
++    if (not isinstance(value, str) or len(value) != 64
++            or any(ch not in '0123456789abcdef' for ch in value)):
++        raise ValueError('CANONICAL_%s_REQUIRED' % name.upper())
++    return value
++
++
++def _finite(value, name):
++    if type(value) not in (int, float) or not math.isfinite(value):
++        raise ValueError('FINITE_%s_REQUIRED' % name.upper())
++    return value
++
++
++class TestTenantAuthority(object):
++    """HMAC test authority; raw client tenant_id is never trusted."""
++
++    issuer = 'TEST_AUTHORITY'
++    audience = 'xuanjun.scheduler.kernel'
++
++    def __init__(self, key):
++        if not isinstance(key, bytes) or len(key) < 32:
++            raise ValueError('TEST_AUTHORITY_KEY_REQUIRED')
++        self._key = key
++
++    def issue(self, tenant_id, principal_id):
++        body = {'issuer': self.issuer, 'audience': self.audience,
++                'tenant_id': _text(tenant_id, 'tenant_id'),
++                'principal_id': _text(principal_id, 'principal_id')}
++        body['assertion_sha256'] = hmac.new(
++            self._key, canonical(body).encode('utf-8'), hashlib.sha256
++        ).hexdigest()
++        return body
++
++    def verify(self, value):
++        if not isinstance(value, dict):
++            raise ValueError('TRUSTED_TENANT_CONTEXT_REQUIRED')
++        required = {'issuer', 'audience', 'tenant_id', 'principal_id',
++                    'assertion_sha256'}
++        if set(value) != required:
++            raise ValueError('TRUSTED_TENANT_CONTEXT_REQUIRED')
++        unsigned = {key: value[key] for key in required
++                    if key != 'assertion_sha256'}
++        expected = hmac.new(self._key, canonical(unsigned).encode('utf-8'),
++                            hashlib.sha256).hexdigest()
++        if (value['issuer'] != self.issuer
++                or value['audience'] != self.audience
++                or not hmac.compare_digest(expected,
++                                           value['assertion_sha256'])):
++            raise ValueError('TRUSTED_TENANT_CONTEXT_REQUIRED')
++        return value['tenant_id']
++
++
++class GatewayKernel(object):
++    """Gateway contract backed by one existing Supervisor SQLite database."""
++
++    def __init__(self, supervisor, tenant_authority, clock=None):
++        if not isinstance(supervisor, Supervisor):
++            raise ValueError('CANONICAL_SUPERVISOR_REQUIRED')
++        self.supervisor = supervisor
++        self.db = supervisor.db
++        self.clock = clock or supervisor.clock
++        self.tenants = tenant_authority
++        self._schema()
++
++    def _schema(self):
++        statements = (
++            '''CREATE TABLE IF NOT EXISTS gateway_graphs(
++              graph_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,
++              project_id TEXT NOT NULL,graph_version TEXT NOT NULL,
++              graph_sha256 TEXT NOT NULL,created_at REAL NOT NULL,
++              UNIQUE(tenant_id,project_id,graph_version))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_task_metadata(
++              task_id TEXT PRIMARY KEY,graph_id TEXT NOT NULL,
++              tenant_id TEXT NOT NULL,project_id TEXT NOT NULL,
++              node_id TEXT NOT NULL,input_version TEXT NOT NULL,
++              output_version TEXT NOT NULL,priority INTEGER NOT NULL,
++              preemptible INTEGER NOT NULL,module_id TEXT NOT NULL,
++              resources_json TEXT NOT NULL,
++              FOREIGN KEY(task_id) REFERENCES tasks(task_id),
++              FOREIGN KEY(graph_id) REFERENCES gateway_graphs(graph_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_dependencies(
++              consumer_task_id TEXT NOT NULL,producer_task_id TEXT NOT NULL,
++              required_version TEXT NOT NULL,required_evidence_ref TEXT NOT NULL,
++              state TEXT NOT NULL DEFAULT 'WAITING',event_id TEXT,
++              updated_at REAL NOT NULL,
++              PRIMARY KEY(consumer_task_id,producer_task_id),
++              FOREIGN KEY(consumer_task_id) REFERENCES tasks(task_id),
++              FOREIGN KEY(producer_task_id) REFERENCES tasks(task_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_inbox(
++              tenant_id TEXT NOT NULL,event_id TEXT NOT NULL,
++              producer_task_id TEXT NOT NULL,producer_attempt_id TEXT NOT NULL,
++              output_version TEXT NOT NULL,evidence_ref TEXT NOT NULL,
++              state TEXT NOT NULL,received_at REAL NOT NULL,acked_at REAL,
++              payload_sha256 TEXT NOT NULL,
++              PRIMARY KEY(tenant_id,event_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_checkpoints(
++              task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
++              checkpoint_id TEXT NOT NULL,payload_json TEXT NOT NULL,
++              inflight_json TEXT NOT NULL,effects_state TEXT NOT NULL,
++              resources_json TEXT NOT NULL,created_at REAL NOT NULL,
++              PRIMARY KEY(task_id,attempt_id,checkpoint_id),
++              FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_resource_releases(
++              task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
++              checkpoint_id TEXT NOT NULL,coverage_digest TEXT NOT NULL,
++              evidence_ref TEXT NOT NULL,released_at REAL NOT NULL,
++              PRIMARY KEY(task_id,attempt_id),
++              FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_resume_grants(
++              grant_id TEXT PRIMARY KEY,task_id TEXT NOT NULL,
++              checkpoint_id TEXT NOT NULL,dependency_event_ids_json TEXT NOT NULL,
++              state TEXT NOT NULL,valid_until REAL NOT NULL,
++              created_at REAL NOT NULL,used_at REAL,
++              FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_delivery_receipts(
++              event_id TEXT NOT NULL,phase TEXT NOT NULL,evidence_ref TEXT NOT NULL,
++              observed_at REAL NOT NULL,PRIMARY KEY(event_id,phase))''',
++            '''CREATE TABLE IF NOT EXISTS gateway_module_contracts(
++              module_id TEXT NOT NULL,version TEXT NOT NULL,contract_json TEXT NOT NULL,
++              contract_sha256 TEXT NOT NULL,PRIMARY KEY(module_id,version))''',
++            '''CREATE INDEX IF NOT EXISTS gateway_dependency_state_idx
++               ON gateway_dependencies(consumer_task_id,state)''',
++            '''CREATE INDEX IF NOT EXISTS gateway_task_tenant_idx
++               ON gateway_task_metadata(tenant_id,project_id,task_id)''',
++        )
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            for statement in statements:
++                self.db.execute(statement)
++            for contract in MODULE_CONTRACTS:
++                body = canonical(contract)
++                self.db.execute('''INSERT OR IGNORE INTO gateway_module_contracts
++                  VALUES (?,?,?,?)''', (contract['module_id'],
++                  contract['version'], body,
++                  hashlib.sha256(body.encode('utf-8')).hexdigest()))
++
++    @staticmethod
++    def _graph_shape(value):
++        required = {'graph_id', 'tenant_id', 'project_id', 'graph_version',
++                    'tasks'}
++        if not isinstance(value, dict) or set(value) != required:
++            raise ValueError('EXACT_TASK_GRAPH_REQUIRED')
++        for name in required - {'tasks'}:
++            _text(value[name], name)
++        if not isinstance(value['tasks'], list) or not value['tasks']:
++            raise ValueError('NONEMPTY_TASK_GRAPH_REQUIRED')
++        task_required = {'task_id', 'node_id', 'stage', 'owner', 'entry',
++                         'checkpoint_sha256', 'spec_sha256', 'input_version',
++                         'output_version', 'priority', 'preemptible',
++                         'module_id', 'resources', 'dependencies',
++                         'completion_evidence'}
++        ids = []
++        for task in value['tasks']:
++            if not isinstance(task, dict) or set(task) != task_required:
++                raise ValueError('EXACT_GRAPH_TASK_REQUIRED')
++            for name in ('task_id', 'node_id', 'stage', 'owner', 'entry',
++                         'input_version', 'output_version', 'module_id'):
++                _text(task[name], name)
++            _sha(task['checkpoint_sha256'], 'checkpoint_sha256')
++            _sha(task['spec_sha256'], 'spec_sha256')
++            if (type(task['priority']) is not int or task['priority'] < 0
++                    or type(task['preemptible']) is not bool
++                    or not isinstance(task['resources'], list)
++                    or not task['resources']
++                    or len(task['resources']) != len(set(task['resources']))
++                    or any(not isinstance(x, str) or not x for x in
++                           task['resources'])
++                    or not isinstance(task['dependencies'], list)
++                    or not isinstance(task['completion_evidence'], list)
++                    or not task['completion_evidence']):
++                raise ValueError('EXACT_GRAPH_TASK_REQUIRED')
++            ids.append(task['task_id'])
++        if len(ids) != len(set(ids)):
++            raise ValueError('DUPLICATE_GRAPH_TASK')
++        known = set(ids)
++        for task in value['tasks']:
++            for dep in task['dependencies']:
++                if (not isinstance(dep, dict)
++                        or set(dep) != {'task_id', 'version', 'evidence_ref'}
++                        or dep['task_id'] not in known
++                        or dep['task_id'] == task['task_id']):
++                    raise ValueError('EXACT_GRAPH_DEPENDENCY_REQUIRED')
++                _text(dep['version'], 'dependency_version')
++                _text(dep['evidence_ref'], 'dependency_evidence_ref')
++        # Directed-cycle rejection.
++        edges = {t['task_id']: [d['task_id'] for d in t['dependencies']]
++                 for t in value['tasks']}
++        visiting, done = set(), set()
++        def visit(node):
++            if node in visiting:
++                raise ValueError('CYCLIC_TASK_GRAPH')
++            if node in done:
++                return
++            visiting.add(node)
++            for dependency in edges[node]:
++                visit(dependency)
++            visiting.remove(node); done.add(node)
++        for node in sorted(edges):
++            visit(node)
++        return value
++
++    def register_graph(self, context, value, now=None):
++        tenant_id = self.tenants.verify(context)
++        value = self._graph_shape(value)
++        if tenant_id != value['tenant_id']:
++            raise ValueError('CROSS_TENANT_GRAPH_REJECTED')
++        now = self.clock() if now is None else _finite(now, 'time')
++        graph_body = canonical(value)
++        graph_sha = hashlib.sha256(graph_body.encode('utf-8')).hexdigest()
++        existing = self.db.execute(
++            'SELECT graph_sha256 FROM gateway_graphs WHERE graph_id=?',
++            (value['graph_id'],)).fetchone()
++        if existing is not None:
++            if existing['graph_sha256'] == graph_sha:
++                return {'duplicate': True, 'graph_sha256': graph_sha}
++            raise ValueError('TASK_GRAPH_ID_CONFLICT')
++        # Full shape validation above makes each canonical Supervisor insert
++        # deterministic.  Graph visibility is committed only after all tasks.
++        for task in value['tasks']:
++            self.supervisor.register({
++                'task_id': task['task_id'],
++                'parent_task_id': value['project_id'], 'stage': task['stage'],
++                'owner': task['owner'], 'entry': task['entry'],
++                'checkpoint_sha256': task['checkpoint_sha256'],
++                'spec_sha256': task['spec_sha256'],
++                'next_action': 'WAIT_DEPENDENCIES' if task['dependencies']
++                               else 'CLAIM_TEST_ONLY_EXECUTOR',
++                'dependencies': [x['task_id'] for x in task['dependencies']],
++                'completion_conditions': task['completion_evidence'],
++                'progress_deadline': now + 900,
++                'receipt_deadline': now + 300,
++                'started_deadline': now + 600,
++                'terminal_deadline': now + 3600,
++                'handoff_deadline': now + 900,
++            }, now=now)
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('INSERT INTO gateway_graphs VALUES (?,?,?,?,?,?)',
++                (value['graph_id'], tenant_id, value['project_id'],
++                 value['graph_version'], graph_sha, now))
++            for task in value['tasks']:
++                self.db.execute('''INSERT INTO gateway_task_metadata
++                  VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
++                  (task['task_id'], value['graph_id'], tenant_id,
++                   value['project_id'], task['node_id'], task['input_version'],
++                   task['output_version'], task['priority'],
++                   int(task['preemptible']), task['module_id'],
++                   canonical(sorted(task['resources']))))
++                for dep in task['dependencies']:
++                    self.db.execute('''INSERT INTO gateway_dependencies
++                      VALUES (?,?,?,?,?,?,?)''',
++                      (task['task_id'], dep['task_id'], dep['version'],
++                       dep['evidence_ref'], 'WAITING', None, now))
++        return {'duplicate': False, 'graph_sha256': graph_sha}
++
++    def task_tenant(self, task_id):
++        row = self.db.execute('''SELECT tenant_id FROM gateway_task_metadata
++          WHERE task_id=?''', (task_id,)).fetchone()
++        if row is None:
++            raise KeyError(task_id)
++        return row['tenant_id']
++
++    def assert_task_context(self, context, task_id):
++        tenant_id = self.tenants.verify(context)
++        if tenant_id != self.task_tenant(task_id):
++            raise ValueError('CROSS_TENANT_ACCESS_REJECTED')
++        return tenant_id
++
++    def mark_outbox_sent(self, context, outbox_id, evidence_ref, now=None):
++        row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',
++                              (outbox_id,)).fetchone()
++        if row is None:
++            raise KeyError(outbox_id)
++        self.assert_task_context(context, row['task_id'])
++        now = self.clock() if now is None else _finite(now, 'time')
++        result = self.supervisor.outbox_result(outbox_id, True, now=now)
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
++              VALUES (?,?,?,?)''', (row['event_id'], 'SENT',
++                                    _text(evidence_ref, 'evidence_ref'), now))
++        return result
++
++    def receive_outbox(self, context, outbox_id, now=None):
++        tenant_id = self.tenants.verify(context)
++        row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',
++                              (outbox_id,)).fetchone()
++        if row is None:
++            raise KeyError(outbox_id)
++        if row['delivered_at'] is None:
++            raise ValueError('OUTBOX_NOT_SENT')
++        if self.task_tenant(row['task_id']) != tenant_id:
++            raise ValueError('CROSS_TENANT_EVENT_REJECTED')
++        meta = self.db.execute('''SELECT * FROM gateway_task_metadata
++          WHERE task_id=?''', (row['task_id'],)).fetchone()
++        payload = json.loads(row['payload_json'])
++        evidence = payload.get('completion_evidence')
++        evidence_ref = UNKNOWN
++        if isinstance(evidence, list) and len(evidence) == 1:
++            item = evidence[0]
++            if isinstance(item, dict):
++                evidence_ref = item.get('evidence_ref', UNKNOWN)
++        now = self.clock() if now is None else _finite(now, 'time')
++        payload_sha = hashlib.sha256(
++            row['payload_json'].encode('utf-8')).hexdigest()
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            prior = self.db.execute('''SELECT * FROM gateway_inbox
++              WHERE tenant_id=? AND event_id=?''',
++              (tenant_id, row['event_id'])).fetchone()
++            exact = (tenant_id, row['event_id'], row['task_id'],
++                     row['attempt_id'], meta['output_version'], evidence_ref,
++                     payload_sha)
++            if prior is not None:
++                actual = (prior['tenant_id'], prior['event_id'],
++                          prior['producer_task_id'],
++                          prior['producer_attempt_id'], prior['output_version'],
++                          prior['evidence_ref'], prior['payload_sha256'])
++                if actual != exact:
++                    raise ValueError('EVENT_ID_REUSE_CONFLICT')
++                return {'duplicate': True, 'state': prior['state']}
++            self.db.execute('''INSERT INTO gateway_inbox
++              VALUES (?,?,?,?,?,?,?,?,?,?)''',
++              (tenant_id, row['event_id'], row['task_id'], row['attempt_id'],
++               meta['output_version'], evidence_ref, 'RECEIVED', now, None,
++               payload_sha))
++        return {'duplicate': False, 'state': 'RECEIVED'}
++
++    def acknowledge_event(self, context, event_id, now=None):
++        tenant_id = self.tenants.verify(context)
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            event = self.db.execute('''SELECT * FROM gateway_inbox
++              WHERE tenant_id=? AND event_id=?''',
++              (tenant_id, event_id)).fetchone()
++            if event is None:
++                raise KeyError(event_id)
++            if event['state'] == 'CONSUMED_ACK':
++                return {'duplicate': True, 'state': 'CONSUMED_ACK'}
++            if event['state'] != 'RECEIVED':
++                raise ValueError('EVENT_NOT_RECEIVED')
++            dependencies = list(self.db.execute('''SELECT * FROM
++              gateway_dependencies WHERE producer_task_id=?''',
++              (event['producer_task_id'],)))
++            matched = 0
++            for dep in dependencies:
++                consumer_tenant = self.task_tenant(dep['consumer_task_id'])
++                if consumer_tenant != tenant_id:
++                    raise ValueError('CROSS_TENANT_DEPENDENCY_REJECTED')
++                if (dep['required_version'] == event['output_version']
++                        and dep['required_evidence_ref'] ==
++                            event['evidence_ref']):
++                    self.db.execute('''UPDATE gateway_dependencies
++                      SET state='RECEIVED',event_id=?,updated_at=?
++                      WHERE consumer_task_id=? AND producer_task_id=?''',
++                      (event_id, now, dep['consumer_task_id'],
++                       dep['producer_task_id']))
++                    matched += 1
++            self.db.execute('''UPDATE gateway_inbox
++              SET state='CONSUMED_ACK',acked_at=?
++              WHERE tenant_id=? AND event_id=?''',
++              (now, tenant_id, event_id))
++            self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
++              VALUES (?,?,?,?)''',
++              (event_id, 'CONSUMED_ACK', event['payload_sha256'], now))
++            return {'duplicate': False, 'state': 'CONSUMED_ACK',
++                    'matched_dependencies': matched}
++
++    def save_checkpoint(self, context, task_id, attempt_id, checkpoint_id,
++                        payload, inflight, effects_state, resources, now=None):
++        self.assert_task_context(context, task_id)
++        if (not isinstance(payload, dict) or not isinstance(inflight, list)
++                or effects_state not in ('RECONCILED', UNKNOWN)
++                or not isinstance(resources, list)
++                or not resources or len(resources) != len(set(resources))):
++            raise ValueError('EXACT_CHECKPOINT_REQUIRED')
++        task = self.supervisor._task(task_id)
++        if task['attempt_id'] != attempt_id:
++            raise ValueError('CHECKPOINT_ATTEMPT_MISMATCH')
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('''INSERT INTO gateway_checkpoints VALUES
++              (?,?,?,?,?,?,?,?)''',
++              (task_id, attempt_id, _text(checkpoint_id, 'checkpoint_id'),
++               canonical(payload), canonical(inflight), effects_state,
++               canonical(sorted(resources)), now))
++        return {'checkpoint_id': checkpoint_id, 'effects_state': effects_state}
++
++    def save_waiting_checkpoint(self, context, task_id, prior_attempt_id,
++                                checkpoint_id, payload, resources, now=None):
++        """Persist a prior-attempt checkpoint for a dependency-waiting task."""
++        self.assert_task_context(context, task_id)
++        task = self.supervisor._task(task_id)
++        waiting = self.db.execute('''SELECT COUNT(*) AS n FROM
++          gateway_dependencies WHERE consumer_task_id=? AND state!='RECEIVED' ''',
++          (task_id,)).fetchone()['n']
++        meta = self.db.execute('''SELECT resources_json FROM
++          gateway_task_metadata WHERE task_id=?''', (task_id,)).fetchone()
++        if (task['state'] != 'READY' or task['authority_state'] != 'NONE'
++                or not waiting or not isinstance(payload, dict)
++                or sorted(resources) != sorted(json.loads(
++                    meta['resources_json']))):
++            raise ValueError('DEPENDENCY_WAITING_CHECKPOINT_REQUIRED')
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('''INSERT INTO gateway_checkpoints VALUES
++              (?,?,?,?,?,?,?,?)''',
++              (task_id, _text(prior_attempt_id, 'prior_attempt_id'),
++               _text(checkpoint_id, 'checkpoint_id'), canonical(payload),
++               '[]', 'RECONCILED', canonical(sorted(resources)), now))
++        return {'checkpoint_id': checkpoint_id,
++                'prior_attempt_id': prior_attempt_id,
++                'state': 'WAITING_DEPENDENCY'}
++
++    def release_revoked_resources(self, context, task_id, attempt_id,
++                                  checkpoint_id, evidence_ref, now=None,
++                                  resume_ready=True):
++        self.assert_task_context(context, task_id)
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            task = self.supervisor._task(task_id)
++            checkpoint = self.db.execute('''SELECT * FROM gateway_checkpoints
++              WHERE task_id=? AND attempt_id=? AND checkpoint_id=?''',
++              (task_id, attempt_id, checkpoint_id)).fetchone()
++            if (task['attempt_id'] != attempt_id
++                    or task['authority_state'] != 'REVOKED'
++                    or task['coverage_digest'] in ('', UNKNOWN)
++                    or checkpoint is None
++                    or checkpoint['effects_state'] != 'RECONCILED'
++                    or json.loads(checkpoint['inflight_json'])
++                    or sorted(json.loads(checkpoint['resources_json'])) !=
++                       sorted(json.loads(task['resource_scope_json']))):
++                raise ValueError('SAFE_RESOURCE_RELEASE_EVIDENCE_REQUIRED')
++            self.db.execute('''DELETE FROM resource_claims
++              WHERE task_id=? AND attempt_id=? AND state='REVOKED' ''',
++              (task_id, attempt_id))
++            if self.db.execute('SELECT changes()').fetchone()[0] < 1:
++                raise ValueError('REVOKED_RESOURCE_CLAIM_REQUIRED')
++            self.db.execute('''INSERT INTO gateway_resource_releases
++              VALUES (?,?,?,?,?,?)''',
++              (task_id, attempt_id, checkpoint_id, task['coverage_digest'],
++               _text(evidence_ref, 'release_evidence'), now))
++            if resume_ready:
++                self.db.execute("""UPDATE tasks SET state='READY',
++                  authority_state='NONE',authority_valid_until=NULL,
++                  run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
++                  epoch=NULL,next_action='RESUME_FROM_CHECKPOINT',
++                  writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
++                  WHERE task_id=?""", (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN,
++                                       now, task_id))
++        return {'state': 'RELEASED', 'checkpoint_id': checkpoint_id}
++
++    def issue_resume_grant(self, context, task_id, checkpoint_id,
++                           valid_until, now=None):
++        self.assert_task_context(context, task_id)
++        now = self.clock() if now is None else _finite(now, 'time')
++        _finite(valid_until, 'valid_until')
++        if valid_until <= now:
++            raise ValueError('FRESH_RESUME_GRANT_REQUIRED')
++        dependencies = list(self.db.execute('''SELECT * FROM
++          gateway_dependencies WHERE consumer_task_id=?
++          ORDER BY producer_task_id''', (task_id,)))
++        if not dependencies or any(row['state'] != 'RECEIVED'
++                                   for row in dependencies):
++            raise ValueError('DEPENDENCY_ACCEPTANCE_REQUIRED')
++        for dep in dependencies:
++            producer = self.supervisor._task(dep['producer_task_id'])
++            meta = self.db.execute('''SELECT output_version FROM
++              gateway_task_metadata WHERE task_id=?''',
++              (dep['producer_task_id'],)).fetchone()
++            if (producer['state'] != 'SUCCESS'
++                    or meta['output_version'] != dep['required_version']):
++                raise ValueError('DEPENDENCY_VERSION_REVOKED')
++        checkpoint = self.db.execute('''SELECT * FROM gateway_checkpoints
++          WHERE task_id=? AND checkpoint_id=? ORDER BY created_at DESC LIMIT 1''',
++          (task_id, checkpoint_id)).fetchone()
++        if checkpoint is None or checkpoint['effects_state'] != 'RECONCILED':
++            raise ValueError('ORIGINAL_CHECKPOINT_REQUIRED')
++        task = self.supervisor._task(task_id)
++        if task['state'] != 'READY' or task['authority_state'] != 'NONE':
++            raise ValueError('TASK_NOT_RESUMABLE')
++        meta = self.db.execute('''SELECT resources_json FROM
++          gateway_task_metadata WHERE task_id=?''', (task_id,)).fetchone()
++        resources = json.loads(meta['resources_json'])
++        if sorted(json.loads(checkpoint['resources_json'])) != sorted(resources):
++            raise ValueError('RESUME_CHECKPOINT_RESOURCE_MISMATCH')
++        placeholders = ','.join('?' for _ in resources)
++        conflicts = self.db.execute('''SELECT task_id FROM resource_claims
++          WHERE resource_key IN (%s) AND state IN ('VALID','REVOKING')
++          LIMIT 1''' % placeholders, resources).fetchone()
++        if conflicts is not None:
++            raise ValueError('RESUME_RESOURCE_CONFLICT')
++        event_ids = [row['event_id'] for row in dependencies]
++        grant_body = {'task_id': task_id, 'checkpoint_id': checkpoint_id,
++                      'dependency_event_ids': event_ids,
++                      'valid_until': valid_until}
++        grant_id = _digest(grant_body)
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('''INSERT OR IGNORE INTO gateway_resume_grants
++              VALUES (?,?,?,?,?,?,?,?)''',
++              (grant_id, task_id, checkpoint_id, canonical(event_ids),
++               'ELIGIBLE', valid_until, now, None))
++        return {'grant_id': grant_id, 'state': 'ELIGIBLE'}
++
++    def validate_resume_grant(self, context, task_id, grant_id,
++                              checkpoint_id, now=None):
++        self.assert_task_context(context, task_id)
++        now = self.clock() if now is None else _finite(now, 'time')
++        row = self.db.execute('''SELECT * FROM gateway_resume_grants
++          WHERE grant_id=? AND task_id=?''', (grant_id, task_id)).fetchone()
++        if row is None or row['checkpoint_id'] != checkpoint_id:
++            raise ValueError('RESUME_CHECKPOINT_MISMATCH')
++        if row['state'] != 'ELIGIBLE':
++            raise ValueError('RESUME_GRANT_ALREADY_USED')
++        if now >= row['valid_until']:
++            raise ValueError('RESUME_GRANT_EXPIRED')
++        return dict(row)
++
++    def consume_resume_grant(self, context, task_id, grant_id, checkpoint_id,
++                             now=None):
++        self.assert_task_context(context, task_id)
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            row = self.db.execute('''SELECT * FROM gateway_resume_grants
++              WHERE grant_id=? AND task_id=?''', (grant_id, task_id)).fetchone()
++            if (row is None or row['checkpoint_id'] != checkpoint_id):
++                raise ValueError('RESUME_CHECKPOINT_MISMATCH')
++            if row['state'] != 'ELIGIBLE':
++                raise ValueError('RESUME_GRANT_ALREADY_USED')
++            if now >= row['valid_until']:
++                self.db.execute('''UPDATE gateway_resume_grants
++                  SET state='EXPIRED' WHERE grant_id=?''', (grant_id,))
++                raise ValueError('RESUME_GRANT_EXPIRED')
++            dependencies = list(self.db.execute('''SELECT state,event_id FROM
++              gateway_dependencies WHERE consumer_task_id=?''', (task_id,)))
++            if (any(dep['state'] != 'RECEIVED' for dep in dependencies)
++                    or sorted(json.loads(row['dependency_event_ids_json'])) !=
++                       sorted(dep['event_id'] for dep in dependencies)):
++                raise ValueError('RESUME_DEPENDENCY_CHANGED')
++            self.db.execute('''UPDATE gateway_resume_grants
++              SET state='STARTED',used_at=? WHERE grant_id=?
++              AND state='ELIGIBLE' ''', (now, grant_id))
++            if self.db.execute('SELECT changes()').fetchone()[0] != 1:
++                raise ValueError('RESUME_GRANT_CAS_FAILED')
++        return {'grant_id': grant_id, 'state': 'STARTED'}
++
++    def complete_resume(self, context, task_id, grant_id, succeeded,
++                        evidence_ref, now=None):
++        """Record the resume result without rewriting the STARTED fact."""
++        self.assert_task_context(context, task_id)
++        if type(succeeded) is not bool:
++            raise ValueError('BOOLEAN_RESUME_RESULT_REQUIRED')
++        now = self.clock() if now is None else _finite(now, 'time')
++        result = 'SUCCEEDED' if succeeded else 'FAILED'
++        evidence_ref = _text(evidence_ref, 'resume_evidence')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            row = self.db.execute('''SELECT * FROM gateway_resume_grants
++              WHERE grant_id=? AND task_id=?''', (grant_id, task_id)).fetchone()
++            if row is None or row['state'] != 'STARTED':
++                raise ValueError('RESUME_NOT_STARTED')
++            self.db.execute('''UPDATE gateway_resume_grants SET state=?
++              WHERE grant_id=? AND state='STARTED' ''', (result, grant_id))
++            self.db.execute('''INSERT INTO gateway_delivery_receipts
++              VALUES (?,?,?,?)''',
++              (grant_id, 'RESUME_' + result, evidence_ref, now))
++        return {'grant_id': grant_id, 'started': True, 'result': result}
++
++    def preemption_decision(self, context, running_task_id, waiting_task_id):
++        """Pure policy verdict; it never stops a process or transfers a lock."""
++        self.assert_task_context(context, running_task_id)
++        self.assert_task_context(context, waiting_task_id)
++        running = self.db.execute('''SELECT priority,preemptible FROM
++          gateway_task_metadata WHERE task_id=?''',
++          (running_task_id,)).fetchone()
++        waiting = self.db.execute('''SELECT priority FROM gateway_task_metadata
++          WHERE task_id=?''', (waiting_task_id,)).fetchone()
++        if not running['preemptible']:
++            return {'decision': 'WAIT_NEXT_SAFE_POINT',
++                    'reason': 'RUNNING_TASK_NON_PREEMPTIBLE'}
++        if waiting['priority'] <= running['priority']:
++            return {'decision': 'KEEP_RUNNING',
++                    'reason': 'NO_HIGHER_PRIORITY_TASK'}
++        return {'decision': 'REQUEST_SAFE_CHECKPOINT',
++                'reason': 'HIGHER_PRIORITY_READY_NO_FORCE_STOP'}
++
++    def revoke_dependency(self, context, producer_task_id, reason, now=None):
++        self.assert_task_context(context, producer_task_id)
++        now = self.clock() if now is None else _finite(now, 'time')
++        self.db.execute('BEGIN IMMEDIATE')
++        with self.db:
++            self.db.execute('''UPDATE gateway_dependencies SET state='REVOKED',
++              updated_at=? WHERE producer_task_id=?''',
++              (now, producer_task_id))
++            task_ids = [row['consumer_task_id'] for row in self.db.execute(
++                '''SELECT consumer_task_id FROM gateway_dependencies
++                   WHERE producer_task_id=?''', (producer_task_id,))]
++            for task_id in task_ids:
++                self.db.execute('''UPDATE gateway_resume_grants
++                  SET state='REVOKED' WHERE task_id=?
++                  AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
++        return {'state': 'REVOKED', 'reason': _text(reason, 'reason')}
++
++    def monitor(self, context, now=None):
++        tenant_id = self.tenants.verify(context)
++        now = self.clock() if now is None else _finite(now, 'time')
++        rows = list(self.db.execute('''SELECT t.*,m.tenant_id,m.priority,
++          m.preemptible FROM tasks t JOIN gateway_task_metadata m
++          ON m.task_id=t.task_id WHERE m.tenant_id=? ORDER BY t.task_id''',
++          (tenant_id,)))
++        results = []
++        for row in rows:
++            waiting = self.db.execute('''SELECT COUNT(*) AS n FROM
++              gateway_dependencies WHERE consumer_task_id=? AND state!='RECEIVED' ''',
++              (row['task_id'],)).fetchone()['n']
++            status = 'WAITING_DEPENDENCY' if row['state'] == 'READY' and waiting else row['state']
++            results.append({'task_id': row['task_id'], 'status': status,
++                            'waiting_dependencies': waiting,
++                            'priority': row['priority'],
++                            'preemptible': bool(row['preemptible']),
++                            'checkpoint_sha256': row['checkpoint_sha256'],
++                            'observed_at': now})
++        return results
++
++    def projection(self, context):
++        tenant_id = self.tenants.verify(context)
++        tasks = []
++        for row in self.db.execute('''SELECT t.*,m.project_id,m.node_id,
++          m.input_version,m.output_version,m.priority,m.preemptible,m.module_id,
++          m.resources_json
++          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
++          WHERE m.tenant_id=? ORDER BY m.priority DESC,t.task_id''',
++          (tenant_id,)):
++            deps = [dict(x) for x in self.db.execute('''SELECT
++              producer_task_id,required_version,required_evidence_ref,state,event_id
++              FROM gateway_dependencies WHERE consumer_task_id=?
++              ORDER BY producer_task_id''', (row['task_id'],))]
++            checkpoints = [dict(x) for x in self.db.execute('''SELECT
++              attempt_id,checkpoint_id,effects_state,resources_json,created_at
++              FROM gateway_checkpoints WHERE task_id=? ORDER BY created_at''',
++              (row['task_id'],))]
++            tasks.append({
++                'task_id': row['task_id'], 'project_id': row['project_id'],
++                'node_id': row['node_id'], 'state': row['state'],
++                'authority_state': row['authority_state'],
++                'attempt_id': row['attempt_id'], 'epoch': row['epoch'],
++                'checkpoint_sha256': row['checkpoint_sha256'],
++                'input_version': row['input_version'],
++                'output_version': row['output_version'],
++                'priority': row['priority'],
++                'preemptible': bool(row['preemptible']),
++                'module_id': row['module_id'], 'dependencies': deps,
++                'resources': json.loads(row['resources_json']),
++                'checkpoints': checkpoints,
++            })
++        events = [dict(row) for row in self.db.execute('''SELECT e.task_id,
++          e.attempt_id,e.event_id,e.kind,e.observed_at,e.evidence_kind,
++          e.evidence_ref FROM events e JOIN gateway_task_metadata m
++          ON m.task_id=e.task_id WHERE m.tenant_id=?
++          ORDER BY e.observed_at,e.event_id''', (tenant_id,))]
++        return {'schema': 1, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
++                'tasks': tasks, 'timeline': events,
++                'production_status': 'NOT_IMPLEMENTED'}
++
++
++class TestOnlyExecutor(object):
++    """Explicit local adapter that drives real Supervisor/Fence transitions."""
++
++    def __init__(self, gateway, fence, context, clock=None):
++        if not isinstance(fence, Fence):
++            raise ValueError('SOURCE_ONLY_FENCE_REQUIRED')
++        self.gateway = gateway
++        self.supervisor = gateway.supervisor
++        self.fence = fence
++        self.context = context
++        self.clock = clock or gateway.clock
++
++    def _caller(self, name):
++        return {'caller_id': 'test-writer-' + name,
++                'run_id': 'test-run-' + name,
++                'session_id': 'test-session-' + name,
++                'gateway_id': 'test-gateway'}
++
++    def start(self, task_id, attempt_id, resources, valid_until,
++              checkpoint_id=None, resume_grant_id=None):
++        self.gateway.assert_task_context(self.context, task_id)
++        now = self.clock()
++        if resume_grant_id is not None:
++            self.gateway.validate_resume_grant(
++                self.context, task_id, resume_grant_id, checkpoint_id,
++                now=now)
++        task = self.supervisor._task(task_id)
++        caller = self._caller(attempt_id)
++        ticket = self.fence.claim(
++            task_id, attempt_id, task['owner'], task['entry'], caller,
++            'lease-' + attempt_id, resources, valid_until)
++        now = self.clock()
++        if resume_grant_id is not None:
++            self.gateway.consume_resume_grant(
++                self.context, task_id, resume_grant_id, checkpoint_id,
++                now=now)
++        self.supervisor.record(task_id, attempt_id,
++            'received-' + attempt_id, 'RECEIVED', now,
++            'PHASE_EXECUTION', 'test-received-' + attempt_id)
++        self.supervisor.record(task_id, attempt_id,
++            'started-' + attempt_id, 'STARTED', now,
++            'PHASE_EXECUTION', 'test-started-' + attempt_id)
++        return {'ticket': ticket, 'caller': caller, 'state': 'STARTED'}
++
++    def progress(self, task_id, attempt_id, event_id, evidence_ref, now=None):
++        return self.supervisor.record(
++            task_id, attempt_id, event_id, 'PROGRESS',
++            self.clock() if now is None else now,
++            'TEST_RUN', evidence_ref,
++            {'next_progress_deadline':
++             (self.clock() if now is None else now) + 600})
++
++    def complete_success(self, task_id, attempt_id, artifact_sha256,
++                         completion_evidence, now=None):
++        now = self.clock() if now is None else now
++        result = self.supervisor.record(
++            task_id, attempt_id, 'terminal-' + attempt_id, 'TERMINAL', now,
++            'TEST_RUN', 'test-terminal-' + attempt_id,
++            {'state': 'SUCCESS', 'artifact_sha256': artifact_sha256,
++             'writer_stopped': True, 'effects_reconciled': True,
++             'next_action': 'DEPENDENCIES_RECHECK',
++             'completion_evidence': completion_evidence})
++        task = self.supervisor._task(task_id)
++        resources = json.loads(task['resource_scope_json'])
++        checkpoint_id = 'terminal-checkpoint-' + attempt_id
++        self.gateway.save_checkpoint(
++            self.context, task_id, attempt_id, checkpoint_id,
++            {'terminal_state': 'SUCCESS'}, [], 'RECONCILED', resources, now)
++        controller = {'role': 'REVOCATION_CONTROLLER',
++                      'caller_id': 'test-executor-finalizer'}
++        self.fence.begin_revocation(task_id, controller)
++        self.fence.drain(task_id, controller, timeout=1)
++        self.fence.invalidate_source_resources(task_id, 'terminal-release')
++        self.supervisor.complete_revocation(task_id)
++        self.gateway.release_revoked_resources(
++            self.context, task_id, attempt_id, checkpoint_id,
++            'test-terminal-release', now, resume_ready=False)
++        return result
+diff --git a/tests/test_reusable_task_gateway.py b/tests/test_reusable_task_gateway.py
+new file mode 100644
+index 00000000..89c1a76f
+--- /dev/null
++++ b/tests/test_reusable_task_gateway.py
+@@ -0,0 +1,321 @@
++from __future__ import print_function
++
++import json
++import os
++import shutil
++import tempfile
++import unittest
++
++import sys
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
++from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
++                                    TestTenantAuthority)
++from task_supervisor import Supervisor, UNKNOWN
++from task_writer_fence import Fence
++
++
++class KernelTests(unittest.TestCase):
++    def setUp(self):
++        self.root = tempfile.mkdtemp()
++        self.path = os.path.join(self.root, 'ledger.sqlite')
++        self.lock_root = os.path.join(self.root, 'locks')
++        self.now = 1000.0
++        self.supervisor = Supervisor(self.path, lambda: self.now)
++        self.authority = TestTenantAuthority(b'k' * 32)
++        self.gateway = GatewayKernel(
++            self.supervisor, self.authority, lambda: self.now)
++        self.fence = Fence(self.supervisor, self.lock_root)
++        self.a = self.authority.issue('tenant-a', 'owner-a')
++        self.b = self.authority.issue('tenant-b', 'owner-b')
++
++    def tearDown(self):
++        try:
++            self.fence.close()
++            self.supervisor.close()
++        finally:
++            shutil.rmtree(self.root)
++
++    @staticmethod
++    def task(task_id, output, dependencies=None, priority=10,
++             preemptible=True, resources=None, evidence='evidence-v1'):
++        return {
++            'task_id': task_id, 'node_id': 'node-' + task_id,
++            'stage': 'development', 'owner': 'developer', 'entry': 'WORK',
++            'checkpoint_sha256': ('a' if task_id.endswith('a') else 'b') * 64,
++            'spec_sha256': ('c' if task_id.endswith('a') else 'd') * 64,
++            'input_version': 'input-v1', 'output_version': output,
++            'priority': priority, 'preemptible': preemptible,
++            'module_id': 'xuanjun.scheduler.kernel',
++            'resources': resources or ['fake:resource-' + task_id],
++            'dependencies': dependencies or [],
++            'completion_evidence': [{'evidence_ref': evidence}],
++        }
++
++    def graph(self, tenant='tenant-a', suffix='a', tasks=None):
++        return {'graph_id': 'graph-' + suffix, 'tenant_id': tenant,
++                'project_id': 'project-' + suffix, 'graph_version': 'v1',
++                'tasks': tasks or [self.task('task-' + suffix, 'v1')]}
++
++    def register_wait_graph(self):
++        producer = self.task('task-b', 'b-v3', evidence='evid-b-v3')
++        consumer = self.task('task-a', 'a-v1', dependencies=[{
++            'task_id': 'task-b', 'version': 'b-v3',
++            'evidence_ref': 'evid-b-v3'}], priority=100,
++            resources=['fake:shared'])
++        worker = self.task('task-c', 'c-v1', priority=10,
++            preemptible=False,
++            resources=['fake:shared'])
++        self.gateway.register_graph(
++            self.a, self.graph(tasks=[producer, consumer, worker]), now=1000)
++
++    def executor(self, context=None):
++        return TestOnlyExecutor(self.gateway, self.fence,
++                                context or self.a, lambda: self.now)
++
++    def start_complete_b(self):
++        exe = self.executor()
++        self.now = 1010
++        exe.start('task-b', 'attempt-b1', ['fake:resource-task-b'], 2000)
++        self.now = 1012
++        exe.progress('task-b', 'attempt-b1', 'progress-b', 'test-b', self.now)
++        self.now = 1013
++        exe.complete_success('task-b', 'attempt-b1', 'f' * 64,
++                             [{'evidence_ref': 'evid-b-v3'}], self.now)
++        return self.supervisor.db.execute(
++            "SELECT outbox_id,event_id FROM outbox WHERE task_id='task-b'"
++        ).fetchone()
++
++    def test_dynamic_graph_and_two_tenant_isolation(self):
++        result = self.gateway.register_graph(self.a, self.graph(), now=1000)
++        self.assertFalse(result['duplicate'])
++        self.gateway.register_graph(self.b, self.graph(
++            tenant='tenant-b', suffix='b'), now=1000)
++        self.assertEqual(len(self.gateway.projection(self.a)['tasks']), 1)
++        self.assertEqual(len(self.gateway.projection(self.b)['tasks']), 1)
++        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
++            self.gateway.assert_task_context(self.b, 'task-a')
++        with self.assertRaisesRegex(ValueError, 'TRUSTED_TENANT'):
++            self.gateway.projection({'tenant_id': 'tenant-a'})
++
++    def test_cycle_and_duplicate_graph_conflict_rejected(self):
++        t1 = self.task('task-a', 'v1', dependencies=[{
++            'task_id': 'task-b', 'version': 'v1', 'evidence_ref': 'e'}])
++        t2 = self.task('task-b', 'v1', dependencies=[{
++            'task_id': 'task-a', 'version': 'v1', 'evidence_ref': 'e'}])
++        with self.assertRaisesRegex(ValueError, 'CYCLIC'):
++            self.gateway.register_graph(self.a, self.graph(tasks=[t1, t2]))
++        graph = self.graph()
++        self.gateway.register_graph(self.a, graph)
++        self.assertTrue(self.gateway.register_graph(self.a, graph)['duplicate'])
++        changed = dict(graph); changed['graph_version'] = 'v2'
++        with self.assertRaisesRegex(ValueError, 'GRAPH_ID_CONFLICT'):
++            self.gateway.register_graph(self.a, changed)
++
++    def test_atomic_terminal_outbox_and_sent_ack_are_distinct(self):
++        self.register_wait_graph()
++        outbox = self.start_complete_b()
++        task = self.supervisor._task('task-b')
++        self.assertEqual(task['state'], 'SUCCESS')
++        self.assertIsNone(self.supervisor.db.execute(
++            'SELECT delivered_at FROM outbox WHERE outbox_id=?',
++            (outbox['outbox_id'],)).fetchone()['delivered_at'])
++        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
++            self.gateway.mark_outbox_sent(
++                self.b, outbox['outbox_id'], 'wrong-tenant', 1014)
++        with self.assertRaisesRegex(ValueError, 'OUTBOX_NOT_SENT'):
++            self.gateway.receive_outbox(self.a, outbox['outbox_id'])
++        self.now = 1014
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'],
++                                      'transport-receipt', self.now)
++        self.assertEqual(self.gateway.receive_outbox(
++            self.a, outbox['outbox_id'], self.now)['state'], 'RECEIVED')
++        dep = self.supervisor.db.execute('''SELECT state FROM
++          gateway_dependencies WHERE consumer_task_id='task-a' ''').fetchone()
++        self.assertEqual(dep['state'], 'WAITING')
++        ack = self.gateway.acknowledge_event(self.a, outbox['event_id'], 1015)
++        self.assertEqual(ack['state'], 'CONSUMED_ACK')
++        dep = self.supervisor.db.execute('''SELECT state FROM
++          gateway_dependencies WHERE consumer_task_id='task-a' ''').fetchone()
++        self.assertEqual(dep['state'], 'RECEIVED')
++
++    def test_duplicate_delivery_and_out_of_order_old_version(self):
++        self.register_wait_graph()
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        first = self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        second = self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1015)
++        self.assertFalse(first['duplicate']); self.assertTrue(second['duplicate'])
++        self.gateway.acknowledge_event(self.a, outbox['event_id'], 1016)
++        duplicate = self.gateway.acknowledge_event(self.a, outbox['event_id'], 1017)
++        self.assertTrue(duplicate['duplicate'])
++        self.supervisor.db.execute("""UPDATE gateway_dependencies
++          SET required_version='b-v4',state='WAITING',event_id=NULL
++          WHERE consumer_task_id='task-a'""")
++        self.supervisor.db.commit()
++        # Replayed old event remains ACKed and cannot satisfy a new version.
++        self.assertTrue(self.gateway.acknowledge_event(
++            self.a, outbox['event_id'], 1018)['duplicate'])
++        state = self.supervisor.db.execute('''SELECT state FROM
++          gateway_dependencies WHERE consumer_task_id='task-a' ''').fetchone()[0]
++        self.assertEqual(state, 'WAITING')
++
++    def test_waiting_dependency_not_reported_timeout(self):
++        self.register_wait_graph()
++        self.now = 10000
++        status = {x['task_id']: x for x in self.gateway.monitor(self.a)}
++        self.assertEqual(status['task-a']['status'], 'WAITING_DEPENDENCY')
++        self.assertEqual(status['task-a']['waiting_dependencies'], 1)
++
++    def test_resource_conflict_nonpreemptible_and_safe_release(self):
++        self.register_wait_graph()
++        exe = self.executor()
++        self.now = 1001
++        started = exe.start('task-c', 'attempt-c1', ['fake:shared'], 3000)
++        decision = self.gateway.preemption_decision(
++            self.a, 'task-c', 'task-a')
++        self.assertEqual(decision['decision'], 'WAIT_NEXT_SAFE_POINT')
++        with self.assertRaisesRegex(ValueError, 'TASK_NOT_READY|CLAIMABLE'):
++            exe.start('task-a', 'attempt-a1', ['fake:shared'], 3000)
++        self.gateway.save_checkpoint(self.a, 'task-c', 'attempt-c1',
++            'checkpoint-c1', {'work': 'saved'}, ['external-write'], UNKNOWN,
++            ['fake:shared'], 1002)
++        with self.assertRaisesRegex(ValueError, 'SAFE_RESOURCE_RELEASE'):
++            self.gateway.release_revoked_resources(
++                self.a, 'task-c', 'attempt-c1', 'checkpoint-c1', 'release', 1003)
++        self.assertFalse(self.supervisor.db.execute('''SELECT preemptible FROM
++          gateway_task_metadata WHERE task_id='task-c' ''').fetchone()[0] is None)
++        # Reconcile checkpoint, then use the existing fence revocation proof.
++        self.supervisor.db.execute('''UPDATE gateway_checkpoints
++          SET inflight_json='[]',effects_state='RECONCILED'
++          WHERE task_id='task-c' ''')
++        self.supervisor.db.commit()
++        controller = {'role': 'REVOCATION_CONTROLLER', 'caller_id': 'gateway'}
++        self.fence.begin_revocation('task-c', controller)
++        self.fence.drain('task-c', controller, timeout=0.2)
++        self.fence.invalidate_source_resources('task-c', 'release-c')
++        self.supervisor.complete_revocation('task-c')
++        released = self.gateway.release_revoked_resources(
++            self.a, 'task-c', 'attempt-c1', 'checkpoint-c1', 'release-c', 1004)
++        self.assertEqual(released['state'], 'RELEASED')
++        self.assertEqual(started['state'], 'STARTED')
++
++    def test_complete_resume_keeps_started_fact_and_records_failure(self):
++        self.register_wait_graph()
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
++            ['fake:shared'], 1001)
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        self.gateway.acknowledge_event(self.a, outbox['event_id'], 1015)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
++        self.gateway.consume_resume_grant(
++            self.a, 'task-a', grant['grant_id'], 'checkpoint-a0', 1017)
++        failed = self.gateway.complete_resume(
++            self.a, 'task-a', grant['grant_id'], False, 'executor-failed', 1018)
++        self.assertTrue(failed['started'])
++        self.assertEqual(failed['result'], 'FAILED')
++        phases = [row['phase'] for row in self.supervisor.db.execute(
++            '''SELECT phase FROM gateway_delivery_receipts WHERE event_id=?''',
++            (grant['grant_id'],))]
++        self.assertEqual(phases, ['RESUME_FAILED'])
++
++    def test_full_wait_do_c_b_event_safe_yield_resume_a(self):
++        self.register_wait_graph()
++        exe = self.executor()
++        self.now = 1001
++        exe.start('task-c', 'attempt-c1', ['fake:shared'], 3000)
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0',
++            {'cursor': 7}, ['fake:shared'], 1002)
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        self.gateway.acknowledge_event(self.a, outbox['event_id'], 1015)
++        with self.assertRaisesRegex(ValueError, 'RESUME_RESOURCE_CONFLICT'):
++            self.gateway.issue_resume_grant(
++                self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
++        self.gateway.save_checkpoint(self.a, 'task-c', 'attempt-c1',
++            'checkpoint-c1', {'cursor': 4}, [], 'RECONCILED',
++            ['fake:shared'], 1016)
++        controller = {'role': 'REVOCATION_CONTROLLER', 'caller_id': 'gateway'}
++        self.fence.begin_revocation('task-c', controller)
++        self.fence.drain('task-c', controller, timeout=0.2)
++        self.fence.invalidate_source_resources('task-c', 'release-c')
++        self.supervisor.complete_revocation('task-c')
++        self.gateway.release_revoked_resources(
++            self.a, 'task-c', 'attempt-c1', 'checkpoint-c1', 'release-c', 1017)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 2000, 1018)
++        self.now = 1019
++        resumed = exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000,
++                            checkpoint_id='checkpoint-a0',
++                            resume_grant_id=grant['grant_id'])
++        self.assertEqual(resumed['state'], 'STARTED')
++        self.assertEqual(self.supervisor._task('task-a')['attempt_id'],
++                         'attempt-a1')
++
++    def test_checkpoint_match_grant_once_expiry_and_revoke(self):
++        self.register_wait_graph()
++        # Persist the original A checkpoint before the dependency unlock.
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0',
++            {'resume': 'here'}, ['fake:shared'], 1001)
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        self.gateway.acknowledge_event(self.a, outbox['event_id'], 1015)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
++        with self.assertRaisesRegex(ValueError, 'CHECKPOINT_MISMATCH'):
++            self.gateway.consume_resume_grant(
++                self.a, 'task-a', grant['grant_id'], 'wrong', 1017)
++        self.assertEqual(self.gateway.consume_resume_grant(
++            self.a, 'task-a', grant['grant_id'], 'checkpoint-a0', 1017
++        )['state'], 'STARTED')
++        with self.assertRaisesRegex(ValueError, 'ALREADY_USED'):
++            self.gateway.consume_resume_grant(
++                self.a, 'task-a', grant['grant_id'], 'checkpoint-a0', 1018)
++        self.gateway.revoke_dependency(self.a, 'task-b', 'qa-revoked', 1019)
++        state = self.supervisor.db.execute('''SELECT state FROM
++          gateway_resume_grants WHERE grant_id=?''',
++          (grant['grant_id'],)).fetchone()[0]
++        self.assertEqual(state, 'REVOKED')
++
++    def test_expired_grant_and_restart_projection_consistency(self):
++        self.register_wait_graph()
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
++            ['fake:shared'], 1001)
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        self.gateway.acknowledge_event(self.a, outbox['event_id'], 1015)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 1020, 1016)
++        with self.assertRaisesRegex(ValueError, 'EXPIRED'):
++            self.gateway.consume_resume_grant(
++                self.a, 'task-a', grant['grant_id'], 'checkpoint-a0', 1021)
++        before = self.gateway.projection(self.a)
++        self.fence.close(); self.supervisor.close()
++        self.supervisor = Supervisor(self.path, lambda: self.now)
++        self.gateway = GatewayKernel(
++            self.supervisor, self.authority, lambda: self.now)
++        self.fence = Fence(self.supervisor, self.lock_root)
++        after = self.gateway.projection(self.a)
++        self.assertEqual(before, after)
++
++    def test_only_scheduler_and_twin_module_contracts_exist(self):
++        rows = list(self.supervisor.db.execute('''SELECT module_id,version,
++          contract_json FROM gateway_module_contracts ORDER BY module_id'''))
++        self.assertEqual(len(rows), 2)
++        self.assertEqual(
++            {x['module_id'] for x in rows},
++            {'xuanjun.scheduler.kernel', 'xuanjun.digital-twin.projection'})
++        self.assertTrue(all(json.loads(x['contract_json'])['lifecycle'] ==
++                            'TEST_ONLY' for x in rows))
++
++
++if __name__ == '__main__':
++    unittest.main()
