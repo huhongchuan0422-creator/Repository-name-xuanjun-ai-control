@@ -155,7 +155,8 @@ class CodexExecutionControl(object):
                   requesting_principal TEXT''')
             for name,kind in (('connection_id','TEXT'),
                               ('connection_config_version','INTEGER'),
-                              ('provider_id','TEXT'),('quota_verified_at','REAL')):
+                              ('provider_id','TEXT'),('provider_config_version','INTEGER'),
+                              ('quota_verified_at','REAL')):
                 if name not in columns:self.db.execute(
                   'ALTER TABLE codex_execution_intents ADD COLUMN %s %s'%(name,kind))
 
@@ -176,12 +177,14 @@ class CodexExecutionControl(object):
           self.tenant_id,task_id,attempt_id,principal)).fetchone() is not None
 
     @staticmethod
-    def _quota_allows_zero_new_spend(row,now):
-        if row is None:return False
+    def _quota_allows_zero_new_spend(row,provider,now):
+        if row is None or provider is None or not provider['enabled']:return False
         source=row['quota_source']
-        attributable=(source in ('EXISTING_SUBSCRIPTION_INCLUDED',
-          'VERIFIED_FREE_TIER') or (isinstance(source,str) and
-          source.startswith('TEST_ONLY_INCLUDED_')))
+        included=(source=='EXISTING_SUBSCRIPTION_INCLUDED')
+        verified_free=(source=='VERIFIED_FREE_TIER' or (isinstance(source,str)
+          and source.startswith('TEST_ONLY_INCLUDED_')))
+        attributable=(included or (verified_free and
+          provider['price_state']=='KNOWN_FREE'))
         return (row['quota_state']=='AVAILABLE' and attributable and
           row['verified_at'] is not None and now-row['verified_at']<=3600)
 
@@ -237,10 +240,13 @@ class CodexExecutionControl(object):
         quota=self.db.execute('''SELECT quota_state,quota_source,verified_at FROM
           model_quota_status WHERE tenant_id=? AND provider_id=?''',(
           self.tenant_id,context['provider_id'])).fetchone()
+        provider=self.db.execute('''SELECT enabled,config_version,price_state FROM
+          model_providers WHERE tenant_id=? AND provider_id=?''',(
+          self.tenant_id,context['provider_id'])).fetchone()
         if (connection is None or connection['provider_id']!=context['provider_id'] or
                 connection['purpose']!='CODEX_EXECUTION' or connection['status']!='ACTIVE'):
             raise ValueError('ACTIVE_CODEX_CONNECTION_REQUIRED')
-        if not self._quota_allows_zero_new_spend(quota,now):
+        if not self._quota_allows_zero_new_spend(quota,provider,now):
             raise ValueError('CODEX_QUOTA_UNKNOWN_OR_UNAVAILABLE')
         seed=canonical({'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'idempotency':idempotency_key})
@@ -258,13 +264,15 @@ class CodexExecutionControl(object):
           writer_valid_until,state,context_json,execution_id,session_id,thread_id,
           turn_id,artifact_sha256,error_kind,cancel_requested,lease_owner,
           lease_until,created_at,updated_at,connection_id,
-          connection_config_version,provider_id,quota_verified_at) VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          connection_config_version,provider_id,provider_config_version,
+          quota_verified_at) VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
           self.tenant_id,intent_id,idempotency_key,task_id,task['attempt_id'],
           transport_kind,principal,task['authority_caller_id'],task['fence'],task['epoch'],
           task['authority_valid_until'],'PENDING',canonical(context),None,None,
           None,None,None,None,0,None,None,now,now,context['connection_id'],
-          connection['config_version'],context['provider_id'],quota['verified_at']));self.db.commit()
+          connection['config_version'],context['provider_id'],
+          provider['config_version'],quota['verified_at']));self.db.commit()
         return {'intent_id':intent_id,'state':'PENDING','duplicate':False}
 
     def cancel(self,intent_id,now=None):
@@ -352,11 +360,16 @@ class CodexExecutionControl(object):
             quota=self.db.execute('''SELECT quota_state,quota_source,verified_at FROM
               model_quota_status WHERE tenant_id=? AND provider_id=?''',(
               self.tenant_id,row['provider_id'])).fetchone()
+            provider=self.db.execute('''SELECT enabled,config_version,price_state
+              FROM model_providers WHERE tenant_id=? AND provider_id=?''',(
+              self.tenant_id,row['provider_id'])).fetchone()
             if (connection is None or connection['status']!='ACTIVE' or
                     connection['purpose']!='CODEX_EXECUTION' or
                     connection['provider_id']!=row['provider_id'] or
                     connection['config_version']!=row['connection_config_version'] or
-                    not self._quota_allows_zero_new_spend(quota,now)):
+                    provider is None or
+                    provider['config_version']!=row['provider_config_version'] or
+                    not self._quota_allows_zero_new_spend(quota,provider,now)):
                 self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
                   error_kind='CODEX_CONNECTION_OR_QUOTA_HOLD',updated_at=? WHERE
                   tenant_id=? AND intent_id=?''',(now,self.tenant_id,row['intent_id']))

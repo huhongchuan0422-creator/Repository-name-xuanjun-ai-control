@@ -48,7 +48,7 @@
 
 ## R6 集中收口门禁
 
-- Codex intent 必须绑定 `CODEX_EXECUTION` connection、其配置版本、provider 和一小时内核验为 `AVAILABLE` 的既有套餐/免费额度。入队后在发送前再次核验；`UNKNOWN/EXHAUSTED` 零调用且无付费 fallback。
+- Codex intent 必须绑定 `CODEX_EXECUTION` connection 及其配置版本、启用中的 provider 及其配置版本，并绑定一小时内核验为 `AVAILABLE` 的可归因额度来源。既有套餐内额度可用；免费/TEST_ONLY 来源还必须对应 `KNOWN_FREE` provider。入队后发送前重新核验连接、provider、价格状态和额度；配置改变、`UNKNOWN/EXHAUSTED` 或已知付费目的地均零调用且无付费 fallback。
 - OAuth revoke 原子失效 pending/exchanging flow 并递增连接版本；迟到兑换结果不能恢复 `ACTIVE`。刷新结果不明或解析失败会清除旧 refresh token 并要求重新授权，避免重放可能已旋转的 token。
 - 缺失或部分 usage 写入逐次记录为未知，不生成伪 0 token 汇总，预留费用维持 `UNKNOWN` 待对账。
 - Skill 的已审内容、版本和摘要由服务端装入真实出站 messages；撤销或错版在发送前归 HOLD。

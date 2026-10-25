@@ -237,6 +237,30 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           codex_execution_intents''').fetchone()[0],0)
 
+    def test_test_only_quota_on_known_paid_provider_is_rejected(self):
+        self.supervisor.db.execute('''UPDATE model_providers SET
+          price_state='KNOWN_PAID',config_version=config_version+1 WHERE
+          tenant_id='tenant-a' AND provider_id='codex-fixture' ''')
+        self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'QUOTA_UNKNOWN_OR_UNAVAILABLE'):
+            self.control.create_intent('demo-b','CODEX_SDK','paid-provider',
+              self.context_body)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          codex_execution_intents''').fetchone()[0],0)
+
+    def test_provider_change_after_queue_blocks_transport(self):
+        self.control.create_intent('demo-b','CODEX_SDK','provider-change',
+          self.context_body);called=[]
+        self.supervisor.db.execute('''UPDATE model_providers SET enabled=0,
+          config_version=config_version+1 WHERE tenant_id='tenant-a' AND
+          provider_id='codex-fixture' ''')
+        self.supervisor.db.commit()
+        result=self.control.dispatch_once({'CODEX_SDK':CodexSDKTransport(
+          lambda value:called.append(value))})
+        self.assertEqual(result['state'],'FAILED');self.assertEqual(called,[])
+        self.assertEqual(self.control.projection()[0]['error_kind'],
+          'CODEX_CONNECTION_OR_QUOTA_HOLD')
+
     def test_cancel_during_send_keeps_late_ids_and_converges_cancelled(self):
         intent=self.control.create_intent('demo-b','CODEX_SDK','cancel-race',
           self.context_body)
