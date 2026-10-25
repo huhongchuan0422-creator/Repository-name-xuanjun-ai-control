@@ -122,6 +122,17 @@ class ApprovalRecord(unittest.TestCase):
         self.assertIn('UNKNOWN_INSPECT_ONLY',output.getvalue())
         self.assertIn('"accepted":false',output.getvalue())
 
+    def test_post_b_uses_distinct_approval_name_and_fixed_operation(self):
+        value=dict(self.value,operation='execute')
+        os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        h.writefile(self.parent,entry.POST_B_APPROVAL_NAME,h.canonical(value),self.uid)
+        with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
+            with __import__('contextlib').ExitStack() as stack:
+                fd,raw,identity=entry._approval_fd(self.parent,'execute',self.old,self.new,self.uid,stack,entry.POST_B_APPROVAL_NAME)
+                self.assertEqual(raw,h.canonical(value));self.assertTrue(identity)
+        self.assertIn('post-b-execute',entry.OPERATIONS)
+        self.assertNotEqual(entry.POST_B_APPROVAL_NAME,entry.APPROVAL_NAME)
+
     def test_cli_has_no_approval_bypass_switch(self):
         with patch.object(entry,'run') as run:
             self.assertEqual(entry.main(['--approve']),2)
