@@ -1,3 +1,55 @@
+## 2026-10-25 — Fixed original-entry call material (source-only)
+
+Latest adapter candidate files:
+- `scripts/community_preview_carrier_handoff_call.py`: 3049 bytes, SHA256 `6e59bd61b14750dab2aa8f9822c1b8e733da3052c569e51d667defca55ae0739`.
+- `tests/test_community_preview_carrier_handoff_call.py`: 2838 bytes, SHA256 `87ed798ad7189bc946ad05c8c15217f3089a904cc743216fe3c6b667d62c06cf`.
+- Original transaction module SHA256 `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`, 35329 bytes.
+- Existing fixed resume script is reused without modification: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`.
+
+Fixed source pins:
+- Host identifier: `iZd7oeikknn1z21sq6ji6zZ`.
+- Parent target: `/opt/xuanjun-community-preview/control-stopped-v1`.
+- Old archive SHA256 `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`; old manifest SHA256 `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
+- New archive SHA256 `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`; new manifest SHA256 `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
+- Historical outer artifacts: old 107650 bytes/SHA256 `a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956`; new 117926 bytes/SHA256 `f529ca439a9decc95efa4cf4f93391e0ba93719565ad952629d752ef7640ca34`.
+
+Fixed call surface from the already-authorized original entry (not a shell/CLI):
+```python
+from scripts.community_preview_carrier_handoff_call import (
+    call_once_from_original_entry,
+    reconcile_from_original_entry,
+    rollback_from_original_entry,
+)
+
+# original_entry_context must be the original entry's live context:
+# parent_fd, journal_fd, ENTRY fd, original lease fd, freshly read identity
+# witnesses, immutable old/new archive bytes, and history_refs acquired by
+# that original entry. It must supply its existing authority_check callback.
+result = call_once_from_original_entry(original_entry_context)
+# If result/transport is UNKNOWN, do not call execute again:
+result = reconcile_from_original_entry(original_entry_context)  # read-only
+# Rollback only after independent review proves the exact module conditions:
+# rollback_from_original_entry(original_entry_context)
+```
+
+No direct `python module.py` command is supported. The adapter intentionally does not open production paths, manufacture identity witnesses, create approvals, or call `Session.acquire`/B/C hooks. It accepts only the already-held original entry FDs and its own authority verifier. The original installation entry's context-construction call site is not present in this repository source candidate; therefore the adapter is auditable call material, but **not yet proof of a complete live call chain**. Do not invoke it until the original installer binds the real context; do not invent that context from historical artifact metadata.
+
+Safe stop/reconcile contract:
+1. Before execute, the original entry verifies its existing authority, exact host, fixed old/new archive+manifest pins, parent/journal/ENTRY/lease identities, original history refs, and absence of transaction/active-attempt conflicts.
+2. Call execute exactly once. Only `SWAPPED_OLD_RETAINED_IN_STAGE` with `retry_safe=False` is accepted.
+3. Any exception or UNKNOWN is reconciled only through read-only `status`; never repeat execute.
+4. Rollback is a separate explicit call only when status proves the current tree and retained stage are exactly this transaction's new/old trees, history and identities remain unchanged, no active-attempt or retained-path conflict exists, and no prior rollback intent/result exists. Any UNKNOWN or identity/history mismatch means HOLD.
+5. No B/C execution, permit creation/renewal, intent deletion, service start/stop, or carrier operation is part of this call.
+
+Local/CI syntax command:
+`python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py`
+Isolated command:
+`PYTHONPATH=. python -B -m unittest tests.test_community_preview_carrier_handoff_admission tests.test_community_preview_carrier_handoff_call -v`
+
+Current CI for this call-material candidate must be checked against its exact pushed HEAD. No live execution is authorized. `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 ## 2026-10-25 — old-to-new carrier handoff candidate (NOT ACCEPTED)
 
 Current source-code candidate (before this documentation-only update): `eca61484c1e9de271001089b28b8078dbb97c818`.
