@@ -298,11 +298,42 @@ class PreparationSteps(unittest.TestCase):
             real=s.os.scandir;seen=[]
             def no_fd_scandir(path):
                 self.assertIsInstance(path,str)
-                seen.append(path);return real(path)
+                seen.append(path)
+                return real(path)
             with patch.object(s.os,'scandir',side_effect=no_fd_scandir):
                 names=s.bounded_names(fd)
-            self.assertIn('center.sqlite',names);self.assertIn('center.sqlite-wal',names)
-            self.assertEqual(len(seen),1);self.assertRegex(seen[0],r'^/proc/self/fd/[0-9]+        p=self.data/'data'/'bad';p.symlink_to('/etc/passwd')
+            self.assertIn('center.sqlite',names)
+            self.assertIn('center.sqlite-wal',names)
+            self.assertEqual(len(seen),1)
+            self.assertTrue(seen[0].startswith('/proc/self/fd/'))
+            self.assertTrue(seen[0].rsplit('/',1)[1].isdigit())
+        finally:
+            os.close(fd)
+    def test_bounded_names_enumeration_error_is_bounded_hold(self):
+        fd=s.directory(s.DATA+'/data')
+        try:
+            with patch.object(s.os,'scandir',side_effect=PermissionError('private path must not escape')):
+                with self.assertRaisesRegex(s.Hold,'TREE_ENUMERATION_UNKNOWN'):
+                    s.bounded_names(fd)
+        finally:
+            os.close(fd)
+    def test_bounded_names_rejects_proc_fd_identity_mismatch(self):
+        fd=s.directory(s.DATA+'/data')
+        other=s.directory(s.DATA+'/config')
+        real=s.os.stat
+        proc_path='/proc/self/fd/'+str(fd)
+        try:
+            def wrong_identity(path,*args,**kwargs):
+                if path==proc_path:
+                    return real('/proc/self/fd/'+str(other))
+                return real(path,*args,**kwargs)
+            with patch.object(s.os,'stat',side_effect=wrong_identity):
+                with self.assertRaisesRegex(s.Hold,'TREE_ENUMERATION_UNKNOWN'):
+                    s.bounded_names(fd)
+        finally:
+            os.close(fd);os.close(other)
+    def test_tree_denies_links_specials_public_files_and_budget(self):
+        p=self.data/'data'/'bad';p.symlink_to('/etc/passwd')
         with self.assertRaises(s.Hold):s.copy_roots(s.DATA,None)
         p.unlink();os.link(str(self.data/'data'/'center.sqlite'),str(p))
         with self.assertRaises(s.Hold):s.copy_roots(s.DATA,None)
