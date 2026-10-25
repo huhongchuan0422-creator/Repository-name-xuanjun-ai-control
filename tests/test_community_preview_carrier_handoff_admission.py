@@ -1,4 +1,4 @@
-"""Real filesystem isolated transfer tests; synthetic archive, never UK B/C."""
+"""Isolated filesystem transaction tests; CI injects exact nested 1d/005c archives, never UK B/C."""
 import fcntl
 import hashlib
 import io
@@ -324,6 +324,31 @@ class HandoffAdmission(unittest.TestCase):
         name,body,pfd=self.history_bodies['b_approval']
         os.unlink(name,dir_fd=pfd);h.writefile(pfd,name,body+b'X',self.uid)
         with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+
+    def test_readonly_status_reopens_fresh_descriptors(self):
+        self.execute()
+        jfd=os.open(h.JOURNAL_DIR,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        entry=os.open(h.ENTRY_NAME,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.parent)
+        lease=os.open(h.LOCK,os.O_RDWR|os.O_NOFOLLOW,dir_fd=jfd)
+        try:
+            refs=dict(self.history_refs)
+            name,body,_=self.history_bodies['b_intent']
+            st=os.stat(name,dir_fd=jfd,follow_symlinks=False)
+            refs['b_intent']=(jfd,name,h.parent_ident(os.fstat(jfd)),h.ident(st),h.sha(body))
+            result=h.status(self.parent,jfd,entry,lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs)
+            self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+        finally:os.close(lease);os.close(entry);os.close(jfd)
+
+    def test_absent_old_stage_permit_must_remain_absent(self):
+        name,body,pfd=self.history_bodies['old_stage_permit']
+        os.unlink(name,dir_fd=pfd)
+        self.history_refs['old_stage_permit']=(pfd,name,h.parent_ident(os.fstat(pfd)),None,None)
+        self.execute()
+        h.writefile(pfd,name,body,self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_ABSENCE_CHANGED'):
             h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
