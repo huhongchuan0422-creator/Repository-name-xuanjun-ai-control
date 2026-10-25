@@ -353,7 +353,7 @@ def run(operation):
         refs={}
         backup_history_fd=None
         for key,name in h.HISTORY_NAMES.items():
-            if key in h.BACKUP_HISTORY_KEYS:
+            if key in h.BACKUP_HISTORY_KEYS and post_b:
                 if backup_history_fd is None:
                     backup_history_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
                     stack.callback(os.close,backup_history_fd)
