@@ -212,6 +212,10 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_preserves_old_stage_permit_and_uses_new_excl_path \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_expired_approval_is_never_reused \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_c_plan_must_bind_new_real_plan \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_rejects_incomplete_or_inconsistent_prior_stage_permit \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_continuously_rechecks_old_reference_and_absence \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_probe_name_conflict_or_unknown_holds_before_first_write \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_known_failure_reopens_new_lock_session_and_recovers_bound_resume_evidence \
               test_community_preview_stopped_handoff.WholeEntry.test_builder_exposes_resume_wrapper_without_changing_default_acceptance \
               test_community_preview_stopped_handoff.WholeEntry.test_actual_b_classes_same_lease_to_c_success_no_old_stop_start \
               test_community_preview_stopped_handoff.WholeEntry.test_default_off_and_no_forged_b_done \

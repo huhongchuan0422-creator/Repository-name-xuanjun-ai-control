@@ -51,6 +51,23 @@ def b_records():
     names=['B-intent','snapshot-result','snapshot-permit','validate-clones-result','validate-clones-permit']
     return {name:u.JOURNAL_PARENT+'/'+attempt()+'-'+name+'.json' for name in names}
 def resume_record_path():return u.JOURNAL_PARENT+'/'+attempt()+'-B-resume-admission.json'
+def resume_probe_names():
+    return tuple('xuanjun-community-preview-'+name+'-probe-f131' for name in CLONES)
+def resume_reference(path,limit=65536):
+    body=raw(path,limit);fd=open_private(path)
+    try:
+        meta=s.identity(os.fstat(fd))
+        need(meta==s.identity(os.stat(path,follow_symlinks=False)) and raw(path,limit)==body,
+             'B_RESUME_REFERENCE_REPLACED')
+        return body,meta
+    finally:os.close(fd)
+def probe_names_absent():
+    body=s.capture(s.DOCKER+['container','ls','--all','--format','{{.Names}}'])
+    try:rows=body.decode('ascii').splitlines()
+    except (UnicodeError,AttributeError):raise u.Hold('B_RESUME_PROBE_INVENTORY_UNKNOWN') from None
+    need(len(rows)<=4096 and all(row and len(row)<=128 for row in rows),'B_RESUME_PROBE_INVENTORY_UNKNOWN')
+    need(not set(resume_probe_names()).intersection(rows),'B_RESUME_PROBE_NAME_CONFLICT')
+    return rows
 def exists_private(path):
     parent=s.directory(os.path.dirname(path))
     try:
@@ -133,6 +150,7 @@ class Session:
         self.owner=None;self.thread=threading.get_ident();self.last=None
         self.braw=None;self.craw=None;self.freeze=None;self.bdone=False;self.approved_stamp=None
         self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_raw=None;self.resume_mode=False
+        self.resume_history={};self.resume_absent=()
         self.started=time.monotonic();self.captured={};self.recovering=False;self.cleanup_unproven=False
     def acquire(self,recover=False):
         self.owner=operator();self.recovering=recover
@@ -159,6 +177,74 @@ class Session:
             self.captured[name]=row
             return v
         s.clone_run=clone
+    def bind_resume_reference(self,path,limit=65536):
+        body,meta=resume_reference(path,limit);self.resume_history[path]=(body,meta,limit);return body
+    def resume_guard(self):
+        if not self.resume_mode:return
+        for path,(body,meta,limit) in self.resume_history.items():
+            current,current_meta=resume_reference(path,limit)
+            need(current==body and current_meta==meta,'B_RESUME_REFERENCE_REPLACED')
+        for path in self.resume_absent:
+            need(not exists_private(path),'B_PARTIAL_STATE_CONFLICT')
+    def resume_require_absent(self,paths):
+        self.resume_guard()
+        for path in paths:need(not exists_private(path),'B_PARTIAL_STATE_CONFLICT')
+    def resume_stage_preflight(self,stage):
+        if not self.resume_mode:return
+        records=b_records()
+        common=[C_APPROVAL,u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt()]
+        if stage=='snapshot':
+            paths=[records['snapshot-result'],records['snapshot-permit'],records['validate-clones-result'],
+                   records['validate-clones-permit'],s.BACKUP,self.stage_permit_path]+common
+        else:
+            paths=[records['validate-clones-result'],records['validate-clones-permit'],self.stage_permit_path]+common
+            paths += list(globals()['paths']().values())
+            paths += [s.BACKUP+'/'+name for name in CLONES]
+        self.resume_require_absent(paths)
+        self.resume_absent=tuple(common)
+    def strict_prior_stage_permit(self,old_b,old_freeze,old_freeze_raw):
+        if not exists_private(s.PERMIT):return None
+        old_permit,old_permit_raw=document(s.PERMIT,16384)
+        fields={'format','host','stage','entry_sha256','issued_at','expires_at',
+                'all_writers_frozen_evidence_sha256','snapshot_manifest_sha256'}
+        valid=(set(old_permit)==fields and type(old_permit.get('format')) is int and old_permit.get('format')==1
+            and old_permit.get('host')==p.HOST and old_permit.get('stage')=='snapshot'
+            and old_permit.get('entry_sha256')==A_ENTRY_SHA
+            and old_permit.get('all_writers_frozen_evidence_sha256')==s.sha(old_freeze_raw)
+            and old_permit.get('snapshot_manifest_sha256') is None
+            and type(old_permit.get('issued_at')) is int and type(old_permit.get('expires_at')) is int
+            and old_b['issued_at']<=old_permit['issued_at']<=old_permit['expires_at']
+            and old_permit['expires_at']<=old_permit['issued_at']+600
+            and old_permit['expires_at']<=old_b['expires_at'] and old_permit['expires_at']<=old_freeze['expires_at'])
+        need(valid,'EXACT_PRIOR_STAGE_PERMIT_REQUIRED')
+        self.bind_resume_reference(s.PERMIT,16384)
+        return s.sha(old_permit_raw)
+    def configure_resumed_recovery(self,proof):
+        evidence=proof.get('evidence') if type(proof) is dict else None
+        rows=evidence.get('b_records') if type(evidence) is dict else None
+        if type(rows) is not dict or 'B-resume-admission' not in rows:return False
+        self.resume_mode=True;self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE;self.stage_permit_path=B_RESUME_STAGE_PERMIT
+        self.resume_raw=self.bind_resume_reference(resume_record_path())
+        need(s.sha(self.resume_raw)==rows['B-resume-admission'],'B_RESUME_PROOF_BINDING_CHANGED')
+        resume=s.exact_json(self.resume_raw)
+        need(type(resume) is dict and resume.get('attempt')==attempt() and resume.get('mode')==MODE,
+             'B_RESUME_PROOF_BINDING_CHANGED')
+        intent_raw=self.bind_resume_reference(b_records()['B-intent'])
+        old_braw=self.bind_resume_reference(B_APPROVAL);old_freeze_raw=self.bind_resume_reference(s.FREEZE,16384)
+        self.b,self.braw=document(self.b_path);self.bind_resume_reference(self.b_path)
+        self.freeze=self.bind_resume_reference(self.freeze_path,16384)
+        if resume.get('old_stage_permit_sha256') is not None:self.bind_resume_reference(s.PERMIT,16384)
+        need(resume.get('old_b_intent_sha256')==s.sha(intent_raw)
+             and resume.get('old_b_approval_sha256')==s.sha(old_braw)
+             and resume.get('old_freeze_sha256')==s.sha(old_freeze_raw)
+             and resume.get('resume_approval_sha256')==s.sha(self.braw)
+             and resume.get('resume_freeze_sha256')==s.sha(self.freeze),
+             'B_RESUME_PROOF_BINDING_CHANGED')
+        if resume.get('old_stage_permit_sha256') is not None:
+            need(resume['old_stage_permit_sha256']==s.sha(raw(s.PERMIT,16384)),'B_RESUME_PROOF_BINDING_CHANGED')
+        self.approved_stamp=self.b['carrier_manifest_sha256']
+        need(self.approved_stamp==resume.get('carrier_manifest_sha256')==self.pins(),'B_SOURCE_BINDING_CHANGED')
+        return True
     def pins(self):
         m,b=document(MANIFEST)
         need(set(m)=={'format','mode','install_root','files','updates_enabled'}
@@ -182,6 +268,7 @@ class Session:
              'A_INSTALLED_ENTRY_CHANGED')
         stamp=self.pins();t=c.now();need(t<s.EXPIRES,'FROZEN_IMAGE_ARTIFACT_EXPIRED')
         need(self.last is None or t>=self.last,'CLOCK_BACKWARDS');self.last=t
+        if self.resume_mode and self.resume_history:self.resume_guard()
         if self.approved_stamp is not None:need(stamp==self.approved_stamp,'CARRIER_STAMP_CHANGED')
         if self.braw is not None:need(raw(self.b_path)==self.braw,'B_REFERENCE_REPLACED')
         if self.resume_raw is not None:need(raw(resume_record_path())==self.resume_raw,'B_RESUME_RECORD_REPLACED')
@@ -206,6 +293,7 @@ class Session:
     def stopped(self):
         self.boundary();self.freeze_live();s.stopped();self.boundary()
     def b_stage(self,stage,snapshot_sha=None):
+        self.resume_stage_preflight(stage)
         self.stopped();acknowledge(stage.upper().replace('-','_'),s.sha(self.braw));self.stopped()
         # No overwrite/reuse of an active or unknown stage permission.
         permit=dict(format=1,host=p.HOST,stage=stage,
@@ -255,50 +343,57 @@ class Session:
         self.bdone=True
     def resume_admission(self):
         self.resume_mode=True;self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE;self.stage_permit_path=B_RESUME_STAGE_PERMIT
-        records=b_records();intent,intent_raw=document(records['B-intent'])
-        need(set(intent)=={'format','mode','attempt','approval_sha256','freeze_sha256'}
+        records=b_records()
+        intent_raw=self.bind_resume_reference(records['B-intent']);intent=s.exact_json(intent_raw)
+        need(intent_raw==s.canonical(intent) and set(intent)=={'format','mode','attempt','approval_sha256','freeze_sha256'}
              and type(intent['format']) is int and intent['format']==1 and intent['mode']==MODE
              and intent['attempt']==attempt(),'EXACT_PRIOR_B_INTENT_REQUIRED')
-        old_b,old_braw=document(B_APPROVAL);old_freeze,old_freeze_raw=document(s.FREEZE,16384)
-        need(set(old_b)=={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at','freeze_sha256','actions'}
+        old_braw=self.bind_resume_reference(B_APPROVAL);old_b=s.exact_json(old_braw)
+        old_freeze_raw=self.bind_resume_reference(s.FREEZE,16384);old_freeze=s.exact_json(old_freeze_raw)
+        need(old_braw==s.canonical(old_b) and set(old_b)=={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at','freeze_sha256','actions'}
              and type(old_b['format']) is int and old_b['format']==1 and old_b['host']==p.HOST and old_b['mode']==MODE
-             and old_b['attempt']==attempt() and old_b['actions']==['SNAPSHOT','THREE_ISOLATED_CLONES'],
+             and old_b['attempt']==attempt() and old_b['actions']==['SNAPSHOT','THREE_ISOLATED_CLONES']
+             and type(old_b['issued_at']) is int and type(old_b['expires_at']) is int
+             and old_b['issued_at']<=old_b['expires_at']<=old_b['issued_at']+600,
              'EXACT_PRIOR_B_APPROVAL_REQUIRED')
         need(intent['approval_sha256']==s.sha(old_braw) and intent['freeze_sha256']==s.sha(old_freeze_raw)
              and old_b['freeze_sha256']==s.sha(old_freeze_raw),'PRIOR_B_EVIDENCE_MISMATCH')
-        need(set(old_freeze)=={'format','host','old_id','old_image','roots','issued_at','expires_at','all_writers_frozen','owner_review_reference_sha256'}
+        need(old_freeze_raw==s.canonical(old_freeze)
+             and set(old_freeze)=={'format','host','old_id','old_image','roots','issued_at','expires_at','all_writers_frozen','owner_review_reference_sha256'}
              and type(old_freeze['format']) is int and old_freeze['format']==1 and old_freeze['host']==p.HOST
              and old_freeze['old_id']==s.OLD_ID and old_freeze['old_image']==s.OLD_IMAGE
              and old_freeze['roots']==[s.DATA+'/data',s.DATA+'/config'] and old_freeze['all_writers_frozen'] is True
-             and p.exact_hex(old_freeze['owner_review_reference_sha256'],64),'EXACT_PRIOR_FREEZE_REQUIRED')
-        # The failed B attempt is resumable only before any snapshot/clone/C state exists.
-        for name in ('snapshot-result','snapshot-permit','validate-clones-result','validate-clones-permit'):
-            need(not exists_private(records[name]),'B_PARTIAL_OUTPUT_PRESENT')
-        for path in (s.BACKUP,C_APPROVAL,B_RESUME_STAGE_PERMIT,u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt(),resume_record_path()):
-            need(not exists_private(path),'B_PARTIAL_STATE_CONFLICT')
-        old_stage_permit_sha=None
-        if exists_private(s.PERMIT):
-            old_permit,old_permit_raw=document(s.PERMIT,16384);old_stage_permit_sha=s.sha(old_permit_raw)
-            need(type(old_permit) is dict and old_permit.get('stage') in ('snapshot','validate-clones'),'EXACT_PRIOR_STAGE_PERMIT_REQUIRED')
-        self.b,self.braw=document(self.b_path);window(self.b)
+             and p.exact_hex(old_freeze['owner_review_reference_sha256'],64)
+             and type(old_freeze['issued_at']) is int and type(old_freeze['expires_at']) is int
+             and old_freeze['issued_at']<=old_freeze['expires_at']<=old_freeze['issued_at']+600,
+             'EXACT_PRIOR_FREEZE_REQUIRED')
+        pre_outputs=[records['snapshot-result'],records['snapshot-permit'],records['validate-clones-result'],records['validate-clones-permit']]
+        pre_state=[s.BACKUP,C_APPROVAL,B_RESUME_STAGE_PERMIT,u.JOURNAL_PARENT+'/active-attempt.json',
+                   u.JOURNAL_PARENT+'/'+attempt(),resume_record_path()]
+        self.resume_require_absent(pre_outputs+pre_state)
+        old_stage_permit_sha=self.strict_prior_stage_permit(old_b,old_freeze,old_freeze_raw)
+        self.braw=self.bind_resume_reference(self.b_path);self.b=s.exact_json(self.braw);window(self.b)
         fields={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at',
                 'old_b_intent_sha256','old_b_approval_sha256','old_freeze_sha256','old_stage_permit_sha256',
                 'resume_freeze_sha256','actions'}
-        need(set(self.b)==fields and type(self.b['format']) is int and self.b['format']==1
+        need(self.braw==s.canonical(self.b) and set(self.b)==fields and type(self.b['format']) is int and self.b['format']==1
              and self.b['host']==p.HOST and self.b['mode']==MODE and self.b['attempt']==attempt()
              and self.b['actions']==['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'],'EXACT_B_RESUME_APPROVAL_REQUIRED')
-        self.freeze=raw(self.freeze_path,16384);self.approved_stamp=self.b['carrier_manifest_sha256']
-        need(self.pins()==self.approved_stamp,'B_SOURCE_BINDING_CHANGED')
+        self.freeze=self.bind_resume_reference(self.freeze_path,16384);self.approved_stamp=self.b['carrier_manifest_sha256']
+        need(self.pins()==self.approved_stamp and old_b['carrier_manifest_sha256']==self.approved_stamp,'B_SOURCE_BINDING_CHANGED')
         need(self.b['old_b_intent_sha256']==s.sha(intent_raw) and self.b['old_b_approval_sha256']==s.sha(old_braw)
              and self.b['old_freeze_sha256']==s.sha(old_freeze_raw) and self.b['old_stage_permit_sha256']==old_stage_permit_sha
              and self.b['resume_freeze_sha256']==s.sha(self.freeze),'B_RESUME_EVIDENCE_BINDING_CHANGED')
-        self.freeze_live();self.stopped()
+        self.freeze_live();self.stopped();probe_names_absent()
+        # Recheck every historical byte+identity and all pre-backup absences immediately before the first write.
+        self.resume_require_absent(pre_outputs+pre_state)
+        self.resume_absent=(C_APPROVAL,u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
         record=dict(format=1,mode=MODE,attempt=attempt(),carrier_manifest_sha256=self.approved_stamp,
             old_b_intent_sha256=s.sha(intent_raw),old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),
             old_stage_permit_sha256=old_stage_permit_sha,resume_approval_sha256=s.sha(self.braw),
             resume_freeze_sha256=s.sha(self.freeze),actions=self.b['actions'])
         write_private(self.parent,os.path.basename(resume_record_path()),record)
-        self.resume_raw=raw(resume_record_path())
+        self.resume_raw=self.bind_resume_reference(resume_record_path())
         need(self.resume_raw==s.canonical(record),'B_RESUME_RECORD_CHANGED')
         return record
     def resume_b_partial(self):
@@ -415,6 +510,9 @@ class Session:
         self.stopped();semantic=self.evidence(True);self.stopped()
         self.backup=open_private(s.BACKUP+'/clone-results.json')
         candidate=self.candidate(semantic)
+        if self.resume_mode:
+            self.resume_absent=(u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
+            self.resume_guard()
         print(json.dumps(dict(state='STOPPED_PLAN_REQUIRES_SEPARATE_C_APPROVAL',plan_sha256=candidate['plan_sha256'],
                               attempt=candidate['attempt'],site_update=False)),flush=True)
         deadline=time.monotonic()+120
@@ -461,6 +559,9 @@ class Session:
             need(active==json.dumps(dict(attempt=candidate['attempt'],plan_sha256=candidate['plan_sha256']),sort_keys=True).encode(),
                  'EXISTING_SAME_ATTEMPT_REQUIRED')
             raw(u.JOURNAL_PARENT+'/'+candidate['attempt']+'/checkpoint.json')
+        if self.resume_mode:
+            self.resume_absent=()
+            self.resume_guard()
         self.journal=u.Journal(self.parent,candidate,lease_fd=self.lease,handoff_binding=binding)
         h=VerifiedHandoff(self,proof,self.journal)
         transport=u.OriginalTransport(h.bindings,c.BoundHttpsHealth(self.journal,h.bindings))
@@ -471,11 +572,12 @@ class Session:
         return update.run_stopped()
     def recover(self):
         proof,_=document(PROOF)
-        self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_mode=False
-        self.b,self.braw=document(self.b_path);self.approved_stamp=self.b['carrier_manifest_sha256'];self.freeze=raw(self.freeze_path,16384)
+        need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
+        if not self.configure_resumed_recovery(proof):
+            self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_mode=False
+            self.b,self.braw=document(self.b_path);self.approved_stamp=self.b['carrier_manifest_sha256'];self.freeze=raw(self.freeze_path,16384)
         self.backup=open_private(s.BACKUP+'/clone-results.json')
         # No B rerun, no new plan, no automatic recovery of intents/UNKNOWN.
-        need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
         self.c_approval(proof['plan'])
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
         return self.consume(proof,True)

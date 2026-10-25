@@ -115,6 +115,9 @@ class WholeEntry(unittest.TestCase):
             self.assertEqual(argv[-1],p.NAME)
             if self.names.get(p.NAME)!=s.OLD_ID:raise u.Hold('ORIGINAL_STOPPED_NAME_REQUIRED')
             return '\n'.join(json.dumps(v) for v in (s.OLD_ID,s.OLD_IMAGE,self.running)).encode()
+        if argv[3:5]==['container','ls']:
+            self.assertEqual(argv[5:],['--all','--format','{{.Names}}'])
+            return '\n'.join(sorted(self.names)).encode()
         self.assertEqual(argv[:4],s.DOCKER+['run']);self.assertEqual(argv[-1],s.CLONE_CODE)
         self.assertIn('none',argv);self.assertIn('--read-only',argv)
         return s.canonical(self.logical)
@@ -649,6 +652,65 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
             plan_sha256='0'*64,issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_APPROVAL,s.canonical(bad))
         with self.assertRaisesRegex(u.Hold,'EXACT_C_APPROVAL_REQUIRED'):q.c_approval(candidate)
+    def test_partial_resume_rejects_incomplete_or_inconsistent_prior_stage_permit(self):
+        intent,old_braw,old_freeze_raw,resume=self.seed_partial_resume()
+        base=dict(format=1,host=p.HOST,stage='snapshot',entry_sha256=h.A_ENTRY_SHA,issued_at=1000,expires_at=1100,
+            all_writers_frozen_evidence_sha256=s.sha(old_freeze_raw),snapshot_manifest_sha256=None)
+        cases=[dict(base,stage='validate-clones'),dict(base,entry_sha256='0'*64),
+               dict(base,all_writers_frozen_evidence_sha256='0'*64),dict(base,snapshot_manifest_sha256='0'*64),
+               dict(base,expires_at=1700)]
+        for n,bad in enumerate(cases):
+            with self.subTest(case=n):
+                self.write(s.PERMIT,s.canonical(bad))
+                bound=dict(resume,old_stage_permit_sha256=s.sha(s.canonical(bad)))
+                self.write(h.B_RESUME_APPROVAL,s.canonical(bound));q=self.fresh_session()
+                with self.assertRaisesRegex(u.Hold,'EXACT_PRIOR_STAGE_PERMIT_REQUIRED'):q.resume_admission()
+        Path(s.PERMIT).unlink()
+    def test_partial_resume_continuously_rechecks_old_reference_and_absence(self):
+        self.seed_partial_resume();q=self.fresh_session();q.resume_admission()
+        old=Path(h.B_APPROVAL).read_bytes();self.write(h.B_APPROVAL,old+b' ')
+        with self.assertRaisesRegex(u.Hold,'B_RESUME_REFERENCE_REPLACED'):q.b_stage('snapshot')
+        self.write(h.B_APPROVAL,old)
+        # A C/journal artifact appearing after admission is not absorbed as a new baseline.
+        self.write(h.C_APPROVAL,b'{}')
+        with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):q.b_stage('snapshot')
+    def test_partial_resume_probe_name_conflict_or_unknown_holds_before_first_write(self):
+        self.seed_partial_resume();q=self.fresh_session()
+        self.names[h.resume_probe_names()[0]]='8'*64
+        with self.assertRaisesRegex(u.Hold,'B_RESUME_PROBE_NAME_CONFLICT'):q.resume_admission()
+        self.assertFalse(Path(h.resume_record_path()).exists())
+        del self.names[h.resume_probe_names()[0]]
+        q.close();q=h.Session();q.acquire();self.addCleanup(q.close)
+        with patch.object(s,'capture',side_effect=s.Hold('COMMAND_UNKNOWN_NO_RETRY')),self.assertRaises(s.Hold):q.resume_admission()
+        self.assertFalse(Path(h.resume_record_path()).exists())
+    def test_partial_resume_known_failure_reopens_new_lock_session_and_recovers_bound_resume_evidence(self):
+        self.seed_partial_resume();q=self.fresh_session();q.resume_b_partial()
+        real=q.candidate
+        def bind(semantic):
+            candidate=real(semantic)
+            approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
+                carrier_manifest_sha256=q.pins(),plan_sha256=candidate['plan_sha256'],
+                issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+            self.write(h.C_APPROVAL,s.canonical(approval));return candidate
+        original=u.Update.replace_and_verify
+        def known(updater):
+            updater.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+                scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+                runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=self.clock)
+            return original(updater)
+        with patch.object(q,'candidate',side_effect=bind),patch.object(u.Update,'replace_and_verify',known),self.assertRaisesRegex(u.Hold,'KNOWN_FAILURE'):
+            q.update()
+        self.assertEqual(q.journal.state['phase'],'KNOWN_FAILURE')
+        q.close();r=h.Session();r.acquire(recover=True);self.addCleanup(r.close)
+        result=r.recover()
+        self.assertEqual(result['phase'],'ROLLED_BACK_PREVIEW_HOLD')
+        self.assertTrue(r.resume_mode)
+        self.assertEqual([x[3] for x in self.calls[-4:]],['stop','rename','rename','start'])
+        # Historical resume evidence remains mandatory in the new lock session.
+        r.close();bad=Path(h.B_APPROVAL).read_bytes();self.write(h.B_APPROVAL,bad+b' ')
+        z=h.Session();z.acquire(recover=True);self.addCleanup(z.close)
+        with self.assertRaisesRegex(u.Hold,'B_RESUME_REFERENCE_REPLACED|B_RESUME_PROOF_BINDING_CHANGED'):z.recover()
+
     def test_builder_exposes_resume_wrapper_without_changing_default_acceptance(self):
         archive,manifest,commands=build.build()
         self.assertIn('resume-b-partial',commands);self.assertIn(b'--resume-b-partial',commands['resume-b-partial'])
