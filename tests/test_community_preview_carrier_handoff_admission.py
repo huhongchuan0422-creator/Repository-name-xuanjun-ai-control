@@ -80,6 +80,10 @@ class HandoffAdmission(unittest.TestCase):
             h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
             self.history_refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
+        for key,name in h.HISTORY_NAMES.items():
+            if key not in self.history_refs:
+                pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
+                self.history_refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),None,None)
 
     def enterContext(self,context):
         obj=context.__enter__();self.addCleanup(context.__exit__,None,None,None);return obj
@@ -431,10 +435,23 @@ class HandoffAdmission(unittest.TestCase):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
+    def test_failed_b_output_appearing_after_handoff_holds(self):
+        self.execute()
+        h.writefile(self.jfd,h.HISTORY_NAMES['snapshot_result'],b'UNEXPECTED_RESULT',self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_ABSENCE_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_ABSENCE_CHANGED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+
     def test_original_evidence_unmodified(self):
         before={key:body for key,(name,body,pfd) in self.history_bodies.items()}
         self.execute()
         for key,(name,body,pfd) in self.history_bodies.items():
             self.assertEqual(h.readfile(pfd,name,self.uid),before[key])
+        for key in h.ABSENT_HISTORY:
+            pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
+            self.assertIsNone(h.childstat(pfd,h.HISTORY_NAMES[key]))
 
 if __name__=='__main__':unittest.main()
