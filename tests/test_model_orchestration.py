@@ -41,6 +41,10 @@ class ProviderHandler(BaseHTTPRequestHandler):
         value=json.loads(self.rfile.read(n).decode('utf-8'));model=value['model']
         if model=='auth':self.send_response(401);self.end_headers();return
         if model=='rate':self.send_response(429);self.end_headers();return
+        if model=='redirect':
+            self.send_response(302);self.send_header('Location',
+              'http://127.0.0.1:%d/v1/chat/completions'%self.server.server_port)
+            self.end_headers();return
         if model=='slow':time.sleep(.2)
         raw=json.dumps({'id':'fixture-'+model,'choices':[{'message':{'content':'ok-'+model}}],
           'usage':{'prompt_tokens':3,'completion_tokens':2,'total_tokens':5}}).encode()
@@ -119,6 +123,17 @@ class ModelOrchestrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'0600'):load_master_key(path)
         os.chmod(path,0o600);self.assertEqual(load_master_key(path),self.master)
 
+    def test_provider_url_rejects_private_https_userinfo_and_query(self):
+        base={'provider_id':'bad','display_name':'bad',
+          'adapter_type':'openai-compatible','enabled':True,
+          'price_state':'UNKNOWN','rate_limit_per_min':1,
+          'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0}
+        for url in ('https://127.0.0.1/api','https://localhost/api',
+                    'https://user:pass@example.com','https://example.com?a=1'):
+            value=dict(base);value['base_url']=url
+            with self.assertRaisesRegex(ValueError,'SAFE_PROVIDER_URL'):
+                self.control.upsert_provider(value,SECRET)
+
     def test_ten_provider_limit_and_tenant_isolation(self):
         for i in range(10):self.provider('p%d'%i)
         with self.assertRaisesRegex(ValueError,'LIMIT_10'):self.provider('p10')
@@ -131,6 +146,14 @@ class ModelOrchestrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'NO_AUTHORIZED'):self.control.assign('demo-b','developer','v1','dev')
         chosen=self.control.assign('demo-b','developer','v1','dev',allow_paid=True)
         self.assertEqual(chosen['reason'],'AUTHORIZED_QUALIFIED_FINAL_COST')
+
+    def test_paid_model_requires_explicit_unit_costs(self):
+        self.provider('paid',price='KNOWN_PAID')
+        with self.assertRaisesRegex(ValueError,'KNOWN_PAID_UNIT_COSTS'):
+            self.control.upsert_model({'provider_id':'paid','model_id':'paid',
+              'capabilities':['code'],'enabled':True,
+              'price_state':'KNOWN_PAID','input_unit_cost':None,
+              'output_unit_cost':None})
 
     def test_free_capable_first_and_self_review_forbidden(self):
         self.provider('paid',price='KNOWN_PAID');self.model('paid','ok','KNOWN_PAID')
@@ -156,6 +179,8 @@ class ModelOrchestrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ProviderError,'AUTH'):adapter.invoke(self.url,SECRET,'auth',[],1)
             with self.assertRaisesRegex(ProviderError,'RATE_LIMIT'):adapter.invoke(self.url,SECRET,'rate',[],1)
             with self.assertRaisesRegex(ProviderError,'TIMEOUT_UNKNOWN'):adapter.invoke(self.url,SECRET,'slow',[],.05)
+            with self.assertRaisesRegex(ProviderError,'HTTP'):
+                adapter.invoke(self.url,SECRET,'redirect',[],1)
 
     def test_persistent_queue_idempotency_success_usage_and_restart(self):
         self.assigned();first=self.control.queue_request('demo-b','developer',[{'role':'user','content':'x'}],'idem-1')
@@ -218,20 +243,72 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.role('acceptor','ACCEPTOR',['code'],False)
         self.control.assign('demo-b','reviewer','v1','qa')
         self.control.assign('demo-b','acceptor','v1','acceptor')
-        submitted=self.control.submit_candidate('demo-b','a'*64,'b'*64,
+        developer=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','developer-1'),self.master)
+        reviewer=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','qa'),self.master)
+        acceptor=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','acceptor'),self.master)
+        submitted=developer.submit_candidate('demo-b','a'*64,'b'*64,
           'developer-1')
         with self.assertRaisesRegex(ValueError,'SELF_REVIEW'):
-            self.control.review_candidate(submitted['candidate_id'],
+            developer.review_candidate(submitted['candidate_id'],
               'developer-1',[],True)
-        changed=self.control.review_candidate(submitted['candidate_id'],'qa',
+        changed=reviewer.review_candidate(submitted['candidate_id'],'qa',
           [{'id':'DEFECT-1'}],False)
         self.assertEqual(changed['state'],'CHANGES_REQUESTED')
         with self.assertRaisesRegex(ValueError,'REVIEW_PASS'):
-            self.control.accept_candidate(submitted['candidate_id'],'acceptor')
-        passed=self.control.review_candidate(submitted['candidate_id'],'qa',[],True)
+            acceptor.accept_candidate(submitted['candidate_id'],'acceptor')
+        with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
+            reviewer.review_candidate(submitted['candidate_id'],'qa',[],True)
+        revised=developer.submit_candidate('demo-b','c'*64,'d'*64,
+          'developer-1')
+        passed=reviewer.review_candidate(revised['candidate_id'],'qa',[],True)
         self.assertEqual(passed['state'],'REVIEW_PASSED')
-        self.assertEqual(self.control.accept_candidate(submitted['candidate_id'],
+        self.assertEqual(acceptor.accept_candidate(revised['candidate_id'],
           'acceptor')['state'],'ACCEPTED')
+        with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
+            reviewer.review_candidate(revised['candidate_id'],'qa',[],False)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          candidate_reviews WHERE candidate_id IN (?,?)''',(submitted['candidate_id'],
+          revised['candidate_id'])).fetchone()[0],2)
+
+    def test_candidate_hash_identity_and_current_attempt_are_enforced(self):
+        self.assigned();developer=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','developer-1'),self.master)
+        with self.assertRaisesRegex(ValueError,'CANONICAL_ARTIFACT'):
+            developer.submit_candidate('demo-b','z'*64,'b'*64,'developer-1')
+        self.supervisor.db.execute("""UPDATE tasks SET authority_state='REVOKED'
+          WHERE task_id='demo-b'""");self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE'):
+            developer.submit_candidate('demo-b','a'*64,'b'*64,'developer-1')
+
+    def test_same_principal_cannot_hold_executor_and_acceptor_roles(self):
+        self.assigned();self.role('acceptor','ACCEPTOR',['code'],False)
+        with self.assertRaisesRegex(ValueError,'SELF_APPROVAL'):
+            self.control.assign('demo-b','acceptor','v1','developer-1')
+
+    def test_cross_task_idempotency_conflict_and_late_worker_result_rejected(self):
+        self.assigned();self.control.queue_request('demo-b','developer',[],
+          'shared-key')
+        with self.assertRaisesRegex(ValueError,'IDEMPOTENCY_CONFLICT'):
+            self.control.queue_request('demo-b','developer',
+              [{'role':'user','content':'different'}],'shared-key')
+        queued=self.control.queue_request('demo-b','developer',[],'late')
+        scheduler=ModelScheduler(self.control,worker_id='old-worker')
+        row=self.supervisor.db.execute('''SELECT r.*,p.price_state AS
+          provider_price,m.price_state AS model_price,m.input_unit_cost,
+          m.output_unit_cost FROM model_requests r JOIN model_providers p ON
+          p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id JOIN
+          model_catalog m ON m.tenant_id=r.tenant_id AND m.provider_id=r.provider_id
+          AND m.model_id=r.model_id WHERE r.request_id=?''',(queued['request_id'],)).fetchone()
+        self.supervisor.db.execute('''UPDATE model_requests SET state='UNKNOWN',
+          lease_owner=NULL WHERE request_id=?''',(queued['request_id'],));self.supervisor.db.commit()
+        self.assertFalse(scheduler._finish(row,'SUCCEEDED',None,
+          {'usage':{'input_tokens':1,'output_tokens':1}},time.time()))
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],
+          'UNKNOWN')
 
     def test_scheduler_runtime_once_continues_without_browser(self):
         self.assigned();self.control.queue_request('demo-b','developer',[],

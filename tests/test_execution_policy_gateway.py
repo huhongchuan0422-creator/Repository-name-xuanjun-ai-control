@@ -45,8 +45,9 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           'existing-source' if outcome=='FOUND' else None,
           'asset-v1' if outcome=='FOUND' else None,False,'reuse checked',
           'preflight-evidence')
-        now=time.time();self.policy.add_authorization('auth-1',source,
-          ['WRITE_SOURCE'],read_only,now-1,valid_until or now+600,'auth-evidence')
+        now=time.time();self.policy.add_authorization('auth-1','demo-b',
+          'asset-v1','test-writer-attempt-b',source,['WRITE_SOURCE'],
+          read_only,now-1,valid_until or now+600,'auth-evidence')
 
     def action(self,**changes):
         value={'task_id':'demo-b','asset_version':'asset-v1',
@@ -93,8 +94,10 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.policy.record_unit(self.unit)
         self.policy.record_preflight('demo-b',['registry'],'UNKNOWN',None,None,
           False,'unknown','evidence')
-        now=time.time();self.policy.add_authorization('auth-1','CURRENT_TEST_ONLY',
-          ['WRITE_SOURCE'],False,now-1,now+60,'evidence')
+        now=time.time();self.policy.add_authorization('auth-1','demo-b',
+          'asset-v1','test-writer-attempt-b','CURRENT_TEST_ONLY',
+          ['WRITE_SOURCE'],False,
+          now-1,now+60,'evidence')
         with self.assertRaisesRegex(ValueError,'UNKNOWN_ASSET'):
             self.policy.request_action(self.action())
 
@@ -111,12 +114,37 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
             self.policy.request_action(self.action(scope='DEPLOY'))
         self.policy.propose_change('change-1','demo-b','asset-v1',['DEPLOY'],
           'owner requested')
-        with self.assertRaisesRegex(ValueError,'INDEPENDENT_CHANGE'):
-            self.policy.review_change('change-1','admin:owner',True,'review')
-        self.policy.review_change('change-1','independent-reviewer',True,'review')
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','independent-reviewer'))
+        with self.assertRaisesRegex(ValueError,'AUTHENTICATED_CHANGE'):
+            reviewer.review_change('change-1','spoofed',True,'review')
+        reviewer.review_change('change-1','independent-reviewer',True,'review')
         admitted=self.policy.request_action(self.action(scope='DEPLOY',
           change_id='change-1'))
         self.assertEqual(admitted['state'],'ADMITTED_TEST_ONLY')
+
+    def test_preflight_change_and_authorization_bind_exact_asset_generation(self):
+        self.prepare()
+        self.supervisor.db.execute("""UPDATE asset_preflight_checks SET
+          reused_version='asset-v0'""");self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'PREFLIGHT_ASSET_VERSION'):
+            self.policy.request_action(self.action())
+        self.supervisor.db.execute("""UPDATE asset_preflight_checks SET
+          reused_version='asset-v1'""")
+        self.supervisor.db.execute("""UPDATE action_authorizations SET
+          attempt_id='stale-attempt'""");self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'AUTHORIZATION_BINDING'):
+            self.policy.request_action(self.action())
+
+    def test_scope_change_wrong_base_version_never_authorizes(self):
+        self.prepare();self.policy.propose_change('wrong-base','demo-b',
+          'asset-v0',['DEPLOY'],'wrong base')
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','independent-reviewer'))
+        reviewer.review_change('wrong-base','independent-reviewer',True,'review')
+        with self.assertRaisesRegex(ValueError,'CHANGE_BASE_ASSET_VERSION'):
+            self.policy.request_action(self.action(scope='DEPLOY',
+              change_id='wrong-base'))
 
     def test_duplicate_and_restart_are_idempotent_not_reexecuted(self):
         self.prepare();first=self.policy.request_action(self.action())

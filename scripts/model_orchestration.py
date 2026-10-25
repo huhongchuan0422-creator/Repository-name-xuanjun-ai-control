@@ -11,12 +11,14 @@ import json
 import math
 import sqlite3
 import time
+import ipaddress
+from urllib.parse import urlparse
 import urllib.error
 import urllib.request
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from reusable_task_gateway import _text
+from reusable_task_gateway import _text, _sha
 from task_supervisor import UNKNOWN, canonical
 
 
@@ -34,9 +36,12 @@ def _number(value, name, minimum=0):
 
 
 def load_master_key(path):
-    import os
-    stat = os.stat(path)
-    if stat.st_mode & 0o077:
+    import os, stat as stat_module
+    info = os.lstat(path)
+    if (not stat_module.S_ISREG(info.st_mode) or info.st_nlink!=1 or
+            info.st_uid!=os.getuid()):
+        raise ValueError('OWNED_REGULAR_MASTER_KEY_FILE_REQUIRED')
+    if info.st_mode & 0o077:
         raise ValueError('MASTER_KEY_FILE_MODE_0600_REQUIRED')
     with open(path, 'rb') as stream:
         raw = stream.read().strip()
@@ -59,9 +64,29 @@ class OpenAICompatibleAdapter(object):
     adapter_type = 'openai-compatible'
 
     def __init__(self, opener=None):
-        self.opener = opener or urllib.request.urlopen
+        if opener is None:
+            class NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, req, fp, code, msg, headers,
+                                     newurl):
+                    return None
+            self.opener = urllib.request.build_opener(NoRedirect()).open
+        else:
+            self.opener = opener
 
     def invoke(self, base_url, secret, model_id, messages, timeout):
+        parsed=urlparse(base_url)
+        if parsed.scheme=='https':
+            import socket
+            try:addresses=socket.getaddrinfo(parsed.hostname,parsed.port or 443,
+              type=socket.SOCK_STREAM)
+            except OSError as exc:
+                raise ProviderError('DNS',type(exc).__name__,False)
+            for item in addresses:
+                address=ipaddress.ip_address(item[4][0])
+                if (address.is_private or address.is_loopback or
+                        address.is_link_local or address.is_multicast or
+                        address.is_reserved or address.is_unspecified):
+                    raise ProviderError('UNSAFE_DESTINATION','PRIVATE_DNS_RESULT',False)
         url = base_url.rstrip('/') + '/v1/chat/completions'
         body = canonical({'model': model_id, 'messages': messages,
                           'stream': False}).encode('utf-8')
@@ -88,7 +113,10 @@ class OpenAICompatibleAdapter(object):
         except ProviderError:
             raise
         except Exception as exc:
-            raise ProviderError('TRANSPORT', type(exc).__name__, True)
+            # A POST may already have reached the provider.  Connection reset,
+            # wrapped timeouts and malformed replies are therefore UNKNOWN,
+            # never safe automatic retries.
+            raise ProviderError('TRANSPORT_UNKNOWN', type(exc).__name__, False)
         try:
             content = value['choices'][0]['message']['content']
             usage = value.get('usage') or {}
@@ -183,6 +211,12 @@ class ModelControl(object):
               input_tokens INTEGER NOT NULL,output_tokens INTEGER NOT NULL,
               cost_state TEXT NOT NULL,cost_value REAL,outcome TEXT NOT NULL,
               observed_at REAL NOT NULL,PRIMARY KEY(tenant_id,request_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_call_attempts(
+              tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
+              attempt_number INTEGER NOT NULL,provider_id TEXT NOT NULL,
+              model_id TEXT NOT NULL,worker_id TEXT NOT NULL,
+              started_at REAL NOT NULL,PRIMARY KEY(tenant_id,request_id,
+              attempt_number))''',
             '''CREATE TABLE IF NOT EXISTS model_audit(
               audit_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,
               principal_id TEXT NOT NULL,action TEXT NOT NULL,target_id TEXT NOT NULL,
@@ -209,6 +243,12 @@ class ModelControl(object):
               state TEXT NOT NULL,findings_json TEXT NOT NULL,
               created_at REAL NOT NULL,updated_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,candidate_id))''',
+            '''CREATE TABLE IF NOT EXISTS candidate_reviews(
+              tenant_id TEXT NOT NULL,candidate_id TEXT NOT NULL,
+              review_id TEXT NOT NULL,reviewer TEXT NOT NULL,
+              decision TEXT NOT NULL,findings_json TEXT NOT NULL,
+              observed_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,candidate_id,review_id))''',
             '''CREATE TABLE IF NOT EXISTS module_settings(
               tenant_id TEXT NOT NULL,module_id TEXT NOT NULL,
               enabled INTEGER NOT NULL,version TEXT NOT NULL,
@@ -234,9 +274,14 @@ class ModelControl(object):
         return principal
 
     def _audit(self, principal, action, target, detail, now):
-        safe = dict(detail)
-        for forbidden in ('secret', 'api_key', 'token', 'secret_cipher'):
-            safe.pop(forbidden, None)
+        forbidden=('secret','api_key','token','secret_cipher','authorization')
+        def redact(value):
+            if isinstance(value,dict):
+                return {key:redact(item) for key,item in value.items()
+                        if not any(mark in key.lower() for mark in forbidden)}
+            if isinstance(value,list):return [redact(item) for item in value]
+            return value
+        safe = redact(dict(detail))
         seed = canonical({'tenant': self.tenant_id, 'principal': principal,
                           'action': action, 'target': target, 'at': now,
                           'detail': safe})
@@ -264,7 +309,22 @@ class ModelControl(object):
             if type(value[name]) is not int or value[name] < (0 if name=='retry_limit' else 1):
                 raise ValueError('VALID_%s_REQUIRED' % name.upper())
         _number(value['timeout_seconds'], 'timeout_seconds', 0.05)
-        if not value['base_url'].startswith(('http://127.0.0.1:', 'http://localhost:', 'https://')):
+        parsed=urlparse(value['base_url'])
+        hostname=(parsed.hostname or '').lower()
+        loopback_http=(parsed.scheme=='http' and hostname in
+                       ('127.0.0.1','localhost'))
+        safe_https=(parsed.scheme=='https' and hostname not in
+                    ('localhost','127.0.0.1','::1') and '.' in hostname and
+                    not hostname.endswith(('.local','.internal')))
+        try:
+            address=ipaddress.ip_address(hostname)
+            if address.is_private or address.is_loopback or address.is_link_local:
+                safe_https=False
+        except ValueError:
+            pass
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError('SAFE_PROVIDER_URL_REQUIRED')
+        if not (loopback_http or safe_https):
             raise ValueError('SAFE_PROVIDER_URL_REQUIRED')
         existing = self.db.execute('''SELECT * FROM model_providers
           WHERE tenant_id=? AND provider_id=?''',
@@ -346,6 +406,10 @@ class ModelControl(object):
             if value[key] is not None:_number(value[key],key)
         if value['price_state']==UNKNOWN and (value['input_unit_cost'] is not None or value['output_unit_cost'] is not None):
             raise ValueError('UNKNOWN_PRICE_MUST_NOT_HAVE_COST')
+        if value['price_state']=='KNOWN_PAID' and (
+                value['input_unit_cost'] is None or
+                value['output_unit_cost'] is None):
+            raise ValueError('KNOWN_PAID_UNIT_COSTS_REQUIRED')
         self.db.execute('''INSERT OR REPLACE INTO model_catalog VALUES
           (?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(value['provider_id'],'provider_id'),
           _text(value['model_id'],'model_id'),canonical(sorted(set(value['capabilities']))),
@@ -369,8 +433,9 @@ class ModelControl(object):
     def bind_skill(self, role_id, role_version, skill_id, skill_version,
                    review_sha256, status):
         self._admin()
-        if status!='APPROVED' or len(review_sha256)!=64:
+        if status!='APPROVED':
             raise ValueError('APPROVED_SKILL_REVIEW_REQUIRED')
+        _sha(review_sha256,'review_sha256')
         self.db.execute('INSERT INTO role_skill_bindings VALUES (?,?,?,?,?,?,?)',
           (self.tenant_id,role_id,role_version,skill_id,skill_version,
            review_sha256,status));self.db.commit()
@@ -385,13 +450,16 @@ class ModelControl(object):
           AND role_id=? AND version=? AND enabled=1''',
           (self.tenant_id,role_id,role_version)).fetchone()
         if role is None:raise ValueError('ACTIVE_ROLE_REQUIRED')
-        if role['phase'] in ('REVIEWER','ACCEPTOR'):
-            executor=self.db.execute('''SELECT principal_id FROM model_assignments
-              WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id IN
-              (SELECT role_id FROM role_templates WHERE tenant_id=? AND phase='EXECUTOR')''',
-              (self.tenant_id,task_id,task['attempt_id'],self.tenant_id)).fetchone()
-            if executor and executor['principal_id']==principal_id:
-                raise ValueError('SELF_APPROVAL_FORBIDDEN')
+        held={r['phase'] for r in self.db.execute('''SELECT rt.phase FROM
+          model_assignments a JOIN role_templates rt ON rt.tenant_id=a.tenant_id
+          AND rt.role_id=a.role_id AND rt.version=a.role_version WHERE
+          a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND
+          a.principal_id=?''',(self.tenant_id,task_id,task['attempt_id'],
+          principal_id))}
+        if ((role['phase']=='EXECUTOR' and held.intersection({'REVIEWER','ACCEPTOR'}))
+                or (role['phase'] in ('REVIEWER','ACCEPTOR') and
+                    'EXECUTOR' in held)):
+            raise ValueError('SELF_APPROVAL_FORBIDDEN')
         capabilities=set(json.loads(role['capabilities_json']))
         candidates=[]
         for row in self.db.execute('''SELECT p.provider_id,p.price_state AS
@@ -427,6 +495,9 @@ class ModelControl(object):
           chosen['provider_id'],chosen['model_id'],'ASSIGNED',
           'QUALIFIED_FREE_FINAL_COST' if chosen['effective_price']=='KNOWN_FREE'
           else 'AUTHORIZED_QUALIFIED_FINAL_COST',now))
+        self._audit(self._principal(),'ROLE_ASSIGNED',task_id,
+          {'role_id':role_id,'role_version':role_version,
+           'principal_id':principal_id,'attempt_id':task['attempt_id']},now)
         self.db.commit();return dict(provider_id=chosen['provider_id'],
           model_id=chosen['model_id'],reason='QUALIFIED_FREE_FINAL_COST' if
           chosen['effective_price']=='KNOWN_FREE' else
@@ -442,12 +513,21 @@ class ModelControl(object):
           (self.tenant_id,task_id,task['attempt_id'],role_id)).fetchone()
         if assignment is None:raise ValueError('MODEL_ASSIGNMENT_REQUIRED')
         payload={'messages':messages};body=canonical(payload);digest=hashlib.sha256(body.encode()).hexdigest()
-        request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,'idempotency':idempotency_key}).encode()).hexdigest()
-        existing=self.db.execute('''SELECT payload_sha256,state FROM model_requests
+        identity={'tenant':self.tenant_id,'task':task_id,
+          'attempt':task['attempt_id'],'role':role_id,
+          'provider':assignment['provider_id'],'model':assignment['model_id'],
+          'idempotency':idempotency_key}
+        request_id=hashlib.sha256(canonical(identity).encode()).hexdigest()
+        existing=self.db.execute('''SELECT * FROM model_requests
           WHERE tenant_id=? AND idempotency_key=?''',(self.tenant_id,idempotency_key)).fetchone()
         if existing:
-            if existing['payload_sha256']!=digest:raise ValueError('IDEMPOTENCY_CONFLICT')
-            return {'request_id':request_id,'state':existing['state'],'duplicate':True}
+            actual=(existing['task_id'],existing['attempt_id'],existing['role_id'],
+              existing['provider_id'],existing['model_id'],existing['payload_sha256'])
+            expected=(task_id,task['attempt_id'],role_id,
+              assignment['provider_id'],assignment['model_id'],digest)
+            if actual!=expected:raise ValueError('IDEMPOTENCY_CONFLICT')
+            return {'request_id':existing['request_id'],'state':existing['state'],
+                    'duplicate':True}
         checkpoint=canonical({'goal':'execute assigned role','input_version':
           task.get('spec_sha256',UNKNOWN),'done':[],'pending':['MODEL_RESULT'],
           'evidence':[]})
@@ -547,9 +627,13 @@ class ModelControl(object):
                          submitted_by, now=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
-        if any(len(x)!=64 for x in (artifact_sha256,checklist_sha256)):
-            raise ValueError('CANDIDATE_SHA256_REQUIRED')
+        if submitted_by!=self._principal():
+            raise ValueError('AUTHENTICATED_EXECUTOR_REQUIRED')
+        _sha(artifact_sha256,'artifact_sha256')
+        _sha(checklist_sha256,'checklist_sha256')
         task=self.gateway.supervisor._task(task_id)
+        if task['authority_state']!='VALID' or task['state']!='STARTED':
+            raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
           AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
@@ -561,7 +645,10 @@ class ModelControl(object):
         self.db.execute('''INSERT INTO delivery_candidates VALUES
           (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,task_id,
           task['attempt_id'],artifact_sha256,checklist_sha256,submitted_by,None,
-          None,'SUBMITTED',canonical([]),now,now));self.db.commit()
+          None,'SUBMITTED',canonical([]),now,now))
+        self._audit(submitted_by,'CANDIDATE_SUBMITTED',candidate_id,
+          {'task_id':task_id,'attempt_id':task['attempt_id'],
+           'artifact_sha256':artifact_sha256},now);self.db.commit()
         return {'candidate_id':candidate_id,'state':'SUBMITTED'}
 
     def review_candidate(self, candidate_id, reviewer, findings, passed,
@@ -570,6 +657,14 @@ class ModelControl(object):
         row=self.db.execute('''SELECT * FROM delivery_candidates WHERE
           tenant_id=? AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
+        task=self.gateway.supervisor._task(row['task_id'])
+        if (task['attempt_id']!=row['attempt_id'] or
+                task['authority_state']!='VALID' or task['state']!='STARTED'):
+            raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        if row['state']!='SUBMITTED':
+            raise ValueError('SUBMITTED_CANDIDATE_REQUIRED')
+        if reviewer!=self._principal():
+            raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
         if reviewer==row['submitted_by']:raise ValueError('SELF_REVIEW_FORBIDDEN')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
@@ -579,9 +674,22 @@ class ModelControl(object):
         if assignment is None:raise ValueError('INDEPENDENT_REVIEW_ASSIGNMENT_REQUIRED')
         if not isinstance(findings,list):raise ValueError('FINDINGS_ARRAY_REQUIRED')
         state='REVIEW_PASSED' if passed and not findings else 'CHANGES_REQUESTED'
-        self.db.execute('''UPDATE delivery_candidates SET reviewed_by=?,state=?,
-          findings_json=?,updated_at=? WHERE tenant_id=? AND candidate_id=?''',
-          (reviewer,state,canonical(findings),now,self.tenant_id,candidate_id));self.db.commit()
+        review_body=canonical({'candidate_id':candidate_id,'reviewer':reviewer,
+          'decision':state,'findings':findings,'observed_at':now})
+        review_id=hashlib.sha256(review_body.encode()).hexdigest()
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            changed=self.db.execute('''UPDATE delivery_candidates SET
+              reviewed_by=?,state=?,findings_json=?,updated_at=? WHERE
+              tenant_id=? AND candidate_id=? AND state='SUBMITTED' ''',
+              (reviewer,state,canonical(findings),now,self.tenant_id,
+               candidate_id)).rowcount
+            if changed!=1:raise ValueError('SUBMITTED_CANDIDATE_REQUIRED')
+            self.db.execute('''INSERT INTO candidate_reviews VALUES
+              (?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,review_id,
+              reviewer,state,canonical(findings),now))
+            self._audit(reviewer,'CANDIDATE_REVIEWED',candidate_id,
+              {'decision':state,'finding_count':len(findings)},now)
         return {'candidate_id':candidate_id,'state':state,
                 'finding_count':len(findings)}
 
@@ -590,6 +698,12 @@ class ModelControl(object):
         row=self.db.execute('''SELECT * FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
+        task=self.gateway.supervisor._task(row['task_id'])
+        if (task['attempt_id']!=row['attempt_id'] or
+                task['authority_state']!='VALID' or task['state']!='STARTED'):
+            raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        if acceptor!=self._principal():
+            raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
         if acceptor in (row['submitted_by'],row['reviewed_by']):
             raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
@@ -599,9 +713,14 @@ class ModelControl(object):
           a.attempt_id=? AND a.principal_id=? AND r.phase='ACCEPTOR' ''',
           (self.tenant_id,row['task_id'],row['attempt_id'],acceptor)).fetchone()
         if assignment is None:raise ValueError('ACCEPTOR_ASSIGNMENT_REQUIRED')
-        self.db.execute('''UPDATE delivery_candidates SET accepted_by=?,state=
-          'ACCEPTED',updated_at=? WHERE tenant_id=? AND candidate_id=?''',
-          (acceptor,now,self.tenant_id,candidate_id));self.db.commit()
+        changed=self.db.execute('''UPDATE delivery_candidates SET accepted_by=?,
+          state='ACCEPTED',updated_at=? WHERE tenant_id=? AND candidate_id=?
+          AND state='REVIEW_PASSED' ''',(acceptor,now,self.tenant_id,
+          candidate_id)).rowcount;self.db.commit()
+        if changed!=1:raise ValueError('REVIEW_PASS_REQUIRED')
+        self._audit(acceptor,'CANDIDATE_ACCEPTED',candidate_id,
+          {'task_id':row['task_id'],'attempt_id':row['attempt_id']},now)
+        self.db.commit()
         return {'candidate_id':candidate_id,'state':'ACCEPTED'}
 
     def set_module(self,module_id,version,enabled,now=None):
@@ -656,6 +775,10 @@ class ModelControl(object):
           reviewed_by,accepted_by,state,findings_json,created_at,updated_at FROM
           delivery_candidates WHERE tenant_id=? ORDER BY created_at,candidate_id''',
           (self.tenant_id,))],
+          'candidate_reviews':[dict(x) for x in self.db.execute('''SELECT
+          candidate_id,review_id,reviewer,decision,findings_json,observed_at
+          FROM candidate_reviews WHERE tenant_id=? ORDER BY observed_at,
+          review_id''',(self.tenant_id,))],
           'modules':[dict(x) for x in self.db.execute('''SELECT module_id,
           enabled,version,updated_at FROM module_settings WHERE tenant_id=?
           ORDER BY module_id''',(self.tenant_id,))],
@@ -698,25 +821,35 @@ class ModelScheduler(object):
         if row is None:return {'state':'IDLE'}
         task=self.control.gateway.supervisor._task(row['task_id'])
         if task['attempt_id']!=row['attempt_id'] or task['authority_state']!='VALID':
-            self._finish(row,'CANCELLED','STALE_OR_UNAUTHORIZED',None,now)
+            self.db.execute('''UPDATE model_requests SET state='CANCELLED',
+              error_kind='STALE_OR_UNAUTHORIZED',updated_at=? WHERE tenant_id=?
+              AND request_id=? AND state IN ('QUEUED','RETRY_WAIT')''',
+              (now,row['tenant_id'],row['request_id']));self.db.commit()
             return {'request_id':row['request_id'],'state':'CANCELLED'}
         if row['circuit_state']=='OPEN' and (row['next_probe_at'] is None or row['next_probe_at']>now):
             return {'request_id':row['request_id'],'state':'CIRCUIT_OPEN'}
-        recent=self.db.execute('''SELECT COUNT(*) FROM model_usage_events WHERE
-          tenant_id=? AND provider_id=? AND observed_at>?''',
-          (row['tenant_id'],row['provider_id'],now-60)).fetchone()[0]
-        running=self.db.execute('''SELECT COUNT(*) FROM model_requests WHERE
-          tenant_id=? AND provider_id=? AND state='RUNNING' ''',
-          (row['tenant_id'],row['provider_id'])).fetchone()[0]
-        if recent>=row['rate_limit_per_min'] or running>=row['concurrency_limit']:
-            return {'request_id':row['request_id'],'state':'QUEUED_LIMIT'}
-        changed=self.db.execute('''UPDATE model_requests SET state='RUNNING',
-          attempts=attempts+1,lease_owner=?,lease_until=?,last_heartbeat=?,
-          updated_at=? WHERE tenant_id=? AND request_id=?
-          AND state IN ('QUEUED','RETRY_WAIT')''',(self.worker_id,
-          now+row['timeout_seconds']+5,now,now,row['tenant_id'],
-          row['request_id'])).rowcount
-        self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            recent=self.db.execute('''SELECT COUNT(*) FROM model_call_attempts
+              WHERE tenant_id=? AND provider_id=? AND started_at>?''',
+              (row['tenant_id'],row['provider_id'],now-60)).fetchone()[0]
+            running=self.db.execute('''SELECT COUNT(*) FROM model_requests WHERE
+              tenant_id=? AND provider_id=? AND state='RUNNING' ''',
+              (row['tenant_id'],row['provider_id'])).fetchone()[0]
+            if (recent>=row['rate_limit_per_min'] or
+                    running>=row['concurrency_limit']):
+                return {'request_id':row['request_id'],'state':'QUEUED_LIMIT'}
+            changed=self.db.execute('''UPDATE model_requests SET state='RUNNING',
+              attempts=attempts+1,lease_owner=?,lease_until=?,last_heartbeat=?,
+              updated_at=? WHERE tenant_id=? AND request_id=?
+              AND state IN ('QUEUED','RETRY_WAIT')''',(self.worker_id,
+              now+row['timeout_seconds']+5,now,now,row['tenant_id'],
+              row['request_id'])).rowcount
+            if changed==1:
+                self.db.execute('''INSERT INTO model_call_attempts VALUES
+                  (?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
+                  row['attempts']+1,row['provider_id'],row['model_id'],
+                  self.worker_id,now))
         if changed!=1:return {'request_id':row['request_id'],'state':'LOST_RACE'}
         secret=self.control.provider_secret(row['provider_id'])
         payload=json.loads(row['payload_json'])
@@ -726,20 +859,32 @@ class ModelScheduler(object):
                                   payload['messages'],row['timeout_seconds'])
         except ProviderError as exc:
             attempts=row['attempts']+1
-            if exc.kind=='TIMEOUT_UNKNOWN':
-                self._finish(row,UNKNOWN,exc.kind,None,now)
-                return {'request_id':row['request_id'],'state':UNKNOWN,'error':exc.kind}
+            if exc.kind in ('TIMEOUT_UNKNOWN','TRANSPORT_UNKNOWN'):
+                stored=self._finish(row,UNKNOWN,exc.kind,None,now)
+                return {'request_id':row['request_id'],'state':UNKNOWN,
+                        'error':exc.kind if stored else 'LATE_WORKER_RESULT_REJECTED'}
             if exc.retryable and attempts<=row['retry_limit']:
-                self.db.execute('''UPDATE model_requests SET state='RETRY_WAIT',
+                changed=self.db.execute('''UPDATE model_requests SET state='RETRY_WAIT',
                   error_kind=?,next_attempt_at=?,lease_owner=NULL,
                   lease_until=NULL,updated_at=? WHERE tenant_id=?
-                  AND request_id=?''',(exc.kind,now+min(60,2**attempts),now,
-                  row['tenant_id'],row['request_id']));self.db.commit()
+                  AND request_id=? AND state='RUNNING' AND lease_owner=?
+                  AND attempts=?''',
+                  (exc.kind,now+min(60,2**attempts),now,
+                  row['tenant_id'],row['request_id'],self.worker_id,
+                  row['attempts']+1)).rowcount
+                self.db.commit()
+                if changed!=1:
+                    return {'request_id':row['request_id'],'state':UNKNOWN,
+                            'error':'LATE_WORKER_RESULT_REJECTED'}
                 return {'request_id':row['request_id'],'state':'RETRY_WAIT','error':exc.kind}
-            self._finish(row,'FAILED',exc.kind,None,now)
-            return {'request_id':row['request_id'],'state':'FAILED','error':exc.kind}
-        self._finish(row,'SUCCEEDED',None,result,now)
-        return {'request_id':row['request_id'],'state':'SUCCEEDED'}
+            stored=self._finish(row,'FAILED',exc.kind,None,now)
+            return {'request_id':row['request_id'],
+                    'state':'FAILED' if stored else UNKNOWN,
+                    'error':exc.kind if stored else 'LATE_WORKER_RESULT_REJECTED'}
+        stored=self._finish(row,'SUCCEEDED',None,result,now)
+        return {'request_id':row['request_id'],
+                'state':'SUCCEEDED' if stored else UNKNOWN,
+                'error':None if stored else 'LATE_WORKER_RESULT_REJECTED'}
 
     def _finish(self,row,state,error,result,now):
         usage=(result or {}).get('usage',{})
@@ -747,18 +892,25 @@ class ModelScheduler(object):
         if UNKNOWN in prices:
             cost_state=UNKNOWN;cost_value=None
         elif 'KNOWN_PAID' in prices:
-            cost_state='KNOWN'
-            cost_value=(usage.get('input_tokens',0) * (row['input_unit_cost'] or 0) +
-                        usage.get('output_tokens',0) * (row['output_unit_cost'] or 0))
+            if row['input_unit_cost'] is None or row['output_unit_cost'] is None:
+                cost_state=UNKNOWN;cost_value=None
+            else:
+                cost_state='KNOWN'
+                cost_value=(usage.get('input_tokens',0) * row['input_unit_cost'] +
+                            usage.get('output_tokens',0) * row['output_unit_cost'])
         else:
             cost_state='KNOWN_ZERO';cost_value=0
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
-            self.db.execute('''UPDATE model_requests SET state=?,result_json=?,
+            changed=self.db.execute('''UPDATE model_requests SET state=?,result_json=?,
               error_kind=?,lease_owner=NULL,lease_until=NULL,updated_at=?
-              WHERE tenant_id=? AND request_id=?''',
+              WHERE tenant_id=? AND request_id=? AND state='RUNNING' AND
+              lease_owner=? AND attempts=?''',
               (state,canonical(result) if result else None,error,now,
-               row['tenant_id'],row['request_id']))
+               row['tenant_id'],row['request_id'],self.worker_id,
+               row['attempts']+1)).rowcount
+            if changed!=1:
+                return False
             self.db.execute('''INSERT OR REPLACE INTO model_usage_events VALUES
               (?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
                row['provider_id'],row['model_id'],usage.get('input_tokens',0),
@@ -776,3 +928,4 @@ class ModelScheduler(object):
                   next_probe_at=CASE WHEN failure_count+1>=3 THEN ? ELSE
                   next_probe_at END,updated_at=? WHERE tenant_id=? AND
                   provider_id=?''',(now+60,now,row['tenant_id'],row['provider_id']))
+        return True

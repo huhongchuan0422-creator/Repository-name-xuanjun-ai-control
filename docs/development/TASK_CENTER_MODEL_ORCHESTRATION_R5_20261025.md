@@ -21,14 +21,16 @@ python3 - <<'PY'
 from cryptography.fernet import Fernet
 open('/tmp/xuanjun-model.key','wb').write(Fernet.generate_key()+b'\n')
 open('/tmp/xuanjun-admin.token','w').write('replace-with-local-random-test-token\n')
+open('/tmp/xuanjun-actors.json','w').write('{"developer-1":"developer-token-123456","qa-1":"reviewer-token-123456","acceptor-1":"acceptor-token-123456"}\n')
 PY
-chmod 600 /tmp/xuanjun-model.key /tmp/xuanjun-admin.token
+chmod 600 /tmp/xuanjun-model.key /tmp/xuanjun-admin.token /tmp/xuanjun-actors.json
 python3 scripts/task_center_app.py \
   --db /tmp/xuanjun-task-center-r5.sqlite \
   --test-authority-key 0123456789abcdef0123456789abcdef \
   --tenant tenant-r5 --host 127.0.0.1 --port 8765 \
   --model-master-key-file /tmp/xuanjun-model.key \
-  --admin-token-file /tmp/xuanjun-admin.token
+  --admin-token-file /tmp/xuanjun-admin.token \
+  --actor-token-file /tmp/xuanjun-actors.json
 ```
 
 浏览 `http://127.0.0.1:8765/` 查看七板块投影；`/admin.html` 是管理后台。
@@ -72,7 +74,8 @@ python3 scripts/model_scheduler_runtime.py \
   Worker lease、心跳、checkpoint、取消请求、结果和错误。
 - 页面关闭不影响独立 scheduler；重启读取同库。到期的 `RUNNING` 被收敛为
   `UNKNOWN/WORKER_LOST_SIDE_EFFECT_UNKNOWN`，不会自动换模型重复有副作用调用。
-- 429 和可重试传输错误仅在配置上限内退避；并发、每分钟限速和三次失败熔断
+- 只有明确 429 在配置上限内退避；超时、断连和其他已可能送达的传输异常均进入
+  `UNKNOWN` 对账，不自动重放。并发、每分钟真实调用尝试限速和三次失败熔断
   在服务端生效。撤销当前任务权限或停用 Provider 后不再发起新调用。
 
 ### 项目、执行门禁与审核闭环
@@ -82,12 +85,15 @@ python3 scripts/model_scheduler_runtime.py \
 - `ExecutionPolicyGateway` 要求资产/能力预检。`UNKNOWN` 不能解释为不存在，也不能
   据此新建资产或通道。
 - 历史能力、只读连接和当前写授权分开；只有未过期的
-  `CURRENT_TEST_ONLY` 写授权可让动作申请进入 `ADMITTED_TEST_ONLY`。进入仍不表示
+  `CURRENT_TEST_ONLY` 写授权，且该授权严格绑定 task、attempt、资产版本和 Writer，
+  才可让动作申请进入 `ADMITTED_TEST_ONLY`。进入仍不表示
   外部动作已执行。
 - 模型只能提出动作申请；服务端重查可信租户、task/attempt、资产版本、动作范围、
   当前授权和唯一 Writer。范围扩大必须绑定独立审核通过的变更单。
-- 候选冻结后，独立 Reviewer 可一次提交缺陷并形成返工状态；Reviewer 通过后，
-  另一个 Acceptor 才能验收。执行者不能自批，所有状态和失败历史留在同库。
+- 候选冻结后，独立 Reviewer 可一次提交缺陷并形成返工状态；返工必须提交不同
+  artifact 的新候选，旧候选和追加审核历史不可覆盖。Reviewer 通过后，另一个
+  Acceptor 才能验收并通过原 Gateway/Fence 安全撤权形成 canonical `SUCCESS`。
+  执行者不能自批，Reviewer/Acceptor 使用独立服务端主体令牌而非请求体自报身份。
 
 ## 只读投影修复
 
@@ -97,7 +103,11 @@ Gateway 的建表/迁移路径。缺库/缺表明确失败。任务/项目 hash 
 执行对称编码和解码，普通、中文、空格与含斜杠 ID 均能往返；非法编码拒绝为
 `invalid` 路由。
 
-## API 操作（均需本地管理员令牌）
+## API 操作与身份
+
+所有入口需要本地管理员令牌；提交、审核、验收和变更审核还必须同时提交由服务端
+0600 映射文件配置的独立主体令牌。主体令牌只保存在当前页面内存，服务端把它映射
+为可信 principal；请求体中的姓名不能替代认证。
 
 `UPSERT_PROVIDER`、`DISABLE_PROVIDER`、`UPSERT_MODEL`、`CREATE_ROLE`、
 `BIND_SKILL`、`REGISTER_BENCHMARK`、`RUN_BENCHMARK`、`CREATE_PROJECT_TASK`、

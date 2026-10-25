@@ -11,6 +11,7 @@ import json
 import os
 import signal
 import sqlite3
+import stat
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -40,7 +41,18 @@ PROJECTION_TABLES = frozenset((
 MODEL_TABLES = frozenset((
     'model_providers', 'model_catalog', 'role_templates', 'model_requests',
     'model_usage_events', 'model_evaluations', 'delivery_candidates',
-    'module_settings', 'task_work_specs'))
+    'candidate_reviews', 'module_settings', 'task_work_specs',
+    'model_call_attempts'))
+
+
+def _read_owned_secret_file(path, label):
+    info=os.lstat(path)
+    if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or
+            info.st_uid!=os.getuid()):
+        raise ValueError('OWNED_REGULAR_%s_FILE_REQUIRED'%label)
+    if info.st_mode & 0o077:
+        raise ValueError('%s_FILE_MODE_0600_REQUIRED'%label)
+    with open(path) as stream:return stream.read()
 
 
 class _ReadOnlySupervisor(object):
@@ -126,7 +138,8 @@ def _json_bytes(value):
 
 
 def build_handler(db_path, authority_key, tenant_id, principal_id,
-                  model_master_key=None, admin_token=None):
+                  model_master_key=None, admin_token=None, actor_tokens=None):
+    actor_tokens = dict(actor_tokens or {})
     class TaskCenterHandler(BaseHTTPRequestHandler):
         server_version = 'XuanjunTaskCenter/1.0-TEST_ONLY'
 
@@ -194,6 +207,16 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 action=value.pop('action')
                 supervisor, control=self._model_control()
                 try:
+                    role_actions={'SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
+                                  'ACCEPT_CANDIDATE','REVIEW_SCOPE_CHANGE'}
+                    actor=None
+                    if action in role_actions:
+                        actor=self._actor_principal()
+                        if actor is None:
+                            raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
+                        control=ModelControl(control.gateway,
+                          control.gateway.tenants.issue(tenant_id,actor),
+                          model_master_key)
                     if action=='UPSERT_PROVIDER':
                         result=control.upsert_provider(value['config'],value.get('secret'))
                     elif action=='DISABLE_PROVIDER':
@@ -270,16 +293,36 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='RUN_SCHEDULER_ONCE':
                         result=ModelScheduler(control).run_once()
                     elif action=='SUBMIT_CANDIDATE':
+                        if value['submitted_by']!=actor:
+                            raise ValueError('AUTHENTICATED_EXECUTOR_REQUIRED')
                         result=control.submit_candidate(value['task_id'],
                           value['artifact_sha256'],value['checklist_sha256'],
                           value['submitted_by'])
                     elif action=='REVIEW_CANDIDATE':
+                        if value['reviewer']!=actor:
+                            raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
                         result=control.review_candidate(value['candidate_id'],
                           value['reviewer'],value['findings'],
                           bool(value['passed']))
                     elif action=='ACCEPT_CANDIDATE':
+                        if value['acceptor']!=actor:
+                            raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
                         result=control.accept_candidate(value['candidate_id'],
                           value['acceptor'])
+                        candidate=control.db.execute('''SELECT * FROM
+                          delivery_candidates WHERE tenant_id=? AND
+                          candidate_id=?''',(control.tenant_id,
+                          value['candidate_id'])).fetchone()
+                        fence=Fence(supervisor,db_path+'.test-only-locks')
+                        try:
+                            task=supervisor._task(candidate['task_id'])
+                            terminal=TestOnlyExecutor(control.gateway,fence,
+                              control.context).complete_success(
+                              candidate['task_id'],candidate['attempt_id'],
+                              candidate['artifact_sha256'],
+                              json.loads(task['completion_json']))
+                        finally:fence.close()
+                        result['canonical_task_state']=terminal['state']
                     elif action=='SET_MODULE':
                         result=control.set_module(value['module_id'],
                           value['version'],bool(value['enabled']))
@@ -292,8 +335,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='ADD_TEST_AUTHORIZATION':
                         result=ExecutionPolicyGateway(control.gateway,
                           control.context).add_authorization(
-                          value['authorization_id'],value['source_kind'],
-                          value['scopes'],bool(value['read_only']),
+                          value['authorization_id'],value['task_id'],
+                          value['asset_version'],value['writer_principal'],
+                          value['source_kind'],value['scopes'],
+                          bool(value['read_only']),
                           value['valid_from'],value['valid_until'],
                           value['evidence_ref'])
                     elif action=='PROPOSE_SCOPE_CHANGE':
@@ -321,6 +366,14 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             return (admin_token is not None and supplied is not None and
                     __import__('hmac').compare_digest(admin_token,supplied))
 
+        def _actor_principal(self):
+            supplied=self.headers.get('X-Test-Actor-Token')
+            if supplied is None:return None
+            for token,actor in actor_tokens.items():
+                if __import__('hmac').compare_digest(token,supplied):
+                    return actor
+            return None
+
         def _model_control(self):
             if model_master_key is None:raise ValueError('MODEL_ADMIN_DISABLED')
             supervisor=Supervisor(db_path)
@@ -334,14 +387,24 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
 def make_server(db_path, authority_key, tenant_id, principal_id,
                 host='127.0.0.1', port=8765, model_master_key=None,
-                admin_token=None):
+                admin_token=None, actor_tokens=None):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
         raise ValueError('CANONICAL_SQLITE_REQUIRED')
+    # Schema initialization is an explicit startup phase.  GET handlers remain
+    # pure read-only and never migrate or create tables.
+    if model_master_key is not None:
+        supervisor=Supervisor(db_path)
+        try:
+            authority=TestTenantAuthority(authority_key)
+            gateway=GatewayKernel(supervisor,authority)
+            ModelControl(gateway,authority.issue(tenant_id,
+              'admin:'+principal_id),model_master_key)
+        finally:supervisor.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
-                            admin_token)
+                            admin_token, actor_tokens)
     return HTTPServer((host, port), handler)
 
 
@@ -355,27 +418,36 @@ def main(argv=None):
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--model-master-key-file')
     parser.add_argument('--admin-token-file')
+    parser.add_argument('--actor-token-file')
     args = parser.parse_args(argv)
     key = args.test_authority_key.encode('utf-8')
     model_key = (load_master_key(args.model_master_key_file)
                  if args.model_master_key_file else None)
     admin_token = None
     if args.admin_token_file:
-        import stat
-        token_stat = os.stat(args.admin_token_file)
-        if token_stat.st_mode & 0o077:
-            raise ValueError('ADMIN_TOKEN_FILE_MODE_0600_REQUIRED')
-        with open(args.admin_token_file) as stream:
-            admin_token = stream.read().strip()
+        admin_token=_read_owned_secret_file(args.admin_token_file,
+          'ADMIN_TOKEN').strip()
         if len(admin_token) < 16:raise ValueError('VALID_ADMIN_TOKEN_REQUIRED')
     if (model_key is None) != (admin_token is None):
         raise ValueError('MODEL_KEY_AND_ADMIN_TOKEN_REQUIRED_TOGETHER')
+    actor_tokens={}
+    if args.actor_token_file:
+        configured=json.loads(_read_owned_secret_file(args.actor_token_file,
+          'ACTOR_TOKEN'))
+        if (not isinstance(configured,dict) or not configured or
+                any(not isinstance(p,str) or not p or not isinstance(t,str)
+                    or len(t)<16 for p,t in configured.items())):
+            raise ValueError('VALID_ACTOR_TOKEN_MAP_REQUIRED')
+        actor_tokens={token:principal for principal,token in configured.items()}
     server = make_server(args.db, key, args.tenant, args.principal,
-                         args.host, args.port, model_key, admin_token)
+                         args.host, args.port, model_key, admin_token,
+                         actor_tokens)
     receipt = {'state': 'STARTED', 'mode': 'TEST_ONLY',
                'url': 'http://%s:%d/' % server.server_address,
                'db': os.path.realpath(args.db), 'tenant_id': args.tenant,
-               'mutation_api': 'DISABLED',
+               'production_mutation_api': 'DISABLED',
+               'test_only_admin_mutation_api': ('ENABLED' if model_key else
+                                                'DISABLED'),
                'model_admin_api': ('TEST_ONLY_ENABLED' if model_key else
                                    'DISABLED'),
                'production_status': 'NOT_IMPLEMENTED'}

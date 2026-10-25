@@ -40,7 +40,9 @@ def main(argv=None):
         while not stopping[0]:
             result=scheduler.run_once();print(json.dumps(result,sort_keys=True),flush=True)
             if args.once:break
-            if result['state']=='IDLE':time.sleep(max(.1,args.poll_seconds))
+            # All outcomes are bounded by the configured poll interval.  In
+            # particular QUEUED_LIMIT/CIRCUIT_OPEN must not busy-loop.
+            time.sleep(max(.1,args.poll_seconds))
     finally:
         supervisor.close()
         print(json.dumps({'state':'STOPPED','mode':'TEST_ONLY'},sort_keys=True),flush=True)

@@ -37,6 +37,8 @@ class ExecutionPolicyGateway(object):
             PRIMARY KEY(tenant_id,task_id,check_id))''',
           '''CREATE TABLE IF NOT EXISTS action_authorizations(
             tenant_id TEXT NOT NULL,authorization_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
+            asset_version TEXT NOT NULL,writer_principal TEXT NOT NULL,
             source_kind TEXT NOT NULL,scopes_json TEXT NOT NULL,
             read_only INTEGER NOT NULL,valid_from REAL NOT NULL,
             valid_until REAL NOT NULL,evidence_ref TEXT NOT NULL,
@@ -57,6 +59,11 @@ class ExecutionPolicyGateway(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             for statement in statements:self.db.execute(statement)
+            columns={row['name'] for row in self.db.execute(
+              'PRAGMA table_info(action_authorizations)')}
+            for name in ('task_id','attempt_id','asset_version','writer_principal'):
+                if name not in columns:
+                    self.db.execute('ALTER TABLE action_authorizations ADD COLUMN %s TEXT'%name)
 
     def record_unit(self,value,now=None):
         required={'task_id','delivery_stage','feature_unit','goal','scope',
@@ -100,10 +107,21 @@ class ExecutionPolicyGateway(object):
           reason,evidence_ref,now));self.db.commit()
         return {'check_id':check_id,'outcome':outcome}
 
-    def add_authorization(self,authorization_id,source_kind,scopes,read_only,
+    def add_authorization(self,authorization_id,task_id,asset_version,
+                          writer_principal,source_kind,scopes,read_only,
                           valid_from,valid_until,evidence_ref):
         principal=self.context['principal_id']
         if not principal.startswith('admin:'):raise ValueError('POLICY_ADMIN_REQUIRED')
+        self.gateway.assert_task_context(self.context,task_id)
+        task=self.gateway.supervisor._task(task_id)
+        if (task['attempt_id'] in (None,UNKNOWN) or
+                task['authority_state']!='VALID' or
+                task['authority_caller_id']!=writer_principal):
+            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
+        unit=self.db.execute('''SELECT asset_version FROM execution_units WHERE
+          tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if unit is None or unit['asset_version']!=asset_version:
+            raise ValueError('ASSET_VERSION_MISMATCH')
         if source_kind not in ('CURRENT_TEST_ONLY','HISTORICAL'):
             raise ValueError('AUTHORIZATION_SOURCE_REQUIRED')
         if not isinstance(scopes,list) or not scopes:raise ValueError('AUTHORIZATION_SCOPES_REQUIRED')
@@ -111,10 +129,15 @@ class ExecutionPolicyGateway(object):
         if not all(type(x) in (int,float) and math.isfinite(x) for x in
                    (valid_from,valid_until)) or valid_until<=valid_from:
             raise ValueError('AUTHORIZATION_WINDOW_REQUIRED')
-        self.db.execute('''INSERT INTO action_authorizations VALUES
-          (?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(authorization_id,
-          'authorization_id'),source_kind,canonical(scopes),int(bool(read_only)),
-          valid_from,valid_until,_text(evidence_ref,'evidence_ref')));self.db.commit()
+        self.db.execute('''INSERT INTO action_authorizations(
+          tenant_id,authorization_id,task_id,attempt_id,asset_version,
+          writer_principal,source_kind,scopes_json,read_only,valid_from,
+          valid_until,evidence_ref) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          self.tenant_id,
+          _text(authorization_id,'authorization_id'),task_id,
+          task['attempt_id'],asset_version,writer_principal,source_kind,
+          canonical(scopes),int(bool(read_only)),valid_from,valid_until,
+          _text(evidence_ref,'evidence_ref')));self.db.commit()
         return {'authorization_id':authorization_id,'source_kind':source_kind}
 
     def propose_change(self,change_id,task_id,base_asset_version,new_scope,
@@ -131,7 +154,13 @@ class ExecutionPolicyGateway(object):
     def review_change(self,change_id,reviewer,approved,evidence_ref,now=None):
         now=self.clock() if now is None else now
         principal=self.context['principal_id']
-        if not principal.startswith('admin:') or reviewer==principal:
+        if reviewer!=principal:
+            raise ValueError('AUTHENTICATED_CHANGE_REVIEWER_REQUIRED')
+        row=self.db.execute('''SELECT c.*,t.authority_caller_id FROM
+          scope_changes c JOIN tasks t ON t.task_id=c.task_id WHERE
+          c.tenant_id=? AND c.change_id=?''',(self.tenant_id,change_id)).fetchone()
+        if row is None:raise KeyError(change_id)
+        if reviewer==row['authority_caller_id']:
             raise ValueError('INDEPENDENT_CHANGE_REVIEW_REQUIRED')
         state='APPROVED' if approved else 'REJECTED'
         changed=self.db.execute('''UPDATE scope_changes SET state=?,reviewed_by=?,
@@ -163,6 +192,9 @@ class ExecutionPolicyGateway(object):
           (self.tenant_id,value['task_id'])).fetchone()
         if preflight is None:raise ValueError('ASSET_PREFLIGHT_REQUIRED')
         if preflight['outcome']==UNKNOWN:raise ValueError('UNKNOWN_ASSET_STATE_HOLD')
+        if (preflight['outcome']=='FOUND' and
+                preflight['reused_version']!=unit['asset_version']):
+            raise ValueError('PREFLIGHT_ASSET_VERSION_MISMATCH')
         allowed=set(json.loads(unit['scope_json']))
         if value['scope'] not in allowed:
             change=self.db.execute('''SELECT * FROM scope_changes WHERE tenant_id=?
@@ -170,11 +202,18 @@ class ExecutionPolicyGateway(object):
               (self.tenant_id,value['change_id'],value['task_id'])).fetchone()
             if change is None or value['scope'] not in json.loads(change['new_scope_json']):
                 raise ValueError('UNAPPROVED_SCOPE_EXPANSION')
+            if change['base_asset_version']!=unit['asset_version']:
+                raise ValueError('CHANGE_BASE_ASSET_VERSION_MISMATCH')
         auth=self.db.execute('''SELECT * FROM action_authorizations WHERE
           tenant_id=? AND authorization_id=?''',(self.tenant_id,
           value['authorization_id'])).fetchone()
         if auth is None or auth['source_kind']!='CURRENT_TEST_ONLY' or auth['read_only']:
             raise ValueError('CURRENT_WRITE_AUTHORIZATION_REQUIRED')
+        if (auth['task_id']!=value['task_id'] or
+                auth['attempt_id']!=task['attempt_id'] or
+                auth['asset_version']!=unit['asset_version'] or
+                auth['writer_principal']!=value['writer_principal']):
+            raise ValueError('AUTHORIZATION_BINDING_MISMATCH')
         if not (auth['valid_from']<=now<auth['valid_until']):
             raise ValueError('CURRENT_AUTHORIZATION_EXPIRED')
         if value['action'] not in json.loads(auth['scopes_json']):

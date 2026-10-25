@@ -10,6 +10,7 @@ import unittest
 import sys
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from urllib.request import Request,urlopen
+from urllib.error import HTTPError
 
 from cryptography.fernet import Fernet
 
@@ -21,6 +22,9 @@ from task_supervisor import Supervisor
 
 KEY=b'0123456789abcdef0123456789abcdef'
 TOKEN='test-admin-token-full-journey'
+ACTORS={'developer-token-123456':'developer-1',
+        'reviewer-token-123456':'qa-1',
+        'acceptor-token-123456':'acceptor-1'}
 
 
 class ThreadServer(socketserver.ThreadingMixIn,HTTPServer):daemon_threads=True
@@ -46,7 +50,8 @@ class FullJourneyTests(unittest.TestCase):
         self.model_thread=threading.Thread(target=self.model.serve_forever)
         self.model_thread.daemon=True;self.model_thread.start()
         self.server=make_server(self.db,KEY,'tenant-journey','owner',port=0,
-          model_master_key=Fernet.generate_key(),admin_token=TOKEN)
+          model_master_key=Fernet.generate_key(),admin_token=TOKEN,
+          actor_tokens=ACTORS)
         self.thread=threading.Thread(target=self.server.serve_forever)
         self.thread.daemon=True;self.thread.start()
         self.base='http://127.0.0.1:%d'%self.server.server_port
@@ -56,11 +61,14 @@ class FullJourneyTests(unittest.TestCase):
         self.model.shutdown();self.model.server_close();self.model_thread.join(2)
         shutil.rmtree(self.root)
 
-    def post(self,value):
+    def post(self,value,actor_token=None):
+        headers={'Content-Type':'application/json','X-Test-Admin-Token':TOKEN}
+        if actor_token:headers['X-Test-Actor-Token']=actor_token
         request=Request(self.base+'/api/admin/model-control',method='POST',
-          data=json.dumps(value).encode('utf-8'),headers={'Content-Type':
-          'application/json','X-Test-Admin-Token':TOKEN})
-        return json.loads(urlopen(request,timeout=3).read().decode('utf-8'))
+          data=json.dumps(value).encode('utf-8'),headers=headers)
+        try:return json.loads(urlopen(request,timeout=3).read().decode('utf-8'))
+        except HTTPError as exc:
+            raise AssertionError(exc.read().decode('utf-8'))
 
     def test_project_to_model_to_independent_review_acceptance(self):
         task={'project_id':'project-journey','task_id':'task-journey',
@@ -106,24 +114,30 @@ class FullJourneyTests(unittest.TestCase):
           'SUCCEEDED')
         candidate=self.post({'action':'SUBMIT_CANDIDATE','task_id':'task-journey',
           'artifact_sha256':'a'*64,'checklist_sha256':'b'*64,
-          'submitted_by':'developer-1'})
+          'submitted_by':'developer-1'},'developer-token-123456')
         changed=self.post({'action':'REVIEW_CANDIDATE','candidate_id':
           candidate['candidate_id'],'reviewer':'qa-1','findings':
-          [{'id':'DEFECT-1'}],'passed':False})
+          [{'id':'DEFECT-1'}],'passed':False},'reviewer-token-123456')
         self.assertEqual(changed['state'],'CHANGES_REQUESTED')
+        revised=self.post({'action':'SUBMIT_CANDIDATE','task_id':'task-journey',
+          'artifact_sha256':'c'*64,'checklist_sha256':'d'*64,
+          'submitted_by':'developer-1'},'developer-token-123456')
         self.assertEqual(self.post({'action':'REVIEW_CANDIDATE','candidate_id':
-          candidate['candidate_id'],'reviewer':'qa-1','findings':[],
-          'passed':True})['state'],'REVIEW_PASSED')
+          revised['candidate_id'],'reviewer':'qa-1','findings':[],
+          'passed':True},'reviewer-token-123456')['state'],'REVIEW_PASSED')
         self.assertEqual(self.post({'action':'ACCEPT_CANDIDATE','candidate_id':
-          candidate['candidate_id'],'acceptor':'acceptor-1'})['state'],'ACCEPTED')
+          revised['candidate_id'],'acceptor':'acceptor-1'},
+          'acceptor-token-123456')['canonical_task_state'],'SUCCESS')
         request=Request(self.base+'/api/admin/model-control',headers={
           'X-Test-Admin-Token':TOKEN})
         projection=json.loads(urlopen(request,timeout=3).read().decode())
         self.assertEqual(projection['requests'][0]['request_id'],
           queued['request_id'])
-        self.assertEqual(projection['candidates'][0]['state'],'ACCEPTED')
+        self.assertIn('ACCEPTED',{x['state'] for x in projection['candidates']})
         live=json.loads(urlopen(self.base+'/api/projection',timeout=3).read().decode())
         self.assertEqual(live['tasks'][0]['project_id'],'project-journey')
+        self.assertEqual(live['tasks'][0]['state'],'SUCCESS')
+        self.assertEqual(live['tasks'][0]['authority_state'],'REVOKED')
 
 
 if __name__=='__main__':unittest.main()
