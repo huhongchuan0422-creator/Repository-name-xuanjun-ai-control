@@ -30,36 +30,44 @@ class HandoffAdmission(unittest.TestCase):
         self.addCleanup(os.close,self.entry)
         self.entry_id=h.ident(os.fstat(self.entry))
         self.parent_id=h.parent_ident(os.fstat(self.parent))
-        old_loader=b'OLD_LOADER'
-        old_meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
+        old_archive_path=os.environ.get('HANDOFF_OLD_ARCHIVE')
+        new_archive_path=os.environ.get('HANDOFF_NEW_ARCHIVE')
+        if old_archive_path and new_archive_path:
+            old_archive=open(old_archive_path,'rb').read()
+            old_manifest=open(os.environ['HANDOFF_OLD_MANIFEST'],'rb').read()
+            new_archive=open(new_archive_path,'rb').read()
+            new_manifest=open(os.environ['HANDOFF_NEW_MANIFEST'],'rb').read()
+            self.old=h.members(old_archive,h.OLD_MANIFEST,h.OLD_ARCHIVE)
+            self.new=h.members(new_archive,h.NEW_MANIFEST,h.NEW_ARCHIVE)
+            if self.old['manifest.json']!=old_manifest or self.new['manifest.json']!=new_manifest:
+                raise AssertionError('OUTER_AND_INNER_MANIFEST_MISMATCH')
+            self.archive=new_archive
+        else:
+            old_loader=b'OLD_LOADER'
+            old_meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
             'install_root':'/opt/xuanjun-community-preview/control-stopped-v1',
             'updates_enabled':False,
             'files':{'loader.py':{'bytes':len(old_loader),'sha256':h.sha(old_loader),
                                  'uid':0,'mode':'0600'}}}
-        self.old={'manifest.json':h.canonical(old_meta),'loader.py':old_loader}
-        self.new={'manifest.json':b'','loader.py':b'NEW_LOADER'}
-        meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
+            self.old={'manifest.json':h.canonical(old_meta),'loader.py':old_loader}
+            self.new={'manifest.json':b'','loader.py':b'NEW_LOADER'}
+            meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
               'install_root':'/opt/xuanjun-community-preview/control-stopped-v1',
               'updates_enabled':False,
               'files':{'loader.py':{'bytes':len(self.new['loader.py']),
                                    'sha256':h.sha(self.new['loader.py']),'uid':0,'mode':'0600'}}}
-        self.new['manifest.json']=h.canonical(meta)
-        data=io.BytesIO()
-        with zipfile.ZipFile(data,'w',zipfile.ZIP_DEFLATED) as z:
-            for key,body in self.new.items():
-                info=zipfile.ZipInfo(key);info.create_system=3
-                info.external_attr=0o100600<<16;info.compress_type=zipfile.ZIP_DEFLATED
-                z.writestr(info,body)
-        self.archive=data.getvalue()
-        self.stack=self.enterContext(patch.multiple(h,OLD_MANIFEST=h.sha(self.old['manifest.json']),
-                                                      NEW_MANIFEST=h.sha(self.new['manifest.json']),
-                                                      NEW_ARCHIVE=h.sha(self.archive)))
-        h.build_tree(self.parent,self.old,self.uid) if False else None
-        os.mkdir(h.TARGET,0o700,dir_fd=self.parent)
-        fd=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
-        try:
-            for key,body in self.old.items():h.writefile(fd,key,body,self.uid)
-        finally:os.close(fd)
+            self.new['manifest.json']=h.canonical(meta)
+            data=io.BytesIO()
+            with zipfile.ZipFile(data,'w',zipfile.ZIP_DEFLATED) as z:
+                for key,body in self.new.items():
+                    info=zipfile.ZipInfo(key);info.create_system=3
+                    info.external_attr=0o100600<<16;info.compress_type=zipfile.ZIP_DEFLATED
+                    z.writestr(info,body)
+            self.archive=data.getvalue()
+            self.stack=self.enterContext(patch.multiple(h,OLD_MANIFEST=h.sha(self.old['manifest.json']),
+                                                          NEW_MANIFEST=h.sha(self.new['manifest.json']),
+                                                          NEW_ARCHIVE=h.sha(self.archive)))
+        h.build_tree(self.parent,self.old,self.uid,name=h.TARGET)
 
     def enterContext(self,context):
         obj=context.__enter__();self.addCleanup(context.__exit__,None,None,None);return obj
@@ -78,8 +86,9 @@ class HandoffAdmission(unittest.TestCase):
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_RESULT))
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
             h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
-        self.assertEqual(h.readfile(os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent),
-                                    'loader.py',self.uid),b'OLD_LOADER')
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
+        finally:os.close(target)
 
     def test_duplicate_attempt_holds(self):
         self.execute()
