@@ -668,12 +668,13 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         Path(s.PERMIT).unlink()
     def test_partial_resume_continuously_rechecks_old_reference_and_absence(self):
         self.seed_partial_resume();q=self.fresh_session();q.resume_admission()
-        old=Path(h.B_APPROVAL).read_bytes();self.write(h.B_APPROVAL,old+b' ')
-        with self.assertRaisesRegex(u.Hold,'B_RESUME_REFERENCE_REPLACED'):q.b_stage('snapshot')
-        self.write(h.B_APPROVAL,old)
         # A C/journal artifact appearing after admission is not absorbed as a new baseline.
         self.write(h.C_APPROVAL,b'{}')
         with self.assertRaisesRegex(u.Hold,'B_PARTIAL_STATE_CONFLICT'):q.b_stage('snapshot')
+        Path(h.C_APPROVAL).unlink()
+        # Same bytes written back at a new inode would still be a replacement; never reset the baseline.
+        old=Path(h.B_APPROVAL).read_bytes();self.write(h.B_APPROVAL,old+b' ')
+        with self.assertRaisesRegex(u.Hold,'B_RESUME_REFERENCE_REPLACED'):q.b_stage('snapshot')
     def test_partial_resume_probe_name_conflict_or_unknown_holds_before_first_write(self):
         self.seed_partial_resume();q=self.fresh_session()
         self.names[h.resume_probe_names()[0]]='8'*64
@@ -681,7 +682,8 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
         self.assertFalse(Path(h.resume_record_path()).exists())
         del self.names[h.resume_probe_names()[0]]
         q.close();q=h.Session();q.acquire();self.addCleanup(q.close)
-        with patch.object(s,'capture',side_effect=s.Hold('COMMAND_UNKNOWN_NO_RETRY')),self.assertRaises(s.Hold):q.resume_admission()
+        with patch.object(h,'probe_names_absent',side_effect=u.Hold('B_RESUME_PROBE_INVENTORY_UNKNOWN')),self.assertRaisesRegex(u.Hold,'B_RESUME_PROBE_INVENTORY_UNKNOWN'):
+            q.resume_admission()
         self.assertFalse(Path(h.resume_record_path()).exists())
     def test_partial_resume_known_failure_reopens_new_lock_session_and_recovers_bound_resume_evidence(self):
         self.seed_partial_resume();q=self.fresh_session();q.resume_b_partial()
@@ -702,7 +704,11 @@ with patch.object(h,'Session',return_value=t.session),patch.object(t.session,'ac
             q.update()
         self.assertEqual(q.journal.state['phase'],'KNOWN_FAILURE')
         q.close();r=h.Session();r.acquire(recover=True);self.addCleanup(r.close)
-        result=r.recover()
+        old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+            runtime_source_sha=None,version_source=None,observed_at=self.clock)
+        with patch.object(c,'BoundHttpsHealth',return_value=old_health):
+            result=r.recover()
         self.assertEqual(result['phase'],'ROLLED_BACK_PREVIEW_HOLD')
         self.assertTrue(r.resume_mode)
         self.assertEqual([x[3] for x in self.calls[-4:]],['stop','rename','rename','start'])
