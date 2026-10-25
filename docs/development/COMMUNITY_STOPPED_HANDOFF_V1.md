@@ -1,5 +1,9 @@
 ## 2026-10-25 — Current fixed caller approval and input contract
 
+The fixed caller now verifies and compiles the exact hash-pinned transaction/call module bytes from the protected installed scripts directory before dispatch. It has no external checker callback; the operation-specific approval is read from the fixed root-0600 approval record, and both old/new archives are read from the fixed protected input names. Production entry still refuses if those inputs or the fresh approval are absent.
+
+
+
 At the current source head, the fixed in-process entry is `scripts/community_preview_carrier_handoff_entry.py`. It no longer accepts an external `authority_checker` and is not a CLI. The original unique installation Writer calls `run('execute')`, `run('status')`, or `run('rollback')` only inside its already-authorized process. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
 
 Fixed input files (must already exist; code never creates or downloads them):
@@ -51,7 +55,7 @@ This is source/caller implementation only. The original installer has not been e
 
 ### Exact fixed-entry source hashes at HEAD 29f401f2cef00fb7913858f27daca4378cc2bc22
 
-- `scripts/community_preview_carrier_handoff_entry.py`: 6557 bytes, SHA256 `14cda6843de950e8ef25d6a97ed7de08e5130a02920b85007b24804cf3ebfac1`.
+- `scripts/community_preview_carrier_handoff_entry.py`: 14377 bytes, SHA256 `0c7736143a9405a3395955e589ec0932fa9db30481b3fbc08cbbca001d21f099`.
 - `tests/test_community_preview_carrier_handoff_entry.py`: 2243 bytes, SHA256 `aacd02f48996b5d0dac448b81236e3ed4aa157b7cdc5264b35ccea42bc4a06b1`.
 - `tests/test_community_preview_carrier_handoff_admission.py`: 34113 bytes, SHA256 `5085c8111211be4cc289e75f0205f395dd6fa380e34ff3b4826b4f42246f9995`.
 - CI stage: two verified original artifacts; parse and execute 38 transaction tests (36 previously verified plus 2 actual adapter/fixed-entry on-disk integration cases), 5 adapter tests, and 5 fixed-entry guard tests; exact-HEAD Hosted status must be verified independently.
