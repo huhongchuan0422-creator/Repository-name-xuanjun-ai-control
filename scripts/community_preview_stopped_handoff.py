@@ -150,7 +150,7 @@ class Session:
         self.owner=None;self.thread=threading.get_ident();self.last=None
         self.braw=None;self.craw=None;self.freeze=None;self.bdone=False;self.approved_stamp=None
         self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_raw=None;self.resume_mode=False
-        self.resume_history={};self.resume_absent=()
+        self.resume_history={};self.resume_absent=();self.resume_old_permit_absent=False
         self.started=time.monotonic();self.captured={};self.recovering=False;self.cleanup_unproven=False
     def acquire(self,recover=False):
         self.owner=operator();self.recovering=recover
@@ -186,6 +186,8 @@ class Session:
             need(current==body and current_meta==meta,'B_RESUME_REFERENCE_REPLACED')
         for path in self.resume_absent:
             need(not exists_private(path),'B_PARTIAL_STATE_CONFLICT')
+        if self.resume_old_permit_absent:
+            need(not exists_private(s.PERMIT),'B_PARTIAL_STATE_CONFLICT')
     def resume_require_absent(self,paths):
         self.resume_guard()
         for path in paths:need(not exists_private(path),'B_PARTIAL_STATE_CONFLICT')
@@ -201,10 +203,12 @@ class Session:
             paths += list(globals()['paths']().values())
             paths += [s.BACKUP+'/'+name for name in CLONES]
         self.resume_require_absent(paths)
-        self.resume_absent=tuple(common)
+        self.resume_absent=tuple(paths)
     def strict_prior_stage_permit(self,old_b,old_freeze,old_freeze_raw):
         if not exists_private(s.PERMIT):return None
-        old_permit,old_permit_raw=document(s.PERMIT,16384)
+        old_permit_raw=self.bind_resume_reference(s.PERMIT,16384)
+        old_permit=s.exact_json(old_permit_raw)
+        need(old_permit_raw==s.canonical(old_permit),'EXACT_PRIOR_STAGE_PERMIT_REQUIRED')
         fields={'format','host','stage','entry_sha256','issued_at','expires_at',
                 'all_writers_frozen_evidence_sha256','snapshot_manifest_sha256'}
         valid=(set(old_permit)==fields and type(old_permit.get('format')) is int and old_permit.get('format')==1
@@ -217,7 +221,7 @@ class Session:
             and old_permit['expires_at']<=old_permit['issued_at']+600
             and old_permit['expires_at']<=old_b['expires_at'] and old_permit['expires_at']<=old_freeze['expires_at'])
         need(valid,'EXACT_PRIOR_STAGE_PERMIT_REQUIRED')
-        self.bind_resume_reference(s.PERMIT,16384)
+        self.resume_guard()
         return s.sha(old_permit_raw)
     def configure_resumed_recovery(self,proof):
         evidence=proof.get('evidence') if type(proof) is dict else None
@@ -301,6 +305,9 @@ class Session:
             issued_at=c.now(),expires_at=min(c.now()+600,self.b['expires_at'],s.exact_json(self.freeze)['expires_at']),
             all_writers_frozen_evidence_sha256=s.sha(self.freeze),snapshot_manifest_sha256=snapshot_sha)
         fd=s.private_parent(s.BASE);name=os.path.basename(self.stage_permit_path);identity=None;digest=s.sha(s.canonical(permit))
+        if self.resume_mode:
+            self.resume_guard();need(not exists_private(self.stage_permit_path),'B_PARTIAL_STATE_CONFLICT')
+            self.resume_absent=tuple(path for path in self.resume_absent if path!=self.stage_permit_path)
         try:
             write_private(fd,name,permit)
             identity=s.identity(os.stat(name,dir_fd=fd,follow_symlinks=False))
@@ -308,8 +315,12 @@ class Session:
             self.stopped()
             value=s.snapshot(permit) if stage=='snapshot' else s.validate_clones(permit)
             self.stopped();authorize_v2(self,stage,digest)
+            if self.resume_mode:
+                self.resume_guard();self.resume_absent=tuple(path for path in self.resume_absent if path!=b_records()[stage+'-result'])
             write_private(self.parent,attempt()+'-'+stage+'-result.json',dict(
                 format=1,attempt=attempt(),stage=stage,approval_sha256=s.sha(self.braw),permit_sha256=digest,result=value))
+            if self.resume_mode:
+                self.resume_guard();self.resume_absent=tuple(path for path in self.resume_absent if path!=b_records()[stage+'-permit'])
             write_private(self.parent,attempt()+'-'+stage+'-permit.json',permit)
             need(raw(self.stage_permit_path,16384)==s.canonical(permit),'ACTIVE_PERMIT_CHANGED')
             self.stopped();authorize_v2(self,stage,digest)
@@ -372,6 +383,7 @@ class Session:
                    u.JOURNAL_PARENT+'/'+attempt(),resume_record_path()]
         self.resume_require_absent(pre_outputs+pre_state)
         old_stage_permit_sha=self.strict_prior_stage_permit(old_b,old_freeze,old_freeze_raw)
+        self.resume_old_permit_absent=old_stage_permit_sha is None
         self.braw=self.bind_resume_reference(self.b_path);self.b=s.exact_json(self.braw);window(self.b)
         fields={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at',
                 'old_b_intent_sha256','old_b_approval_sha256','old_freeze_sha256','old_stage_permit_sha256',
@@ -380,14 +392,14 @@ class Session:
              and self.b['host']==p.HOST and self.b['mode']==MODE and self.b['attempt']==attempt()
              and self.b['actions']==['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'],'EXACT_B_RESUME_APPROVAL_REQUIRED')
         self.freeze=self.bind_resume_reference(self.freeze_path,16384);self.approved_stamp=self.b['carrier_manifest_sha256']
-        need(self.pins()==self.approved_stamp and old_b['carrier_manifest_sha256']==self.approved_stamp,'B_SOURCE_BINDING_CHANGED')
+        need(self.pins()==self.approved_stamp and p.exact_hex(old_b['carrier_manifest_sha256'],64),'B_SOURCE_BINDING_CHANGED')
         need(self.b['old_b_intent_sha256']==s.sha(intent_raw) and self.b['old_b_approval_sha256']==s.sha(old_braw)
              and self.b['old_freeze_sha256']==s.sha(old_freeze_raw) and self.b['old_stage_permit_sha256']==old_stage_permit_sha
              and self.b['resume_freeze_sha256']==s.sha(self.freeze),'B_RESUME_EVIDENCE_BINDING_CHANGED')
         self.freeze_live();self.stopped();probe_names_absent()
         # Recheck every historical byte+identity and all pre-backup absences immediately before the first write.
         self.resume_require_absent(pre_outputs+pre_state)
-        self.resume_absent=(C_APPROVAL,u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
+        self.resume_absent=tuple(pre_outputs+pre_state[:-1])
         record=dict(format=1,mode=MODE,attempt=attempt(),carrier_manifest_sha256=self.approved_stamp,
             old_b_intent_sha256=s.sha(intent_raw),old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),
             old_stage_permit_sha256=old_stage_permit_sha,resume_approval_sha256=s.sha(self.braw),
