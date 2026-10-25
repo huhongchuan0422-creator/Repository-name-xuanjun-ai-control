@@ -1,0 +1,2 @@
+{"db": "/tmp/xuanjun-task-center-r4-final.qMnpob/state.sqlite3", "mode": "TEST_ONLY", "mutation_api": "DISABLED", "production_status": "NOT_IMPLEMENTED", "state": "STARTED", "tenant_id": "tenant-app", "url": "http://127.0.0.1:18766/"}
+{"mode": "TEST_ONLY", "state": "STOPPED"}

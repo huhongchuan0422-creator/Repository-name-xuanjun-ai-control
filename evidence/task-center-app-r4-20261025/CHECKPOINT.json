@@ -1,0 +1,20 @@
+{
+  "scope": "TEST_ONLY task center runnable application",
+  "source_commit": "a1143f44a8eb72f51fc182d851bc815f6e47f733",
+  "source_tree": "52077ff085012dc2585ecac2f077c5276c5e60e5",
+  "completed": [
+    "canonical SQLite HTTP projection",
+    "seven-board to project to task navigation",
+    "multi-project TEST_ONLY execution and restart rebuild",
+    "P2/P3 validation-only receipt contract",
+    "scoped regression and package evidence"
+  ],
+  "in_flight": [],
+  "blocked_or_remaining": [
+    "BROWSER_UNVERIFIED",
+    "P2/P3 production adapters NOT_IMPLEMENTED",
+    "P2/P3 real install acceptance NOT_EXECUTED",
+    "three legacy migration fixtures NOT_EXECUTED on SQLite 3.26"
+  ],
+  "resume": "Read this checkpoint and MANIFEST_SHA256.txt; verify the exact source commit before any follow-up. Do not deploy or connect P2/P3 without separate authority and their completed installation acceptance."
+}
