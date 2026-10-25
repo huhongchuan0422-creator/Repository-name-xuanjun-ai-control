@@ -750,6 +750,7 @@ class Session:
     def reference_digest(self):
         rows=[]
         base=[PROOF,C_APPROVAL,self.b_path,self.freeze_path,s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json']
+        if getattr(self,'c_preconfirm_mode',False):base += [C_RESUME_APPROVAL,C_RESUME_PLAN]
         if self.resume_mode:
             base += [B_APPROVAL,s.FREEZE,resume_record_path()]
             resume=s.exact_json(self.resume_raw)
@@ -769,7 +770,9 @@ class Session:
              'EXACT_HANDOFF_DOCUMENT_REQUIRED')
         need(proof['mode']==MODE and proof['host']==p.HOST and proof['attempt']==attempt()
              and type(proof['format']) is int and proof['format']==1,'EXACT_PROOF_SCOPE_REQUIRED')
-        candidate=proof['plan'];self.c_approval(candidate)
+        candidate=proof['plan']
+        if getattr(self,'c_preconfirm_mode',False):self._c_resume_approval(candidate)
+        else:self.c_approval(candidate)
         need(proof['approval_sha256']==s.sha(self.craw),'PROOF_APPROVAL_CHANGED')
         binding=dict(approval_sha256=s.sha(self.craw),handoff_sha256=self.reference_digest())
         if recover:
