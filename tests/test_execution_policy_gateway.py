@@ -49,7 +49,7 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           'asset-v1' if outcome=='FOUND' else None,False,'reuse checked',
           'preflight-evidence')
         now=time.time();self.policy.add_authorization('auth-1','demo-b',
-          'asset-v1','test-writer-attempt-b',source,['WRITE_SOURCE'],
+          'asset-v1','test-writer-attempt-b',source,['WRITE_SOURCE','DEPLOY'],
           read_only,now-1,valid_until or now+600,'auth-evidence')
 
     def action(self,**changes):
@@ -119,10 +119,12 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           'owner requested')
         reviewer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','independent-reviewer'))
+        self.policy.grant_approval_role('demo-b','independent-reviewer',
+          'SCOPE_CHANGE',time.time()+600)
         with self.assertRaisesRegex(ValueError,'AUTHENTICATED_CHANGE'):
             reviewer.review_change('change-1','spoofed',True,'review')
         reviewer.review_change('change-1','independent-reviewer',True,'review')
-        admitted=self.policy.request_action(self.action(scope='DEPLOY',
+        admitted=self.policy.request_action(self.action(action='DEPLOY',scope='DEPLOY',
           change_id='change-1'))
         self.assertEqual(admitted['state'],'ADMITTED_TEST_ONLY')
 
@@ -144,9 +146,11 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           'asset-v0',['DEPLOY'],'wrong base')
         reviewer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','independent-reviewer'))
+        self.policy.grant_approval_role('demo-b','independent-reviewer',
+          'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('wrong-base','independent-reviewer',True,'review')
         with self.assertRaisesRegex(ValueError,'CHANGE_BASE_ASSET_VERSION'):
-            self.policy.request_action(self.action(scope='DEPLOY',
+            self.policy.request_action(self.action(action='DEPLOY',scope='DEPLOY',
               change_id='wrong-base'))
 
     def test_duplicate_and_restart_are_idempotent_not_reexecuted(self):
@@ -178,11 +182,13 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.policy.propose_change('old-change','demo-b','asset-v1',['DEPLOY'],'x')
         reviewer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','independent-reviewer'))
+        self.policy.grant_approval_role('demo-b','independent-reviewer',
+          'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('old-change','independent-reviewer',True,'review')
         self.supervisor.db.execute("""UPDATE scope_changes SET
           attempt_id='old-attempt'""");self.supervisor.db.commit()
         with self.assertRaisesRegex(ValueError,'CHANGE_ATTEMPT'):
-            self.policy.request_action(self.action(scope='DEPLOY',change_id='old-change'))
+            self.policy.request_action(self.action(action='DEPLOY',scope='DEPLOY',change_id='old-change'))
 
     def test_same_preflight_body_can_be_recorded_for_new_attempt(self):
         self.policy.record_unit(self.unit)
@@ -208,6 +214,8 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','developer',
           'v1','developer-1','p','m','ACTIVE','test',time.time()))
         self.supervisor.db.commit()
+        self.policy.grant_approval_role('demo-b','developer-1',
+          'SCOPE_CHANGE',time.time()+600)
         developer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','developer-1'))
         with self.assertRaisesRegex(ValueError,'INDEPENDENT_CHANGE_REVIEW'):
@@ -219,6 +227,8 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         ModelControl(self.gateway,self.context,Fernet.generate_key())
         reviewer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','developer-later'))
+        self.policy.grant_approval_role('demo-b','developer-later',
+          'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('later-executor','developer-later',True,'review')
         self.supervisor.db.execute('''INSERT INTO role_templates VALUES
           (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
@@ -227,7 +237,7 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
           'v1','developer-later','p','m','ACTIVE','test',time.time()))
         self.supervisor.db.commit()
         with self.assertRaisesRegex(ValueError,'CHANGE_REVIEWER_ROLE_CONFLICT'):
-            self.policy.request_action(self.action(scope='DEPLOY',
+            self.policy.request_action(self.action(action='DEPLOY',scope='DEPLOY',
               change_id='later-executor'))
 
     def test_scope_reviewer_role_check_and_action_insert_are_atomic(self):
@@ -236,6 +246,8 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         ModelControl(self.gateway,self.context,Fernet.generate_key())
         reviewer=ExecutionPolicyGateway(self.gateway,
           self.authority.issue('tenant-a','atomic-reviewer'))
+        self.policy.grant_approval_role('demo-b','atomic-reviewer',
+          'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('atomic-change','atomic-reviewer',True,'review')
         self.supervisor.db.execute('''INSERT INTO role_templates VALUES
           (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
@@ -253,7 +265,7 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
             return sqlite3.SQLITE_OK
         self.supervisor.db.set_authorizer(authorizer)
         try:
-            result=self.policy.request_action(self.action(scope='DEPLOY',
+            result=self.policy.request_action(self.action(action='DEPLOY',scope='DEPLOY',
               change_id='atomic-change'))
         finally:self.supervisor.db.set_authorizer(None)
         self.assertEqual(result['state'],'ADMITTED_TEST_ONLY')
@@ -268,6 +280,47 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.assertEqual(result['external_execution'],'NOT_EXECUTED')
         projected=self.policy.projection()
         self.assertEqual(projected['external_execution'],'NOT_IMPLEMENTED')
+
+    def test_action_scope_disguise_is_rejected_without_side_effect(self):
+        self.prepare();before=self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM execution_action_requests').fetchone()[0]
+        with self.assertRaisesRegex(ValueError,'ACTION_SCOPE_MISMATCH'):
+            self.policy.request_action(self.action(action='DEPLOY',
+              scope='WRITE_SOURCE'))
+        self.assertEqual(self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM execution_action_requests').fetchone()[0],before)
+
+    def test_unassigned_subject_cannot_approve_scope_change(self):
+        self.prepare();self.policy.propose_change('formal-role','demo-b',
+          'asset-v1',['DEPLOY'],'x')
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','authenticated-but-unassigned'))
+        with self.assertRaisesRegex(ValueError,'FORMAL_APPROVAL_ROLE'):
+            reviewer.review_change('formal-role','authenticated-but-unassigned',
+              True,'review')
+
+    def test_expired_writer_blocks_valid_action_authorization(self):
+        self.prepare();self.supervisor.db.execute('''UPDATE tasks SET
+          authority_valid_until=? WHERE task_id='demo-b' ''',(time.time()-1,))
+        self.supervisor.db.commit();before=self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM execution_action_requests').fetchone()[0]
+        with self.assertRaisesRegex(ValueError,'WRITER_AUTHORITY_EXPIRED'):
+            self.policy.request_action(self.action())
+        self.assertEqual(self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM execution_action_requests').fetchone()[0],before)
+
+    def test_preflight_can_bind_real_query_receipt_and_reject_unknown_id(self):
+        self.policy.record_unit(self.unit)
+        self.policy.record_asset_query('demo-b','query-1','REGISTRY','registry-v3',
+          {'search':'existing-source'},'a'*64)
+        receipt=self.policy.record_preflight('demo-b',['registry'],'FOUND',
+          'existing-source','asset-v1',False,'reuse checked','evidence',
+          query_ids=['query-1'])
+        self.assertTrue(receipt['check_id'])
+        with self.assertRaisesRegex(ValueError,'QUERY_RECEIPT'):
+            self.policy.record_preflight('demo-b',['registry'],'FOUND',
+              'existing-source','asset-v1',False,'reuse checked','evidence',
+              query_ids=['missing'])
 
 
 if __name__=='__main__':unittest.main()

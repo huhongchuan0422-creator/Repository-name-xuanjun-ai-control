@@ -112,15 +112,18 @@ class FullJourneyTests(unittest.TestCase):
           'idempotency_key':'journey-execute'})
         self.assertEqual(self.post({'action':'RUN_SCHEDULER_ONCE'})['state'],
           'SUCCEEDED')
+        checklist=self.post({'action':'REGISTER_CHECKLIST','task_id':'task-journey',
+          'items':[{'id':'journey-core','required':True,'result':'PASS',
+          'evidence':'fixture-log'}]})['content_sha256']
         candidate=self.post({'action':'SUBMIT_CANDIDATE','task_id':'task-journey',
-          'artifact_sha256':'a'*64,'checklist_sha256':'b'*64,
+          'artifact_sha256':'a'*64,'checklist_sha256':checklist,
           'submitted_by':'developer-1'},'developer-token-123456')
         changed=self.post({'action':'REVIEW_CANDIDATE','candidate_id':
           candidate['candidate_id'],'reviewer':'qa-1','findings':
           [{'id':'DEFECT-1'}],'passed':False},'reviewer-token-123456')
         self.assertEqual(changed['state'],'CHANGES_REQUESTED')
         revised=self.post({'action':'SUBMIT_CANDIDATE','task_id':'task-journey',
-          'artifact_sha256':'c'*64,'checklist_sha256':'d'*64,
+          'artifact_sha256':'c'*64,'checklist_sha256':checklist,
           'submitted_by':'developer-1'},'developer-token-123456')
         self.assertEqual(self.post({'action':'REVIEW_CANDIDATE','candidate_id':
           revised['candidate_id'],'reviewer':'qa-1','findings':[],

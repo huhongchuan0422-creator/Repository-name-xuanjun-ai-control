@@ -22,6 +22,7 @@ from model_orchestration import ModelControl, ModelScheduler, load_master_key
 from task_supervisor import Supervisor
 from task_writer_fence import Fence
 from execution_policy_gateway import ExecutionPolicyGateway
+from connection_management import ConnectionManager
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -42,7 +43,9 @@ MODEL_TABLES = frozenset((
     'model_providers', 'model_catalog', 'role_templates', 'model_requests',
     'model_usage_events', 'model_evaluations', 'delivery_candidates',
     'candidate_reviews', 'module_settings', 'task_work_specs',
-    'model_call_attempts'))
+    'model_call_attempts','model_request_bindings','model_call_reservations',
+    'model_usage_attempts','model_runtime_limits','approved_skills',
+    'role_instances','acceptance_checklists'))
 
 
 def _read_owned_secret_file(path, label):
@@ -219,11 +222,37 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           model_master_key)
                     if action=='UPSERT_PROVIDER':
                         result=control.upsert_provider(value['config'],value.get('secret'))
+                    elif action=='UPSERT_CONNECTION':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).upsert(value['config'],value.get('credential'))
+                    elif action=='BEGIN_OAUTH':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).begin_oauth(value['connection_id'])
+                    elif action=='COMPLETE_OAUTH':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).complete_oauth(value['connection_id'],
+                          value['flow_id'],value['state'],value['code'],
+                          value['issuer'],value['redirect_uri'])
+                    elif action=='REFRESH_OAUTH':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).refresh(value['connection_id'])
+                    elif action=='REVOKE_CONNECTION':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).revoke(value['connection_id'])
                     elif action=='DISABLE_PROVIDER':
                         result=control.disable_provider(value['provider_id'])
                     elif action=='UPSERT_MODEL':result=control.upsert_model(value['config'])
                     elif action=='CREATE_ROLE':result=control.create_role(value['config'])
                     elif action=='BIND_SKILL':result=control.bind_skill(value['role_id'],value['role_version'],value['skill_id'],value['skill_version'],value['review_sha256'],value['status'])
+                    elif action=='REGISTER_SKILL':result=control.register_skill(
+                        value['skill_id'],value['skill_version'],value['content'],
+                        value['review_sha256'])
+                    elif action=='REVOKE_SKILL':result=control.revoke_skill(
+                        value['skill_id'],value['skill_version'])
+                    elif action=='SET_RUNTIME_LIMITS':result=control.set_runtime_limits(
+                        value['provider_id'],value['tpm_limit'],
+                        value['max_output_tokens'],value.get('tenant_budget'),
+                        value.get('task_budget'))
                     elif action=='REGISTER_GRAPH':
                         result=control.gateway.register_graph(control.context,value['graph'])
                     elif action=='CREATE_PROJECT_TASK':
@@ -250,19 +279,26 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           'dependencies':fields['dependencies'],
                           'board_id':fields['board_id'],
                           'completion_evidence':fields['acceptance']} ]}
-                        result=control.gateway.register_graph(control.context,graph)
-                        control.record_task_spec(fields['task_id'],fields['goal'],
-                          fields['deliverables'],fields['acceptance'])
-                        policy=ExecutionPolicyGateway(control.gateway,
-                          control.context)
-                        policy.record_unit({'task_id':fields['task_id'],
+                        # Validate every post-registration business field before
+                        # the canonical graph write.  A rejected unit therefore
+                        # leaves no half-created graph/task.
+                        unit={'task_id':fields['task_id'],
                           'delivery_stage':fields['delivery_stage'],
                           'feature_unit':fields['feature_unit'],
                           'goal':fields['goal'],'scope':fields['scope'],
                           'acceptance':fields['acceptance'],
                           'dependencies':fields['dependencies'] or ['NONE'],
                           'asset_version':fields['asset_version'],
-                          'responsible_party':fields['owner']})
+                          'responsible_party':fields['owner']}
+                        ExecutionPolicyGateway.validate_unit_input(unit)
+                        if (not fields['deliverables'] or not fields['acceptance']):
+                            raise ValueError('TASK_SPEC_ARRAYS_REQUIRED')
+                        result=control.gateway.register_graph(control.context,graph)
+                        control.record_task_spec(fields['task_id'],fields['goal'],
+                          fields['deliverables'],fields['acceptance'])
+                        policy=ExecutionPolicyGateway(control.gateway,
+                          control.context)
+                        policy.record_unit(unit)
                         result['graph_id']=graph['graph_id']
                     elif action=='START_TEST_ONLY_TASK':
                         fence=Fence(supervisor,db_path+'.test-only-locks')
@@ -281,7 +317,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='QUEUE_REQUEST':
                         result=control.queue_request(value['task_id'],
                           value['role_id'],value['messages'],
-                          value['idempotency_key'])
+                          value['idempotency_key'],value.get('max_output_tokens'),
+                          value.get('connection_id'))
                     elif action=='CANCEL_REQUEST':
                         result=control.request_cancel(value['request_id'])
                     elif action=='REGISTER_BENCHMARK':
@@ -289,7 +326,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           value['suite_version'],value['cases'])
                     elif action=='RUN_BENCHMARK':
                         result=control.run_benchmark(value['provider_id'],
-                          value['model_id'],value['suite_version'])
+                          value['model_id'],value['suite_version'],
+                          allow_paid=bool(value.get('allow_paid',False)))
                     elif action=='RUN_SCHEDULER_ONCE':
                         result=ModelScheduler(control).run_once()
                     elif action=='SUBMIT_CANDIDATE':
@@ -298,6 +336,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=control.submit_candidate(value['task_id'],
                           value['artifact_sha256'],value['checklist_sha256'],
                           value['submitted_by'])
+                    elif action=='REGISTER_CHECKLIST':
+                        result=control.register_checklist(value['task_id'],
+                          value['items'],actor or control.context['principal_id'])
                     elif action=='REVIEW_CANDIDATE':
                         if value['reviewer']!=actor:
                             raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
@@ -333,7 +374,19 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           control.context).record_preflight(value['task_id'],
                           value['checked'],value['outcome'],value.get('reused_asset'),
                           value.get('reused_version'),bool(value['need_new']),
-                          value['reason'],value['evidence_ref'])
+                          value['reason'],value['evidence_ref'],
+                          query_ids=value.get('query_ids'))
+                    elif action=='RECORD_ASSET_QUERY':
+                        result=ExecutionPolicyGateway(control.gateway,
+                          control.context).record_asset_query(value['task_id'],
+                          value['query_id'],value['source_kind'],
+                          value['source_version'],value['query'],
+                          value['result_digest'])
+                    elif action=='GRANT_APPROVAL_ROLE':
+                        result=ExecutionPolicyGateway(control.gateway,
+                          control.context).grant_approval_role(value['task_id'],
+                          value['principal_id'],value['approval_kind'],
+                          value['valid_until'])
                     elif action=='ADD_TEST_AUTHORIZATION':
                         result=ExecutionPolicyGateway(control.gateway,
                           control.context).add_authorization(
@@ -402,6 +455,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             authority=TestTenantAuthority(authority_key)
             gateway=GatewayKernel(supervisor,authority)
             ModelControl(gateway,authority.issue(tenant_id,
+              'admin:'+principal_id),model_master_key)
+            ConnectionManager(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
         finally:supervisor.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,

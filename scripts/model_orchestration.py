@@ -18,18 +18,20 @@ import urllib.request
 import http.client
 import socket
 import ssl
+from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from reusable_task_gateway import _text, _sha
 from task_supervisor import UNKNOWN, canonical
+from connection_management import ConnectionManager
 
 
 ADAPTERS = frozenset(('siliconflow', 'openai-compatible'))
 PRICE_STATES = frozenset(('KNOWN_FREE', 'KNOWN_PAID', UNKNOWN))
 PHASES = frozenset(('EXECUTOR', 'REVIEWER', 'ACCEPTOR'))
 REQUEST_STATES = frozenset(('QUEUED', 'RUNNING', 'RETRY_WAIT', 'SUCCEEDED',
-                            'FAILED', UNKNOWN, 'CANCELLED'))
+                            'FAILED', UNKNOWN, 'CANCELLED','HOLD'))
 
 
 def _number(value, name, minimum=0):
@@ -117,11 +119,13 @@ class OpenAICompatibleAdapter(object):
             connection.close()
             raise
 
-    def invoke(self, base_url, secret, model_id, messages, timeout):
+    def invoke(self, base_url, secret, model_id, messages, timeout,
+               max_output_tokens=None):
         parsed=urlparse(base_url)
         url = base_url.rstrip('/') + '/v1/chat/completions'
-        body = canonical({'model': model_id, 'messages': messages,
-                          'stream': False}).encode('utf-8')
+        payload={'model': model_id, 'messages': messages,'stream': False}
+        if max_output_tokens is not None:payload['max_tokens']=max_output_tokens
+        body = canonical(payload).encode('utf-8')
         headers={'Authorization': 'Bearer ' + secret,
                  'Content-Type': 'application/json','Accept': 'application/json',
                  'User-Agent': 'Xuanjun-TEST-ONLY-Adapter'}
@@ -189,6 +193,7 @@ class ModelControl(object):
         self.db = gateway.db
         self.context = context
         self.tenant_id = gateway.tenants.verify(context)
+        self.master_key = master_key
         self.fernet = Fernet(master_key)
         self.clock = clock or time.time
         self._schema()
@@ -296,11 +301,66 @@ class ModelControl(object):
               tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,goal TEXT NOT NULL,
               deliverables_json TEXT NOT NULL,acceptance_json TEXT NOT NULL,
               created_at REAL NOT NULL,PRIMARY KEY(tenant_id,task_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_runtime_limits(
+              tenant_id TEXT NOT NULL,provider_id TEXT NOT NULL,
+              tpm_limit INTEGER NOT NULL,max_output_tokens INTEGER NOT NULL,
+              tenant_budget REAL,task_budget REAL,
+              updated_at REAL NOT NULL,PRIMARY KEY(tenant_id,provider_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_request_bindings(
+              tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
+              provider_config_version INTEGER NOT NULL,
+              connection_id TEXT,connection_config_version INTEGER,
+              expected_input_tokens INTEGER NOT NULL,
+              max_output_tokens INTEGER NOT NULL,allow_paid INTEGER NOT NULL,
+              writer_fence INTEGER,writer_epoch INTEGER,
+              writer_valid_until REAL,skill_snapshot_sha256 TEXT,
+              work_spec_sha256 TEXT,module_version TEXT,
+              PRIMARY KEY(tenant_id,request_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_call_reservations(
+              tenant_id TEXT NOT NULL,reservation_id TEXT NOT NULL,
+              request_id TEXT NOT NULL,attempt_number INTEGER NOT NULL,
+              task_id TEXT NOT NULL,provider_id TEXT NOT NULL,model_id TEXT NOT NULL,
+              input_tokens INTEGER NOT NULL,output_tokens INTEGER NOT NULL,
+              reserved_cost REAL,cost_state TEXT NOT NULL,state TEXT NOT NULL,
+              created_at REAL NOT NULL,settled_at REAL,
+              PRIMARY KEY(tenant_id,reservation_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_usage_attempts(
+              tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
+              attempt_number INTEGER NOT NULL,provider_id TEXT NOT NULL,
+              model_id TEXT NOT NULL,input_tokens INTEGER,
+              output_tokens INTEGER,cost_state TEXT NOT NULL,cost_value REAL,
+              outcome TEXT NOT NULL,observed_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,request_id,attempt_number))''',
+            '''CREATE TABLE IF NOT EXISTS approved_skills(
+              tenant_id TEXT NOT NULL,skill_id TEXT NOT NULL,
+              skill_version TEXT NOT NULL,content_json TEXT NOT NULL,
+              content_sha256 TEXT NOT NULL,review_sha256 TEXT NOT NULL,
+              state TEXT NOT NULL,updated_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,skill_id,skill_version))''',
+            '''CREATE TABLE IF NOT EXISTS role_instances(
+              tenant_id TEXT NOT NULL,instance_id TEXT NOT NULL,
+              role_id TEXT NOT NULL,role_version TEXT NOT NULL,
+              state TEXT NOT NULL,desired_state TEXT NOT NULL,
+              current_request_id TEXT,last_checkpoint_json TEXT,
+              updated_at REAL NOT NULL,PRIMARY KEY(tenant_id,instance_id))''',
+            '''CREATE TABLE IF NOT EXISTS acceptance_checklists(
+              tenant_id TEXT NOT NULL,checklist_id TEXT NOT NULL,
+              task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
+              content_json TEXT NOT NULL,content_sha256 TEXT NOT NULL,
+              all_required_passed INTEGER NOT NULL,has_unexecuted INTEGER NOT NULL,
+              created_by TEXT NOT NULL,created_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,checklist_id))''',
         )
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             for statement in statements:
                 self.db.execute(statement)
+
+    @staticmethod
+    def _origin(value):
+        parsed=urlsplit(value)
+        port=parsed.port or (443 if parsed.scheme=='https' else 80)
+        return '%s://%s:%d'%(parsed.scheme.lower(),parsed.hostname.lower(),port)
 
     def _principal(self):
         self.gateway.tenants.verify(self.context)
@@ -382,6 +442,12 @@ class ModelControl(object):
                 raise ValueError('PROVIDER_LIMIT_10')
             cipher = existing['secret_cipher'] if existing else None
             mask = existing['secret_mask'] if existing else None
+            destination_changed=(existing is not None and
+              self._origin(existing['base_url'])!=self._origin(value['base_url']))
+            if destination_changed and secret is None:
+                # Credentials are destination-bound.  Moving a provider must
+                # never silently carry the old bearer secret to a new origin.
+                cipher=None;mask=None
             if secret is not None:
                 if not isinstance(secret,str) or len(secret)<8 or '\n' in secret or '\r' in secret:
                     raise ValueError('VALID_PROVIDER_SECRET_REQUIRED')
@@ -398,12 +464,81 @@ class ModelControl(object):
                value['retry_limit'],cipher,mask,version,'CLOSED',0,None,
                created,now))
             self._audit(principal,'PROVIDER_UPSERT',value['provider_id'],
-                        {'config_version':version,'secret_replaced':secret is not None},now)
+                        {'config_version':version,'secret_replaced':secret is not None,
+                         'destination_changed':destination_changed,
+                         'reauthorization_required':destination_changed and secret is None},now)
             self.db.commit()
         except Exception:
             self.db.rollback();raise
         return {'provider_id':value['provider_id'],'config_version':version,
                 'secret_mask':mask,'secret_configured':cipher is not None}
+
+    def set_runtime_limits(self,provider_id,tpm_limit,max_output_tokens,
+                           tenant_budget=None,task_budget=None,now=None):
+        self._admin();now=self.clock() if now is None else now
+        for name,value in (('tpm_limit',tpm_limit),
+                           ('max_output_tokens',max_output_tokens)):
+            if type(value) is not int or value<1:
+                raise ValueError('VALID_%s_REQUIRED'%name.upper())
+        for name,value in (('tenant_budget',tenant_budget),
+                           ('task_budget',task_budget)):
+            if value is not None:_number(value,name)
+        if self.db.execute('''SELECT 1 FROM model_providers WHERE tenant_id=?
+          AND provider_id=?''',(self.tenant_id,provider_id)).fetchone() is None:
+            raise ValueError('PROVIDER_REQUIRED')
+        self.db.execute('''INSERT OR REPLACE INTO model_runtime_limits VALUES
+          (?,?,?,?,?,?,?)''',(self.tenant_id,provider_id,tpm_limit,
+          max_output_tokens,tenant_budget,task_budget,now));self.db.commit()
+        return {'provider_id':provider_id,'tpm_limit':tpm_limit,
+                'max_output_tokens':max_output_tokens}
+
+    def register_skill(self,skill_id,skill_version,content,review_sha256,
+                       now=None):
+        self._admin();now=self.clock() if now is None else now
+        _sha(review_sha256,'review_sha256')
+        if not isinstance(content,dict) or not content:
+            raise ValueError('SKILL_CONTENT_REQUIRED')
+        body=canonical(content);digest=hashlib.sha256(body.encode()).hexdigest()
+        self.db.execute('''INSERT INTO approved_skills VALUES
+          (?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(skill_id,'skill_id'),
+          _text(skill_version,'skill_version'),body,digest,review_sha256,
+          'APPROVED',now));self.db.commit()
+        return {'skill_id':skill_id,'skill_version':skill_version,
+                'content_sha256':digest,'state':'APPROVED'}
+
+    def revoke_skill(self,skill_id,skill_version,now=None):
+        self._admin();now=self.clock() if now is None else now
+        changed=self.db.execute('''UPDATE approved_skills SET state='REVOKED',
+          updated_at=? WHERE tenant_id=? AND skill_id=? AND skill_version=?''',
+          (now,self.tenant_id,skill_id,skill_version)).rowcount;self.db.commit()
+        if changed!=1:raise KeyError(skill_id)
+        return {'skill_id':skill_id,'state':'REVOKED'}
+
+    def register_checklist(self,task_id,items,created_by,now=None):
+        now=self.clock() if now is None else now
+        self.gateway.assert_task_context(self.context,task_id)
+        if created_by!=self._principal():raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
+        if not isinstance(items,list) or not items:raise ValueError('CHECKLIST_ITEMS_REQUIRED')
+        normalized=[]
+        for item in items:
+            if (not isinstance(item,dict) or set(item)!=
+                    {'id','required','result','evidence'}):
+                raise ValueError('EXACT_CHECKLIST_ITEM_REQUIRED')
+            if item['result'] not in ('PASS','FAIL','NOT_EXECUTED'):
+                raise ValueError('CHECKLIST_RESULT_REQUIRED')
+            normalized.append(item)
+        body=canonical(normalized);digest=hashlib.sha256(body.encode()).hexdigest()
+        task=self.gateway.supervisor._task(task_id)
+        checklist_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
+          'task':task_id,'attempt':task['attempt_id'],'content':digest}).encode()).hexdigest()
+        all_pass=all((not x['required']) or x['result']=='PASS' for x in normalized)
+        has_unexecuted=any(x['result']=='NOT_EXECUTED' for x in normalized)
+        self.db.execute('''INSERT OR IGNORE INTO acceptance_checklists VALUES
+          (?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,checklist_id,task_id,
+          task['attempt_id'],body,digest,int(all_pass),int(has_unexecuted),
+          created_by,now));self.db.commit()
+        return {'checklist_id':checklist_id,'content_sha256':digest,
+                'all_required_passed':all_pass,'has_unexecuted':has_unexecuted}
 
     def disable_provider(self, provider_id, now=None):
         principal=self._admin();now=self.clock() if now is None else now
@@ -497,6 +632,11 @@ class ModelControl(object):
         if status!='APPROVED':
             raise ValueError('APPROVED_SKILL_REVIEW_REQUIRED')
         _sha(review_sha256,'review_sha256')
+        skill=self.db.execute('''SELECT * FROM approved_skills WHERE tenant_id=?
+          AND skill_id=? AND skill_version=? AND state='APPROVED' ''',(
+          self.tenant_id,skill_id,skill_version)).fetchone()
+        if skill is None or skill['review_sha256']!=review_sha256:
+            raise ValueError('APPROVED_SKILL_CONTENT_REQUIRED')
         self.db.execute('INSERT INTO role_skill_bindings VALUES (?,?,?,?,?,?,?)',
           (self.tenant_id,role_id,role_version,skill_id,skill_version,
            review_sha256,status));self.db.commit()
@@ -556,6 +696,10 @@ class ModelControl(object):
           chosen['provider_id'],chosen['model_id'],'ASSIGNED',
           'QUALIFIED_FREE_FINAL_COST' if chosen['effective_price']=='KNOWN_FREE'
           else 'AUTHORIZED_QUALIFIED_FINAL_COST',now))
+        self.db.execute('''INSERT OR IGNORE INTO role_instances VALUES
+          (?,?,?,?,?,?,?,?,?)''',(self.tenant_id,principal_id,role_id,role_version,
+          'IDLE','RUNNING',None,canonical({'state':'ASSIGNED','task_id':task_id,
+          'attempt_id':task['attempt_id']}),now))
         self._audit(self._principal(),'ROLE_ASSIGNED',task_id,
           {'role_id':role_id,'role_version':role_version,
            'principal_id':principal_id,'attempt_id':task['attempt_id']},now)
@@ -565,7 +709,7 @@ class ModelControl(object):
           'AUTHORIZED_QUALIFIED_FINAL_COST')
 
     def queue_request(self, task_id, role_id, messages, idempotency_key,
-                      now=None):
+                      max_output_tokens=None,connection_id=None,now=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         task=self.gateway.supervisor._task(task_id)
@@ -573,6 +717,54 @@ class ModelControl(object):
           tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
           (self.tenant_id,task_id,task['attempt_id'],role_id)).fetchone()
         if assignment is None:raise ValueError('MODEL_ASSIGNMENT_REQUIRED')
+        provider=self.db.execute('''SELECT config_version,price_state,enabled
+          FROM model_providers WHERE tenant_id=? AND provider_id=?''',(
+          self.tenant_id,assignment['provider_id'])).fetchone()
+        if provider is None or not provider['enabled']:
+            raise ValueError('ACTIVE_PROVIDER_REQUIRED')
+        module=self.db.execute('''SELECT * FROM module_settings WHERE tenant_id=?
+          AND module_id='xuanjun.scheduler.kernel' ''',(self.tenant_id,)).fetchone()
+        if module is not None and not module['enabled']:
+            raise ValueError('MODULE_DISABLED')
+        spec=self.db.execute('''SELECT goal,deliverables_json,acceptance_json
+          FROM task_work_specs WHERE tenant_id=? AND task_id=?''',(
+          self.tenant_id,task_id)).fetchone()
+        if spec is None:raise ValueError('TASK_WORK_SPEC_REQUIRED')
+        spec_body=canonical(dict(spec));spec_sha=hashlib.sha256(spec_body.encode()).hexdigest()
+        limits=self.db.execute('''SELECT * FROM model_runtime_limits WHERE
+          tenant_id=? AND provider_id=?''',(self.tenant_id,
+          assignment['provider_id'])).fetchone()
+        output_limit=(limits['max_output_tokens'] if limits is not None else 4096)
+        if max_output_tokens is None:max_output_tokens=output_limit
+        if type(max_output_tokens) is not int or not 1<=max_output_tokens<=output_limit:
+            raise ValueError('OUTPUT_TOKEN_LIMIT_EXCEEDED')
+        task_state=self.gateway.supervisor._task(task_id)
+        if (task_state['authority_state']!='VALID' or
+                task_state['authority_valid_until'] is None or
+                not now<task_state['authority_valid_until']):
+            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
+        bindings=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
+          s.content_sha256,s.state FROM role_skill_bindings b JOIN approved_skills s
+          ON s.tenant_id=b.tenant_id AND s.skill_id=b.skill_id AND
+          s.skill_version=b.skill_version WHERE b.tenant_id=? AND b.role_id=?
+          AND b.role_version=? AND b.status='APPROVED' ORDER BY b.skill_id''',(
+          self.tenant_id,assignment['role_id'],assignment['role_version'])))
+        if any(x['state']!='APPROVED' for x in bindings):
+            raise ValueError('SKILL_REVOKED')
+        skill_sha=(hashlib.sha256(canonical([dict(x) for x in bindings]).encode()).hexdigest()
+                   if bindings else None)
+        connection_version=None
+        if connection_id is not None:
+            if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table'
+              AND name='service_connections' ''').fetchone() is None:
+                raise ValueError('CONNECTION_MANAGER_REQUIRED')
+            connection=self.db.execute('''SELECT provider_id,config_version,status
+              FROM service_connections WHERE tenant_id=? AND connection_id=?''',(
+              self.tenant_id,connection_id)).fetchone()
+            if (connection is None or connection['status']!='ACTIVE' or
+                    connection['provider_id']!=assignment['provider_id']):
+                raise ValueError('ACTIVE_PROVIDER_CONNECTION_REQUIRED')
+            connection_version=connection['config_version']
         payload={'messages':messages};body=canonical(payload);digest=hashlib.sha256(body.encode()).hexdigest()
         identity={'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'role':role_id,
@@ -592,11 +784,24 @@ class ModelControl(object):
         checkpoint=canonical({'goal':'execute assigned role','input_version':
           task.get('spec_sha256',UNKNOWN),'done':[],'pending':['MODEL_RESULT'],
           'evidence':[]})
-        self.db.execute('''INSERT INTO model_requests VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
-          _text(idempotency_key,'idempotency_key'),task_id,task['attempt_id'],
-          role_id,assignment['provider_id'],assignment['model_id'],'QUEUED',body,
-          digest,0,now,None,None,None,None,None,checkpoint,0,now,now));self.db.commit()
+        expected_input=max(1,len(body.encode('utf-8'))//4)
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            self.db.execute('''INSERT INTO model_requests VALUES
+              (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
+              _text(idempotency_key,'idempotency_key'),task_id,task['attempt_id'],
+              role_id,assignment['provider_id'],assignment['model_id'],'QUEUED',body,
+              digest,0,now,None,None,None,None,None,checkpoint,0,now,now))
+            self.db.execute('''INSERT INTO model_request_bindings VALUES
+              (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
+              provider['config_version'],connection_id,connection_version,expected_input,
+              max_output_tokens,int(assignment['reason']!='QUALIFIED_FREE_FINAL_COST'),
+              task_state['fence'],task_state['epoch'],
+              task_state['authority_valid_until'],skill_sha,spec_sha,
+              module['version'] if module else 'legacy-test-only'))
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         return {'request_id':request_id,'state':'QUEUED','duplicate':False}
 
     def request_cancel(self, request_id, now=None):
@@ -615,10 +820,111 @@ class ModelControl(object):
               'CANCELLED_BEFORE_CALL' ELSE error_kind END,updated_at=? WHERE
               tenant_id=? AND request_id=?''',(state,state,now,self.tenant_id,
               request_id))
+            self.db.execute('''UPDATE role_instances SET state=CASE WHEN
+              ?='CANCELLED' THEN 'IDLE' ELSE state END,last_checkpoint_json=?,
+              updated_at=? WHERE tenant_id=? AND current_request_id=?''',(
+              state,canonical({'state':state,'reason':'CANCEL_REQUESTED'}),now,
+              self.tenant_id,request_id))
             self._audit(principal,'REQUEST_CANCEL',request_id,
                         {'resulting_state':state},now)
         return {'request_id':request_id,'state':state,
                 'cancel_requested':True}
+
+    def _reserve_call_locked(self,provider_id,model_id,request_id,task_id,
+                             attempt_number,input_tokens,output_tokens,
+                             allow_paid,config_version,now):
+        """One transactional gate shared by benchmark and queued calls."""
+        provider=self.db.execute('''SELECT * FROM model_providers WHERE
+          tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
+        model=self.db.execute('''SELECT * FROM model_catalog WHERE tenant_id=?
+          AND provider_id=? AND model_id=?''',(self.tenant_id,provider_id,
+          model_id)).fetchone()
+        limits=self.db.execute('''SELECT * FROM model_runtime_limits WHERE
+          tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
+        if provider is None or model is None or not provider['enabled'] or not model['enabled']:
+            raise ValueError('ACTIVE_MODEL_REQUIRED')
+        if provider['config_version']!=config_version:
+            raise ValueError('PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED')
+        if provider['circuit_state']=='OPEN' and (provider['next_probe_at'] is None or
+                                                  provider['next_probe_at']>now):
+            raise ValueError('CIRCUIT_OPEN')
+        effective=(UNKNOWN if UNKNOWN in (provider['price_state'],model['price_state'])
+          else 'KNOWN_PAID' if 'KNOWN_PAID' in
+          (provider['price_state'],model['price_state']) else 'KNOWN_FREE')
+        if effective!= 'KNOWN_FREE' and not allow_paid:
+            raise ValueError('PAID_OR_UNKNOWN_NOT_AUTHORIZED')
+        if limits is None:
+            tpm_limit=max(1,provider['rate_limit_per_min']*8192)
+            output_limit=4096;tenant_budget=None;task_budget=None
+        else:
+            tpm_limit=limits['tpm_limit'];output_limit=limits['max_output_tokens']
+            tenant_budget=limits['tenant_budget'];task_budget=limits['task_budget']
+        if output_tokens>output_limit:raise ValueError('OUTPUT_TOKEN_LIMIT_EXCEEDED')
+        recent=self.db.execute('''SELECT COUNT(*) AS calls,
+          COALESCE(SUM(input_tokens+output_tokens),0) AS tokens FROM
+          model_call_reservations WHERE tenant_id=? AND provider_id=? AND
+          created_at>?''',(self.tenant_id,provider_id,now-60)).fetchone()
+        if recent['calls']>=provider['rate_limit_per_min']:
+            raise ValueError('LOCAL_RPM_LIMIT')
+        if recent['tokens']+input_tokens+output_tokens>tpm_limit:
+            raise ValueError('LOCAL_TPM_LIMIT')
+        running=self.db.execute('''SELECT COUNT(*) FROM model_call_reservations
+          WHERE tenant_id=? AND provider_id=? AND state='ACTIVE' ''',(
+          self.tenant_id,provider_id)).fetchone()[0]
+        if running>=provider['concurrency_limit']:
+            raise ValueError('LOCAL_CONCURRENCY_LIMIT')
+        if effective==UNKNOWN:
+            cost_state=UNKNOWN;reserved=None
+        elif effective=='KNOWN_FREE':cost_state='KNOWN_ZERO';reserved=0.0
+        elif model['input_unit_cost'] is None or model['output_unit_cost'] is None:
+            cost_state=UNKNOWN;reserved=None
+        else:
+            cost_state='KNOWN';reserved=(input_tokens*model['input_unit_cost']+
+                                         output_tokens*model['output_unit_cost'])
+        if cost_state==UNKNOWN and (tenant_budget is not None or task_budget is not None):
+            raise ValueError('UNKNOWN_COST_BUDGET_HOLD')
+        known_tenant=self.db.execute('''SELECT COALESCE(SUM(reserved_cost),0)
+          FROM model_call_reservations WHERE tenant_id=? AND
+          cost_state IN ('KNOWN','KNOWN_ZERO') AND state IN ('ACTIVE','SETTLED')''',
+          (self.tenant_id,)).fetchone()[0]
+        known_task=self.db.execute('''SELECT COALESCE(SUM(reserved_cost),0)
+          FROM model_call_reservations WHERE tenant_id=? AND task_id=? AND
+          cost_state IN ('KNOWN','KNOWN_ZERO') AND state IN ('ACTIVE','SETTLED')''',
+          (self.tenant_id,task_id)).fetchone()[0]
+        if tenant_budget is not None and known_tenant+(reserved or 0)>tenant_budget:
+            raise ValueError('TENANT_BUDGET_EXHAUSTED')
+        if task_budget is not None and known_task+(reserved or 0)>task_budget:
+            raise ValueError('TASK_BUDGET_EXHAUSTED')
+        if (tenant_budget is not None and self.db.execute('''SELECT 1 FROM
+              model_call_reservations WHERE tenant_id=? AND cost_state=? AND
+              state='SETTLED' LIMIT 1''',(self.tenant_id,UNKNOWN)).fetchone()):
+            raise ValueError('UNKNOWN_COST_BUDGET_HOLD')
+        if (task_budget is not None and self.db.execute('''SELECT 1 FROM
+              model_call_reservations WHERE tenant_id=? AND task_id=? AND
+              cost_state=? AND state='SETTLED' LIMIT 1''',(
+              self.tenant_id,task_id,UNKNOWN)).fetchone()):
+            raise ValueError('UNKNOWN_COST_BUDGET_HOLD')
+        reservation_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
+          'request':request_id,'attempt':attempt_number}).encode()).hexdigest()
+        self.db.execute('''INSERT INTO model_call_reservations VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,reservation_id,
+          request_id,attempt_number,task_id,provider_id,model_id,input_tokens,
+          output_tokens,reserved,cost_state,'ACTIVE',now,None))
+        return {'reservation_id':reservation_id,'cost_state':cost_state,
+                'reserved_cost':reserved,'provider':provider,'model':model}
+
+    def _settle_reservation_locked(self,reservation_id,state,now,
+                                   cost_state=None,cost_value=None):
+        if cost_state is None:
+            changed=self.db.execute('''UPDATE model_call_reservations SET state=?,
+              settled_at=? WHERE tenant_id=? AND reservation_id=? AND
+              state='ACTIVE' ''',(state,now,self.tenant_id,reservation_id)).rowcount
+        else:
+            changed=self.db.execute('''UPDATE model_call_reservations SET state=?,
+              settled_at=?,cost_state=?,reserved_cost=? WHERE tenant_id=? AND
+              reservation_id=? AND state='ACTIVE' ''',(state,now,cost_state,
+              cost_value,self.tenant_id,reservation_id)).rowcount
+        if changed!=1:raise ValueError('ACTIVE_RESERVATION_REQUIRED')
 
     def register_benchmark_suite(self, suite_version, cases):
         principal=self._admin();_text(suite_version,'suite_version')
@@ -642,7 +948,7 @@ class ModelControl(object):
         return {'suite_version':suite_version,'case_count':len(normalized)}
 
     def run_benchmark(self, provider_id, model_id, suite_version,
-                      adapter=None, now=None):
+                      adapter=None, allow_paid=False, now=None):
         """Run the registered TEST_ONLY cases through the real adapter path."""
         self._admin();now=self.clock() if now is None else now
         provider=self.db.execute('''SELECT * FROM model_providers WHERE
@@ -664,21 +970,24 @@ class ModelControl(object):
             request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
               'provider':provider_id,'model':model_id,'suite':suite_version,
               'case':case['case_id'],'observed_at':now}).encode()).hexdigest()
-            self.db.execute('BEGIN IMMEDIATE')
-            with self.db:
-                recent=self.db.execute('''SELECT COUNT(*) FROM model_call_attempts
-                  WHERE tenant_id=? AND provider_id=? AND started_at>?''',(
-                  self.tenant_id,provider_id,now-60)).fetchone()[0]
-                if recent>=provider['rate_limit_per_min']:
-                    evidence.append({'case_id':case['case_id'],'passed':False,
-                      'error_kind':'LOCAL_RATE_LIMIT'})
-                    continue
+            estimated=max(1,len(case['messages_json'].encode())//4)
+            try:
+                self.db.execute('BEGIN IMMEDIATE')
+                reservation=self._reserve_call_locked(provider_id,model_id,
+                  request_id,'BENCHMARK:'+suite_version,1,estimated,512,
+                  bool(allow_paid),provider['config_version'],now)
                 self.db.execute('''INSERT INTO model_call_attempts VALUES
                   (?,?,?,?,?,?,?)''',(self.tenant_id,request_id,1,provider_id,
                   model_id,'benchmark:'+suite_version,now))
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                evidence.append({'case_id':case['case_id'],'passed':False,
+                  'error_kind':str(exc)})
+                continue
             try:
                 result=adapter.invoke(provider['base_url'],secret,model_id,
-                  json.loads(case['messages_json']),provider['timeout_seconds'])
+                  json.loads(case['messages_json']),provider['timeout_seconds'],512)
                 ok=case['expected_contains'] in result['content']
                 passed+=int(ok);input_tokens+=result['usage']['input_tokens']
                 output_tokens+=result['usage']['output_tokens']
@@ -687,6 +996,24 @@ class ModelControl(object):
             except ProviderError as exc:
                 evidence.append({'case_id':case['case_id'],'passed':False,
                   'error_kind':exc.kind})
+                result=None
+            self.db.execute('BEGIN IMMEDIATE')
+            with self.db:
+                usage=(result or {}).get('usage') or {}
+                outcome=('SUCCEEDED' if result is not None else UNKNOWN)
+                if result is None or UNKNOWN in (provider['price_state'],model['price_state']):
+                    actual_state=UNKNOWN;actual_cost=None
+                elif 'KNOWN_PAID' in (provider['price_state'],model['price_state']):
+                    actual_state='KNOWN';actual_cost=(usage.get('input_tokens',0)*
+                      model['input_unit_cost']+usage.get('output_tokens',0)*
+                      model['output_unit_cost'])
+                else:actual_state='KNOWN_ZERO';actual_cost=0.0
+                self._settle_reservation_locked(reservation['reservation_id'],
+                                                'SETTLED',now,actual_state,actual_cost)
+                self.db.execute('''INSERT INTO model_usage_attempts VALUES
+                  (?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,1,
+                  provider_id,model_id,usage.get('input_tokens'),
+                  usage.get('output_tokens'),actual_state,actual_cost,outcome,now))
         score=float(passed)/len(cases);duration=int((time.monotonic()-started)*1000)
         identity=canonical({'tenant':self.tenant_id,'provider':provider_id,
           'model':model_id,'suite':suite_version,'at':now})
@@ -708,8 +1035,18 @@ class ModelControl(object):
         _sha(artifact_sha256,'artifact_sha256')
         _sha(checklist_sha256,'checklist_sha256')
         task=self.gateway.supervisor._task(task_id)
-        if task['authority_state']!='VALID' or task['state']!='STARTED':
+        if task['authority_state']!='VALID' or task['state'] not in ('STARTED','RUNNING'):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        in_flight=self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
+          AND task_id=? AND attempt_id=? AND state IN ('RUNNING',?) LIMIT 1''',(
+          self.tenant_id,task_id,task['attempt_id'],UNKNOWN)).fetchone()
+        if in_flight is not None:raise ValueError('MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED')
+        checklist=self.db.execute('''SELECT * FROM acceptance_checklists WHERE
+          tenant_id=? AND task_id=? AND attempt_id=? AND content_sha256=?''',(
+          self.tenant_id,task_id,task['attempt_id'],checklist_sha256)).fetchone()
+        if checklist is None:raise ValueError('EXECUTED_CHECKLIST_EVIDENCE_REQUIRED')
+        if not checklist['all_required_passed'] or checklist['has_unexecuted']:
+            raise ValueError('CHECKLIST_INCOMPLETE')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
           AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
@@ -735,7 +1072,7 @@ class ModelControl(object):
         if row is None:raise KeyError(candidate_id)
         task=self.gateway.supervisor._task(row['task_id'])
         if (task['attempt_id']!=row['attempt_id'] or
-                task['authority_state']!='VALID' or task['state']!='STARTED'):
+                task['authority_state']!='VALID' or task['state'] not in ('STARTED','RUNNING')):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         if row['state']!='SUBMITTED':
             raise ValueError('SUBMITTED_CANDIDATE_REQUIRED')
@@ -775,7 +1112,7 @@ class ModelControl(object):
         if row is None:raise KeyError(candidate_id)
         task=self.gateway.supervisor._task(row['task_id'])
         current=((task['attempt_id']==row['attempt_id'] and
-                  task['authority_state']=='VALID' and task['state']=='STARTED') or
+                  task['authority_state']=='VALID' and task['state'] in ('STARTED','RUNNING')) or
                  (task['attempt_id']==row['attempt_id'] and
                   task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
         if not current:
@@ -850,9 +1187,19 @@ class ModelControl(object):
 
     def set_module(self,module_id,version,enabled,now=None):
         self._admin();now=self.clock() if now is None else now
-        self.db.execute('''INSERT OR REPLACE INTO module_settings VALUES
-          (?,?,?,?,?)''',(self.tenant_id,_text(module_id,'module_id'),
-          int(bool(enabled)),_text(version,'version'),now));self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            self.db.execute('''INSERT OR REPLACE INTO module_settings VALUES
+              (?,?,?,?,?)''',(self.tenant_id,_text(module_id,'module_id'),
+              int(bool(enabled)),_text(version,'version'),now))
+            if not enabled and module_id=='xuanjun.scheduler.kernel':
+                self.db.execute('''UPDATE model_requests SET state='CANCELLED',
+                  error_kind='MODULE_DISABLED',updated_at=? WHERE tenant_id=?
+                  AND state IN ('QUEUED','RETRY_WAIT')''',(now,self.tenant_id))
+                self.db.execute('''UPDATE role_instances SET desired_state='STOPPED',
+                  state=CASE WHEN current_request_id IS NULL THEN 'STOPPED'
+                  ELSE 'DRAINING' END,updated_at=? WHERE tenant_id=?''',(
+                  now,self.tenant_id))
         return {'module_id':module_id,'version':version,'enabled':bool(enabled)}
 
     def record_task_spec(self,task_id,goal,deliverables,acceptance,now=None):
@@ -866,7 +1213,14 @@ class ModelControl(object):
         return {'task_id':task_id,'spec_recorded':True}
 
     def projection(self):
+        has_connections=self.db.execute('''SELECT 1 FROM sqlite_master WHERE
+          type='table' AND name='service_connections' ''').fetchone() is not None
         return {'providers':self.list_providers(),
+          'connections':([dict(x) for x in self.db.execute('''SELECT
+          connection_id,provider_id,purpose,auth_type,destination_origin,issuer,
+          scopes_json,supports_refresh,status,config_version,secret_mask,
+          access_expires_at,updated_at FROM service_connections WHERE tenant_id=?
+          ORDER BY connection_id''',(self.tenant_id,))] if has_connections else []),
           'models':[dict(x) for x in self.db.execute('''SELECT provider_id,
           model_id,capabilities_json,enabled,price_state,input_unit_cost,
           output_unit_cost FROM model_catalog WHERE tenant_id=? ORDER BY
@@ -890,6 +1244,11 @@ class ModelControl(object):
           known_cost FROM model_usage_events WHERE tenant_id=? GROUP BY
           provider_id,model_id,cost_state ORDER BY provider_id,model_id''',
           (self.tenant_id,))],
+          'usage_attempts':[dict(x) for x in self.db.execute('''SELECT
+          request_id,attempt_number,provider_id,model_id,input_tokens,
+          output_tokens,cost_state,cost_value,outcome,observed_at FROM
+          model_usage_attempts WHERE tenant_id=? ORDER BY observed_at,
+          request_id,attempt_number''',(self.tenant_id,))],
           'evaluations':[dict(x) for x in self.db.execute('''SELECT
           evaluation_id,provider_id,model_id,suite_version,quality_score,
           duration_ms,input_tokens,output_tokens,retries,rework_count,state,
@@ -932,89 +1291,205 @@ class ModelScheduler(object):
           state='RUNNING' AND lease_until IS NOT NULL AND lease_until<?''',
           (UNKNOWN,'WORKER_LOST_SIDE_EFFECT_UNKNOWN',now,
            self.control.tenant_id,now));self.db.commit()
-        row=self.db.execute('''SELECT r.*,p.adapter_type,p.base_url,
-          p.timeout_seconds,p.retry_limit,p.rate_limit_per_min,
-          p.concurrency_limit,p.circuit_state,p.next_probe_at,p.price_state
-          AS provider_price,m.price_state AS model_price,m.input_unit_cost,
-          m.output_unit_cost FROM model_requests r JOIN model_providers p ON
+        candidates=list(self.db.execute('''SELECT r.*,b.provider_config_version,
+          b.connection_id,b.connection_config_version,b.expected_input_tokens,
+          b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
+          b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
+          b.module_version,p.adapter_type,p.base_url,p.timeout_seconds,
+          p.retry_limit,p.config_version,p.price_state AS provider_price,
+          m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,
+          a.principal_id AS instance_id
+          FROM model_requests r JOIN
+          model_request_bindings b ON b.tenant_id=r.tenant_id AND
+          b.request_id=r.request_id JOIN model_providers p ON
           r.tenant_id=p.tenant_id AND r.provider_id=p.provider_id JOIN
           model_catalog m ON m.tenant_id=r.tenant_id AND
-          m.provider_id=r.provider_id AND m.model_id=r.model_id WHERE
+          m.provider_id=r.provider_id AND m.model_id=r.model_id JOIN
+          model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id
+          AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id WHERE
           r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
-          r.next_attempt_at<=? AND p.enabled=1 ORDER BY r.created_at LIMIT 1''',
-          (self.control.tenant_id,now)).fetchone()
-        if row is None:return {'state':'IDLE'}
-        task=self.control.gateway.supervisor._task(row['task_id'])
-        if task['attempt_id']!=row['attempt_id'] or task['authority_state']!='VALID':
-            self.db.execute('''UPDATE model_requests SET state='CANCELLED',
-              error_kind='STALE_OR_UNAUTHORIZED',updated_at=? WHERE tenant_id=?
-              AND request_id=? AND state IN ('QUEUED','RETRY_WAIT')''',
-              (now,row['tenant_id'],row['request_id']));self.db.commit()
-            return {'request_id':row['request_id'],'state':'CANCELLED'}
-        if row['circuit_state']=='OPEN' and (row['next_probe_at'] is None or row['next_probe_at']>now):
-            return {'request_id':row['request_id'],'state':'CIRCUIT_OPEN'}
-        self.db.execute('BEGIN IMMEDIATE')
-        with self.db:
-            recent=self.db.execute('''SELECT COUNT(*) FROM model_call_attempts
-              WHERE tenant_id=? AND provider_id=? AND started_at>?''',
-              (row['tenant_id'],row['provider_id'],now-60)).fetchone()[0]
-            running=self.db.execute('''SELECT COUNT(*) FROM model_requests WHERE
-              tenant_id=? AND provider_id=? AND state='RUNNING' ''',
-              (row['tenant_id'],row['provider_id'])).fetchone()[0]
-            if (recent>=row['rate_limit_per_min'] or
-                    running>=row['concurrency_limit']):
-                return {'request_id':row['request_id'],'state':'QUEUED_LIMIT'}
-            changed=self.db.execute('''UPDATE model_requests SET state='RUNNING',
-              attempts=attempts+1,lease_owner=?,lease_until=?,last_heartbeat=?,
-              updated_at=? WHERE tenant_id=? AND request_id=?
-              AND state IN ('QUEUED','RETRY_WAIT')''',(self.worker_id,
-              now+row['timeout_seconds']+5,now,now,row['tenant_id'],
-              row['request_id'])).rowcount
-            if changed==1:
+          r.next_attempt_at<=? ORDER BY r.created_at,r.request_id LIMIT 100''',
+          (self.control.tenant_id,now)))
+        if not candidates:return {'state':'IDLE'}
+        row=None;reservation=None;last_limit=None
+        for candidate in candidates:
+            task=self.control.gateway.supervisor._task(candidate['task_id'])
+            fatal=None
+            if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
+                task['authority_state']!='VALID' or
+                task['authority_valid_until'] is None or now>=task['authority_valid_until'] or
+                task['fence']!=candidate['writer_fence'] or
+                task['epoch']!=candidate['writer_epoch']):
+                fatal='STALE_OR_UNAUTHORIZED'
+            elif candidate['config_version']!=candidate['provider_config_version']:
+                fatal='PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED'
+            else:
+                module=self.db.execute('''SELECT enabled,version FROM module_settings
+                  WHERE tenant_id=? AND module_id='xuanjun.scheduler.kernel' ''',(
+                  candidate['tenant_id'],)).fetchone()
+                if module is not None and (not module['enabled'] or
+                        module['version']!=candidate['module_version']):
+                    fatal='MODULE_DISABLED_OR_VERSION_CHANGED'
+                spec=self.db.execute('''SELECT goal,deliverables_json,acceptance_json
+                  FROM task_work_specs WHERE tenant_id=? AND task_id=?''',(
+                  candidate['tenant_id'],candidate['task_id'])).fetchone()
+                current_spec=(hashlib.sha256(canonical(dict(spec)).encode()).hexdigest()
+                              if spec is not None else None)
+                if current_spec!=candidate['work_spec_sha256']:
+                    fatal='WORK_SPEC_CHANGED'
+                assignment=self.db.execute('''SELECT role_version FROM
+                  model_assignments WHERE tenant_id=? AND task_id=? AND
+                  attempt_id=? AND role_id=?''',(candidate['tenant_id'],
+                  candidate['task_id'],candidate['attempt_id'],
+                  candidate['role_id'])).fetchone()
+                if assignment is None:fatal='ASSIGNMENT_REVOKED'
+                else:
+                    skills=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
+                      s.content_sha256,s.state FROM role_skill_bindings b JOIN
+                      approved_skills s ON s.tenant_id=b.tenant_id AND
+                      s.skill_id=b.skill_id AND s.skill_version=b.skill_version
+                      WHERE b.tenant_id=? AND b.role_id=? AND b.role_version=?
+                      AND b.status='APPROVED' ORDER BY b.skill_id''',(
+                      candidate['tenant_id'],candidate['role_id'],
+                      assignment['role_version'])))
+                    current_skill=(hashlib.sha256(canonical([dict(x) for x in skills]).encode()).hexdigest()
+                                   if skills else None)
+                    if current_skill!=candidate['skill_snapshot_sha256'] or any(
+                            x['state']!='APPROVED' for x in skills):
+                        fatal='SKILL_SNAPSHOT_REVOKED_OR_CHANGED'
+                if candidate['connection_id']:
+                    connection=self.db.execute('''SELECT status,config_version,
+                      provider_id FROM service_connections WHERE tenant_id=? AND
+                      connection_id=?''',(candidate['tenant_id'],
+                      candidate['connection_id'])).fetchone()
+                    if (connection is None or connection['status']!='ACTIVE' or
+                            connection['config_version']!=candidate['connection_config_version'] or
+                            connection['provider_id']!=candidate['provider_id']):
+                        fatal='CONNECTION_REAUTH_OR_CONFIG_CHANGED'
+            if fatal:
+                last_limit=fatal
+                self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,
+                  updated_at=? WHERE tenant_id=? AND request_id=? AND state IN
+                  ('QUEUED','RETRY_WAIT')''',(fatal,now,candidate['tenant_id'],
+                  candidate['request_id']));self.db.commit();continue
+            try:
+                self.db.execute('BEGIN IMMEDIATE')
+                fresh=self.db.execute('''SELECT state,cancel_requested FROM
+                  model_requests WHERE tenant_id=? AND request_id=?''',(
+                  candidate['tenant_id'],candidate['request_id'])).fetchone()
+                if fresh is None or fresh['state'] not in ('QUEUED','RETRY_WAIT'):
+                    raise ValueError('LOST_RACE')
+                if fresh['cancel_requested']:raise ValueError('CANCELLED_BEFORE_CALL')
+                reservation=self.control._reserve_call_locked(
+                  candidate['provider_id'],candidate['model_id'],
+                  candidate['request_id'],candidate['task_id'],
+                  candidate['attempts']+1,candidate['expected_input_tokens'],
+                  candidate['max_output_tokens'],bool(candidate['allow_paid']),
+                  candidate['provider_config_version'],now)
+                changed=self.db.execute('''UPDATE model_requests SET state='RUNNING',
+                  attempts=attempts+1,lease_owner=?,lease_until=?,last_heartbeat=?,
+                  updated_at=? WHERE tenant_id=? AND request_id=? AND state IN
+                  ('QUEUED','RETRY_WAIT') AND cancel_requested=0''',(self.worker_id,
+                  now+candidate['timeout_seconds']+5,now,now,candidate['tenant_id'],
+                  candidate['request_id'])).rowcount
+                if changed!=1:raise ValueError('LOST_RACE')
                 self.db.execute('''INSERT INTO model_call_attempts VALUES
-                  (?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
-                  row['attempts']+1,row['provider_id'],row['model_id'],
-                  self.worker_id,now))
-        if changed!=1:return {'request_id':row['request_id'],'state':'LOST_RACE'}
-        secret=self.control.provider_secret(row['provider_id'])
+                  (?,?,?,?,?,?,?)''',(candidate['tenant_id'],candidate['request_id'],
+                  candidate['attempts']+1,candidate['provider_id'],
+                  candidate['model_id'],self.worker_id,now))
+                self.db.execute('''UPDATE role_instances SET state='RUNNING',
+                  current_request_id=?,last_checkpoint_json=?,updated_at=? WHERE
+                  tenant_id=? AND instance_id=? AND desired_state='RUNNING' ''',(
+                  candidate['request_id'],canonical({'state':'CALL_RESERVED',
+                  'request_id':candidate['request_id'],'attempt_number':
+                  candidate['attempts']+1}),now,candidate['tenant_id'],
+                  candidate['instance_id']))
+                self.db.commit();row=candidate;break
+            except ValueError as exc:
+                self.db.rollback();last_limit=str(exc)
+                if str(exc) not in ('LOCAL_RPM_LIMIT','LOCAL_TPM_LIMIT',
+                                    'LOCAL_CONCURRENCY_LIMIT','CIRCUIT_OPEN',
+                                    'TENANT_BUDGET_EXHAUSTED','TASK_BUDGET_EXHAUSTED'):
+                    self.db.execute('''UPDATE model_requests SET state='HOLD',
+                      error_kind=?,updated_at=? WHERE tenant_id=? AND request_id=?
+                      AND state IN ('QUEUED','RETRY_WAIT')''',(str(exc),now,
+                      candidate['tenant_id'],candidate['request_id']));self.db.commit()
+                continue
+        if row is None:
+            return {'state':last_limit if last_limit=='CIRCUIT_OPEN' else
+                    ('HOLD' if last_limit not in (None,'LOCAL_RPM_LIMIT',
+                    'LOCAL_TPM_LIMIT','LOCAL_CONCURRENCY_LIMIT',
+                    'TENANT_BUDGET_EXHAUSTED','TASK_BUDGET_EXHAUSTED') else
+                    'QUEUED_LIMIT'),'reason':last_limit}
+        if row['connection_id']:
+            secret,connection_version=ConnectionManager(self.control.gateway,
+              self.control.context,self.control.master_key).credential(
+              row['connection_id'],row['base_url'],now)
+            if (row['connection_config_version'] is not None and
+                    connection_version!=row['connection_config_version']):
+                self._finish(row,UNKNOWN,'CONNECTION_CONFIG_CHANGED',None,now,
+                             reservation['reservation_id'])
+                return {'request_id':row['request_id'],'state':UNKNOWN,
+                        'error':'CONNECTION_CONFIG_CHANGED'}
+        else:secret=self.control.provider_secret(row['provider_id'])
         payload=json.loads(row['payload_json'])
         adapter=self.adapters[row['adapter_type']]
         try:
             result=adapter.invoke(row['base_url'],secret,row['model_id'],
-                                  payload['messages'],row['timeout_seconds'])
+                                  payload['messages'],row['timeout_seconds'],
+                                  row['max_output_tokens'])
         except ProviderError as exc:
             attempts=row['attempts']+1
             if exc.kind in ('TIMEOUT_UNKNOWN','TRANSPORT_UNKNOWN'):
-                stored=self._finish(row,UNKNOWN,exc.kind,None,now)
+                stored=self._finish(row,UNKNOWN,exc.kind,None,now,
+                                    reservation['reservation_id'])
                 return {'request_id':row['request_id'],'state':UNKNOWN,
                         'error':exc.kind if stored else 'LATE_WORKER_RESULT_REJECTED'}
-            if exc.retryable and attempts<=row['retry_limit']:
-                changed=self.db.execute('''UPDATE model_requests SET state='RETRY_WAIT',
+            if exc.kind=='RATE_LIMIT' and attempts<=row['retry_limit']:
+                self.db.execute('BEGIN IMMEDIATE')
+                cancelled=self.db.execute('''SELECT cancel_requested FROM model_requests
+                  WHERE tenant_id=? AND request_id=?''',(row['tenant_id'],
+                  row['request_id'])).fetchone()['cancel_requested']
+                next_state='CANCELLED' if cancelled else 'RETRY_WAIT'
+                changed=self.db.execute('''UPDATE model_requests SET state=?,
                   error_kind=?,next_attempt_at=?,lease_owner=NULL,
                   lease_until=NULL,updated_at=? WHERE tenant_id=?
                   AND request_id=? AND state='RUNNING' AND lease_owner=?
                   AND attempts=?''',
-                  (exc.kind,now+min(60,2**attempts),now,
+                  (next_state,'CANCELLED_AFTER_RATE_LIMIT' if cancelled else exc.kind,
+                  now+min(60,2**attempts),now,
                   row['tenant_id'],row['request_id'],self.worker_id,
                   row['attempts']+1)).rowcount
+                if changed==1:
+                    self.control._settle_reservation_locked(
+                      reservation['reservation_id'],'CANCELLED' if cancelled else
+                      'SETTLED',now,UNKNOWN,None)
+                    self.db.execute('''INSERT INTO model_usage_attempts VALUES
+                      (?,?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
+                      row['attempts']+1,row['provider_id'],row['model_id'],None,
+                      None,UNKNOWN,None,next_state,now))
                 self.db.commit()
                 if changed!=1:
                     return {'request_id':row['request_id'],'state':UNKNOWN,
                             'error':'LATE_WORKER_RESULT_REJECTED'}
-                return {'request_id':row['request_id'],'state':'RETRY_WAIT','error':exc.kind}
-            stored=self._finish(row,'FAILED',exc.kind,None,now)
+                return {'request_id':row['request_id'],'state':next_state,'error':exc.kind}
+            # Any 5xx is an already-sent POST with an unknown side effect.
+            terminal=UNKNOWN if exc.kind=='HTTP' else 'FAILED'
+            stored=self._finish(row,terminal,exc.kind,None,now,
+                                reservation['reservation_id'])
             return {'request_id':row['request_id'],
-                    'state':'FAILED' if stored else UNKNOWN,
+                    'state':terminal if stored else UNKNOWN,
                     'error':exc.kind if stored else 'LATE_WORKER_RESULT_REJECTED'}
-        stored=self._finish(row,'SUCCEEDED',None,result,now)
+        stored=self._finish(row,'SUCCEEDED',None,result,now,
+                            reservation['reservation_id'])
         return {'request_id':row['request_id'],
                 'state':'SUCCEEDED' if stored else UNKNOWN,
                 'error':None if stored else 'LATE_WORKER_RESULT_REJECTED'}
 
-    def _finish(self,row,state,error,result,now):
+    def _finish(self,row,state,error,result,now,reservation_id=None):
         usage=(result or {}).get('usage',{})
         prices=(row['provider_price'],row['model_price'])
-        if UNKNOWN in prices:
+        if result is None or UNKNOWN in prices:
             cost_state=UNKNOWN;cost_value=None
         elif 'KNOWN_PAID' in prices:
             if row['input_unit_cost'] is None or row['output_unit_cost'] is None:
@@ -1036,11 +1511,28 @@ class ModelScheduler(object):
                row['attempts']+1)).rowcount
             if changed!=1:
                 return False
+            if reservation_id is None:
+                raise ValueError('CALL_RESERVATION_REQUIRED')
+            self.control._settle_reservation_locked(reservation_id,'SETTLED',now,
+                                                    cost_state,cost_value)
+            self.db.execute('''INSERT INTO model_usage_attempts VALUES
+              (?,?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
+              row['attempts']+1,row['provider_id'],row['model_id'],
+              usage.get('input_tokens') if result else None,
+              usage.get('output_tokens') if result else None,cost_state,
+              cost_value,state,now))
             self.db.execute('''INSERT OR REPLACE INTO model_usage_events VALUES
               (?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
                row['provider_id'],row['model_id'],usage.get('input_tokens',0),
                usage.get('output_tokens',0),cost_state,cost_value,
                state,now))
+            self.db.execute('''UPDATE role_instances SET state=CASE WHEN
+              desired_state='STOPPED' THEN 'STOPPED' ELSE 'IDLE' END,
+              current_request_id=NULL,last_checkpoint_json=?,updated_at=? WHERE
+              tenant_id=? AND instance_id=? AND current_request_id=?''',(
+              canonical({'state':state,'request_id':row['request_id'],
+              'error_kind':error,'result_present':result is not None}),now,
+              row['tenant_id'],row['instance_id'],row['request_id']))
             if state=='SUCCEEDED':
                 self.db.execute('''UPDATE model_providers SET failure_count=0,
                   circuit_state='CLOSED',next_probe_at=NULL,updated_at=? WHERE

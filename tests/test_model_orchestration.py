@@ -67,6 +67,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.executor=TestOnlyExecutor(self.gateway,self.fence,self.context)
         self.executor.start('demo-b','attempt-b',['fake:demo-b'],time.time()+600)
         self.master=Fernet.generate_key();self.control=ModelControl(self.gateway,self.context,self.master)
+        self.control.record_task_spec('demo-b','test goal',['artifact'],['tests pass'])
         self.server=ThreadServer(('127.0.0.1',0),ProviderHandler)
         self.thread=threading.Thread(target=self.server.serve_forever);self.thread.daemon=True;self.thread.start()
         self.url='http://127.0.0.1:%d' % self.server.server_port
@@ -100,13 +101,21 @@ class ModelOrchestrationTests(unittest.TestCase):
             def invoke(self,*_args,**_kwargs):return {'content':'ok',
               'usage':{'input_tokens':1,'output_tokens':1,'total_tokens':2},
               'provider_request_id':'benchmark-fixture'}
-        result=self.control.run_benchmark(pid,model,'suite-v1',QualifiedAdapter())
+        row=self.supervisor.db.execute('''SELECT price_state FROM model_providers
+          WHERE tenant_id='tenant-a' AND provider_id=?''',(pid,)).fetchone()
+        result=self.control.run_benchmark(pid,model,'suite-v1',QualifiedAdapter(),
+          allow_paid=row['price_state']!='KNOWN_FREE')
         self.assertEqual(result['state'],'QUALIFIED')
         return result
 
     def assigned(self,pid='free',model='ok'):
         self.provider(pid);self.model(pid,model);self.role();self.qualify(pid,model)
         return self.control.assign('demo-b','developer','v1','developer-1')
+
+    def checklist_sha(self):
+        return self.control.register_checklist('demo-b',[{'id':'core',
+          'required':True,'result':'PASS','evidence':'test-log'}],
+          'admin:owner')['content_sha256']
 
     def test_secret_encrypted_masked_and_never_audited_or_projected(self):
         receipt=self.provider();self.assertEqual(receipt['secret_mask'],'••••7890')
@@ -255,6 +264,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.role()
         with self.assertRaisesRegex(ValueError,'APPROVED'):
             self.control.bind_skill('developer','v1','skill','v1','0'*64,'PENDING')
+        self.control.register_skill('skill','v1',{'instructions':'test only'},'a'*64)
         self.assertEqual(self.control.bind_skill('developer','v1','skill','v1','a'*64,'APPROVED')['status'],'APPROVED')
 
     def test_real_http_adapters_parse_success_auth_rate_and_timeout(self):
@@ -295,7 +305,7 @@ class ModelOrchestrationTests(unittest.TestCase):
     def test_stale_attempt_or_revoked_writer_never_calls_provider(self):
         self.assigned();self.control.queue_request('demo-b','developer',[],'stale')
         self.supervisor.db.execute("UPDATE tasks SET authority_state='REVOKED' WHERE task_id='demo-b'");self.supervisor.db.commit()
-        self.assertEqual(ModelScheduler(self.control).run_once()['state'],'CANCELLED')
+        self.assertEqual(ModelScheduler(self.control).run_once()['state'],'HOLD')
 
     def test_unqualified_writer_model_is_rejected(self):
         self.provider();self.model();self.role()
@@ -334,7 +344,7 @@ class ModelOrchestrationTests(unittest.TestCase):
           self.authority.issue('tenant-a','qa'),self.master)
         acceptor=ModelControl(self.gateway,
           self.authority.issue('tenant-a','acceptor'),self.master)
-        submitted=developer.submit_candidate('demo-b','a'*64,'b'*64,
+        submitted=developer.submit_candidate('demo-b','a'*64,self.checklist_sha(),
           'developer-1')
         with self.assertRaisesRegex(ValueError,'SELF_REVIEW'):
             developer.review_candidate(submitted['candidate_id'],
@@ -346,7 +356,7 @@ class ModelOrchestrationTests(unittest.TestCase):
             acceptor.validate_accept_candidate(submitted['candidate_id'],'acceptor')
         with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
             reviewer.review_candidate(submitted['candidate_id'],'qa',[],True)
-        revised=developer.submit_candidate('demo-b','c'*64,'d'*64,
+        revised=developer.submit_candidate('demo-b','c'*64,self.checklist_sha(),
           'developer-1')
         passed=reviewer.review_candidate(revised['candidate_id'],'qa',[],True)
         self.assertEqual(passed['state'],'REVIEW_PASSED')
@@ -381,9 +391,9 @@ class ModelOrchestrationTests(unittest.TestCase):
           self.authority.issue('tenant-a','developer-1'),self.master)
         reviewer=ModelControl(self.gateway,self.authority.issue('tenant-a','qa'),self.master)
         acceptor=ModelControl(self.gateway,self.authority.issue('tenant-a','acceptor'),self.master)
-        old=developer.submit_candidate('demo-b','a'*64,'b'*64,'developer-1',now=1)
+        old=developer.submit_candidate('demo-b','a'*64,self.checklist_sha(),'developer-1',now=1)
         reviewer.review_candidate(old['candidate_id'],'qa',[],True,now=2)
-        developer.submit_candidate('demo-b','c'*64,'d'*64,'developer-1',now=3)
+        developer.submit_candidate('demo-b','c'*64,self.checklist_sha(),'developer-1',now=3)
         with self.assertRaisesRegex(ValueError,'LATEST_CANDIDATE'):
             acceptor.validate_accept_candidate(old['candidate_id'],'acceptor')
 
@@ -391,11 +401,11 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assigned();developer=ModelControl(self.gateway,
           self.authority.issue('tenant-a','developer-1'),self.master)
         with self.assertRaisesRegex(ValueError,'CANONICAL_ARTIFACT'):
-            developer.submit_candidate('demo-b','z'*64,'b'*64,'developer-1')
+            developer.submit_candidate('demo-b','z'*64,self.checklist_sha(),'developer-1')
         self.supervisor.db.execute("""UPDATE tasks SET authority_state='REVOKED'
           WHERE task_id='demo-b'""");self.supervisor.db.commit()
         with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE'):
-            developer.submit_candidate('demo-b','a'*64,'b'*64,'developer-1')
+            developer.submit_candidate('demo-b','a'*64,self.checklist_sha(),'developer-1')
 
     def test_same_principal_cannot_hold_executor_and_acceptor_roles(self):
         self.assigned();self.role('acceptor','ACCEPTOR',['code'],False)
@@ -460,6 +470,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assigned();self.supervisor.db.execute('''UPDATE model_providers SET
           rate_limit_per_min=1,concurrency_limit=1 WHERE provider_id='free' ''')
         self.supervisor.db.execute("DELETE FROM model_call_attempts WHERE worker_id LIKE 'benchmark:%'")
+        self.supervisor.db.execute("DELETE FROM model_call_reservations WHERE task_id LIKE 'BENCHMARK:%'")
         self.supervisor.db.commit()
         self.control.queue_request('demo-b','developer',[],'limit-one')
         self.assertEqual(ModelScheduler(self.control).run_once(now=time.time())['state'],
@@ -481,6 +492,121 @@ class ModelOrchestrationTests(unittest.TestCase):
           model_usage_events WHERE request_id=?''',(queued['request_id'],)).fetchone()
         self.assertEqual(usage['cost_state'],'UNKNOWN')
         self.assertIsNone(usage['cost_value'])
+
+    def test_destination_change_invalidates_old_provider_secret(self):
+        self.provider();changed={'provider_id':'free','display_name':'free',
+          'adapter_type':'openai-compatible','base_url':'http://localhost:%d'%
+          self.server.server_port,'enabled':True,'price_state':'KNOWN_FREE',
+          'rate_limit_per_min':10,'concurrency_limit':2,'timeout_seconds':.05,
+          'retry_limit':1}
+        receipt=self.control.upsert_provider(changed)
+        self.assertFalse(receipt['secret_configured'])
+        with self.assertRaisesRegex(ValueError,'SECRET_REQUIRED'):
+            self.control.provider_secret('free')
+
+    def test_queued_request_rechecks_provider_config_before_send(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'config-change')
+        self.control.upsert_provider({'provider_id':'free','display_name':'free',
+          'adapter_type':'openai-compatible','base_url':self.url,'enabled':True,
+          'price_state':'KNOWN_FREE','rate_limit_per_min':10,
+          'concurrency_limit':2,'timeout_seconds':.05,'retry_limit':1},SECRET+'x')
+        called=[]
+        class Never(object):
+            def invoke(self,*args):called.append(args);raise AssertionError()
+        result=ModelScheduler(self.control,{'openai-compatible':Never(),
+          'siliconflow':Never()}).run_once()
+        self.assertEqual(result['state'],'HOLD');self.assertEqual(called,[])
+        row=self.supervisor.db.execute('''SELECT state,error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual((row['state'],row['error_kind']),('HOLD',
+          'PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED'))
+
+    def test_sent_500_is_unknown_and_usage_is_not_zero_cost(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'http-500')
+        class FiveHundred(object):
+            def invoke(self,*args):raise ProviderError('HTTP','HTTP_500',True)
+        result=ModelScheduler(self.control,{'openai-compatible':FiveHundred(),
+          'siliconflow':FiveHundred()}).run_once()
+        self.assertEqual(result['state'],'UNKNOWN')
+        usage=self.supervisor.db.execute('''SELECT cost_state,input_tokens FROM
+          model_usage_attempts WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(usage['cost_state'],'UNKNOWN');self.assertIsNone(usage['input_tokens'])
+
+    def test_cancel_during_429_never_enters_retry_wait(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'cancel-429')
+        control=self.control
+        class CancelThenRate(object):
+            def invoke(self,*args):
+                control.request_cancel(queued['request_id'])
+                raise ProviderError('RATE_LIMIT','HTTP_429',True)
+        result=ModelScheduler(control,{'openai-compatible':CancelThenRate(),
+          'siliconflow':CancelThenRate()}).run_once()
+        self.assertEqual(result['state'],'CANCELLED')
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],
+          'CANCELLED')
+
+    def test_fair_queue_skips_open_provider_and_runs_healthy_provider(self):
+        self.assigned('blocked','ok');first=self.control.queue_request('demo-b',
+          'developer',[],'blocked-first')
+        self.provider('healthy');self.model('healthy');self.qualify('healthy','ok')
+        self.supervisor.db.execute('''UPDATE model_assignments SET provider_id='healthy'
+          WHERE task_id='demo-b' AND role_id='developer' ''')
+        self.supervisor.db.execute('''UPDATE model_providers SET circuit_state='OPEN',
+          next_probe_at=? WHERE provider_id='blocked' ''',(time.time()+600,))
+        self.supervisor.db.commit()
+        second=self.control.queue_request('demo-b','developer',[],'healthy-second')
+        result=ModelScheduler(self.control).run_once()
+        self.assertEqual(result['request_id'],second['request_id'])
+        self.assertEqual(result['state'],'SUCCEEDED')
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          model_requests WHERE request_id=?''',(first['request_id'],)).fetchone()[0],
+          'QUEUED')
+
+    def test_skill_revocation_and_module_disable_block_new_execution(self):
+        self.assigned();self.control.register_skill('reviewed','v1',
+          {'instructions':'bounded'},'a'*64)
+        self.control.bind_skill('developer','v1','reviewed','v1','a'*64,'APPROVED')
+        queued=self.control.queue_request('demo-b','developer',[],'skill-revoke')
+        self.control.revoke_skill('reviewed','v1')
+        self.assertEqual(ModelScheduler(self.control).run_once()['state'],'HOLD')
+        self.assertEqual(self.supervisor.db.execute('''SELECT error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],
+          'SKILL_SNAPSHOT_REVOKED_OR_CHANGED')
+        self.control.set_module('xuanjun.scheduler.kernel','v1',False)
+        self.assertEqual(self.supervisor.db.execute('''SELECT desired_state FROM
+          role_instances WHERE instance_id='developer-1' ''').fetchone()[0],
+          'STOPPED')
+
+    def test_paid_budget_is_reserved_before_send(self):
+        self.provider('paid',price='KNOWN_PAID');self.model('paid','ok','KNOWN_PAID')
+        self.supervisor.db.execute('''UPDATE model_catalog SET input_unit_cost=1,
+          output_unit_cost=1 WHERE provider_id='paid' ''');self.supervisor.db.commit()
+        self.role();self.qualify('paid','ok')
+        self.control.assign('demo-b','developer','v1','developer-1',allow_paid=True)
+        self.control.set_runtime_limits('paid',10000,1024,tenant_budget=0,
+          task_budget=0)
+        self.control.queue_request('demo-b','developer',[{'role':'user',
+          'content':'spend'}],'budget-zero',max_output_tokens=100)
+        called=[]
+        class Never(object):
+            def invoke(self,*args):called.append(args)
+        self.assertEqual(ModelScheduler(self.control,{'openai-compatible':Never(),
+          'siliconflow':Never()}).run_once()['state'],'QUEUED_LIMIT')
+        self.assertEqual(called,[])
+
+    def test_incomplete_or_unexecuted_checklist_cannot_freeze_candidate(self):
+        self.assigned();developer=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','developer-1'),self.master)
+        receipt=self.control.register_checklist('demo-b',[{'id':'required',
+          'required':True,'result':'NOT_EXECUTED','evidence':'missing'}],
+          'admin:owner')
+        with self.assertRaisesRegex(ValueError,'CHECKLIST_INCOMPLETE'):
+            developer.submit_candidate('demo-b','a'*64,
+              receipt['content_sha256'],'developer-1')
 
 
 if __name__=='__main__':unittest.main()

@@ -14,6 +14,9 @@ import time
 from reusable_task_gateway import _text
 from task_supervisor import UNKNOWN, canonical
 
+ACTION_SCOPE_MAP={'READ_SOURCE':'READ_SOURCE','WRITE_SOURCE':'WRITE_SOURCE',
+                  'DEPLOY':'DEPLOY','RUN_TEST':'RUN_TEST','PUBLISH':'PUBLISH'}
+
 
 class ExecutionPolicyGateway(object):
     def __init__(self,gateway,context,clock=None):
@@ -57,7 +60,17 @@ class ExecutionPolicyGateway(object):
             action TEXT NOT NULL,scope TEXT NOT NULL,authorization_id TEXT NOT NULL,
             writer_principal TEXT NOT NULL,change_id TEXT,state TEXT NOT NULL,
             evidence_json TEXT NOT NULL,created_at REAL NOT NULL,
-            PRIMARY KEY(tenant_id,request_id),UNIQUE(tenant_id,idempotency_key))''')
+            PRIMARY KEY(tenant_id,request_id),UNIQUE(tenant_id,idempotency_key))''',
+          '''CREATE TABLE IF NOT EXISTS asset_query_receipts(
+            tenant_id TEXT NOT NULL,query_id TEXT NOT NULL,task_id TEXT NOT NULL,
+            source_kind TEXT NOT NULL,source_version TEXT NOT NULL,
+            query_json TEXT NOT NULL,result_digest TEXT NOT NULL,
+            observed_at REAL NOT NULL,PRIMARY KEY(tenant_id,query_id))''',
+          '''CREATE TABLE IF NOT EXISTS formal_approval_roles(
+            tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
+            principal_id TEXT NOT NULL,approval_kind TEXT NOT NULL,
+            valid_until REAL NOT NULL,granted_by TEXT NOT NULL,
+            PRIMARY KEY(tenant_id,task_id,attempt_id,principal_id,approval_kind))''')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             for statement in statements:self.db.execute(statement)
@@ -73,17 +86,46 @@ class ExecutionPolicyGateway(object):
                     if name not in columns:
                         self.db.execute('ALTER TABLE %s ADD COLUMN %s TEXT'%(table,name))
 
-    def record_unit(self,value,now=None):
+    def record_asset_query(self,task_id,query_id,source_kind,source_version,
+                           query,result_digest,now=None):
+        self.gateway.assert_task_context(self.context,task_id)
+        if source_kind not in ('REGISTRY','GIT','ARTIFACT_STORE','CANONICAL_DB'):
+            raise ValueError('TRUSTED_ASSET_QUERY_SOURCE_REQUIRED')
+        if not isinstance(query,dict) or not query:raise ValueError('ASSET_QUERY_REQUIRED')
+        if len(result_digest)!=64:raise ValueError('RESULT_DIGEST_REQUIRED')
+        now=self.clock() if now is None else now
+        self.db.execute('''INSERT INTO asset_query_receipts VALUES
+          (?,?,?,?,?,?,?,?)''',(self.tenant_id,query_id,task_id,source_kind,
+          source_version,canonical(query),result_digest,now));self.db.commit()
+        return {'query_id':query_id,'result_digest':result_digest}
+
+    def grant_approval_role(self,task_id,principal_id,approval_kind,valid_until):
+        admin=self.context['principal_id']
+        if not admin.startswith('admin:'):raise ValueError('POLICY_ADMIN_REQUIRED')
+        task=self.gateway.supervisor._task(task_id);now=self.clock()
+        if valid_until<=now:raise ValueError('APPROVAL_ROLE_WINDOW_REQUIRED')
+        self.db.execute('''INSERT OR REPLACE INTO formal_approval_roles VALUES
+          (?,?,?,?,?,?,?)''',(self.tenant_id,task_id,task['attempt_id'],
+          principal_id,approval_kind,valid_until,admin));self.db.commit()
+        return {'task_id':task_id,'principal_id':principal_id,
+                'approval_kind':approval_kind}
+
+    @staticmethod
+    def validate_unit_input(value):
         required={'task_id','delivery_stage','feature_unit','goal','scope',
           'acceptance','dependencies','asset_version','responsible_party'}
         if not isinstance(value,dict) or set(value)!=required:
             raise ValueError('EXACT_EXECUTION_UNIT_REQUIRED')
-        self.gateway.assert_task_context(self.context,value['task_id'])
         for key in ('delivery_stage','feature_unit','goal','asset_version',
                     'responsible_party'):_text(value[key],key)
         for key in ('scope','acceptance','dependencies'):
             if not isinstance(value[key],list) or not value[key]:
                 raise ValueError('NONEMPTY_%s_REQUIRED'%key.upper())
+        return value
+
+    def record_unit(self,value,now=None):
+        self.validate_unit_input(value)
+        self.gateway.assert_task_context(self.context,value['task_id'])
         task=self.gateway.supervisor._task(value['task_id'])
         if task['owner']!=value['responsible_party']:
             raise ValueError('UNIQUE_RESPONSIBLE_PARTY_MISMATCH')
@@ -97,13 +139,20 @@ class ExecutionPolicyGateway(object):
         return {'task_id':value['task_id'],'state':'UNIT_RECORDED'}
 
     def record_preflight(self,task_id,checked,outcome,reused_asset,
-                         reused_version,need_new,reason,evidence_ref,now=None):
+                         reused_version,need_new,reason,evidence_ref,now=None,
+                         query_ids=None):
         self.gateway.assert_task_context(self.context,task_id)
         if not isinstance(checked,list) or not checked:raise ValueError('CHECKED_ASSETS_REQUIRED')
         if outcome not in ('FOUND','NOT_FOUND',UNKNOWN):raise ValueError('PREFLIGHT_OUTCOME_REQUIRED')
         if outcome==UNKNOWN and need_new:raise ValueError('UNKNOWN_CANNOT_AUTHORIZE_NEW_ASSET')
         if outcome=='FOUND' and (not reused_asset or not reused_version):
             raise ValueError('REUSED_ASSET_VERSION_REQUIRED')
+        query_ids=list(query_ids or [])
+        if query_ids:
+            found=self.db.execute('''SELECT COUNT(*) FROM asset_query_receipts
+              WHERE tenant_id=? AND task_id=? AND query_id IN (%s)'''%(','.join(
+              ['?']*len(query_ids))),(self.tenant_id,task_id)+tuple(query_ids)).fetchone()[0]
+            if found!=len(set(query_ids)):raise ValueError('ASSET_QUERY_RECEIPT_REQUIRED')
         now=self.clock() if now is None else now
         task=self.gateway.supervisor._task(task_id)
         if task['attempt_id'] in (None,UNKNOWN) or task['authority_state']!='VALID':
@@ -111,7 +160,8 @@ class ExecutionPolicyGateway(object):
         body={'checked':checked,'outcome':outcome,'reused_asset':reused_asset,
           'reused_version':reused_version,'need_new':bool(need_new),
           'reason':_text(reason,'reason'),'evidence_ref':_text(evidence_ref,'evidence_ref'),
-          'attempt_id':task['attempt_id'],'writer_principal':task['authority_caller_id']}
+          'attempt_id':task['attempt_id'],'writer_principal':task['authority_caller_id'],
+          'query_ids':sorted(query_ids)}
         check_id=hashlib.sha256(canonical(body).encode()).hexdigest()
         self.db.execute('''INSERT OR IGNORE INTO asset_preflight_checks(
           tenant_id,task_id,check_id,attempt_id,writer_principal,checked_json,
@@ -185,6 +235,11 @@ class ExecutionPolicyGateway(object):
         if row is None:raise KeyError(change_id)
         if reviewer==row['authority_caller_id']:
             raise ValueError('INDEPENDENT_CHANGE_REVIEW_REQUIRED')
+        formal=self.db.execute('''SELECT 1 FROM formal_approval_roles WHERE
+          tenant_id=? AND task_id=? AND attempt_id=? AND principal_id=? AND
+          approval_kind='SCOPE_CHANGE' AND valid_until>?''',(self.tenant_id,
+          row['task_id'],row['attempt_id'],reviewer,now)).fetchone()
+        if formal is None:raise ValueError('FORMAL_APPROVAL_ROLE_REQUIRED')
         model_tables=self.db.execute('''SELECT COUNT(*) FROM sqlite_master
           WHERE type='table' AND name IN ('model_assignments','role_templates')''').fetchone()[0]
         executor_role=None
@@ -229,6 +284,8 @@ class ExecutionPolicyGateway(object):
             raise ValueError('ASSET_VERSION_MISMATCH')
         if task['attempt_id'] in (None,UNKNOWN) or task['authority_state']!='VALID':
             raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
+        if task['authority_valid_until'] is None or not now<task['authority_valid_until']:
+            raise ValueError('CURRENT_WRITER_AUTHORITY_EXPIRED')
         if value['writer_principal']!=task['authority_caller_id']:
             raise ValueError('UNIQUE_WRITER_REQUIRED')
         preflight=self.db.execute('''SELECT * FROM asset_preflight_checks WHERE
@@ -277,6 +334,8 @@ class ExecutionPolicyGateway(object):
             raise ValueError('AUTHORIZATION_BINDING_MISMATCH')
         if not (auth['valid_from']<=now<auth['valid_until']):
             raise ValueError('CURRENT_AUTHORIZATION_EXPIRED')
+        if ACTION_SCOPE_MAP.get(value['action'])!=value['scope']:
+            raise ValueError('ACTION_SCOPE_MISMATCH')
         if value['action'] not in json.loads(auth['scopes_json']):
             raise ValueError('ACTION_OUTSIDE_AUTHORIZATION')
         request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
