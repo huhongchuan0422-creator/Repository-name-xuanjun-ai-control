@@ -111,6 +111,11 @@ class ApprovalRecord(unittest.TestCase):
             with self.assertRaisesRegex(h.Hold,'HANDOFF_MODULE_SHA_MISMATCH'):
                 entry._verify_runtime_sources()
 
+    def test_cli_has_no_approval_bypass_switch(self):
+        with patch.object(entry,'run') as run:
+            self.assertEqual(entry.main(['--approve']),2)
+            run.assert_not_called()
+
     def test_valid_exact_short_lived_record(self):
         raw,identity=self.validate()
         self.assertEqual(raw,h.canonical(self.value))
