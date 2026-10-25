@@ -190,6 +190,9 @@ class WholeEntry(unittest.TestCase):
         self.stack.enter_context(patch.object(self.session,'candidate',side_effect=bind))
     def _prepare_completed_b_before_c_proof(self):
         self.seed_partial_resume()
+        # Both historical B and freeze windows are expired; only the new C
+        # operation approval below is fresh. Historical bytes stay unchanged.
+        self.clock=2400
         q=self.fresh_session()
         q.configure_resumed_b_context()
         q.resume_mode=True
