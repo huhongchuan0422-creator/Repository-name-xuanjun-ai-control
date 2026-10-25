@@ -15,7 +15,8 @@ MODULES = (
     'tests.test_reusable_scheduler_cli', 'tests.test_task_center_app',
     'tests.test_task_center_execution_contract',
     'tests.test_execution_policy_gateway', 'tests.test_model_orchestration',
-    'tests.test_connection_management','tests.test_task_center_full_journey')
+    'tests.test_connection_management','tests.test_codex_execution_adapter',
+    'tests.test_task_center_mcp','tests.test_task_center_full_journey')
 EXCLUDED = frozenset((
     'tests.test_task_supervisor.SupervisorTests.'
     'test_v2_active_attempt_migrates_to_unknown_hold',

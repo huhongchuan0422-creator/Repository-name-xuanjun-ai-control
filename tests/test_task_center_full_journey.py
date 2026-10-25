@@ -77,7 +77,7 @@ class FullJourneyTests(unittest.TestCase):
           'feature_unit':'provider-routing','goal':'deliver tested candidate',
           'scope':['WRITE_SOURCE'],'asset_version':'asset-v1',
           'deliverables':['source','logs'],'acceptance':['tests','review'],
-          'dependencies':[],'priority':80,'owner':'developer'}
+          'dependencies':[],'priority':80,'owner':'developer-1'}
         self.post({'action':'CREATE_PROJECT_TASK','task':task})
         self.post({'action':'RECORD_ASSET_QUERY','task_id':'task-journey',
           'query_id':'query-journey-1','source_kind':'REGISTRY',
@@ -87,7 +87,18 @@ class FullJourneyTests(unittest.TestCase):
           'asset_version':'asset-v1','query_ids':['query-journey-1'],
           'outcome':'NOT_FOUND','reuse_reason':'verified new TEST_ONLY task'})
         self.assertEqual(self.post({'action':'START_TEST_ONLY_TASK',
-          'task_id':'task-journey','attempt_id':'attempt-1'})['state'],'STARTED')
+          'task_id':'task-journey','attempt_id':'attempt-1'},
+          'developer-token-123456')['state'],'STARTED')
+        codex=self.post({'action':'CREATE_CODEX_INTENT',
+          'task_id':'task-journey','transport_kind':'CODEX_SDK',
+          'idempotency_key':'journey-codex-intent','context':{
+          'goal':'deliver tested candidate','scope':['WRITE_SOURCE'],
+          'acceptance':['tests','review'],'asset_version':'asset-v1',
+          'reuse_evidence':['query-journey-1']}},'developer-token-123456')
+        self.assertEqual(codex['state'],'PENDING')
+        self.assertEqual(self.post({'action':'CANCEL_CODEX_INTENT',
+          'intent_id':codex['intent_id']},'developer-token-123456')['state'],
+          'CANCELLED')
         provider={'provider_id':'fixture','display_name':'Fixture',
           'adapter_type':'openai-compatible','base_url':
           'http://127.0.0.1:%d'%self.model.server_port,'enabled':True,
@@ -105,14 +116,15 @@ class FullJourneyTests(unittest.TestCase):
         self.assertEqual(self.post({'action':'RUN_BENCHMARK',
           'provider_id':'fixture','model_id':'capable','suite_version':
           'journey-v1'})['state'],'QUALIFIED')
-        roles=(('executor','EXECUTOR',True,'developer-1'),
-               ('reviewer','REVIEWER',False,'qa-1'),
-               ('security','REVIEWER',False,'security-1'),
-               ('acceptor','ACCEPTOR',False,'acceptor-1'))
-        for role,phase,writer,principal in roles:
+        roles=(('executor','EXECUTOR',True,'developer-1',None),
+               ('reviewer','REVIEWER',False,'qa-1','QA'),
+               ('security','REVIEWER',False,'security-1','SECURITY'),
+               ('acceptor','ACCEPTOR',False,'acceptor-1',None))
+        for role,phase,writer,principal,review_kind in roles:
             self.post({'action':'CREATE_ROLE','config':{'role_id':role,
               'version':'v1','phase':phase,'capabilities':['code'],
-              'writer_allowed':writer,'enabled':True}})
+              'writer_allowed':writer,'enabled':True,
+              'review_kind':review_kind}})
             self.post({'action':'ASSIGN_ROLE','task_id':'task-journey',
               'role_id':role,'role_version':'v1','principal_id':principal,
               'allow_paid':False})

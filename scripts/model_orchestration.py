@@ -32,6 +32,7 @@ PRICE_STATES = frozenset(('KNOWN_FREE', 'KNOWN_PAID', UNKNOWN))
 PHASES = frozenset(('EXECUTOR', 'REVIEWER', 'ACCEPTOR'))
 REQUEST_STATES = frozenset(('QUEUED', 'RUNNING', 'RETRY_WAIT', 'SUCCEEDED',
                             'FAILED', UNKNOWN, 'CANCELLED','HOLD'))
+QUOTA_STATES = frozenset(('AVAILABLE', 'EXHAUSTED', UNKNOWN))
 
 
 def _number(value, name, minimum=0):
@@ -223,6 +224,7 @@ class ModelControl(object):
               tenant_id TEXT NOT NULL,role_id TEXT NOT NULL,version TEXT NOT NULL,
               phase TEXT NOT NULL,capabilities_json TEXT NOT NULL,
               writer_allowed INTEGER NOT NULL,enabled INTEGER NOT NULL,
+              review_kind TEXT,
               PRIMARY KEY(tenant_id,role_id,version))''',
             '''CREATE TABLE IF NOT EXISTS role_skill_bindings(
               tenant_id TEXT NOT NULL,role_id TEXT NOT NULL,role_version TEXT NOT NULL,
@@ -306,13 +308,20 @@ class ModelControl(object):
               tpm_limit INTEGER NOT NULL,max_output_tokens INTEGER NOT NULL,
               tenant_budget REAL,task_budget REAL,
               updated_at REAL NOT NULL,PRIMARY KEY(tenant_id,provider_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_quota_status(
+              tenant_id TEXT NOT NULL,provider_id TEXT NOT NULL,
+              quota_state TEXT NOT NULL,quota_source TEXT NOT NULL,
+              verified_at REAL,unavailable_reason TEXT,updated_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,provider_id),
+              FOREIGN KEY(tenant_id,provider_id) REFERENCES
+              model_providers(tenant_id,provider_id))''',
             '''CREATE TABLE IF NOT EXISTS model_request_bindings(
               tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
               provider_config_version INTEGER NOT NULL,
               connection_id TEXT,connection_config_version INTEGER,
               expected_input_tokens INTEGER NOT NULL,
               max_output_tokens INTEGER NOT NULL,allow_paid INTEGER NOT NULL,
-              writer_fence INTEGER,writer_epoch INTEGER,
+              writer_principal TEXT,writer_fence INTEGER,writer_epoch INTEGER,
               writer_valid_until REAL,skill_snapshot_sha256 TEXT,
               work_spec_sha256 TEXT,module_version TEXT,
               PRIMARY KEY(tenant_id,request_id))''',
@@ -363,6 +372,14 @@ class ModelControl(object):
               'PRAGMA table_info(candidate_reviews)')}
             if 'review_kind' not in review_columns:
                 self.db.execute('ALTER TABLE candidate_reviews ADD COLUMN review_kind TEXT')
+            role_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(role_templates)')}
+            if 'review_kind' not in role_columns:
+                self.db.execute('ALTER TABLE role_templates ADD COLUMN review_kind TEXT')
+            binding_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(model_request_bindings)')}
+            if 'writer_principal' not in binding_columns:
+                self.db.execute('ALTER TABLE model_request_bindings ADD COLUMN writer_principal TEXT')
 
     @staticmethod
     def _origin(value):
@@ -471,6 +488,18 @@ class ModelControl(object):
                value['concurrency_limit'],value['timeout_seconds'],
                value['retry_limit'],cipher,mask,version,'CLOSED',0,None,
                created,now))
+            # Local fixtures are the only configuration whose zero-cost quota
+            # is mechanically known in this package.  Every external provider
+            # starts (and returns after material reconfiguration) at UNKNOWN;
+            # an administrator must record a fresh, attributable verification
+            # before any request can be reserved.
+            if loopback_http:
+                quota=('AVAILABLE','TEST_ONLY_LOCAL_FIXTURE',now,None)
+            else:
+                quota=(UNKNOWN,'UNKNOWN',None,'QUOTA_OR_COST_NOT_VERIFIED')
+            self.db.execute('''INSERT OR REPLACE INTO model_quota_status VALUES
+              (?,?,?,?,?,?,?)''',(self.tenant_id,value['provider_id'],quota[0],
+              quota[1],quota[2],quota[3],now))
             self._audit(principal,'PROVIDER_UPSERT',value['provider_id'],
                         {'config_version':version,'secret_replaced':secret is not None,
                          'destination_changed':destination_changed,
@@ -480,6 +509,39 @@ class ModelControl(object):
             self.db.rollback();raise
         return {'provider_id':value['provider_id'],'config_version':version,
                 'secret_mask':mask,'secret_configured':cipher is not None}
+
+    def set_quota_status(self,provider_id,quota_state,quota_source,
+                         verified_at=None,unavailable_reason=None,now=None):
+        principal=self._admin();now=self.clock() if now is None else now
+        if quota_state not in QUOTA_STATES:
+            raise ValueError('VALID_QUOTA_STATE_REQUIRED')
+        _text(quota_source,'quota_source')
+        if quota_state=='AVAILABLE':
+            _number(verified_at,'verified_at')
+            if quota_source=='UNKNOWN' or verified_at>now+5:
+                raise ValueError('ATTRIBUTABLE_CURRENT_QUOTA_VERIFICATION_REQUIRED')
+            if unavailable_reason is not None:
+                raise ValueError('AVAILABLE_QUOTA_HAS_NO_UNAVAILABLE_REASON')
+        else:
+            if verified_at is not None:_number(verified_at,'verified_at')
+            _text(unavailable_reason,'unavailable_reason')
+        if self.db.execute('''SELECT 1 FROM model_providers WHERE tenant_id=?
+          AND provider_id=?''',(self.tenant_id,provider_id)).fetchone() is None:
+            raise ValueError('PROVIDER_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            self.db.execute('''INSERT OR REPLACE INTO model_quota_status VALUES
+              (?,?,?,?,?,?,?)''',(self.tenant_id,provider_id,quota_state,
+              quota_source,verified_at,unavailable_reason,now))
+            self._audit(principal,'PROVIDER_QUOTA_STATUS_SET',provider_id,
+              {'quota_state':quota_state,'quota_source':quota_source,
+               'verified_at':verified_at,'unavailable_reason':unavailable_reason},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        return {'provider_id':provider_id,'quota_state':quota_state,
+                'quota_source':quota_source,'verified_at':verified_at,
+                'unavailable_reason':unavailable_reason}
 
     def set_runtime_limits(self,provider_id,tpm_limit,max_output_tokens,
                            tenant_budget=None,task_budget=None,now=None):
@@ -646,15 +708,21 @@ class ModelControl(object):
         return {'provider_id':value['provider_id'],'model_id':value['model_id']}
 
     def create_role(self, value):
-        self._admin();required={'role_id','version','phase','capabilities','writer_allowed','enabled'}
+        self._admin();required={'role_id','version','phase','capabilities',
+          'writer_allowed','enabled','review_kind'}
         if not isinstance(value,dict) or set(value)!=required:raise ValueError('EXACT_ROLE_TEMPLATE_REQUIRED')
         if value['phase'] not in PHASES:raise ValueError('VALID_ROLE_PHASE_REQUIRED')
         if value['phase']!='EXECUTOR' and value['writer_allowed'] is not False:
             raise ValueError('REVIEW_ACCEPT_NO_WRITER')
-        self.db.execute('INSERT INTO role_templates VALUES (?,?,?,?,?,?,?)',
+        if value['phase']=='REVIEWER':
+            if value['review_kind'] not in ('QA','SECURITY'):
+                raise ValueError('REVIEWER_MANDATE_REQUIRED')
+        elif value['review_kind'] is not None:
+            raise ValueError('NON_REVIEWER_MANDATE_FORBIDDEN')
+        self.db.execute('INSERT INTO role_templates VALUES (?,?,?,?,?,?,?,?)',
           (self.tenant_id,_text(value['role_id'],'role_id'),_text(value['version'],'version'),
            value['phase'],canonical(sorted(set(value['capabilities']))),
-           int(value['writer_allowed']),int(value['enabled'])))
+           int(value['writer_allowed']),int(value['enabled']),value['review_kind']))
         self.db.commit();return {'role_id':value['role_id'],'version':value['version']}
 
     def bind_skill(self, role_id, role_version, skill_id, skill_version,
@@ -688,6 +756,8 @@ class ModelControl(object):
           AND role_id=? AND version=? AND enabled=1''',
           (self.tenant_id,role_id,role_version)).fetchone()
         if role is None:raise ValueError('ACTIVE_ROLE_REQUIRED')
+        if role['phase']=='EXECUTOR' and not role['writer_allowed']:
+            raise ValueError('EXECUTOR_WRITER_PERMISSION_REQUIRED')
         held={r['phase'] for r in self.db.execute('''SELECT rt.phase FROM
           model_assignments a JOIN role_templates rt ON rt.tenant_id=a.tenant_id
           AND rt.role_id=a.role_id AND rt.version=a.role_version WHERE
@@ -701,9 +771,12 @@ class ModelControl(object):
         capabilities=set(json.loads(role['capabilities_json']))
         candidates=[]
         for row in self.db.execute('''SELECT p.provider_id,p.price_state AS
-          provider_price,m.model_id,m.price_state,m.capabilities_json FROM
+          provider_price,m.model_id,m.price_state,m.capabilities_json,
+          q.quota_state,q.quota_source,q.verified_at FROM
           model_providers p JOIN model_catalog m ON p.tenant_id=m.tenant_id
-          AND p.provider_id=m.provider_id WHERE p.tenant_id=? AND p.enabled=1
+          AND p.provider_id=m.provider_id JOIN model_quota_status q ON
+          q.tenant_id=p.tenant_id AND q.provider_id=p.provider_id
+          WHERE p.tenant_id=? AND p.enabled=1
           AND m.enabled=1 AND p.circuit_state='CLOSED' ''',(self.tenant_id,)):
             if capabilities.issubset(set(json.loads(row['capabilities_json']))):
                 qualified=self.db.execute('''SELECT state,quality_score,
@@ -716,7 +789,12 @@ class ModelControl(object):
                 effective=(UNKNOWN if UNKNOWN in (row['price_state'],row['provider_price'])
                            else 'KNOWN_PAID' if 'KNOWN_PAID' in
                            (row['price_state'],row['provider_price']) else 'KNOWN_FREE')
-                if effective!='KNOWN_FREE' and not allow_paid:continue
+                # Zero-new-spend policy: only attributable, currently verified
+                # included/free quota can enter assignment.  The legacy
+                # allow_paid input is retained for wire compatibility but does
+                # not widen this gate.
+                if (effective!='KNOWN_FREE' or row['quota_state']!='AVAILABLE'
+                        or row['verified_at'] is None):continue
                 item=dict(row);item['effective_price']=effective
                 item['acceptance_penalty']=(qualified['retries']+
                   qualified['rework_count']+(1-qualified['quality_score'])*100+
@@ -760,6 +838,12 @@ class ModelControl(object):
           tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
           (self.tenant_id,task_id,task['attempt_id'],role_id)).fetchone()
         if assignment is None:raise ValueError('MODEL_ASSIGNMENT_REQUIRED')
+        role=self.db.execute('''SELECT phase,writer_allowed FROM role_templates
+          WHERE tenant_id=? AND role_id=? AND version=? AND enabled=1''',(
+          self.tenant_id,assignment['role_id'],assignment['role_version'])).fetchone()
+        if role is None:raise ValueError('ACTIVE_ROLE_REQUIRED')
+        if (role['phase']=='EXECUTOR' and not role['writer_allowed']):
+            raise ValueError('CURRENT_WRITER_EXECUTOR_REQUIRED')
         provider=self.db.execute('''SELECT config_version,price_state,enabled
           FROM model_providers WHERE tenant_id=? AND provider_id=?''',(
           self.tenant_id,assignment['provider_id'])).fetchone()
@@ -801,10 +885,11 @@ class ModelControl(object):
             if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table'
               AND name='service_connections' ''').fetchone() is None:
                 raise ValueError('CONNECTION_MANAGER_REQUIRED')
-            connection=self.db.execute('''SELECT provider_id,config_version,status
+            connection=self.db.execute('''SELECT provider_id,config_version,status,purpose
               FROM service_connections WHERE tenant_id=? AND connection_id=?''',(
               self.tenant_id,connection_id)).fetchone()
             if (connection is None or connection['status']!='ACTIVE' or
+                    connection['purpose']!='MODEL_INFERENCE' or
                     connection['provider_id']!=assignment['provider_id']):
                 raise ValueError('ACTIVE_PROVIDER_CONNECTION_REQUIRED')
             connection_version=connection['config_version']
@@ -835,11 +920,16 @@ class ModelControl(object):
               _text(idempotency_key,'idempotency_key'),task_id,task['attempt_id'],
               role_id,assignment['provider_id'],assignment['model_id'],'QUEUED',body,
               digest,0,now,None,None,None,None,None,checkpoint,0,now,now))
-            self.db.execute('''INSERT INTO model_request_bindings VALUES
-              (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
+            self.db.execute('''INSERT INTO model_request_bindings(
+              tenant_id,request_id,provider_config_version,connection_id,
+              connection_config_version,expected_input_tokens,max_output_tokens,
+              allow_paid,writer_principal,writer_fence,writer_epoch,
+              writer_valid_until,skill_snapshot_sha256,work_spec_sha256,
+              module_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+              self.tenant_id,request_id,
               provider['config_version'],connection_id,connection_version,expected_input,
               max_output_tokens,int(assignment['reason']!='QUALIFIED_FREE_FINAL_COST'),
-              task_state['fence'],task_state['epoch'],
+              task_state['authority_caller_id'],task_state['fence'],task_state['epoch'],
               task_state['authority_valid_until'],skill_sha,spec_sha,
               module['version'] if module else 'legacy-test-only'))
             self.db.commit()
@@ -884,18 +974,28 @@ class ModelControl(object):
           model_id)).fetchone()
         limits=self.db.execute('''SELECT * FROM model_runtime_limits WHERE
           tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
+        quota=self.db.execute('''SELECT * FROM model_quota_status WHERE
+          tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
         if provider is None or model is None or not provider['enabled'] or not model['enabled']:
             raise ValueError('ACTIVE_MODEL_REQUIRED')
         if provider['config_version']!=config_version:
             raise ValueError('PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED')
+        if quota is None or quota['quota_state']==UNKNOWN:
+            raise ValueError('PROVIDER_QUOTA_UNKNOWN_HOLD')
+        if quota['quota_state']=='EXHAUSTED':
+            raise ValueError('PROVIDER_QUOTA_EXHAUSTED_HOLD')
+        if quota['quota_state']!='AVAILABLE' or quota['verified_at'] is None:
+            raise ValueError('PROVIDER_QUOTA_UNAVAILABLE_HOLD')
         if provider['circuit_state']=='OPEN' and (provider['next_probe_at'] is None or
                                                   provider['next_probe_at']>now):
             raise ValueError('CIRCUIT_OPEN')
         effective=(UNKNOWN if UNKNOWN in (provider['price_state'],model['price_state'])
           else 'KNOWN_PAID' if 'KNOWN_PAID' in
           (provider['price_state'],model['price_state']) else 'KNOWN_FREE')
-        if effective!= 'KNOWN_FREE' and not allow_paid:
-            raise ValueError('PAID_OR_UNKNOWN_NOT_AUTHORIZED')
+        if effective==UNKNOWN:
+            raise ValueError('UNKNOWN_PRICE_HOLD')
+        if effective=='KNOWN_PAID':
+            raise ValueError('PAID_MODEL_DISABLED_BY_ZERO_NEW_SPEND_POLICY')
         if limits is None:
             tpm_limit=max(1,provider['rate_limit_per_min']*8192)
             output_limit=4096;tenant_budget=None;task_budget=None
@@ -1090,7 +1190,7 @@ class ModelControl(object):
         if checklist is None:raise ValueError('EXECUTED_CHECKLIST_EVIDENCE_REQUIRED')
         if not checklist['all_required_passed'] or checklist['has_unexecuted']:
             raise ValueError('CHECKLIST_INCOMPLETE')
-        assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
+        assignment=self.db.execute('''SELECT r.review_kind FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
           AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
           a.attempt_id=? AND a.principal_id=? AND r.phase='EXECUTOR' ''',
@@ -1211,12 +1311,14 @@ class ModelControl(object):
           AND candidate_id=? AND reviewer=?''',(self.tenant_id,candidate_id,
           reviewer)).fetchone() is not None:
             raise ValueError('INDEPENDENT_REVIEW_IDENTITIES_REQUIRED')
-        assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
+        assignment=self.db.execute('''SELECT r.review_kind FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
           AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
           a.attempt_id=? AND a.principal_id=? AND r.phase='REVIEWER' ''',
           (self.tenant_id,row['task_id'],row['attempt_id'],reviewer)).fetchone()
         if assignment is None:raise ValueError('INDEPENDENT_REVIEW_ASSIGNMENT_REQUIRED')
+        if assignment['review_kind']!=review_kind:
+            raise ValueError('REVIEWER_MANDATE_MISMATCH')
         if not isinstance(findings,list):raise ValueError('FINDINGS_ARRAY_REQUIRED')
         if self.db.execute('''SELECT 1 FROM candidate_reviews WHERE tenant_id=?
           AND candidate_id=? AND review_kind=?''',(self.tenant_id,candidate_id,
@@ -1369,6 +1471,10 @@ class ModelControl(object):
         has_connections=self.db.execute('''SELECT 1 FROM sqlite_master WHERE
           type='table' AND name='service_connections' ''').fetchone() is not None
         return {'providers':self.list_providers(),
+          'quota_status':[dict(x) for x in self.db.execute('''SELECT
+          provider_id,quota_state,quota_source,verified_at,unavailable_reason,
+          updated_at FROM model_quota_status WHERE tenant_id=? ORDER BY
+          provider_id''',(self.tenant_id,))],
           'connections':([dict(x) for x in self.db.execute('''SELECT
           connection_id,provider_id,purpose,auth_type,destination_origin,issuer,
           scopes_json,supports_refresh,status,config_version,secret_mask,
@@ -1379,7 +1485,7 @@ class ModelControl(object):
           output_unit_cost FROM model_catalog WHERE tenant_id=? ORDER BY
           provider_id,model_id''',(self.tenant_id,))],
           'roles':[dict(x) for x in self.db.execute('''SELECT role_id,version,
-          phase,capabilities_json,writer_allowed,enabled FROM role_templates
+          phase,capabilities_json,writer_allowed,enabled,review_kind FROM role_templates
           WHERE tenant_id=? ORDER BY role_id,version''',(self.tenant_id,))],
           'instances':[dict(x) for x in self.db.execute('''SELECT instance_id,
           role_id,role_version,state,desired_state,current_request_id,
@@ -1443,19 +1549,33 @@ class ModelScheduler(object):
         now=self.clock() if now is None else now
         # A dead process may have made an external request.  Expiry therefore
         # converges to UNKNOWN for reconciliation, never to an automatic retry.
-        self.db.execute('''UPDATE model_requests SET state=?,error_kind=?,
-          lease_owner=NULL,lease_until=NULL,updated_at=? WHERE tenant_id=? AND
-          state='RUNNING' AND lease_until IS NOT NULL AND lease_until<?''',
-          (UNKNOWN,'WORKER_LOST_SIDE_EFFECT_UNKNOWN',now,
-           self.control.tenant_id,now));self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            lost=[x['request_id'] for x in self.db.execute('''SELECT request_id
+              FROM model_requests WHERE tenant_id=? AND state='RUNNING' AND
+              lease_until IS NOT NULL AND lease_until<?''',(
+              self.control.tenant_id,now))]
+            for request_id in lost:
+                self.db.execute('''UPDATE model_call_reservations SET
+                  state='SETTLED',cost_state=?,reserved_cost=NULL,settled_at=?
+                  WHERE tenant_id=? AND request_id=? AND state='ACTIVE' ''',(
+                  UNKNOWN,now,self.control.tenant_id,request_id))
+            self.db.execute('''UPDATE model_requests SET state=?,error_kind=?,
+              lease_owner=NULL,lease_until=NULL,updated_at=? WHERE tenant_id=? AND
+              state='RUNNING' AND lease_until IS NOT NULL AND lease_until<?''',
+              (UNKNOWN,'WORKER_LOST_SIDE_EFFECT_UNKNOWN',now,
+               self.control.tenant_id,now))
+            self.db.commit()
+        except Exception:self.db.rollback();raise
         candidates=list(self.db.execute('''SELECT r.*,b.provider_config_version,
           b.connection_id,b.connection_config_version,b.expected_input_tokens,
           b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
-          b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
+          b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
           b.module_version,p.adapter_type,p.base_url,p.timeout_seconds,
           p.retry_limit,p.config_version,p.price_state AS provider_price,
           m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,
-          a.principal_id AS instance_id
+          a.principal_id AS instance_id,rt.phase AS role_phase,
+          rt.writer_allowed AS role_writer_allowed
           FROM model_requests r JOIN
           model_request_bindings b ON b.tenant_id=r.tenant_id AND
           b.request_id=r.request_id JOIN model_providers p ON
@@ -1463,7 +1583,9 @@ class ModelScheduler(object):
           model_catalog m ON m.tenant_id=r.tenant_id AND
           m.provider_id=r.provider_id AND m.model_id=r.model_id JOIN
           model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id
-          AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id WHERE
+          AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
+          role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
+          AND rt.version=a.role_version WHERE
           r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
           r.next_attempt_at<=? ORDER BY r.created_at,r.request_id LIMIT 100''',
           (self.control.tenant_id,now)))
@@ -1475,9 +1597,13 @@ class ModelScheduler(object):
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
                 task['authority_state']!='VALID' or
                 task['authority_valid_until'] is None or now>=task['authority_valid_until'] or
+                task['authority_caller_id']!=candidate['writer_principal'] or
                 task['fence']!=candidate['writer_fence'] or
                 task['epoch']!=candidate['writer_epoch']):
                 fatal='STALE_OR_UNAUTHORIZED'
+            elif (candidate['role_phase']=='EXECUTOR' and
+                    not candidate['role_writer_allowed']):
+                fatal='CURRENT_WRITER_EXECUTOR_REQUIRED'
             elif candidate['config_version']!=candidate['provider_config_version']:
                 fatal='PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED'
             else:
@@ -1587,7 +1713,7 @@ class ModelScheduler(object):
         if row['connection_id']:
             secret,connection_version=ConnectionManager(self.control.gateway,
               self.control.context,self.control.master_key).credential(
-              row['connection_id'],row['base_url'],now)
+              row['connection_id'],row['base_url'],'MODEL_INFERENCE',now)
             if (row['connection_config_version'] is not None and
                     connection_version!=row['connection_config_version']):
                 self._finish(row,UNKNOWN,'CONNECTION_CONFIG_CHANGED',None,now,
@@ -1643,11 +1769,18 @@ class ModelScheduler(object):
             return {'request_id':row['request_id'],
                     'state':terminal if stored else UNKNOWN,
                     'error':exc.kind if stored else 'LATE_WORKER_RESULT_REJECTED'}
-        stored=self._finish(row,'SUCCEEDED',None,result,now,
+        cancel=self.db.execute('''SELECT cancel_requested FROM model_requests
+          WHERE tenant_id=? AND request_id=?''',(row['tenant_id'],
+          row['request_id'])).fetchone()
+        final_state=('CANCELLED' if cancel and cancel['cancel_requested'] else
+                     'SUCCEEDED')
+        final_error=('CANCELLED_DURING_CALL_RESULT_RETAINED' if
+                     final_state=='CANCELLED' else None)
+        stored=self._finish(row,final_state,final_error,result,now,
                             reservation['reservation_id'])
         return {'request_id':row['request_id'],
-                'state':'SUCCEEDED' if stored else UNKNOWN,
-                'error':None if stored else 'LATE_WORKER_RESULT_REJECTED'}
+                'state':final_state if stored else UNKNOWN,
+                'error':final_error if stored else 'LATE_WORKER_RESULT_REJECTED'}
 
     def _finish(self,row,state,error,result,now,reservation_id=None):
         usage=(result or {}).get('usage',{})

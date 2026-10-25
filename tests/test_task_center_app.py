@@ -177,6 +177,8 @@ class TaskCenterAppTests(unittest.TestCase):
 
         good=dict(bad);good['goal']='deliver bounded candidate'
         self.post({'action':'CREATE_PROJECT_TASK','task':good})
+        self.post({'action':'START_TEST_ONLY_TASK','task_id':'task-zero',
+          'attempt_id':'attempt-zero'},'AUTHENTICATED_ACTOR_REQUIRED')
         self.post({'action':'ASSIGN_ROLE','task_id':'task-zero',
           'role_id':'missing','role_version':'v1','principal_id':'developer'},
           'DISPATCH_PREFLIGHT_REQUIRED')

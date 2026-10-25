@@ -208,8 +208,10 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.prepare();self.policy.propose_change('role-change','demo-b',
           'asset-v1',['DEPLOY'],'x')
         ModelControl(self.gateway,self.context,Fernet.generate_key())
-        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
-          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.execute('''INSERT INTO role_templates(
+          tenant_id,role_id,version,phase,capabilities_json,writer_allowed,
+          enabled,review_kind) VALUES (?,?,?,?,?,?,?,?)''',(
+          'tenant-a','developer','v1','EXECUTOR','["code"]',1,1,None))
         self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
           (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','developer',
           'v1','developer-1','p','m','ACTIVE','test',time.time()))
@@ -230,8 +232,10 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.policy.grant_approval_role('demo-b','developer-later',
           'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('later-executor','developer-later',True,'review')
-        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
-          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.execute('''INSERT INTO role_templates(
+          tenant_id,role_id,version,phase,capabilities_json,writer_allowed,
+          enabled,review_kind) VALUES (?,?,?,?,?,?,?,?)''',(
+          'tenant-a','developer','v1','EXECUTOR','["code"]',1,1,None))
         self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
           (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','developer',
           'v1','developer-later','p','m','ACTIVE','test',time.time()))
@@ -249,8 +253,10 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.policy.grant_approval_role('demo-b','atomic-reviewer',
           'SCOPE_CHANGE',time.time()+600)
         reviewer.review_change('atomic-change','atomic-reviewer',True,'review')
-        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
-          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.execute('''INSERT INTO role_templates(
+          tenant_id,role_id,version,phase,capabilities_json,writer_allowed,
+          enabled,review_kind) VALUES (?,?,?,?,?,?,?,?)''',(
+          'tenant-a','developer','v1','EXECUTOR','["code"]',1,1,None))
         self.supervisor.db.commit();blocked=[]
         def authorizer(action,table,*_args):
             if action==sqlite3.SQLITE_INSERT and table=='execution_action_requests':

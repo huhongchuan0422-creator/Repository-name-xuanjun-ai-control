@@ -23,6 +23,7 @@ from task_supervisor import Supervisor
 from task_writer_fence import Fence
 from execution_policy_gateway import ExecutionPolicyGateway
 from connection_management import ConnectionManager
+from codex_execution_adapter import CodexExecutionControl
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -45,7 +46,8 @@ MODEL_TABLES = frozenset((
     'candidate_reviews', 'module_settings', 'task_work_specs',
     'model_call_attempts','model_request_bindings','model_call_reservations',
     'model_usage_attempts','model_runtime_limits','approved_skills',
-    'role_instances','acceptance_checklists'))
+    'role_instances','acceptance_checklists','model_quota_status',
+    'codex_execution_intents','codex_execution_events'))
 
 
 def _read_owned_secret_file(path, label):
@@ -118,6 +120,9 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
         control.context = authority.issue(tenant_id, 'admin:' + principal_id)
         control.tenant_id = tenant_id
         result = control.projection()
+        codex=CodexExecutionControl.__new__(CodexExecutionControl)
+        codex.db=connection;codex.tenant_id=tenant_id
+        result['codex_executions']=codex.projection()
         actual = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
         if {'execution_units','asset_preflight_checks',
@@ -210,8 +215,11 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 action=value.pop('action')
                 supervisor, control=self._model_control()
                 try:
-                    role_actions={'SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
-                                  'ACCEPT_CANDIDATE','REVIEW_SCOPE_CHANGE'}
+                    role_actions={'START_TEST_ONLY_TASK','CREATE_CODEX_INTENT',
+                                  'CANCEL_CODEX_INTENT','SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
+                                  'ACCEPT_CANDIDATE','REVIEW_SCOPE_CHANGE',
+                                  'REPORT_TEST_ONLY_PROGRESS',
+                                  'SAVE_TEST_ONLY_CHECKPOINT'}
                     actor=None
                     if action in role_actions:
                         actor=self._actor_principal()
@@ -256,6 +264,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         value['provider_id'],value['tpm_limit'],
                         value['max_output_tokens'],value.get('tenant_budget'),
                         value.get('task_budget'))
+                    elif action=='SET_QUOTA_STATUS':result=control.set_quota_status(
+                        value['provider_id'],value['quota_state'],
+                        value['quota_source'],value.get('verified_at'),
+                        value.get('unavailable_reason'))
                     elif action=='REGISTER_GRAPH':
                         result=control.gateway.register_graph(control.context,value['graph'])
                     elif action=='CREATE_PROJECT_TASK':
@@ -328,6 +340,29 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           value['role_id'],value['messages'],
                           value['idempotency_key'],value.get('max_output_tokens'),
                           value.get('connection_id'))
+                    elif action in ('REPORT_TEST_ONLY_PROGRESS',
+                                     'SAVE_TEST_ONLY_CHECKPOINT'):
+                        task=supervisor._task(value['task_id'])
+                        assigned=supervisor.db.execute('''SELECT 1 FROM
+                          model_assignments WHERE tenant_id=? AND task_id=? AND
+                          attempt_id=? AND principal_id=?''',(tenant_id,
+                          value['task_id'],task['attempt_id'],actor)).fetchone()
+                        if assigned is None:
+                            raise ValueError('CURRENT_ASSIGNED_ACTOR_REQUIRED')
+                        if action=='REPORT_TEST_ONLY_PROGRESS':
+                            fence=Fence(supervisor,db_path+'.test-only-locks')
+                            try:result=TestOnlyExecutor(control.gateway,fence,
+                              control.context).progress(value['task_id'],
+                              task['attempt_id'],value['event_id'],
+                              value['evidence_ref'])
+                            finally:fence.close()
+                        else:
+                            result=control.gateway.save_checkpoint(
+                              control.context,value['task_id'],task['attempt_id'],
+                              value['checkpoint_id'],value['payload'],
+                              value['inflight'],value['effects_state'],
+                              control.gateway.canonical_resources(
+                                value['task_id']))
                     elif action=='CANCEL_REQUEST':
                         result=control.request_cancel(value['request_id'])
                     elif action=='REGISTER_BENCHMARK':
@@ -339,6 +374,17 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           allow_paid=bool(value.get('allow_paid',False)))
                     elif action=='RUN_SCHEDULER_ONCE':
                         result=ModelScheduler(control).run_once()
+                    elif action=='CREATE_CODEX_INTENT':
+                        result=CodexExecutionControl(control.gateway,
+                          control.context).create_intent(value['task_id'],
+                          value['transport_kind'],value['idempotency_key'],
+                          value['context'])
+                    elif action=='CANCEL_CODEX_INTENT':
+                        result=CodexExecutionControl(control.gateway,
+                          control.context).cancel(value['intent_id'])
+                    elif action=='RECONCILE_CODEX_RESTART':
+                        result=CodexExecutionControl(control.gateway,
+                          control.context).reconcile_restart()
                     elif action=='SUBMIT_CANDIDATE':
                         if value['submitted_by']!=actor:
                             raise ValueError('AUTHENTICATED_EXECUTOR_REQUIRED')
@@ -473,6 +519,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
               'admin:'+principal_id),model_master_key)
             ConnectionManager(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
+            CodexExecutionControl(gateway,authority.issue(tenant_id,
+              'admin:'+principal_id))
         finally:supervisor.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,

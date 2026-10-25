@@ -55,7 +55,7 @@ class ConnectionManagementTests(unittest.TestCase):
         self.supervisor.close();shutil.rmtree(self.root)
 
     def oauth_config(self,cid='oauth'):
-        return {'connection_id':cid,'provider_id':'fixture','purpose':'model-call',
+        return {'connection_id':cid,'provider_id':'fixture','purpose':'MODEL_INFERENCE',
           'auth_type':'OAUTH2_AUTH_CODE_PKCE','destination_origin':self.base,
           'issuer':self.base,'authorization_endpoint':self.base+'/authorize',
           'token_endpoint':self.base+'/token','revocation_endpoint':self.base+'/revoke',
@@ -63,7 +63,7 @@ class ConnectionManagementTests(unittest.TestCase):
           'scopes':['models.run','tools.read'],'supports_refresh':True}
 
     def api_config(self,cid='key',origin=None):
-        return {'connection_id':cid,'provider_id':'fixture','purpose':'model-call',
+        return {'connection_id':cid,'provider_id':'fixture','purpose':'MODEL_INFERENCE',
           'auth_type':'API_KEY','destination_origin':origin or self.base,'issuer':None,
           'authorization_endpoint':None,'token_endpoint':None,
           'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
@@ -75,13 +75,23 @@ class ConnectionManagementTests(unittest.TestCase):
         self.assertNotIn(b'api-key-123456',raw)
         projected=json.dumps(self.manager.projection(),ensure_ascii=False)
         self.assertNotIn('api-key-123456',projected);self.assertIn('••••3456',projected)
-        secret,version=self.manager.credential('key',self.base)
+        secret,version=self.manager.credential('key',self.base,'MODEL_INFERENCE')
         self.assertEqual((secret,version),('api-key-123456',1))
         other='http://127.0.0.1:%d'%(self.server.server_port+1)
         changed=self.manager.upsert(self.api_config(origin=other),credential=None)
         self.assertEqual(changed['status'],'REAUTH_REQUIRED')
         with self.assertRaisesRegex(ValueError,'ACTIVE_CONNECTION'):
-            self.manager.credential('key',other)
+            self.manager.credential('key',other,'MODEL_INFERENCE')
+        config=self.api_config('other-purpose');config['purpose']='MCP_TOOL'
+        self.manager.upsert(config,
+          credential='api-key-purpose')
+        with self.assertRaisesRegex(ValueError,'PURPOSE_MISMATCH'):
+            self.manager.credential('other-purpose',self.base,'MODEL_INFERENCE')
+
+    def test_unrecognized_connection_purpose_is_rejected(self):
+        config=self.api_config('bad-purpose');config['purpose']='ARBITRARY_CHANNEL'
+        with self.assertRaisesRegex(ValueError,'CONNECTION_PURPOSE_REQUIRED'):
+            self.manager.upsert(config,credential='api-key-purpose')
 
     def test_oauth_pkce_success_replay_refresh_and_revoke(self):
         self.manager.upsert(self.oauth_config())
@@ -98,7 +108,7 @@ class ConnectionManagementTests(unittest.TestCase):
         self.assertEqual(len(OAuthHandler.calls),2)
         self.assertEqual(self.manager.revoke('oauth')['status'],'REVOKED')
         with self.assertRaisesRegex(ValueError,'ACTIVE_CONNECTION'):
-            self.manager.credential('oauth',self.base,now=1003)
+            self.manager.credential('oauth',self.base,'MODEL_INFERENCE',now=1003)
 
     def test_oauth_state_issuer_redirect_expiry_and_refresh_conflict(self):
         self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
@@ -120,6 +130,17 @@ class ConnectionManagementTests(unittest.TestCase):
         self.supervisor.db.commit()
         with self.assertRaisesRegex(ValueError,'REFRESH_IN_PROGRESS'):
             self.manager.refresh('oauth',now=2002)
+        with self.assertRaisesRegex(ValueError,'REFRESH_IN_PROGRESS'):
+            self.manager.upsert(self.oauth_config(),now=2002)
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          refresh_lease_until=NULL WHERE connection_id='oauth' ''')
+        self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'RECOVERY_REAUTH_REQUIRED'):
+            self.manager.refresh('oauth',now=2200)
+        row=self.supervisor.db.execute('''SELECT status,refresh_lease,
+          refresh_lease_until FROM service_connections WHERE
+          connection_id='oauth' ''').fetchone()
+        self.assertEqual(tuple(row),('REAUTH_REQUIRED',None,None))
 
     def test_tenant_isolation_and_scope_expansion_require_new_authorization(self):
         self.manager.upsert(self.oauth_config())

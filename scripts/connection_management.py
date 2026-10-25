@@ -24,6 +24,7 @@ from task_supervisor import canonical
 
 
 AUTH_TYPES=frozenset(('API_KEY','OAUTH2_AUTH_CODE_PKCE'))
+CONNECTION_PURPOSES=frozenset(('MODEL_INFERENCE','MCP_TOOL','CODEX_EXECUTION'))
 
 
 def _safe_endpoint(value, allow_loopback=True):
@@ -158,6 +159,8 @@ class ConnectionManager(object):
         if not isinstance(config,dict) or set(config)!=required:
             raise ValueError('EXACT_CONNECTION_CONFIG_REQUIRED')
         if config['auth_type'] not in AUTH_TYPES:raise ValueError('AUTH_TYPE_REQUIRED')
+        if config['purpose'] not in CONNECTION_PURPOSES:
+            raise ValueError('CONNECTION_PURPOSE_REQUIRED')
         if not isinstance(config['scopes'],list):raise ValueError('SCOPES_ARRAY_REQUIRED')
         scopes=sorted(set(_text(x,'scope') for x in config['scopes']))
         destination=_origin(config['destination_origin'])
@@ -178,6 +181,10 @@ class ConnectionManager(object):
             existing=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,
               config['connection_id'])).fetchone()
+            if (existing and existing['status']=='REFRESHING' and
+                    existing['refresh_lease_until'] is not None and
+                    existing['refresh_lease_until']>now):
+                raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
             old_scopes=set(json.loads(existing['scopes_json'])) if existing else set()
             if existing and not set(scopes).issubset(old_scopes):
                 raise ValueError('SCOPE_EXPANSION_REQUIRES_NEW_AUTHORIZATION')
@@ -187,6 +194,11 @@ class ConnectionManager(object):
             refresh_cipher=existing['refresh_cipher'] if existing else None
             expires=existing['access_expires_at'] if existing else None
             status=existing['status'] if existing else 'CONFIGURED'
+            if existing and existing['status']=='REFRESHING':
+                # A stale/unknown refresh cannot be carried into a new
+                # configuration version.  Force explicit re-authorization.
+                secret_cipher=secret_mask=refresh_cipher=expires=None
+                status='REAUTH_REQUIRED'
             old_binding=(existing['destination_origin'],existing['issuer'],
               existing['auth_type']) if existing else None
             new_binding=(destination,config['issuer'],config['auth_type'])
@@ -325,8 +337,15 @@ class ConnectionManager(object):
                 raise ValueError('OAUTH_CONNECTION_REQUIRED')
             if not row['supports_refresh']:raise ValueError('OAUTH_REFRESH_NOT_SUPPORTED')
             if row['refresh_cipher'] is None:raise ValueError('OAUTH_REFRESH_TOKEN_REQUIRED')
-            if row['status']=='REFRESHING' and row['refresh_lease_until']>now:
-                raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
+            if row['status']=='REFRESHING':
+                if row['refresh_lease_until'] is not None and row['refresh_lease_until']>now:
+                    raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
+                self.db.execute('''UPDATE service_connections SET
+                  status='REAUTH_REQUIRED',refresh_lease=NULL,
+                  refresh_lease_until=NULL,updated_at=? WHERE tenant_id=? AND
+                  connection_id=?''',(now,self.tenant_id,connection_id))
+                self.db.commit()
+                raise ValueError('OAUTH_REFRESH_RECOVERY_REAUTH_REQUIRED')
             self.db.execute('''UPDATE service_connections SET status='REFRESHING',
               refresh_lease=?,refresh_lease_until=?,updated_at=? WHERE tenant_id=?
               AND connection_id=?''',(lease,now+30,now,self.tenant_id,connection_id))
@@ -377,7 +396,7 @@ class ConnectionManager(object):
         return {'connection_id':connection_id,'status':'REVOKED',
           'external_revocation':'NOT_EXECUTED'}
 
-    def credential(self,connection_id,required_origin,now=None):
+    def credential(self,connection_id,required_origin,required_purpose,now=None):
         now=self.clock() if now is None else now
         row=self.db.execute('''SELECT * FROM service_connections WHERE tenant_id=?
           AND connection_id=?''',(self.tenant_id,connection_id)).fetchone()
@@ -385,6 +404,8 @@ class ConnectionManager(object):
             raise ValueError('ACTIVE_CONNECTION_REQUIRED')
         if row['destination_origin']!=_origin(required_origin):
             raise ValueError('CONNECTION_DESTINATION_MISMATCH')
+        if row['purpose']!=_text(required_purpose,'required_purpose'):
+            raise ValueError('CONNECTION_PURPOSE_MISMATCH')
         if row['auth_type']=='OAUTH2_AUTH_CODE_PKCE' and (
                 row['access_expires_at'] is None or now>=row['access_expires_at']):
             raise ValueError('OAUTH_ACCESS_EXPIRED')
