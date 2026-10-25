@@ -108,7 +108,7 @@ class HandoffAdmission(unittest.TestCase):
         refs=dict(self.history_refs)
         required={'snapshot_result':b'B_SNAPSHOT_RESULT','snapshot_permit':b'B_SNAPSHOT_PERMIT',
             'validate_clones_result':b'B_CLONE_RESULT','validate_clones_permit':b'B_CLONE_PERMIT',
-            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE',
+            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE','resume_admission':b'B_RESUME_ADMISSION',
             'backup_dir':None,'c_approval':b'OLD_C_APPROVAL'}
         for key,body in required.items():
             if key=='backup_dir':continue
