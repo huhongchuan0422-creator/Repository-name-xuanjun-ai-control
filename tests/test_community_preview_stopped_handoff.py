@@ -378,9 +378,12 @@ class WholeEntry(unittest.TestCase):
         candidate={'attempt':h.attempt(),'plan_sha256':'a'*64}
         proof={'format':1,'mode':h.MODE,'host':p.HOST,'attempt':h.attempt(),
             'plan':candidate,'approval_sha256':'b'*64,'evidence':{},'approval_kind':'C_RESUME_APPROVAL'}
+        owned_path=self.root/'owned-recovery-backup';owned_path.write_bytes(b'isolated-backup-fd')
+        owned_fd=os.open(str(owned_path),os.O_RDONLY|os.O_NOFOLLOW)
+        self.addCleanup(lambda fd: os.close(fd) if fd>=0 else None,owned_fd)
         with patch.object(h,'document',return_value=(proof,b'proof')),\
              patch.object(q,'configure_resumed_recovery',return_value=True),\
-             patch.object(h,'open_private',return_value=44),\
+             patch.object(h,'open_private',return_value=owned_fd),\
              patch.object(q,'_c_resume_approval',return_value={'ok':True}) as fresh_approval,\
              patch.object(q,'c_approval',side_effect=AssertionError('old C approval must not be used')),\
              patch.object(h,'acknowledge'),\
