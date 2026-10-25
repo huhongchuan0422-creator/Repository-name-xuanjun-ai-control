@@ -18,7 +18,7 @@ from execution_policy_gateway import ExecutionPolicyGateway
 
 
 STATES=frozenset(('PENDING','SENDING','ACKED','RUNNING','WAITING_APPROVAL',
-  'SUCCEEDED','FAILED','CANCEL_REQUESTED','CANCELLED',UNKNOWN))
+  'EXECUTION_COMPLETED','SUCCEEDED','FAILED','CANCEL_REQUESTED','CANCELLED',UNKNOWN))
 
 
 class CodexTransportUnavailable(Exception):pass
@@ -75,13 +75,22 @@ class CodexAppServerTransport(object):
           'turn_id':intent.get('turn_id'),'app_server_method':method}
         if method=='turn/started':
             turn=params.get('turn') or {};base['turn_id']=turn.get('id') or base['turn_id']
+            if ((params.get('threadId') and params.get('threadId')!=intent.get('thread_id')) or
+                    (intent.get('turn_id') and turn.get('id')!=intent.get('turn_id'))):
+                return None
             base['state']='RUNNING';return base
         if (method and (method.endswith('/requestApproval') or
                 method in ('item/tool/requestUserInput','mcpServer/elicitation/request'))):
+            if (params.get('threadId')!=intent.get('thread_id') or
+                    params.get('turnId')!=intent.get('turn_id')):
+                return None
             base.update({'state':'WAITING_APPROVAL','approval_request_id':value.get('id'),
               'approval_kind':method});return base
         if method=='turn/completed':
             turn=params.get('turn') or {};base['turn_id']=turn.get('id') or base['turn_id']
+            if ((params.get('threadId') and params.get('threadId')!=intent.get('thread_id')) or
+                    turn.get('id')!=intent.get('turn_id')):
+                return None
             status=turn.get('status')
             if status=='interrupted':base['state']='CANCELLED'
             elif status=='failed':base.update({'state':'FAILED','error':turn.get('error')})
@@ -163,21 +172,31 @@ class CodexAppServerTransport(object):
               'params':{}})+'\n').encode('utf-8'));proc.stdin.flush()
             resumed=self._rpc(proc,{'jsonrpc':'2.0','id':2,'method':'thread/resume',
               'params':{'threadId':intent['thread_id'],'excludeTurns':True}})
-            turns=self._rpc(proc,{'jsonrpc':'2.0','id':3,
-              'method':'thread/turns/list','params':{'threadId':intent['thread_id'],
-              'limit':50,'sortDirection':'desc','itemsView':'summary'}})
+            cursor=None;target=None;request_id=3
+            while True:
+                params={'threadId':intent['thread_id'],'limit':50,
+                  'sortDirection':'desc','itemsView':'summary'}
+                if cursor is not None:params['cursor']=cursor
+                turns=self._rpc(proc,{'jsonrpc':'2.0','id':request_id,
+                  'method':'thread/turns/list','params':params})
+                for turn in turns.get('data') or []:
+                    if turn.get('id')==intent.get('turn_id'):
+                        target=turn;break
+                if target is not None:break
+                cursor=turns.get('nextCursor')
+                if not cursor:break
+                request_id+=1
             self.processes[intent['thread_id']]=proc
-            for turn in turns.get('data') or []:
-                if turn.get('id')==intent.get('turn_id'):
-                    notification={'method':'turn/completed','params':{'turn':turn}}
-                    mapped=self._turn_receipt(notification,intent)
-                    if mapped:return mapped
-                    if turn.get('status')=='inProgress':
-                        return dict(intent,state='RUNNING')
-            thread=resumed.get('thread') or {};status=thread.get('status') or {}
-            if status.get('type')=='active':return dict(intent,state='RUNNING')
-            return dict(intent,state='WAITING_APPROVAL',
-              error='TURN_STATUS_RECONCILIATION_REQUIRED')
+            if target is not None:
+                notification={'method':'turn/completed','params':{
+                  'threadId':intent['thread_id'],'turn':target}}
+                mapped=self._turn_receipt(notification,intent)
+                if mapped:return mapped
+                if target.get('status')=='inProgress':
+                    return dict(intent,state=('CANCEL_REQUESTED' if
+                      intent.get('cancel_requested') else 'RUNNING'))
+            return dict(intent,state=UNKNOWN,
+              error='TARGET_TURN_STATUS_UNPROVEN')
         except Exception:
             self._terminate(proc)
             raise
@@ -366,14 +385,17 @@ class CodexExecutionControl(object):
           lease_until=NULL,updated_at=? WHERE tenant_id=? AND state IN
           ('SENDING','ACKED','RUNNING','WAITING_APPROVAL') ''',(
           UNKNOWN,now,self.tenant_id)).rowcount;self.db.commit()
+        self.db.execute('''UPDATE codex_execution_intents SET
+          error_kind='CANCEL_RECONCILIATION_REQUIRED_AFTER_RESTART',
+          lease_owner=NULL,lease_until=NULL,updated_at=? WHERE tenant_id=?
+          AND state='CANCEL_REQUESTED' ''',(now,self.tenant_id));self.db.commit()
         return {'unknown_intents':changed}
 
     def reconcile_transport_once(self,transports,now=None):
         now=self.clock() if now is None else now
         row=self.db.execute('''SELECT * FROM codex_execution_intents WHERE
-          tenant_id=? AND state=? AND thread_id IS NOT NULL AND
-          cancel_requested=0 ORDER BY updated_at,intent_id LIMIT 1''',(
-          self.tenant_id,UNKNOWN)).fetchone()
+          tenant_id=? AND state IN (?, 'CANCEL_REQUESTED') AND thread_id IS NOT NULL
+          ORDER BY updated_at,intent_id LIMIT 1''',(self.tenant_id,UNKNOWN)).fetchone()
         if row is None:return {'state':'IDLE'}
         transport=transports.get(row['transport_kind'])
         if transport is None or not hasattr(transport,'reconcile'):
@@ -383,8 +405,8 @@ class CodexExecutionControl(object):
         except Exception as exc:return {'intent_id':row['intent_id'],'state':UNKNOWN,
           'error':'RECONCILIATION_UNKNOWN:'+type(exc).__name__}
         if not isinstance(receipt,dict) or receipt.get('state') not in (
-                'ACKED','RUNNING','WAITING_APPROVAL','EXECUTION_COMPLETED',
-                'SUCCEEDED','FAILED','CANCELLED'):
+                'ACKED','RUNNING','WAITING_APPROVAL','CANCEL_REQUESTED',
+                'EXECUTION_COMPLETED','SUCCEEDED','FAILED','CANCELLED',UNKNOWN):
             raise ValueError('VALID_CODEX_RECONCILIATION_RECEIPT_REQUIRED')
         event_hash=hashlib.sha256(canonical(receipt).encode()).hexdigest()
         return self.record_result(row['intent_id'],'reconciled-'+event_hash,
@@ -521,27 +543,37 @@ class CodexExecutionControl(object):
 
     def poll_transport_once(self,transports,now=None):
         now=self.clock() if now is None else now
-        row=self.db.execute('''SELECT * FROM codex_execution_intents WHERE
+        rows=list(self.db.execute('''SELECT * FROM codex_execution_intents WHERE
           tenant_id=? AND state IN ('RUNNING','WAITING_APPROVAL',
           'CANCEL_REQUESTED') AND thread_id IS NOT NULL ORDER BY
-          updated_at,intent_id LIMIT 1''',(self.tenant_id,)).fetchone()
-        if row is None:return {'state':'IDLE'}
-        transport=transports.get(row['transport_kind'])
-        if transport is None or not hasattr(transport,'poll'):
-            return {'intent_id':row['intent_id'],'state':row['state'],
-                    'error':'EVENT_STREAM_UNSUPPORTED'}
-        try:receipt=transport.poll(dict(row),0)
-        except Exception as exc:return {'intent_id':row['intent_id'],'state':UNKNOWN,
-          'error':'EVENT_STREAM_UNKNOWN:'+type(exc).__name__}
-        if receipt is None:return {'intent_id':row['intent_id'],'state':row['state']}
-        event_seed=canonical({'intent':row['intent_id'],'receipt':receipt})
-        event_id='app-event-'+hashlib.sha256(event_seed.encode()).hexdigest()
-        return self.record_result(row['intent_id'],event_id,receipt['state'],receipt,now)
+          updated_at,intent_id LIMIT 64''',(self.tenant_id,)))
+        if not rows:return {'state':'IDLE'}
+        last=None
+        for offset,row in enumerate(rows):
+            transport=transports.get(row['transport_kind'])
+            if transport is None or not hasattr(transport,'poll'):
+                last={'intent_id':row['intent_id'],'state':row['state'],
+                      'error':'EVENT_STREAM_UNSUPPORTED'};continue
+            try:receipt=transport.poll(dict(row),0)
+            except Exception as exc:
+                last={'intent_id':row['intent_id'],'state':UNKNOWN,
+                  'error':'EVENT_STREAM_UNKNOWN:'+type(exc).__name__};continue
+            if receipt is None:
+                # Rotate silent intents within the existing queue ordering so
+                # a later instance with a terminal event cannot starve.
+                self.db.execute('''UPDATE codex_execution_intents SET updated_at=?
+                  WHERE tenant_id=? AND intent_id=?''',(now+(offset+1)*1e-9,
+                  self.tenant_id,row['intent_id']));self.db.commit()
+                last={'intent_id':row['intent_id'],'state':row['state']};continue
+            event_seed=canonical({'intent':row['intent_id'],'receipt':receipt})
+            event_id='app-event-'+hashlib.sha256(event_seed.encode()).hexdigest()
+            return self.record_result(row['intent_id'],event_id,receipt['state'],receipt,now)
+        return last
 
     def record_result(self,intent_id,event_id,state,payload,now=None):
         now=self.clock() if now is None else now
-        if state not in ('ACKED','RUNNING','WAITING_APPROVAL','EXECUTION_COMPLETED',
-                         'SUCCEEDED','FAILED','CANCELLED'):
+        if state not in ('ACKED','RUNNING','WAITING_APPROVAL','CANCEL_REQUESTED',
+                         'EXECUTION_COMPLETED','SUCCEEDED','FAILED','CANCELLED',UNKNOWN):
             raise ValueError('CODEX_RESULT_STATE_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         try:
@@ -565,8 +597,16 @@ class CodexExecutionControl(object):
               now<task['authority_valid_until'])
             if row['state'] in ('EXECUTION_COMPLETED','SUCCEEDED','FAILED','CANCELLED'):
                 current=False
-            cancellation=(row['cancel_requested'] and state=='CANCELLED')
-            accepted=int((current and not row['cancel_requested']) or cancellation)
+            identity_ok=((not payload.get('thread_id') or
+              payload.get('thread_id')==row['thread_id']) and
+              (not payload.get('turn_id') or payload.get('turn_id')==row['turn_id']))
+            if row['transport_kind']=='CODEX_APP_SERVER' and row['thread_id']:
+                identity_ok=(payload.get('thread_id')==row['thread_id'] and
+                  payload.get('turn_id')==row['turn_id'])
+            cancellation=(row['cancel_requested'] and state in (
+              'CANCEL_REQUESTED','CANCELLED') and identity_ok)
+            accepted=int(((current and not row['cancel_requested'] and identity_ok)
+              or cancellation))
             self.db.execute('''INSERT INTO codex_execution_events VALUES
               (?,?,?,?,?,?,?)''',(self.tenant_id,intent_id,event_id,state,body,
               accepted,now))

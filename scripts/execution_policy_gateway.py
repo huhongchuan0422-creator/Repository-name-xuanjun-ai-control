@@ -150,10 +150,26 @@ class ExecutionPolicyGateway(object):
           tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
         if unit is None or unit['asset_version']!=asset_version:
             raise ValueError('ASSET_VERSION_MISMATCH')
-        found=self.db.execute('''SELECT COUNT(*) FROM asset_query_receipts WHERE
+        receipts=list(self.db.execute('''SELECT query_json FROM
+          asset_query_receipts WHERE
           tenant_id=? AND task_id=? AND query_id IN (%s)'''%(','.join(
-          ['?']*len(query_ids))),(self.tenant_id,task_id)+tuple(query_ids)).fetchone()[0]
-        if found!=len(set(query_ids)):raise ValueError('ASSET_QUERY_RECEIPT_REQUIRED')
+          ['?']*len(query_ids))),(self.tenant_id,task_id)+tuple(query_ids)))
+        if len(receipts)!=len(set(query_ids)):
+            raise ValueError('ASSET_QUERY_RECEIPT_REQUIRED')
+        # The conclusion is derived from the trusted query receipts.  It is
+        # not a caller assertion that can contradict the authoritative result.
+        has_match=False
+        for receipt in receipts:
+            observed=json.loads(receipt['query_json'])['observed_result']
+            matches=observed.get('matches') if isinstance(observed,dict) else None
+            if matches is None:
+                matches=observed.get('found') if isinstance(observed,dict) else None
+            if not isinstance(matches,list):
+                raise ValueError('ASSET_QUERY_OUTCOME_UNDETERMINED')
+            has_match=has_match or bool(matches)
+        derived='FOUND' if has_match else 'NOT_FOUND'
+        if outcome!=derived:
+            raise ValueError('ASSET_QUERY_OUTCOME_MISMATCH')
         now=self.clock() if now is None else now
         body={'task_id':task_id,'asset_version':asset_version,
           'query_ids':sorted(set(query_ids)),'outcome':outcome,

@@ -339,5 +339,27 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
               'existing-source','asset-v1',False,'reuse checked','evidence',
               query_ids=['missing'])
 
+    def test_dispatch_outcome_must_match_trusted_query_result(self):
+        self.policy.record_unit(self.unit)
+        found={'matches':[{'asset_key':'existing-source'}]}
+        self.policy.upsert_canonical_asset('existing-source','registry-v4',found)
+        self.policy.record_asset_query('demo-b','found-query','CANONICAL_DB','registry-v4',
+          {'lookup':{'asset_key':'existing-source'},'observed_result':found,
+          'evidence_ref':'canonical-db://existing-source@registry-v4'},hashlib.sha256(
+          canonical(found).encode()).hexdigest())
+        missing={'matches':[]}
+        self.policy.record_asset_query('demo-b','missing-query','CANONICAL_DB','registry-v4',
+          {'lookup':{'asset_key':'missing-source'},'observed_result':missing,
+          'evidence_ref':'canonical-db://missing-source@registry-v4'},hashlib.sha256(
+          canonical(missing).encode()).hexdigest())
+        with self.assertRaisesRegex(ValueError,'OUTCOME_MISMATCH'):
+            self.policy.record_dispatch_preflight('demo-b','asset-v1',['found-query'],
+              'NOT_FOUND','caller contradicted found result')
+        with self.assertRaisesRegex(ValueError,'OUTCOME_MISMATCH'):
+            self.policy.record_dispatch_preflight('demo-b','asset-v1',['missing-query'],
+              'FOUND','caller contradicted empty result')
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          dispatch_preflights WHERE task_id='demo-b' ''').fetchone()[0],0)
+
 
 if __name__=='__main__':unittest.main()

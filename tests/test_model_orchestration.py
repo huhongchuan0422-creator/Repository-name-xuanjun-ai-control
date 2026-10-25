@@ -870,6 +870,21 @@ class ModelOrchestrationTests(unittest.TestCase):
           model_requests WHERE request_id=?''',(large['request_id'],)).fetchone()[0],
           'QUEUED')
 
+    def test_same_provider_sixteen_oversized_heads_do_not_starve_seventeenth(self):
+        self.assigned();large=[]
+        for index in range(16):
+            large.append(self.control.queue_request('demo-b','developer',
+              [{'role':'user','content':'x'*12000}],'large-head-%02d'%index,128))
+        small=self.control.queue_request('demo-b','developer',[],
+          'small-after-sixteen',128)
+        self.control.set_runtime_limits('free',1024,4096)
+        result=ModelScheduler(self.control).run_once()
+        self.assertEqual(result['request_id'],small['request_id'])
+        self.assertEqual(result['state'],'SUCCEEDED')
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          model_requests WHERE request_id IN (%s) AND state='QUEUED' '''%(','.join(
+          ['?']*len(large))),tuple(x['request_id'] for x in large)).fetchone()[0],16)
+
     def test_frozen_task_spec_change_invalidates_later_review(self):
         self.assigned();self.role('reviewer','REVIEWER',['code'],False,'QA')
         self.control.assign('demo-b','reviewer','v1','qa')

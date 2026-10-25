@@ -1666,8 +1666,8 @@ class ModelScheduler(object):
           model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id
           AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
           role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
-          AND rt.version=a.role_version WHERE r.provider_rank<=16
-          ORDER BY r.provider_rank,r.created_at,r.request_id LIMIT 1600''',
+          AND rt.version=a.role_version
+          ORDER BY r.provider_rank,r.created_at,r.request_id''',
           (self.control.tenant_id,now)))
         if not candidates:return {'state':'IDLE'}
         row=None;reservation=None;last_limit=None

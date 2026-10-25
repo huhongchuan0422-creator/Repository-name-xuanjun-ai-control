@@ -208,10 +208,11 @@ class CodexExecutionAdapterTests(unittest.TestCase):
           CodexAppServerTransport(lambda _intent:{'state':'RUNNING',
           'execution_id':'exec-app','thread_id':'thr-1','turn_id':'turn-1'})})
         self.assertEqual(result['state'],'RUNNING')
+        event={'approval':'owner','thread_id':'thr-1','turn_id':'turn-1'}
         first=self.control.record_result(intent['intent_id'],'event-1',
-          'WAITING_APPROVAL',{'approval':'owner'})
+          'WAITING_APPROVAL',event)
         replay=self.control.record_result(intent['intent_id'],'event-1',
-          'WAITING_APPROVAL',{'approval':'owner'})
+          'WAITING_APPROVAL',event)
         self.assertTrue(first['accepted']);self.assertTrue(replay['duplicate'])
         with self.assertRaisesRegex(ValueError,'EVENT_ID_CONFLICT'):
             self.control.record_result(intent['intent_id'],'event-1','FAILED',{})
@@ -374,6 +375,104 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         row=self.supervisor.db.execute('''SELECT state,execution_id FROM
           codex_execution_intents WHERE intent_id=?''',(intent['intent_id'],)).fetchone()
         self.assertEqual(tuple(row),('ACKED','worker-exec'))
+
+    def test_poll_skips_silent_first_intent_and_consumes_second_terminal(self):
+        first=self.control.create_intent('demo-b','CODEX_APP_SERVER','silent-first',
+          self.context_body)
+        second=self.control.create_intent('demo-b','CODEX_APP_SERVER','done-second',
+          self.context_body)
+        counter=[0]
+        def send(_intent):
+            counter[0]+=1;number=counter[0]
+            return {'state':'RUNNING','execution_id':'turn-%s'%number,
+              'session_id':'session-%s'%number,'thread_id':'thread-%s'%number,
+              'turn_id':'turn-%s'%number}
+        transport=CodexAppServerTransport(send)
+        self.control.dispatch_once({'CODEX_APP_SERVER':transport})
+        self.control.dispatch_once({'CODEX_APP_SERVER':transport})
+        class Poller(object):
+            def poll(self,row,_timeout):
+                if row['intent_id']==first['intent_id']:return None
+                return {'state':'EXECUTION_COMPLETED','thread_id':'thread-2',
+                  'turn_id':'turn-2'}
+        result=self.control.poll_transport_once({'CODEX_APP_SERVER':Poller()})
+        self.assertTrue(result['accepted'])
+        states={x['intent_id']:x['state'] for x in self.control.projection()}
+        self.assertEqual(states[first['intent_id']],'RUNNING')
+        self.assertEqual(states[second['intent_id']],'EXECUTION_COMPLETED')
+
+    def test_wrong_thread_and_old_turn_events_are_historical_only(self):
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','identity-events',
+          self.context_body)
+        self.control.dispatch_once({'CODEX_APP_SERVER':CodexAppServerTransport(
+          lambda _intent:{'state':'RUNNING','thread_id':'thread-current',
+          'turn_id':'turn-current','execution_id':'turn-current'})})
+        wrong=self.control.record_result(intent['intent_id'],'wrong-thread',
+          'WAITING_APPROVAL',{'thread_id':'thread-other','turn_id':'turn-current'})
+        old=self.control.record_result(intent['intent_id'],'old-turn',
+          'EXECUTION_COMPLETED',{'thread_id':'thread-current','turn_id':'turn-old'})
+        self.assertFalse(wrong['accepted']);self.assertFalse(old['accepted'])
+        self.assertEqual(self.control.projection()[0]['state'],'RUNNING')
+        self.assertEqual(self.supervisor.db.execute('''SELECT SUM(accepted) FROM
+          codex_execution_events WHERE event_id IN ('wrong-thread','old-turn')''').fetchone()[0],0)
+
+    def test_cancel_requested_survives_restart_and_reconciles_same_turn(self):
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','cancel-restart',
+          self.context_body)
+        self.control.dispatch_once({'CODEX_APP_SERVER':CodexAppServerTransport(
+          lambda _intent:{'state':'RUNNING','thread_id':'thread-cancel',
+          'turn_id':'turn-cancel','execution_id':'turn-cancel'})})
+        self.control.cancel(intent['intent_id'])
+        self.control.reconcile_restart()
+        self.assertEqual(self.control.projection()[0]['state'],'CANCEL_REQUESTED')
+        class Reconciler(object):
+            def reconcile(self,row):
+                self.row=row
+                return {'state':'CANCEL_REQUESTED','thread_id':'thread-cancel',
+                  'turn_id':'turn-cancel'}
+            def poll(self,row,_timeout):
+                return {'state':'CANCELLED','thread_id':'thread-cancel',
+                  'turn_id':'turn-cancel'}
+        transport=Reconciler()
+        recovered=self.control.reconcile_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertTrue(recovered['accepted'])
+        self.assertEqual(transport.row['turn_id'],'turn-cancel')
+        settled=self.control.poll_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertTrue(settled['accepted'])
+        self.assertEqual(self.control.projection()[0]['state'],'CANCELLED')
+
+    def test_app_server_reconcile_pages_to_exact_turn_and_absence_is_unknown(self):
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','paged-turn',
+          self.context_body)
+        self.control.dispatch_once({'CODEX_APP_SERVER':CodexAppServerTransport(
+          lambda _intent:{'state':'RUNNING','thread_id':'thread-page',
+          'turn_id':'target-turn','execution_id':'target-turn'})})
+        self.control.reconcile_restart()
+        fixture=("import sys,json\n"
+          "for line in sys.stdin:\n"
+          " v=json.loads(line)\n"
+          " if 'id' not in v: continue\n"
+          " m=v.get('method');p=v.get('params') or {};r={}\n"
+          " if m=='thread/resume': r={'thread':{'id':'thread-page','status':{'type':'active'}}}\n"
+          " elif m=='thread/turns/list':\n"
+          "  if not p.get('cursor'): r={'data':[{'id':'other-%d'%i,'status':'inProgress'} for i in range(50)],'nextCursor':'page-2'}\n"
+          "  else: r={'data':[{'id':'target-turn','status':'completed','items':[]}]}\n"
+          " print(json.dumps({'jsonrpc':'2.0','id':v['id'],'result':r}),flush=True)\n")
+        transport=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
+        result=self.control.reconcile_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertTrue(result['accepted'])
+        self.assertEqual(self.control.projection()[0]['state'],'EXECUTION_COMPLETED')
+        proc=transport.processes['thread-page'];proc.terminate();proc.wait()
+        proc.stdin.close();proc.stdout.close();proc.stderr.close()
+
+    def test_app_server_turn_receipt_rejects_other_identity(self):
+        intent={'thread_id':'thread-current','turn_id':'turn-current'}
+        self.assertIsNone(CodexAppServerTransport._turn_receipt({'method':'turn/completed',
+          'params':{'threadId':'thread-current','turn':{'id':'turn-old',
+          'status':'completed'}}},intent))
+        self.assertIsNone(CodexAppServerTransport._turn_receipt({'id':9,
+          'method':'item/commandExecution/requestApproval','params':{
+          'threadId':'thread-other','turnId':'turn-current'}},intent))
 
 
 if __name__=='__main__':unittest.main()

@@ -494,9 +494,13 @@ class GatewayKernel(object):
                 or not isinstance(resources, list)
                 or not resources or len(resources) != len(set(resources))):
             raise ValueError('EXACT_CHECKPOINT_REQUIRED')
-        now = self.clock() if now is None else _finite(now, 'time')
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            # Authority time is sampled only after the serialization lock is
+            # held.  A caller that waited behind a writer must not use a
+            # pre-lock timestamp to cross an authority expiry boundary.
+            supplied_now = None if now is None else _finite(now, 'time')
+            now = max(self.clock(), supplied_now) if supplied_now is not None else self.clock()
             task = self.supervisor._task(task_id)
             if task['attempt_id'] != attempt_id:
                 raise ValueError('CHECKPOINT_ATTEMPT_MISMATCH')

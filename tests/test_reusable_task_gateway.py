@@ -221,6 +221,31 @@ class KernelTests(unittest.TestCase):
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           gateway_checkpoints WHERE checkpoint_id='race-point' ''').fetchone()[0],0)
 
+    def test_checkpoint_waiting_on_lock_rechecks_expiry_after_acquire(self):
+        self.gateway.register_graph(self.a,self.graph(),now=1000)
+        self.executor().start('task-a','attempt-a1',['fake:resource-task-a'],1500)
+        clock=[1002.0];attempting=threading.Event();result=[]
+        self.supervisor.db.execute('BEGIN IMMEDIATE')
+        def save_after_lock():
+            attempting.set()
+            second_supervisor=Supervisor(self.path,lambda:clock[0])
+            second_gateway=GatewayKernel(second_supervisor,
+              TestTenantAuthority(b'k'*32),lambda:clock[0])
+            try:
+                second_gateway.save_checkpoint(
+                  second_gateway.tenants.issue('tenant-a','owner-a'),
+                  'task-a','attempt-a1','expired-after-wait',{'work':'late'},[],
+                  'RECONCILED',['fake:resource-task-a'])
+            except Exception as exc:result.append(str(exc))
+            finally:second_supervisor.close()
+        thread=threading.Thread(target=save_after_lock);thread.start()
+        self.assertTrue(attempting.wait(2))
+        clock[0]=1501.0
+        self.supervisor.db.commit();thread.join(5)
+        self.assertEqual(result,['CURRENT_WRITER_AUTHORITY_REQUIRED'])
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          gateway_checkpoints WHERE checkpoint_id='expired-after-wait' ''').fetchone()[0],0)
+
     def test_resource_conflict_nonpreemptible_and_safe_release(self):
         self.register_wait_graph()
         exe = self.executor()
