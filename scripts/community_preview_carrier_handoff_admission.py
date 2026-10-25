@@ -210,7 +210,89 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
              'HISTORY_FILE_CONTENT_CHANGED')
         result[key]={'name':name,'parent_identity':expected_parent,
                      'file_identity':expected_file,'sha256':expected_sha}
+    if mode==POST_B_MODE:verify_post_b_history(refs,uid)
     return result
+
+def _history_json(refs,key,uid):
+    pfd,name,expected_parent,expected_file,expected_sha=refs[key]
+    raw=readfile(pfd,name,uid,8*1024*1024)
+    try:value=json.loads(raw.decode('utf8'))
+    except (ValueError,UnicodeError):raise Hold('POST_B_HISTORY_JSON_INVALID')
+    need(type(value) is dict and raw==canonical(value) and sha(raw)==expected_sha,
+         'POST_B_HISTORY_NONCANONICAL_OR_CHANGED')
+    return value,raw
+
+def verify_post_b_history(refs,uid):
+    intent,ib=_history_json(refs,'b_intent',uid)
+    old,ob=_history_json(refs,'b_approval',uid)
+    freeze,fb=_history_json(refs,'freeze',uid)
+    resume,rb=_history_json(refs,'resume_approval',uid)
+    rfreeze,rfb=_history_json(refs,'resume_freeze',uid)
+    admission,ab=_history_json(refs,'resume_admission',uid)
+    attempt=ORIGINAL_ATTEMPT
+    need(set(intent)=={'format','mode','attempt','approval_sha256','freeze_sha256'}
+         and intent==dict(format=1,mode='STOPPED_HANDOFF_V1',attempt=attempt,
+             approval_sha256=sha(ob),freeze_sha256=sha(fb)),'POST_B_INTENT_BINDING')
+    need(set(old)=={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at','freeze_sha256','actions'}
+         and old.get('format')==1 and old.get('host')==HOST and old.get('mode')=='STOPPED_HANDOFF_V1'
+         and old.get('attempt')==attempt and old.get('freeze_sha256')==sha(fb)
+         and old.get('actions')==['SNAPSHOT','THREE_ISOLATED_CLONES'],'POST_B_APPROVAL_BINDING')
+    freeze_fields={'format','host','old_id','old_image','roots','issued_at','expires_at','all_writers_frozen','owner_review_reference_sha256'}
+    need(set(freeze)==freeze_fields and freeze.get('format')==1 and freeze.get('host')==HOST
+         and freeze.get('all_writers_frozen') is True and type(freeze.get('roots')) is list
+         and type(freeze.get('owner_review_reference_sha256')) is str
+         and re.fullmatch(r'[0-9a-f]{64}',freeze['owner_review_reference_sha256']) is not None,
+         'POST_B_FREEZE_BINDING')
+    need(set(rfreeze)==freeze_fields and rfreeze.get('format')==1 and rfreeze.get('host')==HOST
+         and rfreeze.get('old_id')==freeze.get('old_id') and rfreeze.get('old_image')==freeze.get('old_image')
+         and rfreeze.get('roots')==freeze.get('roots') and rfreeze.get('all_writers_frozen') is True,
+         'POST_B_RESUME_FREEZE_BINDING')
+    resume_fields={'format','host','mode','attempt','carrier_manifest_sha256','issued_at','expires_at',
+        'old_b_intent_sha256','old_b_approval_sha256','old_freeze_sha256','old_stage_permit_sha256','resume_freeze_sha256','actions'}
+    need(set(resume)==resume_fields and resume.get('format')==1 and resume.get('host')==HOST
+         and resume.get('mode')=='STOPPED_HANDOFF_V1' and resume.get('attempt')==attempt
+         and resume.get('actions')==['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES']
+         and resume.get('old_b_intent_sha256')==sha(ib) and resume.get('old_b_approval_sha256')==sha(ob)
+         and resume.get('old_freeze_sha256')==sha(fb) and resume.get('resume_freeze_sha256')==sha(rfb),
+         'POST_B_RESUME_APPROVAL_BINDING')
+    old_permit=refs['old_stage_permit']
+    if resume.get('old_stage_permit_sha256') is None:
+        need(old_permit[3] is None and old_permit[4] is None,'POST_B_OLD_STAGE_PERMIT_NOT_ABSENT')
+    else:need(old_permit[3] is not None and old_permit[4]==resume['old_stage_permit_sha256'],'POST_B_OLD_STAGE_PERMIT_BINDING')
+    admission_fields={'format','mode','attempt','carrier_manifest_sha256','old_b_intent_sha256',
+        'old_b_approval_sha256','old_freeze_sha256','old_stage_permit_sha256','resume_approval_sha256','resume_freeze_sha256','actions'}
+    need(set(admission)==admission_fields and admission.get('format')==1
+         and admission.get('mode')=='STOPPED_HANDOFF_V1' and admission.get('attempt')==attempt
+         and admission.get('carrier_manifest_sha256')==resume.get('carrier_manifest_sha256')
+         and admission.get('old_b_intent_sha256')==sha(ib) and admission.get('old_b_approval_sha256')==sha(ob)
+         and admission.get('old_freeze_sha256')==sha(fb)
+         and admission.get('old_stage_permit_sha256')==resume.get('old_stage_permit_sha256')
+         and admission.get('resume_approval_sha256')==sha(rb)
+         and admission.get('resume_freeze_sha256')==sha(rfb)
+         and admission.get('actions')==resume.get('actions'),'POST_B_RESUME_ADMISSION_BINDING')
+    manifest,mb=_history_json(refs,'backup_manifest',uid)
+    clones,cb=_history_json(refs,'backup_clone_results',uid)
+    need(set(manifest)=={'format','old_id','old_image','product_image','all_writers_frozen_evidence_sha256','trees'}
+         and manifest.get('format')==1 and manifest.get('old_id')==freeze.get('old_id')
+         and manifest.get('old_image')==freeze.get('old_image')
+         and manifest.get('all_writers_frozen_evidence_sha256')==sha(rfb)
+         and set(manifest.get('trees',{}))=={'data','config'},'POST_B_BACKUP_MANIFEST_BINDING')
+    need(set(clones)=={'stage','snapshot_manifest_sha256','logical_evidence_sha256','tested_at',
+         'restore_original_host','downgrade_logical_equality','production_acceptance','rollback_health_acceptance'}
+         and clones.get('stage')=='validate-clones' and clones.get('snapshot_manifest_sha256')==sha(mb)
+         and type(clones.get('tested_at')) is int and clones.get('restore_original_host') is True
+         and clones.get('downgrade_logical_equality') is True and clones.get('production_acceptance') is False
+         and clones.get('rollback_health_acceptance') is False,'POST_B_CLONE_SUMMARY_BINDING')
+    rows=[]
+    for key,name in (('clone_restore_old','restore-old'),('clone_verify_f131','verify-f131'),('clone_verify_downgrade','verify-downgrade')):
+        row,_=_history_json(refs,key,uid)
+        need(set(row)=={'format','attempt','name','image','code_sha256','result'}
+             and row.get('format')==1 and row.get('attempt')==attempt and row.get('name')==name
+             and type(row.get('code_sha256')) is str and re.fullmatch(r'[0-9a-f]{64}',row['code_sha256']) is not None,
+             'POST_B_CLONE_ROW_BINDING')
+        rows.append(row['result'])
+    need(rows[0]==rows[1]==rows[2] and sha(canonical(rows[0]))==clones.get('logical_evidence_sha256'),
+         'POST_B_CLONE_ROWS_MISMATCH')
 
 def verified_old_inventory(expected,mode=None):
     old_manifest,old_archive,new_manifest,new_archive=manifest_pins(mode)
