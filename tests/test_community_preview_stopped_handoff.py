@@ -332,6 +332,24 @@ class WholeEntry(unittest.TestCase):
         self.assertFalse(Path(h.PROOF).exists())
         self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
 
+    def test_known_failure_recovery_uses_new_c_resume_approval_provenance(self):
+        q=self.fresh_session()
+        candidate={'attempt':h.attempt(),'plan_sha256':'a'*64}
+        proof={'format':1,'mode':h.MODE,'host':p.HOST,'attempt':h.attempt(),
+            'plan':candidate,'approval_sha256':'b'*64,'evidence':{},'approval_kind':'C_RESUME_APPROVAL'}
+        with patch.object(h,'document',return_value=(proof,b'proof')),\
+             patch.object(q,'configure_resumed_recovery',return_value=True),\
+             patch.object(h,'open_private',return_value=44),\
+             patch.object(q,'_c_resume_approval',return_value={'ok':True}) as fresh_approval,\
+             patch.object(q,'c_approval',side_effect=AssertionError('old C approval must not be used')),\
+             patch.object(h,'acknowledge'),\
+             patch.object(q,'consume',return_value={'phase':'KNOWN_FAILURE_RECOVERED'}) as consume:
+            result=q.recover()
+        self.assertEqual(result['phase'],'KNOWN_FAILURE_RECOVERED')
+        fresh_approval.assert_called_once_with(candidate)
+        self.assertTrue(q.c_preconfirm_mode)
+        consume.assert_called_once_with(proof,True)
+
     def test_c_preconfirmation_duplicate_call_after_commit_is_rejected(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
         with patch.object(h,'acknowledge',return_value=None):
