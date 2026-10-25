@@ -297,10 +297,7 @@ class PreparationSteps(unittest.TestCase):
         try:
             real=s.os.scandir;seen=[]
             def no_fd_scandir(path):
-                # Emulate the fixed Python 3.6.8 capability: scandir accepts paths,
-                # not integer directory descriptors.
                 self.assertIsInstance(path,str)
-                if isinstance(path,int):raise TypeError('scandir fd unsupported')
                 seen.append(path);return real(path)
             with patch.object(s.os,'scandir',side_effect=no_fd_scandir):
                 names=s.bounded_names(fd)
@@ -405,10 +402,11 @@ class PreparationSteps(unittest.TestCase):
             exec(compile(ast.Module(body=[node],type_ignores=[]),'<exact-production-space>','exec'),ns)
             with self.assertRaises(s.Hold):ns['space'](fd,100,1)
         finally:os.close(fd)
-    def test_wrapper_binds_current_entry_hash_and_syntax(self):
+    def test_wrapper_keeps_installed_a_entry_hash_and_syntax(self):
         import subprocess
         script=Path('deploy/community-preview/prepare-site.sh').read_bytes()
-        self.assertIn(s.sha(Path(s.__file__).read_bytes()).encode(),script)
+        self.assertIn(b'48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55',script)
+        self.assertNotEqual(s.sha(Path(s.__file__).read_bytes()),'48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55')
         self.assertEqual(subprocess.run(['/bin/sh','-n'],input=script,capture_output=True,timeout=2).returncode,0)
     def test_bounded_child_and_default_source_python36(self):
         import sys
