@@ -84,7 +84,7 @@ jobs:
           if not b or not b.endswith(b'\0'):raise SystemExit('PUSH_DELTA_UNKNOWN')
           rows=b[:-1].split(b'\0')
           if len(rows)>10000 or any(not x or b'\n' in x or b'\r' in x for x in rows):raise SystemExit('PUSH_DELTA_UNKNOWN')
-          allowed={b'scripts/community_preview_stopped_handoff.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
+          allowed={b'scripts/community_preview_stopped_handoff.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json'}
           handoff={b'scripts/community_preview_carrier_handoff_admission.py',
                    b'scripts/community_preview_carrier_handoff_call.py',
                    b'scripts/community_preview_carrier_handoff_entry.py',
