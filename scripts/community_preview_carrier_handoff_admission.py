@@ -382,7 +382,10 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
     old_id=j['old_identity'];new_id=j['stage_identity']
     rb_intent=childstat(jfd,ROLLBACK_INTENT)
     rb_result=childstat(jfd,ROLLBACK_RESULT)
+    need(rb_result is None or rb_intent is not None,'ORPHAN_ROLLBACK_RESULT')
+    if retained is not None:return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     if dirident(current)==new_id and dirident(stage)==old_id:
+        need(rb_result is None,'ROLLBACK_RESULT_STATE_CONFLICT')
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
         if rb_intent is not None:state='ROLLBACK_NOT_APPLIED_RESULT_UNKNOWN'
         tree(parent,TARGET,uid,new_entries,new_id)
