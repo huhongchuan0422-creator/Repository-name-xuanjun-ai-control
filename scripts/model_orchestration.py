@@ -15,6 +15,9 @@ import ipaddress
 from urllib.parse import urlparse
 import urllib.error
 import urllib.request
+import http.client
+import socket
+import ssl
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -64,39 +67,66 @@ class OpenAICompatibleAdapter(object):
     adapter_type = 'openai-compatible'
 
     def __init__(self, opener=None):
-        if opener is None:
-            class NoRedirect(urllib.request.HTTPRedirectHandler):
-                def redirect_request(self, req, fp, code, msg, headers,
-                                     newurl):
-                    return None
-            self.opener = urllib.request.build_opener(NoRedirect()).open
-        else:
-            self.opener = opener
+        self.opener = opener
+
+    def _pinned_open(self, parsed, body, headers, timeout):
+        """Resolve once, validate, then connect to that exact address.
+
+        Keeping the TLS server name separate from the connected address closes
+        the DNS-rebinding gap between policy validation and socket creation.
+        """
+        port=parsed.port or (443 if parsed.scheme=='https' else 80)
+        try:addresses=socket.getaddrinfo(parsed.hostname,port,type=socket.SOCK_STREAM)
+        except OSError as exc:raise ProviderError('DNS',type(exc).__name__,False)
+        if not addresses:raise ProviderError('DNS','EMPTY_RESULT',False)
+        vetted=[]
+        for item in addresses:
+            address=ipaddress.ip_address(item[4][0])
+            if parsed.scheme=='https' and (address.is_private or address.is_loopback or
+                    address.is_link_local or address.is_multicast or
+                    address.is_reserved or address.is_unspecified):
+                raise ProviderError('UNSAFE_DESTINATION','PRIVATE_DNS_RESULT',False)
+            vetted.append(str(address))
+        ip=vetted[0]
+        class PinnedHTTP(http.client.HTTPConnection):
+            def connect(connection):
+                connection.sock=socket.create_connection((ip,port),connection.timeout)
+        class PinnedHTTPS(http.client.HTTPSConnection):
+            def connect(connection):
+                raw=socket.create_connection((ip,port),connection.timeout)
+                connection.sock=connection._context.wrap_socket(
+                  raw,server_hostname=parsed.hostname)
+        cls=PinnedHTTPS if parsed.scheme=='https' else PinnedHTTP
+        connection=cls(parsed.hostname,port=port,timeout=timeout,
+          context=ssl.create_default_context()) if parsed.scheme=='https' else cls(
+          parsed.hostname,port=port,timeout=timeout)
+        path=(parsed.path.rstrip('/')+'/v1/chat/completions') or '/v1/chat/completions'
+        if parsed.query:path+='?'+parsed.query
+        request_headers=dict(headers);request_headers['Host']=parsed.netloc
+        try:
+            connection.request('POST',path,body=body,headers=request_headers)
+            return connection,connection.getresponse()
+        except Exception:
+            connection.close()
+            raise
 
     def invoke(self, base_url, secret, model_id, messages, timeout):
         parsed=urlparse(base_url)
-        if parsed.scheme=='https':
-            import socket
-            try:addresses=socket.getaddrinfo(parsed.hostname,parsed.port or 443,
-              type=socket.SOCK_STREAM)
-            except OSError as exc:
-                raise ProviderError('DNS',type(exc).__name__,False)
-            for item in addresses:
-                address=ipaddress.ip_address(item[4][0])
-                if (address.is_private or address.is_loopback or
-                        address.is_link_local or address.is_multicast or
-                        address.is_reserved or address.is_unspecified):
-                    raise ProviderError('UNSAFE_DESTINATION','PRIVATE_DNS_RESULT',False)
         url = base_url.rstrip('/') + '/v1/chat/completions'
         body = canonical({'model': model_id, 'messages': messages,
                           'stream': False}).encode('utf-8')
-        request = urllib.request.Request(url, data=body, method='POST',
-            headers={'Authorization': 'Bearer ' + secret,
-                     'Content-Type': 'application/json',
-                     'Accept': 'application/json',
-                     'User-Agent': 'Xuanjun-TEST-ONLY-Adapter'})
+        headers={'Authorization': 'Bearer ' + secret,
+                 'Content-Type': 'application/json','Accept': 'application/json',
+                 'User-Agent': 'Xuanjun-TEST-ONLY-Adapter'}
+        request = urllib.request.Request(url,data=body,method='POST',headers=headers)
+        connection=None
         try:
-            response = self.opener(request, timeout=timeout)
+            if self.opener is None:
+                connection,response=self._pinned_open(parsed,body,headers,timeout)
+                if response.status in (401,429) or response.status>=300:
+                    kind='AUTH' if response.status==401 else ('RATE_LIMIT' if response.status==429 else 'HTTP')
+                    raise ProviderError(kind,'HTTP_%d'%response.status,response.status==429 or response.status>=500)
+            else:response = self.opener(request, timeout=timeout)
             raw = response.read(2 * 1024 * 1024 + 1)
             if len(raw) > 2 * 1024 * 1024:
                 raise ProviderError('RESPONSE_TOO_LARGE', 'body limit')
@@ -117,6 +147,8 @@ class OpenAICompatibleAdapter(object):
             # wrapped timeouts and malformed replies are therefore UNKNOWN,
             # never safe automatic retries.
             raise ProviderError('TRANSPORT_UNKNOWN', type(exc).__name__, False)
+        finally:
+            if connection is not None:connection.close()
         try:
             content = value['choices'][0]['message']['content']
             usage = value.get('usage') or {}
@@ -410,6 +442,13 @@ class ModelControl(object):
                 value['input_unit_cost'] is None or
                 value['output_unit_cost'] is None):
             raise ValueError('KNOWN_PAID_UNIT_COSTS_REQUIRED')
+        provider=self.db.execute('''SELECT price_state FROM model_providers
+          WHERE tenant_id=? AND provider_id=?''',(self.tenant_id,
+          value['provider_id'])).fetchone()
+        if provider is None:raise ValueError('PROVIDER_REQUIRED')
+        if (provider['price_state']=='KNOWN_PAID' and
+                value['price_state']!='KNOWN_PAID'):
+            raise ValueError('PAID_PROVIDER_MODEL_MUST_BE_KNOWN_PAID')
         self.db.execute('''INSERT OR REPLACE INTO model_catalog VALUES
           (?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(value['provider_id'],'provider_id'),
           _text(value['model_id'],'model_id'),canonical(sorted(set(value['capabilities']))),
@@ -599,7 +638,22 @@ class ModelControl(object):
           'openai-compatible':OpenAICompatibleAdapter()}[provider['adapter_type']])
         started=time.monotonic();passed=0;input_tokens=0;output_tokens=0;evidence=[]
         secret=self.provider_secret(provider_id)
-        for case in cases:
+        for index,case in enumerate(cases,1):
+            request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
+              'provider':provider_id,'model':model_id,'suite':suite_version,
+              'case':case['case_id'],'observed_at':now}).encode()).hexdigest()
+            self.db.execute('BEGIN IMMEDIATE')
+            with self.db:
+                recent=self.db.execute('''SELECT COUNT(*) FROM model_call_attempts
+                  WHERE tenant_id=? AND provider_id=? AND started_at>?''',(
+                  self.tenant_id,provider_id,now-60)).fetchone()[0]
+                if recent>=provider['rate_limit_per_min']:
+                    evidence.append({'case_id':case['case_id'],'passed':False,
+                      'error_kind':'LOCAL_RATE_LIMIT'})
+                    continue
+                self.db.execute('''INSERT INTO model_call_attempts VALUES
+                  (?,?,?,?,?,?,?)''',(self.tenant_id,request_id,1,provider_id,
+                  model_id,'benchmark:'+suite_version,now))
             try:
                 result=adapter.invoke(provider['base_url'],secret,model_id,
                   json.loads(case['messages_json']),provider['timeout_seconds'])
@@ -694,16 +748,24 @@ class ModelControl(object):
                 'finding_count':len(findings)}
 
     def validate_accept_candidate(self, candidate_id, acceptor):
-        row=self.db.execute('''SELECT * FROM delivery_candidates WHERE tenant_id=?
+        row=self.db.execute('''SELECT rowid AS candidate_seq,* FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
         task=self.gateway.supervisor._task(row['task_id'])
-        if (task['attempt_id']!=row['attempt_id'] or
-                task['authority_state']!='VALID' or task['state']!='STARTED'):
+        current=((task['attempt_id']==row['attempt_id'] and
+                  task['authority_state']=='VALID' and task['state']=='STARTED') or
+                 (task['attempt_id']==row['attempt_id'] and
+                  task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
+        if not current:
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
+        newer=self.db.execute('''SELECT 1 FROM delivery_candidates WHERE
+          tenant_id=? AND task_id=? AND attempt_id=? AND rowid>?
+          LIMIT 1''',(self.tenant_id,row['task_id'],row['attempt_id'],
+          row['candidate_seq'])).fetchone()
+        if newer is not None:raise ValueError('LATEST_CANDIDATE_REQUIRED')
         if acceptor in (row['submitted_by'],row['reviewed_by']):
             raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
@@ -726,6 +788,12 @@ class ModelControl(object):
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
+        newer=self.db.execute('''SELECT 1 FROM delivery_candidates WHERE
+          tenant_id=? AND task_id=? AND attempt_id=? AND rowid>(SELECT rowid
+          FROM delivery_candidates WHERE tenant_id=? AND candidate_id=?) LIMIT 1''',(
+          self.tenant_id,row['task_id'],row['attempt_id'],self.tenant_id,
+          candidate_id)).fetchone()
+        if newer is not None:raise ValueError('LATEST_CANDIDATE_REQUIRED')
         if acceptor in (row['submitted_by'],row['reviewed_by']):
             raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN

@@ -6,6 +6,7 @@ import tempfile
 import time
 import unittest
 import sys
+from cryptography.fernet import Fernet
 
 ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
 sys.path.insert(0,os.path.join(ROOT,'scripts'))
@@ -14,6 +15,7 @@ from reusable_scheduler_cli import demo_graph
 from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
 from task_supervisor import Supervisor
 from task_writer_fence import Fence
+from model_orchestration import ModelControl
 
 KEY=b'0123456789abcdef0123456789abcdef'
 
@@ -156,6 +158,45 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         self.assertTrue(duplicate['duplicate'])
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           execution_action_requests''').fetchone()[0],1)
+
+    def test_idempotency_binds_authorization_writer_change_and_preflight(self):
+        self.prepare();self.policy.request_action(self.action())
+        now=time.time();self.policy.add_authorization('auth-2','demo-b','asset-v1',
+          'test-writer-attempt-b','CURRENT_TEST_ONLY',['WRITE_SOURCE'],False,
+          now-1,now+60,'auth-2-evidence')
+        with self.assertRaisesRegex(ValueError,'IDEMPOTENCY_CONFLICT'):
+            self.policy.request_action(self.action(authorization_id='auth-2'))
+
+    def test_old_attempt_preflight_and_change_cannot_be_reused(self):
+        self.prepare();self.supervisor.db.execute("""UPDATE asset_preflight_checks
+          SET attempt_id='old-attempt'""");self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'PREFLIGHT_ATTEMPT'):
+            self.policy.request_action(self.action())
+        self.supervisor.db.execute("""UPDATE asset_preflight_checks SET
+          attempt_id='attempt-b'""");self.supervisor.db.commit()
+        self.policy.propose_change('old-change','demo-b','asset-v1',['DEPLOY'],'x')
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','independent-reviewer'))
+        reviewer.review_change('old-change','independent-reviewer',True,'review')
+        self.supervisor.db.execute("""UPDATE scope_changes SET
+          attempt_id='old-attempt'""");self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'CHANGE_ATTEMPT'):
+            self.policy.request_action(self.action(scope='DEPLOY',change_id='old-change'))
+
+    def test_executor_role_cannot_approve_scope_change(self):
+        self.prepare();self.policy.propose_change('role-change','demo-b',
+          'asset-v1',['DEPLOY'],'x')
+        ModelControl(self.gateway,self.context,Fernet.generate_key())
+        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
+          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
+          (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','developer',
+          'v1','developer-1','p','m','ACTIVE','test',time.time()))
+        self.supervisor.db.commit()
+        developer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','developer-1'))
+        with self.assertRaisesRegex(ValueError,'INDEPENDENT_CHANGE_REVIEW'):
+            developer.review_change('role-change','developer-1',True,'review')
 
     def test_accepted_request_never_claims_external_execution(self):
         self.prepare();result=self.policy.request_action(self.action())

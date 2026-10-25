@@ -312,11 +312,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         fence=Fence(supervisor,db_path+'.test-only-locks')
                         try:
                             task=supervisor._task(candidate['task_id'])
-                            terminal=TestOnlyExecutor(control.gateway,fence,
-                              control.context).complete_success(
-                              candidate['task_id'],candidate['attempt_id'],
-                              candidate['artifact_sha256'],
-                              json.loads(task['completion_json']))
+                            if (task['state']=='SUCCESS' and
+                                    task['authority_state']=='REVOKED'):
+                                terminal={'state':'SUCCESS','recovered':True}
+                            else:
+                                terminal=TestOnlyExecutor(control.gateway,fence,
+                                  control.context).complete_success(
+                                  candidate['task_id'],candidate['attempt_id'],
+                                  candidate['artifact_sha256'],
+                                  json.loads(task['completion_json']))
                         finally:fence.close()
                         result=control.accept_candidate(value['candidate_id'],
                           value['acceptor'])

@@ -31,6 +31,7 @@ class ExecutionPolicyGateway(object):
             created_at REAL NOT NULL,PRIMARY KEY(tenant_id,task_id))''',
           '''CREATE TABLE IF NOT EXISTS asset_preflight_checks(
             tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,check_id TEXT NOT NULL,
+            attempt_id TEXT NOT NULL,writer_principal TEXT NOT NULL,
             checked_json TEXT NOT NULL,outcome TEXT NOT NULL,reused_asset TEXT,
             reused_version TEXT,need_new INTEGER NOT NULL,reason TEXT NOT NULL,
             evidence_ref TEXT NOT NULL,observed_at REAL NOT NULL,
@@ -45,6 +46,7 @@ class ExecutionPolicyGateway(object):
             PRIMARY KEY(tenant_id,authorization_id))''',
           '''CREATE TABLE IF NOT EXISTS scope_changes(
             tenant_id TEXT NOT NULL,change_id TEXT NOT NULL,task_id TEXT NOT NULL,
+            attempt_id TEXT NOT NULL,writer_principal TEXT NOT NULL,
             base_asset_version TEXT NOT NULL,new_scope_json TEXT NOT NULL,
             reason TEXT NOT NULL,state TEXT NOT NULL,reviewed_by TEXT,
             evidence_ref TEXT,created_at REAL NOT NULL,updated_at REAL NOT NULL,
@@ -64,6 +66,12 @@ class ExecutionPolicyGateway(object):
             for name in ('task_id','attempt_id','asset_version','writer_principal'):
                 if name not in columns:
                     self.db.execute('ALTER TABLE action_authorizations ADD COLUMN %s TEXT'%name)
+            for table in ('asset_preflight_checks','scope_changes'):
+                columns={row['name'] for row in self.db.execute(
+                  'PRAGMA table_info(%s)'%table)}
+                for name in ('attempt_id','writer_principal'):
+                    if name not in columns:
+                        self.db.execute('ALTER TABLE %s ADD COLUMN %s TEXT'%(table,name))
 
     def record_unit(self,value,now=None):
         required={'task_id','delivery_stage','feature_unit','goal','scope',
@@ -97,12 +105,19 @@ class ExecutionPolicyGateway(object):
         if outcome=='FOUND' and (not reused_asset or not reused_version):
             raise ValueError('REUSED_ASSET_VERSION_REQUIRED')
         now=self.clock() if now is None else now
+        task=self.gateway.supervisor._task(task_id)
+        if task['attempt_id'] in (None,UNKNOWN) or task['authority_state']!='VALID':
+            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
         body={'checked':checked,'outcome':outcome,'reused_asset':reused_asset,
           'reused_version':reused_version,'need_new':bool(need_new),
           'reason':_text(reason,'reason'),'evidence_ref':_text(evidence_ref,'evidence_ref')}
         check_id=hashlib.sha256(canonical(body).encode()).hexdigest()
-        self.db.execute('''INSERT INTO asset_preflight_checks VALUES
-          (?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,task_id,check_id,
+        self.db.execute('''INSERT INTO asset_preflight_checks(
+          tenant_id,task_id,check_id,attempt_id,writer_principal,checked_json,
+          outcome,reused_asset,reused_version,need_new,reason,evidence_ref,
+          observed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          self.tenant_id,task_id,check_id,task['attempt_id'],
+          task['authority_caller_id'],
           canonical(checked),outcome,reused_asset,reused_version,int(bool(need_new)),
           reason,evidence_ref,now));self.db.commit()
         return {'check_id':check_id,'outcome':outcome}
@@ -145,8 +160,15 @@ class ExecutionPolicyGateway(object):
         self.gateway.assert_task_context(self.context,task_id)
         if not isinstance(new_scope,list) or not new_scope:raise ValueError('NEW_SCOPE_REQUIRED')
         now=self.clock() if now is None else now
-        self.db.execute('''INSERT INTO scope_changes VALUES
-          (?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,change_id,task_id,
+        task=self.gateway.supervisor._task(task_id)
+        if task['attempt_id'] in (None,UNKNOWN) or task['authority_state']!='VALID':
+            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
+        self.db.execute('''INSERT INTO scope_changes(
+          tenant_id,change_id,task_id,attempt_id,writer_principal,
+          base_asset_version,new_scope_json,reason,state,reviewed_by,
+          evidence_ref,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          self.tenant_id,change_id,task_id,task['attempt_id'],
+          task['authority_caller_id'],
           base_asset_version,canonical(new_scope),_text(reason,'reason'),
           'PENDING',None,None,now,now));self.db.commit()
         return {'change_id':change_id,'state':'PENDING'}
@@ -161,6 +183,17 @@ class ExecutionPolicyGateway(object):
           c.tenant_id=? AND c.change_id=?''',(self.tenant_id,change_id)).fetchone()
         if row is None:raise KeyError(change_id)
         if reviewer==row['authority_caller_id']:
+            raise ValueError('INDEPENDENT_CHANGE_REVIEW_REQUIRED')
+        model_tables=self.db.execute('''SELECT COUNT(*) FROM sqlite_master
+          WHERE type='table' AND name IN ('model_assignments','role_templates')''').fetchone()[0]
+        executor_role=None
+        if model_tables==2:
+            executor_role=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
+              role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
+              AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
+              a.attempt_id=? AND a.principal_id=? AND r.phase='EXECUTOR' LIMIT 1''',(
+              self.tenant_id,row['task_id'],row['attempt_id'],reviewer)).fetchone()
+        if executor_role is not None:
             raise ValueError('INDEPENDENT_CHANGE_REVIEW_REQUIRED')
         state='APPROVED' if approved else 'REJECTED'
         changed=self.db.execute('''UPDATE scope_changes SET state=?,reviewed_by=?,
@@ -191,6 +224,9 @@ class ExecutionPolicyGateway(object):
           tenant_id=? AND task_id=? ORDER BY observed_at DESC,check_id DESC LIMIT 1''',
           (self.tenant_id,value['task_id'])).fetchone()
         if preflight is None:raise ValueError('ASSET_PREFLIGHT_REQUIRED')
+        if (preflight['attempt_id']!=task['attempt_id'] or
+                preflight['writer_principal']!=task['authority_caller_id']):
+            raise ValueError('PREFLIGHT_ATTEMPT_BINDING_MISMATCH')
         if preflight['outcome']==UNKNOWN:raise ValueError('UNKNOWN_ASSET_STATE_HOLD')
         if (preflight['outcome']=='FOUND' and
                 preflight['reused_version']!=unit['asset_version']):
@@ -202,6 +238,9 @@ class ExecutionPolicyGateway(object):
               (self.tenant_id,value['change_id'],value['task_id'])).fetchone()
             if change is None or value['scope'] not in json.loads(change['new_scope_json']):
                 raise ValueError('UNAPPROVED_SCOPE_EXPANSION')
+            if (change['attempt_id']!=task['attempt_id'] or
+                    change['writer_principal']!=task['authority_caller_id']):
+                raise ValueError('CHANGE_ATTEMPT_BINDING_MISMATCH')
             if change['base_asset_version']!=unit['asset_version']:
                 raise ValueError('CHANGE_BASE_ASSET_VERSION_MISMATCH')
         auth=self.db.execute('''SELECT * FROM action_authorizations WHERE
@@ -228,9 +267,13 @@ class ExecutionPolicyGateway(object):
           value['authorization_id'],'external_execution':'NOT_EXECUTED'}
         if prior:
             expected=(value['task_id'],task['attempt_id'],value['asset_version'],
-                      value['action'],value['scope'])
+                      value['action'],value['scope'],value['authorization_id'],
+                      value['writer_principal'],value['change_id'],
+                      preflight['check_id'])
             actual=(prior['task_id'],prior['attempt_id'],prior['asset_version'],
-                    prior['action'],prior['scope'])
+                    prior['action'],prior['scope'],prior['authorization_id'],
+                    prior['writer_principal'],prior['change_id'],
+                    json.loads(prior['evidence_json'])['asset_preflight'])
             if actual!=expected:raise ValueError('IDEMPOTENCY_CONFLICT')
             return {'request_id':prior['request_id'],'state':prior['state'],
                     'duplicate':True}

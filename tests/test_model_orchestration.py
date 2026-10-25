@@ -155,6 +155,35 @@ class ModelOrchestrationTests(unittest.TestCase):
               'price_state':'KNOWN_PAID','input_unit_cost':None,
               'output_unit_cost':None})
 
+    def test_paid_provider_cannot_disguise_model_as_free_without_costs(self):
+        self.provider('paid-provider',price='KNOWN_PAID')
+        with self.assertRaisesRegex(ValueError,'PAID_PROVIDER_MODEL'):
+            self.control.upsert_model({'provider_id':'paid-provider',
+              'model_id':'disguised-free','capabilities':['code'],
+              'enabled':True,'price_state':'KNOWN_FREE',
+              'input_unit_cost':None,'output_unit_cost':None})
+
+    def test_benchmark_calls_share_persistent_provider_rate_limit(self):
+        self.control.upsert_provider({'provider_id':'limited','display_name':'limited',
+          'adapter_type':'openai-compatible','base_url':self.url,'enabled':True,
+          'price_state':'KNOWN_FREE','rate_limit_per_min':1,
+          'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0},SECRET)
+        self.model('limited','ok');self.control.register_benchmark_suite('two',[{
+          'case_id':'one','capability':'code','messages':[],
+          'expected_contains':'ok'},{'case_id':'two','capability':'code',
+          'messages':[],'expected_contains':'ok'}])
+        calls=[]
+        class Counting(object):
+            def invoke(inner,*args):
+                calls.append(1);return {'content':'ok','usage':{
+                  'input_tokens':1,'output_tokens':1,'total_tokens':2},
+                  'provider_request_id':'fixture'}
+        result=self.control.run_benchmark('limited','ok','two',Counting(),now=1000)
+        self.assertEqual(len(calls),1)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          model_call_attempts WHERE provider_id='limited' ''').fetchone()[0],1)
+        self.assertEqual(result['state'],'NOT_QUALIFIED')
+
     def test_free_capable_first_and_self_review_forbidden(self):
         self.provider('paid',price='KNOWN_PAID');self.model('paid','ok','KNOWN_PAID')
         self.provider('free');self.model();self.role();self.qualify('free','ok')
@@ -268,6 +297,9 @@ class ModelOrchestrationTests(unittest.TestCase):
         acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
         self.executor.complete_success('demo-b','attempt-b','c'*64,
           json.loads(self.supervisor._task('demo-b')['completion_json']))
+        # A crash between canonical completion and candidate update is
+        # recoverable: validation accepts the same terminal attempt.
+        acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
         self.assertEqual(acceptor.accept_candidate(revised['candidate_id'],
           'acceptor')['state'],'ACCEPTED')
         with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE'):
@@ -275,6 +307,21 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           candidate_reviews WHERE candidate_id IN (?,?)''',(submitted['candidate_id'],
           revised['candidate_id'])).fetchone()[0],2)
+
+    def test_older_review_passed_candidate_cannot_supersede_new_submission(self):
+        self.assigned();self.role('reviewer','REVIEWER',['code'],False)
+        self.role('acceptor','ACCEPTOR',['code'],False)
+        self.control.assign('demo-b','reviewer','v1','qa')
+        self.control.assign('demo-b','acceptor','v1','acceptor')
+        developer=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','developer-1'),self.master)
+        reviewer=ModelControl(self.gateway,self.authority.issue('tenant-a','qa'),self.master)
+        acceptor=ModelControl(self.gateway,self.authority.issue('tenant-a','acceptor'),self.master)
+        old=developer.submit_candidate('demo-b','a'*64,'b'*64,'developer-1',now=1)
+        reviewer.review_candidate(old['candidate_id'],'qa',[],True,now=2)
+        developer.submit_candidate('demo-b','c'*64,'d'*64,'developer-1',now=3)
+        with self.assertRaisesRegex(ValueError,'LATEST_CANDIDATE'):
+            acceptor.validate_accept_candidate(old['candidate_id'],'acceptor')
 
     def test_candidate_hash_identity_and_current_attempt_are_enforced(self):
         self.assigned();developer=ModelControl(self.gateway,
@@ -348,6 +395,7 @@ class ModelOrchestrationTests(unittest.TestCase):
     def test_rate_and_concurrency_limits_leave_request_queued(self):
         self.assigned();self.supervisor.db.execute('''UPDATE model_providers SET
           rate_limit_per_min=1,concurrency_limit=1 WHERE provider_id='free' ''')
+        self.supervisor.db.execute("DELETE FROM model_call_attempts WHERE worker_id LIKE 'benchmark:%'")
         self.supervisor.db.commit()
         self.control.queue_request('demo-b','developer',[],'limit-one')
         self.assertEqual(ModelScheduler(self.control).run_once(now=time.time())['state'],
