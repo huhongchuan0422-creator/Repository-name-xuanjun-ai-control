@@ -70,7 +70,13 @@ class ExecutionPolicyGateway(object):
             tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
             principal_id TEXT NOT NULL,approval_kind TEXT NOT NULL,
             valid_until REAL NOT NULL,granted_by TEXT NOT NULL,
-            PRIMARY KEY(tenant_id,task_id,attempt_id,principal_id,approval_kind))''')
+            PRIMARY KEY(tenant_id,task_id,attempt_id,principal_id,approval_kind))''',
+          '''CREATE TABLE IF NOT EXISTS dispatch_preflights(
+            tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,preflight_id TEXT NOT NULL,
+            asset_version TEXT NOT NULL,query_ids_json TEXT NOT NULL,
+            outcome TEXT NOT NULL,reuse_reason TEXT NOT NULL,
+            created_by TEXT NOT NULL,observed_at REAL NOT NULL,
+            PRIMARY KEY(tenant_id,task_id,preflight_id))''')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             for statement in statements:self.db.execute(statement)
@@ -98,6 +104,52 @@ class ExecutionPolicyGateway(object):
           (?,?,?,?,?,?,?,?)''',(self.tenant_id,query_id,task_id,source_kind,
           source_version,canonical(query),result_digest,now));self.db.commit()
         return {'query_id':query_id,'result_digest':result_digest}
+
+    def record_dispatch_preflight(self,task_id,asset_version,query_ids,outcome,
+                                  reuse_reason,now=None):
+        self.gateway.assert_task_context(self.context,task_id)
+        principal=self.context['principal_id']
+        if not principal.startswith('admin:'):raise ValueError('POLICY_ADMIN_REQUIRED')
+        if outcome not in ('FOUND','NOT_FOUND'):raise ValueError('KNOWN_PREFLIGHT_REQUIRED')
+        if not isinstance(query_ids,list) or not query_ids:
+            raise ValueError('ASSET_QUERY_RECEIPT_REQUIRED')
+        unit=self.db.execute('''SELECT asset_version FROM execution_units WHERE
+          tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if unit is None or unit['asset_version']!=asset_version:
+            raise ValueError('ASSET_VERSION_MISMATCH')
+        found=self.db.execute('''SELECT COUNT(*) FROM asset_query_receipts WHERE
+          tenant_id=? AND task_id=? AND query_id IN (%s)'''%(','.join(
+          ['?']*len(query_ids))),(self.tenant_id,task_id)+tuple(query_ids)).fetchone()[0]
+        if found!=len(set(query_ids)):raise ValueError('ASSET_QUERY_RECEIPT_REQUIRED')
+        now=self.clock() if now is None else now
+        body={'task_id':task_id,'asset_version':asset_version,
+          'query_ids':sorted(set(query_ids)),'outcome':outcome,
+          'reuse_reason':_text(reuse_reason,'reuse_reason')}
+        preflight_id=hashlib.sha256(canonical(body).encode()).hexdigest()
+        self.db.execute('''INSERT INTO dispatch_preflights VALUES
+          (?,?,?,?,?,?,?,?,?)''',(self.tenant_id,task_id,preflight_id,
+          asset_version,canonical(body['query_ids']),outcome,reuse_reason,
+          principal,now));self.db.commit()
+        return {'preflight_id':preflight_id,'state':'READY_FOR_DISPATCH'}
+
+    def require_dispatch_ready(self,task_id):
+        self.gateway.assert_task_context(self.context,task_id)
+        unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
+          AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if unit is None:raise ValueError('EXECUTION_UNIT_REQUIRED')
+        spec=self.db.execute('''SELECT 1 FROM task_work_specs WHERE tenant_id=?
+          AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if spec is None:raise ValueError('TASK_WORK_SPEC_REQUIRED')
+        preflight=self.db.execute('''SELECT * FROM dispatch_preflights WHERE
+          tenant_id=? AND task_id=? ORDER BY observed_at DESC,preflight_id DESC
+          LIMIT 1''',(self.tenant_id,task_id)).fetchone()
+        if preflight is None:raise ValueError('DISPATCH_PREFLIGHT_REQUIRED')
+        if preflight['asset_version']!=unit['asset_version']:
+            raise ValueError('PREFLIGHT_ASSET_VERSION_MISMATCH')
+        if preflight['outcome'] not in ('FOUND','NOT_FOUND'):
+            raise ValueError('UNKNOWN_ASSET_STATE_HOLD')
+        return {'task_id':task_id,'preflight_id':preflight['preflight_id'],
+                'asset_version':unit['asset_version']}
 
     def grant_approval_role(self,task_id,principal_id,approval_kind,valid_until):
         admin=self.context['principal_id']

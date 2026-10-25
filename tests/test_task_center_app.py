@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import threading
 import unittest
+import sqlite3
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from cryptography.fernet import Fernet
@@ -49,6 +50,20 @@ class TaskCenterAppTests(unittest.TestCase):
     def get(self, path):
         response = urlopen(self.base + path, timeout=3)
         return response.status, response.headers, response.read()
+
+    def post(self, value, expect_error=None):
+        request = Request(self.base + '/api/admin/model-control', method='POST',
+            data=json.dumps(value).encode('utf-8'), headers={
+            'Content-Type':'application/json',
+            'X-Test-Admin-Token':'test-admin-token-123456'})
+        if expect_error:
+            with self.assertRaises(HTTPError) as caught:
+                urlopen(request, timeout=3)
+            self.assertEqual(caught.exception.code, 400)
+            body=json.loads(caught.exception.read().decode('utf-8'))
+            self.assertIn(expect_error, body['detail'])
+            return body
+        return json.loads(urlopen(request, timeout=3).read().decode('utf-8'))
 
     def test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves(self):
         status, headers, body = self.get('/api/projection')
@@ -141,6 +156,39 @@ class TaskCenterAppTests(unittest.TestCase):
         self.assertIn('••••alue',encoded)
         status,_,body=self.get('/admin.html')
         self.assertEqual(status,200);self.assertIn(b'adminToken',body)
+
+    def test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects(self):
+        bad={'project_id':'project-zero','task_id':'task-zero',
+          'board_id':'research-development','delivery_stage':'implementation',
+          'feature_unit':'gate','goal':'','scope':['WRITE_SOURCE'],
+          'asset_version':'asset-v1','deliverables':['source'],
+          'acceptance':['tests'],'dependencies':[],'priority':50,
+          'owner':'developer'}
+        self.post({'action':'CREATE_PROJECT_TASK','task':bad},'NONEMPTY_GOAL_REQUIRED')
+        connection=sqlite3.connect(self.db)
+        self.assertEqual(connection.execute(
+          "SELECT count(*) FROM tasks WHERE task_id='task-zero'").fetchone()[0],0)
+        unit_table=connection.execute("SELECT count(*) FROM sqlite_master "
+          "WHERE type='table' AND name='execution_units'").fetchone()[0]
+        if unit_table:
+            self.assertEqual(connection.execute(
+              "SELECT count(*) FROM execution_units WHERE task_id='task-zero'").fetchone()[0],0)
+        connection.close()
+
+        good=dict(bad);good['goal']='deliver bounded candidate'
+        self.post({'action':'CREATE_PROJECT_TASK','task':good})
+        self.post({'action':'ASSIGN_ROLE','task_id':'task-zero',
+          'role_id':'missing','role_version':'v1','principal_id':'developer'},
+          'DISPATCH_PREFLIGHT_REQUIRED')
+        self.post({'action':'QUEUE_REQUEST','task_id':'task-zero',
+          'role_id':'missing','messages':[],'idempotency_key':'zero'},
+          'DISPATCH_PREFLIGHT_REQUIRED')
+        connection=sqlite3.connect(self.db)
+        self.assertEqual(connection.execute(
+          "SELECT count(*) FROM model_assignments WHERE task_id='task-zero'").fetchone()[0],0)
+        self.assertEqual(connection.execute(
+          "SELECT count(*) FROM model_requests WHERE task_id='task-zero'").fetchone()[0],0)
+        connection.close()
 
 
 if __name__ == '__main__':

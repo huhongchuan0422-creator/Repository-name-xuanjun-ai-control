@@ -243,6 +243,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=control.disable_provider(value['provider_id'])
                     elif action=='UPSERT_MODEL':result=control.upsert_model(value['config'])
                     elif action=='CREATE_ROLE':result=control.create_role(value['config'])
+                    elif action=='CONFIGURE_INSTANCE':result=control.configure_instance(
+                        value['instance_id'],value['role_id'],
+                        value['role_version'],value['desired_state'])
                     elif action=='BIND_SKILL':result=control.bind_skill(value['role_id'],value['role_version'],value['skill_id'],value['skill_version'],value['review_sha256'],value['status'])
                     elif action=='REGISTER_SKILL':result=control.register_skill(
                         value['skill_id'],value['skill_version'],value['content'],
@@ -301,6 +304,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         policy.record_unit(unit)
                         result['graph_id']=graph['graph_id']
                     elif action=='START_TEST_ONLY_TASK':
+                        ExecutionPolicyGateway(control.gateway,
+                          control.context).require_dispatch_ready(value['task_id'])
                         fence=Fence(supervisor,db_path+'.test-only-locks')
                         try:
                             executor=TestOnlyExecutor(control.gateway,fence,
@@ -311,10 +316,14 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                                 value['task_id']),__import__('time').time()+600)
                         finally:fence.close()
                     elif action=='ASSIGN_ROLE':
+                        ExecutionPolicyGateway(control.gateway,
+                          control.context).require_dispatch_ready(value['task_id'])
                         result=control.assign(value['task_id'],value['role_id'],
                           value['role_version'],value['principal_id'],
                           bool(value.get('allow_paid',False)))
                     elif action=='QUEUE_REQUEST':
+                        ExecutionPolicyGateway(control.gateway,
+                          control.context).require_dispatch_ready(value['task_id'])
                         result=control.queue_request(value['task_id'],
                           value['role_id'],value['messages'],
                           value['idempotency_key'],value.get('max_output_tokens'),
@@ -344,7 +353,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
                         result=control.review_candidate(value['candidate_id'],
                           value['reviewer'],value['findings'],
-                          bool(value['passed']))
+                          bool(value['passed']),value.get('review_kind','QA'))
                     elif action=='ACCEPT_CANDIDATE':
                         if value['acceptor']!=actor:
                             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
@@ -382,6 +391,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           value['query_id'],value['source_kind'],
                           value['source_version'],value['query'],
                           value['result_digest'])
+                    elif action=='RECORD_DISPATCH_PREFLIGHT':
+                        result=ExecutionPolicyGateway(control.gateway,
+                          control.context).record_dispatch_preflight(
+                          value['task_id'],value['asset_version'],
+                          value['query_ids'],value['outcome'],
+                          value['reuse_reason'])
                     elif action=='GRANT_APPROVAL_ROLE':
                         result=ExecutionPolicyGateway(control.gateway,
                           control.context).grant_approval_role(value['task_id'],

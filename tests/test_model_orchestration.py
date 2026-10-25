@@ -335,13 +335,17 @@ class ModelOrchestrationTests(unittest.TestCase):
 
     def test_independent_review_rework_and_acceptance_gates(self):
         self.assigned();self.role('reviewer','REVIEWER',['code'],False)
+        self.role('security','REVIEWER',['code'],False)
         self.role('acceptor','ACCEPTOR',['code'],False)
         self.control.assign('demo-b','reviewer','v1','qa')
+        self.control.assign('demo-b','security','v1','security')
         self.control.assign('demo-b','acceptor','v1','acceptor')
         developer=ModelControl(self.gateway,
           self.authority.issue('tenant-a','developer-1'),self.master)
         reviewer=ModelControl(self.gateway,
           self.authority.issue('tenant-a','qa'),self.master)
+        security=ModelControl(self.gateway,
+          self.authority.issue('tenant-a','security'),self.master)
         acceptor=ModelControl(self.gateway,
           self.authority.issue('tenant-a','acceptor'),self.master)
         submitted=developer.submit_candidate('demo-b','a'*64,self.checklist_sha(),
@@ -354,11 +358,14 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assertEqual(changed['state'],'CHANGES_REQUESTED')
         with self.assertRaisesRegex(ValueError,'REVIEW_PASS'):
             acceptor.validate_accept_candidate(submitted['candidate_id'],'acceptor')
-        with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
+        with self.assertRaisesRegex(ValueError,'REVIEWABLE_CANDIDATE'):
             reviewer.review_candidate(submitted['candidate_id'],'qa',[],True)
         revised=developer.submit_candidate('demo-b','c'*64,self.checklist_sha(),
           'developer-1')
         passed=reviewer.review_candidate(revised['candidate_id'],'qa',[],True)
+        self.assertEqual(passed['state'],'QA_PASSED')
+        passed=security.review_candidate(revised['candidate_id'],'security',[],
+          True,'SECURITY')
         self.assertEqual(passed['state'],'REVIEW_PASSED')
         acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
         self.executor.complete_success('demo-b','attempt-b','c'*64,
@@ -366,7 +373,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.supervisor.db.execute('''UPDATE delivery_candidates SET
           artifact_sha256=? WHERE candidate_id=?''',('a'*64,
           revised['candidate_id']));self.supervisor.db.commit()
-        with self.assertRaisesRegex(ValueError,'CANONICAL_ARTIFACT_MISMATCH'):
+        with self.assertRaisesRegex(ValueError,'CANDIDATE_SNAPSHOT_MISMATCH'):
             acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
         self.supervisor.db.execute('''UPDATE delivery_candidates SET
           artifact_sha256=? WHERE candidate_id=?''',('c'*64,
@@ -380,19 +387,24 @@ class ModelOrchestrationTests(unittest.TestCase):
             reviewer.review_candidate(revised['candidate_id'],'qa',[],False)
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           candidate_reviews WHERE candidate_id IN (?,?)''',(submitted['candidate_id'],
-          revised['candidate_id'])).fetchone()[0],2)
+          revised['candidate_id'])).fetchone()[0],3)
 
     def test_older_review_passed_candidate_cannot_supersede_new_submission(self):
         self.assigned();self.role('reviewer','REVIEWER',['code'],False)
+        self.role('security','REVIEWER',['code'],False)
         self.role('acceptor','ACCEPTOR',['code'],False)
         self.control.assign('demo-b','reviewer','v1','qa')
+        self.control.assign('demo-b','security','v1','security')
         self.control.assign('demo-b','acceptor','v1','acceptor')
         developer=ModelControl(self.gateway,
           self.authority.issue('tenant-a','developer-1'),self.master)
         reviewer=ModelControl(self.gateway,self.authority.issue('tenant-a','qa'),self.master)
+        security=ModelControl(self.gateway,self.authority.issue('tenant-a','security'),self.master)
         acceptor=ModelControl(self.gateway,self.authority.issue('tenant-a','acceptor'),self.master)
         old=developer.submit_candidate('demo-b','a'*64,self.checklist_sha(),'developer-1',now=1)
         reviewer.review_candidate(old['candidate_id'],'qa',[],True,now=2)
+        security.review_candidate(old['candidate_id'],'security',[],True,
+          'SECURITY',now=2.5)
         developer.submit_candidate('demo-b','c'*64,self.checklist_sha(),'developer-1',now=3)
         with self.assertRaisesRegex(ValueError,'LATEST_CANDIDATE'):
             acceptor.validate_accept_candidate(old['candidate_id'],'acceptor')
@@ -607,6 +619,20 @@ class ModelOrchestrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CHECKLIST_INCOMPLETE'):
             developer.submit_candidate('demo-b','a'*64,
               receipt['content_sha256'],'developer-1')
+
+    def test_frozen_task_spec_change_invalidates_later_review(self):
+        self.assigned();self.role('reviewer','REVIEWER',['code'],False)
+        self.control.assign('demo-b','reviewer','v1','qa')
+        developer=ModelControl(self.gateway,self.authority.issue('tenant-a',
+          'developer-1'),self.master)
+        reviewer=ModelControl(self.gateway,self.authority.issue('tenant-a','qa'),
+          self.master)
+        candidate=developer.submit_candidate('demo-b','a'*64,
+          self.checklist_sha(),'developer-1')
+        self.supervisor.db.execute('''UPDATE task_work_specs SET goal='changed'
+          WHERE tenant_id='tenant-a' AND task_id='demo-b' ''');self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'FROZEN_SCOPE_CHANGED'):
+            reviewer.review_candidate(candidate['candidate_id'],'qa',[],True)
 
 
 if __name__=='__main__':unittest.main()

@@ -24,6 +24,7 @@ KEY=b'0123456789abcdef0123456789abcdef'
 TOKEN='test-admin-token-full-journey'
 ACTORS={'developer-token-123456':'developer-1',
         'reviewer-token-123456':'qa-1',
+        'security-token-123456':'security-1',
         'acceptor-token-123456':'acceptor-1'}
 
 
@@ -78,6 +79,13 @@ class FullJourneyTests(unittest.TestCase):
           'deliverables':['source','logs'],'acceptance':['tests','review'],
           'dependencies':[],'priority':80,'owner':'developer'}
         self.post({'action':'CREATE_PROJECT_TASK','task':task})
+        self.post({'action':'RECORD_ASSET_QUERY','task_id':'task-journey',
+          'query_id':'query-journey-1','source_kind':'REGISTRY',
+          'source_version':'registry-v1','query':{'asset':'asset-v1'},
+          'result_digest':'e'*64})
+        self.post({'action':'RECORD_DISPATCH_PREFLIGHT','task_id':'task-journey',
+          'asset_version':'asset-v1','query_ids':['query-journey-1'],
+          'outcome':'NOT_FOUND','reuse_reason':'verified new TEST_ONLY task'})
         self.assertEqual(self.post({'action':'START_TEST_ONLY_TASK',
           'task_id':'task-journey','attempt_id':'attempt-1'})['state'],'STARTED')
         provider={'provider_id':'fixture','display_name':'Fixture',
@@ -99,6 +107,7 @@ class FullJourneyTests(unittest.TestCase):
           'journey-v1'})['state'],'QUALIFIED')
         roles=(('executor','EXECUTOR',True,'developer-1'),
                ('reviewer','REVIEWER',False,'qa-1'),
+               ('security','REVIEWER',False,'security-1'),
                ('acceptor','ACCEPTOR',False,'acceptor-1'))
         for role,phase,writer,principal in roles:
             self.post({'action':'CREATE_ROLE','config':{'role_id':role,
@@ -127,7 +136,12 @@ class FullJourneyTests(unittest.TestCase):
           'submitted_by':'developer-1'},'developer-token-123456')
         self.assertEqual(self.post({'action':'REVIEW_CANDIDATE','candidate_id':
           revised['candidate_id'],'reviewer':'qa-1','findings':[],
-          'passed':True},'reviewer-token-123456')['state'],'REVIEW_PASSED')
+          'review_kind':'QA','passed':True},'reviewer-token-123456')['state'],
+          'QA_PASSED')
+        self.assertEqual(self.post({'action':'REVIEW_CANDIDATE','candidate_id':
+          revised['candidate_id'],'reviewer':'security-1','findings':[],
+          'review_kind':'SECURITY','passed':True},'security-token-123456')['state'],
+          'REVIEW_PASSED')
         self.assertEqual(self.post({'action':'ACCEPT_CANDIDATE','candidate_id':
           revised['candidate_id'],'acceptor':'acceptor-1'},
           'acceptor-token-123456')['canonical_task_state'],'SUCCESS')

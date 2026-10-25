@@ -290,7 +290,7 @@ class ModelControl(object):
             '''CREATE TABLE IF NOT EXISTS candidate_reviews(
               tenant_id TEXT NOT NULL,candidate_id TEXT NOT NULL,
               review_id TEXT NOT NULL,reviewer TEXT NOT NULL,
-              decision TEXT NOT NULL,findings_json TEXT NOT NULL,
+              review_kind TEXT,decision TEXT NOT NULL,findings_json TEXT NOT NULL,
               observed_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,candidate_id,review_id))''',
             '''CREATE TABLE IF NOT EXISTS module_settings(
@@ -350,11 +350,19 @@ class ModelControl(object):
               all_required_passed INTEGER NOT NULL,has_unexecuted INTEGER NOT NULL,
               created_by TEXT NOT NULL,created_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,checklist_id))''',
+            '''CREATE TABLE IF NOT EXISTS candidate_snapshots(
+              tenant_id TEXT NOT NULL,candidate_id TEXT NOT NULL,
+              snapshot_json TEXT NOT NULL,snapshot_sha256 TEXT NOT NULL,
+              created_at REAL NOT NULL,PRIMARY KEY(tenant_id,candidate_id))''',
         )
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             for statement in statements:
                 self.db.execute(statement)
+            review_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(candidate_reviews)')}
+            if 'review_kind' not in review_columns:
+                self.db.execute('ALTER TABLE candidate_reviews ADD COLUMN review_kind TEXT')
 
     @staticmethod
     def _origin(value):
@@ -540,6 +548,29 @@ class ModelControl(object):
         return {'checklist_id':checklist_id,'content_sha256':digest,
                 'all_required_passed':all_pass,'has_unexecuted':has_unexecuted}
 
+    def configure_instance(self,instance_id,role_id,role_version,desired_state,
+                           now=None):
+        self._admin();now=self.clock() if now is None else now
+        if desired_state not in ('RUNNING','STOPPED'):
+            raise ValueError('INSTANCE_DESIRED_STATE_REQUIRED')
+        role=self.db.execute('''SELECT 1 FROM role_templates WHERE tenant_id=? AND
+          role_id=? AND version=? AND enabled=1''',(self.tenant_id,role_id,
+          role_version)).fetchone()
+        if role is None:raise ValueError('ACTIVE_ROLE_REQUIRED')
+        existing=self.db.execute('''SELECT * FROM role_instances WHERE tenant_id=?
+          AND instance_id=?''',(self.tenant_id,instance_id)).fetchone()
+        current_request=existing['current_request_id'] if existing else None
+        state=('DRAINING' if desired_state=='STOPPED' and current_request else
+               'STOPPED' if desired_state=='STOPPED' else
+               existing['state'] if existing and existing['state']=='RUNNING' else 'IDLE')
+        self.db.execute('''INSERT OR REPLACE INTO role_instances VALUES
+          (?,?,?,?,?,?,?,?,?)''',(self.tenant_id,_text(instance_id,'instance_id'),
+          role_id,role_version,state,desired_state,current_request,
+          existing['last_checkpoint_json'] if existing else canonical(
+          {'state':'CONFIGURED'}),now));self.db.commit()
+        return {'instance_id':instance_id,'state':state,
+                'desired_state':desired_state}
+
     def disable_provider(self, provider_id, now=None):
         principal=self._admin();now=self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
@@ -646,6 +677,12 @@ class ModelControl(object):
                allow_paid=False, now=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
+        if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
+          name='execution_units' ''').fetchone() is not None and self.db.execute(
+          '''SELECT 1 FROM execution_units WHERE tenant_id=? AND task_id=?''',(
+          self.tenant_id,task_id)).fetchone() is not None:
+            from execution_policy_gateway import ExecutionPolicyGateway
+            ExecutionPolicyGateway(self.gateway,self.context).require_dispatch_ready(task_id)
         task=self.gateway.supervisor._task(task_id)
         role=self.db.execute('''SELECT * FROM role_templates WHERE tenant_id=?
           AND role_id=? AND version=? AND enabled=1''',
@@ -712,6 +749,12 @@ class ModelControl(object):
                       max_output_tokens=None,connection_id=None,now=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
+        if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
+          name='execution_units' ''').fetchone() is not None and self.db.execute(
+          '''SELECT 1 FROM execution_units WHERE tenant_id=? AND task_id=?''',(
+          self.tenant_id,task_id)).fetchone() is not None:
+            from execution_policy_gateway import ExecutionPolicyGateway
+            ExecutionPolicyGateway(self.gateway,self.context).require_dispatch_ready(task_id)
         task=self.gateway.supervisor._task(task_id)
         assignment=self.db.execute('''SELECT * FROM model_assignments WHERE
           tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
@@ -1055,17 +1098,99 @@ class ModelControl(object):
         if assignment is None:raise ValueError('EXECUTOR_ASSIGNMENT_REQUIRED')
         candidate_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
           'task':task_id,'attempt':task['attempt_id'],'artifact':artifact_sha256}).encode()).hexdigest()
-        self.db.execute('''INSERT INTO delivery_candidates VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,task_id,
-          task['attempt_id'],artifact_sha256,checklist_sha256,submitted_by,None,
-          None,'SUBMITTED',canonical([]),now,now))
-        self._audit(submitted_by,'CANDIDATE_SUBMITTED',candidate_id,
-          {'task_id':task_id,'attempt_id':task['attempt_id'],
-           'artifact_sha256':artifact_sha256},now);self.db.commit()
+        unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
+          AND task_id=?''',(self.tenant_id,task_id)).fetchone() if self.db.execute(
+          "SELECT 1 FROM sqlite_master WHERE name='execution_units'").fetchone() else None
+        dispatch=self.db.execute('''SELECT * FROM dispatch_preflights WHERE
+          tenant_id=? AND task_id=? ORDER BY observed_at DESC LIMIT 1''',(
+          self.tenant_id,task_id)).fetchone() if self.db.execute(
+          "SELECT 1 FROM sqlite_master WHERE name='dispatch_preflights'").fetchone() else None
+        request_binding=self.db.execute('''SELECT b.* FROM model_request_bindings b
+          JOIN model_requests r ON r.tenant_id=b.tenant_id AND r.request_id=b.request_id
+          WHERE r.tenant_id=? AND r.task_id=? AND r.attempt_id=? AND
+          r.state='SUCCEEDED' ORDER BY r.updated_at DESC LIMIT 1''',(
+          self.tenant_id,task_id,task['attempt_id'])).fetchone()
+        snapshot={'task_id':task_id,'attempt_id':task['attempt_id'],
+          'artifact_sha256':artifact_sha256,'checklist_sha256':checklist_sha256,
+          'task_spec_sha256':hashlib.sha256(canonical(dict(self.db.execute(
+          '''SELECT goal,deliverables_json,acceptance_json FROM task_work_specs
+          WHERE tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+          )).encode()).hexdigest(),'unit':dict(unit) if unit else None,
+          'dispatch_preflight_id':dispatch['preflight_id'] if dispatch else None,
+          'skill_snapshot_sha256':request_binding['skill_snapshot_sha256']
+          if request_binding else None}
+        snapshot_json=canonical(snapshot);snapshot_sha=hashlib.sha256(
+          snapshot_json.encode()).hexdigest()
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            self.db.execute('''INSERT INTO delivery_candidates VALUES
+              (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,task_id,
+              task['attempt_id'],artifact_sha256,checklist_sha256,submitted_by,None,
+              None,'SUBMITTED',canonical([]),now,now))
+            self.db.execute('''INSERT INTO candidate_snapshots VALUES
+              (?,?,?,?,?)''',(self.tenant_id,candidate_id,snapshot_json,
+              snapshot_sha,now))
+            self._audit(submitted_by,'CANDIDATE_SUBMITTED',candidate_id,
+              {'task_id':task_id,'attempt_id':task['attempt_id'],
+               'artifact_sha256':artifact_sha256,'snapshot_sha256':snapshot_sha},now)
         return {'candidate_id':candidate_id,'state':'SUBMITTED'}
 
+    def _require_candidate_snapshot(self,row):
+        snapshot_row=self.db.execute('''SELECT * FROM candidate_snapshots WHERE
+          tenant_id=? AND candidate_id=?''',(self.tenant_id,
+          row['candidate_id'])).fetchone()
+        if snapshot_row is None:raise ValueError('CANDIDATE_SNAPSHOT_REQUIRED')
+        snapshot=json.loads(snapshot_row['snapshot_json'])
+        if (snapshot['task_id']!=row['task_id'] or
+                snapshot['attempt_id']!=row['attempt_id'] or
+                snapshot['artifact_sha256']!=row['artifact_sha256'] or
+                snapshot['checklist_sha256']!=row['checklist_sha256']):
+            raise ValueError('CANDIDATE_SNAPSHOT_MISMATCH')
+        spec=self.db.execute('''SELECT goal,deliverables_json,acceptance_json FROM
+          task_work_specs WHERE tenant_id=? AND task_id=?''',(self.tenant_id,
+          row['task_id'])).fetchone()
+        if spec is None or hashlib.sha256(canonical(dict(spec)).encode()).hexdigest()!= \
+                snapshot['task_spec_sha256']:
+            raise ValueError('FROZEN_SCOPE_CHANGED')
+        if snapshot['unit'] is not None:
+            unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
+              AND task_id=?''',(self.tenant_id,row['task_id'])).fetchone()
+            if unit is None or canonical(dict(unit))!=canonical(snapshot['unit']):
+                raise ValueError('FROZEN_SCOPE_CHANGED')
+        if snapshot['dispatch_preflight_id'] is not None:
+            dispatch=self.db.execute('''SELECT preflight_id FROM dispatch_preflights
+              WHERE tenant_id=? AND task_id=? ORDER BY observed_at DESC,
+              preflight_id DESC LIMIT 1''',(self.tenant_id,row['task_id'])).fetchone()
+            if dispatch is None or dispatch['preflight_id']!=snapshot['dispatch_preflight_id']:
+                raise ValueError('FROZEN_PREFLIGHT_CHANGED')
+        checklist=self.db.execute('''SELECT content_sha256,all_required_passed,
+          has_unexecuted FROM acceptance_checklists WHERE tenant_id=? AND task_id=?
+          AND attempt_id=? AND content_sha256=?''',(self.tenant_id,row['task_id'],
+          row['attempt_id'],snapshot['checklist_sha256'])).fetchone()
+        if checklist is None or not checklist['all_required_passed'] or \
+                checklist['has_unexecuted']:
+            raise ValueError('FROZEN_CHECKLIST_INVALID')
+        if snapshot['skill_snapshot_sha256'] is not None:
+            assignment=self.db.execute('''SELECT role_id,role_version FROM
+              model_assignments WHERE tenant_id=? AND task_id=? AND attempt_id=?
+              AND principal_id=?''',(self.tenant_id,row['task_id'],
+              row['attempt_id'],row['submitted_by'])).fetchone()
+            skills=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
+              s.content_sha256,s.state FROM role_skill_bindings b JOIN
+              approved_skills s ON s.tenant_id=b.tenant_id AND
+              s.skill_id=b.skill_id AND s.skill_version=b.skill_version WHERE
+              b.tenant_id=? AND b.role_id=? AND b.role_version=? AND
+              b.status='APPROVED' ORDER BY b.skill_id''',(self.tenant_id,
+              assignment['role_id'],assignment['role_version']))) if assignment else []
+            current=(hashlib.sha256(canonical([dict(x) for x in skills]).encode()).hexdigest()
+                     if skills else None)
+            if current!=snapshot['skill_snapshot_sha256'] or any(
+                    x['state']!='APPROVED' for x in skills):
+                raise ValueError('FROZEN_SKILL_CHANGED')
+        return snapshot_row['snapshot_sha256']
+
     def review_candidate(self, candidate_id, reviewer, findings, passed,
-                         now=None):
+                         review_kind='QA',now=None):
         now=self.clock() if now is None else now
         row=self.db.execute('''SELECT * FROM delivery_candidates WHERE
           tenant_id=? AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
@@ -1074,11 +1199,18 @@ class ModelControl(object):
         if (task['attempt_id']!=row['attempt_id'] or
                 task['authority_state']!='VALID' or task['state'] not in ('STARTED','RUNNING')):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
-        if row['state']!='SUBMITTED':
-            raise ValueError('SUBMITTED_CANDIDATE_REQUIRED')
+        if row['state'] not in ('SUBMITTED','QA_PASSED','SECURITY_PASSED'):
+            raise ValueError('REVIEWABLE_CANDIDATE_REQUIRED')
+        if review_kind not in ('QA','SECURITY'):
+            raise ValueError('REVIEW_KIND_REQUIRED')
+        self._require_candidate_snapshot(row)
         if reviewer!=self._principal():
             raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
         if reviewer==row['submitted_by']:raise ValueError('SELF_REVIEW_FORBIDDEN')
+        if self.db.execute('''SELECT 1 FROM candidate_reviews WHERE tenant_id=?
+          AND candidate_id=? AND reviewer=?''',(self.tenant_id,candidate_id,
+          reviewer)).fetchone() is not None:
+            raise ValueError('INDEPENDENT_REVIEW_IDENTITIES_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
           AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
@@ -1086,23 +1218,39 @@ class ModelControl(object):
           (self.tenant_id,row['task_id'],row['attempt_id'],reviewer)).fetchone()
         if assignment is None:raise ValueError('INDEPENDENT_REVIEW_ASSIGNMENT_REQUIRED')
         if not isinstance(findings,list):raise ValueError('FINDINGS_ARRAY_REQUIRED')
-        state='REVIEW_PASSED' if passed and not findings else 'CHANGES_REQUESTED'
+        if self.db.execute('''SELECT 1 FROM candidate_reviews WHERE tenant_id=?
+          AND candidate_id=? AND review_kind=?''',(self.tenant_id,candidate_id,
+          review_kind)).fetchone() is not None:
+            raise ValueError('REVIEW_KIND_ALREADY_RECORDED')
+        if not passed or findings:state='CHANGES_REQUESTED'
+        else:
+            other='SECURITY' if review_kind=='QA' else 'QA'
+            other_pass=self.db.execute('''SELECT 1 FROM candidate_reviews WHERE
+              tenant_id=? AND candidate_id=? AND review_kind=? AND
+              decision IN ('QA_PASSED','SECURITY_PASSED')''',(self.tenant_id,
+              candidate_id,other)).fetchone()
+            state='REVIEW_PASSED' if other_pass else review_kind+'_PASSED'
         review_body=canonical({'candidate_id':candidate_id,'reviewer':reviewer,
-          'decision':state,'findings':findings,'observed_at':now})
+          'review_kind':review_kind,'decision':state,'findings':findings,
+          'observed_at':now})
         review_id=hashlib.sha256(review_body.encode()).hexdigest()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             changed=self.db.execute('''UPDATE delivery_candidates SET
               reviewed_by=?,state=?,findings_json=?,updated_at=? WHERE
-              tenant_id=? AND candidate_id=? AND state='SUBMITTED' ''',
+              tenant_id=? AND candidate_id=? AND state IN
+              ('SUBMITTED','QA_PASSED','SECURITY_PASSED')''',
               (reviewer,state,canonical(findings),now,self.tenant_id,
                candidate_id)).rowcount
-            if changed!=1:raise ValueError('SUBMITTED_CANDIDATE_REQUIRED')
-            self.db.execute('''INSERT INTO candidate_reviews VALUES
-              (?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,review_id,
-              reviewer,state,canonical(findings),now))
+            if changed!=1:raise ValueError('REVIEWABLE_CANDIDATE_REQUIRED')
+            self.db.execute('''INSERT INTO candidate_reviews(
+              tenant_id,candidate_id,review_id,reviewer,review_kind,decision,
+              findings_json,observed_at) VALUES (?,?,?,?,?,?,?,?)''',(
+              self.tenant_id,candidate_id,review_id,reviewer,review_kind,
+              state,canonical(findings),now))
             self._audit(reviewer,'CANDIDATE_REVIEWED',candidate_id,
-              {'decision':state,'finding_count':len(findings)},now)
+              {'review_kind':review_kind,'decision':state,
+               'finding_count':len(findings)},now)
         return {'candidate_id':candidate_id,'state':state,
                 'finding_count':len(findings)}
 
@@ -1110,6 +1258,7 @@ class ModelControl(object):
         row=self.db.execute('''SELECT rowid AS candidate_seq,* FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
+        self._require_candidate_snapshot(row)
         task=self.gateway.supervisor._task(row['task_id'])
         current=((task['attempt_id']==row['attempt_id'] and
                   task['authority_state']=='VALID' and task['state'] in ('STARTED','RUNNING')) or
@@ -1127,7 +1276,9 @@ class ModelControl(object):
           LIMIT 1''',(self.tenant_id,row['task_id'],row['attempt_id'],
           row['candidate_seq'])).fetchone()
         if newer is not None:raise ValueError('LATEST_CANDIDATE_REQUIRED')
-        if acceptor in (row['submitted_by'],row['reviewed_by']):
+        if (acceptor==row['submitted_by'] or self.db.execute('''SELECT 1 FROM
+              candidate_reviews WHERE tenant_id=? AND candidate_id=? AND
+              reviewer=?''',(self.tenant_id,candidate_id,acceptor)).fetchone()):
             raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
@@ -1156,7 +1307,9 @@ class ModelControl(object):
           self.tenant_id,row['task_id'],row['attempt_id'],self.tenant_id,
           candidate_id)).fetchone()
         if newer is not None:raise ValueError('LATEST_CANDIDATE_REQUIRED')
-        if acceptor in (row['submitted_by'],row['reviewed_by']):
+        if (acceptor==row['submitted_by'] or self.db.execute('''SELECT 1 FROM
+              candidate_reviews WHERE tenant_id=? AND candidate_id=? AND
+              reviewer=?''',(self.tenant_id,candidate_id,acceptor)).fetchone()):
             raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
         assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
           role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
@@ -1228,6 +1381,10 @@ class ModelControl(object):
           'roles':[dict(x) for x in self.db.execute('''SELECT role_id,version,
           phase,capabilities_json,writer_allowed,enabled FROM role_templates
           WHERE tenant_id=? ORDER BY role_id,version''',(self.tenant_id,))],
+          'instances':[dict(x) for x in self.db.execute('''SELECT instance_id,
+          role_id,role_version,state,desired_state,current_request_id,
+          last_checkpoint_json,updated_at FROM role_instances WHERE tenant_id=?
+          ORDER BY instance_id''',(self.tenant_id,))],
           'requests':[dict(x) for x in self.db.execute('''SELECT request_id,
           task_id,attempt_id,role_id,provider_id,model_id,state,attempts,
           error_kind,payload_sha256,result_json,lease_owner,lease_until,
@@ -1260,7 +1417,7 @@ class ModelControl(object):
           delivery_candidates WHERE tenant_id=? ORDER BY created_at,candidate_id''',
           (self.tenant_id,))],
           'candidate_reviews':[dict(x) for x in self.db.execute('''SELECT
-          candidate_id,review_id,reviewer,decision,findings_json,observed_at
+          candidate_id,review_id,reviewer,review_kind,decision,findings_json,observed_at
           FROM candidate_reviews WHERE tenant_id=? ORDER BY observed_at,
           review_id''',(self.tenant_id,))],
           'modules':[dict(x) for x in self.db.execute('''SELECT module_id,
@@ -1366,6 +1523,12 @@ class ModelScheduler(object):
                             connection['config_version']!=candidate['connection_config_version'] or
                             connection['provider_id']!=candidate['provider_id']):
                         fatal='CONNECTION_REAUTH_OR_CONFIG_CHANGED'
+                instance=self.db.execute('''SELECT desired_state,state FROM
+                  role_instances WHERE tenant_id=? AND instance_id=?''',(
+                  candidate['tenant_id'],candidate['instance_id'])).fetchone()
+                if instance is None or instance['desired_state']!='RUNNING' or \
+                        instance['state'] in ('DRAINING','STOPPED'):
+                    fatal='ROLE_INSTANCE_NOT_ACCEPTING'
             if fatal:
                 last_limit=fatal
                 self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,
