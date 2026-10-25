@@ -397,6 +397,7 @@ def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identi
                      and result['result']=='OLD_RESTORED_NEW_RETAINED'
                      and result['rollback_intent_sha256']==sha(intent_raw),
                      'ROLLBACK_RESULT_BINDING')
+                state='ROLLED_BACK_OLD_TARGET_RESTORED_NEW_RETAINED'
         tree(parent,TARGET,uid,old_entries,old_id)
         tree(parent,STAGE,uid,new_entries,new_id)
     else:
