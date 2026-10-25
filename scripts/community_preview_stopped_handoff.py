@@ -454,6 +454,11 @@ class Session:
         try:write_private(fd,os.path.basename(PROOF),proof)
         finally:os.close(fd)
         self.boundary()
+        # The pre-C absence fence is discharged only after the bound proof is
+        # durably written and rechecked; the original C transaction may now
+        # create its own active-attempt/checkpoint under its existing guards.
+        self.resume_absent=tuple(path for path in self.resume_absent
+            if path not in (active_path,attempt_path))
         return self.consume(proof,False)
 
     def pins(self):
