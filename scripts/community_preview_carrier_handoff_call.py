@@ -32,10 +32,9 @@ def invoke(ctx, operation, mode=None):
     """Call only from the original authorized entry; operation is status/execute/rollback."""
     ctx = _context(ctx)
     if mode is not None and mode != handoff.POST_B_MODE:raise handoff.Hold('HANDOFF_MODE_DENIED')
-    old_entries = handoff.members(
-        ctx.old_archive_bytes, handoff.OLD_MANIFEST, handoff.OLD_ARCHIVE)
-    new_entries = handoff.members(
-        ctx.new_archive_bytes, handoff.NEW_MANIFEST, handoff.NEW_ARCHIVE)
+    old_manifest,old_archive,new_manifest,new_archive=handoff.manifest_pins(mode)
+    old_entries = handoff.members(ctx.old_archive_bytes,old_manifest,old_archive)
+    new_entries = handoff.members(ctx.new_archive_bytes,new_manifest,new_archive)
     args = (ctx.parent_fd, ctx.journal_fd, ctx.entry_fd, ctx.lease_fd,
             ctx.uid, old_entries, new_entries, ctx.parent_identity,
             ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
