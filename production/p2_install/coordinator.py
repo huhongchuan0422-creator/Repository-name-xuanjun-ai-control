@@ -732,13 +732,14 @@ class Coordinator:
                 if not due:
                     continue
                 key = digest([attempt,event])
-                self.journal.db.execute(
+                cursor = self.journal.db.execute(
                     "INSERT OR IGNORE INTO coordinator_outbox VALUES(?,?,?,?,?)",
                     (key,attempt,event,"UNAVAILABLE",
                      canonical({"provider":"UNAVAILABLE","next":"inspect/reconcile",
                                 "deadline_utc":request["deadline_utc"]}).decode("ascii")))
-                output.append({"attempt_id":attempt,"event":event,
-                               "delivery":"UNAVAILABLE","id":key})
+                if cursor.rowcount == 1:
+                    output.append({"attempt_id":attempt,"event":event,
+                                   "delivery":"UNAVAILABLE","id":key})
         # Retained duplicate/unknown legacy rows remain queryable evidence
         # but do not inflate threshold counts until a stable event identity is
         # known.
