@@ -343,6 +343,8 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof \
+              test_community_preview_stopped_handoff.WholeEntry.test_real_pty_production_ack_prompt_then_input_eof_timeout \
               -v 2>&1 | tee community-tests.log
           elif [ "${{ contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
