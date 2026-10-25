@@ -734,7 +734,7 @@ jobs:
           retention-days: 14
 
       - name: Preserve stopped handoff proposal evidence (no site execution)
-        if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]')
+        if: always() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
         uses: actions/upload-artifact@v4
         with:
           name: community-stopped-handoff-v1
