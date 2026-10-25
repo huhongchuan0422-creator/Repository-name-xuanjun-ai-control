@@ -178,6 +178,7 @@ def tree(fd,name,uid,expected,expected_id=None):
                 dirs.setdefault('/'.join(chunks[:j+1]),set())
             dirs.setdefault('/'.join(chunks[:-1]),set()).add(chunks[-1])
         need(len(expected)<=MAX_FILES and len(dirs)<=MAX_FILES,'TREE_BUDGET_EXCEEDED')
+        dir_ids={}
         for rel,names in dirs.items():
             current=root;opened=[]
             try:
@@ -186,8 +187,9 @@ def tree(fd,name,uid,expected,expected_id=None):
                     opened.append(nxt);current=nxt
                     checked_dir(current,uid)
                 before=dirident(os.fstat(current))
-                need(set(os.listdir(current))==names and set(os.listdir(current))==names
-                     and before==dirident(os.fstat(current)),'TREE_EXTRA_OR_MISSING_MEMBER')
+                first=set(os.listdir(current));after=dirident(os.fstat(current));second=set(os.listdir(current))
+                need(first==names and second==names and before==after,'TREE_EXTRA_OR_MISSING_MEMBER')
+                dir_ids[rel]=before
             finally:
                 for n in reversed(opened):os.close(n)
         for rel,want in expected.items():
@@ -206,7 +208,8 @@ def tree(fd,name,uid,expected,expected_id=None):
                 for part in rel.split('/') if rel else ():
                     nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=cur)
                     opened.append(nxt);cur=nxt;checked_dir(cur,uid)
-                need(set(os.listdir(cur))==names,'TREE_CHANGED_DURING_READ')
+                need(dirident(os.fstat(cur))==dir_ids[rel]
+                     and set(os.listdir(cur))==names,'TREE_CHANGED_DURING_READ')
             finally:
                 for n in reversed(opened):os.close(n)
         need(dirident(st)==dirident(os.fstat(root))
@@ -362,6 +365,7 @@ def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identi
     rb_result=childstat(jfd,ROLLBACK_RESULT)
     if dirident(current)==new_id and dirident(stage)==old_id:
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
+        if rb_intent is not None:state='ROLLBACK_NOT_APPLIED_RESULT_UNKNOWN'
         tree(parent,TARGET,uid,new_entries,new_id)
         tree(parent,STAGE,uid,old_entries,old_id)
     elif dirident(current)==old_id and dirident(stage)==new_id and retained is None:
@@ -436,7 +440,9 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         tree(parent,STAGE,uid,new_entries,stage_id)
         need(journal(jfd,uid)==j,'INTENT_CHANGED')
         if fault:fault('before_switch')
-        exchange(parent,TARGET,STAGE)
+        switch_attempted=True
+        try:exchange(parent,TARGET,STAGE)
+        except BaseException:raise Hold('EXCHANGE_RESULT_UNKNOWN_INSPECT_ONLY') from None
         # From this point a failure is always UNKNOWN, and cannot be retried.
         try:
             if fault:fault('after_exchange')
@@ -445,7 +451,12 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
             need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','SWITCH_STATUS_UNKNOWN')
             return result
         except BaseException:raise Hold('POST_SWITCH_UNKNOWN_INSPECT_ONLY')
-    finally:_close_lease(lease)
+    finally:
+        try:_close_lease(lease)
+        except BaseException:
+            if 'switch_attempted' in locals() and switch_attempted:
+                raise Hold('POST_SWITCH_CLOSE_UNKNOWN_INSPECT_ONLY') from None
+            raise
 
 def _close_lease(fd):
     os.close(fd)
@@ -474,15 +485,21 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_parent_iden
              'ROLLBACK_BOUNDARY_CHANGED')
         result=status(parent,jfd,uid,old_entries,new_entries)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_BOUNDARY_CHANGED')
+        rollback_attempted=True
         try:exchange(parent,TARGET,STAGE)
         except BaseException:raise Hold('ROLLBACK_EXCHANGE_UNKNOWN_INSPECT_ONLY') from None
         try:
             os.fsync(parent)
             result=status(parent,jfd,uid,old_entries,new_entries)
-            need(result['state']=='PREPARED_OR_REVERTED','ROLLBACK_UNKNOWN')
+            need(result['state'] in ('PREPARED_OR_REVERTED','ROLLBACK_APPLIED_RESULT_UNKNOWN'),'ROLLBACK_UNKNOWN')
             writefile(jfd,ROLLBACK_RESULT,canonical({'format':1,'attempt':intent['attempt'],
                      'result':'OLD_RESTORED_NEW_RETAINED','rollback_intent_sha256':sha(canonical(intent))}),uid)
             return {'state':'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED',
                     'retry_safe':False}
         except BaseException:raise Hold('ROLLBACK_UNKNOWN_INSPECT_ONLY')
-    finally:_close_lease(lease)
+    finally:
+        try:_close_lease(lease)
+        except BaseException:
+            if 'rollback_attempted' in locals() and rollback_attempted:
+                raise Hold('ROLLBACK_CLOSE_UNKNOWN_INSPECT_ONLY') from None
+            raise
