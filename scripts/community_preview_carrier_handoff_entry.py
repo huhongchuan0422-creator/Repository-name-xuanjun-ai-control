@@ -276,7 +276,9 @@ def main(argv=None):
         elif operation=='rollback':
             accepted=state=='ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED' and result.get('retry_safe') is False
         else:
-            accepted=state is not None
+            accepted=state in ('NO_HANDOFF_JOURNAL','PREPARED_OR_REVERTED',
+                'SWAPPED_OLD_RETAINED_IN_STAGE',
+                'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_RETAINED')
         print(h.canonical({'operation':operation,'state':state,
                            'accepted':bool(accepted),'retry_safe':False}))
         return 0 if accepted else 3
