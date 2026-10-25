@@ -160,6 +160,34 @@ class HandoffAdmission(unittest.TestCase):
         self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
 
+    def test_partial_stage_write_is_owned_by_preintent_and_never_retried(self):
+        def fault(where):
+            if where=='stage_partial_write':raise RuntimeError('PARTIAL_STAGE_WRITE')
+        with self.assertRaisesRegex(RuntimeError,'PARTIAL_STAGE_WRITE'):self.execute(fault)
+        self.assertIsNotNone(h.childstat(self.jfd,h.PREINTENT))
+        self.assertIsNotNone(h.childstat(self.parent,h.STAGE))
+        self.assertIsNone(h.childstat(self.jfd,h.STATE))
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
+            'UNKNOWN_INSPECT_ONLY')
+        with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
+
+    def test_nested_mkdir_fsyncs_parent_directory(self):
+        nested={'scripts/subdir/module.py':b'fixture'}
+        seen=[]
+        original=h.os.fsync
+        def capture(fd):
+            st=os.fstat(fd)
+            if stat.S_ISDIR(st.st_mode):
+                try:path=os.readlink('/proc/self/fd/'+str(fd))
+                except OSError:path=''
+                seen.append(path)
+            return original(fd)
+        with patch.object(h.os,'fsync',side_effect=capture):
+            h.build_tree(self.parent,nested,self.uid,name='fsync-probe')
+        self.assertTrue(any(path.endswith('/fsync-probe/scripts') for path in seen),seen)
+        self.assertTrue(any(path.endswith('/fsync-probe') for path in seen),seen)
+
     def test_crash_after_intent_never_retries(self):
         def fault(where):
             if where=='intent_fsynced':raise RuntimeError('SYNTHETIC_CRASH')
