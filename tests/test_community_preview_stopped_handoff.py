@@ -188,6 +188,84 @@ class WholeEntry(unittest.TestCase):
                 issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
             self.write(h.C_APPROVAL,s.canonical(a));return candidate
         self.stack.enter_context(patch.object(self.session,'candidate',side_effect=bind))
+    def _prepare_completed_b_before_c_proof(self):
+        self.seed_partial_resume()
+        q=self.fresh_session()
+        q.resume_b_partial()
+        self.assertTrue(q.bdone)
+        self.assertFalse(Path(h.PROOF).exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,h.attempt()).exists())
+        q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        semantic=q.evidence(True)
+        candidate=q.candidate(semantic)
+        q.backup and os.close(q.backup);q.backup=None
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
+            carrier_manifest_sha256=q.pins(),plan_sha256=candidate['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_APPROVAL,s.canonical(approval))
+        return q,candidate
+
+    def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        before_calls=len(self.calls)
+        with patch.object(h,'acknowledge',side_effect=u.Hold('EXACT_CONFIRMATION_REQUIRED')):
+            with self.assertRaisesRegex(u.Hold,'EXACT_CONFIRMATION_REQUIRED'):
+                q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before_calls)
+        self.assertFalse(Path(h.PROOF).exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,h.attempt()).exists())
+        q.close()
+        resumed=h.Session();resumed.acquire();self.addCleanup(resumed.close);self.session=resumed
+        with patch.object(h,'acknowledge',return_value=None):
+            result=resumed.resume_c_before_confirmation()
+        self.assertEqual(result['phase'],'COMMITTED')
+        self.assertEqual(resumed.journal.plan['plan_sha256'],candidate['plan_sha256'])
+        self.assertEqual([row[3] for row in self.calls[before_calls:]],['rename','run'])
+        self.assertTrue(Path(h.PROOF).exists())
+        self.assertTrue(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+
+    def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        bad,_=h.document(h.C_APPROVAL)
+        self.write(h.C_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
+        before=len(self.calls)
+        with self.assertRaisesRegex(u.Hold,'EXACT_C_APPROVAL_REQUIRED'):
+            q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+        bad,_=h.document(h.C_APPROVAL)
+        self.write(h.C_APPROVAL,s.canonical(dict(bad,issued_at=1,expires_at=2)))
+        with self.assertRaises(u.Hold):q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+        self.assertFalse(Path(h.PROOF).exists())
+
+    def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        path=h.paths()['verify-f131'];saved=Path(path).read_bytes();Path(path).unlink()
+        before=len(self.calls)
+        with self.assertRaises(Exception):q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before);self.assertFalse(Path(h.PROOF).exists())
+        self.write(path,saved)
+        q.close()
+        q=h.Session();q.acquire();self.addCleanup(q.close);self.session=q
+        self.write(u.JOURNAL_PARENT+'/active-attempt.json',
+                   s.canonical(dict(attempt=h.attempt(),plan_sha256=candidate['plan_sha256'])))
+        with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
+            q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+
+    def test_c_preconfirmation_duplicate_call_after_commit_is_rejected(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        with patch.object(h,'acknowledge',return_value=None):
+            result=q.resume_c_before_confirmation()
+        self.assertEqual(result['phase'],'COMMITTED')
+        before=len(self.calls);q.close()
+        second=h.Session();second.acquire();self.addCleanup(second.close);self.session=second
+        with self.assertRaisesRegex(u.Hold,'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY'):
+            second.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+
     def test_actual_b_classes_same_lease_to_c_success_no_old_stop_start(self):
         self.prepare_b_and_c();result=self.session.update()
         self.assertEqual(result['phase'],'COMMITTED')
