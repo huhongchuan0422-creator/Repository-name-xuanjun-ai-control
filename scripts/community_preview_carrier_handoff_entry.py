@@ -351,8 +351,15 @@ def run(operation):
                 and h.ident(ls)==h.ident(os.stat(h.LOCK,dir_fd=journal,follow_symlinks=False)),
                 'ORIGINAL_LOCK_IDENTITY_CHANGED')
         refs={}
+        backup_history_fd=None
         for key,name in h.HISTORY_NAMES.items():
-            home=journal if key in h.JOURNAL_HISTORY_KEYS else parent
+            if key in h.BACKUP_HISTORY_KEYS:
+                if backup_history_fd is None:
+                    backup_history_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
+                    stack.callback(os.close,backup_history_fd)
+                home=backup_history_fd
+            else:
+                home=journal if key in h.JOURNAL_HISTORY_KEYS else parent
             st=h.childstat(home,name)
             if st is None:
                 refs[key]=(home,name,h.parent_ident(os.fstat(home)),None,None)
