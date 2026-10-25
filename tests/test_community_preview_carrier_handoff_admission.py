@@ -130,6 +130,9 @@ class HandoffAdmission(unittest.TestCase):
             old_b_intent_sha256=h.sha(intent_raw),old_b_approval_sha256=h.sha(old_approval_raw),
             old_freeze_sha256=h.sha(freeze_raw),old_stage_permit_sha256=None,
             resume_approval_sha256=h.sha(resume_approval_raw),resume_freeze_sha256=h.sha(resume_freeze_raw),actions=actions)
+        try:os.unlink(h.HISTORY_NAMES['old_stage_permit'],dir_fd=self.parent)
+        except FileNotFoundError:pass
+        refs['old_stage_permit']=(self.parent,h.HISTORY_NAMES['old_stage_permit'],h.parent_ident(os.fstat(self.parent)),None,None)
         records={'b_intent':intent_raw,'b_approval':old_approval_raw,'freeze':freeze_raw,
             'resume_approval':resume_approval_raw,'resume_freeze':resume_freeze_raw,
             'resume_admission':h.canonical(admission),'c_approval':b'OLD_C_APPROVAL'}
