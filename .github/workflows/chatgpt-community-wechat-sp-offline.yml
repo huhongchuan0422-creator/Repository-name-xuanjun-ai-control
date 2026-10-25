@@ -231,7 +231,7 @@ jobs:
         run: |
           set -euo pipefail
           : > community-tests.log
-          python3 - <<'FIXTURE'
+          python3 - <<'FIXTURE' 2>&1 | tee -a community-tests.log
           import hashlib,io,json,os,urllib.request,zipfile
           from pathlib import Path
           repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
