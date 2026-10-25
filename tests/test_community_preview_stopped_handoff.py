@@ -192,36 +192,24 @@ class WholeEntry(unittest.TestCase):
         self.stack.enter_context(patch.object(self.session,'candidate',side_effect=bind))
     def _prepare_completed_b_before_c_proof(self):
         self.seed_partial_resume()
-        # Both historical B and freeze windows are expired; only the new C
-        # operation approval below is fresh. Historical bytes stay unchanged.
+        # Complete B through the original isolated resume path while its fresh
+        # B-resume approval/freeze are valid. This creates real fixture admission,
+        # snapshot, clone records and clone outputs before any C test begins.
+        q=self.fresh_session()
+        q.resume_b_partial()
+        self.assertTrue(q.bdone)
+        self.assertEqual(set(q.captured),set(h.CLONES))
+        historical_paths=[h.B_RESUME_APPROVAL,h.resume_record_path(),h.B_APPROVAL,
+            s.FREEZE,s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json'] + list(h.paths().values())
+        historical_bytes={path:Path(path).read_bytes() for path in historical_paths}
+        q.close()
+        # Only after successful isolated B completion does the test cross the
+        # historical freshness window; no B/clone rerun and no timestamp rewrite.
         self.clock=2400
-        # Model the durable admission record left by a completed B resume.
-        # This record is absent during B admission tests and appears only here,
-        # after the fixture represents successful B completion.
-        bresume,_=h.document(h.B_RESUME_APPROVAL)
-        admission=dict(format=1,mode=h.MODE,attempt=h.attempt(),
-            carrier_manifest_sha256=bresume['carrier_manifest_sha256'],
-            old_b_intent_sha256=bresume['old_b_intent_sha256'],
-            old_b_approval_sha256=bresume['old_b_approval_sha256'],
-            old_freeze_sha256=bresume['old_freeze_sha256'],
-            old_stage_permit_sha256=bresume['old_stage_permit_sha256'],
-            resume_approval_sha256=s.sha(s.canonical(bresume)),
-            resume_freeze_sha256=bresume['resume_freeze_sha256'],
-            actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
-        self.write(h.resume_record_path(),s.canonical(admission))
-        # Historical B-resume carrier is deliberately distinct from current C
-        # source carrier. Rebind the fixture record hashes, never the old B data.
-        resume,_=h.document(h.resume_record_path())
-        bresume,_=h.document(h.B_RESUME_APPROVAL)
-        historical_carrier='a'*64
-        bresume['carrier_manifest_sha256']=historical_carrier
-        self.write(h.B_RESUME_APPROVAL,s.canonical(bresume))
-        resume['carrier_manifest_sha256']=historical_carrier
-        resume['resume_approval_sha256']=s.sha(s.canonical(bresume))
-        self.write(h.resume_record_path(),s.canonical(resume))
+        for path,raw in historical_bytes.items():
+            self.assertEqual(Path(path).read_bytes(),raw,'HISTORICAL_B_EVIDENCE_MUTATED')
         q=self.fresh_session()
         q.configure_resumed_b_context()
-        self.assertNotEqual(q.approved_stamp,historical_carrier)
         q.resume_mode=True
         self.assertFalse(q.bdone)
         q.backup=h.open_private(s.BACKUP+'/clone-results.json')
