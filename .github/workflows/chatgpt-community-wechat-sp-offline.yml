@@ -617,7 +617,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Preserve Issue76 carrier handoff isolated test evidence
-        if: steps.scope.outputs.handoff_only == 'true'
+        if: always() && steps.scope.outputs.handoff_only == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: community-carrier-handoff-isolated-evidence
