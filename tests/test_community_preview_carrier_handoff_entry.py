@@ -66,7 +66,7 @@ class ApprovalRecord(unittest.TestCase):
     def test_missing_record_holds(self):
         os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
         with patch.object(entry,'ROOT_UID',self.uid):
-            with self.assertRaises(FileNotFoundError):
+            with self.assertRaisesRegex(h.Hold,'APPROVAL_MISSING'):
                 self.validate()
 
     def test_expired_record_holds(self):
@@ -102,7 +102,7 @@ class ApprovalRecord(unittest.TestCase):
         os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
         os.symlink('missing',entry.APPROVAL_NAME,dir_fd=self.parent)
         with patch.object(entry,'ROOT_UID',self.uid):
-            with self.assertRaises(OSError):self.validate()
+            with self.assertRaisesRegex(h.Hold,'APPROVAL_OPEN_REJECTED'):self.validate()
         os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
         self.write_record(self.value)
         os.chmod(os.path.join(self.tmp.name,entry.APPROVAL_NAME),0o640)
