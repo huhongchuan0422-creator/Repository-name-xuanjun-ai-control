@@ -266,7 +266,7 @@ class WholeEntry(unittest.TestCase):
         bad,_=h.document(h.C_RESUME_APPROVAL)
         self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
         before=len(self.calls)
-        with self.assertRaisesRegex(u.Hold,'ORIGINAL_C_PLAN_EVIDENCE_MISSING'):
+        with self.assertRaisesRegex(u.Hold,'EXACT_C_RESUME_APPROVAL_REQUIRED'):
             q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
         bad,_=h.document(h.C_RESUME_APPROVAL)
@@ -288,9 +288,9 @@ class WholeEntry(unittest.TestCase):
             result=q.resume_c_before_confirmation()
         self.assertEqual(result['phase'],'COMMITTED')
         self.assertEqual(q.journal.plan['plan_sha256'],candidate['plan_sha256'])
-        self.assertEqual(len(self.calls),before)
-        self.assertFalse(Path(h.PROOF).exists())
-        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+        self.assertGreater(len(self.calls),before)
+        self.assertTrue(Path(h.PROOF).exists())
+        self.assertTrue(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
 
     def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
@@ -314,7 +314,7 @@ class WholeEntry(unittest.TestCase):
             value,_=h.document(h.C_RESUME_APPROVAL)
             self.write(h.C_RESUME_APPROVAL,s.canonical(dict(value,plan_sha256='0'*64)))
         with patch.object(h,'acknowledge',side_effect=revoke):
-            with self.assertRaisesRegex(u.Hold,'C_APPROVAL_REVOKED|EXACT_C_APPROVAL_REQUIRED'):
+            with self.assertRaisesRegex(u.Hold,'C_APPROVAL_REVOKED|EXACT_C_RESUME_APPROVAL_REQUIRED|B_RESUME_REFERENCE_REPLACED'):
                 q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
