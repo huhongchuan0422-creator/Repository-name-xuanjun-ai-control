@@ -248,6 +248,13 @@ class HandoffAdmission(unittest.TestCase):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
+    def test_replaced_original_lock_path_is_rejected_before_intent(self):
+        os.unlink(h.LOCK,dir_fd=self.jfd)
+        h.writefile(self.jfd,h.LOCK,b'REPLACEMENT_LOCK',self.uid)
+        with self.assertRaisesRegex(h.Hold,'ORIGINAL_LOCK_FD_PATH_CHANGED'):
+            self.execute()
+        self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
+
     def test_copied_journal_parent_is_rejected(self):
         self.execute()
         copied=os.path.join(self.tmp.name,'journal-copy');os.mkdir(copied,0o700)
