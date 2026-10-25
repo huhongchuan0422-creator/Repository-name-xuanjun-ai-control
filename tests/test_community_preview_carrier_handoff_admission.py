@@ -106,13 +106,34 @@ class HandoffAdmission(unittest.TestCase):
                          history_refs=self.history_refs,fault=fault)
 
     def post_b_refs(self):
-        refs=dict(self.history_refs)
-        required={'snapshot_result':b'B_SNAPSHOT_RESULT','snapshot_permit':b'B_SNAPSHOT_PERMIT',
-            'validate_clones_result':b'B_CLONE_RESULT','validate_clones_permit':b'B_CLONE_PERMIT',
-            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE','resume_stage_permit':b'B_RESUME_STAGE_PERMIT','resume_admission':b'B_RESUME_ADMISSION',
-            'backup_dir':None,'backup_manifest':None,'backup_clone_results':None,'c_approval':b'OLD_C_APPROVAL'}
-        for key,body in required.items():
-            if key in ('backup_dir','backup_manifest','backup_clone_results'):continue
+        from scripts import community_preview_stopped_handoff as stopped
+        from scripts import community_preview_site_prepare as site
+        refs=dict(self.history_refs);attempt=h.ORIGINAL_ATTEMPT
+        actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES']
+        freeze=dict(format=1,host=h.HOST,old_id=site.OLD_ID,old_image=site.OLD_IMAGE,
+            roots=[site.DATA+'/data',site.DATA+'/config'],issued_at=1000,expires_at=1600,
+            all_writers_frozen=True,owner_review_reference_sha256='f'*64)
+        freeze_raw=h.canonical(freeze)
+        old_approval=dict(format=1,host=h.HOST,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+            issued_at=1000,expires_at=1600,freeze_sha256=h.sha(freeze_raw),actions=['SNAPSHOT','THREE_ISOLATED_CLONES'])
+        old_approval_raw=h.canonical(old_approval)
+        intent=dict(format=1,mode=h.MODE,attempt=attempt,approval_sha256=h.sha(old_approval_raw),freeze_sha256=h.sha(freeze_raw))
+        intent_raw=h.canonical(intent)
+        resume_freeze=dict(freeze,issued_at=1700,expires_at=2300,owner_review_reference_sha256='e'*64)
+        resume_freeze_raw=h.canonical(resume_freeze)
+        resume_approval=dict(format=1,host=h.HOST,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+            issued_at=1700,expires_at=2300,old_b_intent_sha256=h.sha(intent_raw),
+            old_b_approval_sha256=h.sha(old_approval_raw),old_freeze_sha256=h.sha(freeze_raw),
+            old_stage_permit_sha256=None,resume_freeze_sha256=h.sha(resume_freeze_raw),actions=actions)
+        resume_approval_raw=h.canonical(resume_approval)
+        admission=dict(format=1,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+            old_b_intent_sha256=h.sha(intent_raw),old_b_approval_sha256=h.sha(old_approval_raw),
+            old_freeze_sha256=h.sha(freeze_raw),old_stage_permit_sha256=None,
+            resume_approval_sha256=h.sha(resume_approval_raw),resume_freeze_sha256=h.sha(resume_freeze_raw),actions=actions)
+        records={'b_intent':intent_raw,'b_approval':old_approval_raw,'freeze':freeze_raw,
+            'resume_approval':resume_approval_raw,'resume_freeze':resume_freeze_raw,
+            'resume_admission':h.canonical(admission),'c_approval':b'OLD_C_APPROVAL'}
+        for key,body in records.items():
             pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
             name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
@@ -120,24 +141,44 @@ class HandoffAdmission(unittest.TestCase):
         os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
         backup_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         self.addCleanup(os.close,backup_fd)
-        try:
-            clone_body=dict(format=1,original_host_open=True,center_integrity=True,stores=['isolated-fixture'])
-            bodies={
-                'backup_manifest':h.canonical(dict(format=1,old_id='old-container-fixture',old_image='old-image-fixture',
-                    product_image='candidate-image-fixture',all_writers_frozen_evidence_sha256='a'*64,
-                    trees=dict(data=dict(bytes=1,sha256='b'*64),config=dict(bytes=1,sha256='c'*64)))),
-                'backup_clone_results':h.canonical(dict(stage='validate-clones',snapshot_manifest_sha256='d'*64,
-                    logical_evidence_sha256=h.sha(h.canonical(clone_body)),tested_at=1000,
-                    restore_original_host=True,downgrade_logical_equality=True,production_acceptance=False,
-                    rollback_health_acceptance=False))}
-            for name,image in (('restore-old','old-image-fixture'),('verify-f131','candidate-image-fixture'),('verify-downgrade','old-image-fixture')):
-                bodies['clone_'+name.replace('-','_')]=h.canonical(dict(format=1,attempt=h.ORIGINAL_ATTEMPT,name=name,
-                    image=image,code_sha256='e'*64,result=clone_body))
-            for key,body in bodies.items():
-                name=h.HISTORY_NAMES[key];h.writefile(backup_fd,name,body,self.uid)
-                item=os.stat(name,dir_fd=backup_fd,follow_symlinks=False)
-                refs[key]=(backup_fd,name,h.parent_ident(os.fstat(backup_fd)),h.ident(item),h.sha(body))
-        finally:pass
+        trees={'data':dict(bytes=1,sha256='b'*64),'config':dict(bytes=1,sha256='c'*64)}
+        manifest=dict(format=1,old_id=site.OLD_ID,old_image=site.OLD_IMAGE,product_image=site.NEW_IMAGE,
+            all_writers_frozen_evidence_sha256=h.sha(resume_freeze_raw),trees=trees)
+        manifest_raw=h.canonical(manifest);manifest_sha=h.sha(manifest_raw)
+        logical=dict(format=1,original_host_open=True,center_integrity=True,stores=['isolated-fixture'])
+        clone_rows={}
+        for name,image in (('restore-old',site.OLD_IMAGE),('verify-f131',site.NEW_IMAGE),('verify-downgrade',site.OLD_IMAGE)):
+            clone_rows[name]=h.canonical(dict(format=1,attempt=attempt,name=name,image=image,
+                code_sha256='e'*64,result=logical))
+        clone_summary=dict(stage='validate-clones',snapshot_manifest_sha256=manifest_sha,
+            logical_evidence_sha256=h.sha(h.canonical(logical)),tested_at=1800,
+            restore_original_host=True,downgrade_logical_equality=True,
+            production_acceptance=False,rollback_health_acceptance=False)
+        clone_summary_raw=h.canonical(clone_summary)
+        backup_bodies={'backup_manifest':manifest_raw,'backup_clone_results':clone_summary_raw}
+        backup_bodies.update({'clone_'+name.replace('-','_'):body for name,body in clone_rows.items()})
+        for key,body in backup_bodies.items():
+            name=h.HISTORY_NAMES[key];h.writefile(backup_fd,name,body,self.uid)
+            st=os.stat(name,dir_fd=backup_fd,follow_symlinks=False)
+            refs[key]=(backup_fd,name,h.parent_ident(os.fstat(backup_fd)),h.ident(st),h.sha(body))
+        def permit(stage):
+            return h.canonical(dict(format=1,host=h.HOST,stage=stage,entry_sha256=stopped.A_ENTRY_SHA,
+                issued_at=1700,expires_at=2300,all_writers_frozen_evidence_sha256=h.sha(resume_freeze_raw),
+                snapshot_manifest_sha256=None if stage=='snapshot' else manifest_sha))
+        snapshot_permit=permit('snapshot');clone_permit=permit('validate-clones')
+        snapshot_result=h.canonical(dict(format=1,attempt=attempt,stage='snapshot',
+            approval_sha256=h.sha(resume_approval_raw),permit_sha256=h.sha(snapshot_permit),
+            result=dict(stage='snapshot',manifest_sha256=manifest_sha,bytes=2,
+                recovery_verified=False,downgrade_verified=False)))
+        clone_result=h.canonical(dict(format=1,attempt=attempt,stage='validate-clones',
+            approval_sha256=h.sha(resume_approval_raw),permit_sha256=h.sha(clone_permit),result=clone_summary))
+        for key,body in (('snapshot_result',snapshot_result),('snapshot_permit',snapshot_permit),
+                         ('validate_clones_result',clone_result),('validate_clones_permit',clone_permit),
+                         ('resume_stage_permit',clone_permit)):
+            pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
+            name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
+            st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
+            refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
         st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
         refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         return refs
