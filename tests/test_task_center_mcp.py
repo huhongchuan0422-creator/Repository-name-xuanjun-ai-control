@@ -34,6 +34,13 @@ class TaskCenterMCPTests(unittest.TestCase):
             self.assertNotIn(forbidden,encoded.lower())
         self.assertEqual(len({x['name'] for x in TOOLS}),len(TOOLS))
 
+    def test_loopback_url_cannot_be_bypassed_with_userinfo(self):
+        for bad in ('http://127.0.0.1:8080@evil.example',
+                    'http://127.0.0.1:8080/path',
+                    'http://127.0.0.1:8080?next=evil'):
+            with self.assertRaisesRegex(ValueError,'LOOPBACK_TASK_CENTER'):
+                TaskCenterMCP(bad,'admin','actor','principal',lambda _:None)
+
     def test_read_is_task_scoped_and_writes_use_server_bound_actor(self):
         result=self.mcp.call('task_read_context',{'task_id':'task-a'})
         self.assertEqual(result['task']['task_id'],'task-a')

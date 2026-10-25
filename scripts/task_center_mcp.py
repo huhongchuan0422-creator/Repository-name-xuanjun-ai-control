@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import sys
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
@@ -61,9 +62,13 @@ def _owned_secret(path):
 
 class TaskCenterMCP(object):
     def __init__(self,base_url,admin_token,actor_token,trusted_principal,opener=None):
-        if not base_url.startswith('http://127.0.0.1:'):
+        parsed=urlsplit(base_url)
+        if (parsed.scheme!='http' or parsed.hostname!='127.0.0.1' or
+                parsed.username is not None or parsed.password is not None or
+                parsed.port is None or parsed.path not in ('','/') or
+                parsed.query or parsed.fragment):
             raise ValueError('LOOPBACK_TASK_CENTER_REQUIRED')
-        self.base=base_url.rstrip('/');self.admin=admin_token
+        self.base='http://127.0.0.1:%d'%parsed.port;self.admin=admin_token
         self.actor=actor_token;self.principal=trusted_principal
         self.open=opener or urlopen
 

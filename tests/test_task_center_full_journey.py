@@ -18,6 +18,7 @@ ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
 sys.path.insert(0,os.path.join(ROOT,'scripts'))
 from reusable_task_gateway import GatewayKernel,TestTenantAuthority
 from task_center_app import make_server
+from task_center_mcp import TaskCenterMCP
 from task_supervisor import Supervisor
 
 KEY=b'0123456789abcdef0123456789abcdef'
@@ -56,6 +57,8 @@ class FullJourneyTests(unittest.TestCase):
         self.thread=threading.Thread(target=self.server.serve_forever)
         self.thread.daemon=True;self.thread.start()
         self.base='http://127.0.0.1:%d'%self.server.server_port
+        self.mcp=TaskCenterMCP(self.base,TOKEN,'developer-token-123456',
+          'developer-1')
 
     def tearDown(self):
         self.server.shutdown();self.server.server_close();self.thread.join(2)
@@ -86,9 +89,12 @@ class FullJourneyTests(unittest.TestCase):
         self.post({'action':'RECORD_DISPATCH_PREFLIGHT','task_id':'task-journey',
           'asset_version':'asset-v1','query_ids':['query-journey-1'],
           'outcome':'NOT_FOUND','reuse_reason':'verified new TEST_ONLY task'})
-        self.assertEqual(self.post({'action':'START_TEST_ONLY_TASK',
-          'task_id':'task-journey','attempt_id':'attempt-1'},
-          'developer-token-123456')['state'],'STARTED')
+        self.assertEqual(self.mcp.call('task_claim',{'task_id':'task-journey',
+          'attempt_id':'attempt-1'})['state'],'STARTED')
+        listed=self.mcp.call('task_list',{})
+        self.assertEqual([x['task_id'] for x in listed],['task-journey'])
+        context=self.mcp.call('task_read_context',{'task_id':'task-journey'})
+        self.assertEqual(context['task']['attempt_id'],'attempt-1')
         codex=self.post({'action':'CREATE_CODEX_INTENT',
           'task_id':'task-journey','transport_kind':'CODEX_SDK',
           'idempotency_key':'journey-codex-intent','context':{

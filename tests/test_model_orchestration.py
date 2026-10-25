@@ -179,6 +179,20 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assertEqual(projected['unavailable_reason'],
                          'FREE_ALLOWANCE_EXHAUSTED')
 
+    def test_stale_quota_verification_holds_before_adapter_call(self):
+        self.provider();self.model();self.control.register_benchmark_suite(
+          'stale-suite',[{'case_id':'basic','capability':'code',
+          'messages':[{'role':'user','content':'fixture'}],
+          'expected_contains':'ok'}])
+        self.control.set_quota_status('free','AVAILABLE','EXISTING_PLAN_INCLUDED',
+          verified_at=100,now=100)
+        called=[]
+        class Never(object):
+            def invoke(self,*args,**kwargs):called.append(args);raise AssertionError()
+        result=self.control.run_benchmark('free','ok','stale-suite',Never(),
+          now=3701)
+        self.assertEqual(result['state'],'NOT_QUALIFIED');self.assertEqual(called,[])
+
     def test_paid_model_requires_explicit_unit_costs(self):
         self.provider('paid',price='KNOWN_PAID')
         with self.assertRaisesRegex(ValueError,'KNOWN_PAID_UNIT_COSTS'):
@@ -315,6 +329,27 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assigned(model='slow');self.control.queue_request('demo-b','developer',[],'slow-1')
         result=ModelScheduler(self.control).run_once();self.assertEqual(result['state'],'UNKNOWN')
         self.assertEqual(ModelScheduler(self.control).run_once()['state'],'IDLE')
+
+    def test_qualification_unknown_after_queue_holds_before_adapter_call(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'qualification-revoked')
+        latest=self.supervisor.db.execute('''SELECT * FROM model_evaluations
+          WHERE tenant_id='tenant-a' AND provider_id='free' AND model_id='ok'
+          ORDER BY observed_at DESC LIMIT 1''').fetchone()
+        values=list(latest);values[1]='qualification-unknown';values[11]='UNKNOWN'
+        values[13]=latest['observed_at']+1
+        self.supervisor.db.execute('''INSERT INTO model_evaluations VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',values);self.supervisor.db.commit()
+        calls=[]
+        class Never(object):
+            def invoke(self,*args):calls.append(args);raise AssertionError()
+        result=ModelScheduler(self.control,{'openai-compatible':Never(),
+          'siliconflow':Never()}).run_once()
+        self.assertEqual(result['state'],'HOLD');self.assertEqual(calls,[])
+        row=self.supervisor.db.execute('''SELECT state,error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD',
+          'MODEL_QUALIFICATION_NOT_CURRENT_HOLD'))
 
     def test_429_is_bounded_retry_and_disable_cancels_queue(self):
         self.assigned(model='rate');self.control.queue_request('demo-b','developer',[],'rate-1')

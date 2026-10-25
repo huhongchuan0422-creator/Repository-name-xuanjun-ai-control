@@ -33,6 +33,7 @@ PHASES = frozenset(('EXECUTOR', 'REVIEWER', 'ACCEPTOR'))
 REQUEST_STATES = frozenset(('QUEUED', 'RUNNING', 'RETRY_WAIT', 'SUCCEEDED',
                             'FAILED', UNKNOWN, 'CANCELLED','HOLD'))
 QUOTA_STATES = frozenset(('AVAILABLE', 'EXHAUSTED', UNKNOWN))
+QUOTA_VERIFICATION_MAX_AGE_SECONDS = 3600
 
 
 def _number(value, name, minimum=0):
@@ -965,7 +966,8 @@ class ModelControl(object):
 
     def _reserve_call_locked(self,provider_id,model_id,request_id,task_id,
                              attempt_number,input_tokens,output_tokens,
-                             allow_paid,config_version,now):
+                             allow_paid,config_version,now,
+                             require_qualified=False):
         """One transactional gate shared by benchmark and queued calls."""
         provider=self.db.execute('''SELECT * FROM model_providers WHERE
           tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
@@ -978,6 +980,13 @@ class ModelControl(object):
           tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
         if provider is None or model is None or not provider['enabled'] or not model['enabled']:
             raise ValueError('ACTIVE_MODEL_REQUIRED')
+        if require_qualified:
+            evaluation=self.db.execute('''SELECT state FROM model_evaluations
+              WHERE tenant_id=? AND provider_id=? AND model_id=? ORDER BY
+              observed_at DESC,evaluation_id DESC LIMIT 1''',(self.tenant_id,
+              provider_id,model_id)).fetchone()
+            if evaluation is None or evaluation['state']!='QUALIFIED':
+                raise ValueError('MODEL_QUALIFICATION_NOT_CURRENT_HOLD')
         if provider['config_version']!=config_version:
             raise ValueError('PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED')
         if quota is None or quota['quota_state']==UNKNOWN:
@@ -986,6 +995,8 @@ class ModelControl(object):
             raise ValueError('PROVIDER_QUOTA_EXHAUSTED_HOLD')
         if quota['quota_state']!='AVAILABLE' or quota['verified_at'] is None:
             raise ValueError('PROVIDER_QUOTA_UNAVAILABLE_HOLD')
+        if now-quota['verified_at']>QUOTA_VERIFICATION_MAX_AGE_SECONDS:
+            raise ValueError('PROVIDER_QUOTA_VERIFICATION_STALE_HOLD')
         if provider['circuit_state']=='OPEN' and (provider['next_probe_at'] is None or
                                                   provider['next_probe_at']>now):
             raise ValueError('CIRCUIT_OPEN')
@@ -1674,7 +1685,7 @@ class ModelScheduler(object):
                   candidate['request_id'],candidate['task_id'],
                   candidate['attempts']+1,candidate['expected_input_tokens'],
                   candidate['max_output_tokens'],bool(candidate['allow_paid']),
-                  candidate['provider_config_version'],now)
+                  candidate['provider_config_version'],now,True)
                 changed=self.db.execute('''UPDATE model_requests SET state='RUNNING',
                   attempts=attempts+1,lease_owner=?,lease_until=?,last_heartbeat=?,
                   updated_at=? WHERE tenant_id=? AND request_id=? AND state IN

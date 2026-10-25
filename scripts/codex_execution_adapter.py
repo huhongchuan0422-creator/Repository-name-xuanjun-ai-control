@@ -82,12 +82,49 @@ class CodexExecutionControl(object):
         if not isinstance(context,dict) or set(context)!={'goal','scope',
               'acceptance','asset_version','reuse_evidence'}:
             raise ValueError('EXACT_CODEX_CONTEXT_REQUIRED')
-        ExecutionPolicyGateway(self.gateway,self.context).require_dispatch_ready(task_id)
+        ready=ExecutionPolicyGateway(self.gateway,
+          self.context).require_dispatch_ready(task_id)
         task=self.gateway.supervisor._task(task_id)
         if (task['attempt_id'] in (None,UNKNOWN) or task['authority_state']!='VALID'
                 or task['authority_valid_until'] is None or
                 now>=task['authority_valid_until']):
             raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
+        unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
+          AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        spec=self.db.execute('''SELECT goal,acceptance_json FROM task_work_specs
+          WHERE tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        preflight=self.db.execute('''SELECT query_ids_json FROM dispatch_preflights
+          WHERE tenant_id=? AND task_id=? AND preflight_id=?''',(
+          self.tenant_id,task_id,ready['preflight_id'])).fetchone()
+        principal=self.context['principal_id']
+        assigned=False
+        if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
+          name='model_assignments' ''').fetchone() is not None:
+            assigned=self.db.execute('''SELECT 1 FROM model_assignments WHERE
+              tenant_id=? AND task_id=? AND attempt_id=? AND principal_id=?''',(
+              self.tenant_id,task_id,task['attempt_id'],principal)).fetchone() is not None
+        if principal not in (task['authority_caller_id'],unit['responsible_party']) \
+                and not assigned:
+            raise ValueError('CURRENT_ASSIGNED_CODEX_ACTOR_REQUIRED')
+        expected_reuse=sorted(json.loads(preflight['query_ids_json']))
+        supplied_reuse=(sorted(context['reuse_evidence']) if isinstance(
+          context['reuse_evidence'],list) else None)
+        if (context['goal']!=unit['goal'] or context['goal']!=spec['goal'] or
+                canonical(context['scope'])!=unit['scope_json'] or
+                canonical(context['acceptance'])!=unit['acceptance_json'] or
+                canonical(context['acceptance'])!=spec['acceptance_json'] or
+                context['asset_version']!=unit['asset_version'] or
+                context['asset_version']!=ready['asset_version'] or
+                supplied_reuse!=expected_reuse):
+            raise ValueError('CODEX_CONTEXT_NOT_CANONICAL')
+        if expected_reuse:
+            placeholders=','.join(['?']*len(expected_reuse))
+            found=self.db.execute('''SELECT COUNT(*) FROM asset_query_receipts
+              WHERE tenant_id=? AND task_id=? AND query_id IN (%s)'''%
+              placeholders,(self.tenant_id,task_id)+tuple(
+              expected_reuse)).fetchone()[0]
+            if found!=len(set(expected_reuse)):
+                raise ValueError('CODEX_REUSE_EVIDENCE_REQUIRED')
         seed=canonical({'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'idempotency':idempotency_key})
         intent_id=hashlib.sha256(seed.encode()).hexdigest()
@@ -118,9 +155,9 @@ class CodexExecutionControl(object):
           self.tenant_id,self.tenant_id,intent_id,principal)).fetchone()
         if row['writer_principal']!=principal and responsible is None:
             raise ValueError('CURRENT_CODEX_WRITER_REQUIRED')
-        if row['state'] in ('PENDING','ACKED'):
+        if row['state']=='PENDING':
             state='CANCELLED'
-        elif row['state'] in ('SENDING','RUNNING','WAITING_APPROVAL'):
+        elif row['state'] in ('SENDING','ACKED','RUNNING','WAITING_APPROVAL'):
             state='CANCEL_REQUESTED'
         else:raise ValueError('CODEX_INTENT_TERMINAL')
         self.db.execute('''UPDATE codex_execution_intents SET state=?,
@@ -168,25 +205,34 @@ class CodexExecutionControl(object):
               'transport_kind':row['transport_kind']}),1,now));self.db.commit()
         except Exception:self.db.rollback();raise
         transport=transports.get(row['transport_kind'])
+        if transport is None:
+            self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
+              error_kind=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE
+              tenant_id=? AND intent_id=? AND state='SENDING' ''',(
+              row['transport_kind']+'_UNAVAILABLE',now,self.tenant_id,
+              row['intent_id']));self.db.commit()
+            return {'intent_id':row['intent_id'],'state':'FAILED'}
         try:
-            if transport is None:raise CodexTransportUnavailable(
-              row['transport_kind']+'_UNAVAILABLE')
             receipt=transport.send(dict(row))
             if not isinstance(receipt,dict) or receipt.get('state') not in (
                     'ACKED','RUNNING','WAITING_APPROVAL'):
                 raise ValueError('VALID_CODEX_RECEIPT_REQUIRED')
-        except (TimeoutError,CodexSendUnknown):
-            self.db.execute('''UPDATE codex_execution_intents SET state=?,
-              error_kind='SEND_RESULT_UNKNOWN',lease_owner=NULL,lease_until=NULL,
-              updated_at=? WHERE tenant_id=? AND intent_id=? AND state='SENDING' ''',
-              (UNKNOWN,now,self.tenant_id,row['intent_id']));self.db.commit()
-            return {'intent_id':row['intent_id'],'state':UNKNOWN}
-        except Exception as exc:
+        except CodexTransportUnavailable as exc:
+            # An adapter that proves it was unavailable before sending is a
+            # definitive local failure.  Every exception after a transport
+            # accepted the call is conservatively UNKNOWN below.
             self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
               error_kind=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE
               tenant_id=? AND intent_id=? AND state='SENDING' ''',(
               str(exc),now,self.tenant_id,row['intent_id']));self.db.commit()
             return {'intent_id':row['intent_id'],'state':'FAILED'}
+        except Exception as exc:
+            self.db.execute('''UPDATE codex_execution_intents SET state=?,
+              error_kind=?,lease_owner=NULL,lease_until=NULL,
+              updated_at=? WHERE tenant_id=? AND intent_id=? AND state='SENDING' ''',
+              (UNKNOWN,'SEND_RESULT_UNKNOWN:'+type(exc).__name__,now,
+               self.tenant_id,row['intent_id']));self.db.commit()
+            return {'intent_id':row['intent_id'],'state':UNKNOWN}
         fresh=self.db.execute('''SELECT cancel_requested FROM codex_execution_intents
           WHERE tenant_id=? AND intent_id=?''',(self.tenant_id,
           row['intent_id'])).fetchone()

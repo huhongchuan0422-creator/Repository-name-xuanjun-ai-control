@@ -93,6 +93,19 @@ class CodexExecutionAdapterTests(unittest.TestCase):
           codex_execution_events WHERE event_id='late-1' ''').fetchone()
         self.assertEqual(row[0],0)
 
+    def test_connection_and_malformed_receipt_after_send_are_unknown(self):
+        for key,error in (('disconnect',ConnectionError('lost')),
+                          ('malformed',None)):
+            self.control.create_intent('demo-b','CODEX_SDK',key,
+              self.context_body)
+            if error is None:
+                transport=CodexSDKTransport(lambda _intent:{'unexpected':True})
+            else:
+                transport=CodexSDKTransport(lambda _intent,e=error:(_ for _ in
+                  ()).throw(e))
+            result=self.control.dispatch_once({'CODEX_SDK':transport})
+            self.assertEqual(result['state'],'UNKNOWN')
+
     def test_non_writer_cannot_cancel_codex_intent(self):
         intent=self.control.create_intent('demo-b','CODEX_SDK','owned',
           self.context_body)
@@ -101,6 +114,29 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CURRENT_CODEX_WRITER_REQUIRED'):
             other.cancel(intent['intent_id'])
         self.assertEqual(self.control.projection()[0]['state'],'PENDING')
+
+    def test_unassigned_actor_and_noncanonical_scope_have_zero_intents(self):
+        other=CodexExecutionControl(self.gateway,
+          self.authority.issue('tenant-a','other-principal'))
+        with self.assertRaisesRegex(ValueError,'ASSIGNED_CODEX_ACTOR'):
+            other.create_intent('demo-b','CODEX_SDK','unassigned',
+              self.context_body)
+        changed=dict(self.context_body);changed['scope']=['DEPLOY']
+        with self.assertRaisesRegex(ValueError,'CONTEXT_NOT_CANONICAL'):
+            self.control.create_intent('demo-b','CODEX_SDK','bad-scope',changed)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          codex_execution_intents''').fetchone()[0],0)
+
+    def test_acked_cancel_is_request_not_false_terminal(self):
+        intent=self.control.create_intent('demo-b','CODEX_SDK','acked-cancel',
+          self.context_body)
+        self.assertEqual(self.control.dispatch_once({'CODEX_SDK':
+          CodexSDKTransport(lambda _intent:{'state':'ACKED',
+          'execution_id':'remote-exec'})})['state'],'ACKED')
+        cancelled=self.control.cancel(intent['intent_id'])
+        self.assertEqual(cancelled['state'],'CANCEL_REQUESTED')
+        self.assertEqual(self.control.projection()[0]['state'],
+          'CANCEL_REQUESTED')
 
     def test_app_server_receipt_and_event_idempotency(self):
         intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','app-1',
