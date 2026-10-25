@@ -313,6 +313,11 @@ class Session:
             identity=s.identity(os.stat(name,dir_fd=fd,follow_symlinks=False))
             authorize_v2(self,stage,digest);s._ACTIVE=(stage,digest)
             self.stopped()
+            if self.resume_mode:
+                self.resume_guard()
+                becoming=[s.BACKUP] if stage=='snapshot' else list(globals()['paths']().values())+[s.BACKUP+'/'+name for name in CLONES]
+                self.resume_require_absent(becoming)
+                self.resume_absent=tuple(path for path in self.resume_absent if path not in becoming)
             value=s.snapshot(permit) if stage=='snapshot' else s.validate_clones(permit)
             self.stopped();authorize_v2(self,stage,digest)
             if self.resume_mode:
