@@ -192,46 +192,24 @@ class WholeEntry(unittest.TestCase):
         self.stack.enter_context(patch.object(self.session,'candidate',side_effect=bind))
     def _prepare_completed_b_before_c_proof(self):
         self.seed_partial_resume()
-        # Complete B through the original isolated resume path while its fresh
-        # B-resume approval/freeze are valid. This creates real fixture admission,
-        # snapshot, clone records and clone outputs before any C test begins.
-        q=self.fresh_session()
-        q.resume_b_partial()
-        self.assertTrue(q.bdone)
-        self.assertEqual(set(q.captured),set(h.CLONES))
-        historical_paths=[h.B_RESUME_APPROVAL,h.resume_record_path(),h.B_APPROVAL,
-            s.FREEZE,s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json'] + list(h.paths().values())
-        historical_bytes={path:Path(path).read_bytes() for path in historical_paths}
-        q.close()
-        # Only after successful isolated B completion does the test cross the
-        # historical freshness window; no B/clone rerun and no timestamp rewrite.
-        self.clock=2400
-        for path,raw in historical_bytes.items():
-            self.assertEqual(Path(path).read_bytes(),raw,'HISTORICAL_B_EVIDENCE_MUTATED')
-        q=self.fresh_session()
-        q.configure_resumed_b_context()
-        q.resume_mode=True
+        q=self.fresh_session();q.resume_b_partial()
+        self.assertTrue(q.bdone);self.assertEqual(set(q.captured),set(h.CLONES))
+        historical_paths=[h.B_RESUME_APPROVAL,h.resume_record_path(),h.B_APPROVAL,s.FREEZE,
+            s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json']+list(h.paths().values())+list(h.b_records().values())
+        historical={path:Path(path).read_bytes() for path in historical_paths if Path(path).exists()}
+        q.close();self.clock=2400
+        for path,raw in historical.items():self.assertEqual(Path(path).read_bytes(),raw,'HISTORICAL_B_EVIDENCE_MUTATED')
+        q=self.fresh_session();q.configure_resumed_b_context()
         self.assertFalse(q.bdone)
-        q.backup=h.open_private(s.BACKUP+'/clone-results.json')
-        semantic=q.evidence(True)
-        candidate=q.candidate(semantic)
-        # The original C approval is immutable historical evidence; never edit it.
-        old_approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
-            carrier_manifest_sha256=q.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
-            issued_at=1,expires_at=2,actions=h.C_ACTIONS)
-        self.write(h.C_APPROVAL,s.canonical(old_approval))
-        record=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
-            carrier_manifest_sha256=q.approved_stamp,evidence_sha256=s.sha(s.canonical(h.Session._without_observed_at(semantic))),
-            plan=candidate,plan_sha256=candidate['plan_sha256'],
-            plan_document_sha256=s.sha(s.canonical(candidate)),
-            issued_at=self.clock,expires_at=self.clock+600)
-        self.write(h.C_RESUME_PLAN,s.canonical(record))
-        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
-            carrier_manifest_sha256=q.pins(),plan_sha256=candidate['plan_sha256'],
+        return q,historical
+
+    def _register_c_resume_approval_from_persisted_plan(self,q):
+        record,_=h.document(h.C_RESUME_PLAN)
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=record['attempt'],
+            carrier_manifest_sha256=q.pins(),plan_sha256=record['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
-        os.close(q.backup);q.backup=None
-        return q,candidate
+        return record['plan']
 
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
@@ -257,22 +235,19 @@ class WholeEntry(unittest.TestCase):
         self.assertTrue(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
 
     def test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval(self):
-        q,candidate=self._prepare_completed_b_before_c_proof()
-        old_c=Path(h.C_APPROVAL).read_bytes()
-        Path(h.C_RESUME_PLAN).unlink()
-        Path(h.C_RESUME_APPROVAL).unlink()
-        original=h.Session._c_resume_approval
+        q,historical=self._prepare_completed_b_before_c_proof()
+        self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
+        original=h.Session._c_resume_approval;seen=[]
         def owner_approves(session,plan):
             if not Path(h.C_RESUME_APPROVAL).exists():
-                record,_=h.document(h.C_RESUME_PLAN)
-                approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
-                    carrier_manifest_sha256=session.pins(),plan_sha256=record['plan_sha256'],
-                    issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
-                self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+                seen.append(json.loads(output.getvalue().splitlines()[-1]))
+                candidate=self._register_c_resume_approval_from_persisted_plan(session)
+                self.assertEqual(candidate['plan_sha256'],plan['plan_sha256'])
             return original(session,plan)
         output=io.StringIO()
         with patch.object(h.Session,'_c_resume_approval',owner_approves),contextlib.redirect_stdout(output):
             result=q.resume_c_before_confirmation()
+        candidate=h.document(h.C_RESUME_PLAN)[0]['plan']
         self.assertIn('"plan":',output.getvalue())
         self.assertIn(candidate['attempt'],output.getvalue())
         self.assertEqual(result['phase'],'COMMITTED')
