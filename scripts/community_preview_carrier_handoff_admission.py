@@ -473,6 +473,7 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
 def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_parent_identity,
             expected_journal_identity,expected_entry_identity,expected_lock_identity,attempt,history_refs=None,fault=None,mode=None):
     """One-shot isolated transaction; caller supplies immutable old inventory and fd witnesses."""
+    state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
@@ -545,6 +546,7 @@ def _close_lease(fd):
     os.close(fd)
 
 def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs=None,mode=None):
+    state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     lease=_locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
