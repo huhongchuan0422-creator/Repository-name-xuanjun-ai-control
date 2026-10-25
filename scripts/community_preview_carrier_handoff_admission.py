@@ -596,6 +596,8 @@ class SafeArtifactRedirect(urllib.request.HTTPRedirectHandler):
             raise Hold('ARTIFACT_REDIRECT_DESTINATION_REJECTED')
         if old.hostname=='api.github.com' and not _ARTIFACT_API_PATH.fullmatch(old.path):
             raise Hold('ARTIFACT_API_PATH_REJECTED')
+        if new.hostname=='api.github.com' and not _ARTIFACT_API_PATH.fullmatch(new.path):
+            raise Hold('ARTIFACT_REDIRECT_DESTINATION_REJECTED')
         # Only innocuous headers survive. In particular Authorization,
         # Cookie and Proxy-Authorization never cross a redirect boundary.
         safe={}
