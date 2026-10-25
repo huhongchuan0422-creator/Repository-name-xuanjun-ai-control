@@ -1,0 +1,50 @@
+CUS-008 SaaS JS -> e7 MATERIAL LIFECYCLE — 2026-10-25
+
+SOURCE BYTE CHECK BEFORE RUN:
+git hash-object src/api.js        = 81504cda86684faa671689760dd702dde356ca48
+git hash-object src/journey.js    = d28bcd2be278310981404a26117c67df891774ff
+git hash-object src/submission.js = fdcb1dd74d61010e320445a138c4570ba530f1e3
+
+COMMAND:
+cd /mnt/data/cus008_local
+XJ_PR122_E7_ROOT=/mnt/data/cus008_e7/review/customer-center node tests/cus008-e7-js-lifecycle.mjs
+
+EXIT_CODE=0
+
+STDOUT:
+{"status":"PASS","scope":"CUS008_SAAS_JS_TO_E7","source_blobs":{"api":"81504cda86684faa671689760dd702dde356ca48","journey":"d28bcd2be278310981404a26117c67df891774ff","submission":"fdcb1dd74d61010e320445a138c4570ba530f1e3"},"save1_revision":1,"unknown_submit_calls":1,"correction_reason":"缺少授权签字","accepted_revision":8,"accepted_preserved_after_new_save":8,"historical_downloads":2,"stale_revision_409":"版本或状态已变化，请刷新后重试","csrf_403":"权限不足、凭据失效或请求不符合要求","other_download_403":"权限不足、凭据失效或请求不符合要求","revoked_403":"权限不足、凭据失效或请求不符合要求","browser":"NOT_VERIFIED"}
+
+STDERR:
+<empty>
+
+STDOUT_SHA256=598111dac461f1fd192311e6f3fe6c18ebed59f5a269b0357f428ebd2a6fe9cd
+STDERR_SHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+LOCAL_SCRIPT_SHA256=ce850c2faa3a5167861b6309c9a59dd0be320ee91e2ffb6a398a3f3d6ba6a736
+
+COVERED:
+- save PRIVATE_DOCUMENT;
+- service-returned object_id -> authenticated historical download;
+- unauthorized download -> Chinese 403;
+- stale transition revision -> Chinese 409, definite, no mutation;
+- stale CSRF -> Chinese 403, definite, no mutation;
+- submit response lost after real commit -> uncertain=true, exactly one transition POST, no blind retry;
+- checklist readback SUBMITTED;
+- fixture reviewer begin_review/request_changes only, not exposed as SaaS reviewer UI;
+- customer readback NEEDS_CORRECTION and reason;
+- corrected save + download both historical versions;
+- customer re-submit -> fixture reviewer approve -> ACCEPTED;
+- accepted_revision=8;
+- later new save -> PARTIAL while accepted_revision remains 8;
+- revoke-owner-project -> original JS client gets Chinese 403.
+
+EXPIRY:
+Existing e7 browser fixture exposes no clock-advance control. Expiry was not fabricated through JS.
+Executed exact e7 source test:
+python3 -B -m unittest tests.test_pr122_customer_center.CustomerTests.test_authority_signature_scope_replay_and_expiration -v
+RC=0
+RESULT=OK (1 test)
+STDERR_SHA256=99ae1adefddc2943afcf87675c60a3ba76106680b4864f55ff393ea6e1330892
+This is backend expiry-contract evidence, not JS/browser expiry E2E.
+
+BROWSER:
+NOT RERUN. Direct Chromium navigation remains ERR_BLOCKED_BY_ADMINISTRATOR.

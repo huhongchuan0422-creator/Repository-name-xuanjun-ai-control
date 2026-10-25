@@ -13,3 +13,17 @@ test('material journey binds PRIVATE_DOCUMENT save and rejects wrong role/type',
  await assert.rejects(j.saveMaterial({id:'project-a',role:'VIEWER'},item,'x'),/MATERIAL_WRITE_REQUIRED/);
  await assert.rejects(j.saveMaterial(p,{...item,submission_type:'OAUTH'},'x'),/PRIVATE_DOCUMENT_REQUIRED/);
 });
+
+test('CUS008 customer journey exposes submit only for owner/editor ready states and download uses returned object id',async()=>{
+ const calls=[],api={
+  transition:async(...x)=>{calls.push(['transition',...x]);return{state:'SUBMITTED',revision:x[2]+1,accepted_revision:null}},
+  downloadUrl:(project,object)=>'/customer/center/api/download/'+project+'/'+object
+ },j=new (await import('../src/journey.js')).ProjectJourney(api,{});
+ const p={id:'project-a',role:'OWNER'},item={id:'license',revision:4,state:'NEEDS_CORRECTION'},v={details:{object_id:'o_'+'b'.repeat(32)}};
+ assert.equal((await j.submitMaterial(p,item)).state,'SUBMITTED');
+ assert.deepEqual(calls[0],['transition','project-a','license',4,'submit','']);
+ assert.equal(j.materialDownloadUrl(p,v),'/customer/center/api/download/project-a/o_'+'b'.repeat(32));
+ await assert.rejects(j.submitMaterial({id:'project-a',role:'REVIEWER'},item),/MATERIAL_SUBMIT_REQUIRED/);
+ await assert.rejects(j.submitMaterial(p,{...item,state:'IN_REVIEW'}),/MATERIAL_NOT_READY/);
+ assert.throws(()=>j.materialDownloadUrl(p,{details:{}}),/MATERIAL_OBJECT_REQUIRED/);
+});

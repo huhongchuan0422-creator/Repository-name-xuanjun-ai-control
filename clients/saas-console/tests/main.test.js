@@ -105,3 +105,24 @@ test('PRIVATE_DOCUMENT checklist renders upload and saves exact current revision
  assert.ok(checkCalls>=2);assert.equal(app.current.id,'A');
  assert.match(d.m.get('status').textContent,/新版本已保存/);
 });
+
+test('CUS008 renders accepted revision, correction basis, historical download and exact submit-review wiring',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','csrf');let transitionArgs=null,checks=0;
+ const object='o_'+'a'.repeat(32),item={id:'license',title:'企业授权',purpose:'核实签约关系',required:true,state:'NEEDS_CORRECTION',revision:4,accepted_revision:2,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[
+  {seq:1,kind:'SAVE',actor:'u1',details:{object_id:object}},
+  {seq:4,kind:'request_changes',actor:'reviewer',details:{reason:'缺少授权签字'}}
+ ]};
+ const a={id:'A',title:'A',role:'OWNER'};
+ const api=apiBase({
+  checklist:async()=>{checks++;return{requirements_revision:1,overall:'PARTIAL',items:[checks>1?{...item,state:'SUBMITTED',revision:5}:item]}},
+  transition:async(...x)=>{transitionArgs=x;return{state:'SUBMITTED',revision:5,accepted_revision:2}},
+  downloadUrl:(project,oid)=>'/customer/center/api/download/'+project+'/'+oid
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const root=d.m.get('requirements');
+ assert.ok(find(root,x=>x.textContent.includes('accepted_revision 2')));
+ assert.ok(find(root,x=>x.textContent==='补正依据：缺少授权签字'));
+ const link=find(root,x=>x.tagName==='a'&&x.textContent==='下载此历史材料');assert.ok(link);assert.equal(link.href,'/customer/center/api/download/A/'+object);
+ const submit=find(root,x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(submit);await submit.onclick();
+ assert.deepEqual(transitionArgs,['A','license',4,'submit','']);assert.ok(checks>=2);assert.equal(app.current.id,'A');
+});

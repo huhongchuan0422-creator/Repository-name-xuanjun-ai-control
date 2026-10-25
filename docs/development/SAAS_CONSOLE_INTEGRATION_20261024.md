@@ -266,3 +266,34 @@ Raw stdout/exit evidence is retained in `clients/saas-console/tests/E7_JS_CLIENT
 Hosted CI only syntax-checks this artifact-bound integration entry because the e7 review artifact is not part of the repository checkout. A Hosted syntax PASS must not be described as Hosted e7 HTTP execution. Existing frontend `npm test` remains a separate source/isolation gate.
 
 Browser route/navigation remains `BLOCKED / NOT_VERIFIED` due `net::ERR_BLOCKED_BY_ADMINISTRATOR`; no proxy, `setContent`, alternate address, or alternate browser tool is used to convert that refusal into browser E2E evidence.
+
+
+## V12 CUS-008 material review lifecycle
+
+The SaaS customer console now consumes the existing e7 material lifecycle without adding backend state or reviewer authority.
+
+Customer-side additions:
+- `api.transition(project,item,revision,action,reason)` sends the exact five-field e7 transition body.
+- `ProjectJourney.submitMaterial` exposes only customer `submit` for OWNER/EDITOR items in `PARTIAL` or `NEEDS_CORRECTION`.
+- `accepted_revision` is displayed from checklist server state.
+- the latest `request_changes` version reason is displayed as the correction basis.
+- historical material links are built only from server-returned `versions[].details.object_id` through `/customer/center/api/download/{project}/{object_id}`.
+- no reviewer `begin_review/request_changes/approve` controls are added to the SaaS customer UI.
+
+Exact e7 JS lifecycle evidence imports blobs:
+- api.js `81504cda86684faa671689760dd702dde356ca48`
+- journey.js `d28bcd2be278310981404a26117c67df891774ff`
+- submission.js `fdcb1dd74d61010e320445a138c4570ba530f1e3`
+
+Command:
+```sh
+cd clients/saas-console
+XJ_PR122_E7_ROOT=/path/to/extracted/e7/customer-center \
+  node tests/cus008-e7-js-lifecycle.mjs
+```
+
+Actual local result: exit 0. It covered first save, authenticated historical download, unauthorized download 403, stale revision 409, stale CSRF 403, an UNKNOWN submit response after the server committed with exactly one transition POST and no retry, checklist readback to SUBMITTED, fixture-only reviewer request-changes, customer correction reason readback, corrected save, two historical downloads, resubmit, fixture-only reviewer approve, `accepted_revision=8`, and a later new save preserving accepted revision 8 while state returned to PARTIAL. Project revocation then produced the real Chinese 403 through the original JS API.
+
+The existing browser fixture has no clock-advance control, so expiry is not fabricated through the JS harness. The exact e7 backend expiry test `CustomerTests.test_authority_signature_scope_replay_and_expiration` was executed separately and passed; this is backend expiry-contract evidence, not JS/browser expiry E2E.
+
+Browser navigation remains `BLOCKED / NOT_VERIFIED` due `ERR_BLOCKED_BY_ADMINISTRATOR` and is not bypassed.

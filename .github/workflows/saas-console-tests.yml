@@ -51,6 +51,8 @@ jobs:
           bash -n tests/run_real_python_backend_integration.sh
           node --check tests/e7-js-client-integration.mjs
           bash -n tests/run_e7_js_client_integration.sh
+          node --check tests/cus008-e7-js-lifecycle.mjs
+          bash -n tests/run_cus008_e7_js_lifecycle.sh
 
       - name: Run SaaS console tests
         working-directory: clients/saas-console

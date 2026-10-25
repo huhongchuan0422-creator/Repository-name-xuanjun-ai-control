@@ -22,3 +22,13 @@ test('material save uses exact e7 fields and preserves Chinese backend error tex
  const denied=makeApi(async()=>({ok:false,status:403,json:async()=>({error:'权限不足、凭据失效或请求不符合要求'})}),()=> 'csrf');
  await assert.rejects(denied.save('project-a','license',0,'DOCUMENT','JVBERi0xLjc=',null),e=>e.status===403&&e.message==='权限不足、凭据失效或请求不符合要求');
 });
+
+test('material transition uses exact five fields and history download URL is server object-id bound',async()=>{
+ let body;
+ const api=makeApi(async(u,o)=>{body=JSON.parse(o.body);return{ok:true,status:200,json:async()=>({state:'SUBMITTED',revision:2,accepted_revision:null})}},()=> 'csrf');
+ const r=await api.transition('project-a','license',1,'submit','');
+ assert.deepEqual(body,{project:'project-a',item:'license',revision:1,action:'submit',reason:''});
+ assert.equal(r.state,'SUBMITTED');
+ assert.equal(api.downloadUrl('project-a','o_'+'a'.repeat(32)),'/customer/center/api/download/project-a/o_'+'a'.repeat(32));
+ assert.throws(()=>api.downloadUrl('project-a','guessed-object'),/INVALID_OBJECT/);
+});
