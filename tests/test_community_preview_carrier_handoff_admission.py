@@ -23,6 +23,9 @@ class HandoffAdmission(unittest.TestCase):
         self.uid=os.getuid()
         fd=os.open('community-update.lock',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600,dir_fd=self.jfd)
         os.close(fd)
+        self.lease=os.open(h.LOCK,os.O_RDWR|os.O_NOFOLLOW,dir_fd=self.jfd)
+        self.addCleanup(os.close,self.lease)
+        self.lock_id=h.ident(os.fstat(self.lease))
         h.writefile(self.parent,h.ENTRY_NAME,b'A_ENTRY_FIXTURE',self.uid)
         self.entry=os.open(h.ENTRY_NAME,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.parent)
         self.addCleanup(os.close,self.entry)
@@ -82,20 +85,20 @@ class HandoffAdmission(unittest.TestCase):
         obj=context.__enter__();self.addCleanup(context.__exit__,None,None,None);return obj
 
     def execute(self,fault=None):
-        return h.execute(self.parent,self.jfd,self.entry,self.old,self.archive,self.uid,
-                         self.parent_id,self.journal_id,self.entry_id,'isolated-attempt-0001',
+        return h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+                         self.parent_id,self.journal_id,self.entry_id,self.lock_id,'isolated-attempt-0001',
                          history_refs=self.history_refs,fault=fault)
 
     def test_legal_exchange_and_owned_rollback(self):
         self.assertEqual(self.execute()['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
-        self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_INTENT))
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_RESULT))
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
         finally:os.close(target)
@@ -106,13 +109,13 @@ class HandoffAdmission(unittest.TestCase):
 
     def test_wrong_identity_holds_without_stage(self):
         with self.assertRaisesRegex(h.Hold,'PARENT_IDENTITY_CHANGED'):
-            h.execute(self.parent,self.jfd,self.entry,self.old,self.archive,self.uid,[],self.journal_id,self.entry_id,'isolated-attempt-0001',history_refs=self.history_refs)
+            h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,[],self.journal_id,self.entry_id,self.lock_id,'isolated-attempt-0001',history_refs=self.history_refs)
         self.assertIsNone(h.childstat(self.jfd,h.STATE))
 
     def test_wrong_candidate_sha_holds(self):
         with self.assertRaisesRegex(h.Hold,'CANDIDATE_ARCHIVE_SHA'):h.execute(
-            self.parent,self.jfd,self.entry,self.old,b'bad',self.uid,self.parent_id,
-            self.journal_id,self.entry_id,'isolated-attempt-0001',history_refs=self.history_refs)
+            self.parent,self.jfd,self.entry,self.lease,self.old,b'bad',self.uid,self.parent_id,
+            self.journal_id,self.entry_id,self.lock_id,'isolated-attempt-0001',history_refs=self.history_refs)
         self.assertIsNone(h.childstat(self.jfd,h.STATE))
 
     def test_preintent_is_durable_before_stage_and_reopen_is_inspect_only(self):
@@ -121,7 +124,7 @@ class HandoffAdmission(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'PRESTAGE_STOP'):self.execute(fault)
         self.assertIsNotNone(h.childstat(self.jfd,h.PREINTENT))
         self.assertIsNone(h.childstat(self.parent,h.STAGE))
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'UNKNOWN_INSPECT_ONLY')
         with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
 
@@ -153,15 +156,15 @@ class HandoffAdmission(unittest.TestCase):
         self.execute()
         h.writefile(self.jfd,'active-attempt.json',b'INFLIGHT',self.uid)
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_CONFLICT'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_crash_after_intent_never_retries(self):
         def fault(where):
             if where=='intent_fsynced':raise RuntimeError('SYNTHETIC_CRASH')
         with self.assertRaisesRegex(RuntimeError,'SYNTHETIC_CRASH'):self.execute(fault)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'PREPARED_OR_REVERTED')
         with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
 
@@ -169,7 +172,7 @@ class HandoffAdmission(unittest.TestCase):
         def fault(where):
             if where=='after_exchange':raise RuntimeError('SYNTHETIC_AFTER')
         with self.assertRaisesRegex(h.Hold,'POST_SWITCH_UNKNOWN_INSPECT_ONLY'):self.execute(fault)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_foreign_replacement_refuses_rollback(self):
@@ -180,7 +183,7 @@ class HandoffAdmission(unittest.TestCase):
             try:os.write(file,b'BAD')
             finally:os.close(file)
         finally:os.close(fd)
-        with self.assertRaises(h.Hold):h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        with self.assertRaises(h.Hold):h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
     def test_contention_original_lock_holds(self):
         second=os.open(h.LOCK,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=self.jfd)
@@ -256,8 +259,8 @@ class HandoffAdmission(unittest.TestCase):
         other=os.open(copied,os.O_RDONLY|os.O_DIRECTORY)
         try:
             with self.assertRaisesRegex(h.Hold,'JOURNAL_PARENT_PATH_CHANGED'):
-                h.status(self.parent,other,self.entry,self.uid,self.old,self.new,
-                    self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+                h.status(self.parent,other,self.entry,self.lease,self.uid,self.old,self.new,
+                    self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
         finally:os.close(other)
 
     def test_rollback_fsync_failure_reconciles_without_replay(self):
