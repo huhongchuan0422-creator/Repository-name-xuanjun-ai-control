@@ -380,7 +380,7 @@ class Session:
                  and saved['host']==p.HOST and saved['mode']==MODE and saved['attempt']==attempt()
                  and saved['carrier_manifest_sha256']==self.approved_stamp==self.pins()
                  and saved['evidence_sha256']==evidence_sha
-                 and saved['plan']['attempt']==attempt()
+                 and type(saved['plan']) is dict and saved['plan'].get('attempt')==attempt()
                  and saved['plan_sha256']==saved['plan'].get('plan_sha256')
                  and saved['plan_document_sha256']==s.sha(s.canonical(saved['plan']))
                  and type(saved['issued_at']) is int and type(saved['expires_at']) is int
