@@ -20,6 +20,8 @@ STAGE='control-stopped-v1.handoff-stage-v1'
 RETAINED='control-stopped-v1.handoff-retained-old-v1'
 STATE='carrier-handoff-intent-v1.json'
 PREINTENT='carrier-handoff-preintent-v1.json'
+ROLLBACK_INTENT='carrier-handoff-rollback-intent-v1.json'
+ROLLBACK_RESULT='carrier-handoff-rollback-result-v1.json'
 LOCK='community-update.lock'
 OLD_MANIFEST='e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a'
 NEW_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
@@ -370,13 +372,31 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_ident
     lease=_locks(jfd,entryfd,uid,expected_entry_identity)
     try:
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,'ROLLBACK_CONFLICT')
+        need(childstat(jfd,ROLLBACK_INTENT) is None
+             and childstat(jfd,ROLLBACK_RESULT) is None,'ROLLBACK_ALREADY_ATTEMPTED')
         result=status(parent,jfd,uid,old_entries,new_entries)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
-        exchange(parent,TARGET,STAGE)
+        binding=journal(jfd,uid)
+        intent={'format':1,'attempt':binding['attempt'],
+                'old_identity':binding['old_identity'],
+                'new_identity':binding['stage_identity'],
+                'old_tree_sha':binding['old_tree_sha'],
+                'new_tree_sha':binding['new_tree_sha']}
+        writefile(jfd,ROLLBACK_INTENT,canonical(intent),uid)
+        need(childstat(jfd,'active-attempt.json') is None
+             and childstat(parent,RETAINED) is None
+             and ident(os.fstat(entryfd))==expected_entry_identity,
+             'ROLLBACK_BOUNDARY_CHANGED')
+        result=status(parent,jfd,uid,old_entries,new_entries)
+        need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_BOUNDARY_CHANGED')
+        try:exchange(parent,TARGET,STAGE)
+        except BaseException:raise Hold('ROLLBACK_EXCHANGE_UNKNOWN_INSPECT_ONLY') from None
         try:
             os.fsync(parent)
             result=status(parent,jfd,uid,old_entries,new_entries)
             need(result['state']=='PREPARED_OR_REVERTED','ROLLBACK_UNKNOWN')
+            writefile(jfd,ROLLBACK_RESULT,canonical({'format':1,'attempt':intent['attempt'],
+                     'result':'OLD_RESTORED_NEW_RETAINED','rollback_intent_sha256':sha(canonical(intent))}),uid)
             return {'state':'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED',
                     'retry_safe':False}
         except BaseException:raise Hold('ROLLBACK_UNKNOWN_INSPECT_ONLY')
