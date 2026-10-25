@@ -255,18 +255,18 @@ class WholeEntry(unittest.TestCase):
         self.assertIn('"plan":',output.getvalue())
         self.assertIn(candidate['attempt'],output.getvalue())
         self.assertEqual(result['phase'],'COMMITTED')
-        self.assertEqual(Path(h.C_APPROVAL).read_bytes(),old_c)
+        self.assertFalse(Path(h.C_APPROVAL).exists())
         self.assertTrue(Path(h.C_RESUME_PLAN).exists())
         self.assertTrue(Path(h.C_RESUME_APPROVAL).exists())
 
     def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
         q,historical=self._prepare_completed_b_before_c_proof()
-        bad,_=h.document(h.C_RESUME_APPROVAL)
-        self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
         with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
             q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
+        bad,_=h.document(h.C_RESUME_APPROVAL)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
         before=len(self.calls)
         with self.assertRaisesRegex(u.Hold,'EXACT_C_RESUME_APPROVAL_REQUIRED'):
             q.resume_c_before_confirmation()
@@ -300,11 +300,11 @@ class WholeEntry(unittest.TestCase):
 
     def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
         q,historical=self._prepare_completed_b_before_c_proof()
-        path=h.paths()['verify-f131'];saved=Path(path).read_bytes();Path(path).unlink()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
         with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
             q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
+        path=h.paths()['verify-f131'];saved=Path(path).read_bytes();Path(path).unlink()
         before=len(self.calls)
         with self.assertRaises(Exception):q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before);self.assertFalse(Path(h.PROOF).exists())
