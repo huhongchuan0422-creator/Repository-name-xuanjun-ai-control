@@ -676,6 +676,54 @@ jobs:
             docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
           retention-days: 14
+      - name: Build exact post-B C-resume delivery index
+        if: success() && steps.scope.outputs.resume_only == 'true'
+        run: |
+          set -euo pipefail
+          python - <<'INDEX'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path('deploy/community-preview/stopped-handoff-v1-delivery')
+          report=json.loads((root/'delivery.json').read_text())
+          head=os.environ['GITHUB_SHA']
+          assert report['candidate_commit']==head, 'CANDIDATE_COMMIT_MISMATCH'
+          required=[
+            root/'control-stopped-v1.zip',root/'manifest.json',
+            root/'resume-c-before-confirmation.sh',root/'delivery.json',
+            Path('scripts/community_preview_stopped_handoff.py'),
+            Path('scripts/community_preview_update_composition.py'),
+            Path('scripts/community_preview_update_checkpoint.py'),
+            Path('scripts/community_preview_release_plan.py'),
+            Path('tests/test_community_preview_stopped_handoff.py'),
+            Path('docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md')]
+          files={}
+          for path in required:
+              raw=path.read_bytes()
+              files[str(path)]=dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
+          index=dict(format=1,purpose='POST_B_C_RESUME_SOURCE_CANDIDATE_NOT_INSTALLED',
+              commit=head,tree=os.popen('git rev-parse HEAD^{tree}').read().strip(),
+              carrier_archive_sha256=hashlib.sha256((root/'control-stopped-v1.zip').read_bytes()).hexdigest(),
+              carrier_manifest_sha256=hashlib.sha256((root/'manifest.json').read_bytes()).hexdigest(),
+              install_authorized=False,site_executed=False,bc_executed=False,files=files)
+          (root/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\\n')
+          print(json.dumps(index,sort_keys=True))
+          INDEX
+      - name: Preserve exact post-B C-resume source candidate
+        if: success() && steps.scope.outputs.resume_only == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-post-b-c-resume-source
+          path: |
+            deploy/community-preview/stopped-handoff-v1-delivery/
+            scripts/community_preview_stopped_handoff.py
+            scripts/community_preview_update_composition.py
+            scripts/community_preview_update_checkpoint.py
+            scripts/community_preview_release_plan.py
+            tests/test_community_preview_stopped_handoff.py
+            docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Preserve stopped handoff proposal evidence (no site execution)
         if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]')
         uses: actions/upload-artifact@v4
