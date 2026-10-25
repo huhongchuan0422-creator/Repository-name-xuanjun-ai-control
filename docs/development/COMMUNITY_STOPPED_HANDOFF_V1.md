@@ -1,3 +1,54 @@
+## 2026-10-25 — Current fixed caller approval and input contract
+
+At the current source head, the fixed in-process entry is `scripts/community_preview_carrier_handoff_entry.py`. It no longer accepts an external `authority_checker` and is not a CLI. The original unique installation Writer calls `run('execute')`, `run('status')`, or `run('rollback')` only inside its already-authorized process. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
+
+Fixed input files (must already exist; code never creates or downloads them):
+- `/opt/xuanjun-community-preview/control-stopped-v1-1d639.zip`
+- `/opt/xuanjun-community-preview/control-stopped-v1-005c.zip`
+
+Each must be a root-owned regular file, mode 0600, single-link, opened with `O_NOFOLLOW|O_NONBLOCK`, stable FD/path identity, size at most 4 MiB, and match the exact archive SHA pins above. Missing/mismatched inputs HOLD. These fixed paths are a delivery precondition for the original installer; no transport or download route is created here.
+
+Short-lived approval record:
+- Fixed path: `/opt/xuanjun-community-preview/carrier-handoff-approval.json`.
+- Must be root-owned regular file, mode 0600, single link, no-follow/nonblocking open, at most 16 KiB, canonical compact sorted-key JSON, duplicate keys and non-finite values rejected, and the same FD/path identity must remain unchanged.
+- Exact schema (no additional/missing keys):
+```json
+{
+  "format": 1,
+  "host": "iZd7oeikknn1z21sq6ji6zZ",
+  "operation": "execute",
+  "attempt": "community-update-f13155ed63a3-818fe0b0622c-stopped-v1",
+  "old_archive_sha256": "5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4",
+  "old_manifest_sha256": "e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a",
+  "new_archive_sha256": "2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff",
+  "new_manifest_sha256": "d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd",
+  "issued_at": 1800000000,
+  "expires_at": 1800000300
+}
+```
+The example timestamps above are schema illustration only, **not a real approval**. The record must bind the exact requested operation and attempt, and satisfy `issued_at <= current_time <= expires_at <= issued_at + 600`. A separate fresh record is required for status or rollback; old B/C approvals cannot authorize this transaction. Re-read from the same FD and recheck FD/path identity, content, pins, operation and expiry immediately before dispatch. Missing, stale, replaced, malformed, or mismatched record is HOLD.
+
+The entry verifies the transaction and call module source SHA before loading/compiling those exact bytes from the fixed installed `control-stopped-v1/scripts` directory. Fixed source pins:
+- `community_preview_carrier_handoff_admission.py`: `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`.
+- `community_preview_carrier_handoff_call.py`: `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
+
+Original Writer invocation/result consumption:
+```python
+from scripts.community_preview_carrier_handoff_entry import run
+result = run('execute')  # one call only; consumes fixed inputs + current approval
+if result.get('state') != 'SWAPPED_OLD_RETAINED_IN_STAGE':
+    # Do not call execute again. Use a separately approved, read-only status call.
+    raise RuntimeError('HANDOFF_NOT_ACCEPTED_INSPECT_ONLY')
+# After any exception/UNKNOWN: separately approved run('status'), read-only.
+# A separately approved run('rollback') is allowed only by the transaction's
+# exact ownership/history/absence checks; no automatic rollback or retry.
+```
+No shell command or direct module execution is supplied because that would create a second entrypoint outside the original Writer. The existing `resume-b-partial.sh` remains unchanged and must not run before handoff acceptance and its separate B-resume gate.
+
+This is source/caller implementation only. The original installer has not been edited or invoked; no approval record is fabricated here. Required fixed input files and a fresh approval must be provisioned by the original installation owner after package review. `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 ### Exact fixed-entry source hashes at HEAD 29f401f2cef00fb7913858f27daca4378cc2bc22
 
 - `scripts/community_preview_carrier_handoff_entry.py`: 6557 bytes, SHA256 `14cda6843de950e8ef25d6a97ed7de08e5130a02920b85007b24804cf3ebfac1`.
