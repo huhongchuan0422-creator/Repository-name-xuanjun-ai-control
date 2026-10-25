@@ -338,8 +338,9 @@ class Session:
 
     def resume_c_before_confirmation(self):
         """Re-enter only the pre-proof C boundary for the same completed B attempt."""
-        need(self.journal is None and self.bdone is False,
-             'C_PRECONFIRMATION_RECOVERY_STATE_INVALID')
+        # A fresh process/session has bdone=False by design. Completed B is
+        # proven below from bound admission, snapshot/clone and manifest evidence.
+        need(self.journal is None,'C_PRECONFIRMATION_RECOVERY_STATE_INVALID')
         proof_path=PROOF
         active_path=u.JOURNAL_PARENT+'/active-attempt.json'
         attempt_path=u.JOURNAL_PARENT+'/'+attempt()
