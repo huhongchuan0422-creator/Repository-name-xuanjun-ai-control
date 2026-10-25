@@ -119,8 +119,16 @@ class HandoffAdmission(unittest.TestCase):
 
     def test_legal_exchange_and_owned_rollback(self):
         self.assertEqual(self.execute()['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
-                         'SWAPPED_OLD_RETAINED_IN_STAGE')
+        with self.assertRaisesRegex(h.Hold,'HISTORY_ABSENCE_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        # Independently verify the exchange already completed before the new
+        # active-attempt appeared; status refusal must not hide tree ownership.
+        binding=h.journal(self.jfd,self.uid)
+        self.assertEqual(h.tree(self.parent,h.TARGET,self.uid,self.new,binding['stage_identity']),
+                         binding['stage_identity'])
+        self.assertEqual(h.tree(self.parent,h.STAGE,self.uid,self.old,binding['old_identity']),
+                         binding['old_identity'])
         self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
                          'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
         self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_INTENT))
@@ -438,7 +446,7 @@ class HandoffAdmission(unittest.TestCase):
             if where=='staged':
                 os.unlink(h.ENTRY_NAME,dir_fd=self.parent)
                 h.writefile(self.parent,h.ENTRY_NAME,b'REPLACED_ENTRY',self.uid)
-        with self.assertRaisesRegex(h.Hold,'ORIGINAL_ENTRY_FD_PATH_CHANGED'):
+        with self.assertRaisesRegex(h.Hold,'FINAL_LEASE_OR_PARENT_CHANGED'):
             self.execute(fault)
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
