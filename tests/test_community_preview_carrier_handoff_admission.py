@@ -86,6 +86,26 @@ class HandoffAdmission(unittest.TestCase):
             self.entry_id,'isolated-attempt-0001')
         self.assertIsNone(h.childstat(self.jfd,h.STATE))
 
+    def test_preintent_is_durable_before_stage_and_reopen_is_inspect_only(self):
+        def fault(where):
+            if where=='preintent_fsynced':raise RuntimeError('PRESTAGE_STOP')
+        with self.assertRaisesRegex(RuntimeError,'PRESTAGE_STOP'):self.execute(fault)
+        self.assertIsNotNone(h.childstat(self.jfd,h.PREINTENT))
+        self.assertIsNone(h.childstat(self.parent,h.STAGE))
+        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+                         'UNKNOWN_INSPECT_ONLY')
+        with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
+
+    def test_active_attempt_prevents_first_persistent_write(self):
+        h.writefile(self.jfd,'active-attempt.json',b'UNKNOWN_ACTIVE',self.uid)
+        with self.assertRaisesRegex(h.Hold,'ACTIVE_BUSINESS_ATTEMPT'):self.execute()
+        self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
+
+    def test_changed_old_member_holds_before_intent(self):
+        self.old['loader.py']=b'NOT_OLD_LOADER'
+        with self.assertRaisesRegex(h.Hold,'TREE_BYTES_CHANGED'):self.execute()
+        self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
+
     def test_crash_after_intent_never_retries(self):
         def fault(where):
             if where=='intent_fsynced':raise RuntimeError('SYNTHETIC_CRASH')
