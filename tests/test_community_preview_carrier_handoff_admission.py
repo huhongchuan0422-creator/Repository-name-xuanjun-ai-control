@@ -7,9 +7,9 @@ class HandoffAdmission(unittest.TestCase):
         with self.assertRaisesRegex(h.Hold,'OLD_INSTALLED_MANIFEST_UNPROVEN'):
             h.verify_inputs(b'BAD',b'NEW',b'{}')
 
-    def test_live_switch_always_holds(self):
-        with self.assertRaisesRegex(h.Hold,'LIVE_HANDOFF_NOT_AUTHORIZED_OR_IMPLEMENTED'):
-            h.execute()
+    def test_live_switch_unqualified_holds(self):
+        with self.assertRaisesRegex(h.Hold,'ISOLATED_EXECUTION_IDENTITY_REQUIRED'):
+            h.execute(None,None,None,None,None)
 
     def test_rollback_always_holds(self):
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_OWNERSHIP_NOT_PROVEN'):
