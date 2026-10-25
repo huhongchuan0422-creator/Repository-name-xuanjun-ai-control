@@ -25,6 +25,8 @@ B_RESUME_APPROVAL='/opt/xuanjun-community-preview/bc-b-resume-approval.json'
 RESUME_FREEZE='/opt/xuanjun-community-preview/writer-freeze-resume-reference.json'
 B_RESUME_STAGE_PERMIT='/opt/xuanjun-community-preview/site-prepare-resume-approval.json'
 C_APPROVAL='/opt/xuanjun-community-preview/bc-c-approval.json'
+C_RESUME_APPROVAL='/opt/xuanjun-community-preview/bc-c-resume-approval.json'
+C_RESUME_PLAN=s.BACKUP+'/c-preconfirmation-resume-plan.json'
 MANIFEST=CONTROL+'/manifest.json'
 PROOF=s.BACKUP+'/stopped-handoff-v1.json'
 C_ACTIONS=['STOPPED_HANDOFF_RENAME_RUN','KNOWN_FAILURE_SERIAL_RECOVERY','JOURNAL_WRITES']
@@ -430,7 +432,7 @@ class Session:
             need(raw(self.freeze_path,16384)==self.freeze,'FREEZE_REPLACED')
             pre=self.journal is None or self.journal.state['phase'] in ('PREPARED','STOPPED_HANDOFF_ACCEPTED',
                 'OLD_RENAME_INTENT','OLD_RETAINED','NEW_RUN_INTENT')
-            if not self.recovering and pre:window(s.exact_json(self.freeze))
+            if not self.recovering and pre and not getattr(self,'c_preconfirm_mode',False):window(s.exact_json(self.freeze))
     def freeze_live(self):
         f,b=document(self.freeze_path,16384)
         need(b==self.freeze and set(f)=={'format','host','old_id','old_image','roots','issued_at','expires_at',
