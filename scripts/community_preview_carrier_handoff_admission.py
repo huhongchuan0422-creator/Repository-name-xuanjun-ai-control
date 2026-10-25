@@ -560,7 +560,7 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
         capture_history(history_refs,uid,parent,jfd,mode)
         need(childstat(jfd,rollback_intent_name) is None
              and childstat(jfd,rollback_result_name) is None,'ROLLBACK_ALREADY_ATTEMPTED')
-        result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs)
+        result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs,mode=mode)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
         binding=journal(jfd,uid,state_name)
         history=capture_history(history_refs,uid,parent,jfd,mode)
@@ -580,7 +580,7 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
         need(capture_history(history_refs,uid,parent,jfd,mode)==history,'ROLLBACK_HISTORY_CHANGED')
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,retained_name) is None,
              'ROLLBACK_CONFLICT')
-        result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs)
+        result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs,mode=mode)
         need(result['state']=='ROLLBACK_NOT_APPLIED_RESULT_UNKNOWN'
              and childstat(jfd,rollback_intent_name) is not None
              and childstat(jfd,rollback_result_name) is None
