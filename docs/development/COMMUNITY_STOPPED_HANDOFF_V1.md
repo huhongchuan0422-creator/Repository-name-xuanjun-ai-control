@@ -4,7 +4,7 @@ The fixed caller now verifies and compiles the exact hash-pinned transaction/cal
 
 
 
-At the current source head, the fixed caller is `scripts/community_preview_carrier_handoff_entry.py` (current hash/size recorded below). It reads only fixed old/new input filenames, validates both archive pins, verifies and loads exact hash-pinned transaction/call module bytes from the protected parent, and reads a short-lived operation-bound approval record. It has a fixed CLI with no approval bypass flags; root/admin identity alone is not authorization. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
+At the current source head, the fixed caller is `scripts/community_preview_carrier_handoff_entry.py`, 16414 UTF-8 bytes, SHA256 `a1ae8e2f290da83e6ce6b095721007e31513568fe440aaddff286e7e5a842071`. It reads only fixed old/new input filenames, validates both archive pins, verifies and loads exact hash-pinned transaction/call module bytes from the protected parent, and reads a short-lived operation-bound approval record. It has a fixed CLI with no approval bypass flags; root/admin identity alone is not authorization. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
 
 Fixed input files (must already exist; code never creates or downloads them):
 - `/opt/xuanjun-community-preview/control-stopped-v1-1d639.zip`
@@ -50,92 +50,23 @@ This is source/caller implementation only. The original installer has not been e
 
 ---
 
-### Exact fixed-entry source hashes at current caller source revision (see latest branch HEAD)
+### Current fixed caller hashes and acceptance boundary
 
-- `scripts/community_preview_carrier_handoff_entry.py`: 14377 bytes, SHA256 `0c7736143a9405a3395955e589ec0932fa9db30481b3fbc08cbbca001d21f099`.
-- `tests/test_community_preview_carrier_handoff_entry.py`: 2243 bytes, SHA256 `aacd02f48996b5d0dac448b81236e3ed4aa157b7cdc5264b35ccea42bc4a06b1`.
-- `tests/test_community_preview_carrier_handoff_admission.py`: 34113 bytes, SHA256 `5085c8111211be4cc289e75f0205f395dd6fa380e34ff3b4826b4f42246f9995`.
-- CI stage: two verified original artifacts; parse and execute 38 transaction tests (36 previously verified plus 2 actual adapter/fixed-entry on-disk integration cases), 5 adapter tests, and 5 fixed-entry guard tests; exact-HEAD Hosted status must be verified independently.
-- External execution constraint: there is no currently bound and independently approved `authority_checker` at the unique installation Writer. The in-process call refuses without it; root/admin identity is not authorization. The current source delivery contains no standalone production shell command, because inventing one would bypass that gate.
-- Isolated cross-check: 48/48 on reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; this is not exact-head Hosted acceptance and does not verify Python 3.6.8.
+- Caller `scripts/community_preview_carrier_handoff_entry.py`: 16414 bytes, SHA256 `a1ae8e2f290da83e6ce6b095721007e31513568fe440aaddff286e7e5a842071`, Git blob `de68be5edc296297b2ddd1b0cb449a2254411fba`.
+- Transaction module `scripts/community_preview_carrier_handoff_admission.py`: 35329 bytes, SHA256 `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`.
+- Call module `scripts/community_preview_carrier_handoff_call.py`: 3461 bytes, SHA256 `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
+- Entry tests `tests/test_community_preview_carrier_handoff_entry.py`: 10492 bytes, SHA256 `21f65643cc66a047dc4b72447f0ef59366b25466b1be81e513cbb337a464593c`.
+- Existing fixed `resume-b-partial.sh`: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`; unchanged.
 
-## Issue76 fixed protected entry handoff material — source-only
+The fixed caller no longer accepts an external `authority_checker`. It reads the exact old/new archives from fixed root-owned 0600 single-link files, validates archive/manifest pins, loads only transaction/call modules matching pinned SHA from the protected parent, and requires the fixed short-lived approval record for the requested operation. The approval schema above is illustrative only; no real approval is embedded in source. Missing/expired/mismatched approval or input holds before transaction mutation.
 
-- `scripts/community_preview_carrier_handoff_entry.py`: fixed in-process `run(operation, authority_checker, old_archive_bytes, new_archive_bytes)`. The existing **single installation Writer** must supply an independently verified and current action-authority checker; root/admin sudo/loginuid identity **alone never authorizes execution**.
-- `scripts/community_preview_carrier_handoff_call.py`: existing dispatch adapter, with the correct `rollback` argument order; it must not be executed as an independent shell entry.
-- `tests/test_community_preview_carrier_handoff_entry.py` and the fixed fixture's `test_fixed_entry_real_exchange_and_rollback_in_isolated_directory`: test host/authority failure, exact archive pins, true isolated on-disk exchange and rollback via the entry, and duplicate rollback HOLD.
-- Fixed UK authority identity: host `iZd7oeikknn1z21sq6ji6zZ`, root through original `admin → sudo -n` with matching `SUDO_USER/SUDO_UID/SUDO_GID` and kernel `loginuid`.
-- Fixed protected parent `/opt/xuanjun-community-preview`; original journal `/opt/xuanjun-community-preview/update-journal`; original ENTRY `site-prepare-v1.py`; original lease `community-update.lock`. Existing files are opened `NOFOLLOW` and checked by fd and path identity; no new lock namespace or Session.acquire.
-- Original 1d carrier archive: `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`; manifest `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
-- Reviewed 005c carrier archive: `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`; manifest `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
-- Existing `resume-b-partial.sh` remains unchanged: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`. It is **not** part of the carrier exchange and must never execute before the new carrier is independently accepted and B-resume's separate authorization gate is met.
-
-**Fixed in-process call, not a live CLI**:
-
-```python
-from scripts.community_preview_carrier_handoff_entry import run
-# Called by the independently authorized original unique Writer:
-result = run('execute', existing_action_authority_checker,
-             verified_old_archive_bytes, verified_new_archive_bytes)
-# An uncertain result is not retried; use the original same-entry 'status'.
-# 'rollback' is a distinct action requiring its own approval and exact ownership.
+Fixed command (only in the original unique installer's execution slot; do not manually run during review):
+```bash
+sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py execute
 ```
+On UNKNOWN, do not repeat execute. Obtain a fresh operation-bound status approval and call `status` read-only. Rollback requires a separate operation-bound approval and the transaction's exact ownership/history/absence guards. No approval bypass flags exist.
 
-`existing_action_authority_checker` must verify an actual protected Owner approval for the specific operation/host/attempt in the single original execution chain. It cannot be replaced with a new lambda, asserted flag, simulated permit or saved chat receipt. This exact integration and the contemporary live authorization are external to this source candidate: **MISSING means HOLD**. The adapter is not a production authorization mechanism.
-
-All operations preserve original B-intent, expired permissions, freeze/history and old carrier. `UNKNOWN` means only read-only reconstruction, never automatic execute replay or emergency service start. Python3.6.8 verified environment: `REAL_PYTHON_3_6_8=NOT_RUN`.
-
----
-
-## 2026-10-25 — Fixed original-entry call material (source-only)
-
-Latest adapter candidate files:
-- `scripts/community_preview_carrier_handoff_call.py`: 3461 bytes, SHA256 `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
-- `tests/test_community_preview_carrier_handoff_call.py`: 2838 bytes, SHA256 `87ed798ad7189bc946ad05c8c15217f3089a904cc743216fe3c6b667d62c06cf`.
-- Original transaction module SHA256 `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`, 35329 bytes.
-- Existing fixed resume script is reused without modification: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`.
-
-Fixed source pins:
-- Host identifier: `iZd7oeikknn1z21sq6ji6zZ`.
-- Parent target: `/opt/xuanjun-community-preview/control-stopped-v1`.
-- Old archive SHA256 `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`; old manifest SHA256 `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
-- New archive SHA256 `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`; new manifest SHA256 `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
-- Historical outer artifacts: old 107650 bytes/SHA256 `a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956`; new 117926 bytes/SHA256 `f529ca439a9decc95efa4cf4f93391e0ba93719565ad952629d752ef7640ca34`.
-
-Fixed call surface from the already-authorized original entry (not a shell/CLI):
-```python
-from scripts.community_preview_carrier_handoff_call import (
-    call_once_from_original_entry,
-    reconcile_from_original_entry,
-    rollback_from_original_entry,
-)
-
-# original_entry_context must be the original entry's live context:
-# parent_fd, journal_fd, ENTRY fd, original lease fd, freshly read identity
-# witnesses, immutable old/new archive bytes, and history_refs acquired by
-# that original entry. It must supply its existing authority_check callback.
-result = call_once_from_original_entry(original_entry_context)
-# If result/transport is UNKNOWN, do not call execute again:
-result = reconcile_from_original_entry(original_entry_context)  # read-only
-# Rollback only after independent review proves the exact module conditions:
-# rollback_from_original_entry(original_entry_context)
-```
-
-No direct `python module.py` command is supported. The adapter intentionally does not open production paths, manufacture identity witnesses, create approvals, or call `Session.acquire`/B/C hooks. It accepts only the already-held original entry FDs and its own authority verifier. The original installation entry's context-construction call site is not present in this repository source candidate; therefore the adapter is auditable call material, but **not yet proof of a complete live call chain**. Do not invoke it until the original installer binds the real context; do not invent that context from historical artifact metadata.
-
-Safe stop/reconcile contract:
-1. Before execute, the original entry verifies its existing authority, exact host, fixed old/new archive+manifest pins, parent/journal/ENTRY/lease identities, original history refs, and absence of transaction/active-attempt conflicts.
-2. Call execute exactly once. Only `SWAPPED_OLD_RETAINED_IN_STAGE` with `retry_safe=False` is accepted.
-3. Any exception or UNKNOWN is reconciled only through read-only `status`; never repeat execute.
-4. Rollback is a separate explicit call only when status proves the current tree and retained stage are exactly this transaction's new/old trees, history and identities remain unchanged, no active-attempt or retained-path conflict exists, and no prior rollback intent/result exists. Any UNKNOWN or identity/history mismatch means HOLD.
-5. No B/C execution, permit creation/renewal, intent deletion, service start/stop, or carrier operation is part of this call.
-
-Local/CI syntax command:
-`python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py`
-Isolated command:
-`PYTHONPATH=. python -B -m unittest tests.test_community_preview_carrier_handoff_admission tests.test_community_preview_carrier_handoff_call -v`
-
-Current CI for this call-material candidate must be checked against its exact pushed HEAD. No live execution is authorized. `REAL_PYTHON_3_6_8=NOT_RUN`.
+The earlier 48/48 local evidence was from reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; it is **not** an exact-current-HEAD Hosted result. Current exact HEAD CI/raw log is not verified by the available connector. `REAL_PYTHON_3_6_8=NOT_RUN`. The original installation operator must deliver exact caller/module/input files through the already-approved delivery path and create a real short-lived approval only after package review and explicit per-operation site approval. No production action was performed by this source task.
 
 ---
 
