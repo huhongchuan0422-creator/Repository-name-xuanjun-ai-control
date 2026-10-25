@@ -1,3 +1,31 @@
+## Issue76 fixed protected entry handoff material — source-only
+
+- `scripts/community_preview_carrier_handoff_entry.py`: fixed in-process `run(operation, authority_checker, old_archive_bytes, new_archive_bytes)`. The existing **single installation Writer** must supply an independently verified and current action-authority checker; root/admin sudo/loginuid identity **alone never authorizes execution**.
+- `scripts/community_preview_carrier_handoff_call.py`: existing dispatch adapter, with the correct `rollback` argument order; it must not be executed as an independent shell entry.
+- `tests/test_community_preview_carrier_handoff_entry.py` and the fixed fixture's `test_fixed_entry_real_exchange_and_rollback_in_isolated_directory`: test host/authority failure, exact archive pins, true isolated on-disk exchange and rollback via the entry, and duplicate rollback HOLD.
+- Fixed UK authority identity: host `iZd7oeikknn1z21sq6ji6zZ`, root through original `admin → sudo -n` with matching `SUDO_USER/SUDO_UID/SUDO_GID` and kernel `loginuid`.
+- Fixed protected parent `/opt/xuanjun-community-preview`; original journal `/opt/xuanjun-community-preview/update-journal`; original ENTRY `site-prepare-v1.py`; original lease `community-update.lock`. Existing files are opened `NOFOLLOW` and checked by fd and path identity; no new lock namespace or Session.acquire.
+- Original 1d carrier archive: `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`; manifest `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
+- Reviewed 005c carrier archive: `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`; manifest `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
+- Existing `resume-b-partial.sh` remains unchanged: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`. It is **not** part of the carrier exchange and must never execute before the new carrier is independently accepted and B-resume's separate authorization gate is met.
+
+**Fixed in-process call, not a live CLI**:
+
+```python
+from scripts.community_preview_carrier_handoff_entry import run
+# Called by the independently authorized original unique Writer:
+result = run('execute', existing_action_authority_checker,
+             verified_old_archive_bytes, verified_new_archive_bytes)
+# An uncertain result is not retried; use the original same-entry 'status'.
+# 'rollback' is a distinct action requiring its own approval and exact ownership.
+```
+
+`existing_action_authority_checker` must verify an actual protected Owner approval for the specific operation/host/attempt in the single original execution chain. It cannot be replaced with a new lambda, asserted flag, simulated permit or saved chat receipt. This exact integration and the contemporary live authorization are external to this source candidate: **MISSING means HOLD**. The adapter is not a production authorization mechanism.
+
+All operations preserve original B-intent, expired permissions, freeze/history and old carrier. `UNKNOWN` means only read-only reconstruction, never automatic execute replay or emergency service start. Python3.6.8 verified environment: `REAL_PYTHON_3_6_8=NOT_RUN`.
+
+---
+
 ## 2026-10-25 — Fixed original-entry call material (source-only)
 
 Latest adapter candidate files:
