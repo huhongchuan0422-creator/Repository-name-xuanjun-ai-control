@@ -135,7 +135,10 @@ class HandoffAdmission(unittest.TestCase):
             'resume_admission':h.canonical(admission),'c_approval':b'OLD_C_APPROVAL'}
         for key,body in records.items():
             pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
-            name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
+            name=h.HISTORY_NAMES[key]
+            try:os.unlink(name,dir_fd=pfd)
+            except FileNotFoundError:pass
+            h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
             refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
         os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
