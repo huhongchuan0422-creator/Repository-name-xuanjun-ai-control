@@ -212,6 +212,23 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'INDEPENDENT_CHANGE_REVIEW'):
             developer.review_change('role-change','developer-1',True,'review')
 
+    def test_scope_approval_invalidates_if_reviewer_later_becomes_executor(self):
+        self.prepare();self.policy.propose_change('later-executor','demo-b',
+          'asset-v1',['DEPLOY'],'x')
+        ModelControl(self.gateway,self.context,Fernet.generate_key())
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','developer-later'))
+        reviewer.review_change('later-executor','developer-later',True,'review')
+        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
+          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
+          (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','developer',
+          'v1','developer-later','p','m','ACTIVE','test',time.time()))
+        self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'CHANGE_REVIEWER_ROLE_CONFLICT'):
+            self.policy.request_action(self.action(scope='DEPLOY',
+              change_id='later-executor'))
+
     def test_accepted_request_never_claims_external_execution(self):
         self.prepare();result=self.policy.request_action(self.action())
         self.assertEqual(result['external_execution'],'NOT_EXECUTED')

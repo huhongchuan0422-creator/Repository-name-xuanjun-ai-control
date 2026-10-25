@@ -242,6 +242,17 @@ class ExecutionPolicyGateway(object):
             if (change['attempt_id']!=task['attempt_id'] or
                     change['writer_principal']!=task['authority_caller_id']):
                 raise ValueError('CHANGE_ATTEMPT_BINDING_MISMATCH')
+            model_tables=self.db.execute('''SELECT COUNT(*) FROM sqlite_master
+              WHERE type='table' AND name IN ('model_assignments',
+              'role_templates')''').fetchone()[0]
+            if model_tables==2 and self.db.execute('''SELECT 1 FROM
+              model_assignments a JOIN role_templates r ON
+              r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND
+              r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=?
+              AND a.attempt_id=? AND a.principal_id=? AND r.phase='EXECUTOR'
+              LIMIT 1''',(self.tenant_id,value['task_id'],task['attempt_id'],
+              change['reviewed_by'])).fetchone() is not None:
+                raise ValueError('CHANGE_REVIEWER_ROLE_CONFLICT')
             if change['base_asset_version']!=unit['asset_version']:
                 raise ValueError('CHANGE_BASE_ASSET_VERSION_MISMATCH')
         auth=self.db.execute('''SELECT * FROM action_authorizations WHERE
