@@ -110,9 +110,9 @@ class HandoffAdmission(unittest.TestCase):
         required={'snapshot_result':b'B_SNAPSHOT_RESULT','snapshot_permit':b'B_SNAPSHOT_PERMIT',
             'validate_clones_result':b'B_CLONE_RESULT','validate_clones_permit':b'B_CLONE_PERMIT',
             'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE','resume_stage_permit':b'B_RESUME_STAGE_PERMIT','resume_admission':b'B_RESUME_ADMISSION',
-            'backup_dir':None,'c_approval':b'OLD_C_APPROVAL'}
+            'backup_dir':None,'backup_manifest':None,'backup_clone_results':None,'c_approval':b'OLD_C_APPROVAL'}
         for key,body in required.items():
-            if key=='backup_dir':continue
+            if key in ('backup_dir','backup_manifest','backup_clone_results'):continue
             pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
             name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
@@ -120,6 +120,17 @@ class HandoffAdmission(unittest.TestCase):
         os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
         st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
         refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
+        backup_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:
+            bodies={'backup_manifest':h.canonical(dict(format=1,mode=h.POST_B_MODE,attempt=h.ORIGINAL_ATTEMPT,
+                    files=['clone-results.json'],source='completed-B-fixture')),
+                    'backup_clone_results':h.canonical(dict(format=1,mode=h.POST_B_MODE,attempt=h.ORIGINAL_ATTEMPT,
+                    tested_at=1000,clones=['restore-old','verify-f131','verify-downgrade']))}
+            for key,body in bodies.items():
+                name=h.HISTORY_NAMES[key];h.writefile(backup_fd,name,body,self.uid)
+                item=os.stat(name,dir_fd=backup_fd,follow_symlinks=False)
+                refs[key]=(backup_fd,name,h.parent_ident(os.fstat(backup_fd)),h.ident(item),h.sha(body))
+        finally:os.close(backup_fd)
         return refs
 
     def post_b_fixture(self):
