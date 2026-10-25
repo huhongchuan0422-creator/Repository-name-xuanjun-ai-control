@@ -36,9 +36,10 @@ class PreparationSteps(unittest.TestCase):
     def tearDown(self):self.stack.close();self.tmp.cleanup()
     def private(self,path,body):path=Path(path);path.write_bytes(body);path.chmod(0o600)
     def stage_carrier(self):
-        raw,m=carrier.build();self.private(self.input/'control-oci2330-v1.zip',raw)
-        # Only installation target path is fixture-specific; archived bytes are
-        # frozen b789, so patch target constant back via an isolated ZIP target.
+        raw=Path('deploy/community-preview/control-oci2330-v1.zip').read_bytes()
+        m=Path('deploy/community-preview/control-oci2330-v1-manifest.json').read_bytes()
+        self.assertEqual(len(raw),111330);self.assertEqual(s.sha(raw),s.CARRIER_SHA);self.assertEqual(s.sha(m),s.CARRIER_MANIFEST)
+        self.private(self.input/'control-oci2330-v1.zip',raw)
         return raw,m
     def snapshot(self):
         with patch.object(s,'stopped') as stop:r=s.snapshot({'all_writers_frozen_evidence_sha256':'a'*64})
@@ -216,7 +217,7 @@ class PreparationSteps(unittest.TestCase):
         with patch.object(s,'authorize') as a,patch.object(s,'capture') as c,contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(s.main([]),2);a.assert_not_called();c.assert_not_called()
     def test_exact_frozen_carrier_and_unchanged_controller_product(self):
-        raw,m=carrier.build();self.assertEqual(len(raw),111330);self.assertEqual(s.sha(raw),s.CARRIER_SHA);self.assertEqual(s.sha(m),s.CARRIER_MANIFEST)
+        raw,m=self.stage_carrier()
         self.assertEqual(json.loads(m)['files']['scripts/community_preview_update_composition.py']['sha256'],'f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1')
     def test_stage_permit_exact_host_file_hash_scope_and_timing(self):
         p=self.permit();self.assertEqual(self.auth(p)['stage'],'install')
@@ -241,8 +242,8 @@ class PreparationSteps(unittest.TestCase):
         link=self.base/'alias';link.symlink_to(self.data,target_is_directory=True)
         with self.assertRaises((s.Hold,OSError)):s.directory(str(link))
     def test_install_exact_carrier_without_changing_service_or_existing_paths(self):
-        self.stage_carrier();r=s.install()
-        self.assertFalse(r['update_executed']);self.assertEqual(Path(s.INSTALL+'/manifest.json').read_bytes(),carrier.build()[1])
+        _,manifest=self.stage_carrier();r=s.install()
+        self.assertFalse(r['update_executed']);self.assertEqual(Path(s.INSTALL+'/manifest.json').read_bytes(),manifest)
         self.assertEqual(Path(s.INSTALL+'/loader.py').stat().st_mode&0o777,0o600)
         self.assertEqual((self.base/'update-journal').stat().st_mode&0o777,0o700)
         with self.assertRaisesRegex(s.Hold,'EXISTING_INSTALL'):s.install()
