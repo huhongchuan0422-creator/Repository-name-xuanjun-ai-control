@@ -1,12 +1,16 @@
-## 2026-10-25 Carrier handoff status: HOLD (source review only)
+## 2026-10-25 — old-to-new carrier handoff candidate (NOT ACCEPTED)
 
-The existing install-stopped-v1.sh and community_preview_bc_install.py are NOT APPLICABLE to the installed-to-new upgrade. They pin the older archive 5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4 and manifest e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a and require an absent target.
+Current source-only branch candidate: `1e1ebbecca5ed3c0e66ba020491c81efe7f194a6` (latest branch HEAD at time of this note; Tree and Hosted result must be checked against the final HEAD).
 
-The replacement candidate archive digest is 2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff; candidate manifest digest d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd. No live replacement is authorized.
+- Installed historical carrier: archive SHA256 `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4`, manifest SHA256 `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a`.
+- New fixed candidate: archive SHA256 `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`, manifest SHA256 `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
+- Exact nested source fixtures are retrieved read-only from original GitHub artifacts: run `40125347707`, artifact `12572781194`, outer SHA256 `a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956`; and run `40160005255`, artifact `12586026477`, outer SHA256 `f529ca439a9decc95efa4cf4f93391e0ba93719565ad952629d752ef7640ca34`. CI verifies both outer ZIPs and nested archive/manifest digests before using the nested full-tree fixtures.
 
-scripts/community_preview_carrier_handoff_admission.py is a SOURCE-ONLY digest admission prototype. Its execute and rollback entrypoints deliberately HOLD. It does not yet prove fresh installed identity, unique writer lease, durable journal, crash recovery, atomic transition or rollback ownership. Old B intent, original carrier, expired approvals and historical failure evidence must be preserved. No implicit B/C execution or permit reuse is allowed.
+`scripts/community_preview_carrier_handoff_admission.py` now contains a real isolated-directory transaction candidate: full manifest/member binding, durable pre-intent before staging, exclusive non-overwrite stage creation, nested directory/file fsync, original ENTRY/journal/lock FD/path checks, fixed historical B-intent/approval/freeze/permit identity binding, atomic directory exchange, read-only state reconstruction, and separately journalled one-shot rollback. Failure after exchange or rollback is UNKNOWN and cannot be blindly replayed. Tests use temporary directories only; no production path is opened by a CLI and no B/C hook is called.
 
-Python 3.6.8 check requires a separately approved already existing isolated genuine interpreter with provenance verification, not the UK production host; do not download, install or simulate. REAL_PYTHON_3_6_8=NOT_RUN.
+**Not accepted for production.** The candidate still requires independent review of the exact final source and actual Hosted logs. A CI status query that returns no push-run rows is UNKNOWN, not PASS. No UK live identity or authorization is inferred from artifact fixtures. No installed carrier has been switched, and historical intent/approval/freeze/permit files have not been altered.
+
+`REAL_PYTHON_3_6_8=NOT_RUN`: no approved isolated genuine CPython 3.6.8 environment is available. Do not install/download an interpreter or use the UK production host for compatibility testing.
 
 ---
 # STOPPED_HANDOFF_V1 — current verified source candidate and historical proposal
