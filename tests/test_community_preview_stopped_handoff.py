@@ -236,29 +236,31 @@ class WholeEntry(unittest.TestCase):
 
     def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
-        bad,_=h.document(h.C_APPROVAL)
-        self.write(h.C_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
+        bad,_=h.document(h.C_RESUME_APPROVAL)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
         before=len(self.calls)
         with self.assertRaisesRegex(u.Hold,'ORIGINAL_C_PLAN_EVIDENCE_MISSING'):
             q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
-        bad,_=h.document(h.C_APPROVAL)
-        self.write(h.C_APPROVAL,s.canonical(dict(bad,issued_at=1,expires_at=2)))
+        bad,_=h.document(h.C_RESUME_APPROVAL)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,issued_at=1,expires_at=2)))
         with self.assertRaises(u.Hold):q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
 
-    def test_c_preconfirmation_observed_at_drift_holds_without_forging_original_plan(self):
+    def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
         before=len(self.calls)
+        self.clock += 1
         real=c.read_current
         def drift(*args,**kwargs):
             value=real(*args,**kwargs)
             value=dict(value,observed_at=value['observed_at']+1)
             return value
         with patch.object(c,'read_current',side_effect=drift):
-            with self.assertRaisesRegex(u.Hold,'ORIGINAL_C_PLAN_EVIDENCE_MISSING'):
-                q.resume_c_before_confirmation()
+            result=q.resume_c_before_confirmation()
+        self.assertEqual(result['phase'],'COMMITTED')
+        self.assertEqual(q.journal.plan['plan_sha256'],candidate['plan_sha256'])
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
         self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
@@ -282,8 +284,8 @@ class WholeEntry(unittest.TestCase):
         q,candidate=self._prepare_completed_b_before_c_proof()
         before=len(self.calls)
         def revoke(_action,_digest):
-            value,_=h.document(h.C_APPROVAL)
-            self.write(h.C_APPROVAL,s.canonical(dict(value,plan_sha256='0'*64)))
+            value,_=h.document(h.C_RESUME_APPROVAL)
+            self.write(h.C_RESUME_APPROVAL,s.canonical(dict(value,plan_sha256='0'*64)))
         with patch.object(h,'acknowledge',side_effect=revoke):
             with self.assertRaisesRegex(u.Hold,'C_APPROVAL_REVOKED|EXACT_C_APPROVAL_REQUIRED'):
                 q.resume_c_before_confirmation()
