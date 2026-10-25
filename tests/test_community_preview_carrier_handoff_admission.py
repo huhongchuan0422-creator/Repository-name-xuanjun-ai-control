@@ -114,19 +114,19 @@ class HandoffAdmission(unittest.TestCase):
             roots=[site.DATA+'/data',site.DATA+'/config'],issued_at=1000,expires_at=1600,
             all_writers_frozen=True,owner_review_reference_sha256='f'*64)
         freeze_raw=h.canonical(freeze)
-        old_approval=dict(format=1,host=h.HOST,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+        old_approval=dict(format=1,host=h.HOST,mode='STOPPED_HANDOFF_V1',attempt=attempt,carrier_manifest_sha256='a'*64,
             issued_at=1000,expires_at=1600,freeze_sha256=h.sha(freeze_raw),actions=['SNAPSHOT','THREE_ISOLATED_CLONES'])
         old_approval_raw=h.canonical(old_approval)
-        intent=dict(format=1,mode=h.MODE,attempt=attempt,approval_sha256=h.sha(old_approval_raw),freeze_sha256=h.sha(freeze_raw))
+        intent=dict(format=1,mode='STOPPED_HANDOFF_V1',attempt=attempt,approval_sha256=h.sha(old_approval_raw),freeze_sha256=h.sha(freeze_raw))
         intent_raw=h.canonical(intent)
         resume_freeze=dict(freeze,issued_at=1700,expires_at=2300,owner_review_reference_sha256='e'*64)
         resume_freeze_raw=h.canonical(resume_freeze)
-        resume_approval=dict(format=1,host=h.HOST,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+        resume_approval=dict(format=1,host=h.HOST,mode='STOPPED_HANDOFF_V1',attempt=attempt,carrier_manifest_sha256='a'*64,
             issued_at=1700,expires_at=2300,old_b_intent_sha256=h.sha(intent_raw),
             old_b_approval_sha256=h.sha(old_approval_raw),old_freeze_sha256=h.sha(freeze_raw),
             old_stage_permit_sha256=None,resume_freeze_sha256=h.sha(resume_freeze_raw),actions=actions)
         resume_approval_raw=h.canonical(resume_approval)
-        admission=dict(format=1,mode=h.MODE,attempt=attempt,carrier_manifest_sha256='a'*64,
+        admission=dict(format=1,mode='STOPPED_HANDOFF_V1',attempt=attempt,carrier_manifest_sha256='a'*64,
             old_b_intent_sha256=h.sha(intent_raw),old_b_approval_sha256=h.sha(old_approval_raw),
             old_freeze_sha256=h.sha(freeze_raw),old_stage_permit_sha256=None,
             resume_approval_sha256=h.sha(resume_approval_raw),resume_freeze_sha256=h.sha(resume_freeze_raw),actions=actions)
