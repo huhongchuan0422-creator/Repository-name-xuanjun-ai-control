@@ -47,7 +47,13 @@ def invoke(ctx, operation):
             ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
             ctx.attempt, history_refs=ctx.history_refs)
     if operation == 'rollback':
-        return handoff.rollback(*args)
+        # rollback's stable public order is four FDs, old/new inventories, uid,
+        # then the bound identity witnesses and history references.
+        rollback_args = (ctx.parent_fd, ctx.journal_fd, ctx.entry_fd, ctx.lease_fd,
+            old_entries, new_entries, ctx.uid, ctx.parent_identity,
+            ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
+            ctx.history_refs)
+        return handoff.rollback(*rollback_args)
     raise handoff.Hold('UNKNOWN_HANDOFF_OPERATION')
 
 def call_once_from_original_entry(ctx):
