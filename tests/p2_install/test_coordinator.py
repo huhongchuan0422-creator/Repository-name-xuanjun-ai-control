@@ -102,17 +102,110 @@ class CoordinatorTests(unittest.TestCase):
             self.effect.mode="COMMITTED"
             self.assertEqual(c.execute(self.request("a2"))["status"],"COMMITTED")
     def test_threshold_dedup_and_unavailable(self):
-        with self.open() as c:
-            # A persisted intent with no durable terminal result.
-            c._store(self.request())
-        # Deterministic clock, no external service claims.
-        with Coordinator(self.root,self.plan,{"one":self.effect},now=lambda:4102444700,component_roots={"one":self.component},grant=Grant()) as c:
-            rows = c.tick()
-            self.assertTrue(rows)
-            self.assertTrue(all(r["delivery"]=="UNAVAILABLE" for r in rows))
-            c.tick()
-            count = c.journal.db.execute("SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0]
-            self.assertEqual(count,len(set(x["id"] for x in rows)))
+        clock=[0]
+        req=self.request("timeout-main")
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            c._store(req)
+
+        clock[0]=4000
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            first=c.tick()
+            self.assertEqual(len(first),5)
+            self.assertEqual(
+                {x["event"] for x in first},
+                {"NO_RECEIPT_5M","NO_START_15M","NO_PROGRESS_15M",
+                 "BLOCKED_30M","METHOD_STOP_60M"})
+            self.assertTrue(all(x["delivery"]=="UNAVAILABLE" for x in first))
+            saved=c.journal.db.execute(
+                "SELECT id,state,detail FROM coordinator_outbox ORDER BY id").fetchall()
+            self.assertEqual(len(saved),5)
+            self.assertEqual(c.tick(),[])
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT id,state,detail FROM coordinator_outbox ORDER BY id").fetchall(),
+                saved)
+
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            self.assertEqual(c.tick(),[])
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT id,state,detail FROM coordinator_outbox ORDER BY id").fetchall(),
+                saved)
+
+        child=(
+            "import json,sys;"
+            "from production.p2_install.coordinator import Coordinator;"
+            "root=sys.argv[1];"
+            "plan={'schema':1,'release':'"+"a"*64+"','batches':['one','two']};"
+            "c=Coordinator(root,plan,now=lambda:4000);c.__enter__();"
+            "out=c.tick();rows=c.journal.db.execute("
+            "'SELECT id,state,detail FROM coordinator_outbox ORDER BY id').fetchall();"
+            "c.__exit__(None,None,None);"
+            "print(json.dumps({'out':out,'rows':rows},sort_keys=True))"
+        )
+        proc=subprocess.run([sys.executable,"-c",child,self.root],
+                            cwd=str(ROOT),capture_output=True,text=True,timeout=20)
+        self.assertEqual(proc.returncode,0,proc.stderr)
+        child_result=json.loads(proc.stdout)
+        self.assertEqual(child_result["out"],[])
+        self.assertEqual([tuple(x) for x in child_result["rows"]],saved)
+
+        # A new attempt returns only notifications inserted for that attempt.
+        clock[0]=3700
+        req2=self.request("timeout-new")
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            c._store(req2)
+        clock[0]=4000
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            new_now=c.tick()
+            self.assertEqual(
+                [(x["attempt_id"],x["event"]) for x in new_now],
+                [("timeout-new","NO_RECEIPT_5M")])
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],6)
+
+        clock[0]=4600
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            later=c.tick()
+            self.assertEqual(
+                {(x["attempt_id"],x["event"]) for x in later},
+                {("timeout-new","NO_START_15M"),
+                 ("timeout-new","NO_PROGRESS_15M")})
+            self.assertEqual(
+                c.journal.db.execute(
+                    "SELECT COUNT(*) FROM coordinator_outbox").fetchone()[0],8)
+
+        # Terminal attempts suppress all ordinary timeout notifications.
+        clock[0]=0
+        complete=self.request("terminal-complete")
+        failed=self.request("terminal-fail")
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            c._store(complete); c._store(failed)
+            c.event(complete,"COMPLETE",{"result":"done"})
+            c.event(failed,"FAIL",{"result":"failed"})
+        clock[0]=4000
+        with Coordinator(self.root,self.plan,{"one":self.effect},
+                         now=lambda:clock[0],
+                         component_roots={"one":self.component},grant=Grant()) as c:
+            terminal_scan=c.tick()
+            self.assertFalse(any(
+                x.get("attempt_id") in ("terminal-complete","terminal-fail")
+                for x in terminal_scan))
     def test_subprocess_call_timeout_does_not_repeat_execute(self):
         import subprocess
         class BlockingEffects(Effects):
