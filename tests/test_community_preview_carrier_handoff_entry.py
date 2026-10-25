@@ -123,12 +123,12 @@ class ApprovalRecord(unittest.TestCase):
         self.assertIn('"accepted":false',output.getvalue())
 
     def test_post_b_uses_distinct_approval_name_and_fixed_operation(self):
-        value=dict(self.value,operation='execute')
+        value=dict(self.value,operation='post-b-execute')
         os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
         h.writefile(self.parent,entry.POST_B_APPROVAL_NAME,h.canonical(value),self.uid)
         with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
             with __import__('contextlib').ExitStack() as stack:
-                fd,raw,identity=entry._approval_fd(self.parent,'execute',self.old,self.new,self.uid,stack,entry.POST_B_APPROVAL_NAME)
+                fd,raw,identity=entry._approval_fd(self.parent,'post-b-execute',self.old,self.new,self.uid,stack,entry.POST_B_APPROVAL_NAME)
                 self.assertEqual(raw,h.canonical(value));self.assertTrue(identity)
         self.assertIn('post-b-execute',entry.OPERATIONS)
         self.assertNotEqual(entry.POST_B_APPROVAL_NAME,entry.APPROVAL_NAME)
