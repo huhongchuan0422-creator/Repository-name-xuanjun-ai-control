@@ -339,8 +339,9 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_actual_b_classes_same_lease_to_c_success_no_old_stop_start \
               test_community_preview_stopped_handoff.WholeEntry.test_default_off_and_no_forged_b_done \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation \
-              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_observed_at_drift_holds_without_forging_original_plan \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
