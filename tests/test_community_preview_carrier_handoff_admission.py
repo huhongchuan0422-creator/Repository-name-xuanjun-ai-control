@@ -121,10 +121,18 @@ class HandoffAdmission(unittest.TestCase):
         backup_fd=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         self.addCleanup(os.close,backup_fd)
         try:
-            bodies={'backup_manifest':h.canonical(dict(format=1,mode=h.POST_B_MODE,attempt=h.ORIGINAL_ATTEMPT,
-                    files=['clone-results.json'],source='completed-B-fixture')),
-                    'backup_clone_results':h.canonical(dict(format=1,mode=h.POST_B_MODE,attempt=h.ORIGINAL_ATTEMPT,
-                    tested_at=1000,clones=['restore-old','verify-f131','verify-downgrade']))}
+            clone_body=dict(format=1,original_host_open=True,center_integrity=True,stores=['isolated-fixture'])
+            bodies={
+                'backup_manifest':h.canonical(dict(format=1,old_id='old-container-fixture',old_image='old-image-fixture',
+                    product_image='candidate-image-fixture',all_writers_frozen_evidence_sha256='a'*64,
+                    trees=dict(data=dict(bytes=1,sha256='b'*64),config=dict(bytes=1,sha256='c'*64)))),
+                'backup_clone_results':h.canonical(dict(stage='validate-clones',snapshot_manifest_sha256='d'*64,
+                    logical_evidence_sha256=h.sha(h.canonical(clone_body)),tested_at=1000,
+                    restore_original_host=True,downgrade_logical_equality=True,production_acceptance=False,
+                    rollback_health_acceptance=False))}
+            for name,image in (('restore-old','old-image-fixture'),('verify-f131','candidate-image-fixture'),('verify-downgrade','old-image-fixture')):
+                bodies['clone_'+name.replace('-','_')]=h.canonical(dict(format=1,attempt=h.ORIGINAL_ATTEMPT,name=name,
+                    image=image,code_sha256='e'*64,result=clone_body))
             for key,body in bodies.items():
                 name=h.HISTORY_NAMES[key];h.writefile(backup_fd,name,body,self.uid)
                 item=os.stat(name,dir_fd=backup_fd,follow_symlinks=False)
