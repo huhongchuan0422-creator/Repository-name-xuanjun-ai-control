@@ -699,9 +699,16 @@ jobs:
           names=('control-stopped-v1.zip','manifest.json',
                  'resume-c-before-confirmation.sh','delivery.json')
           for name in names:shutil.copyfile(source/name,dest/name)
+          shutil.copyfile(source/'control-stopped-v1.zip',dest/'control-stopped-v1-post-b-candidate.zip')
           required=[
             dest/'control-stopped-v1.zip',dest/'manifest.json',
             dest/'resume-c-before-confirmation.sh',dest/'delivery.json',
+            dest/'control-stopped-v1-post-b-candidate.zip',
+            Path('scripts/community_preview_carrier_handoff_admission.py'),
+            Path('scripts/community_preview_carrier_handoff_call.py'),
+            Path('scripts/community_preview_carrier_handoff_entry.py'),
+            Path('tests/test_community_preview_carrier_handoff_admission.py'),
+            Path('tests/test_community_preview_carrier_handoff_entry.py'),
             Path('scripts/community_preview_stopped_handoff.py'),
             Path('scripts/community_preview_update_composition.py'),
             Path('scripts/community_preview_update_checkpoint.py'),
