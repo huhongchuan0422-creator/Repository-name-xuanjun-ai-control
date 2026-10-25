@@ -208,8 +208,8 @@ class HandoffAdmission(unittest.TestCase):
         with patch.object(h,'exchange',side_effect=exchange_then_raise):
             with self.assertRaisesRegex(h.Hold,'EXCHANGE_RESULT_UNKNOWN_INSPECT_ONLY'):
                 self.execute()
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'SWAPPED_OLD_RETAINED_IN_STAGE')
         with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
 
@@ -224,8 +224,8 @@ class HandoffAdmission(unittest.TestCase):
             return original(fd)
         with patch.object(h.os,'fsync',side_effect=fsync):
             with self.assertRaisesRegex(h.Hold,'POST_SWITCH_UNKNOWN_INSPECT_ONLY'):self.execute(fault)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_history_replacement_refuses_rollback_before_exchange(self):
@@ -234,10 +234,10 @@ class HandoffAdmission(unittest.TestCase):
         os.unlink(name,dir_fd=pfd)
         h.writefile(pfd,name,body,self.uid)
         with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
-                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_entry_path_replacement_refuses_rollback(self):
@@ -245,8 +245,8 @@ class HandoffAdmission(unittest.TestCase):
         os.unlink(h.ENTRY_NAME,dir_fd=self.parent)
         h.writefile(self.parent,h.ENTRY_NAME,b'A_ENTRY_FIXTURE',self.uid)
         with self.assertRaisesRegex(h.Hold,'ORIGINAL_ENTRY_FD_PATH_CHANGED'):
-            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
-                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
     def test_copied_journal_parent_is_rejected(self):
         self.execute()
@@ -280,10 +280,10 @@ class HandoffAdmission(unittest.TestCase):
                 original_exchange(parent,a,b);armed['value']=True
             with patch.object(h,'exchange',side_effect=exchange_then_arm):
                 with self.assertRaisesRegex(h.Hold,'ROLLBACK_UNKNOWN_INSPECT_ONLY'):
-                    h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
-                        self.parent_id,self.journal_id,self.entry_id,self.history_refs)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+                    h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                        self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'ROLLBACK_APPLIED_RESULT_UNKNOWN')
 
     def test_lease_close_failure_after_exchange_is_unknown(self):
@@ -294,8 +294,8 @@ class HandoffAdmission(unittest.TestCase):
         with patch.object(h,'_close_lease',side_effect=close_then_raise):
             with self.assertRaisesRegex(h.Hold,'POST_SWITCH_CLOSE_UNKNOWN_INSPECT_ONLY'):
                 self.execute()
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_rollback_lease_close_failure_is_reconciled_read_only(self):
@@ -306,10 +306,10 @@ class HandoffAdmission(unittest.TestCase):
             raise OSError('SYNTHETIC_ROLLBACK_CLOSE')
         with patch.object(h,'_close_lease',side_effect=close_then_raise):
             with self.assertRaisesRegex(h.Hold,'ROLLBACK_CLOSE_UNKNOWN_INSPECT_ONLY'):
-                h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
-                    self.parent_id,self.journal_id,self.entry_id,self.history_refs)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+                h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                    self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
             'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_RETAINED')
 
     def test_history_change_blocks_status_reconstruction(self):
@@ -317,8 +317,8 @@ class HandoffAdmission(unittest.TestCase):
         name,body,pfd=self.history_bodies['b_approval']
         os.unlink(name,dir_fd=pfd);h.writefile(pfd,name,body+b'X',self.uid)
         with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
-            h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
-                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
     def test_original_evidence_unmodified(self):
         before=self.history_bodies['b_intent'][1]
