@@ -271,6 +271,18 @@ class Session:
         old_braw=self.bind_resume_reference(B_APPROVAL)
         old_freeze_raw=self.bind_resume_reference(s.FREEZE,16384)
         old_b=s.exact_json(old_braw);old_freeze=s.exact_json(old_freeze_raw)
+        need(old_freeze_raw==s.canonical(old_freeze)
+             and set(old_freeze)=={'format','host','old_id','old_image','roots','issued_at','expires_at',
+                 'all_writers_frozen','owner_review_reference_sha256'}
+             and type(old_freeze['format']) is int and old_freeze['format']==1
+             and old_freeze['host']==p.HOST and old_freeze['old_id']==s.OLD_ID
+             and old_freeze['old_image']==s.OLD_IMAGE
+             and old_freeze['roots']==[s.DATA+'/data',s.DATA+'/config']
+             and old_freeze['all_writers_frozen'] is True
+             and p.exact_hex(old_freeze['owner_review_reference_sha256'],64)
+             and type(old_freeze['issued_at']) is int and type(old_freeze['expires_at']) is int
+             and old_freeze['issued_at']<=old_freeze['expires_at']<=old_freeze['issued_at']+600,
+             'EXACT_PRIOR_FREEZE_REQUIRED')
         need(resume['old_b_intent_sha256']==s.sha(intent_raw)
              and resume['old_b_approval_sha256']==s.sha(old_braw)
              and resume['old_freeze_sha256']==s.sha(old_freeze_raw),
@@ -281,6 +293,10 @@ class Session:
              and old_b['host']==p.HOST and old_b['mode']==MODE
              and old_b['attempt']==attempt()
              and old_b['actions']==['SNAPSHOT','THREE_ISOLATED_CLONES']
+             and old_b['freeze_sha256']==s.sha(old_freeze_raw)
+             and p.exact_hex(old_b['carrier_manifest_sha256'],64)
+             and type(old_b['issued_at']) is int and type(old_b['expires_at']) is int
+             and old_b['issued_at']<=old_b['expires_at']<=old_b['issued_at']+600
              and intent_raw==s.canonical(s.exact_json(intent_raw))
              and s.exact_json(intent_raw)==dict(format=1,mode=MODE,attempt=attempt(),
                  approval_sha256=s.sha(old_braw),freeze_sha256=s.sha(old_freeze_raw)),
@@ -306,11 +322,9 @@ class Session:
              and resume['resume_freeze_sha256']==s.sha(self.freeze),
              'B_RESUME_EVIDENCE_BINDING_CHANGED')
         self.resume_old_permit_absent=resume['old_stage_permit_sha256'] is None
-        if self.resume_old_permit_absent:
-            need(not exists_private(s.PERMIT),'B_PARTIAL_STATE_CONFLICT')
-        else:
-            prior=self.bind_resume_reference(s.PERMIT,16384)
-            need(s.sha(prior)==resume['old_stage_permit_sha256'],'B_RESUME_PROOF_BINDING_CHANGED')
+        prior_permit_sha=self.strict_prior_stage_permit(old_b,old_freeze,old_freeze_raw)
+        need(prior_permit_sha==resume['old_stage_permit_sha256'],
+             'B_RESUME_PROOF_BINDING_CHANGED')
         self.approved_stamp=self.b['carrier_manifest_sha256']
         need(self.approved_stamp==resume['carrier_manifest_sha256']==self.pins(),
              'B_SOURCE_BINDING_CHANGED')
