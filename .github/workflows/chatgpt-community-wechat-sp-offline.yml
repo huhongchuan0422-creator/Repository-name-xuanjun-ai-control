@@ -338,6 +338,10 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_builder_exposes_resume_wrapper_without_changing_default_acceptance \
               test_community_preview_stopped_handoff.WholeEntry.test_actual_b_classes_same_lease_to_c_success_no_old_stop_start \
               test_community_preview_stopped_handoff.WholeEntry.test_default_off_and_no_forged_b_done \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
               -v 2>&1 | tee community-tests.log
           elif [ "${{ contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') }}" = true ]; then
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
