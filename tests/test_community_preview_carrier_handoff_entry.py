@@ -1,43 +1,96 @@
-"""Fixed in-process entry admission tests. No UK host, no B/C."""
+"""Protected approval record validation tests; no production host or B/C."""
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
 from scripts import community_preview_carrier_handoff_admission as h
 from scripts import community_preview_carrier_handoff_entry as entry
 
-class FixedEntry(unittest.TestCase):
-    def test_unknown_action_holds_before_identity_or_io(self):
-        with patch.object(entry,'identify_admin') as identity:
-            with self.assertRaisesRegex(h.Hold,'HANDOFF_OPERATION_DENIED'):
-                entry.run('owner-bc',lambda *args:True,b'old',b'new')
-            identity.assert_not_called()
+class ApprovalRecord(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.parent=os.open(self.tmp.name,os.O_RDONLY|os.O_DIRECTORY)
+        self.addCleanup(os.close,self.parent)
+        self.uid=os.getuid()
+        self.old=b'fixed-old-archive'
+        self.new=b'fixed-new-archive'
+        self.now=1800000000
+        self.value={'format':1,'host':h.HOST,'operation':'execute',
+            'attempt':entry.ATTEMPT,'old_archive_sha256':h.OLD_ARCHIVE,
+            'old_manifest_sha256':h.OLD_MANIFEST,'new_archive_sha256':h.NEW_ARCHIVE,
+            'new_manifest_sha256':h.NEW_MANIFEST,'issued_at':self.now-10,
+            'expires_at':self.now+300}
+        self.write_record(self.value)
 
-    def test_absent_authority_holds_before_archive_read(self):
-        with patch.object(entry,'identify_admin',return_value=1008),patch.object(h,'members') as members:
-            with self.assertRaisesRegex(h.Hold,'CURRENT_INSTALL_WRITER_APPROVAL_REQUIRED'):
-                entry.run('execute',lambda *args:False,b'old',b'new')
-            members.assert_not_called()
+    def write_record(self,value):
+        try:os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        except FileNotFoundError:pass
+        h.writefile(self.parent,entry.APPROVAL_NAME,h.canonical(value),self.uid)
 
-    def test_authority_called_once_and_rejected_from_original_host(self):
-        seen=[]
-        def approve(*args):
-            seen.append(args)
-            return False
-        with patch.object(entry,'identify_admin',return_value=1008):
-            with self.assertRaisesRegex(h.Hold,'CURRENT_INSTALL_WRITER_APPROVAL_REQUIRED'):
-                entry.run('rollback',approve,b'old',b'new')
-        self.assertEqual(seen,[('rollback',h.HOST,entry.ATTEMPT)])
+    def validate(self,operation='execute'):
+        with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
+            with __import__('contextlib').ExitStack() as stack:
+                fd,raw,identity=entry._approval_fd(self.parent,operation,self.old,self.new,self.uid,stack)
+                return raw,identity
 
-    def test_host_identity_denied(self):
-        with patch.object(entry.os,'geteuid',return_value=0),patch.object(entry.os,'uname') as u:
-            u.return_value.nodename='NOT_THE_FIXED_HOST'
-            with self.assertRaisesRegex(h.Hold,'FIXED_UK_HOST_AND_ROOT_REQUIRED'):
-                entry.identify_admin()
+    def test_valid_exact_short_lived_record(self):
+        raw,identity=self.validate()
+        self.assertEqual(raw,h.canonical(self.value))
+        self.assertTrue(identity)
 
-    def test_exact_archive_pins_checked_before_parent_open(self):
-        with patch.object(entry,'identify_admin',return_value=1008):
-            with patch.object(entry,'_protected_path_directory') as open_parent:
-                with self.assertRaisesRegex(h.Hold,'CANDIDATE_ARCHIVE_SHA'):
-                    entry.run('status',lambda *args:True,b'not-the-old-archive',b'not-the-new-archive')
-                open_parent.assert_not_called()
+    def test_missing_record_holds(self):
+        os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        with patch.object(entry,'ROOT_UID',self.uid):
+            with self.assertRaises(FileNotFoundError):
+                self.validate()
+
+    def test_expired_record_holds(self):
+        value=dict(self.value,issued_at=self.now-700,expires_at=self.now-1)
+        self.write_record(value)
+        with self.assertRaisesRegex(h.Hold,'APPROVAL_EXPIRED_OR_TTL_INVALID'):
+            self.validate()
+
+    def test_ttl_over_600_holds(self):
+        self.write_record(dict(self.value,expires_at=self.now+601))
+        with self.assertRaisesRegex(h.Hold,'APPROVAL_EXPIRED_OR_TTL_INVALID'):
+            self.validate()
+
+    def test_operation_host_attempt_and_pins_are_bound(self):
+        for change,reason in (
+            ({'operation':'rollback'},'APPROVAL_SCOPE_MISMATCH'),
+            ({'host':'other-host'},'APPROVAL_SCOPE_MISMATCH'),
+            ({'attempt':'other-attempt'},'APPROVAL_SCOPE_MISMATCH'),
+            ({'new_archive_sha256':'0'*64},'APPROVAL_PIN_MISMATCH'),
+            ({'old_manifest_sha256':'0'*64},'APPROVAL_PIN_MISMATCH')):
+            value=dict(self.value);value.update(change);self.write_record(value)
+            with self.assertRaisesRegex(h.Hold,reason):self.validate()
+
+    def test_unknown_schema_noncanonical_and_duplicate_key_hold(self):
+        self.write_record(dict(self.value,extra='no'))
+        with self.assertRaisesRegex(h.Hold,'APPROVAL_SCHEMA'):self.validate()
+        raw=b'{"format":1,"format":1}'
+        os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        h.writefile(self.parent,entry.APPROVAL_NAME,raw,self.uid)
+        with self.assertRaisesRegex(h.Hold,'APPROVAL_DUPLICATE_KEY'):self.validate()
+
+    def test_symlink_hardlink_and_mode_rejected(self):
+        os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        os.symlink('missing',entry.APPROVAL_NAME,dir_fd=self.parent)
+        with patch.object(entry,'ROOT_UID',self.uid):
+            with self.assertRaises(OSError):self.validate()
+        os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+        self.write_record(self.value)
+        os.chmod(os.path.join(self.tmp.name,entry.APPROVAL_NAME),0o640)
+        with self.assertRaisesRegex(h.Hold,'APPROVAL_FILE_IDENTITY_OR_MODE'):self.validate()
+
+    def test_replacement_after_read_is_rejected(self):
+        with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
+            with __import__('contextlib').ExitStack() as stack:
+                fd,raw,identity=entry._approval_fd(self.parent,'execute',self.old,self.new,self.uid,stack)
+                replacement=dict(self.value,expires_at=self.now+250)
+                os.unlink(entry.APPROVAL_NAME,dir_fd=self.parent)
+                h.writefile(self.parent,entry.APPROVAL_NAME,h.canonical(replacement),self.uid)
+                with self.assertRaisesRegex(h.Hold,'APPROVAL_REPLACED'):
+                    entry._recheck_approval(self.parent,fd,raw,identity,'execute',self.old,self.new,self.uid)
 
 if __name__=='__main__':unittest.main()
