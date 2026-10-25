@@ -344,7 +344,9 @@ class Session:
         return resume
 
     def _c_resume_approval(self,candidate):
+        bound=self.bind_resume_reference(C_RESUME_APPROVAL,16384)
         a,b=document(C_RESUME_APPROVAL)
+        need(bound==b,'C_RESUME_APPROVAL_REPLACED')
         need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256',
                 'plan_sha256','issued_at','expires_at','actions'}
              and type(a['format']) is int and a['format']==1
@@ -391,6 +393,8 @@ class Session:
                 # EXCL: never replace a previous request or silently change plan.
                 write_private(fd,os.path.basename(C_RESUME_PLAN),record)
             finally:os.close(fd)
+        bound_plan=self.bind_resume_reference(C_RESUME_PLAN,4*1024*1024)
+        self.resume_guard()
         print(json.dumps(dict(state='C_RESUME_PLAN_REQUIRES_FRESH_APPROVAL',
             attempt=attempt(),plan_sha256=s.sha(s.canonical(candidate)),
             plan=candidate,approval_path=C_RESUME_APPROVAL,expires_in_seconds=600,
