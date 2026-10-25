@@ -681,19 +681,27 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'INDEX'
-          import hashlib,json,os
+          import hashlib,json,os,shutil,subprocess
           from pathlib import Path
-          root=Path('deploy/community-preview/stopped-handoff-v1-delivery')
-          report=json.loads((root/'delivery.json').read_text())
+          source=Path('deploy/community-preview/stopped-handoff-v1-delivery')
+          dest=Path('post-b-c-resume-delivery')
+          dest.mkdir(mode=0o700)
+          report=json.loads((source/'delivery.json').read_text())
           head=os.environ['GITHUB_SHA']
           assert report['candidate_commit']==head, 'CANDIDATE_COMMIT_MISMATCH'
+          # Do not ship owner-bc or resume-b-partial wrappers in this post-B
+          # candidate; only the C continuation wrapper is applicable.
+          names=('control-stopped-v1.zip','manifest.json',
+                 'resume-c-before-confirmation.sh','delivery.json')
+          for name in names:shutil.copyfile(source/name,dest/name)
           required=[
-            root/'control-stopped-v1.zip',root/'manifest.json',
-            root/'resume-c-before-confirmation.sh',root/'delivery.json',
+            dest/'control-stopped-v1.zip',dest/'manifest.json',
+            dest/'resume-c-before-confirmation.sh',dest/'delivery.json',
             Path('scripts/community_preview_stopped_handoff.py'),
             Path('scripts/community_preview_update_composition.py'),
             Path('scripts/community_preview_update_checkpoint.py'),
             Path('scripts/community_preview_release_plan.py'),
+            Path('scripts/community_preview_bc_build.py'),
             Path('tests/test_community_preview_stopped_handoff.py'),
             Path('docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md')]
           files={}
@@ -701,11 +709,11 @@ jobs:
               raw=path.read_bytes()
               files[str(path)]=dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
           index=dict(format=1,purpose='POST_B_C_RESUME_SOURCE_CANDIDATE_NOT_INSTALLED',
-              commit=head,tree=os.popen('git rev-parse HEAD^{tree}').read().strip(),
-              carrier_archive_sha256=hashlib.sha256((root/'control-stopped-v1.zip').read_bytes()).hexdigest(),
-              carrier_manifest_sha256=hashlib.sha256((root/'manifest.json').read_bytes()).hexdigest(),
+              commit=head,tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+              carrier_archive_sha256=hashlib.sha256((dest/'control-stopped-v1.zip').read_bytes()).hexdigest(),
+              carrier_manifest_sha256=hashlib.sha256((dest/'manifest.json').read_bytes()).hexdigest(),
               install_authorized=False,site_executed=False,bc_executed=False,files=files)
-          (root/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\\n')
+          (dest/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\\n')
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
@@ -714,11 +722,12 @@ jobs:
         with:
           name: community-post-b-c-resume-source
           path: |
-            deploy/community-preview/stopped-handoff-v1-delivery/
+            post-b-c-resume-delivery/
             scripts/community_preview_stopped_handoff.py
             scripts/community_preview_update_composition.py
             scripts/community_preview_update_checkpoint.py
             scripts/community_preview_release_plan.py
+            scripts/community_preview_bc_build.py
             tests/test_community_preview_stopped_handoff.py
             docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
