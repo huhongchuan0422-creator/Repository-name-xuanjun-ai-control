@@ -18,12 +18,13 @@ ENTRY=PARENT+'/site-prepare-v1.py'
 ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 OPERATIONS=('execute','status','rollback')
+ROOT_UID=0  # Production invariant, overridden only in isolated fixture tests.
 
 def require(condition,reason):
     if not condition:raise h.Hold(reason)
 
 def identify_admin():
-    require(os.geteuid()==0 and os.uname().nodename.split('.')[0]==h.HOST,
+    require(os.geteuid()==ROOT_UID and os.uname().nodename.split('.')[0]==h.HOST,
             'FIXED_UK_HOST_AND_ROOT_REQUIRED')
     admin=pwd.getpwnam('admin')
     require(admin.pw_uid>0 and os.environ.get('SUDO_USER')=='admin'
@@ -43,7 +44,7 @@ def _protected_path_directory(path,stack):
     for part in path.strip('/').split('/'):
         nextfd=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
         stack.callback(os.close,nextfd)
-        require(os.fstat(nextfd).st_uid==0 and not(os.fstat(nextfd).st_mode&0o022),
+        require(os.fstat(nextfd).st_uid==ROOT_UID and not(os.fstat(nextfd).st_mode&0o022),
                 'UNTRUSTED_PATH_COMPONENT')
         fd=nextfd
     return fd
@@ -113,12 +114,12 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
                 continue
             require(stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode)==0o600
                     and st.st_uid==0 and st.st_nlink==1,'HISTORY_UNEXPECTED_OBJECT')
-            body=h.readfile(home,name,0,8*1024*1024)
+            body=h.readfile(home,name,ROOT_UID,8*1024*1024)
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
-        h.capture_history(refs,0,parent,journal)
+        h.capture_history(refs,ROOT_UID,parent,journal)
         ctx=SimpleNamespace(
             host_id=h.HOST,authority_check=lambda:approved is True,
-            parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=0,
+            parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=ROOT_UID,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
             entry_identity=h.ident(os.fstat(entry)),lock_identity=h.ident(os.fstat(lease)),
