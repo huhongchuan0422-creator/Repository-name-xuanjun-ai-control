@@ -21,6 +21,9 @@ JOURNAL=PARENT+'/update-journal'
 ENTRY=PARENT+'/site-prepare-v1.py'
 ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 APPROVAL_NAME='carrier-handoff-approval.json'
+OLD_INPUT_NAME='control-stopped-v1-1d639.zip'
+NEW_INPUT_NAME='control-stopped-v1-005c.zip'
+INPUT_MAX=4*1024*1024
 APPROVAL_MAX=16384
 APPROVAL_TTL_MAX=600
 SCRIPTS_DIR=PARENT+'/control-stopped-v1/scripts'
@@ -146,6 +149,23 @@ def _open_fixed_scripts_dir():
         raise
 
 
+def _read_fixed_archive(parent,name,expected_sha,uid):
+    require(name in (OLD_INPUT_NAME,NEW_INPUT_NAME),'FIXED_INPUT_NAME_DENIED')
+    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+    try:
+        st=os.fstat(fd)
+        require(stat.S_ISREG(st.st_mode) and st.st_uid==uid
+                and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1
+                and 0<st.st_size<=INPUT_MAX
+                and h.ident(st)==h.ident(os.stat(name,dir_fd=parent,follow_symlinks=False)),
+                'FIXED_INPUT_IDENTITY_OR_MODE')
+        raw=_read_fd_exact(fd,INPUT_MAX)
+        require(h.sha(raw)==expected_sha,'FIXED_INPUT_SHA_MISMATCH')
+        require(h.ident(st)==h.ident(os.stat(name,dir_fd=parent,follow_symlinks=False)),
+                'FIXED_INPUT_REPLACED')
+        return raw
+    finally:os.close(fd)
+
 def _canonical(raw):
     def pairs(rows):
         result={}
@@ -211,7 +231,7 @@ def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_arc
             'APPROVAL_EXPIRED_OR_TTL_INVALID')
     return True
 
-def run(operation, old_archive_bytes, new_archive_bytes):
+def run(operation, old_archive_bytes=None, new_archive_bytes=None):
     """Fixed original-entry caller; current approval is read from the protected record."""
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     identify_admin()
@@ -221,6 +241,11 @@ def run(operation, old_archive_bytes, new_archive_bytes):
     with contextlib.ExitStack() as stack:
         parent=_protected_path_directory(PARENT,stack)
         journal=_protected_path_directory(JOURNAL,stack)
+        if old_archive_bytes is None and new_archive_bytes is None:
+            old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
+            new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
+        require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
+                'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
         approval_fd,approval_raw,approval_identity=_approval_fd(
             parent,operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack)
         h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
