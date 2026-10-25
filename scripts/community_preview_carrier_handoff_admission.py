@@ -237,7 +237,8 @@ def tree(fd,name,uid,expected,expected_id=None):
 def writefile(fd,name,body,uid):
     f=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=fd)
     try:
-        os.fchown(f,uid,-1);os.fchmod(f,0o600)
+        if os.fstat(f).st_uid!=uid:os.fchown(f,uid,-1)
+        os.fchmod(f,0o600)
         pos=0
         while pos<len(body):
             n=os.write(f,body[pos:]);need(n>0,'WRITE_NO_PROGRESS');pos+=n
@@ -251,7 +252,8 @@ def build_tree(parent,entries,uid,name=STAGE,fault=None):
     os.fsync(parent)
     root=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
     try:
-        os.fchown(root,uid,-1);os.fchmod(root,0o700)
+        if os.fstat(root).st_uid!=uid:os.fchown(root,uid,-1)
+        os.fchmod(root,0o700)
         dirs=set()
         for path in entries:
             parts=path.split('/')
@@ -267,7 +269,9 @@ def build_tree(parent,entries,uid,name=STAGE,fault=None):
                 os.mkdir(chunks[-1],0o700,dir_fd=fd)
                 os.fsync(fd)
                 f=os.open(chunks[-1],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
-                try:os.fchown(f,uid,-1);os.fchmod(f,0o700);os.fsync(f)
+                try:
+                    if os.fstat(f).st_uid!=uid:os.fchown(f,uid,-1)
+                    os.fchmod(f,0o700);os.fsync(f)
                 finally:os.close(f)
             finally:
                 for n in reversed(opened):os.close(n)
