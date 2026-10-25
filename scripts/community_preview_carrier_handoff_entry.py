@@ -372,7 +372,7 @@ def run(operation):
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
-                approval_identity,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name),
+                approval_identity,approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name,pins=pins),
             parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=ROOT_UID,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
@@ -380,7 +380,7 @@ def run(operation):
             history_refs=refs,old_archive_bytes=old_archive_bytes,
             new_archive_bytes=new_archive_bytes,attempt=ATTEMPT)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
+                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name,pins=pins)
         if post_b:
             if base_operation=='execute':return call.call_once_post_b_from_original_entry(ctx)
             if base_operation=='status':return call.reconcile_post_b_from_original_entry(ctx)
