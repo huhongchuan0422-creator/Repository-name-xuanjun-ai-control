@@ -183,6 +183,8 @@ class HandoffAdmission(unittest.TestCase):
                 'new_archive_sha256':h.NEW_ARCHIVE,'new_manifest_sha256':h.NEW_MANIFEST,
                 'issued_at':now-1,'expires_at':now+300}
             h.writefile(self.parent,fixed_entry.APPROVAL_NAME,h.canonical(record),self.uid)
+        h.writefile(self.parent,fixed_entry.OLD_INPUT_NAME,self.old_archive_bytes,self.uid)
+        h.writefile(self.parent,fixed_entry.NEW_INPUT_NAME,self.archive,self.uid)
         with patch.object(fixed_entry,'identify_admin',return_value=1008),\
              patch.object(fixed_entry,'_protected_path_directory',side_effect=fixture_directory),\
              patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')),\
@@ -190,13 +192,13 @@ class HandoffAdmission(unittest.TestCase):
              patch.object(fixed_entry,'_verify_runtime_sources',return_value=True),\
              patch.object(fixed_entry.time,'time',return_value=1800000000):
             approval('execute')
-            result=fixed_entry.run('execute',self.old_archive_bytes,self.archive)
+            result=fixed_entry.run('execute')
             self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
             approval('rollback')
-            restored=fixed_entry.run('rollback',self.old_archive_bytes,self.archive)
+            restored=fixed_entry.run('rollback')
             self.assertEqual(restored['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
             with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
-                fixed_entry.run('rollback',self.old_archive_bytes,self.archive)
+                fixed_entry.run('rollback')
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:
             self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
