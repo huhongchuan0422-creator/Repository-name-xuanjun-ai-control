@@ -108,8 +108,10 @@ class HandoffAdmission(unittest.TestCase):
         refs=dict(self.history_refs)
         required={'snapshot_result':b'B_SNAPSHOT_RESULT','snapshot_permit':b'B_SNAPSHOT_PERMIT',
             'validate_clones_result':b'B_CLONE_RESULT','validate_clones_permit':b'B_CLONE_PERMIT',
-            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE','c_approval':b'OLD_C_APPROVAL'}
+            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE',
+            'backup_dir':None,'c_approval':b'OLD_C_APPROVAL'}
         for key,body in required.items():
+            if key=='backup_dir':continue
             pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
             name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
