@@ -112,7 +112,8 @@ class HandoffAdmission(unittest.TestCase):
         handler=h.SafeArtifactRedirect()
         for target in ('http://productionresultssa.blob.core.windows.net/a?sig=x',
                        'https://evil.example/a?sig=x',
-                       'https://api.github.com.evil.example/repos/a/b/actions/artifacts/123/zip'):
+                       'https://api.github.com.evil.example/repos/a/b/actions/artifacts/123/zip',
+                       'https://api.github.com/repos/example/repo/issues/1'):
             with self.assertRaisesRegex(h.Hold,'ARTIFACT_REDIRECT_DESTINATION_REJECTED'):
                 handler.redirect_request(req,None,302,'Found',{},target)
 
