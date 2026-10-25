@@ -211,7 +211,14 @@ jobs:
           elif [ "${{ contains(github.event.head_commit.message, '[preview-site-steps-scope]') }}" = true ]; then
             # Reuse the already frozen A carrier. This scope validates the V2
             # site-preparation source only; rebuilding frozen v1 is intentionally denied.
-            PYTHONPATH=.:tests python -B -m unittest test_community_preview_preparation_steps -v 2>&1 | tee community-tests.log
+            PYTHONPATH=.:tests python -B -m unittest \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_python36_compat_uses_verified_proc_fd_path \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_enumeration_error_is_bounded_hold \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_rejects_proc_fd_identity_mismatch \
+              test_community_preview_preparation_steps.PreparationSteps.test_tree_denies_links_specials_public_files_and_budget \
+              test_community_preview_preparation_steps.PreparationSteps.test_snapshot_full_private_dataset_readback_and_no_live_changes \
+              test_community_preview_preparation_steps.PreparationSteps.test_clones_real_copies_synthetic_semantics_no_active_restore \
+              -v 2>&1 | tee community-tests.log
             bash -n deploy/community-preview/prepare-site.sh
           elif [ "${{ contains(github.event.head_commit.message, '[preview-https-acceptance-scope]') }}" = true ]; then
             python -B scripts/community_preview_preupdate_bundle.py
