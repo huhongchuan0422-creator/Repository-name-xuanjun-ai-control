@@ -318,6 +318,7 @@ jobs:
             git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c
             git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
+            cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
             python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
             PYTHONPATH=.:tests python -B -m unittest \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
