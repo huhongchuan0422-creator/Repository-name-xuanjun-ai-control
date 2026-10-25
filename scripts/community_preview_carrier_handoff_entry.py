@@ -342,6 +342,11 @@ def run(operation):
             if st is None:
                 refs[key]=(home,name,h.parent_ident(os.fstat(home)),None,None)
                 continue
+            if key=='backup_dir':
+                require(stat.S_ISDIR(st.st_mode) and stat.S_IMODE(st.st_mode)==0o700
+                        and st.st_uid==ROOT_UID,'HISTORY_UNEXPECTED_OBJECT')
+                refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.dirident(st),None)
+                continue
             require(stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode)==0o600
                     and st.st_uid==ROOT_UID and st.st_nlink==1,'HISTORY_UNEXPECTED_OBJECT')
             body=h.readfile(home,name,ROOT_UID,8*1024*1024)
