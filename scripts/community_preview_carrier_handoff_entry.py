@@ -8,6 +8,8 @@ import os
 import pwd
 import stat
 import contextlib
+import json
+import time
 from types import SimpleNamespace
 from scripts import community_preview_carrier_handoff_admission as h
 from scripts import community_preview_carrier_handoff_call as call
@@ -16,6 +18,9 @@ PARENT='/opt/xuanjun-community-preview'
 JOURNAL=PARENT+'/update-journal'
 ENTRY=PARENT+'/site-prepare-v1.py'
 ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
+APPROVAL_NAME='carrier-handoff-approval.json'
+APPROVAL_MAX=16384
+APPROVAL_TTL_MAX=600
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 OPERATIONS=('execute','status','rollback')
 ROOT_UID=0  # Production invariant, overridden only in isolated fixture tests.
@@ -71,26 +76,84 @@ def _read_fd_exact(fd,limit):
             'INPUT_CHANGED')
     return bytes(body)
 
-def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
-    """Requires original Writer's independently approved action checker.
+def _canonical(raw):
+    def pairs(rows):
+        result={}
+        for key,value in rows:
+            require(key not in result,'APPROVAL_DUPLICATE_KEY')
+            result[key]=value
+        return result
+    def invalid(_value):
+        raise h.Hold('APPROVAL_NONFINITE_JSON')
+    try:value=json.loads(raw.decode('utf-8'),object_pairs_hook=pairs,parse_constant=invalid)
+    except (ValueError,UnicodeError):raise h.Hold('APPROVAL_JSON_INVALID')
+    require(type(value) is dict and h.canonical(value)==raw,'APPROVAL_NONCANONICAL')
+    return value
 
-    The checker is invoked once with (operation, fixed host, attempt).
-    It must verify a separately protected current approval; identity alone
-    is not approval. On rejected/unknown grant, no stage/write occurs.
-    """
+def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack):
+    fd=os.open(APPROVAL_NAME,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+    stack.callback(os.close,fd)
+    st=os.fstat(fd)
+    require(stat.S_ISREG(st.st_mode) and st.st_uid==uid
+            and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1
+            and 0<st.st_size<=APPROVAL_MAX
+            and h.ident(st)==h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False)),
+            'APPROVAL_FILE_IDENTITY_OR_MODE')
+    record=_read_fd_exact(fd,APPROVAL_MAX)
+    value=_canonical(record)
+    fields={'format','host','operation','attempt','old_archive_sha256',
+            'old_manifest_sha256','new_archive_sha256','new_manifest_sha256',
+            'issued_at','expires_at'}
+    require(set(value)==fields and type(value['format']) is int and value['format']==1,
+            'APPROVAL_SCHEMA')
+    require(value['host']==h.HOST and value['operation']==operation
+            and value['attempt']==ATTEMPT,'APPROVAL_SCOPE_MISMATCH')
+    require(value['old_archive_sha256']==h.OLD_ARCHIVE
+            and value['old_manifest_sha256']==h.OLD_MANIFEST
+            and value['new_archive_sha256']==h.NEW_ARCHIVE
+            and value['new_manifest_sha256']==h.NEW_MANIFEST,
+            'APPROVAL_PIN_MISMATCH')
+    issued=value['issued_at'];expires=value['expires_at'];now=int(time.time())
+    require(type(issued) is int and type(expires) is int and issued<=now<=expires
+            and expires<=issued+APPROVAL_TTL_MAX,'APPROVAL_EXPIRED_OR_TTL_INVALID')
+    require(h.ident(os.fstat(fd))==h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False)),
+            'APPROVAL_REPLACED')
+    return fd,record,h.ident(st)
+
+def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_archive_bytes,new_archive_bytes,uid):
+    st=os.fstat(fd)
+    require(h.ident(st)==expected_identity and h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False))==expected_identity,
+            'APPROVAL_REPLACED')
+    raw=_read_fd_exact(fd,APPROVAL_MAX)
+    require(raw==expected_raw,'APPROVAL_CONTENT_CHANGED')
+    # Revalidate operation, pins and expiry at the last boundary before mutation.
+    value=_canonical(raw)
+    require(value.get('operation')==operation and value.get('host')==h.HOST
+            and value.get('attempt')==ATTEMPT
+            and value.get('old_archive_sha256')==h.OLD_ARCHIVE
+            and value.get('old_manifest_sha256')==h.OLD_MANIFEST
+            and value.get('new_archive_sha256')==h.NEW_ARCHIVE
+            and value.get('new_manifest_sha256')==h.NEW_MANIFEST,
+            'APPROVAL_SCOPE_MISMATCH')
+    now=int(time.time())
+    require(type(value.get('issued_at')) is int and type(value.get('expires_at')) is int
+            and value['issued_at']<=now<=value['expires_at']<=value['issued_at']+APPROVAL_TTL_MAX,
+            'APPROVAL_EXPIRED_OR_TTL_INVALID')
+    return True
+
+def run(operation, old_archive_bytes, new_archive_bytes):
+    """Fixed original-entry caller; current approval is read from the protected record."""
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
-    require(callable(authority_checker),'INSTALL_WRITER_AUTHORITY_REQUIRED')
     identify_admin()
-    approved=authority_checker(operation,h.HOST,ATTEMPT)
-    require(approved is True,'CURRENT_INSTALL_WRITER_APPROVAL_REQUIRED')
     require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
             'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
-    # Complete pinned archive/manifests must be verified before any transaction.
-    h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
-    h.members(new_archive_bytes,h.NEW_MANIFEST,h.NEW_ARCHIVE)
     with contextlib.ExitStack() as stack:
         parent=_protected_path_directory(PARENT,stack)
         journal=_protected_path_directory(JOURNAL,stack)
+        approval_fd,approval_raw,approval_identity=_approval_fd(
+            parent,operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack)
+        h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
+        h.members(new_archive_bytes,h.NEW_MANIFEST,h.NEW_ARCHIVE)
         require(h.dirident(os.fstat(journal))==h.dirident(os.stat(
                     h.JOURNAL_DIR,dir_fd=parent,follow_symlinks=False)),
                 'JOURNAL_PARENT_PATH_CHANGED')
@@ -103,8 +166,6 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
                 and stat.S_IMODE(ls.st_mode)==0o600 and ls.st_nlink==1
                 and h.ident(ls)==h.ident(os.stat(h.LOCK,dir_fd=journal,follow_symlinks=False)),
                 'ORIGINAL_LOCK_IDENTITY_CHANGED')
-        # Bind all fixed historical names; absent stays absent, existing is
-        # read with stable fd and protected SHA/identity. No historical writes.
         refs={}
         for key,name in h.HISTORY_NAMES.items():
             home=journal if key in h.JOURNAL_HISTORY_KEYS else parent
@@ -117,14 +178,20 @@ def run(operation, authority_checker, old_archive_bytes, new_archive_bytes):
             body=h.readfile(home,name,ROOT_UID,8*1024*1024)
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
         h.capture_history(refs,ROOT_UID,parent,journal)
+        _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
+                          operation,old_archive_bytes,new_archive_bytes,ROOT_UID)
         ctx=SimpleNamespace(
-            host_id=h.HOST,authority_check=lambda:approved is True,
+            host_id=h.HOST,
+            authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
+                approval_identity,operation,old_archive_bytes,new_archive_bytes,ROOT_UID),
             parent_fd=parent,journal_fd=journal,entry_fd=entry,lease_fd=lease,uid=ROOT_UID,
             parent_identity=h.parent_ident(os.fstat(parent)),
             journal_identity=h.dirident(os.fstat(journal)),
             entry_identity=h.ident(os.fstat(entry)),lock_identity=h.ident(os.fstat(lease)),
             history_refs=refs,old_archive_bytes=old_archive_bytes,
             new_archive_bytes=new_archive_bytes,attempt=ATTEMPT)
+        _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
+                          operation,old_archive_bytes,new_archive_bytes,ROOT_UID)
         if operation=='execute':return call.call_once_from_original_entry(ctx)
         if operation=='status':return call.reconcile_from_original_entry(ctx)
         return call.rollback_from_original_entry(ctx)
