@@ -30,7 +30,13 @@ class HandoffAdmission(unittest.TestCase):
         self.addCleanup(os.close,self.entry)
         self.entry_id=h.ident(os.fstat(self.entry))
         self.parent_id=h.parent_ident(os.fstat(self.parent))
-        self.old={'manifest.json':b'OLD_TEST_MANIFEST','loader.py':b'OLD_LOADER'}
+        old_loader=b'OLD_LOADER'
+        old_meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
+            'install_root':'/opt/xuanjun-community-preview/control-stopped-v1',
+            'updates_enabled':False,
+            'files':{'loader.py':{'bytes':len(old_loader),'sha256':h.sha(old_loader),
+                                 'uid':0,'mode':'0600'}}}
+        self.old={'manifest.json':h.canonical(old_meta),'loader.py':old_loader}
         self.new={'manifest.json':b'','loader.py':b'NEW_LOADER'}
         meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
               'install_root':'/opt/xuanjun-community-preview/control-stopped-v1',
@@ -105,6 +111,28 @@ class HandoffAdmission(unittest.TestCase):
         self.old['loader.py']=b'NOT_OLD_LOADER'
         with self.assertRaisesRegex(h.Hold,'TREE_BYTES_CHANGED'):self.execute()
         self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
+
+    def test_manifest_unchanged_disk_and_inventory_mutated_holds(self):
+        # A matching disk and caller-provided inventory must not bypass fixed manifest.
+        fake=b'FAKE_LOADER!'
+        self.old['loader.py']=fake
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:
+            fd=os.open('loader.py',os.O_WRONLY|os.O_TRUNC,dir_fd=target)
+            try:os.write(fd,fake)
+            finally:os.close(fd)
+        finally:os.close(target)
+        with self.assertRaisesRegex(h.Hold,'OLD_MEMBER_MANIFEST_BINDING'):
+            self.execute()
+        self.assertIsNone(h.childstat(self.jfd,h.PREINTENT))
+
+    def test_rollback_active_attempt_refused_before_swap(self):
+        self.execute()
+        h.writefile(self.jfd,'active-attempt.json',b'INFLIGHT',self.uid)
+        with self.assertRaisesRegex(h.Hold,'ROLLBACK_CONFLICT'):
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
+        self.assertEqual(h.status(self.parent,self.jfd,self.uid,self.old,self.new)['state'],
+                         'SWAPPED_OLD_RETAINED_IN_STAGE')
 
     def test_crash_after_intent_never_retries(self):
         def fault(where):
