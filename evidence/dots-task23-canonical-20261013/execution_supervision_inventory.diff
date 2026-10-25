@@ -1,0 +1,63 @@
+--- a/stage1/execution_supervision.py
++++ b/stage1/execution_supervision.py
+@@ -178,8 +178,19 @@
+                                                 for key in keys)
+ 
+     def _event(self, db, task_id, kind, details,
+-               destinations=('GITHUB_PR17', 'OWNER'), canonical=False):
++               destinations=('GITHUB_PR17', 'OWNER'), canonical=False, dedupe_key=None):
+         key = ('%s:terminal:%s' % (task_id, kind)) if canonical else None
++        if dedupe_key is not None:
++            if (not isinstance(dedupe_key, str) or len(dedupe_key) != 64
++                    or any(c not in '0123456789abcdef' for c in dedupe_key)):
++                raise ValueError('INVALID_INVENTORY_EVENT_KEY')
++            key = '%s:inventory:%s' % (task_id, dedupe_key)
++            previous = db.execute('SELECT kind,details FROM supervision_events WHERE event_key=?',
++                                  (key,)).fetchone()
++            if previous is not None:
++                if previous['kind'] != kind or previous['details'] != _dump(details):
++                    raise ValueError('INVENTORY_EVENT_KEY_COLLISION')
++                return key
+         if key is not None and db.execute(
+                 'SELECT 1 FROM supervision_events WHERE event_key=?',
+                 (key,)).fetchone():
+@@ -202,6 +213,39 @@
+               VALUES(?,?,'PENDING',0,?,NULL,NULL,0,?,?,NULL,NULL,0,NULL,NULL,NULL,0)""",
+                        (key, destination, now, task_fence, authority_epoch))
+         return key
++
++    def record_inventory_notice(self, db, intent, activation_binding, ledger_identity):
++        """Called only inside the existing owner's pinned canonical transaction.
++
++        The caller must pin the DB/file identity, roll back on ANY exception,
++        and validate activation when committing. This never dispatches/resumes.
++        """
++        from task_supervisor_runtime import canonical_inventory_page, assert_inventory_lineage
++        if not db.in_transaction or self.activation_store is None:
++            raise ValueError('ADMITTED_CANONICAL_TRANSACTION_REQUIRED')
++        self._assert_activation()
++        if activation_binding != self.activation_binding:
++            raise ValueError('INVENTORY_ACTIVATION_CHANGED')
++        if not isinstance(intent, dict) or not isinstance(intent.get('binding'), dict):
++            raise ValueError('INVENTORY_INTENT_REQUIRED')
++        task_id = intent['binding'].get('task_id')
++        page = canonical_inventory_page(db, self.clock(), task_id=task_id,
++            activation_binding=activation_binding, ledger_identity=ledger_identity)
++        if len(page['tasks']) != 1:
++            raise ValueError('INVENTORY_TASK_CHANGED')
++        current = page['tasks'][0]
++        assert_inventory_lineage(intent['binding'], current['binding'], notice_only=True)
++        if (intent.get('decision_key') != current['decision_key']
++                or intent.get('attention') != current['attention']
++                or current['decision'] != 'HOLD_AND_NOTIFY_REQUIRES_ADMISSION'):
++            raise ValueError('INVENTORY_DECISION_CHANGED')
++        key = self._event(db, task_id, 'INVENTORY_NOTICE',
++            {'decision_key': current['decision_key'], 'binding': current['binding'],
++             'attention': current['attention'], 'dispatch_performed': False},
++            dedupe_key=current['decision_key'])
++        self._assert_activation()
++        return {'state': 'NOTICE_RECORDED_NOT_DELIVERED', 'event_key': key,
++                'dispatch_performed': False, 'receiver_ack': 'NOT_PROVEN'}
+ 
+     def dispatch(self, task_id, spec_hash, executor, run_id, session_id, workdir,
+                  artifact, start_deadline, progress_deadline, result_deadline,
