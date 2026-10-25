@@ -331,7 +331,8 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
                  and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST
                  and pre.get('parent_identity')==expected_parent_identity
                  and pre.get('journal_parent_identity')==expected_journal_identity
-                 and pre.get('entry_identity')==expected_entry_identity,
+                 and pre.get('entry_identity')==expected_entry_identity
+                 and pre.get('lock_identity')==expected_lock_identity,
                  'PREINTENT_BINDING_UNKNOWN')
             need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid),
                  'PREINTENT_HISTORY_CHANGED')
@@ -354,6 +355,7 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
          and pre.get('parent_identity')==expected_parent_identity
          and pre.get('journal_parent_identity')==expected_journal_identity
          and pre.get('entry_identity')==expected_entry_identity
+         and pre.get('lock_identity')==expected_lock_identity
          and pre.get('old_tree_sha')==j['old_tree_sha']
          and pre.get('new_tree_sha')==j['new_tree_sha']
          and j['preintent_sha256']==sha(pre_raw),'PREINTENT_CHAIN_CHANGED')
