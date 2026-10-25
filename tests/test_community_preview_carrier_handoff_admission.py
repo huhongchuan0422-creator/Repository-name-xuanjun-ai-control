@@ -180,7 +180,8 @@ class HandoffAdmission(unittest.TestCase):
             return fd
         with patch.object(fixed_entry,'identify_admin',return_value=1008),\
              patch.object(fixed_entry,'_protected_path_directory',side_effect=fixture_directory),\
-             patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')):
+             patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')),\
+             patch.object(fixed_entry,'ROOT_UID',self.uid):
             result=fixed_entry.run('execute',lambda *args:True,
                 self.old_archive_bytes,self.archive)
             self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
