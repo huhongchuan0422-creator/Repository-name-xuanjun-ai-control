@@ -189,6 +189,108 @@ class HandoffAdmission(unittest.TestCase):
             with self.assertRaises((BlockingIOError,OSError)):self.execute()
         finally:fcntl.flock(second,fcntl.LOCK_UN);os.close(second)
 
+    def test_real_nested_carriers_are_full_manifests_when_ci_fixture_set(self):
+        if not (os.environ.get('HANDOFF_OLD_ARCHIVE') and os.environ.get('HANDOFF_NEW_ARCHIVE')):
+            self.skipTest('CI fixture downloader not configured')
+        self.assertGreater(len(self.old),8)
+        self.assertGreater(len(self.new),8)
+        self.assertTrue(h.verified_old_inventory(self.old))
+        self.assertEqual(h.sha(self.new['manifest.json']),h.NEW_MANIFEST)
+
+    def test_exchange_effect_then_exception_is_unknown_and_not_replayed(self):
+        original=h.exchange
+        def exchange_then_raise(parent,a,b):
+            original(parent,a,b)
+            raise OSError('SYNTHETIC_POST_EXCHANGE_EXCEPTION')
+        with patch.object(h,'exchange',side_effect=exchange_then_raise):
+            with self.assertRaisesRegex(h.Hold,'EXCHANGE_RESULT_UNKNOWN_INSPECT_ONLY'):
+                self.execute()
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'SWAPPED_OLD_RETAINED_IN_STAGE')
+        with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):self.execute()
+
+    def test_parent_fsync_failure_after_exchange_is_unknown(self):
+        original=h.os.fsync;armed={'value':False}
+        def fault(stage):
+            if stage=='after_exchange':armed['value']=True
+        def fsync(fd):
+            if armed['value'] and fd==self.parent:
+                armed['value']=False
+                raise OSError('SYNTHETIC_PARENT_FSYNC_FAILURE')
+            return original(fd)
+        with patch.object(h.os,'fsync',side_effect=fsync):
+            with self.assertRaisesRegex(h.Hold,'POST_SWITCH_UNKNOWN_INSPECT_ONLY'):self.execute(fault)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'SWAPPED_OLD_RETAINED_IN_STAGE')
+
+    def test_history_replacement_refuses_rollback_before_exchange(self):
+        self.execute()
+        name,body,pfd=self.history_bodies['freeze']
+        os.unlink(name,dir_fd=pfd)
+        h.writefile(pfd,name,body,self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'SWAPPED_OLD_RETAINED_IN_STAGE')
+
+    def test_entry_path_replacement_refuses_rollback(self):
+        self.execute()
+        os.unlink(h.ENTRY_NAME,dir_fd=self.parent)
+        h.writefile(self.parent,h.ENTRY_NAME,b'A_ENTRY_FIXTURE',self.uid)
+        with self.assertRaisesRegex(h.Hold,'ORIGINAL_ENTRY_FD_PATH_CHANGED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+
+    def test_copied_journal_parent_is_rejected(self):
+        self.execute()
+        copied=os.path.join(self.tmp.name,'journal-copy');os.mkdir(copied,0o700)
+        for name in (h.STATE,h.PREINTENT,h.ROLLBACK_INTENT,h.ROLLBACK_RESULT):
+            if h.childstat(self.jfd,name) is not None:
+                with open(os.path.join(copied,name),'wb') as out:
+                    out.write(h.readfile(self.jfd,name,self.uid))
+                os.chmod(os.path.join(copied,name),0o600)
+        other=os.open(copied,os.O_RDONLY|os.O_DIRECTORY)
+        try:
+            with self.assertRaisesRegex(h.Hold,'JOURNAL_PARENT_PATH_CHANGED'):
+                h.status(self.parent,other,self.entry,self.uid,self.old,self.new,
+                    self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        finally:os.close(other)
+
+    def test_rollback_fsync_failure_reconciles_without_replay(self):
+        self.execute()
+        original=h.os.fsync;armed={'value':False}
+        # Arm at rollback intent fsync completion; then fail the first parent fsync after exchange.
+        def wrapper(fd):
+            if armed['value'] and fd==self.parent:
+                armed['value']=False
+                raise OSError('SYNTHETIC_ROLLBACK_FSYNC')
+            return original(fd)
+        with patch.object(h.os,'fsync',side_effect=wrapper):
+            # writefile invokes fsync on its fd and then journal dir, not carrier parent.
+            # Arm via exchange wrapper after the atomic reverse operation.
+            original_exchange=h.exchange
+            def exchange_then_arm(parent,a,b):
+                original_exchange(parent,a,b);armed['value']=True
+            with patch.object(h,'exchange',side_effect=exchange_then_arm):
+                with self.assertRaisesRegex(h.Hold,'ROLLBACK_UNKNOWN_INSPECT_ONLY'):
+                    h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
+                        self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'ROLLBACK_APPLIED_RESULT_UNKNOWN')
+
+    def test_history_change_blocks_status_reconstruction(self):
+        self.execute()
+        name,body,pfd=self.history_bodies['b_approval']
+        os.unlink(name,dir_fd=pfd);h.writefile(pfd,name,body+b'X',self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+
     def test_original_evidence_unmodified(self):
         before=self.history_bodies['b_intent'][1]
         self.execute()
