@@ -204,7 +204,14 @@ class WholeEntry(unittest.TestCase):
             carrier_manifest_sha256=q.pins(),plan_sha256=candidate['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_APPROVAL,s.canonical(approval))
-        return q,candidate
+        # Simulate the actual process exit after B completed and before C proof:
+        # release the original Session and reacquire a genuinely fresh one.
+        q.close()
+        reopened=h.Session();reopened.acquire()
+        self.addCleanup(reopened.close);self.session=reopened
+        self.assertFalse(reopened.bdone)
+        self.assertIsNone(reopened.journal)
+        return reopened,candidate
 
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
