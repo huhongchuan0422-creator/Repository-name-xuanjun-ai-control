@@ -355,7 +355,7 @@ def run(operation):
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
         h.capture_history(refs,ROOT_UID,parent,journal)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
+                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
@@ -367,7 +367,7 @@ def run(operation):
             history_refs=refs,old_archive_bytes=old_archive_bytes,
             new_archive_bytes=new_archive_bytes,attempt=ATTEMPT)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
+                          approval_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
         if post_b:
             if base_operation=='execute':return call.call_once_post_b_from_original_entry(ctx)
             if base_operation=='status':return call.reconcile_post_b_from_original_entry(ctx)
