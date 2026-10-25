@@ -86,7 +86,9 @@ jobs:
           if len(rows)>10000 or any(not x or b'\n' in x or b'\r' in x for x in rows):raise SystemExit('PUSH_DELTA_UNKNOWN')
           allowed={b'scripts/community_preview_stopped_handoff.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
           handoff={b'scripts/community_preview_carrier_handoff_admission.py',
+                   b'scripts/community_preview_carrier_handoff_call.py',
                    b'tests/test_community_preview_carrier_handoff_admission.py',
+                   b'tests/test_community_preview_carrier_handoff_call.py',
                    b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               f.write('resume_only='+str(set(rows)<=allowed).lower()+'\n')
@@ -298,8 +300,8 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c 2>&1 | tee -a community-tests.log
           git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum 2>&1 | tee -a community-tests.log | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
-          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_admission.py 2>&1 | tee -a community-tests.log
-          PYTHONPATH=. python -B -m unittest tests.test_community_preview_carrier_handoff_admission -v 2>&1 | tee -a community-tests.log
+          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py 2>&1 | tee -a community-tests.log
+          PYTHONPATH=. python -B -m unittest tests.test_community_preview_carrier_handoff_admission tests.test_community_preview_carrier_handoff_call -v 2>&1 | tee -a community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: UK read-only inspection candidate affected scope (no site execution)
         if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-inspection-scope]') || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-site-steps-scope]')
@@ -648,7 +650,9 @@ jobs:
             community-parse.log
             community-tests.log
             scripts/community_preview_carrier_handoff_admission.py
+            scripts/community_preview_carrier_handoff_call.py
             tests/test_community_preview_carrier_handoff_admission.py
+            tests/test_community_preview_carrier_handoff_call.py
           if-no-files-found: error
           retention-days: 14
       - name: Preserve stopped handoff proposal evidence (no site execution)
