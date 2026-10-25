@@ -432,8 +432,9 @@ class HandoffAdmission(unittest.TestCase):
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
     def test_original_evidence_unmodified(self):
-        before=self.history_bodies['b_intent'][1]
+        before={key:body for key,(name,body,pfd) in self.history_bodies.items()}
         self.execute()
-        self.assertEqual(h.readfile(self.jfd,self.history_bodies['b_intent'][0],self.uid),before)
+        for key,(name,body,pfd) in self.history_bodies.items():
+            self.assertEqual(h.readfile(pfd,name,self.uid),before[key])
 
 if __name__=='__main__':unittest.main()
