@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import http.cookiejar
+import http.client
 import json
 import os
 import shutil
@@ -107,6 +108,7 @@ class SessionAuthIntegrationTests(unittest.TestCase):
         except HTTPError as error:
             self.fail('unexpected HTTP %s: %s'%(error.code,
               error.read().decode('utf-8')))
+
 
     def test_login_cookie_csrf_logout_and_expiry_are_server_enforced(self):
         with self.assertRaises(HTTPError) as denied:
@@ -299,6 +301,85 @@ class SessionAuthIntegrationTests(unittest.TestCase):
         with open(target) as stream:prepared=json.load(stream)
         self.assertEqual(set(prepared['users']),{'executor-cli','qa-cli'})
         self.assertEqual(os.stat(target).st_mode & 0o777,0o600)
+
+
+class ExternalHttpsContractTests(unittest.TestCase):
+    def setUp(self):
+        self.root=tempfile.mkdtemp();self.db=os.path.join(self.root,'state.sqlite3')
+        supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY)
+        GatewayKernel(supervisor,authority).register_graph(
+          authority.issue('tenant-session','seed'),demo_graph('tenant-session'))
+        supervisor.close();self.identity_path=os.path.join(self.root,'identities.json')
+        with open(self.identity_path,'w') as stream:
+            json.dump({'users':{'admin':{'password_hash':password_hash('fixture-password-only'),
+              'tenant_id':'tenant-session','principal_id':'owner-test',
+              'roles':['TASK_CENTER_ADMIN'],'enabled':True}}},stream)
+        os.chmod(self.identity_path,0o600)
+        def connect():
+            db=sqlite3.connect(self.db);db.row_factory=sqlite3.Row;return db
+        self.sessions=SessionStore(connect,'tenant-session',ttl_seconds=600)
+        self.server=make_server(self.db,KEY,'tenant-session','viewer',port=0,
+          model_master_key=Fernet.generate_key(),
+          identity_provider=FileTestIdentityProvider(self.identity_path),
+          session_store=self.sessions,outbound_enabled=False,
+          external_origin='https://uk.wenwenwenyiyiyi.work',
+          base_path='/task-center-test/')
+        self.thread=threading.Thread(target=self.server.serve_forever)
+        self.thread.daemon=True;self.thread.start()
+
+    def tearDown(self):
+        self.server.shutdown();self.server.server_close();self.thread.join(2)
+        shutil.rmtree(self.root)
+
+    def raw(self,method,path,body=None,headers=None):
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=3)
+        supplied={'Host':'uk.wenwenwenyiyiyi.work'};supplied.update(headers or {})
+        connection.request(method,path,body=body,headers=supplied)
+        response=connection.getresponse();data=response.read()
+        result=(response.status,response.getheaders(),data);connection.close();return result
+
+    def test_external_base_path_host_origin_cookie_and_redirect_contract(self):
+        status,headers,_=self.raw('GET','/task-center-test/admin.html')
+        self.assertEqual(status,302);self.assertEqual(dict(headers)['Location'],'/task-center-test/login.html')
+        self.assertEqual(self.raw('GET','/admin.html')[0],404)
+        self.assertEqual(self.raw('GET','/task-center-test/login.html',headers={
+          'Host':'evil.example','X-Forwarded-Host':'uk.wenwenwenyiyiyi.work',
+          'X-Forwarded-Proto':'https'})[0],421)
+        payload=json.dumps({'username':'admin','password':'fixture-password-only'})
+        self.assertEqual(self.raw('POST','/task-center-test/api/session/login',payload,
+          {'Content-Type':'application/json'})[0],403)
+        self.assertEqual(self.raw('POST','/task-center-test/api/session/login',payload,
+          {'Content-Type':'application/json','Origin':'https://evil.example'})[0],403)
+        status,headers,body=self.raw('POST','/task-center-test/api/session/login',payload,
+          {'Content-Type':'application/json','Origin':'https://uk.wenwenwenyiyiyi.work'})
+        self.assertEqual(status,200);receipt=json.loads(body.decode())
+        cookies=[value for name,value in headers if name.lower()=='set-cookie']
+        self.assertEqual(len(cookies),2)
+        self.assertTrue(all('Path=/task-center-test/' in value and 'Secure' in value
+                            and 'SameSite=Strict' in value for value in cookies))
+        self.assertIn('HttpOnly',next(x for x in cookies if x.startswith('xuanjun_task_center_session=')))
+        cookie='; '.join(x.split(';',1)[0] for x in cookies)
+        self.assertEqual(self.raw('GET','/task-center-test/api/session',headers={'Cookie':cookie})[0],200)
+        status,headers,_=self.raw('POST','/task-center-test/api/session/logout','{}',{
+          'Content-Type':'application/json','Origin':'https://uk.wenwenwenyiyiyi.work',
+          'Cookie':cookie,'X-CSRF-Token':receipt['csrf_token']})
+        self.assertEqual(status,200)
+        cleared=[value for name,value in headers if name.lower()=='set-cookie']
+        self.assertTrue(all('Path=/task-center-test/' in value and 'Secure' in value
+                            and 'Max-Age=0' in value for value in cleared))
+
+    def test_external_assets_are_base_relative_and_configuration_is_strict(self):
+        for path in ('/task-center-test/app.js','/task-center-test/admin.js',
+                     '/task-center-test/login.js','/task-center-test/login.html',
+                     '/task-center-test/oauth-callback.html'):
+            status,_,body=self.raw('GET',path);self.assertEqual(status,200)
+            self.assertNotIn(b"fetch('/api/",body);self.assertNotIn(b'href="/admin.html"',body)
+        with self.assertRaisesRegex(ValueError,'HTTPS_EXTERNAL_ORIGIN_REQUIRED'):
+            make_server(self.db,KEY,'tenant-session','viewer',port=0,
+              external_origin='http://uk.wenwenwenyiyiyi.work',base_path='/task-center-test/')
+        with self.assertRaisesRegex(ValueError,'VALID_BASE_PATH_REQUIRED'):
+            make_server(self.db,KEY,'tenant-session','viewer',port=0,
+              external_origin='https://uk.wenwenwenyiyiyi.work',base_path='/../bad/')
 
 
 if __name__=='__main__':unittest.main()

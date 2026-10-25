@@ -15,6 +15,7 @@ import sys
 import threading
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.dirname(__file__))
 from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
@@ -187,12 +188,38 @@ class CodexWorkerLoop(object):
         finally:supervisor.close()
 
 
+def _normalize_base_path(value):
+    value = value or '/'
+    if not value.startswith('/') or '//' in value or '?' in value or '#' in value:
+        raise ValueError('VALID_BASE_PATH_REQUIRED')
+    if not value.endswith('/'):
+        value += '/'
+    if value != '/' and any(part in ('', '.', '..')
+                            for part in value[1:-1].split('/')):
+        raise ValueError('VALID_BASE_PATH_REQUIRED')
+    return value
+
+
+def _normalize_external_origin(value):
+    if value is None:return None
+    parsed=urlsplit(value)
+    if (parsed.scheme != 'https' or not parsed.netloc or parsed.path not in ('','/')
+            or parsed.query or parsed.fragment or parsed.username or parsed.password):
+        raise ValueError('HTTPS_EXTERNAL_ORIGIN_REQUIRED')
+    return 'https://'+parsed.netloc
+
+
 def build_handler(db_path, authority_key, tenant_id, principal_id,
                   model_master_key=None, admin_token=None, actor_tokens=None,
                   codex_transports=None, identity_provider=None,
-                  session_store=None, outbound_enabled=False):
+                  session_store=None, outbound_enabled=False,
+                  external_origin=None, base_path='/'):
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
+    base_path = _normalize_base_path(base_path)
+    external_origin = _normalize_external_origin(external_origin)
+    external_host = (urlsplit(external_origin).netloc
+                     if external_origin is not None else None)
     class TaskCenterHandler(BaseHTTPRequestHandler):
         server_version = 'XuanjunTaskCenter/1.0-TEST_ONLY'
 
@@ -220,7 +247,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             if not self._host_allowed():
                 self._send(421,_json_bytes({'error':'LOOPBACK_HOST_REQUIRED'}),
                   'application/json; charset=utf-8');return
-            path = self.path.split('?', 1)[0]
+            path = self._route_path()
+            if path is None:
+                self._send(404,b'not found\n','text/plain; charset=utf-8');return
             if path == '/healthz':
                 self._send(200, _json_bytes({'state':'UP','mode':'TEST_ONLY',
                   'outbound':'DISABLED' if not outbound_enabled else
@@ -247,7 +276,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'application/json; charset=utf-8');return
             if (session_store is not None and path in ('/','/index.html',
                     '/admin.html') and self._session() is None):
-                self.send_response(302);self.send_header('Location','/login.html')
+                self.send_response(302);self.send_header('Location',self._external_path('/login.html'))
                 self.send_header('Cache-Control','no-store');self.end_headers();return
             if path == '/api/projection':
                 if session_store is not None and self._session() is None:
@@ -289,7 +318,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             if not self._host_allowed() or not self._origin_allowed():
                 self._send(403,_json_bytes({'error':'SAME_ORIGIN_REQUIRED'}),
                   'application/json; charset=utf-8');return
-            path = self.path.split('?',1)[0]
+            path = self._route_path()
+            if path is None:
+                self._send(404,b'not found\n','text/plain; charset=utf-8');return
             if path == '/api/session/login':
                 return self._login()
             if path == '/api/session/logout':
@@ -304,9 +335,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 session_store.revoke(token)
                 self._send(200,_json_bytes({'state':'LOGGED_OUT'}),
                   'application/json; charset=utf-8', [('Set-Cookie',
-                  session_store.COOKIE+'=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0'),
+                  session_store.COOKIE+'=; Path='+base_path+'; HttpOnly; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0'),
                   ('Set-Cookie',session_store.CSRF_COOKIE+
-                   '=; Path=/; SameSite=Strict; Max-Age=0')]);return
+                   '=; Path='+base_path+'; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0')]);return
             if path != '/api/admin/model-control':
                 self._send(405,b'read only\n','text/plain; charset=utf-8');return
             session=self._session()
@@ -656,6 +687,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
         def _host_allowed(self):
             supplied=self.headers.get('Host','')
+            if external_host is not None:
+                return supplied.lower() == external_host.lower()
             allowed={'127.0.0.1:%d'%self.server.server_port,
                      'localhost:%d'%self.server.server_port,
                      '[::1]:%d'%self.server.server_port}
@@ -663,9 +696,25 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
         def _origin_allowed(self):
             origin=self.headers.get('Origin')
+            if external_origin is not None:
+                return origin == external_origin
             if origin is None:return True
             supplied=self.headers.get('Host','')
             return origin=='http://'+supplied
+
+        def _route_path(self):
+            raw=self.path.split('?',1)[0]
+            if base_path == '/':return raw
+            prefix=base_path[:-1]
+            if raw == prefix:return '/'
+            if not raw.startswith(base_path):return None
+            return '/'+raw[len(base_path):]
+
+        def _external_path(self, path):
+            return ((base_path[:-1] if base_path != '/' else '') + path)
+
+        def _secure_cookie(self):
+            return 'Secure; ' if external_origin is not None else ''
 
         def _session(self):
             return (session_store.get(self._session_token())
@@ -687,10 +736,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'principal_id':identity['principal_id'],'roles':identity['roles'],
                   'csrf_token':csrf,'expires_at':expires}),
                   'application/json; charset=utf-8', [('Set-Cookie',
-                  '%s=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d'%(
-                  session_store.COOKIE,token,session_store.ttl_seconds)),
-                  ('Set-Cookie','%s=%s; Path=/; SameSite=Strict; Max-Age=%d'%(
-                  session_store.CSRF_COOKIE,csrf,session_store.ttl_seconds))])
+                  '%s=%s; Path=%s; HttpOnly; SameSite=Strict; %sMax-Age=%d'%(
+                  session_store.COOKIE,token,base_path,self._secure_cookie(),session_store.ttl_seconds)),
+                  ('Set-Cookie','%s=%s; Path=%s; SameSite=Strict; %sMax-Age=%d'%(
+                  session_store.CSRF_COOKIE,csrf,base_path,self._secure_cookie(),session_store.ttl_seconds))])
             except Exception as exc:
                 self._send(401,_json_bytes({'error':type(exc).__name__,
                   'detail':str(exc)}),'application/json; charset=utf-8')
@@ -713,7 +762,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 host='127.0.0.1', port=8765, model_master_key=None,
                 admin_token=None, actor_tokens=None,codex_transports=None,
                 identity_provider=None,session_store=None,
-                outbound_enabled=True):
+                outbound_enabled=True,external_origin=None,base_path='/'):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
@@ -735,7 +784,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
                             admin_token, actor_tokens,codex_transports,
-                            identity_provider,session_store,outbound_enabled)
+                            identity_provider,session_store,outbound_enabled,
+                            external_origin,base_path)
     server=HTTPServer((host, port), handler)
     server.codex_worker=None
     if codex_transports:
@@ -761,6 +811,8 @@ def main(argv=None):
     parser.add_argument('--test-identity-file')
     parser.add_argument('--session-ttl-seconds',type=int,default=1800)
     parser.add_argument('--allow-loopback-fixture-outbound',action='store_true')
+    parser.add_argument('--external-origin')
+    parser.add_argument('--base-path',default='/')
     args = parser.parse_args(argv)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
@@ -807,9 +859,13 @@ def main(argv=None):
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
                          actor_tokens,codex_transports,identity_provider,
-                         session_store,args.allow_loopback_fixture_outbound)
+                         session_store,args.allow_loopback_fixture_outbound,
+                         args.external_origin,args.base_path)
+    advertised_origin=(args.external_origin or
+                       'http://%s:%d'%server.server_address)
+    advertised_base=_normalize_base_path(args.base_path)
     receipt = {'state': 'STARTED', 'mode': 'TEST_ONLY',
-               'url': 'http://%s:%d/' % server.server_address,
+               'url': advertised_origin+advertised_base,
                'db': os.path.realpath(args.db), 'tenant_id': args.tenant,
                'production_mutation_api': 'DISABLED',
                'test_only_admin_mutation_api': ('ENABLED' if model_key else

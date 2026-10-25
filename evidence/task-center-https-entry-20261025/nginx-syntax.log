@@ -1,0 +1,3 @@
+nginx: [alert] could not open error log file: open() "/var/log/nginx/error.log" failed (13: Permission denied)
+nginx: the configuration file /home/xuanjun_dev/xuanjun-task-center-https-bc317/evidence/task-center-https-entry-20261025/nginx-syntax-fixture.conf syntax is ok
+nginx: configuration file /home/xuanjun_dev/xuanjun-task-center-https-bc317/evidence/task-center-https-entry-20261025/nginx-syntax-fixture.conf test is successful
