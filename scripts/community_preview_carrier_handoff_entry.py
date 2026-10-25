@@ -25,6 +25,10 @@ class _Bootstrap(object):
     @staticmethod
     def sha(raw):
         return hashlib.sha256(raw).hexdigest()
+    @staticmethod
+    def ident(st):
+        return [st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,
+                st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns]
 
 try:
     from scripts import community_preview_carrier_handoff_admission as h
@@ -299,8 +303,6 @@ def main(argv=None):
         print('UNKNOWN_INSPECT_ONLY')
         return 4
 
-if __name__=='__main__':
-    raise SystemExit(main())
 
 def run(operation):
     """Fixed original-entry caller; current approval is read from the protected record."""
@@ -357,3 +359,6 @@ def run(operation):
         if operation=='execute':return call.call_once_from_original_entry(ctx)
         if operation=='status':return call.reconcile_from_original_entry(ctx)
         return call.rollback_from_original_entry(ctx)
+
+if __name__=='__main__':
+    raise SystemExit(main())
