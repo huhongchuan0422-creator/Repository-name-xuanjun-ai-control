@@ -13,8 +13,27 @@ import time
 import sys
 import types
 from types import SimpleNamespace
-from scripts import community_preview_carrier_handoff_admission as h
-from scripts import community_preview_carrier_handoff_call as call
+import hashlib
+import sys
+
+class _BootstrapHold(RuntimeError):
+    pass
+
+class _Bootstrap(object):
+    HOST='iZd7oeikknn1z21sq6ji6zZ'
+    Hold=_BootstrapHold
+    @staticmethod
+    def sha(raw):
+        return hashlib.sha256(raw).hexdigest()
+
+try:
+    from scripts import community_preview_carrier_handoff_admission as h
+    from scripts import community_preview_carrier_handoff_call as call
+except ImportError:
+    # Standalone fixed caller starts without trusting any carrier Python module;
+    # it verifies and loads the pinned module bytes before transaction work.
+    h=_Bootstrap
+    call=None
 
 PARENT='/opt/xuanjun-community-preview'
 JOURNAL=PARENT+'/update-journal'
@@ -235,6 +254,40 @@ def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_arc
             and value['issued_at']<=now<=value['expires_at']<=value['issued_at']+APPROVAL_TTL_MAX,
             'APPROVAL_EXPIRED_OR_TTL_INVALID')
     return True
+
+def main(argv=None):
+    """Fixed caller CLI. The command selects an operation; only the protected
+    short-lived record authorizes it. No approval flags or caller-supplied paths.
+    """
+    import sys
+    args=list(sys.argv[1:] if argv is None else argv)
+    if len(args)!=1 or args[0] not in OPERATIONS:
+        print('HOLD HANDOFF_OPERATION_DENIED')
+        return 2
+    operation=args[0]
+    try:
+        result=run(operation)
+        state=result.get('state') if isinstance(result,dict) else None
+        if operation=='execute':
+            accepted=state=='SWAPPED_OLD_RETAINED_IN_STAGE' and result.get('retry_safe') is False
+        elif operation=='rollback':
+            accepted=state=='ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED' and result.get('retry_safe') is False
+        else:
+            accepted=state is not None
+        print(h.canonical({'operation':operation,'state':state,
+                           'accepted':bool(accepted),'retry_safe':False}))
+        return 0 if accepted else 3
+    except h.Hold as exc:
+        # Print only the stable reason code, never input data, approval bytes,
+        # paths from untrusted JSON, or signed URLs.
+        print('HOLD '+str(exc))
+        return 3
+    except BaseException:
+        print('UNKNOWN_INSPECT_ONLY')
+        return 4
+
+if __name__=='__main__':
+    raise SystemExit(main())
 
 def run(operation):
     """Fixed original-entry caller; current approval is read from the protected record."""
