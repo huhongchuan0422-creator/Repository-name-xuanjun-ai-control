@@ -6,7 +6,10 @@ on:
       - .github/workflows/p2-uk-swas-diagnostic.yml
       - scripts/p2_uk_swas_diagnostic.py
       - scripts/p2_uk_readonly_diagnostic.py
+      - scripts/p2_uk_stage_a_admission.py
+      - scripts/p2_uk_stage_a_admission_readonly.sh
       - tests/test_p2_uk_readonly_diagnostic.py
+      - tests/test_p2_uk_swas_stage_a_admission.py
   workflow_dispatch:
     inputs:
       operation:
@@ -14,7 +17,7 @@ on:
         required: true
         type: choice
         default: offline
-        options: [offline, remote-run, cloud-query, a5-preflight, a5-query, read-only-diagnostic, read-only-diagnostic-query]
+        options: [offline, remote-run, cloud-query, a5-preflight, a5-query, read-only-diagnostic, read-only-diagnostic-query, b5-admission, b5-admission-query]
       attempt:
         description: 'Exact approved transport attempt; no command input'
         required: false
@@ -31,6 +34,9 @@ on:
       - scripts/p2_swas_receipt_validator.py
       - tests/test_p2_uk_swas_diagnostic.py
       - tests/test_p2_swas_receipt_validator.py
+      - scripts/p2_uk_stage_a_admission.py
+      - scripts/p2_uk_stage_a_admission_readonly.sh
+      - tests/test_p2_uk_swas_stage_a_admission.py
       - tests/test_p2_uk_readonly_diagnostic.py
       - scripts/p2_uk_readonly_diagnostic.py
       - evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md
@@ -77,14 +83,14 @@ jobs:
           python - <<'PY'
           import ast,hashlib,json,os,subprocess,tarfile
           from pathlib import Path
-          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md','scripts/p2_uk_readonly_diagnostic.py','tests/test_p2_uk_readonly_diagnostic.py','docs/development/P2_UK_READONLY_DIAGNOSTIC_20261017.md']
+          paths=['.github/workflows/p2-uk-swas-diagnostic.yml','scripts/p2_uk_swas_diagnostic.py','scripts/p2_swas_receipt_validator.py','tests/test_p2_uk_swas_diagnostic.py','tests/test_p2_swas_receipt_validator.py','evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md','scripts/p2_uk_readonly_diagnostic.py','tests/test_p2_uk_readonly_diagnostic.py','docs/development/P2_UK_READONLY_DIAGNOSTIC_20261017.md','scripts/p2_uk_stage_a_admission.py','scripts/p2_uk_stage_a_admission_readonly.sh','tests/test_p2_uk_swas_stage_a_admission.py']
           for name in paths:
               if name.endswith('.py'):ast.parse(Path(name).read_text(),feature_version=(3,6))
           records=[{'path':n,'size':Path(n).stat().st_size,'sha256':hashlib.sha256(Path(n).read_bytes()).hexdigest()} for n in paths]
           log=Path('/tmp/P2_UK_SWAS_TESTS.log').read_bytes()
           diag_log=Path('/tmp/P2_DIAGNOSTIC_TESTS.log').read_bytes()
           assert b'\nOK\n' in diag_log and b'skipped=' not in diag_log
-          expected_tests=102
+          expected_tests=121
           assert ('Ran %d tests in ' % expected_tests).encode() in log and b'\nOK\n' in log and b'skipped=' not in log
           doc=Path('evidence/p2-epoch7-access-repair-20261014/c-private-completeness/SWAS_HANDOFF.md').read_text()
           script=doc.split('<!-- BEGIN P2_SITE_ENTRY_V1 -->\n```python\n',1)[1].split('```\n<!-- END P2_SITE_ENTRY_V1 -->',1)[0].encode()
@@ -142,7 +148,7 @@ jobs:
     needs: [offline, site-python36]
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query' || inputs.operation == 'a5-preflight' || inputs.operation == 'a5-query' || inputs.operation == 'read-only-diagnostic' || inputs.operation == 'read-only-diagnostic-query') &&
+      (inputs.operation == 'remote-run' || inputs.operation == 'cloud-query' || inputs.operation == 'a5-preflight' || inputs.operation == 'a5-query' || inputs.operation == 'read-only-diagnostic' || inputs.operation == 'read-only-diagnostic-query' || inputs.operation == 'b5-admission' || inputs.operation == 'b5-admission-query') &&
       github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
       github.actor_id == '332398908' &&
       vars.P2_UK_SPLIT_LIVE_ENABLED == 'true'
