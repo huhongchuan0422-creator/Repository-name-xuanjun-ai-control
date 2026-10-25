@@ -181,7 +181,9 @@ def _canonical(raw):
     return value
 
 def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack):
-    fd=os.open(APPROVAL_NAME,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+    try:fd=os.open(APPROVAL_NAME,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+    except FileNotFoundError:raise h.Hold('APPROVAL_MISSING')
+    except OSError:raise h.Hold('APPROVAL_OPEN_REJECTED')
     stack.callback(os.close,fd)
     st=os.fstat(fd)
     require(stat.S_ISREG(st.st_mode) and st.st_uid==uid
