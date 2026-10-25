@@ -229,7 +229,7 @@ class Session:
         evidence=proof.get('evidence') if type(proof) is dict else None
         rows=evidence.get('b_records') if type(evidence) is dict else None
         if type(rows) is not dict or 'B-resume-admission' not in rows:return False
-        self.resume_mode=True;self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE;self.stage_permit_path=B_RESUME_STAGE_PERMIT
+        self.resume_mode=True;self.c_preconfirm_mode=(proof.get('approval_kind')=='C_RESUME_APPROVAL');self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE;self.stage_permit_path=B_RESUME_STAGE_PERMIT
         self.resume_raw=self.bind_resume_reference(resume_record_path())
         need(s.sha(self.resume_raw)==rows['B-resume-admission'],'B_RESUME_PROOF_BINDING_CHANGED')
         resume=s.exact_json(self.resume_raw)
@@ -250,8 +250,13 @@ class Session:
              'B_RESUME_PROOF_BINDING_CHANGED')
         if resume.get('old_stage_permit_sha256') is not None:
             need(resume['old_stage_permit_sha256']==s.sha(raw(s.PERMIT,16384)),'B_RESUME_PROOF_BINDING_CHANGED')
-        self.approved_stamp=self.b['carrier_manifest_sha256']
-        need(self.approved_stamp==resume.get('carrier_manifest_sha256')==self.pins(),'B_SOURCE_BINDING_CHANGED')
+        historical_carrier=self.b['carrier_manifest_sha256']
+        need(historical_carrier==resume.get('carrier_manifest_sha256'),'B_HISTORICAL_CARRIER_BINDING_CHANGED')
+        if self.c_preconfirm_mode:
+            self.approved_stamp=self.pins()
+        else:
+            self.approved_stamp=historical_carrier
+            need(self.approved_stamp==self.pins(),'B_SOURCE_BINDING_CHANGED')
         self.resume_guard()
         return True
     def configure_resumed_b_context(self):
@@ -451,7 +456,8 @@ class Session:
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
         self._c_resume_approval(candidate)
         proof=dict(format=1,mode=MODE,host=p.HOST,attempt=attempt(),
-             plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic)
+             plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic,
+             approval_kind='C_RESUME_APPROVAL')
         fd=s.private_parent(s.BACKUP)
         try:write_private(fd,os.path.basename(PROOF),proof)
         finally:os.close(fd)
@@ -780,12 +786,14 @@ class Session:
             finally:os.close(fd)
         return c.digest(rows)
     def consume(self,proof,recover):
-        need(type(proof) is dict and set(proof)=={'format','mode','host','attempt','plan','approval_sha256','evidence'},
+        need(type(proof) is dict and set(proof) in ({'format','mode','host','attempt','plan','approval_sha256','evidence'},
+             {'format','mode','host','attempt','plan','approval_sha256','evidence','approval_kind'}),
              'EXACT_HANDOFF_DOCUMENT_REQUIRED')
         need(proof['mode']==MODE and proof['host']==p.HOST and proof['attempt']==attempt()
              and type(proof['format']) is int and proof['format']==1,'EXACT_PROOF_SCOPE_REQUIRED')
         candidate=proof['plan']
-        if getattr(self,'c_preconfirm_mode',False):self._c_resume_approval(candidate)
+        if proof.get('approval_kind')=='C_RESUME_APPROVAL':
+            self.c_preconfirm_mode=True;self._c_resume_approval(candidate)
         else:self.c_approval(candidate)
         need(proof['approval_sha256']==s.sha(self.craw),'PROOF_APPROVAL_CHANGED')
         binding=dict(approval_sha256=s.sha(self.craw),handoff_sha256=self.reference_digest())
@@ -813,7 +821,9 @@ class Session:
             self.b,self.braw=document(self.b_path);self.approved_stamp=self.b['carrier_manifest_sha256'];self.freeze=raw(self.freeze_path,16384)
         self.backup=open_private(s.BACKUP+'/clone-results.json')
         # No B rerun, no new plan, no automatic recovery of intents/UNKNOWN.
-        self.c_approval(proof['plan'])
+        if proof.get('approval_kind')=='C_RESUME_APPROVAL':
+            self.c_preconfirm_mode=True;self._c_resume_approval(proof['plan'])
+        else:self.c_approval(proof['plan'])
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
         return self.consume(proof,True)
     def close(self):
