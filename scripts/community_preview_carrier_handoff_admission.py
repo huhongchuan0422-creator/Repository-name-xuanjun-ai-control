@@ -462,6 +462,10 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         tree(parent,TARGET,uid,old_entries,old_id)
         tree(parent,STAGE,uid,new_entries,stage_id)
         need(journal(jfd,uid)==j,'INTENT_CHANGED')
+        _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
+        need(capture_history(history_refs,uid)==history,'HISTORY_CHANGED_BEFORE_SWITCH')
+        need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,
+             'HANDOFF_CONFLICT_BEFORE_SWITCH')
         if fault:fault('before_switch')
         switch_attempted=True
         try:exchange(parent,TARGET,STAGE)
@@ -509,14 +513,18 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
              and ident(os.fstat(entryfd))==expected_entry_identity
              and sha(canonical(capture_history(history_refs,uid)))==intent['history_sha256'],
              'ROLLBACK_BOUNDARY_CHANGED')
-        result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
+        _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
+        need(capture_history(history_refs,uid)==history,'ROLLBACK_HISTORY_CHANGED')
+        need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,
+             'ROLLBACK_CONFLICT')
+        result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_BOUNDARY_CHANGED')
         rollback_attempted=True
         try:exchange(parent,TARGET,STAGE)
         except BaseException:raise Hold('ROLLBACK_EXCHANGE_UNKNOWN_INSPECT_ONLY') from None
         try:
             os.fsync(parent)
-            result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
+            result=status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs)
             need(result['state'] in ('PREPARED_OR_REVERTED','ROLLBACK_APPLIED_RESULT_UNKNOWN'),'ROLLBACK_UNKNOWN')
             writefile(jfd,ROLLBACK_RESULT,canonical({'format':1,'attempt':intent['attempt'],
                      'result':'OLD_RESTORED_NEW_RETAINED','rollback_intent_sha256':sha(canonical(intent))}),uid)
