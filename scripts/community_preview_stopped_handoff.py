@@ -237,7 +237,9 @@ class Session:
         old_braw=self.bind_resume_reference(B_APPROVAL);old_freeze_raw=self.bind_resume_reference(s.FREEZE,16384)
         self.b,self.braw=document(self.b_path);self.bind_resume_reference(self.b_path)
         self.freeze=self.bind_resume_reference(self.freeze_path,16384)
-        if resume.get('old_stage_permit_sha256') is not None:self.bind_resume_reference(s.PERMIT,16384)
+        self.resume_old_permit_absent=resume.get('old_stage_permit_sha256') is None
+        if not self.resume_old_permit_absent:self.bind_resume_reference(s.PERMIT,16384)
+        self.resume_guard()
         need(resume.get('old_b_intent_sha256')==s.sha(intent_raw)
              and resume.get('old_b_approval_sha256')==s.sha(old_braw)
              and resume.get('old_freeze_sha256')==s.sha(old_freeze_raw)
@@ -248,6 +250,7 @@ class Session:
             need(resume['old_stage_permit_sha256']==s.sha(raw(s.PERMIT,16384)),'B_RESUME_PROOF_BINDING_CHANGED')
         self.approved_stamp=self.b['carrier_manifest_sha256']
         need(self.approved_stamp==resume.get('carrier_manifest_sha256')==self.pins(),'B_SOURCE_BINDING_CHANGED')
+        self.resume_guard()
         return True
     def pins(self):
         m,b=document(MANIFEST)
