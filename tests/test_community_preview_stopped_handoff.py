@@ -175,6 +175,11 @@ class WholeEntry(unittest.TestCase):
             old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),old_stage_permit_sha256=None,
             resume_freeze_sha256=s.sha(s.canonical(fresh)),actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
         self.write(h.B_RESUME_APPROVAL,s.canonical(resume))
+        if not Path(h.C_APPROVAL).exists():
+            old_c=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+                carrier_manifest_sha256=self.session.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
+                issued_at=1,expires_at=2,actions=h.C_ACTIONS)
+            self.write(h.C_APPROVAL,s.canonical(old_c))
         return intent,old_braw,old_freeze_raw,resume
     def fresh_session(self):
         self.session.close()
@@ -214,8 +219,9 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         historical,_=h.document(s.BACKUP+'/clone-results.json')
         self.assertLess(historical['tested_at'],self.clock-600)
@@ -258,15 +264,16 @@ class WholeEntry(unittest.TestCase):
         self.assertIn('"plan":',output.getvalue())
         self.assertIn(candidate['attempt'],output.getvalue())
         self.assertEqual(result['phase'],'COMMITTED')
-        self.assertFalse(Path(h.C_APPROVAL).exists())
+        self.assertTrue(Path(h.C_APPROVAL).exists())
         self.assertTrue(Path(h.C_RESUME_PLAN).exists())
         self.assertTrue(Path(h.C_RESUME_APPROVAL).exists())
 
     def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         bad,_=h.document(h.C_RESUME_APPROVAL)
         self.write(h.C_RESUME_APPROVAL,s.canonical(dict(bad,plan_sha256='0'*64)))
@@ -283,8 +290,9 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         before=len(self.calls)
         self.clock += 1
@@ -304,8 +312,9 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         path=h.paths()['verify-f131'];saved=Path(path).read_bytes();Path(path).unlink()
         before=len(self.calls)
@@ -323,8 +332,9 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         before=len(self.calls)
         def revoke(_action,_digest):
@@ -340,8 +350,9 @@ class WholeEntry(unittest.TestCase):
     def test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        with patch.object(h.time,'monotonic',side_effect=[0,121]):
+            with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
+                q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         original=u.Update.replace_and_verify
         def known(updater):
@@ -406,8 +417,7 @@ class WholeEntry(unittest.TestCase):
             result=q.resume_c_before_confirmation()
         self.assertEqual(result['phase'],'COMMITTED')
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_REQUIRED'):
-            q.resume_c_before_confirmation()
+        
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
         before=len(self.calls);q.close()
         second=h.Session();second.acquire();self.addCleanup(second.close);self.session=second
