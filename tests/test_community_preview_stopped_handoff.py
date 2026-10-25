@@ -233,6 +233,9 @@ class WholeEntry(unittest.TestCase):
 
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
+        historical,_=h.document(s.BACKUP+'/clone-results.json')
+        self.assertLess(historical['tested_at'],self.clock-600)
+        self.assertTrue(q.c_preconfirm_mode)
         before_calls=len(self.calls)
         with patch.object(h,'acknowledge',side_effect=u.Hold('EXACT_CONFIRMATION_REQUIRED')):
             with self.assertRaisesRegex(u.Hold,'EXACT_CONFIRMATION_REQUIRED'):
