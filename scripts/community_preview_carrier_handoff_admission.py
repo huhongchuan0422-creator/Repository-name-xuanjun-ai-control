@@ -490,6 +490,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
             expected_journal_identity,expected_entry_identity,expected_lock_identity,attempt,history_refs=None,fault=None,mode=None):
     """One-shot isolated transaction; caller supplies immutable old inventory and fd witnesses."""
     state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
+    old_manifest,old_archive,new_manifest,new_archive_sha=manifest_pins(mode)
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
@@ -499,15 +500,14 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         need(childstat(jfd,state_name) is None and childstat(jfd,preintent_name) is None and childstat(parent,stage_name) is None
              and childstat(parent,retained_name) is None,'EXISTING_TRANSACTION_INSPECT_ONLY')
         need(childstat(jfd,'active-attempt.json') is None,'ACTIVE_BUSINESS_ATTEMPT')
-        verified_old_inventory(old_entries)
+        verified_old_inventory(old_entries,mode)
         old_id=tree(parent,TARGET,uid,old_entries)
         need(sha(old_entries['manifest.json'])==old_manifest,'OLD_MANIFEST_CHANGED')
-        old_manifest,old_archive,new_manifest,new_archive_sha=manifest_pins(mode)
         new_entries=members(new_archive,new_manifest,new_archive_sha)
         need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
         history=capture_history(history_refs,uid,parent,jfd,mode)
         pre=dict(format=1,attempt=attempt,old_identity=old_id,
-                 old_manifest=OLD_MANIFEST,new_manifest=NEW_MANIFEST,
+                 old_manifest=old_manifest,new_manifest=new_manifest,
                  entry_identity=expected_entry_identity,
                  parent_identity=expected_parent_identity,
                  journal_parent_identity=dirident(os.fstat(jfd)),lock_identity=expected_lock_identity,history=history,
@@ -518,8 +518,8 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         build_tree(parent,new_entries,uid,name=stage_name,fault=fault)
         stage_id=tree(parent,stage_name,uid,new_entries)
         if fault:fault('staged')
-        j={'format':1,'attempt':attempt,'old_manifest':OLD_MANIFEST,
-           'new_manifest':NEW_MANIFEST,'old_identity':old_id,'stage_identity':stage_id,
+        j={'format':1,'attempt':attempt,'old_manifest':old_manifest,
+           'new_manifest':new_manifest,'old_identity':old_id,'stage_identity':stage_id,
            'old_tree_sha':sha(canonical({x:sha(y) for x,y in old_entries.items()})),
            'new_tree_sha':sha(canonical({x:sha(y) for x,y in new_entries.items()})),
            'history':history,'entry_identity':expected_entry_identity,
