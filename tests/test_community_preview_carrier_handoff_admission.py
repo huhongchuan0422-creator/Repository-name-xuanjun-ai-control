@@ -104,6 +104,45 @@ class HandoffAdmission(unittest.TestCase):
                          self.parent_id,self.journal_id,self.entry_id,self.lock_id,'isolated-attempt-0001',
                          history_refs=self.history_refs,fault=fault)
 
+    def post_b_refs(self):
+        refs=dict(self.history_refs)
+        required={'snapshot_result':b'B_SNAPSHOT_RESULT','snapshot_permit':b'B_SNAPSHOT_PERMIT',
+            'validate_clones_result':b'B_CLONE_RESULT','validate_clones_permit':b'B_CLONE_PERMIT',
+            'resume_approval':b'B_RESUME_APPROVAL','resume_freeze':b'B_RESUME_FREEZE','c_approval':b'OLD_C_APPROVAL'}
+        for key,body in required.items():
+            pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
+            name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
+            st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
+            refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
+        os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
+        st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
+        refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.ident(st),None)
+        return refs
+
+    def test_post_b_exchange_status_and_owned_rollback_use_separate_records(self):
+        refs=self.post_b_refs()
+        result=h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0001',history_refs=refs,mode=h.POST_B_MODE)
+        self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+        self.assertIsNone(h.childstat(self.jfd,h.STATE));self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_STATE))
+        status=h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+        self.assertEqual(status['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+        rolled=h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+        self.assertEqual(rolled['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+        self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_INTENT))
+        self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_RESULT))
+
+    def test_post_b_requires_completed_b_and_preserves_old_c_approval(self):
+        refs=self.post_b_refs();saved=h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid)
+        os.unlink(h.HISTORY_NAMES['snapshot_result'],dir_fd=self.jfd)
+        refs['snapshot_result']=(self.jfd,h.HISTORY_NAMES['snapshot_result'],h.parent_ident(os.fstat(self.jfd)),None,None)
+        with self.assertRaisesRegex(h.Hold,'REQUIRED_HISTORY_MISSING'):
+            h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0002',history_refs=refs,mode=h.POST_B_MODE)
+        self.assertEqual(h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid),saved)
+
     def test_artifact_redirect_strips_authorization_and_signed_url_is_not_logged(self):
         req=__import__('urllib.request',fromlist=['Request']).Request(
             'https://api.github.com/repos/example/repo/actions/artifacts/123/zip',
