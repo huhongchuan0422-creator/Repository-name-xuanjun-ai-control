@@ -5,6 +5,7 @@ import io
 import json
 import os
 import stat
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -121,43 +122,59 @@ class HandoffAdmission(unittest.TestCase):
         refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         return refs
 
-    def test_post_b_exchange_status_and_owned_rollback_use_separate_records(self):
+    def post_b_fixture(self):
+        if not os.environ.get('HANDOFF_NEW_ARCHIVE'):
+            self.skipTest('exact nested 005c carrier fixture required')
         refs=self.post_b_refs()
-        result=h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+        old_entries=h.members(self.archive,h.POST_B_OLD_MANIFEST,h.POST_B_OLD_ARCHIVE)
+        from scripts.community_preview_bc_build import build
+        candidate_archive,candidate_manifest,_=build()
+        self.assertEqual(hashlib.sha256(candidate_archive).hexdigest(),h.POST_B_NEW_ARCHIVE)
+        self.assertEqual(hashlib.sha256(candidate_manifest).hexdigest(),h.POST_B_NEW_MANIFEST)
+        new_entries=h.members(candidate_archive,h.POST_B_NEW_MANIFEST,h.POST_B_NEW_ARCHIVE)
+        target=os.path.join(self.tmp.name,'carrier',h.TARGET)
+        shutil.rmtree(target)
+        h.build_tree(self.parent,old_entries,self.uid,name=h.TARGET)
+        return refs,old_entries,new_entries,candidate_archive
+
+    def test_post_b_exchange_status_and_owned_rollback_use_separate_records(self):
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        result=h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
             self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0001',history_refs=refs,mode=h.POST_B_MODE)
         self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
         self.assertIsNone(h.childstat(self.jfd,h.STATE));self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_STATE))
-        status=h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+        status=h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,old_entries,new_entries,
             self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
         self.assertEqual(status['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
-        rolled=h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+        rolled=h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
             self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
         self.assertEqual(rolled['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
         self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_INTENT))
         self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_RESULT))
 
     def test_post_b_refuses_c_proof_or_checkpoint_before_execute_status_and_rollback(self):
-        refs=self.post_b_refs()
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
         backup=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:h.writefile(backup,'stopped-handoff-v1.json',b'PROOF_ALREADY_EXISTS',self.uid)
         finally:os.close(backup)
         with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
-            h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+            h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0003',
                 history_refs=refs,mode=h.POST_B_MODE)
         with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
-            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,old_entries,new_entries,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
         with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
-            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
 
     def test_post_b_requires_completed_b_and_preserves_old_c_approval(self):
-        refs=self.post_b_refs();saved=h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid)
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        saved=h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid)
         os.unlink(h.HISTORY_NAMES['snapshot_result'],dir_fd=self.jfd)
         refs['snapshot_result']=(self.jfd,h.HISTORY_NAMES['snapshot_result'],h.parent_ident(os.fstat(self.jfd)),None,None)
         with self.assertRaisesRegex(h.Hold,'REQUIRED_HISTORY_MISSING'):
-            h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+            h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0002',history_refs=refs,mode=h.POST_B_MODE)
         self.assertEqual(h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid),saved)
 
