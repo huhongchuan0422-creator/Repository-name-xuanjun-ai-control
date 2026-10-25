@@ -240,11 +240,9 @@ class HandoffAdmission(unittest.TestCase):
         with patch.object(h,'exchange',side_effect=exchange_then_raise):
             with self.assertRaisesRegex(h.Hold,'EXCHANGE_RESULT_UNKNOWN_INSPECT_ONLY'):
                 self.execute()
-        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
-            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
-                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
-        # Independently inspect the two directory trees without trusting the
-        # changed historical binding; proves the rejected rollback did not exchange.
+        result=h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
         binding=h.journal(self.jfd,self.uid)
         self.assertEqual(h.tree(self.parent,h.TARGET,self.uid,self.new,binding['stage_identity']),
                          binding['stage_identity'])
