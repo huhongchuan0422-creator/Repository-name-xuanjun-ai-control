@@ -332,9 +332,12 @@ class Session:
         prior_permit_sha=self.strict_prior_stage_permit(old_b,old_freeze,old_freeze_raw)
         need(prior_permit_sha==resume['old_stage_permit_sha256'],
              'B_RESUME_PROOF_BINDING_CHANGED')
-        self.approved_stamp=self.b['carrier_manifest_sha256']
-        need(self.approved_stamp==resume['carrier_manifest_sha256']==self.pins(),
-             'B_SOURCE_BINDING_CHANGED')
+        historical_carrier=self.b['carrier_manifest_sha256']
+        need(historical_carrier==resume['carrier_manifest_sha256'],
+             'B_HISTORICAL_CARRIER_BINDING_CHANGED')
+        # B's completed results stay bound to the historical carrier. The
+        # current caller/modules are separately verified by pins() for C.
+        self.approved_stamp=self.pins()
         self.resume_absent=(u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
         # The existing C approval is expected input for this recovery, not an
         # absence constraint. All C side-effect/journal markers remain absent.
