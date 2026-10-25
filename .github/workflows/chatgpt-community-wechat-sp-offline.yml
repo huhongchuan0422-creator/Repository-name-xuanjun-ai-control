@@ -225,6 +225,21 @@ jobs:
           python -m pip install fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 cryptography==50.0.2
           PYTHONPATH=.:tests python -B -m unittest test_community_ocr_bridge.OcrComposition test_community_mini_merchant.OcrSourceBoundary test_community_merchant_onboarding -v 2>&1 | tee community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Issue76 exact source AST and syntax preflight
+        if: steps.scope.outputs.handoff_touched == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_admission.py 2>&1 | tee community-parse.log
+          python -B - <<'PY' 2>&1 | tee -a community-parse.log
+          import ast
+          from pathlib import Path
+          for name in ('scripts/community_preview_carrier_handoff_admission.py',
+                       'tests/test_community_preview_carrier_handoff_admission.py'):
+              raw=Path(name).read_bytes()
+              ast.parse(raw.decode('utf-8'),filename=name)
+              print('AST_PARSE_PASS',name,'bytes='+str(len(raw)))
+          PY
       - name: Retrieve and verify immutable nested 1d and 005c carrier fixtures
         if: steps.scope.outputs.handoff_touched == 'true'
         env:
@@ -630,6 +645,7 @@ jobs:
         with:
           name: community-carrier-handoff-isolated-evidence
           path: |
+            community-parse.log
             community-tests.log
             scripts/community_preview_carrier_handoff_admission.py
             tests/test_community_preview_carrier_handoff_admission.py
