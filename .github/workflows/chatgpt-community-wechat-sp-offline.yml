@@ -91,6 +91,7 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               f.write('resume_only='+str(set(rows)<=allowed).lower()+'\n')
               f.write('handoff_only='+str(set(rows)<=handoff).lower()+'\n')
+              f.write('handoff_touched='+str(bool(set(rows)&handoff)).lower()+'\n')
           CHECK
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -225,7 +226,7 @@ jobs:
           PYTHONPATH=.:tests python -B -m unittest test_community_ocr_bridge.OcrComposition test_community_mini_merchant.OcrSourceBoundary test_community_merchant_onboarding -v 2>&1 | tee community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Retrieve and verify immutable nested 1d and 005c carrier fixtures
-        if: steps.scope.outputs.handoff_only == 'true'
+        if: steps.scope.outputs.handoff_touched == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -618,7 +619,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Preserve Issue76 carrier handoff isolated test evidence
-        if: always() && steps.scope.outputs.handoff_only == 'true'
+        if: always() && steps.scope.outputs.handoff_touched == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: community-carrier-handoff-isolated-evidence
