@@ -4,7 +4,7 @@ The fixed caller now verifies and compiles the exact hash-pinned transaction/cal
 
 
 
-At the current source head, the fixed in-process entry is `scripts/community_preview_carrier_handoff_entry.py`. It no longer accepts an external `authority_checker` and is not a CLI. The original unique installation Writer calls `run('execute')`, `run('status')`, or `run('rollback')` only inside its already-authorized process. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
+At the current source head, the fixed caller is `scripts/community_preview_carrier_handoff_entry.py` (current hash/size recorded below). It reads only fixed old/new input filenames, validates both archive pins, verifies and loads exact hash-pinned transaction/call module bytes from the protected parent, and reads a short-lived operation-bound approval record. It has a fixed CLI with no approval bypass flags; root/admin identity alone is not authorization. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
 
 Fixed input files (must already exist; code never creates or downloads them):
 - `/opt/xuanjun-community-preview/control-stopped-v1-1d639.zip`
@@ -32,28 +32,25 @@ Short-lived approval record:
 ```
 The example timestamps above are schema illustration only, **not a real approval**. The record must bind the exact requested operation and attempt, and satisfy `issued_at <= current_time <= expires_at <= issued_at + 600`. A separate fresh record is required for status or rollback; old B/C approvals cannot authorize this transaction. Re-read from the same FD and recheck FD/path identity, content, pins, operation and expiry immediately before dispatch. Missing, stale, replaced, malformed, or mismatched record is HOLD.
 
-The entry verifies the transaction and call module source SHA before loading/compiling those exact bytes from the fixed installed `control-stopped-v1/scripts` directory. Fixed source pins:
+The entry verifies the transaction and call module source SHA before loading/compiling those exact bytes from `/opt/xuanjun-community-preview/`. Fixed source pins:
 - `community_preview_carrier_handoff_admission.py`: `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`.
 - `community_preview_carrier_handoff_call.py`: `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
 
-Original Writer invocation/result consumption:
-```python
-from scripts.community_preview_carrier_handoff_entry import run
-result = run('execute')  # one call only; consumes fixed inputs + current approval
-if result.get('state') != 'SWAPPED_OLD_RETAINED_IN_STAGE':
-    # Do not call execute again. Use a separately approved, read-only status call.
-    raise RuntimeError('HANDOFF_NOT_ACCEPTED_INSPECT_ONLY')
-# After any exception/UNKNOWN: separately approved run('status'), read-only.
-# A separately approved run('rollback') is allowed only by the transaction's
-# exact ownership/history/absence checks; no automatic rollback or retry.
+Fixed startup commands (must be invoked only in the original unique installer's execution slot; never parallel/manual retry):
+```bash
+sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py execute
+# On UNKNOWN, after the original owner issues a fresh operation=status approval:
+sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py status
+# Rollback requires its own fresh operation=rollback approval and exact ownership checks:
+sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py rollback
 ```
-No shell command or direct module execution is supplied because that would create a second entrypoint outside the original Writer. The existing `resume-b-partial.sh` remains unchanged and must not run before handoff acceptance and its separate B-resume gate.
+The operation argument is not approval; the protected record is the authority. Execute is one-shot. UNKNOWN means status only, never re-run execute. The original installation workflow must place the fixed caller and the two pinned modules into the protected parent using its existing approved delivery path. This source task does not transport/install them or create approval records. The existing `resume-b-partial.sh` remains unchanged and must not run before handoff acceptance and its separate B-resume gate.
 
 This is source/caller implementation only. The original installer has not been edited or invoked; no approval record is fabricated here. Required fixed input files and a fresh approval must be provisioned by the original installation owner after package review. `REAL_PYTHON_3_6_8=NOT_RUN`.
 
 ---
 
-### Exact fixed-entry source hashes at HEAD 29f401f2cef00fb7913858f27daca4378cc2bc22
+### Exact fixed-entry source hashes at current caller source revision (see latest branch HEAD)
 
 - `scripts/community_preview_carrier_handoff_entry.py`: 14377 bytes, SHA256 `0c7736143a9405a3395955e589ec0932fa9db30481b3fbc08cbbca001d21f099`.
 - `tests/test_community_preview_carrier_handoff_entry.py`: 2243 bytes, SHA256 `aacd02f48996b5d0dac448b81236e3ed4aa157b7cdc5264b35ccea42bc4a06b1`.
