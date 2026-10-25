@@ -19,6 +19,7 @@ TARGET='control-stopped-v1'
 STAGE='control-stopped-v1.handoff-stage-v1'
 RETAINED='control-stopped-v1.handoff-retained-old-v1'
 STATE='carrier-handoff-intent-v1.json'
+PREINTENT='carrier-handoff-preintent-v1.json'
 LOCK='community-update.lock'
 OLD_MANIFEST='e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a'
 NEW_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
@@ -122,6 +123,7 @@ def tree(fd,name,uid,expected,expected_id=None):
                 dirs.setdefault(prefix,set()).add(child)
                 dirs.setdefault('/'.join(chunks[:j+1]),set())
             dirs.setdefault('/'.join(chunks[:-1]),set()).add(chunks[-1])
+        need(len(expected)<=MAX_FILES and len(dirs)<=MAX_FILES,'TREE_BUDGET_EXCEEDED')
         for rel,names in dirs.items():
             current=root;opened=[]
             try:
@@ -129,7 +131,9 @@ def tree(fd,name,uid,expected,expected_id=None):
                     nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=current)
                     opened.append(nxt);current=nxt
                     checked_dir(current,uid)
-                need(set(os.listdir(current))==names,'TREE_EXTRA_OR_MISSING_MEMBER')
+                before=dirident(os.fstat(current))
+                need(set(os.listdir(current))==names and set(os.listdir(current))==names
+                     and before==dirident(os.fstat(current)),'TREE_EXTRA_OR_MISSING_MEMBER')
             finally:
                 for n in reversed(opened):os.close(n)
         for rel,want in expected.items():
@@ -140,6 +144,15 @@ def tree(fd,name,uid,expected,expected_id=None):
                     nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=current)
                     opened.append(nxt);current=nxt;checked_dir(current,uid)
                 need(readfile(current,parts[-1],uid)==want,'TREE_BYTES_CHANGED')
+            finally:
+                for n in reversed(opened):os.close(n)
+        for rel,names in dirs.items():
+            cur=root;opened=[]
+            try:
+                for part in rel.split('/') if rel else ():
+                    nxt=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=cur)
+                    opened.append(nxt);cur=nxt;checked_dir(cur,uid)
+                need(set(os.listdir(cur))==names,'TREE_CHANGED_DURING_READ')
             finally:
                 for n in reversed(opened):os.close(n)
         need(dirident(st)==dirident(os.fstat(root))
@@ -233,6 +246,13 @@ def _locks(jfd,entryfd,uid,expected_entry_identity):
 
 def status(parent,jfd,uid,old_entries,new_entries):
     j=journal(jfd,uid)
+    pre_raw=readfile(jfd,PREINTENT,uid,8192)
+    try:pre=json.loads(pre_raw.decode('utf8'))
+    except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
+    need(pre_raw==canonical(pre) and pre['attempt']==j['attempt']
+         and pre['old_identity']==j['old_identity']
+         and pre['old_manifest']==OLD_MANIFEST
+         and pre['new_manifest']==NEW_MANIFEST,'PREINTENT_CHAIN_CHANGED')
     current=childstat(parent,TARGET)
     stage=childstat(parent,STAGE)
     retained=childstat(parent,RETAINED)
@@ -264,7 +284,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
     need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
     lease=_locks(jfd,entryfd,uid,expected_entry_identity)
     try:
-        need(childstat(jfd,STATE) is None and childstat(parent,STAGE) is None
+        need(childstat(jfd,STATE) is None and childstat(jfd,PREINTENT) is None and childstat(parent,STAGE) is None
              and childstat(parent,RETAINED) is None,'EXISTING_TRANSACTION_INSPECT_ONLY')
         need(childstat(jfd,'active-attempt.json') is None,'ACTIVE_BUSINESS_ATTEMPT')
         old_id=tree(parent,TARGET,uid,old_entries)
@@ -272,6 +292,13 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         new_entries=members(new_archive,NEW_MANIFEST,NEW_ARCHIVE)
         # The fixed original B intent is never rewritten, or used as new authority.
         need(childstat(jfd,'community-update-intent.json') is None,'UNREVIEWED_INTENT_NAMESPACE')
+        pre=dict(format=1,attempt=attempt,old_identity=old_id,
+                 old_manifest=OLD_MANIFEST,new_manifest=NEW_MANIFEST,
+                 entry_identity=expected_entry_identity,
+                 parent_identity=expected_parent_identity,
+                 journal_parent_identity=parent_ident(os.fstat(jfd)))
+        writefile(jfd,PREINTENT,canonical(pre),uid)
+        if fault:fault('preintent_fsynced')
         build_tree(parent,new_entries,uid)
         stage_id=tree(parent,STAGE,uid,new_entries)
         if fault:fault('staged')
