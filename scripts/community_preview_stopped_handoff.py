@@ -381,6 +381,7 @@ class Session:
                  'C_RESUME_PLAN_EVIDENCE_CHANGED')
             candidate=saved['plan']
         else:
+            need(not exists_private(C_RESUME_APPROVAL),'C_RESUME_APPROVAL_PREEXISTS_WITHOUT_PLAN')
             record=dict(format=1,host=p.HOST,mode=MODE,attempt=attempt(),
                 carrier_manifest_sha256=self.approved_stamp,evidence_sha256=evidence_sha,
                 plan=candidate,plan_sha256=s.sha(s.canonical(candidate)),
