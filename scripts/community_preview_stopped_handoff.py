@@ -314,6 +314,9 @@ class Session:
         need(self.approved_stamp==resume['carrier_manifest_sha256']==self.pins(),
              'B_SOURCE_BINDING_CHANGED')
         self.resume_absent=(u.JOURNAL_PARENT+'/active-attempt.json',u.JOURNAL_PARENT+'/'+attempt())
+        # The existing C approval is expected input for this recovery, not an
+        # absence constraint. All C side-effect/journal markers remain absent.
+        self.resume_absent=tuple(path for path in self.resume_absent if path!=C_APPROVAL)
         self.freeze_live()
         self.resume_guard()
         return resume
@@ -771,9 +774,7 @@ def main(argv=None):
     group=parser.add_mutually_exclusive_group()
     group.add_argument('--owner-bc',action='store_true')
     group.add_argument('--resume-b-partial',action='store_true')
-    group.add_argument('--resume-c-before-confirmation',action='store_true')
     group.add_argument('--recover-known-failure',action='store_true')
-    group.add_argument('--resume-c-before-confirmation',action='store_true')
     args=parser.parse_args(argv)
     if not args.owner_bc and not args.resume_b_partial and not args.recover_known_failure and not args.resume_c_before_confirmation:
         print('{"state":"BC_DEFAULT_HOLD","site_executed":false}');return 2
