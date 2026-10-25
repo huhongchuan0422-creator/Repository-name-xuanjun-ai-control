@@ -287,6 +287,7 @@ class Session:
              'PRIOR_B_EVIDENCE_MISMATCH')
         self.braw=self.bind_resume_reference(self.b_path)
         self.b=s.exact_json(self.braw)
+        window(self.b)
         need(self.braw==s.canonical(self.b)
              and set(self.b)=={'format','host','mode','attempt','carrier_manifest_sha256',
                 'issued_at','expires_at','old_b_intent_sha256','old_b_approval_sha256',
