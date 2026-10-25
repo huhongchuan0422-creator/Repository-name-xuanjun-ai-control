@@ -1,3 +1,53 @@
+# Issue76 fixed handoff — current delivery index (2026-10-25)
+
+This section supersedes stale caller sizes/hashes and historical pending-CI wording below. Source review anchor: commit `bd2fe0859b95fdc19aec25ce993a829043718570`, Tree `4e77e8c05c4a3e2aee74088cce566046cfbd29ae`. Hosted Run `40185248009` reported 60/60 and COMPLIANCE_PASS; the one-FD repeated-read defect was the prior 58-test failure and is fixed in that source-pass anchor. The present change is documentation-only; no code/test/workflow changes.
+
+## Fixed files and SHA256
+
+| Item | Fixed path / source | Size | SHA256 / digest |
+|---|---|---:|---|
+| Caller | `scripts/community_preview_carrier_handoff_entry.py` → install at `/opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py` | 17099 B | `8cb625d5fbe5f9dd637f31060799d57bb52600d995a6a613061ab59dbbf411f8` |
+| Transaction module | `scripts/community_preview_carrier_handoff_admission.py` → same protected parent | 35329 B | `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386` |
+| Call adapter | `scripts/community_preview_carrier_handoff_call.py` → same protected parent | 3461 B | `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc` |
+| Old 1d archive | `/opt/xuanjun-community-preview/control-stopped-v1-1d639.zip` | nested archive | `5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4` |
+| Old manifest | embedded and independently checked against old archive | 1548 B | `e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a` |
+| New 005c archive | `/opt/xuanjun-community-preview/control-stopped-v1-005c.zip` | nested archive | `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff` |
+| New manifest | embedded and independently checked against new archive | 1548 B | `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd` |
+| Old source artifact | original Run 40125347707 / Artifact 12572781194 | 107650 B | `a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956` |
+| New source artifact | original Run 40160005255 / Artifact 12586026477 | 117926 B | `f529ca439a9decc95efa4cf4f93391e0ba93719565ad952629d752ef7640ca34` |
+| B resume wrapper | existing `resume-b-partial.sh` | 1883 B | `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f` |
+
+The fixed inputs and source files must already be placed by the original installation owner through the existing approved delivery path. This documentation change does not upload, install, rename, or create any protected file. The caller checks the exact transaction/call module pins and archive/manifest pins before transaction dispatch. The Python 3.6.8 real-host test remains `NOT_RUN`.
+
+## Approval record and responsibility
+
+Fixed approval path: `/opt/xuanjun-community-preview/carrier-handoff-approval.json`.
+
+Exactly ten fields; no extra fields or duplicate JSON keys:
+`format` (integer 1), `host`, `operation` (`execute`, `status`, or `rollback`), `attempt`, `old_archive_sha256`, `old_manifest_sha256`, `new_archive_sha256`, `new_manifest_sha256`, `issued_at` (Unix integer seconds), `expires_at` (Unix integer seconds).
+
+The file must be root-owned, regular, mode 0600, single-link, opened with NOFOLLOW/NONBLOCK, no larger than 16 KiB, canonical compact sorted-key JSON, and stable on the same FD and path. The operation/host/attempt and all four archive/manifest digests must match fixed values. Time condition: `issued_at <= now <= expires_at <= issued_at + 600`. Missing, expired, malformed, wrong-scope, changed, replaced, or identity-mismatched record is HOLD. A separate fresh record is required for status and rollback. The sample JSON in historical text is schema illustration only; it is **not** an approval.
+
+**Approval responsibility:** the Owner/original installation owner must explicitly approve the specific on-site operation after reviewing the complete package and current site facts. Only that owner/authorized registrar may create the real short-lived record through the already approved process. No record or real timestamps are created by this source task. Old B/C approvals cannot authorize carrier handoff.
+
+## Original installation sequence — do not run during this source-only preparation
+
+1. Original installation owner checks the live UK host identity `iZd7oeikknn1z21sq6ji6zZ`, the existing root/admin→sudo identity and loginuid, original ENTRY SHA `48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55`, existing update-journal, `community-update.lock`, and all original B-intent/freeze/permit/failure history. Unknown, replaced, missing, or inconsistent state means HOLD; do not reconstruct a baseline from historical screenshots.
+2. Through the original approved delivery route only, place the exact caller, two modules, and the two archive inputs at the fixed paths above. Independently verify every listed size/SHA, file owner/mode/link count and parent/FD identity. Do not use the first-install path, delete/rename the old target, or create another lock/transport.
+3. After package review and explicit per-operation approval, the original unique installer registers the ten-field approval record with a lifetime no greater than 600 seconds. The example values below are not to be copied into a live record.
+4. Exactly one invocation: `sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_preview_carrier_handoff_entry.py execute`. Only the exact accepted `SWAPPED_OLD_RETAINED_IN_STAGE` result is accepted. Never automatically retry.
+5. If execution returns UNKNOWN, crashes, or transport result is lost: no second execute. Obtain a fresh operation=`status` approval, invoke the same fixed caller once for read-only reconciliation, preserve its raw result, and have the original owner adjudicate.
+6. Rollback is not automatic. It requires a separate fresh operation=`rollback` approval and the transaction's exact tree ownership, history, active-attempt/retained-path absence and prior-rollback guards. Any mismatch/UNKNOWN means HOLD; do not broaden the rollback or delete retained evidence.
+7. Only after handoff package acceptance and a separate new B-resume authorization may the original installation owner consider the unchanged `resume-b-partial.sh`. This handoff never runs B/C, issues B/C permits, starts services, deletes old intent, or replays an old operation.
+
+## Authorization boundary
+
+Already covered: source and isolated test implementation/review, fixed digest indexing, documenting the call contract and stopping conditions, reusing previously verified CI evidence without repeating unchanged work.
+
+Not covered by this source-only scope: uploading protected files to the UK host, creating/writing the approval record, executing `execute/status/rollback` on the live host, changing the installed carrier, invoking B/C, issuing/renewing any permit, deleting or rewriting old intent/history, or starting/stopping services. Each such operation needs the original installation owner's specific valid authorization and fresh现场 checks. The schedule extension to 2026-10-25 24:00 is a deadline, not execution permission.
+
+---
+
 ## 2026-10-25 — Current fixed caller approval and input contract
 
 The fixed caller now verifies and compiles the exact hash-pinned transaction/call module bytes from the protected installed scripts directory before dispatch. It has no external checker callback; the operation-specific approval is read from the fixed root-0600 approval record, and both old/new archives are read from the fixed protected input names. Production entry still refuses if those inputs or the fresh approval are absent.
