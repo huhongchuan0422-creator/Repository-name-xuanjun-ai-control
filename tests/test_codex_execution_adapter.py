@@ -127,6 +127,45 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           codex_execution_intents''').fetchone()[0],0)
 
+    def test_reviewer_assignment_never_authorizes_codex_transport(self):
+        now=time.time()
+        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
+          (?,?,?,?,?,?,?,?)''',('tenant-a','qa-review','v1','REVIEWER','["code"]',
+          0,1,'QA'))
+        self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
+          (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b','qa-review',
+          'v1','qa-principal','fixture','fixture','ASSIGNED','test',now))
+        self.supervisor.db.commit()
+        reviewer=CodexExecutionControl(self.gateway,
+          self.authority.issue('tenant-a','qa-principal'))
+        with self.assertRaisesRegex(ValueError,'ASSIGNED_CODEX_ACTOR'):
+            reviewer.create_intent('demo-b','CODEX_SDK','reviewer-send',
+              self.context_body)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          codex_execution_intents''').fetchone()[0],0)
+
+    def test_executor_role_revocation_after_intent_blocks_transport(self):
+        now=time.time()
+        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
+          (?,?,?,?,?,?,?,?)''',('tenant-a','codex-executor','v1','EXECUTOR',
+          '["code"]',1,1,None))
+        self.supervisor.db.execute('''INSERT INTO model_assignments VALUES
+          (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b',
+          'codex-executor','v1','codex-principal','fixture','fixture','ASSIGNED',
+          'test',now));self.supervisor.db.commit()
+        executor=CodexExecutionControl(self.gateway,
+          self.authority.issue('tenant-a','codex-principal'))
+        executor.create_intent('demo-b','CODEX_SDK','executor-send',
+          self.context_body)
+        self.supervisor.db.execute('''UPDATE role_templates SET enabled=0 WHERE
+          tenant_id='tenant-a' AND role_id='codex-executor' ''')
+        self.supervisor.db.commit();calls=[]
+        result=executor.dispatch_once({'CODEX_SDK':CodexSDKTransport(
+          lambda intent:(calls.append(intent) or {'state':'ACKED'}))})
+        self.assertEqual(result['state'],'FAILED');self.assertEqual(calls,[])
+        self.assertEqual(executor.projection()[0]['requesting_principal'],
+          'codex-principal')
+
     def test_acked_cancel_is_request_not_false_terminal(self):
         intent=self.control.create_intent('demo-b','CODEX_SDK','acked-cancel',
           self.context_body)

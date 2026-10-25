@@ -60,6 +60,7 @@ class CodexExecutionControl(object):
               tenant_id TEXT NOT NULL,intent_id TEXT NOT NULL,
               idempotency_key TEXT NOT NULL,task_id TEXT NOT NULL,
               attempt_id TEXT NOT NULL,transport_kind TEXT NOT NULL,
+              requesting_principal TEXT,
               writer_principal TEXT NOT NULL,writer_fence INTEGER NOT NULL,
               writer_epoch INTEGER NOT NULL,writer_valid_until REAL NOT NULL,
               state TEXT NOT NULL,context_json TEXT NOT NULL,
@@ -73,6 +74,27 @@ class CodexExecutionControl(object):
               event_kind TEXT NOT NULL,payload_json TEXT NOT NULL,
               accepted INTEGER NOT NULL,observed_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,intent_id,event_id))''')
+            columns={row['name'] for row in self.db.execute(
+              'PRAGMA table_info(codex_execution_intents)')}
+            if 'requesting_principal' not in columns:
+                self.db.execute('''ALTER TABLE codex_execution_intents ADD COLUMN
+                  requesting_principal TEXT''')
+
+    def _actor_allowed(self,task_id,attempt_id,principal,writer_principal):
+        unit=self.db.execute('''SELECT responsible_party FROM execution_units
+          WHERE tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if principal==writer_principal or (unit is not None and
+                principal==unit['responsible_party']):
+            return True
+        if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
+          name='model_assignments' ''').fetchone() is None:
+            return False
+        return self.db.execute('''SELECT 1 FROM model_assignments a JOIN
+          role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
+          AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
+          a.attempt_id=? AND a.principal_id=? AND a.state='ASSIGNED' AND
+          r.phase='EXECUTOR' AND r.writer_allowed=1 AND r.enabled=1''',(
+          self.tenant_id,task_id,attempt_id,principal)).fetchone() is not None
 
     def create_intent(self,task_id,transport_kind,idempotency_key,context,now=None):
         now=self.clock() if now is None else now
@@ -97,14 +119,8 @@ class CodexExecutionControl(object):
           WHERE tenant_id=? AND task_id=? AND preflight_id=?''',(
           self.tenant_id,task_id,ready['preflight_id'])).fetchone()
         principal=self.context['principal_id']
-        assigned=False
-        if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
-          name='model_assignments' ''').fetchone() is not None:
-            assigned=self.db.execute('''SELECT 1 FROM model_assignments WHERE
-              tenant_id=? AND task_id=? AND attempt_id=? AND principal_id=?''',(
-              self.tenant_id,task_id,task['attempt_id'],principal)).fetchone() is not None
-        if principal not in (task['authority_caller_id'],unit['responsible_party']) \
-                and not assigned:
+        if not self._actor_allowed(task_id,task['attempt_id'],principal,
+                                   task['authority_caller_id']):
             raise ValueError('CURRENT_ASSIGNED_CODEX_ACTOR_REQUIRED')
         expected_reuse=sorted(json.loads(preflight['query_ids_json']))
         supplied_reuse=(sorted(context['reuse_evidence']) if isinstance(
@@ -135,10 +151,15 @@ class CodexExecutionControl(object):
             if existing['intent_id']!=intent_id or existing['context_json']!=canonical(context):
                 raise ValueError('CODEX_IDEMPOTENCY_CONFLICT')
             return {'intent_id':intent_id,'state':existing['state'],'duplicate':True}
-        self.db.execute('''INSERT INTO codex_execution_intents VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+        self.db.execute('''INSERT INTO codex_execution_intents(
+          tenant_id,intent_id,idempotency_key,task_id,attempt_id,transport_kind,
+          requesting_principal,writer_principal,writer_fence,writer_epoch,
+          writer_valid_until,state,context_json,execution_id,session_id,thread_id,
+          turn_id,artifact_sha256,error_kind,cancel_requested,lease_owner,
+          lease_until,created_at,updated_at) VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
           self.tenant_id,intent_id,idempotency_key,task_id,task['attempt_id'],
-          transport_kind,task['authority_caller_id'],task['fence'],task['epoch'],
+          transport_kind,principal,task['authority_caller_id'],task['fence'],task['epoch'],
           task['authority_valid_until'],'PENDING',canonical(context),None,None,
           None,None,None,None,0,None,None,now,now));self.db.commit()
         return {'intent_id':intent_id,'state':'PENDING','duplicate':False}
@@ -193,6 +214,14 @@ class CodexExecutionControl(object):
                   error_kind='STALE_OR_UNAUTHORIZED',updated_at=? WHERE tenant_id=?
                   AND intent_id=?''',(now,self.tenant_id,row['intent_id']))
                 self.db.commit();return {'intent_id':row['intent_id'],'state':'FAILED'}
+            if not self._actor_allowed(row['task_id'],row['attempt_id'],
+                    row['requesting_principal'],row['writer_principal']):
+                self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
+                  error_kind='REQUESTING_ACTOR_REVOKED',updated_at=? WHERE
+                  tenant_id=? AND intent_id=?''',(now,self.tenant_id,
+                  row['intent_id']))
+                self.db.commit();return {'intent_id':row['intent_id'],
+                  'state':'FAILED'}
             changed=self.db.execute('''UPDATE codex_execution_intents SET
               state='SENDING',lease_owner=?,lease_until=?,updated_at=? WHERE
               tenant_id=? AND intent_id=? AND state='PENDING' AND
@@ -289,7 +318,8 @@ class CodexExecutionControl(object):
 
     def projection(self):
         return [dict(x) for x in self.db.execute('''SELECT intent_id,task_id,
-          attempt_id,transport_kind,state,execution_id,session_id,thread_id,
+          attempt_id,transport_kind,requesting_principal,state,execution_id,
+          session_id,thread_id,
           turn_id,artifact_sha256,error_kind,cancel_requested,updated_at FROM
           codex_execution_intents WHERE tenant_id=? ORDER BY created_at,
           intent_id''',(self.tenant_id,))]
