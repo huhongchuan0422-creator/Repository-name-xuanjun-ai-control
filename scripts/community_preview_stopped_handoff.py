@@ -375,13 +375,14 @@ class Session:
         if exists_private(C_RESUME_PLAN):
             saved,_=document(C_RESUME_PLAN,4*1024*1024)
             need(set(saved)=={'format','host','mode','attempt','carrier_manifest_sha256',
-                    'evidence_sha256','plan','plan_sha256','issued_at','expires_at'}
+                    'evidence_sha256','plan','plan_sha256','plan_document_sha256','issued_at','expires_at'}
                  and type(saved['format']) is int and saved['format']==1
                  and saved['host']==p.HOST and saved['mode']==MODE and saved['attempt']==attempt()
                  and saved['carrier_manifest_sha256']==self.approved_stamp==self.pins()
                  and saved['evidence_sha256']==evidence_sha
                  and saved['plan']['attempt']==attempt()
-                 and saved['plan_sha256']==s.sha(s.canonical(saved['plan']))
+                 and saved['plan_sha256']==saved['plan'].get('plan_sha256')
+                 and saved['plan_document_sha256']==s.sha(s.canonical(saved['plan']))
                  and type(saved['issued_at']) is int and type(saved['expires_at']) is int
                  and saved['issued_at']<=c.now()<=saved['expires_at']<=saved['issued_at']+600,
                  'C_RESUME_PLAN_RECORD_INVALID')
@@ -393,7 +394,8 @@ class Session:
             need(not exists_private(C_RESUME_APPROVAL),'C_RESUME_APPROVAL_PREEXISTS_WITHOUT_PLAN')
             record=dict(format=1,host=p.HOST,mode=MODE,attempt=attempt(),
                 carrier_manifest_sha256=self.approved_stamp,evidence_sha256=evidence_sha,
-                plan=candidate,plan_sha256=s.sha(s.canonical(candidate)),
+                plan=candidate,plan_sha256=candidate['plan_sha256'],
+                plan_document_sha256=s.sha(s.canonical(candidate)),
                 issued_at=c.now(),expires_at=c.now()+600)
             fd=s.private_parent(s.BACKUP)
             try:
@@ -403,7 +405,7 @@ class Session:
         bound_plan=self.bind_resume_reference(C_RESUME_PLAN,4*1024*1024)
         self.resume_guard()
         print(json.dumps(dict(state='C_RESUME_PLAN_REQUIRES_FRESH_APPROVAL',
-            attempt=attempt(),plan_sha256=s.sha(s.canonical(candidate)),
+            attempt=attempt(),plan_sha256=candidate['plan_sha256'],
             plan=candidate,approval_path=C_RESUME_APPROVAL,expires_in_seconds=600,
             site_update=False),sort_keys=True,separators=(',',':')),flush=True)
         return candidate
