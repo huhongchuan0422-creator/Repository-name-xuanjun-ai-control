@@ -283,6 +283,32 @@ class HandoffAdmission(unittest.TestCase):
             self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
             'ROLLBACK_APPLIED_RESULT_UNKNOWN')
 
+    def test_lease_close_failure_after_exchange_is_unknown(self):
+        original=h._close_lease
+        def close_then_raise(fd):
+            original(fd)
+            raise OSError('SYNTHETIC_LEASE_CLOSE')
+        with patch.object(h,'_close_lease',side_effect=close_then_raise):
+            with self.assertRaisesRegex(h.Hold,'POST_SWITCH_CLOSE_UNKNOWN_INSPECT_ONLY'):
+                self.execute()
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'SWAPPED_OLD_RETAINED_IN_STAGE')
+
+    def test_rollback_lease_close_failure_is_reconciled_read_only(self):
+        self.execute()
+        original=h._close_lease
+        def close_then_raise(fd):
+            original(fd)
+            raise OSError('SYNTHETIC_ROLLBACK_CLOSE')
+        with patch.object(h,'_close_lease',side_effect=close_then_raise):
+            with self.assertRaisesRegex(h.Hold,'ROLLBACK_CLOSE_UNKNOWN_INSPECT_ONLY'):
+                h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,
+                    self.parent_id,self.journal_id,self.entry_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.history_refs)['state'],
+            'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_RETAINED')
+
     def test_history_change_blocks_status_reconstruction(self):
         self.execute()
         name,body,pfd=self.history_bodies['b_approval']
