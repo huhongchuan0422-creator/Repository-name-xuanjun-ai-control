@@ -127,6 +127,34 @@ class ApprovalRecord(unittest.TestCase):
             self.assertEqual(entry.main(['--approve']),2)
             run.assert_not_called()
 
+    def test_same_approval_fd_can_be_read_repeatedly_from_byte_zero(self):
+        with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
+            with __import__('contextlib').ExitStack() as stack:
+                fd,raw,identity=entry._approval_fd(self.parent,'execute',self.old,self.new,self.uid,stack)
+                first=entry._read_fd_exact(fd,entry.APPROVAL_MAX)
+                second=entry._read_fd_exact(fd,entry.APPROVAL_MAX)
+                third=entry._read_fd_exact(fd,entry.APPROVAL_MAX)
+                self.assertEqual(first,raw)
+                self.assertEqual(second,raw)
+                self.assertEqual(third,raw)
+                self.assertTrue(entry._recheck_approval(self.parent,fd,raw,identity,
+                    'execute',self.old,self.new,self.uid))
+
+    def test_same_fd_in_place_content_change_is_rejected(self):
+        with patch.object(entry.time,'time',return_value=self.now),patch.object(entry,'ROOT_UID',self.uid):
+            with __import__('contextlib').ExitStack() as stack:
+                fd,raw,identity=entry._approval_fd(self.parent,'execute',self.old,self.new,self.uid,stack)
+                replacement=dict(self.value,expires_at=self.now+240)
+                changed=h.canonical(replacement)
+                writer=os.open(entry.APPROVAL_NAME,os.O_WRONLY|os.O_TRUNC|os.O_NOFOLLOW,dir_fd=self.parent)
+                try:
+                    os.write(writer,changed)
+                    os.fsync(writer)
+                finally:os.close(writer)
+                with self.assertRaises(h.Hold):
+                    entry._recheck_approval(self.parent,fd,raw,identity,
+                        'execute',self.old,self.new,self.uid)
+
     def test_valid_exact_short_lived_record(self):
         raw,identity=self.validate()
         self.assertEqual(raw,h.canonical(self.value))
