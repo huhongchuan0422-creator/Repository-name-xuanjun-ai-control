@@ -335,7 +335,7 @@ def exchange(parent,a,b):
     if fn(parent,a.encode('ascii'),parent,b.encode('ascii'),2)!=0:
         raise Hold('ATOMIC_EXCHANGE_UNKNOWN_'+str(ctypes.get_errno()))
 
-def journal(jfd,uid,state_name):
+def journal(jfd,uid,state_name=STATE):
     b=readfile(jfd,state_name,uid,8192)
     try:v=json.loads(b.decode('utf8'))
     except (UnicodeError,ValueError):raise Hold('JOURNAL_JSON_UNKNOWN')
