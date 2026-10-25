@@ -255,6 +255,19 @@ class WholeEntry(unittest.TestCase):
             q.resume_c_before_confirmation()
         self.assertEqual(len(self.calls),before)
 
+    def test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof(self):
+        q,candidate=self._prepare_completed_b_before_c_proof()
+        before=len(self.calls)
+        def revoke(_action,_digest):
+            value,_=h.document(h.C_APPROVAL)
+            self.write(h.C_APPROVAL,s.canonical(dict(value,plan_sha256='0'*64)))
+        with patch.object(h,'acknowledge',side_effect=revoke):
+            with self.assertRaisesRegex(u.Hold,'C_APPROVAL_REVOKED|EXACT_C_APPROVAL_REQUIRED'):
+                q.resume_c_before_confirmation()
+        self.assertEqual(len(self.calls),before)
+        self.assertFalse(Path(h.PROOF).exists())
+        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
+
     def test_c_preconfirmation_duplicate_call_after_commit_is_rejected(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
         with patch.object(h,'acknowledge',return_value=None):
