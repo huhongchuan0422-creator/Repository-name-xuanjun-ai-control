@@ -33,6 +33,31 @@ class ApprovalRecord(unittest.TestCase):
                 fd,raw,identity=entry._approval_fd(self.parent,operation,self.old,self.new,self.uid,stack)
                 return raw,identity
 
+    def test_fixed_archive_reader_accepts_exact_protected_bytes(self):
+        raw=b'PINNED_ARCHIVE_BYTES'
+        h.writefile(self.parent,entry.OLD_INPUT_NAME,raw,self.uid)
+        with patch.object(entry,'ROOT_UID',self.uid),patch.object(h,'OLD_ARCHIVE',h.sha(raw)):
+            self.assertEqual(entry._read_fixed_archive(
+                self.parent,entry.OLD_INPUT_NAME,h.OLD_ARCHIVE,self.uid),raw)
+
+    def test_fixed_archive_reader_rejects_wrong_sha_and_hardlink(self):
+        raw=b'PINNED_ARCHIVE_BYTES'
+        h.writefile(self.parent,entry.OLD_INPUT_NAME,raw,self.uid)
+        with patch.object(entry,'ROOT_UID',self.uid):
+            with self.assertRaisesRegex(h.Hold,'FIXED_INPUT_SHA_MISMATCH'):
+                entry._read_fixed_archive(self.parent,entry.OLD_INPUT_NAME,'0'*64,self.uid)
+        os.link(os.path.join(self.tmp.name,entry.OLD_INPUT_NAME),
+                os.path.join(self.tmp.name,'hardlink-copy'))
+        with patch.object(entry,'ROOT_UID',self.uid),patch.object(h,'OLD_ARCHIVE',h.sha(raw)):
+            with self.assertRaisesRegex(h.Hold,'FIXED_INPUT_IDENTITY_OR_MODE'):
+                entry._read_fixed_archive(self.parent,entry.OLD_INPUT_NAME,h.OLD_ARCHIVE,self.uid)
+
+    def test_fixed_archive_reader_rejects_symlink(self):
+        os.symlink('missing',entry.NEW_INPUT_NAME,dir_fd=self.parent)
+        with patch.object(entry,'ROOT_UID',self.uid):
+            with self.assertRaises(OSError):
+                entry._read_fixed_archive(self.parent,entry.NEW_INPUT_NAME,h.NEW_ARCHIVE,self.uid)
+
     def test_valid_exact_short_lived_record(self):
         raw,identity=self.validate()
         self.assertEqual(raw,h.canonical(self.value))
