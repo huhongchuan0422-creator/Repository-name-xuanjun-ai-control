@@ -347,7 +347,11 @@ class Session:
         return resume
 
     def _c_resume_approval(self,candidate):
-        bound=self.bind_resume_reference(C_RESUME_APPROVAL,16384)
+        if C_RESUME_APPROVAL in self.resume_history:
+            self.resume_guard()
+            bound,meta,limit=self.resume_history[C_RESUME_APPROVAL]
+        else:
+            bound=self.bind_resume_reference(C_RESUME_APPROVAL,16384)
         a,b=document(C_RESUME_APPROVAL)
         need(bound==b,'C_RESUME_APPROVAL_REPLACED')
         need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256',
