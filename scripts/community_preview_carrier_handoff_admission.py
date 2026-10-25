@@ -39,8 +39,9 @@ MAX_FILE=131072
 MAX_FILES=100
 ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','resume_admission'}
+BACKUP_HISTORY_KEYS={'backup_manifest','backup_clone_results'}
 REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
-ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir'}
+ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','backup_manifest','backup_clone_results'}
 POST_B_MODE='POST_B_CARRIER_HANDOFF_V1'
 POST_B_STATE='post-b-carrier-handoff-intent-v1.json'
 POST_B_PREINTENT='post-b-carrier-handoff-preintent-v1.json'
@@ -49,7 +50,7 @@ POST_B_ROLLBACK_RESULT='post-b-carrier-handoff-rollback-result-v1.json'
 POST_B_STAGE='control-stopped-v1.post-b-handoff-stage-v1'
 POST_B_RETAINED='control-stopped-v1.post-b-handoff-retained-old-v1'
 POST_B_REQUIRED={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit',
-                 'b_approval','freeze','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','c_approval'}
+                 'b_approval','freeze','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','backup_manifest','backup_clone_results','c_approval'}
 POST_B_ABSENT={'active_attempt'}
 POST_B_OLD_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
 POST_B_OLD_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
@@ -69,7 +70,8 @@ HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
                'b_approval':'bc-b-approval.json','freeze':'writer-freeze-reference.json',
                'old_stage_permit':'site-prepare-approval.json','c_approval':'bc-c-approval.json',
                'resume_approval':'bc-b-resume-approval.json','resume_freeze':'writer-freeze-resume-reference.json',
-               'resume_stage_permit':'site-prepare-resume-approval.json','resume_admission':ORIGINAL_ATTEMPT+'-B-resume-admission.json','backup_dir':'backup-2330-to-f131-v1'}
+               'resume_stage_permit':'site-prepare-resume-approval.json','resume_admission':ORIGINAL_ATTEMPT+'-B-resume-admission.json','backup_dir':'backup-2330-to-f131-v1',
+               'backup_manifest':'private-manifest.json','backup_clone_results':'clone-results.json'}
 
 class Hold(RuntimeError):pass
 
@@ -174,9 +176,12 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
         need(type(ref) in (tuple,list) and len(ref)==5,'HISTORY_REFERENCE_SCHEMA')
         pfd,name,expected_parent,expected_file,expected_sha=ref
         if carrier_parent is not None and journal_parent is not None:
-            wanted_parent=journal_parent if key in JOURNAL_HISTORY_KEYS else carrier_parent
-            need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
-                 'HISTORY_PARENT_ROLE_MISMATCH')
+            if key in BACKUP_HISTORY_KEYS and refs['backup_dir'][3] is not None:
+                need(dirident(os.fstat(pfd))==refs['backup_dir'][3],'HISTORY_PARENT_ROLE_MISMATCH')
+            else:
+                wanted_parent=journal_parent if key in JOURNAL_HISTORY_KEYS else carrier_parent
+                need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
+                     'HISTORY_PARENT_ROLE_MISMATCH')
             need(name==HISTORY_NAMES[key],'HISTORY_PATH_NOT_FIXED')
             if key in required:need(expected_file is not None and (expected_sha is not None or key=='backup_dir'),'REQUIRED_HISTORY_MISSING')
             if key in absent_keys:need(expected_file is None and expected_sha is None,'EXPECTED_ABSENCE_BINDING_REQUIRED')
