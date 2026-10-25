@@ -9,7 +9,9 @@ import tempfile
 import unittest
 import zipfile
 from unittest.mock import patch
+from types import SimpleNamespace
 from scripts import community_preview_carrier_handoff_admission as h
+from scripts import community_preview_carrier_handoff_call as handoff_call
 
 class HandoffAdmission(unittest.TestCase):
     def setUp(self):
@@ -36,6 +38,7 @@ class HandoffAdmission(unittest.TestCase):
         new_archive_path=os.environ.get('HANDOFF_NEW_ARCHIVE')
         if old_archive_path and new_archive_path:
             old_archive=open(old_archive_path,'rb').read()
+            self.old_archive_bytes=old_archive
             old_manifest=open(os.environ['HANDOFF_OLD_MANIFEST'],'rb').read()
             new_archive=open(new_archive_path,'rb').read()
             new_manifest=open(os.environ['HANDOFF_NEW_MANIFEST'],'rb').read()
@@ -53,6 +56,12 @@ class HandoffAdmission(unittest.TestCase):
                                  'uid':0,'mode':'0600'}}}
             self.old={'manifest.json':h.canonical(old_meta),'loader.py':old_loader}
             self.new={'manifest.json':b'','loader.py':b'NEW_LOADER'}
+            old_data=io.BytesIO()
+            with zipfile.ZipFile(old_data,'w',zipfile.ZIP_DEFLATED) as z:
+                for key,body in self.old.items():
+                    info=zipfile.ZipInfo(key);info.create_system=3;info.external_attr=0o100600<<16;info.compress_type=zipfile.ZIP_DEFLATED
+                    z.writestr(info,body)
+            self.old_archive_bytes=old_data.getvalue()
             meta={'format':1,'mode':'STOPPED_HANDOFF_V1',
               'install_root':'/opt/xuanjun-community-preview/control-stopped-v1',
               'updates_enabled':False,
@@ -67,6 +76,7 @@ class HandoffAdmission(unittest.TestCase):
                     z.writestr(info,body)
             self.archive=data.getvalue()
             self.stack=self.enterContext(patch.multiple(h,OLD_MANIFEST=h.sha(self.old['manifest.json']),
+                                                          OLD_ARCHIVE=h.sha(self.old_archive_bytes),
                                                           NEW_MANIFEST=h.sha(self.new['manifest.json']),
                                                           NEW_ARCHIVE=h.sha(self.archive)))
         h.build_tree(self.parent,self.old,self.uid,name=h.TARGET)
@@ -133,6 +143,25 @@ class HandoffAdmission(unittest.TestCase):
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
         finally:os.close(target)
+
+    def test_adapter_calls_real_rollback_with_fixed_archive_fixture(self):
+        self.execute()
+        ctx=SimpleNamespace(
+            host_id=h.HOST,authority_check=lambda:True,
+            parent_fd=self.parent,journal_fd=self.jfd,entry_fd=self.entry,lease_fd=self.lease,
+            uid=self.uid,parent_identity=self.parent_id,journal_identity=self.journal_id,
+            entry_identity=self.entry_id,lock_identity=self.lock_id,
+            history_refs=self.history_refs,old_archive_bytes=self.old_archive_bytes,
+            new_archive_bytes=self.archive,attempt='isolated-attempt-0001')
+        result=handoff_call.rollback_from_original_entry(ctx)
+        self.assertEqual(result['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:
+            self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
+            self.assertEqual(h.readfile(target,'manifest.json',self.uid),self.old['manifest.json'])
+        finally:os.close(target)
+        with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
+            handoff_call.rollback_from_original_entry(ctx)
 
     def test_duplicate_attempt_holds(self):
         self.execute()
