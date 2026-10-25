@@ -39,6 +39,7 @@ def ident(st):
     return [st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,
             st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns]
 def parent_ident(st):return [st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid]
+def dirident(st):return [st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,st.st_nlink]
 def childstat(fd,name):
     try:return os.stat(name,dir_fd=fd,follow_symlinks=False)
     except FileNotFoundError:return None
@@ -109,8 +110,8 @@ def tree(fd,name,uid,expected,expected_id=None):
     try:
         st=os.fstat(root)
         need(stat.S_ISDIR(st.st_mode) and st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o700
-             and (expected_id is None or ident(st)==expected_id)
-             and ident(st)==ident(os.stat(name,dir_fd=fd,follow_symlinks=False)),
+             and (expected_id is None or dirident(st)==expected_id)
+             and dirident(st)==dirident(os.stat(name,dir_fd=fd,follow_symlinks=False)),
              'TREE_IDENTITY_CHANGED')
         dirs={'':set()}
         for rel in expected:
@@ -141,10 +142,10 @@ def tree(fd,name,uid,expected,expected_id=None):
                 need(readfile(current,parts[-1],uid)==want,'TREE_BYTES_CHANGED')
             finally:
                 for n in reversed(opened):os.close(n)
-        need(ident(st)==ident(os.fstat(root))
-             and ident(st)==ident(os.stat(name,dir_fd=fd,follow_symlinks=False)),
+        need(dirident(st)==dirident(os.fstat(root))
+             and dirident(st)==dirident(os.stat(name,dir_fd=fd,follow_symlinks=False)),
              'TREE_REPLACED_DURING_READ')
-        return ident(st)
+        return dirident(st)
     finally:os.close(root)
 
 def writefile(fd,name,body,uid):
@@ -238,11 +239,11 @@ def status(parent,jfd,uid,old_entries,new_entries):
     if current is None or stage is None:
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     old_id=j['old_identity'];new_id=j['stage_identity']
-    if ident(current)==new_id and ident(stage)==old_id:
+    if dirident(current)==new_id and dirident(stage)==old_id:
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
         tree(parent,TARGET,uid,new_entries,new_id)
         tree(parent,STAGE,uid,old_entries,old_id)
-    elif ident(current)==old_id and ident(stage)==new_id and retained is None:
+    elif dirident(current)==old_id and dirident(stage)==new_id and retained is None:
         state='PREPARED_OR_REVERTED'
         tree(parent,TARGET,uid,old_entries,old_id)
         tree(parent,STAGE,uid,new_entries,new_id)
