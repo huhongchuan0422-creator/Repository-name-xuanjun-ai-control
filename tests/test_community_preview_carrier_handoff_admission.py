@@ -168,6 +168,36 @@ class HandoffAdmission(unittest.TestCase):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
 
+    def test_post_b_changed_completed_b_evidence_holds_status_and_rollback(self):
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        result=h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-evidence-change-0001',history_refs=refs,mode=h.POST_B_MODE)
+        self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+        name=h.HISTORY_NAMES['snapshot_result']
+        os.unlink(name,dir_fd=self.jfd);h.writefile(self.jfd,name,b'MUTATED_B_SNAPSHOT_RESULT',self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED|HISTORY_FILE_CONTENT_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,old_entries,new_entries,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED|HISTORY_FILE_CONTENT_CHANGED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+
+    def test_post_b_interrupted_after_exchange_is_inspect_only_not_replayed(self):
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        def interrupt(point):
+            if point=='after_exchange':raise RuntimeError('injected after-exchange interruption')
+        with self.assertRaisesRegex(h.Hold,'POST_SWITCH_UNKNOWN_INSPECT_ONLY'):
+            h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-interrupt-0001',
+                history_refs=refs,mode=h.POST_B_MODE,fault=interrupt)
+        status=h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,old_entries,new_entries,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+        self.assertEqual(status['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+        with self.assertRaisesRegex(h.Hold,'EXISTING_TRANSACTION_INSPECT_ONLY'):
+            h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-interrupt-0001',
+                history_refs=refs,mode=h.POST_B_MODE)
+
     def test_post_b_original_entry_call_admission_exchange_status_rollback(self):
         refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
         from scripts import community_preview_carrier_handoff_entry as entry
