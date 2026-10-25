@@ -231,7 +231,7 @@ def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_arc
             'APPROVAL_EXPIRED_OR_TTL_INVALID')
     return True
 
-def run(operation, old_archive_bytes=None, new_archive_bytes=None):
+def run(operation):
     """Fixed original-entry caller; current approval is read from the protected record."""
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     identify_admin()
@@ -239,11 +239,8 @@ def run(operation, old_archive_bytes=None, new_archive_bytes=None):
     with contextlib.ExitStack() as stack:
         parent=_protected_path_directory(PARENT,stack)
         journal=_protected_path_directory(JOURNAL,stack)
-        if old_archive_bytes is None and new_archive_bytes is None:
-            old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
-            new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
-        require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
-                'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
+        old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
+        new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
         approval_fd,approval_raw,approval_identity=_approval_fd(
             parent,operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack)
         h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
