@@ -33,10 +33,19 @@ MAX_ZIP=4*1024*1024
 MAX_FILE=131072
 MAX_FILES=100
 ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
+JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt'}
+REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
+ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','backup_dir'}
 HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
-               'b_approval':'bc-b-approval.json',
-               'freeze':'writer-freeze-reference.json',
-               'old_stage_permit':'site-prepare-approval.json'}
+               'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
+               'snapshot_permit':ORIGINAL_ATTEMPT+'-snapshot-permit.json',
+               'validate_clones_result':ORIGINAL_ATTEMPT+'-validate-clones-result.json',
+               'validate_clones_permit':ORIGINAL_ATTEMPT+'-validate-clones-permit.json',
+               'active_attempt':'active-attempt.json',
+               'b_approval':'bc-b-approval.json','freeze':'writer-freeze-reference.json',
+               'old_stage_permit':'site-prepare-approval.json','c_approval':'bc-c-approval.json',
+               'resume_approval':'bc-b-resume-approval.json','resume_freeze':'writer-freeze-resume-reference.json',
+               'resume_stage_permit':'site-prepare-resume-approval.json','backup_dir':'backup-2330-to-f131-v1'}
 
 class Hold(RuntimeError):pass
 
@@ -122,7 +131,7 @@ def members(raw,manifest_sha,archive_sha):
         return contents
 
 def capture_history(refs,uid,carrier_parent=None,journal_parent=None):
-    need(type(refs) is dict and set(refs)=={'b_intent','b_approval','freeze','old_stage_permit'},
+    need(type(refs) is dict and set(refs)==set(HISTORY_NAMES),
          'HISTORICAL_BINDINGS_REQUIRED')
     result={}
     for key in sorted(refs):
@@ -130,10 +139,12 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None):
         need(type(ref) in (tuple,list) and len(ref)==5,'HISTORY_REFERENCE_SCHEMA')
         pfd,name,expected_parent,expected_file,expected_sha=ref
         if carrier_parent is not None and journal_parent is not None:
-            wanted_parent=journal_parent if key=='b_intent' else carrier_parent
+            wanted_parent=journal_parent if key in JOURNAL_HISTORY_KEYS else carrier_parent
             need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
                  'HISTORY_PARENT_ROLE_MISMATCH')
             need(name==HISTORY_NAMES[key],'HISTORY_PATH_NOT_FIXED')
+            if key in REQUIRED_HISTORY:need(expected_file is not None and expected_sha is not None,'REQUIRED_HISTORY_MISSING')
+            if key in ABSENT_HISTORY:need(expected_file is None and expected_sha is None,'EXPECTED_ABSENCE_BINDING_REQUIRED')
         pst=os.fstat(pfd)
         need(stat.S_ISDIR(pst.st_mode) and pst.st_uid==uid
              and not(stat.S_IMODE(pst.st_mode)&0o022)
