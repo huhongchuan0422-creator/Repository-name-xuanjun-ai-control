@@ -15,4 +15,15 @@ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?projec
 assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/进程：UNKNOWN/);
 assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/运行投影：WAITING_DEPENDENCY/);
 assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
+for(const id of ['task-normal','任务/设计','task with space']){
+  const target=ui.href('task','research-development',id,{project:'项目/一'});
+  const parsed=ui.parseRoute(target);
+  assert.strictEqual(parsed.task,id);
+  assert.strictEqual(parsed.query.project,'项目/一');
+}
+const special=JSON.parse(JSON.stringify(data));
+special.tasks[0].task_id='任务/设计';special.anomalies[0].task_id='任务/设计';
+assert.match(ui.render(special,ui.parseRoute(ui.href('task','research-development','任务/设计',{}))),/任务\/设计/);
+assert.match(ui.render(special,ui.parseRoute(ui.href('task','research-development','任务/设计',{}))),/异常证据/);
+assert.strictEqual(ui.parseRoute('#task/research-development/%E0%A4%A').view,'invalid');
 ui.loadProjection(()=>Promise.resolve({ok:true,json:()=>Promise.resolve(data)})).then(x=>{assert.strictEqual(x,data);console.log('task_center_digital_twin.test: PASS');});

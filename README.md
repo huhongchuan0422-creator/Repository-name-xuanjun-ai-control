@@ -26,6 +26,11 @@ acceptance/delivery, maintenance, shared ecosystem, finance). It does not
 deploy a service, is not a business-request router, and contains no OCR
 business adapter.
 
+The TEST_ONLY provider/model/role administration and persistent model scheduler
+extension is documented in
+[TASK_CENTER_MODEL_ORCHESTRATION_R5_20261025.md](docs/development/TASK_CENTER_MODEL_ORCHESTRATION_R5_20261025.md).
+It adds no production credential, paid call, deployment, or second task ledger.
+
 ## Mandatory development execution rules
 
 Work and OpenClaw must read and follow [开发执行与反馈强制规则](docs/DEVELOPMENT_EXECUTION_AND_FEEDBACK_RULES_20261012.md) before dispatch or continuation. Deliver results, actively advance ready nodes, track missing receipts, preserve interrupted tasks and unblock independent work. Documentation and alerts are not proof of deployed execution capabilities.
