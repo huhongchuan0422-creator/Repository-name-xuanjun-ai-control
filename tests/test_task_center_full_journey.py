@@ -85,10 +85,13 @@ class FullJourneyTests(unittest.TestCase):
           'dependencies':[],'priority':80,'owner':'developer-1'}
         self.post({'action':'CREATE_PROJECT_TASK','task':task})
         observed={'matches':[]}
+        # Query an absent key from the server-owned canonical registry; the
+        # observed result is verified by the service, not trusted from caller.
         self.post({'action':'RECORD_ASSET_QUERY','task_id':'task-journey',
-          'query_id':'query-journey-1','source_kind':'REGISTRY',
-          'source_version':'registry-v1','query':{'lookup':{'asset':'asset-v1'},
-          'observed_result':observed,'evidence_ref':'registry://query-journey-1'},
+          'query_id':'query-journey-1','source_kind':'CANONICAL_DB',
+          'source_version':'registry-v1','query':{'lookup':{'asset_key':'asset-v1'},
+          'observed_result':observed,
+          'evidence_ref':'canonical-db://asset-v1@registry-v1'},
           'result_digest':hashlib.sha256(json.dumps(observed,sort_keys=True,
           separators=(',',':')).encode()).hexdigest()})
         self.post({'action':'RECORD_DISPATCH_PREFLIGHT','task_id':'task-journey',

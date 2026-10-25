@@ -61,8 +61,9 @@ class CodexExecutionAdapterTests(unittest.TestCase):
           'dependencies':['NONE'],'asset_version':'asset-v1',
           'responsible_party':'test-executor'})
         observed={'matches':[]};policy.record_asset_query('demo-b','query-1',
-          'REGISTRY','registry-v1',{'lookup':{'asset':'asset-v1'},
-          'observed_result':observed,'evidence_ref':'registry://query-1'},
+          'CANONICAL_DB','registry-v1',{'lookup':{'asset_key':'asset-v1'},
+          'observed_result':observed,
+          'evidence_ref':'canonical-db://asset-v1@registry-v1'},
           hashlib.sha256(canonical(observed).encode()).hexdigest())
         policy.record_dispatch_preflight('demo-b','asset-v1',['query-1'],
           'NOT_FOUND','verified TEST_ONLY gap')
@@ -286,24 +287,81 @@ class CodexExecutionAdapterTests(unittest.TestCase):
           " v=json.loads(line)\n"
           " if 'id' not in v: continue\n"
           " m=v.get('method');r={}\n"
-          " if m=='thread/start': r={'threadId':'fixture-thread'}\n"
-          " elif m=='turn/start': r={'turnId':'fixture-turn'}\n"
+          " if m=='thread/start': r={'thread':{'id':'fixture-thread','sessionId':'fixture-session'}}\n"
+          " elif m=='turn/start': r={'turn':{'id':'fixture-turn','status':'inProgress','items':[]}}\n"
+          " elif m=='thread/resume': r={'thread':{'id':'fixture-thread','status':{'type':'active'}}}\n"
+          " elif m=='thread/turns/list': r={'data':[{'id':'fixture-turn','status':'inProgress'}]}\n"
           " elif m=='turn/interrupt': r={'cancelled':True}\n"
           " print(json.dumps({'jsonrpc':'2.0','id':v['id'],'result':r}),flush=True)\n")
         transport=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
         result=self.control.dispatch_once({'CODEX_APP_SERVER':transport})
         self.assertEqual(result['state'],'RUNNING')
         row=self.control.projection()[0]
-        self.assertEqual((row['thread_id'],row['turn_id']),
-          ('fixture-thread','fixture-turn'))
+        self.assertEqual((row['session_id'],row['thread_id'],row['turn_id']),
+          ('fixture-session','fixture-thread','fixture-turn'))
         proc=transport.processes['fixture-thread'];proc.terminate();proc.wait()
         proc.stdin.close();proc.stdout.close();proc.stderr.close()
         self.assertEqual(self.control.reconcile_restart()['unknown_intents'],1)
         resumed=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
         receipt=self.control.reconcile_transport_once({'CODEX_APP_SERVER':resumed})
         self.assertTrue(receipt['accepted']);self.assertEqual(
-          self.control.projection()[0]['state'],'ACKED')
+          self.control.projection()[0]['state'],'RUNNING')
         proc=resumed.processes['fixture-thread'];proc.terminate();proc.wait()
+        proc.stdin.close();proc.stdout.close();proc.stderr.close()
+
+    def test_app_server_interleaved_notifications_approval_terminal_and_cancel(self):
+        fixture=("import sys,json\n"
+          "for line in sys.stdin:\n"
+          " v=json.loads(line);m=v.get('method')\n"
+          " if 'id' not in v: continue\n"
+          " if m=='initialize':\n"
+          "  print(json.dumps({'jsonrpc':'2.0','method':'warning','params':{'message':'fixture'}}),flush=True);r={}\n"
+          " elif m=='thread/start': r={'thread':{'id':'nested-thread','sessionId':'nested-session'}}\n"
+          " elif m=='turn/start': r={'turn':{'id':'nested-turn','status':'inProgress','items':[]}}\n"
+          " elif m=='turn/interrupt': r={}\n"
+          " else: r={}\n"
+          " print(json.dumps({'jsonrpc':'2.0','id':v['id'],'result':r}),flush=True)\n"
+          " if m=='turn/start':\n"
+          "  print(json.dumps({'jsonrpc':'2.0','id':901,'method':'item/commandExecution/requestApproval','params':{'threadId':'nested-thread','turnId':'nested-turn','itemId':'cmd-1'}}),flush=True)\n"
+          " if m=='turn/interrupt':\n"
+          "  print(json.dumps({'jsonrpc':'2.0','method':'turn/completed','params':{'turn':{'id':'nested-turn','status':'interrupted','items':[]}}}),flush=True)\n")
+        transport=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','events',
+          self.context_body)
+        self.assertEqual(self.control.dispatch_once({'CODEX_APP_SERVER':transport})[
+          'state'],'RUNNING')
+        approval=self.control.poll_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertEqual(approval['state'],'WAITING_APPROVAL')
+        self.control.cancel(intent['intent_id'])
+        requested=self.control.dispatch_cancel_once({'CODEX_APP_SERVER':transport})
+        self.assertEqual(requested['state'],'CANCEL_REQUESTED')
+        terminal=self.control.poll_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertTrue(terminal['accepted']);self.assertEqual(
+          self.control.projection()[0]['state'],'CANCELLED')
+        proc=transport.processes['nested-thread'];proc.terminate();proc.wait()
+        proc.stdin.close();proc.stdout.close();proc.stderr.close()
+
+    def test_app_server_restart_reconciles_completed_turn_without_business_acceptance(self):
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','completed-restart',
+          self.context_body)
+        self.control.dispatch_once({'CODEX_APP_SERVER':CodexAppServerTransport(
+          lambda _intent:{'state':'RUNNING','execution_id':'turn-done',
+          'session_id':'session-done','thread_id':'thread-done','turn_id':'turn-done'})})
+        self.assertEqual(self.control.reconcile_restart()['unknown_intents'],1)
+        fixture=("import sys,json\n"
+          "for line in sys.stdin:\n"
+          " v=json.loads(line)\n"
+          " if 'id' not in v: continue\n"
+          " m=v.get('method');r={}\n"
+          " if m=='thread/resume': r={'thread':{'id':'thread-done','status':{'type':'idle'}}}\n"
+          " elif m=='thread/turns/list': r={'data':[{'id':'turn-done','status':'completed','items':[]}]}\n"
+          " print(json.dumps({'jsonrpc':'2.0','id':v['id'],'result':r}),flush=True)\n")
+        transport=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
+        result=self.control.reconcile_transport_once({'CODEX_APP_SERVER':transport})
+        self.assertTrue(result['accepted']);self.assertEqual(
+          self.control.projection()[0]['state'],'EXECUTION_COMPLETED')
+        self.assertIsNone(self.control.projection()[0]['artifact_sha256'])
+        proc=transport.processes['thread-done'];proc.terminate();proc.wait()
         proc.stdin.close();proc.stdout.close();proc.stderr.close()
 
     def test_service_worker_dispatches_persisted_intent_without_client(self):

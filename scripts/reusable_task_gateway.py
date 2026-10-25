@@ -494,21 +494,24 @@ class GatewayKernel(object):
                 or not isinstance(resources, list)
                 or not resources or len(resources) != len(set(resources))):
             raise ValueError('EXACT_CHECKPOINT_REQUIRED')
-        task = self.supervisor._task(task_id)
-        if task['attempt_id'] != attempt_id:
-            raise ValueError('CHECKPOINT_ATTEMPT_MISMATCH')
         now = self.clock() if now is None else _finite(now, 'time')
-        if (task['authority_state'] != 'VALID' or
-                task['authority_valid_until'] is None or
-                not now < task['authority_valid_until']):
-            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
-        with self.db:
+        try:
+            task = self.supervisor._task(task_id)
+            if task['attempt_id'] != attempt_id:
+                raise ValueError('CHECKPOINT_ATTEMPT_MISMATCH')
+            if (task['authority_state'] != 'VALID' or
+                    task['authority_valid_until'] is None or
+                    not now < task['authority_valid_until']):
+                raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
             self.db.execute('''INSERT INTO gateway_checkpoints VALUES
               (?,?,?,?,?,?,?,?)''',
               (task_id, attempt_id, _text(checkpoint_id, 'checkpoint_id'),
                canonical(payload), canonical(inflight), effects_state,
                canonical(sorted(resources)), now))
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         return {'checkpoint_id': checkpoint_id, 'effects_state': effects_state}
 
     def save_waiting_checkpoint(self, context, task_id, prior_attempt_id,

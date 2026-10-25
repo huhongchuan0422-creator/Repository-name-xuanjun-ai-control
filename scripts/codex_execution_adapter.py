@@ -43,17 +43,63 @@ class CodexAppServerTransport(object):
     kind='CODEX_APP_SERVER'
     def __init__(self,exchange=None,command=None,timeout=5):
         self.exchange=exchange;self.command=command;self.timeout=timeout
-        self.processes={}
-    def _rpc(self,proc,request):
-        proc.stdin.write((canonical(request)+'\n').encode('utf-8'));proc.stdin.flush()
-        ready,_,_=select.select([proc.stdout],[],[],self.timeout)
-        if not ready:raise CodexSendUnknown('APP_SERVER_TIMEOUT')
+        self.processes={};self.pending={}
+    def _read(self,proc,timeout):
+        ready,_,_=select.select([proc.stdout],[],[],timeout)
+        if not ready:return None
         line=proc.stdout.readline()
         if not line:raise CodexSendUnknown('APP_SERVER_EOF')
-        value=json.loads(line.decode('utf-8'))
-        if value.get('id')!=request.get('id') or 'error' in value:
-            raise CodexSendUnknown('APP_SERVER_RPC_ERROR')
-        return value.get('result') or {}
+        return json.loads(line.decode('utf-8'))
+    @staticmethod
+    def _terminate(proc):
+        if proc.poll() is None:proc.terminate()
+        try:proc.wait(timeout=1)
+        except Exception:proc.kill();proc.wait()
+        for stream in (proc.stdin,proc.stdout,proc.stderr):
+            if stream is not None and not stream.closed:stream.close()
+    def _rpc(self,proc,request):
+        proc.stdin.write((canonical(request)+'\n').encode('utf-8'));proc.stdin.flush()
+        deadline=time.time()+self.timeout
+        while True:
+            value=self._read(proc,max(0,deadline-time.time()))
+            if value is None:raise CodexSendUnknown('APP_SERVER_TIMEOUT')
+            if value.get('id')==request.get('id') and 'method' not in value:
+                if 'error' in value:raise CodexSendUnknown('APP_SERVER_RPC_ERROR')
+                return value.get('result') or {}
+            self.pending.setdefault(id(proc),[]).append(value)
+    @staticmethod
+    def _turn_receipt(value,intent):
+        method=value.get('method');params=value.get('params') or {}
+        base={'execution_id':intent.get('execution_id'),
+          'session_id':intent.get('session_id'),'thread_id':intent.get('thread_id'),
+          'turn_id':intent.get('turn_id'),'app_server_method':method}
+        if method=='turn/started':
+            turn=params.get('turn') or {};base['turn_id']=turn.get('id') or base['turn_id']
+            base['state']='RUNNING';return base
+        if (method and (method.endswith('/requestApproval') or
+                method in ('item/tool/requestUserInput','mcpServer/elicitation/request'))):
+            base.update({'state':'WAITING_APPROVAL','approval_request_id':value.get('id'),
+              'approval_kind':method});return base
+        if method=='turn/completed':
+            turn=params.get('turn') or {};base['turn_id']=turn.get('id') or base['turn_id']
+            status=turn.get('status')
+            if status=='interrupted':base['state']='CANCELLED'
+            elif status=='failed':base.update({'state':'FAILED','error':turn.get('error')})
+            elif status=='completed':base['state']='EXECUTION_COMPLETED'
+            else:return None
+            return base
+        return None
+    def poll(self,intent,timeout=0):
+        proc=self.processes.get(intent.get('thread_id'))
+        if proc is None or proc.poll() is not None:
+            raise CodexSendUnknown('APP_SERVER_PROCESS_NOT_AVAILABLE')
+        queue=self.pending.setdefault(id(proc),[])
+        while True:
+            value=queue.pop(0) if queue else self._read(proc,timeout)
+            timeout=0
+            if value is None:return None
+            receipt=self._turn_receipt(value,intent)
+            if receipt is not None:return receipt
     def send(self,intent):
         if self.exchange is not None:return self.exchange(intent)
         if not self.command:
@@ -77,18 +123,23 @@ class CodexAppServerTransport(object):
                 thread=self._rpc(proc,{'jsonrpc':'2.0','id':2,
                   'method':'thread/start','params':{'metadata':{'task_id':
                   intent['task_id'],'attempt_id':intent['attempt_id']}}})
-                thread_id=thread.get('threadId') or thread.get('id')
+                thread_value=thread.get('thread') or {}
+                thread_id=thread_value.get('id')
+                session_id=thread_value.get('sessionId') or thread_id
             if not thread_id:raise CodexSendUnknown('APP_SERVER_THREAD_ID_REQUIRED')
             turn=self._rpc(proc,{'jsonrpc':'2.0','id':3,'method':'turn/start',
               'params':{'threadId':thread_id,'input':[{'type':'text','text':
               canonical(context)}]}})
-            turn_id=turn.get('turnId') or turn.get('id')
+            turn_value=turn.get('turn') or {}
+            turn_id=turn_value.get('id')
             if not turn_id:raise CodexSendUnknown('APP_SERVER_TURN_ID_REQUIRED')
             self.processes[thread_id]=proc
             return {'state':'RUNNING','execution_id':turn_id,
-              'session_id':thread_id,'thread_id':thread_id,'turn_id':turn_id}
+              'session_id':session_id if not intent.get('thread_id') else
+              intent.get('session_id') or thread_id,'thread_id':thread_id,
+              'turn_id':turn_id}
         except Exception:
-            if proc.poll() is None:proc.terminate()
+            self._terminate(proc)
             raise
     def cancel(self,intent):
         proc=self.processes.get(intent.get('thread_id'))
@@ -96,7 +147,7 @@ class CodexAppServerTransport(object):
             raise CodexSendUnknown('CANCEL_TRANSPORT_STATE_UNKNOWN')
         self._rpc(proc,{'jsonrpc':'2.0','id':4,'method':'turn/interrupt',
           'params':{'threadId':intent['thread_id'],'turnId':intent['turn_id']}})
-        return {'state':'CANCELLED','thread_id':intent['thread_id'],
+        return {'state':'CANCEL_REQUESTED','thread_id':intent['thread_id'],
           'turn_id':intent['turn_id']}
     def reconcile(self,intent):
         if self.exchange is not None:
@@ -110,14 +161,25 @@ class CodexAppServerTransport(object):
               'params':{'clientInfo':{'name':'xuanjun-task-center','version':'r6'}}})
             proc.stdin.write((canonical({'jsonrpc':'2.0','method':'initialized',
               'params':{}})+'\n').encode('utf-8'));proc.stdin.flush()
-            self._rpc(proc,{'jsonrpc':'2.0','id':2,'method':'thread/resume',
-              'params':{'threadId':intent['thread_id']}})
+            resumed=self._rpc(proc,{'jsonrpc':'2.0','id':2,'method':'thread/resume',
+              'params':{'threadId':intent['thread_id'],'excludeTurns':True}})
+            turns=self._rpc(proc,{'jsonrpc':'2.0','id':3,
+              'method':'thread/turns/list','params':{'threadId':intent['thread_id'],
+              'limit':50,'sortDirection':'desc','itemsView':'summary'}})
             self.processes[intent['thread_id']]=proc
-            return {'state':'ACKED','execution_id':intent.get('execution_id'),
-              'session_id':intent.get('session_id'),'thread_id':intent['thread_id'],
-              'turn_id':intent.get('turn_id')}
+            for turn in turns.get('data') or []:
+                if turn.get('id')==intent.get('turn_id'):
+                    notification={'method':'turn/completed','params':{'turn':turn}}
+                    mapped=self._turn_receipt(notification,intent)
+                    if mapped:return mapped
+                    if turn.get('status')=='inProgress':
+                        return dict(intent,state='RUNNING')
+            thread=resumed.get('thread') or {};status=thread.get('status') or {}
+            if status.get('type')=='active':return dict(intent,state='RUNNING')
+            return dict(intent,state='WAITING_APPROVAL',
+              error='TURN_STATUS_RECONCILIATION_REQUIRED')
         except Exception:
-            if proc.poll() is None:proc.terminate()
+            self._terminate(proc)
             raise
 
 
@@ -321,9 +383,11 @@ class CodexExecutionControl(object):
         except Exception as exc:return {'intent_id':row['intent_id'],'state':UNKNOWN,
           'error':'RECONCILIATION_UNKNOWN:'+type(exc).__name__}
         if not isinstance(receipt,dict) or receipt.get('state') not in (
-                'ACKED','RUNNING','WAITING_APPROVAL','SUCCEEDED','FAILED'):
+                'ACKED','RUNNING','WAITING_APPROVAL','EXECUTION_COMPLETED',
+                'SUCCEEDED','FAILED','CANCELLED'):
             raise ValueError('VALID_CODEX_RECONCILIATION_RECEIPT_REQUIRED')
-        return self.record_result(row['intent_id'],'reconciled-'+row['intent_id'],
+        event_hash=hashlib.sha256(canonical(receipt).encode()).hexdigest()
+        return self.record_result(row['intent_id'],'reconciled-'+event_hash,
           receipt['state'],receipt,now)
 
     def dispatch_once(self,transports,worker_id='codex-adapter',now=None):
@@ -443,15 +507,41 @@ class CodexExecutionControl(object):
               state='CANCEL_REQUESTED' ''',('CANCEL_RESULT_UNKNOWN:'+type(exc).__name__,
               now,self.tenant_id,row['intent_id']));self.db.commit()
             return {'intent_id':row['intent_id'],'state':UNKNOWN}
-        if not isinstance(receipt,dict) or receipt.get('state')!='CANCELLED':
+        if not isinstance(receipt,dict) or receipt.get('state') not in (
+                'CANCEL_REQUESTED','CANCELLED'):
             raise ValueError('VALID_CODEX_CANCEL_RECEIPT_REQUIRED')
+        if receipt['state']=='CANCEL_REQUESTED':
+            self.db.execute('''UPDATE codex_execution_intents SET error_kind=NULL,
+              updated_at=? WHERE tenant_id=? AND intent_id=? AND
+              state='CANCEL_REQUESTED' ''',(now,self.tenant_id,row['intent_id']))
+            self.db.commit();return {'intent_id':row['intent_id'],
+              'state':'CANCEL_REQUESTED'}
         return self.record_result(row['intent_id'],'cancelled-'+row['intent_id'],
           'CANCELLED',receipt,now)
 
+    def poll_transport_once(self,transports,now=None):
+        now=self.clock() if now is None else now
+        row=self.db.execute('''SELECT * FROM codex_execution_intents WHERE
+          tenant_id=? AND state IN ('RUNNING','WAITING_APPROVAL',
+          'CANCEL_REQUESTED') AND thread_id IS NOT NULL ORDER BY
+          updated_at,intent_id LIMIT 1''',(self.tenant_id,)).fetchone()
+        if row is None:return {'state':'IDLE'}
+        transport=transports.get(row['transport_kind'])
+        if transport is None or not hasattr(transport,'poll'):
+            return {'intent_id':row['intent_id'],'state':row['state'],
+                    'error':'EVENT_STREAM_UNSUPPORTED'}
+        try:receipt=transport.poll(dict(row),0)
+        except Exception as exc:return {'intent_id':row['intent_id'],'state':UNKNOWN,
+          'error':'EVENT_STREAM_UNKNOWN:'+type(exc).__name__}
+        if receipt is None:return {'intent_id':row['intent_id'],'state':row['state']}
+        event_seed=canonical({'intent':row['intent_id'],'receipt':receipt})
+        event_id='app-event-'+hashlib.sha256(event_seed.encode()).hexdigest()
+        return self.record_result(row['intent_id'],event_id,receipt['state'],receipt,now)
+
     def record_result(self,intent_id,event_id,state,payload,now=None):
         now=self.clock() if now is None else now
-        if state not in ('ACKED','RUNNING','WAITING_APPROVAL','SUCCEEDED','FAILED',
-                         'CANCELLED'):
+        if state not in ('ACKED','RUNNING','WAITING_APPROVAL','EXECUTION_COMPLETED',
+                         'SUCCEEDED','FAILED','CANCELLED'):
             raise ValueError('CODEX_RESULT_STATE_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         try:
@@ -473,7 +563,7 @@ class CodexExecutionControl(object):
               and task['authority_state']=='VALID' and
               task['authority_valid_until'] is not None and
               now<task['authority_valid_until'])
-            if row['state'] in ('SUCCEEDED','FAILED','CANCELLED'):
+            if row['state'] in ('EXECUTION_COMPLETED','SUCCEEDED','FAILED','CANCELLED'):
                 current=False
             cancellation=(row['cancel_requested'] and state=='CANCELLED')
             accepted=int((current and not row['cancel_requested']) or cancellation)

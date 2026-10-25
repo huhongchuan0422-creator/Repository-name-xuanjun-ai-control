@@ -167,8 +167,11 @@ class CodexWorkerLoop(object):
                 reconciled=control.reconcile_transport_once(self.transports)
                 sent=control.dispatch_once(self.transports)
                 cancelled=control.dispatch_cancel_once(self.transports)
+                streamed=control.poll_transport_once(self.transports)
                 if (reconciled.get('state') in ('IDLE','UNKNOWN') and sent.get('state')=='IDLE'
-                        and cancelled.get('state')=='IDLE'):
+                        and cancelled.get('state')=='IDLE' and
+                        streamed.get('state') in ('IDLE','RUNNING',
+                        'WAITING_APPROVAL','CANCEL_REQUESTED')):
                     self.stop_event.wait(self.interval)
         finally:supervisor.close()
 
@@ -474,6 +477,11 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           value['query_id'],value['source_kind'],
                           value['source_version'],value['query'],
                           value['result_digest'])
+                    elif action=='UPSERT_CANONICAL_ASSET':
+                        result=ExecutionPolicyGateway(control.gateway,
+                          control.context).upsert_canonical_asset(
+                          value['asset_key'],value['source_version'],
+                          value['content'])
                     elif action=='RECORD_DISPATCH_PREFLIGHT':
                         result=ExecutionPolicyGateway(control.gateway,
                           control.context).record_dispatch_preflight(

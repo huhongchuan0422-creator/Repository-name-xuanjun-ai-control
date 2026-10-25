@@ -66,6 +66,10 @@ class ExecutionPolicyGateway(object):
             source_kind TEXT NOT NULL,source_version TEXT NOT NULL,
             query_json TEXT NOT NULL,result_digest TEXT NOT NULL,
             observed_at REAL NOT NULL,PRIMARY KEY(tenant_id,query_id))''',
+          '''CREATE TABLE IF NOT EXISTS canonical_asset_registry(
+            tenant_id TEXT NOT NULL,asset_key TEXT NOT NULL,source_version TEXT NOT NULL,
+            content_json TEXT NOT NULL,content_sha256 TEXT NOT NULL,updated_at REAL NOT NULL,
+            PRIMARY KEY(tenant_id,asset_key,source_version))''',
           '''CREATE TABLE IF NOT EXISTS formal_approval_roles(
             tenant_id TEXT NOT NULL,task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
             principal_id TEXT NOT NULL,approval_kind TEXT NOT NULL,
@@ -92,19 +96,41 @@ class ExecutionPolicyGateway(object):
                     if name not in columns:
                         self.db.execute('ALTER TABLE %s ADD COLUMN %s TEXT'%(table,name))
 
+    def upsert_canonical_asset(self,asset_key,source_version,content,now=None):
+        principal=self.context['principal_id']
+        self.gateway.tenants.verify(self.context)
+        if not principal.startswith('admin:'):raise ValueError('POLICY_ADMIN_REQUIRED')
+        _text(asset_key,'asset_key');_text(source_version,'source_version')
+        if not isinstance(content,dict):raise ValueError('ASSET_CONTENT_REQUIRED')
+        body=canonical(content);digest=hashlib.sha256(body.encode()).hexdigest()
+        now=self.clock() if now is None else now
+        self.db.execute('''INSERT OR REPLACE INTO canonical_asset_registry VALUES
+          (?,?,?,?,?,?)''',(self.tenant_id,asset_key,source_version,body,digest,now))
+        self.db.commit();return {'asset_key':asset_key,'content_sha256':digest}
+
     def record_asset_query(self,task_id,query_id,source_kind,source_version,
                            query,result_digest,now=None):
         self.gateway.assert_task_context(self.context,task_id)
-        if source_kind not in ('REGISTRY','GIT','ARTIFACT_STORE','CANONICAL_DB'):
-            raise ValueError('TRUSTED_ASSET_QUERY_SOURCE_REQUIRED')
+        if source_kind!='CANONICAL_DB':
+            raise ValueError('EXTERNAL_TRUSTED_READER_NOT_CONFIGURED')
         _text(source_version,'source_version')
         if (not isinstance(query,dict) or set(query)!=
                 {'lookup','observed_result','evidence_ref'} or
-                not isinstance(query['lookup'],dict) or not query['lookup'] or
+                not isinstance(query['lookup'],dict) or
+                set(query['lookup'])!={'asset_key'} or
                 not isinstance(query['evidence_ref'],str) or
                 query['evidence_ref'] in ('',UNKNOWN)):
             raise ValueError('VERIFIABLE_ASSET_QUERY_RECEIPT_REQUIRED')
-        computed=hashlib.sha256(canonical(query['observed_result']).encode()).hexdigest()
+        asset_key=_text(query['lookup']['asset_key'],'asset_key')
+        row=self.db.execute('''SELECT content_json,content_sha256 FROM
+          canonical_asset_registry WHERE tenant_id=? AND asset_key=? AND
+          source_version=?''',(self.tenant_id,asset_key,source_version)).fetchone()
+        observed=(json.loads(row['content_json']) if row is not None else
+                  {'matches':[]})
+        expected_ref='canonical-db://%s@%s'%(asset_key,source_version)
+        if query['observed_result']!=observed or query['evidence_ref']!=expected_ref:
+            raise ValueError('ASSET_QUERY_RESULT_NOT_FROM_CANONICAL_SOURCE')
+        computed=hashlib.sha256(canonical(observed).encode()).hexdigest()
         if result_digest!=computed:raise ValueError('RESULT_DIGEST_MISMATCH')
         now=self.clock() if now is None else now
         self.db.execute('''INSERT INTO asset_query_receipts VALUES

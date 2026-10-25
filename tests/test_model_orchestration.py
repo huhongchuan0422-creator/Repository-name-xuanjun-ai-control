@@ -344,7 +344,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         values=list(latest);values[1]='qualification-unknown';values[11]='UNKNOWN'
         values[13]=latest['observed_at']+1
         self.supervisor.db.execute('''INSERT INTO model_evaluations VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',values);self.supervisor.db.commit()
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',values);self.supervisor.db.commit()
         calls=[]
         class Never(object):
             def invoke(self,*args):calls.append(args);raise AssertionError()
@@ -772,6 +772,41 @@ class ModelOrchestrationTests(unittest.TestCase):
             self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
               model_usage_events WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],0)
 
+    def test_benchmark_missing_partial_and_mixed_usage_stays_truthful(self):
+        self.provider();self.model();self.control.register_benchmark_suite(
+          'usage-mixed',[{'case_id':'a','capability':'code','messages':[],
+          'expected_contains':'ok'},{'case_id':'b','capability':'code','messages':[],
+          'expected_contains':'ok'}])
+        usages=[{'input_tokens':3,'output_tokens':None,'total_tokens':None},{}]
+        class Mixed(object):
+            def invoke(_self,*_args):
+                return {'content':'ok','usage':usages.pop(0),
+                  'provider_request_id':'mixed'}
+        result=self.control.run_benchmark('free','ok','usage-mixed',Mixed())
+        row=self.supervisor.db.execute('''SELECT input_tokens,output_tokens,
+          input_usage_state,output_usage_state FROM model_evaluations WHERE
+          evaluation_id=?''',(result['evaluation_id'],)).fetchone()
+        self.assertEqual(tuple(row),(3,0,'PARTIAL','UNKNOWN'))
+        projected=self.control.projection()['evaluations'][-1]
+        self.assertEqual(projected['input_usage_state'],'PARTIAL')
+        self.assertEqual(projected['output_usage_state'],'UNKNOWN')
+
+    def test_skill_content_counts_toward_tpm_before_send(self):
+        self.assigned();content={'instructions':'x'*12000}
+        self.control.register_skill('large','v1',content,'a'*64)
+        self.control.bind_skill('developer','v1','large','v1','a'*64,'APPROVED')
+        queued=self.control.queue_request('demo-b','developer',
+          [{'role':'user','content':'short'}],'large-skill-tpm',128)
+        self.control.set_runtime_limits('free',512,4096);calls=[]
+        class Never(object):
+            def invoke(self,*args):calls.append(args);raise AssertionError()
+        result=ModelScheduler(self.control,{'openai-compatible':Never(),
+          'siliconflow':Never()}).run_once()
+        self.assertEqual(result['state'],'QUEUED_LIMIT');self.assertEqual(calls,[])
+        binding=self.supervisor.db.execute('''SELECT expected_input_tokens FROM
+          model_request_bindings WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertGreater(binding['expected_input_tokens'],512)
+
     def test_paid_model_is_held_before_send_under_zero_new_spend_policy(self):
         self.provider('paid',price='KNOWN_PAID');self.model('paid','ok','KNOWN_PAID')
         self.supervisor.db.execute('''UPDATE model_catalog SET input_unit_cost=1,
@@ -821,6 +856,19 @@ class ModelOrchestrationTests(unittest.TestCase):
         result=ModelScheduler(self.control).run_once()
         self.assertEqual(result['request_id'],healthy['request_id'])
         self.assertEqual(result['state'],'SUCCEEDED')
+
+    def test_same_provider_oversized_head_does_not_starve_small_request(self):
+        self.assigned();large=self.control.queue_request('demo-b','developer',
+          [{'role':'user','content':'x'*12000}],'large-head',128)
+        small=self.control.queue_request('demo-b','developer',[],
+          'small-after-head',128)
+        self.control.set_runtime_limits('free',1024,4096)
+        result=ModelScheduler(self.control).run_once()
+        self.assertEqual(result['request_id'],small['request_id'])
+        self.assertEqual(result['state'],'SUCCEEDED')
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          model_requests WHERE request_id=?''',(large['request_id'],)).fetchone()[0],
+          'QUEUED')
 
     def test_frozen_task_spec_change_invalidates_later_review(self):
         self.assigned();self.role('reviewer','REVIEWER',['code'],False,'QA')

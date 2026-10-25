@@ -4,7 +4,7 @@
 
 - `scripts/task_center_mcp.py` 是自建、stdio MCP 外壳；它只调用现有任务中心 HTTP 业务入口，不建立第二任务库，也不开放 Shell、SQL 或任意文件读取。
 - `scripts/codex_execution_adapter.py` 在同一 SQLite 中持久化发送意图、执行标识和事件；任务、attempt、Writer/fence/epoch 仍由原 Gateway/Supervisor 判定。
-- Codex SDK 与 App Server 共用上述执行意图和状态机。当前已实现具体的 App Server stdio JSON-RPC 传输：`initialize/initialized → thread/start 或 thread/resume → turn/start`，以及 `turn/interrupt` 取消；本地受控假进程已验证协议、重启附着和取消。SDK 仍只有明确的适配边界，具体 SDK transport 为 `NOT_IMPLEMENTED`。
+- Codex SDK 与 App Server 共用上述执行意图和状态机。当前已实现具体的 App Server stdio JSON-RPC 传输：`initialize/initialized → thread/start 或 thread/resume → turn/start`，并持续消费交错通知、审批请求和 `turn/completed`。响应按官方嵌套 `result.thread.id/sessionId`、`result.turn.id` 读取；`turn/interrupt` 的空响应只表示取消请求已收，须等待 `turn/completed.status=interrupted` 才写 `CANCELLED`。重启通过 `thread/resume` 与 `thread/turns/list` 对账。SDK 仍只有明确的适配边界，具体 SDK transport 为 `NOT_IMPLEMENTED`。
 - `task_center_app.py` 可在显式提供固定 `--codex-app-server-command-json` 时启动 TEST_ONLY 后台循环；它从同一 SQLite 领取持久意图、恢复待对账执行并消费取消请求，网页关闭不影响该循环。命令来自服务启动配置，不来自任务或模型输出。
 - 本包没有安装 Codex SDK、没有连接真实 App Server 账户、没有创建真实 OAuth grant、没有调用真实模型或部署服务。真实账户及 Hosted 能力均为 `NOT_EXECUTED` / `UNVERIFIED`。
 - MCP 自建不代表模型调用无限免费。任何模型调用都必须通过 `model_quota_status`：资格、余量或费用为 `UNKNOWN` 时发送前 `HOLD`；`EXHAUSTED` 时停止；不自动切换付费 API、不充值。
@@ -29,14 +29,14 @@
 
 ## Codex 状态规则
 
-`PENDING → SENDING → ACKED/RUNNING/WAITING_APPROVAL → SUCCEEDED/FAILED`。
+`PENDING → SENDING → ACKED/RUNNING/WAITING_APPROVAL → EXECUTION_COMPLETED/SUCCEEDED/FAILED`。
 取消、发送结果不明和迟到结果分别处理：
 
 - 发送前取消不发送；发送中取消进入 `CANCEL_REQUESTED`。
 - 超时、断线或重启发现 `SENDING/ACKED/RUNNING/WAITING_APPROVAL` 均进入 `UNKNOWN` 待对账，不得自动再启动一份；具有持久 `thread_id` 的 App Server 执行只做 `thread/resume` 附着，不创建新 turn。
-- 发送中收到取消时，迟到 ACK 仍保存 execution/session/thread/turn 标识；随后调用真实 transport cancel，只有取消回执才收敛为 `CANCELLED`。
+- 发送中收到取消时，迟到 ACK 仍保存 execution/session/thread/turn 标识；随后调用 transport interrupt，RPC 空响应仍保持 `CANCEL_REQUESTED`，只有 `turn/completed.status=interrupted` 才收敛为 `CANCELLED`。
 - 旧 attempt/fence 的迟到结果只写历史事件，`accepted=0`，不推进当前任务。
-- turn 完成、聊天结束或进程退出不是业务验收；成果仍需绑定 SHA、清单和独立审核。
+- turn 完成只落 `EXECUTION_COMPLETED`，聊天结束或进程退出也不是业务验收；成果仍需绑定 SHA、清单和独立审核。
 
 ## 本地启动顺序
 

@@ -290,6 +290,8 @@ class ModelControl(object):
               output_tokens INTEGER NOT NULL,retries INTEGER NOT NULL,
               rework_count INTEGER NOT NULL,state TEXT NOT NULL,
               evidence_json TEXT NOT NULL,observed_at REAL NOT NULL,
+              input_usage_state TEXT NOT NULL DEFAULT 'KNOWN',
+              output_usage_state TEXT NOT NULL DEFAULT 'KNOWN',
               PRIMARY KEY(tenant_id,evaluation_id))''',
             '''CREATE TABLE IF NOT EXISTS delivery_candidates(
               tenant_id TEXT NOT NULL,candidate_id TEXT NOT NULL,
@@ -390,6 +392,11 @@ class ModelControl(object):
               'PRAGMA table_info(model_request_bindings)')}
             if 'writer_principal' not in binding_columns:
                 self.db.execute('ALTER TABLE model_request_bindings ADD COLUMN writer_principal TEXT')
+            evaluation_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(model_evaluations)')}
+            for name in ('input_usage_state','output_usage_state'):
+                if name not in evaluation_columns:
+                    self.db.execute("ALTER TABLE model_evaluations ADD COLUMN %s TEXT NOT NULL DEFAULT 'KNOWN'"%name)
 
     @staticmethod
     def _origin(value):
@@ -895,14 +902,16 @@ class ModelControl(object):
                 not now<task_state['authority_valid_until']):
             raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
         bindings=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
-          s.content_sha256,s.state FROM role_skill_bindings b JOIN approved_skills s
+          s.content_sha256,s.content_json,s.state FROM role_skill_bindings b JOIN approved_skills s
           ON s.tenant_id=b.tenant_id AND s.skill_id=b.skill_id AND
           s.skill_version=b.skill_version WHERE b.tenant_id=? AND b.role_id=?
           AND b.role_version=? AND b.status='APPROVED' ORDER BY b.skill_id''',(
           self.tenant_id,assignment['role_id'],assignment['role_version'])))
         if any(x['state']!='APPROVED' for x in bindings):
             raise ValueError('SKILL_REVOKED')
-        skill_sha=(hashlib.sha256(canonical([dict(x) for x in bindings]).encode()).hexdigest()
+        skill_snapshot=[{'skill_id':x['skill_id'],'skill_version':x['skill_version'],
+          'content_sha256':x['content_sha256'],'state':x['state']} for x in bindings]
+        skill_sha=(hashlib.sha256(canonical(skill_snapshot).encode()).hexdigest()
                    if bindings else None)
         connection_version=None
         if connection_id is not None:
@@ -917,7 +926,13 @@ class ModelControl(object):
                     connection['provider_id']!=assignment['provider_id']):
                 raise ValueError('ACTIVE_PROVIDER_CONNECTION_REQUIRED')
             connection_version=connection['config_version']
-        payload={'messages':messages};body=canonical(payload);digest=hashlib.sha256(body.encode()).hexdigest()
+        approved=[{'skill_id':x['skill_id'],'skill_version':x['skill_version'],
+          'content_sha256':x['content_sha256'],'content':json.loads(x['content_json'])}
+          for x in bindings]
+        outbound_messages=([{'role':'system','content':canonical(
+          {'approved_skills':approved})}] if approved else [])+messages
+        payload={'messages':outbound_messages};body=canonical(payload)
+        digest=hashlib.sha256(body.encode()).hexdigest()
         identity={'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'role':role_id,
           'provider':assignment['provider_id'],'model':assignment['model_id'],
@@ -1142,6 +1157,7 @@ class ModelControl(object):
         adapter=adapter or ({'siliconflow':SiliconFlowAdapter(),
           'openai-compatible':OpenAICompatibleAdapter()}[provider['adapter_type']])
         started=time.monotonic();passed=0;input_tokens=0;output_tokens=0;evidence=[]
+        input_complete=True;output_complete=True
         secret=self.provider_secret(provider_id)
         for index,case in enumerate(cases,1):
             request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
@@ -1167,13 +1183,16 @@ class ModelControl(object):
                   json.loads(case['messages_json']),provider['timeout_seconds'],512)
                 ok=case['expected_contains'] in result['content']
                 passed+=int(ok)
-                if result['usage']['input_tokens'] is not None:
+                if result['usage'].get('input_tokens') is not None:
                     input_tokens+=result['usage']['input_tokens']
-                if result['usage']['output_tokens'] is not None:
+                else:input_complete=False
+                if result['usage'].get('output_tokens') is not None:
                     output_tokens+=result['usage']['output_tokens']
+                else:output_complete=False
                 evidence.append({'case_id':case['case_id'],'passed':ok,
                   'provider_request_id':result['provider_request_id']})
             except ProviderError as exc:
+                input_complete=False;output_complete=False
                 evidence.append({'case_id':case['case_id'],'passed':False,
                   'error_kind':exc.kind})
                 result=None
@@ -1202,10 +1221,17 @@ class ModelControl(object):
           'model':model_id,'suite':suite_version,'at':now})
         evaluation_id=hashlib.sha256(identity.encode()).hexdigest()
         state='QUALIFIED' if score==1.0 else 'NOT_QUALIFIED'
-        self.db.execute('''INSERT INTO model_evaluations VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,evaluation_id,
+        self.db.execute('''INSERT INTO model_evaluations(
+          tenant_id,evaluation_id,provider_id,model_id,suite_version,
+          quality_score,duration_ms,input_tokens,output_tokens,retries,
+          rework_count,state,evidence_json,observed_at,input_usage_state,
+          output_usage_state) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          self.tenant_id,evaluation_id,
           provider_id,model_id,suite_version,score,duration,input_tokens,
-          output_tokens,0,0,state,canonical(evidence),now));self.db.commit()
+          output_tokens,0,0,state,canonical(evidence),now,
+          'KNOWN' if input_complete else ('PARTIAL' if input_tokens else UNKNOWN),
+          'KNOWN' if output_complete else ('PARTIAL' if output_tokens else UNKNOWN)));
+        self.db.commit()
         return {'evaluation_id':evaluation_id,'state':state,
                 'quality_score':score,'duration_ms':duration}
 
@@ -1565,7 +1591,8 @@ class ModelControl(object):
           'evaluations':[dict(x) for x in self.db.execute('''SELECT
           evaluation_id,provider_id,model_id,suite_version,quality_score,
           duration_ms,input_tokens,output_tokens,retries,rework_count,state,
-          observed_at FROM model_evaluations WHERE tenant_id=? ORDER BY
+          input_usage_state,output_usage_state,observed_at FROM
+          model_evaluations WHERE tenant_id=? ORDER BY
           observed_at,evaluation_id''',(self.tenant_id,))],
           'candidates':[dict(x) for x in self.db.execute('''SELECT candidate_id,
           task_id,attempt_id,artifact_sha256,checklist_sha256,submitted_by,
@@ -1639,8 +1666,8 @@ class ModelScheduler(object):
           model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id
           AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
           role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
-          AND rt.version=a.role_version WHERE r.provider_rank=1
-          ORDER BY r.created_at,r.request_id LIMIT 100''',
+          AND rt.version=a.role_version WHERE r.provider_rank<=16
+          ORDER BY r.provider_rank,r.created_at,r.request_id LIMIT 1600''',
           (self.control.tenant_id,now)))
         if not candidates:return {'state':'IDLE'}
         row=None;reservation=None;last_limit=None
@@ -1777,12 +1804,6 @@ class ModelScheduler(object):
                         'error':'CONNECTION_CONFIG_CHANGED'}
         else:secret=self.control.provider_secret(row['provider_id'])
         payload=json.loads(row['payload_json'])
-        if skills:
-            approved=[{'skill_id':x['skill_id'],'skill_version':x['skill_version'],
-              'content_sha256':x['content_sha256'],'content':json.loads(x['content_json'])}
-              for x in skills]
-            payload['messages']=[{'role':'system','content':canonical(
-              {'approved_skills':approved})}]+payload['messages']
         adapter=self.adapters[row['adapter_type']]
         try:
             result=adapter.invoke(row['base_url'],secret,row['model_id'],

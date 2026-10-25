@@ -3,8 +3,10 @@ from __future__ import print_function
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import tempfile
+import threading
 import unittest
 
 import sys
@@ -186,6 +188,38 @@ class KernelTests(unittest.TestCase):
           'SELECT COUNT(*) FROM events').fetchone()[0],before_events)
         self.assertEqual(self.supervisor.db.execute(
           'SELECT COUNT(*) FROM gateway_checkpoints').fetchone()[0],before_points)
+
+    def test_checkpoint_validation_and_write_are_serialized_with_revocation(self):
+        self.gateway.register_graph(self.a,self.graph(),now=1000)
+        self.executor().start('task-a','attempt-a1',['fake:resource-task-a'],2000)
+        locked=threading.Event();release=threading.Event()
+        def revoke():
+            db=sqlite3.connect(self.path,timeout=5,isolation_level=None)
+            try:
+                db.execute('BEGIN IMMEDIATE')
+                db.execute("UPDATE tasks SET authority_state='REVOKED' WHERE task_id='task-a'")
+                locked.set();release.wait(5);db.commit()
+            finally:db.close()
+        thread=threading.Thread(target=revoke);thread.start()
+        self.assertTrue(locked.wait(2))
+        script=("import os,sys\n"
+          "sys.path.insert(0,sys.argv[2])\n"
+          "from task_supervisor import Supervisor\n"
+          "from reusable_task_gateway import GatewayKernel,TestTenantAuthority\n"
+          "s=Supervisor(sys.argv[1],lambda:1002.0);a=TestTenantAuthority(b'k'*32);g=GatewayKernel(s,a,lambda:1002.0)\n"
+          "print('READY',flush=True)\n"
+          "try:g.save_checkpoint(a.issue('tenant-a','owner-a'),'task-a','attempt-a1','race-point',{'work':'late'},[],'RECONCILED',['fake:resource-task-a'],1002)\n"
+          "except Exception as e:print(type(e).__name__+':'+str(e),flush=True)\n"
+          "finally:s.close()\n")
+        proc=subprocess.Popen([sys.executable,'-u','-c',script,self.path,
+          os.path.join(os.path.dirname(__file__),'..','scripts')],
+          stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True)
+        self.assertEqual(proc.stdout.readline().strip(),'READY');release.set()
+        stdout,stderr=proc.communicate(timeout=5);thread.join(5)
+        self.assertEqual(proc.returncode,0,stderr)
+        self.assertIn('CURRENT_WRITER_AUTHORITY_REQUIRED',stdout)
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          gateway_checkpoints WHERE checkpoint_id='race-point' ''').fetchone()[0],0)
 
     def test_resource_conflict_nonpreemptible_and_safe_release(self):
         self.register_wait_graph()
