@@ -12,6 +12,7 @@ from unittest.mock import patch
 from types import SimpleNamespace
 from scripts import community_preview_carrier_handoff_admission as h
 from scripts import community_preview_carrier_handoff_call as handoff_call
+from scripts import community_preview_carrier_handoff_entry as fixed_entry
 
 class HandoffAdmission(unittest.TestCase):
     def setUp(self):
@@ -162,6 +163,39 @@ class HandoffAdmission(unittest.TestCase):
         finally:os.close(target)
         with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
             handoff_call.rollback_from_original_entry(ctx)
+
+    def test_fixed_entry_real_exchange_and_rollback_in_isolated_directory(self):
+        # Only the fixed operator/absolute-directory opener are substituted for
+        # a temporary fixture. Transaction, file integrity, locks, journal,
+        # exchange and rollback are the real implementation.
+        def fixture_directory(path, stack):
+            if path==fixed_entry.PARENT:
+                source=self.parent
+            elif path==fixed_entry.JOURNAL:
+                source=self.jfd
+            else:
+                raise AssertionError('UNEXPECTED_FIXED_DIRECTORY')
+            fd=os.dup(source)
+            stack.callback(os.close,fd)
+            return fd
+        with patch.object(fixed_entry,'identify_admin',return_value=1008),\
+             patch.object(fixed_entry,'_protected_path_directory',side_effect=fixture_directory),\
+             patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')):
+            result=fixed_entry.run('execute',lambda *args:True,
+                self.old_archive_bytes,self.archive)
+            self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
+            restored=fixed_entry.run('rollback',lambda *args:True,
+                self.old_archive_bytes,self.archive)
+            self.assertEqual(restored['state'],
+                'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+            with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
+                fixed_entry.run('rollback',lambda *args:True,
+                    self.old_archive_bytes,self.archive)
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:
+            self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
+            self.assertEqual(h.readfile(target,'manifest.json',self.uid),self.old['manifest.json'])
+        finally:os.close(target)
 
     def test_duplicate_attempt_holds(self):
         self.execute()
