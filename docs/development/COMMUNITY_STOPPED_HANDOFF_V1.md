@@ -6,6 +6,13 @@ Fixed operations are `post-b-execute`, `post-b-status`, and `post-b-rollback`. T
 
 Post-B admission requires the completed B intent, snapshot result/permit, validate-clones result/permit, B approval/freeze, B-resume approval/freeze, protected backup directory and historical C approval to remain bound, while C active-attempt must be absent. Status and rollback re-read the same protected history. Rollback is accepted only for the transaction's own swapped identities and its own post-B rollback intent/result chain. Source exchange approval is separate from `bc-c-resume-approval.json`; exchanging source bytes never approves C execution.
 
+Fixed post-B input identities (deterministic Hosted build):
+- Previous carrier 005c: `control-stopped-v1-005c.zip`, archive SHA256 `2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff`, manifest SHA256 `d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd`.
+- Candidate carrier: `control-stopped-v1-post-b-candidate.zip`, archive SHA256 `8556531d52b81ca87f3346f2d098de7aea50cf7838106482aadcc86188c374eb`, manifest SHA256 `f7118e9a45c77cf260ae516864635d45af4a9159055da3f9ab983ff4ca95f99e`.
+- Deterministic build report: archive 63,221 bytes; manifest 1,548 bytes. These values come from Hosted output, not a Git blob SHA. The original pre-B 1d→005c pins and transaction names remain unchanged.
+- Original entry runtime pins are SHA256 of exact source bytes, verified by the Hosted artifact `community-carrier-handoff-isolated-evidence`; Git blob IDs are not used as runtime SHA256 values.
+- The post-B operation record binds both fixed archive/manifest tuples, completed B snapshot/clone results and permits, B-resume admission/approval/freeze, backup directory identity, and the preserved old C approval. The new C resume approval remains a separate file and cannot authorize source exchange.
+
 This source task does not create a real approval or execute the UK host. `REAL_PYTHON_3_6_8=NOT_RUN`.
 
 ---
