@@ -17,7 +17,9 @@ import re
 import urllib.parse
 import urllib.request
 
-_ARTIFACT_API_PATH=re.compile(r'^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/artifacts/[1-9][0-9]{0,19}/zip'iZd7oeikknn1z21sq6ji6zZ'
+_ARTIFACT_API_PATH=re.compile(r"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/artifacts/[1-9][0-9]{0,19}/zip$")
+
+HOST='iZd7oeikknn1z21sq6ji6zZ'
 TARGET='control-stopped-v1'
 ENTRY_NAME='site-prepare-v1.py'
 JOURNAL_DIR='update-journal'
