@@ -165,33 +165,37 @@ class HandoffAdmission(unittest.TestCase):
             handoff_call.rollback_from_original_entry(ctx)
 
     def test_fixed_entry_real_exchange_and_rollback_in_isolated_directory(self):
-        # Only the fixed operator/absolute-directory opener are substituted for
-        # a temporary fixture. Transaction, file integrity, locks, journal,
-        # exchange and rollback are the real implementation.
+        # Only the host identity and fixed absolute-directory opener are
+        # substituted for temporary directories. The approval is a real
+        # protected file and transaction/exchange/rollback run without mocks.
         def fixture_directory(path, stack):
-            if path==fixed_entry.PARENT:
-                source=self.parent
-            elif path==fixed_entry.JOURNAL:
-                source=self.jfd
-            else:
-                raise AssertionError('UNEXPECTED_FIXED_DIRECTORY')
-            fd=os.dup(source)
-            stack.callback(os.close,fd)
-            return fd
+            if path==fixed_entry.PARENT:source=self.parent
+            elif path==fixed_entry.JOURNAL:source=self.jfd
+            else:raise AssertionError('UNEXPECTED_FIXED_DIRECTORY')
+            fd=os.dup(source);stack.callback(os.close,fd);return fd
+        def approval(operation):
+            try:os.unlink(fixed_entry.APPROVAL_NAME,dir_fd=self.parent)
+            except FileNotFoundError:pass
+            now=1800000000
+            record={'format':1,'host':h.HOST,'operation':operation,
+                'attempt':fixed_entry.ATTEMPT,
+                'old_archive_sha256':h.OLD_ARCHIVE,'old_manifest_sha256':h.OLD_MANIFEST,
+                'new_archive_sha256':h.NEW_ARCHIVE,'new_manifest_sha256':h.NEW_MANIFEST,
+                'issued_at':now-1,'expires_at':now+300}
+            h.writefile(self.parent,fixed_entry.APPROVAL_NAME,h.canonical(record),self.uid)
         with patch.object(fixed_entry,'identify_admin',return_value=1008),\
              patch.object(fixed_entry,'_protected_path_directory',side_effect=fixture_directory),\
              patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')),\
-             patch.object(fixed_entry,'ROOT_UID',self.uid):
-            result=fixed_entry.run('execute',lambda *args:True,
-                self.old_archive_bytes,self.archive)
+             patch.object(fixed_entry,'ROOT_UID',self.uid),\
+             patch.object(fixed_entry.time,'time',return_value=1800000000):
+            approval('execute')
+            result=fixed_entry.run('execute',self.old_archive_bytes,self.archive)
             self.assertEqual(result['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
-            restored=fixed_entry.run('rollback',lambda *args:True,
-                self.old_archive_bytes,self.archive)
-            self.assertEqual(restored['state'],
-                'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+            approval('rollback')
+            restored=fixed_entry.run('rollback',self.old_archive_bytes,self.archive)
+            self.assertEqual(restored['state'],'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
             with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
-                fixed_entry.run('rollback',lambda *args:True,
-                    self.old_archive_bytes,self.archive)
+                fixed_entry.run('rollback',self.old_archive_bytes,self.archive)
         target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
         try:
             self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
