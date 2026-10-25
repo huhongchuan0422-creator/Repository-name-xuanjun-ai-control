@@ -175,18 +175,6 @@ class WholeEntry(unittest.TestCase):
             old_b_approval_sha256=s.sha(old_braw),old_freeze_sha256=s.sha(old_freeze_raw),old_stage_permit_sha256=None,
             resume_freeze_sha256=s.sha(s.canonical(fresh)),actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
         self.write(h.B_RESUME_APPROVAL,s.canonical(resume))
-        # Model the immutable B-resume-admission record produced by the real
-        # admission path; C tests must bind both records, not synthesize one later.
-        admission=dict(format=1,mode=h.MODE,attempt=h.attempt(),
-            carrier_manifest_sha256=self.session.pins(),
-            old_b_intent_sha256=s.sha(s.canonical(intent)),
-            old_b_approval_sha256=s.sha(old_braw),
-            old_freeze_sha256=s.sha(old_freeze_raw),
-            old_stage_permit_sha256=None,
-            resume_approval_sha256=s.sha(s.canonical(resume)),
-            resume_freeze_sha256=s.sha(s.canonical(fresh)),
-            actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
-        self.write(h.resume_record_path(),s.canonical(admission))
         return intent,old_braw,old_freeze_raw,resume
     def fresh_session(self):
         self.session.close()
@@ -207,6 +195,20 @@ class WholeEntry(unittest.TestCase):
         # Both historical B and freeze windows are expired; only the new C
         # operation approval below is fresh. Historical bytes stay unchanged.
         self.clock=2400
+        # Model the durable admission record left by a completed B resume.
+        # This record is absent during B admission tests and appears only here,
+        # after the fixture represents successful B completion.
+        bresume,_=h.document(h.B_RESUME_APPROVAL)
+        admission=dict(format=1,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=bresume['carrier_manifest_sha256'],
+            old_b_intent_sha256=bresume['old_b_intent_sha256'],
+            old_b_approval_sha256=bresume['old_b_approval_sha256'],
+            old_freeze_sha256=bresume['old_freeze_sha256'],
+            old_stage_permit_sha256=bresume['old_stage_permit_sha256'],
+            resume_approval_sha256=s.sha(s.canonical(bresume)),
+            resume_freeze_sha256=bresume['resume_freeze_sha256'],
+            actions=['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'])
+        self.write(h.resume_record_path(),s.canonical(admission))
         # Historical B-resume carrier is deliberately distinct from current C
         # source carrier. Rebind the fixture record hashes, never the old B data.
         resume,_=h.document(h.resume_record_path())
