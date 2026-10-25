@@ -307,12 +307,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='ACCEPT_CANDIDATE':
                         if value['acceptor']!=actor:
                             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
-                        result=control.accept_candidate(value['candidate_id'],
-                          value['acceptor'])
-                        candidate=control.db.execute('''SELECT * FROM
-                          delivery_candidates WHERE tenant_id=? AND
-                          candidate_id=?''',(control.tenant_id,
-                          value['candidate_id'])).fetchone()
+                        candidate=control.validate_accept_candidate(
+                          value['candidate_id'],value['acceptor'])
                         fence=Fence(supervisor,db_path+'.test-only-locks')
                         try:
                             task=supervisor._task(candidate['task_id'])
@@ -322,6 +318,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                               candidate['artifact_sha256'],
                               json.loads(task['completion_json']))
                         finally:fence.close()
+                        result=control.accept_candidate(value['candidate_id'],
+                          value['acceptor'])
                         result['canonical_task_state']=terminal['state']
                     elif action=='SET_MODULE':
                         result=control.set_module(value['module_id'],

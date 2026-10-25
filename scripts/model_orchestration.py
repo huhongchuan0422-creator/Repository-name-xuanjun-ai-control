@@ -693,8 +693,7 @@ class ModelControl(object):
         return {'candidate_id':candidate_id,'state':state,
                 'finding_count':len(findings)}
 
-    def accept_candidate(self, candidate_id, acceptor, now=None):
-        now=self.clock() if now is None else now
+    def validate_accept_candidate(self, candidate_id, acceptor):
         row=self.db.execute('''SELECT * FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
@@ -702,6 +701,28 @@ class ModelControl(object):
         if (task['attempt_id']!=row['attempt_id'] or
                 task['authority_state']!='VALID' or task['state']!='STARTED'):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        if acceptor!=self._principal():
+            raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
+        if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
+        if acceptor in (row['submitted_by'],row['reviewed_by']):
+            raise ValueError('INDEPENDENT_ACCEPTANCE_REQUIRED')
+        assignment=self.db.execute('''SELECT 1 FROM model_assignments a JOIN
+          role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id
+          AND r.version=a.role_version WHERE a.tenant_id=? AND a.task_id=? AND
+          a.attempt_id=? AND a.principal_id=? AND r.phase='ACCEPTOR' ''',
+          (self.tenant_id,row['task_id'],row['attempt_id'],acceptor)).fetchone()
+        if assignment is None:raise ValueError('ACCEPTOR_ASSIGNMENT_REQUIRED')
+        return dict(row)
+
+    def accept_candidate(self, candidate_id, acceptor, now=None):
+        now=self.clock() if now is None else now
+        row=self.db.execute('''SELECT * FROM delivery_candidates WHERE tenant_id=?
+          AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
+        if row is None:raise KeyError(candidate_id)
+        task=self.gateway.supervisor._task(row['task_id'])
+        if (task['attempt_id']!=row['attempt_id'] or task['state']!='SUCCESS'
+                or task['authority_state']!='REVOKED'):
+            raise ValueError('CANONICAL_TASK_SUCCESS_REQUIRED')
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')

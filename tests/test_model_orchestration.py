@@ -258,16 +258,19 @@ class ModelOrchestrationTests(unittest.TestCase):
           [{'id':'DEFECT-1'}],False)
         self.assertEqual(changed['state'],'CHANGES_REQUESTED')
         with self.assertRaisesRegex(ValueError,'REVIEW_PASS'):
-            acceptor.accept_candidate(submitted['candidate_id'],'acceptor')
+            acceptor.validate_accept_candidate(submitted['candidate_id'],'acceptor')
         with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
             reviewer.review_candidate(submitted['candidate_id'],'qa',[],True)
         revised=developer.submit_candidate('demo-b','c'*64,'d'*64,
           'developer-1')
         passed=reviewer.review_candidate(revised['candidate_id'],'qa',[],True)
         self.assertEqual(passed['state'],'REVIEW_PASSED')
+        acceptor.validate_accept_candidate(revised['candidate_id'],'acceptor')
+        self.executor.complete_success('demo-b','attempt-b','c'*64,
+          json.loads(self.supervisor._task('demo-b')['completion_json']))
         self.assertEqual(acceptor.accept_candidate(revised['candidate_id'],
           'acceptor')['state'],'ACCEPTED')
-        with self.assertRaisesRegex(ValueError,'SUBMITTED_CANDIDATE'):
+        with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE'):
             reviewer.review_candidate(revised['candidate_id'],'qa',[],False)
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           candidate_reviews WHERE candidate_id IN (?,?)''',(submitted['candidate_id'],
