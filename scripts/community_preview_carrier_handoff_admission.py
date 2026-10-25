@@ -106,6 +106,28 @@ def members(raw,manifest_sha,archive_sha):
                  and meta['uid']==0 and meta['mode']=='0600','CANDIDATE_MEMBER_SHA')
         return contents
 
+def verified_old_inventory(expected):
+    need(type(expected) is dict and 'manifest.json' in expected,
+         'OLD_INVENTORY_REQUIRED')
+    manifest_raw=expected['manifest.json']
+    need(sha(manifest_raw)==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
+    try:m=json.loads(manifest_raw.decode('utf8'))
+    except (ValueError,UnicodeError):raise Hold('OLD_MANIFEST_INVALID')
+    need(manifest_raw==canonical(m) and type(m) is dict
+         and set(m)=={'format','mode','install_root','files','updates_enabled'}
+         and m['format']==1 and type(m['format']) is int
+         and m['mode']=='STOPPED_HANDOFF_V1'
+         and m['install_root']=='/opt/xuanjun-community-preview/control-stopped-v1'
+         and m['updates_enabled'] is False
+         and type(m['files']) is dict and set(expected)==set(m['files'])|{'manifest.json'},
+         'OLD_INVENTORY_SCOPE')
+    for name,meta in m['files'].items():
+        need(type(meta) is dict and set(meta)=={'bytes','sha256','uid','mode'}
+             and type(meta['bytes']) is int and meta['bytes']==len(expected[name])
+             and meta['sha256']==sha(expected[name])
+             and meta['uid']==0 and meta['mode']=='0600','OLD_MEMBER_MANIFEST_BINDING')
+    return True
+
 def tree(fd,name,uid,expected,expected_id=None):
     root=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
     try:
@@ -255,6 +277,7 @@ def status(parent,jfd,uid,old_entries,new_entries):
         if childstat(jfd,PREINTENT) is not None:
             readfile(jfd,PREINTENT,uid,8192)
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
+    verified_old_inventory(old_entries)
     j=journal(jfd,uid)
     pre_raw=readfile(jfd,PREINTENT,uid,8192)
     try:pre=json.loads(pre_raw.decode('utf8'))
@@ -298,6 +321,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         need(childstat(jfd,STATE) is None and childstat(jfd,PREINTENT) is None and childstat(parent,STAGE) is None
              and childstat(parent,RETAINED) is None,'EXISTING_TRANSACTION_INSPECT_ONLY')
         need(childstat(jfd,'active-attempt.json') is None,'ACTIVE_BUSINESS_ATTEMPT')
+        verified_old_inventory(old_entries)
         old_id=tree(parent,TARGET,uid,old_entries)
         need(sha(old_entries['manifest.json'])==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
         new_entries=members(new_archive,NEW_MANIFEST,NEW_ARCHIVE)
@@ -342,8 +366,10 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
     finally:os.close(lease)
 
 def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_identity):
+    checked_dir(parent,uid)
     lease=_locks(jfd,entryfd,uid,expected_entry_identity)
     try:
+        need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,'ROLLBACK_CONFLICT')
         result=status(parent,jfd,uid,old_entries,new_entries)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
         exchange(parent,TARGET,STAGE)
