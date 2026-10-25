@@ -1,3 +1,12 @@
+### Exact fixed-entry source hashes at HEAD 29f401f2cef00fb7913858f27daca4378cc2bc22
+
+- `scripts/community_preview_carrier_handoff_entry.py`: 6557 bytes, SHA256 `14cda6843de950e8ef25d6a97ed7de08e5130a02920b85007b24804cf3ebfac1`.
+- `tests/test_community_preview_carrier_handoff_entry.py`: 2243 bytes, SHA256 `aacd02f48996b5d0dac448b81236e3ed4aa157b7cdc5264b35ccea42bc4a06b1`.
+- `tests/test_community_preview_carrier_handoff_admission.py`: 34113 bytes, SHA256 `5085c8111211be4cc289e75f0205f395dd6fa380e34ff3b4826b4f42246f9995`.
+- CI stage: two verified original artifacts; parse and execute 36 original transaction tests, one real fixed-entry/adapter rollback integration added to the transaction module, five original adapter tests, and five fixed-entry guard tests.
+- External execution constraint: there is no currently bound and independently approved `authority_checker` at the unique installation Writer. The in-process call refuses without it; root/admin identity is not authorization. The current source delivery contains no standalone production shell command, because inventing one would bypass that gate.
+- Isolated cross-check: 48/48 on reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; this is not exact-head Hosted acceptance and does not verify Python 3.6.8.
+
 ## Issue76 fixed protected entry handoff material — source-only
 
 - `scripts/community_preview_carrier_handoff_entry.py`: fixed in-process `run(operation, authority_checker, old_archive_bytes, new_archive_bytes)`. The existing **single installation Writer** must supply an independently verified and current action-authority checker; root/admin sudo/loginuid identity **alone never authorizes execution**.
@@ -29,7 +38,7 @@ All operations preserve original B-intent, expired permissions, freeze/history a
 ## 2026-10-25 — Fixed original-entry call material (source-only)
 
 Latest adapter candidate files:
-- `scripts/community_preview_carrier_handoff_call.py`: 3049 bytes, SHA256 `6e59bd61b14750dab2aa8f9822c1b8e733da3052c569e51d667defca55ae0739`.
+- `scripts/community_preview_carrier_handoff_call.py`: 3461 bytes, SHA256 `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
 - `tests/test_community_preview_carrier_handoff_call.py`: 2838 bytes, SHA256 `87ed798ad7189bc946ad05c8c15217f3089a904cc743216fe3c6b667d62c06cf`.
 - Original transaction module SHA256 `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`, 35329 bytes.
 - Existing fixed resume script is reused without modification: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`.
