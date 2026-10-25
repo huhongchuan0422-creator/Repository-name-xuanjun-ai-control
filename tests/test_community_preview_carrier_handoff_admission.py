@@ -118,7 +118,7 @@ class HandoffAdmission(unittest.TestCase):
             refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
         os.mkdir(h.HISTORY_NAMES['backup_dir'],0o700,dir_fd=self.parent)
         st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
-        refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.ident(st),None)
+        refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         return refs
 
     def test_post_b_exchange_status_and_owned_rollback_use_separate_records(self):
