@@ -275,9 +275,16 @@ class HandoffAdmission(unittest.TestCase):
         with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
-        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
-            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
-            'SWAPPED_OLD_RETAINED_IN_STAGE')
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        # Independently prove no exchange: current target still has the new tree,
+        # while the stage retains the old tree, without trusting changed history.
+        binding=h.journal(self.jfd,self.uid)
+        self.assertEqual(h.tree(self.parent,h.TARGET,self.uid,self.new,binding['stage_identity']),
+                         binding['stage_identity'])
+        self.assertEqual(h.tree(self.parent,h.STAGE,self.uid,self.old,binding['old_identity']),
+                         binding['old_identity'])
 
     def test_entry_path_replacement_refuses_rollback(self):
         self.execute()
