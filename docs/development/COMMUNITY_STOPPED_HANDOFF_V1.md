@@ -1,3 +1,14 @@
+## 2026-10-25 Carrier handoff status: HOLD (source review only)
+
+The existing install-stopped-v1.sh and community_preview_bc_install.py are NOT APPLICABLE to the installed-to-new upgrade. They pin the older archive 5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4 and manifest e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a and require an absent target.
+
+The replacement candidate archive digest is 2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff; candidate manifest digest d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd. No live replacement is authorized.
+
+scripts/community_preview_carrier_handoff_admission.py is a SOURCE-ONLY digest admission prototype. Its execute and rollback entrypoints deliberately HOLD. It does not yet prove fresh installed identity, unique writer lease, durable journal, crash recovery, atomic transition or rollback ownership. Old B intent, original carrier, expired approvals and historical failure evidence must be preserved. No implicit B/C execution or permit reuse is allowed.
+
+Python 3.6.8 check requires a separately approved already existing isolated genuine interpreter with provenance verification, not the UK production host; do not download, install or simulate. REAL_PYTHON_3_6_8=NOT_RUN.
+
+---
 # STOPPED_HANDOFF_V1 — current verified source candidate and historical proposal
 
 ## Current verified status — 2026-10-25 Beijing
