@@ -236,6 +236,7 @@ jobs:
         run: |
           set -euo pipefail
           python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py scripts/community_preview_carrier_handoff_entry.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_entry.py 2>&1 | tee community-parse.log
+          sha256sum scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py | tee -a community-parse.log
           python -B - <<'PY' 2>&1 | tee -a community-parse.log
           import ast
           from pathlib import Path
