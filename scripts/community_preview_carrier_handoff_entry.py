@@ -44,6 +44,7 @@ JOURNAL=PARENT+'/update-journal'
 ENTRY=PARENT+'/site-prepare-v1.py'
 ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 APPROVAL_NAME='carrier-handoff-approval.json'
+POST_B_APPROVAL_NAME='post-b-carrier-handoff-approval.json'
 OLD_INPUT_NAME='control-stopped-v1-1d639.zip'
 NEW_INPUT_NAME='control-stopped-v1-005c.zip'
 INPUT_MAX=4*1024*1024
@@ -55,7 +56,7 @@ MODULE_PINS={
     'community_preview_carrier_handoff_call.py':'a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc'
 }
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
-OPERATIONS=('execute','status','rollback')
+OPERATIONS=('execute','status','rollback','post-b-execute','post-b-status','post-b-rollback')
 ROOT_UID=0  # Production invariant, overridden only in isolated fixture tests.
 
 def require(condition,reason):
@@ -217,8 +218,8 @@ def _canonical(raw):
     require(type(value) is dict and h.canonical(value)==raw,'APPROVAL_NONCANONICAL')
     return value
 
-def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack):
-    try:fd=os.open(APPROVAL_NAME,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
+def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,approval_name=APPROVAL_NAME):
+    try:fd=os.open(approval_name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
     except FileNotFoundError:raise h.Hold('APPROVAL_MISSING')
     except OSError:raise h.Hold('APPROVAL_OPEN_REJECTED')
     stack.callback(os.close,fd)
@@ -226,7 +227,7 @@ def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack)
     require(stat.S_ISREG(st.st_mode) and st.st_uid==uid
             and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1
             and 0<st.st_size<=APPROVAL_MAX
-            and h.ident(st)==h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False)),
+            and h.ident(st)==h.ident(os.stat(approval_name,dir_fd=parent,follow_symlinks=False)),
             'APPROVAL_FILE_IDENTITY_OR_MODE')
     record=_read_fd_exact(fd,APPROVAL_MAX)
     value=_canonical(record)
@@ -245,13 +246,13 @@ def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack)
     issued=value['issued_at'];expires=value['expires_at'];now=int(time.time())
     require(type(issued) is int and type(expires) is int and issued<=now<=expires
             and expires<=issued+APPROVAL_TTL_MAX,'APPROVAL_EXPIRED_OR_TTL_INVALID')
-    require(h.ident(os.fstat(fd))==h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False)),
+    require(h.ident(os.fstat(fd))==h.ident(os.stat(approval_name,dir_fd=parent,follow_symlinks=False)),
             'APPROVAL_REPLACED')
     return fd,record,h.ident(st)
 
-def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_archive_bytes,new_archive_bytes,uid):
+def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_archive_bytes,new_archive_bytes,uid,approval_name=APPROVAL_NAME):
     st=os.fstat(fd)
-    require(h.ident(st)==expected_identity and h.ident(os.stat(APPROVAL_NAME,dir_fd=parent,follow_symlinks=False))==expected_identity,
+    require(h.ident(st)==expected_identity and h.ident(os.stat(approval_name,dir_fd=parent,follow_symlinks=False))==expected_identity,
             'APPROVAL_REPLACED')
     raw=_read_fd_exact(fd,APPROVAL_MAX)
     require(raw==expected_raw,'APPROVAL_CONTENT_CHANGED')
@@ -307,6 +308,8 @@ def main(argv=None):
 def run(operation):
     """Fixed original-entry caller; current approval is read from the protected record."""
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
+    post_b=operation.startswith('post-b-');base_operation=operation[7:] if post_b else operation
+    approval_name=POST_B_APPROVAL_NAME if post_b else APPROVAL_NAME
     identify_admin()
     _verify_runtime_sources()
     with contextlib.ExitStack() as stack:
@@ -315,7 +318,7 @@ def run(operation):
         old_archive_bytes=_read_fixed_archive(parent,OLD_INPUT_NAME,h.OLD_ARCHIVE,ROOT_UID)
         new_archive_bytes=_read_fixed_archive(parent,NEW_INPUT_NAME,h.NEW_ARCHIVE,ROOT_UID)
         approval_fd,approval_raw,approval_identity=_approval_fd(
-            parent,operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack)
+            parent,base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,stack,approval_name)
         h.members(old_archive_bytes,h.OLD_MANIFEST,h.OLD_ARCHIVE)
         h.members(new_archive_bytes,h.NEW_MANIFEST,h.NEW_ARCHIVE)
         require(h.dirident(os.fstat(journal))==h.dirident(os.stat(
@@ -343,7 +346,7 @@ def run(operation):
             refs[key]=(home,name,h.parent_ident(os.fstat(home)),h.ident(st),h.sha(body))
         h.capture_history(refs,ROOT_UID,parent,journal)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          operation,old_archive_bytes,new_archive_bytes,ROOT_UID)
+                          base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
         ctx=SimpleNamespace(
             host_id=h.HOST,
             authority_check=lambda:_recheck_approval(parent,approval_fd,approval_raw,
@@ -355,9 +358,13 @@ def run(operation):
             history_refs=refs,old_archive_bytes=old_archive_bytes,
             new_archive_bytes=new_archive_bytes,attempt=ATTEMPT)
         _recheck_approval(parent,approval_fd,approval_raw,approval_identity,
-                          operation,old_archive_bytes,new_archive_bytes,ROOT_UID)
-        if operation=='execute':return call.call_once_from_original_entry(ctx)
-        if operation=='status':return call.reconcile_from_original_entry(ctx)
+                          base_operation,old_archive_bytes,new_archive_bytes,ROOT_UID,approval_name)
+        if post_b:
+            if base_operation=='execute':return call.call_once_post_b_from_original_entry(ctx)
+            if base_operation=='status':return call.reconcile_post_b_from_original_entry(ctx)
+            return call.rollback_post_b_from_original_entry(ctx)
+        if base_operation=='execute':return call.call_once_from_original_entry(ctx)
+        if base_operation=='status':return call.reconcile_from_original_entry(ctx)
         return call.rollback_from_original_entry(ctx)
 
 if __name__=='__main__':
