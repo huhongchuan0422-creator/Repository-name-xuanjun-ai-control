@@ -187,6 +187,7 @@ class HandoffAdmission(unittest.TestCase):
              patch.object(fixed_entry,'_protected_path_directory',side_effect=fixture_directory),\
              patch.object(fixed_entry,'ENTRY_SHA',h.sha(b'A_ENTRY_FIXTURE')),\
              patch.object(fixed_entry,'ROOT_UID',self.uid),\
+             patch.object(fixed_entry,'_verify_runtime_sources',return_value=True),\
              patch.object(fixed_entry.time,'time',return_value=1800000000):
             approval('execute')
             result=fixed_entry.run('execute',self.old_archive_bytes,self.archive)
