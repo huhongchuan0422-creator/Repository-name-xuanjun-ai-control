@@ -245,7 +245,7 @@ def writefile(fd,name,body,uid):
     finally:os.close(f)
     os.fsync(fd)
 
-def build_tree(parent,entries,uid,name=STAGE):
+def build_tree(parent,entries,uid,name=STAGE,fault=None):
     need(childstat(parent,name) is None,'STAGE_ALREADY_EXISTS')
     os.mkdir(name,0o700,dir_fd=parent)
     os.fsync(parent)
@@ -271,7 +271,7 @@ def build_tree(parent,entries,uid,name=STAGE):
                 finally:os.close(f)
             finally:
                 for n in reversed(opened):os.close(n)
-        for path,body in sorted(entries.items()):
+        for index,(path,body) in enumerate(sorted(entries.items())):
             parts=path.split('/');fd=root;opened=[]
             try:
                 for part in parts[:-1]:
@@ -280,6 +280,7 @@ def build_tree(parent,entries,uid,name=STAGE):
                 writefile(fd,parts[-1],body,uid)
             finally:
                 for n in reversed(opened):os.close(n)
+            if fault is not None and index==0:fault('stage_partial_write')
         os.fsync(root)
     finally:os.close(root)
     os.fsync(parent)
@@ -453,7 +454,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
                  new_tree_sha=sha(canonical({x:sha(y) for x,y in new_entries.items()})))
         writefile(jfd,PREINTENT,canonical(pre),uid)
         if fault:fault('preintent_fsynced')
-        build_tree(parent,new_entries,uid)
+        build_tree(parent,new_entries,uid,fault=fault)
         stage_id=tree(parent,STAGE,uid,new_entries)
         if fault:fault('staged')
         j={'format':1,'attempt':attempt,'old_manifest':OLD_MANIFEST,
