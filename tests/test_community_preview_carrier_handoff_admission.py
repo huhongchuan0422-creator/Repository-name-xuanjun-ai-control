@@ -380,6 +380,57 @@ class HandoffAdmission(unittest.TestCase):
             h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
 
+    def test_history_mutation_after_stage_holds_before_exchange(self):
+        def fault(where):
+            if where=='staged':
+                name,body,pfd=self.history_bodies['freeze']
+                os.unlink(name,dir_fd=pfd)
+                h.writefile(pfd,name,body+b'CHANGED',self.uid)
+        with self.assertRaisesRegex(h.Hold,'HISTORY_FILE_IDENTITY_CHANGED'):
+            self.execute(fault)
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
+        finally:os.close(target)
+        self.assertIsNotNone(h.childstat(self.jfd,h.PREINTENT))
+
+    def test_entry_replacement_after_stage_holds_before_exchange(self):
+        def fault(where):
+            if where=='staged':
+                os.unlink(h.ENTRY_NAME,dir_fd=self.parent)
+                h.writefile(self.parent,h.ENTRY_NAME,b'REPLACED_ENTRY',self.uid)
+        with self.assertRaisesRegex(h.Hold,'ORIGINAL_ENTRY_FD_PATH_CHANGED'):
+            self.execute(fault)
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.old['loader.py'])
+        finally:os.close(target)
+
+    def test_retained_path_conflict_refuses_rollback_before_exchange(self):
+        self.execute()
+        os.mkdir(h.RETAINED,0o700,dir_fd=self.parent)
+        with self.assertRaisesRegex(h.Hold,'ROLLBACK_CONFLICT'):
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        target=os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:self.assertEqual(h.readfile(target,'loader.py',self.uid),self.new['loader.py'])
+        finally:os.close(target)
+
+    def test_rollback_exchange_effect_then_exception_is_unknown(self):
+        self.execute()
+        original=h.exchange
+        def exchange_then_raise(parent,a,b):
+            original(parent,a,b)
+            raise OSError('SYNTHETIC_ROLLBACK_EXCHANGE_RESULT_UNKNOWN')
+        with patch.object(h,'exchange',side_effect=exchange_then_raise):
+            with self.assertRaisesRegex(h.Hold,'ROLLBACK_EXCHANGE_UNKNOWN_INSPECT_ONLY'):
+                h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                    self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+        self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+            self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
+            'ROLLBACK_APPLIED_RESULT_UNKNOWN')
+        with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)
+
     def test_original_evidence_unmodified(self):
         before=self.history_bodies['b_intent'][1]
         self.execute()
