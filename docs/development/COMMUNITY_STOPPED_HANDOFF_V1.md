@@ -46,7 +46,7 @@ sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_previ
 ```
 The operation argument is not approval; the protected record is the authority. Execute is one-shot. UNKNOWN means status only, never re-run execute. The original installation workflow must place the fixed caller and the two pinned modules into the protected parent using its existing approved delivery path. This source task does not transport/install them or create approval records. The existing `resume-b-partial.sh` remains unchanged and must not run before handoff acceptance and its separate B-resume gate.
 
-This is source/caller implementation only. The original installer has not been edited or invoked; no approval record is fabricated here. Required fixed input files and a fresh approval must be provisioned by the original installation owner after package review. `REAL_PYTHON_3_6_8=NOT_RUN`.
+This is source/caller implementation only. The original installer has not been edited or invoked; no approval record is fabricated here. Required fixed caller/module/input files and a fresh approval must be provisioned by the original installation owner through the existing approved delivery path after package review. `REAL_PYTHON_3_6_8=NOT_RUN`.
 
 ---
 
