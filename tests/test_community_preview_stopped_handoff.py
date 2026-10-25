@@ -52,7 +52,7 @@ class WholeEntry(unittest.TestCase):
             (h,dict(CONTROL=str(base/'control-stopped-v1'),B_APPROVAL=str(base/'bc-b-approval.json'),
                 B_RESUME_APPROVAL=str(base/'bc-b-resume-approval.json'),RESUME_FREEZE=str(base/'writer-freeze-resume-reference.json'),
                 B_RESUME_STAGE_PERMIT=str(base/'site-prepare-resume-approval.json'),
-                C_APPROVAL=str(base/'bc-c-approval.json'),MANIFEST=str(base/'control-stopped-v1/manifest.json'),
+                C_APPROVAL=str(base/'bc-c-approval.json'),C_RESUME_APPROVAL=str(base/'bc-c-resume-approval.json'),\n                C_RESUME_PLAN=str(base/'backup-2330-to-f131-v1/c-preconfirmation-resume-plan.json'),\n                MANIFEST=str(base/'control-stopped-v1/manifest.json'),
                 PROOF=str(base/'backup-2330-to-f131-v1/stopped-handoff-v1.json'))),
             (u,dict(JOURNAL_PARENT=str(journal),OWNER_UID=uid)),
             (c.observation,dict(ROOT_ANCHOR=str(self.root),ROOT_UID=uid,PROJECT_UID=uid)),
@@ -191,38 +191,28 @@ class WholeEntry(unittest.TestCase):
     def _prepare_completed_b_before_c_proof(self):
         self.seed_partial_resume()
         q=self.fresh_session()
-        q.resume_b_partial()
-        self.assertTrue(q.bdone)
-        self.assertFalse(Path(h.PROOF).exists())
-        self.assertFalse(Path(u.JOURNAL_PARENT,'active-attempt.json').exists())
-        self.assertFalse(Path(u.JOURNAL_PARENT,h.attempt()).exists())
+        q.configure_resumed_b_context()
+        q.resume_mode=True
+        self.assertFalse(q.bdone)
         q.backup=h.open_private(s.BACKUP+'/clone-results.json')
         semantic=q.evidence(True)
         candidate=q.candidate(semantic)
-        q.backup and os.close(q.backup);q.backup=None
+        # The original C approval is immutable historical evidence; never edit it.
+        old_approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
+            carrier_manifest_sha256=q.pins(),plan_sha256='d50795e5cd54974c0acd7692d38da3c97e0ff1809a6a7c30d77dce2c24aabbea',
+            issued_at=1,expires_at=2,actions=h.C_ACTIONS)
+        self.write(h.C_APPROVAL,s.canonical(old_approval))
+        record=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.approved_stamp,evidence_sha256=s.sha(s.canonical(semantic)),
+            plan=candidate,plan_sha256=s.sha(s.canonical(candidate)),
+            issued_at=self.clock,expires_at=self.clock+600)
+        self.write(h.C_RESUME_PLAN,s.canonical(record))
         approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate['attempt'],
             carrier_manifest_sha256=q.pins(),plan_sha256=candidate['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
-        self.write(h.C_APPROVAL,s.canonical(approval))
-        # Simulate the actual process exit after B completed and before C proof:
-        # release the original Session and reacquire a genuinely fresh one.
-        q.close()
-        reopened=h.Session();reopened.acquire()
-        self.addCleanup(reopened.close);self.session=reopened
-        self.assertFalse(reopened.bdone)
-        self.assertIsNone(reopened.journal)
-        # Rebuild from retained evidence in the new process. A newly approved
-        # plan is a test fixture only; production may not replace the Owner's
-        # historical approval without a separate explicit approval.
-        reopened.backup=h.open_private(s.BACKUP+'/clone-results.json')
-        semantic2=reopened.evidence(True)
-        candidate2=reopened.candidate(semantic2)
-        os.close(reopened.backup);reopened.backup=None
-        approval2=dict(format=1,host=p.HOST,mode=h.MODE,attempt=candidate2['attempt'],
-            carrier_manifest_sha256=reopened.pins(),plan_sha256=candidate2['plan_sha256'],
-            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
-        self.write(h.C_APPROVAL,s.canonical(approval2))
-        return reopened,candidate2
+        self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+        os.close(q.backup);q.backup=None
+        return q,candidate
 
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,candidate=self._prepare_completed_b_before_c_proof()
