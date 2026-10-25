@@ -108,6 +108,34 @@ def members(raw,manifest_sha,archive_sha):
                  and meta['uid']==0 and meta['mode']=='0600','CANDIDATE_MEMBER_SHA')
         return contents
 
+def capture_history(refs,uid):
+    need(type(refs) is dict and set(refs)=={'b_intent','b_approval','freeze','old_stage_permit'},
+         'HISTORICAL_BINDINGS_REQUIRED')
+    result={}
+    for key in sorted(refs):
+        ref=refs[key]
+        need(type(ref) in (tuple,list) and len(ref)==5,'HISTORY_REFERENCE_SCHEMA')
+        pfd,name,expected_parent,expected_file,expected_sha=ref
+        pst=os.fstat(pfd)
+        need(stat.S_ISDIR(pst.st_mode) and pst.st_uid==uid
+             and not(stat.S_IMODE(pst.st_mode)&0o022)
+             and parent_ident(pst)==expected_parent,'HISTORY_PARENT_CHANGED')
+        need(type(name) is str and name and '/' not in name and name not in ('.','..'),
+             'HISTORY_NAME_INVALID')
+        st=childstat(pfd,name)
+        if expected_file is None:
+            need(expected_sha is None and st is None,'HISTORY_ABSENCE_CHANGED')
+            result[key]={'name':name,'parent_identity':expected_parent,'file_identity':None,'sha256':None}
+            continue
+        need(st is not None and ident(st)==expected_file,'HISTORY_FILE_IDENTITY_CHANGED')
+        raw=readfile(pfd,name,uid,8*1024*1024)
+        after=childstat(pfd,name)
+        need(after is not None and ident(after)==expected_file and sha(raw)==expected_sha,
+             'HISTORY_FILE_CONTENT_CHANGED')
+        result[key]={'name':name,'parent_identity':expected_parent,
+                     'file_identity':expected_file,'sha256':expected_sha}
+    return result
+
 def verified_old_inventory(expected):
     need(type(expected) is dict and 'manifest.json' in expected,
          'OLD_INVENTORY_REQUIRED')
@@ -276,12 +304,14 @@ def _locks(jfd,entryfd,uid,expected_entry_identity):
         return lease
     except BaseException:os.close(lease);raise
 
-def status(parent,jfd,uid,old_entries,new_entries):
+def status(parent,jfd,uid,old_entries,new_entries,history_refs=None):
     if childstat(jfd,STATE) is None:
         if childstat(jfd,PREINTENT) is not None:
             readfile(jfd,PREINTENT,uid,8192)
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     verified_old_inventory(old_entries)
+    need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
+    current_history=capture_history(history_refs,uid)
     j=journal(jfd,uid)
     pre_raw=readfile(jfd,PREINTENT,uid,8192)
     try:pre=json.loads(pre_raw.decode('utf8'))
@@ -289,12 +319,14 @@ def status(parent,jfd,uid,old_entries,new_entries):
     need(pre_raw==canonical(pre) and pre['attempt']==j['attempt']
          and pre['old_identity']==j['old_identity']
          and pre['old_manifest']==OLD_MANIFEST
-         and pre['new_manifest']==NEW_MANIFEST,'PREINTENT_CHAIN_CHANGED')
+         and pre['new_manifest']==NEW_MANIFEST
+         and pre.get('history')==current_history,'PREINTENT_CHAIN_CHANGED')
     current=childstat(parent,TARGET)
     stage=childstat(parent,STAGE)
     retained=childstat(parent,RETAINED)
     if current is None or stage is None:
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
+    need(j.get('history')==current_history,'HISTORY_CHANGED_SINCE_INTENT')
     need(j['old_tree_sha']==sha(canonical({x:sha(y) for x,y in old_entries.items()}))
          and j['new_tree_sha']==sha(canonical({x:sha(y) for x,y in new_entries.items()}))
          and sha(old_entries['manifest.json'])==OLD_MANIFEST
@@ -333,7 +365,7 @@ def status(parent,jfd,uid,old_entries,new_entries):
     return {'state':state,'retry_safe':False,'attempt':j['attempt']}
 
 def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_identity,
-            expected_entry_identity,attempt,fault=None):
+            expected_entry_identity,attempt,history_refs=None,fault=None):
     """One-shot isolated transaction; caller supplies immutable old inventory and fd witnesses."""
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
@@ -348,13 +380,15 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         old_id=tree(parent,TARGET,uid,old_entries)
         need(sha(old_entries['manifest.json'])==OLD_MANIFEST,'OLD_MANIFEST_CHANGED')
         new_entries=members(new_archive,NEW_MANIFEST,NEW_ARCHIVE)
-        # The fixed original B intent is never rewritten, or used as new authority.
-        need(childstat(jfd,'community-update-intent.json') is None,'UNREVIEWED_INTENT_NAMESPACE')
+        need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
+        history=capture_history(history_refs,uid)
         pre=dict(format=1,attempt=attempt,old_identity=old_id,
                  old_manifest=OLD_MANIFEST,new_manifest=NEW_MANIFEST,
                  entry_identity=expected_entry_identity,
                  parent_identity=expected_parent_identity,
-                 journal_parent_identity=parent_ident(os.fstat(jfd)))
+                 journal_parent_identity=parent_ident(os.fstat(jfd)),history=history,
+                 old_tree_sha=sha(canonical({x:sha(y) for x,y in old_entries.items()})),
+                 new_tree_sha=sha(canonical({x:sha(y) for x,y in new_entries.items()})))
         writefile(jfd,PREINTENT,canonical(pre),uid)
         if fault:fault('preintent_fsynced')
         build_tree(parent,new_entries,uid)
@@ -364,7 +398,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
            'new_manifest':NEW_MANIFEST,'old_identity':old_id,'stage_identity':stage_id,
            'old_tree_sha':sha(canonical({x:sha(y) for x,y in old_entries.items()})),
            'new_tree_sha':sha(canonical({x:sha(y) for x,y in new_entries.items()})),
-           'entry_identity':expected_entry_identity,
+           'history':history,'entry_identity':expected_entry_identity,
            'journal_parent_identity':parent_ident(os.fstat(jfd))}
         writefile(jfd,STATE,canonical(j),uid)
         if fault:fault('intent_fsynced')
@@ -382,7 +416,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         try:
             if fault:fault('after_exchange')
             os.fsync(parent)
-            result=status(parent,jfd,uid,old_entries,new_entries)
+            result=status(parent,jfd,uid,old_entries,new_entries,history_refs)
             need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','SWITCH_STATUS_UNKNOWN')
             return result
         except BaseException:raise Hold('POST_SWITCH_UNKNOWN_INSPECT_ONLY')
@@ -391,14 +425,16 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
 def _close_lease(fd):
     os.close(fd)
 
-def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_identity):
+def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_identity,history_refs=None):
     checked_dir(parent,uid)
+    need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     lease=_locks(jfd,entryfd,uid,expected_entry_identity)
     try:
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,'ROLLBACK_CONFLICT')
+        capture_history(history_refs,uid)
         need(childstat(jfd,ROLLBACK_INTENT) is None
              and childstat(jfd,ROLLBACK_RESULT) is None,'ROLLBACK_ALREADY_ATTEMPTED')
-        result=status(parent,jfd,uid,old_entries,new_entries)
+        result=status(parent,jfd,uid,old_entries,new_entries,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_NOT_OWNED')
         binding=journal(jfd,uid)
         intent={'format':1,'attempt':binding['attempt'],
