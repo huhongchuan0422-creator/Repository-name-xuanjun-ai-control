@@ -138,9 +138,10 @@ def execute(parent,archive_bytes,manifest_bytes,old_target_identity,
         if old!=old_target_identity:raise Hold('OLD_IDENTITY_CHANGED')
         old_manifest=_read_member(parent,OLD_NAME,'manifest.json')
         verify_inputs(old_manifest,archive_bytes,manifest_bytes)
-        # Real builder must first supply a verified extracted directory, never
-        # a generic extractall or a fake manifest-only stage.
-        raise Hold('STAGE_BUILDER_NOT_YET_BOUND')
+        # Reject a live transaction until all original writer and attempt
+        # authorities are wired into this same held lease. This is a
+        # deliberate blocker, not a recoverable exception.
+        raise Hold('ORIGINAL_WRITER_AND_ATTEMPT_ADMISSION_NOT_BOUND')
     finally:os.close(lock)
 
 def rollback(*args,**kwargs):
