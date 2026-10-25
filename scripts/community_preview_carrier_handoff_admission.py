@@ -196,10 +196,11 @@ def writefile(fd,name,body,uid):
     finally:os.close(f)
     os.fsync(fd)
 
-def build_tree(parent,entries,uid):
-    need(childstat(parent,STAGE) is None,'STAGE_ALREADY_EXISTS')
-    os.mkdir(STAGE,0o700,dir_fd=parent)
-    root=os.open(STAGE,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
+def build_tree(parent,entries,uid,name=STAGE):
+    need(childstat(parent,name) is None,'STAGE_ALREADY_EXISTS')
+    os.mkdir(name,0o700,dir_fd=parent)
+    os.fsync(parent)
+    root=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
     try:
         os.fchown(root,uid,-1);os.fchmod(root,0o700)
         dirs=set()
@@ -215,6 +216,7 @@ def build_tree(parent,entries,uid):
                     new=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
                     opened.append(new);fd=new
                 os.mkdir(chunks[-1],0o700,dir_fd=fd)
+                os.fsync(fd)
                 f=os.open(chunks[-1],os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd)
                 try:os.fchown(f,uid,-1);os.fchmod(f,0o700);os.fsync(f)
                 finally:os.close(f)
@@ -299,12 +301,31 @@ def status(parent,jfd,uid,old_entries,new_entries):
          and sha(new_entries['manifest.json'])==NEW_MANIFEST,
          'JOURNAL_TREE_DIGEST_MISMATCH')
     old_id=j['old_identity'];new_id=j['stage_identity']
+    rb_intent=childstat(jfd,ROLLBACK_INTENT)
+    rb_result=childstat(jfd,ROLLBACK_RESULT)
     if dirident(current)==new_id and dirident(stage)==old_id:
         state='SWAPPED_OLD_RETAINED_IN_STAGE'
         tree(parent,TARGET,uid,new_entries,new_id)
         tree(parent,STAGE,uid,old_entries,old_id)
     elif dirident(current)==old_id and dirident(stage)==new_id and retained is None:
         state='PREPARED_OR_REVERTED'
+        if rb_intent is not None:
+            intent_raw=readfile(jfd,ROLLBACK_INTENT,uid,8192)
+            intent=json.loads(intent_raw.decode('utf8'))
+            need(intent_raw==canonical(intent) and set(intent)=={'format','attempt','old_identity','new_identity','old_tree_sha','new_tree_sha'}
+                 and intent['format']==1 and intent['attempt']==j['attempt']
+                 and intent['old_identity']==old_id and intent['new_identity']==new_id
+                 and intent['old_tree_sha']==j['old_tree_sha'] and intent['new_tree_sha']==j['new_tree_sha'],
+                 'ROLLBACK_INTENT_BINDING')
+            if rb_result is None:state='ROLLBACK_APPLIED_RESULT_UNKNOWN'
+            else:
+                result_raw=readfile(jfd,ROLLBACK_RESULT,uid,8192)
+                result=json.loads(result_raw.decode('utf8'))
+                need(result_raw==canonical(result) and set(result)=={'format','attempt','result','rollback_intent_sha256'}
+                     and result['format']==1 and result['attempt']==j['attempt']
+                     and result['result']=='OLD_RESTORED_NEW_RETAINED'
+                     and result['rollback_intent_sha256']==sha(intent_raw),
+                     'ROLLBACK_RESULT_BINDING')
         tree(parent,TARGET,uid,old_entries,old_id)
         tree(parent,STAGE,uid,new_entries,new_id)
     else:
@@ -365,7 +386,10 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
             need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','SWITCH_STATUS_UNKNOWN')
             return result
         except BaseException:raise Hold('POST_SWITCH_UNKNOWN_INSPECT_ONLY')
-    finally:os.close(lease)
+    finally:_close_lease(lease)
+
+def _close_lease(fd):
+    os.close(fd)
 
 def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_identity):
     checked_dir(parent,uid)
@@ -400,4 +424,4 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_ident
             return {'state':'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED',
                     'retry_safe':False}
         except BaseException:raise Hold('ROLLBACK_UNKNOWN_INSPECT_ONLY')
-    finally:os.close(lease)
+    finally:_close_lease(lease)
