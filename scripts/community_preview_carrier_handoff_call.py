@@ -14,6 +14,7 @@ REQUIRED_CONTEXT = (
     'attempt'
 )
 
+
 def _context(ctx):
     for name in REQUIRED_CONTEXT:
         if not hasattr(ctx, name):
@@ -27,9 +28,10 @@ def _context(ctx):
         raise handoff.Hold('ORIGINAL_ENTRY_AUTHORITY_NOT_PROVEN')
     return ctx
 
-def invoke(ctx, operation):
+def invoke(ctx, operation, mode=None):
     """Call only from the original authorized entry; operation is status/execute/rollback."""
     ctx = _context(ctx)
+    if mode is not None and mode != handoff.POST_B_MODE:raise handoff.Hold('HANDOFF_MODE_DENIED')
     old_entries = handoff.members(
         ctx.old_archive_bytes, handoff.OLD_MANIFEST, handoff.OLD_ARCHIVE)
     new_entries = handoff.members(
@@ -39,13 +41,13 @@ def invoke(ctx, operation):
             ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
             ctx.history_refs)
     if operation == 'status':
-        return handoff.status(*args)
+        return handoff.status(*args,mode=mode)
     if operation == 'execute':
         return handoff.execute(
             ctx.parent_fd, ctx.journal_fd, ctx.entry_fd, ctx.lease_fd,
             old_entries, ctx.new_archive_bytes, ctx.uid, ctx.parent_identity,
             ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
-            ctx.attempt, history_refs=ctx.history_refs)
+            ctx.attempt, history_refs=ctx.history_refs,mode=mode)
     if operation == 'rollback':
         # rollback's stable public order is four FDs, old/new inventories, uid,
         # then the bound identity witnesses and history references.
@@ -53,7 +55,7 @@ def invoke(ctx, operation):
             old_entries, new_entries, ctx.uid, ctx.parent_identity,
             ctx.journal_identity, ctx.entry_identity, ctx.lock_identity,
             ctx.history_refs)
-        return handoff.rollback(*rollback_args)
+        return handoff.rollback(*rollback_args,mode=mode)
     raise handoff.Hold('UNKNOWN_HANDOFF_OPERATION')
 
 def call_once_from_original_entry(ctx):
@@ -70,3 +72,11 @@ def reconcile_from_original_entry(ctx):
 def rollback_from_original_entry(ctx):
     """Rollback only when the transaction's own exact conditions pass."""
     return invoke(ctx, 'rollback')
+
+def call_once_post_b_from_original_entry(ctx):
+    result=invoke(ctx,'execute',handoff.POST_B_MODE)
+    if result.get('state')!='SWAPPED_OLD_RETAINED_IN_STAGE' or result.get('retry_safe') is not False:
+        raise handoff.Hold('HANDOFF_RESULT_NOT_ACCEPTED_INSPECT_ONLY')
+    return result
+def reconcile_post_b_from_original_entry(ctx):return invoke(ctx,'status',handoff.POST_B_MODE)
+def rollback_post_b_from_original_entry(ctx):return invoke(ctx,'rollback',handoff.POST_B_MODE)
