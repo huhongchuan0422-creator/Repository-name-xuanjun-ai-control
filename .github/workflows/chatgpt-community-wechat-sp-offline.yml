@@ -209,7 +209,8 @@ jobs:
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_stage_a -v 2>&1 | tee community-tests.log
             bash -n deploy/community-preview/stage-a-owner-call.sh
           elif [ "${{ contains(github.event.head_commit.message, '[preview-site-steps-scope]') }}" = true ]; then
-            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            # Reuse the already frozen A carrier. This scope validates the V2
+            # site-preparation source only; rebuilding frozen v1 is intentionally denied.
             PYTHONPATH=.:tests python -B -m unittest test_community_preview_preparation_steps -v 2>&1 | tee community-tests.log
             bash -n deploy/community-preview/prepare-site.sh
           elif [ "${{ contains(github.event.head_commit.message, '[preview-https-acceptance-scope]') }}" = true ]; then
