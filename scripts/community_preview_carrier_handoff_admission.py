@@ -352,6 +352,18 @@ def journal(jfd,uid,state_name=STATE):
          and b==canonical(v),'JOURNAL_SCHEMA_OR_BINDING')
     return v
 
+def post_b_c_not_started(parent,jfd,uid):
+    need(childstat(jfd,'active-attempt.json') is None
+         and childstat(jfd,ORIGINAL_ATTEMPT) is None,'POST_B_C_ALREADY_STARTED')
+    backup=os.open('backup-2330-to-f131-v1',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
+    try:
+        st=os.fstat(backup)
+        need(stat.S_ISDIR(st.st_mode) and st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o700
+             and dirident(st)==dirident(os.stat('backup-2330-to-f131-v1',dir_fd=parent,follow_symlinks=False)),
+             'POST_B_BACKUP_IDENTITY_CHANGED')
+        need(childstat(backup,'stopped-handoff-v1.json') is None,'POST_B_C_PROOF_ALREADY_EXISTS')
+    finally:os.close(backup)
+
 def _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity):
     checked_parent(parent,uid)
     need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
@@ -386,6 +398,7 @@ def _locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_jour
 def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs=None,mode=None):
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
+    if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
     if childstat(jfd,state_name) is None:
         if childstat(jfd,preintent_name) is not None:
             pre_raw=readfile(jfd,preintent_name,uid,8192)
@@ -482,6 +495,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
+    if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
     lease=_locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     try:
         need(childstat(jfd,state_name) is None and childstat(jfd,preintent_name) is None and childstat(parent,stage_name) is None
@@ -553,6 +567,7 @@ def _close_lease(fd):
 def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity,history_refs=None,mode=None):
     state_name,preintent_name,rollback_intent_name,rollback_result_name,stage_name,retained_name=transaction_names(mode)
     _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
+    if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     lease=_locks(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity)
     try:
