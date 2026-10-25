@@ -136,6 +136,22 @@ class HandoffAdmission(unittest.TestCase):
         self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_INTENT))
         self.assertIsNotNone(h.childstat(self.jfd,h.POST_B_ROLLBACK_RESULT))
 
+    def test_post_b_refuses_c_proof_or_checkpoint_before_execute_status_and_rollback(self):
+        refs=self.post_b_refs()
+        backup=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+        try:h.writefile(backup,'stopped-handoff-v1.json',b'PROOF_ALREADY_EXISTS',self.uid)
+        finally:os.close(backup)
+        with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
+            h.execute(self.parent,self.jfd,self.entry,self.lease,self.old,self.archive,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-isolated-0003',
+                history_refs=refs,mode=h.POST_B_MODE)
+        with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
+            h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+        with self.assertRaisesRegex(h.Hold,'POST_B_C_PROOF_ALREADY_EXISTS'):
+            h.rollback(self.parent,self.jfd,self.entry,self.lease,self.old,self.new,self.uid,
+                self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
+
     def test_post_b_requires_completed_b_and_preserves_old_c_approval(self):
         refs=self.post_b_refs();saved=h.readfile(self.parent,h.HISTORY_NAMES['c_approval'],self.uid)
         os.unlink(h.HISTORY_NAMES['snapshot_result'],dir_fd=self.jfd)
