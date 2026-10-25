@@ -133,6 +133,11 @@ class ApprovalRecord(unittest.TestCase):
         self.assertIn('post-b-execute',entry.OPERATIONS)
         self.assertNotEqual(entry.POST_B_APPROVAL_NAME,entry.APPROVAL_NAME)
 
+    def test_post_b_rollback_success_uses_rollback_acceptance_branch(self):
+        result={'state':'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED','retry_safe':False}
+        with patch.object(entry,'run',return_value=result):
+            self.assertEqual(entry.main(['post-b-rollback']),0)
+
     def test_cli_has_no_approval_bypass_switch(self):
         with patch.object(entry,'run') as run:
             self.assertEqual(entry.main(['--approve']),2)
