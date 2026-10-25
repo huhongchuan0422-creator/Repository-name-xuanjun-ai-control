@@ -193,8 +193,19 @@ class WholeEntry(unittest.TestCase):
         # Both historical B and freeze windows are expired; only the new C
         # operation approval below is fresh. Historical bytes stay unchanged.
         self.clock=2400
+        # Historical B-resume carrier is deliberately distinct from current C
+        # source carrier. Rebind the fixture record hashes, never the old B data.
+        resume,_=h.document(h.resume_record_path())
+        bresume,_=h.document(h.B_RESUME_APPROVAL)
+        historical_carrier='a'*64
+        bresume['carrier_manifest_sha256']=historical_carrier
+        self.write(h.B_RESUME_APPROVAL,s.canonical(bresume))
+        resume['carrier_manifest_sha256']=historical_carrier
+        resume['resume_approval_sha256']=s.sha(s.canonical(bresume))
+        self.write(h.resume_record_path(),s.canonical(resume))
         q=self.fresh_session()
         q.configure_resumed_b_context()
+        self.assertNotEqual(q.approved_stamp,historical_carrier)
         q.resume_mode=True
         self.assertFalse(q.bdone)
         q.backup=h.open_private(s.BACKUP+'/clone-results.json')
