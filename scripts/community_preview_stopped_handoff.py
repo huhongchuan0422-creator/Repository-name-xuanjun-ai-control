@@ -771,8 +771,9 @@ def main(argv=None):
     group.add_argument('--owner-bc',action='store_true')
     group.add_argument('--resume-b-partial',action='store_true')
     group.add_argument('--recover-known-failure',action='store_true')
+    group.add_argument('--resume-c-before-confirmation',action='store_true')
     args=parser.parse_args(argv)
-    if not args.owner_bc and not args.resume_b_partial and not args.recover_known_failure:
+    if not args.owner_bc and not args.resume_b_partial and not args.recover_known_failure and not args.resume_c_before_confirmation:
         print('{"state":"BC_DEFAULT_HOLD","site_executed":false}');return 2
     session=Session();result=None;code=2
     try:
@@ -781,6 +782,8 @@ def main(argv=None):
             session.run_b();result=session.update()
         elif args.resume_b_partial:
             session.resume_b_partial();result=session.update()
+        elif args.resume_c_before_confirmation:
+            result=session.resume_c_before_confirmation()
         else:result=session.recover()
         need(result['phase'] in ('COMMITTED','ROLLED_BACK_PREVIEW_HOLD'),'NONTERMINAL_NOT_SUCCESS')
         code=0
