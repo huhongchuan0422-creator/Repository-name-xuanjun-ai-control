@@ -3,7 +3,7 @@
 - `scripts/community_preview_carrier_handoff_entry.py`: 6557 bytes, SHA256 `14cda6843de950e8ef25d6a97ed7de08e5130a02920b85007b24804cf3ebfac1`.
 - `tests/test_community_preview_carrier_handoff_entry.py`: 2243 bytes, SHA256 `aacd02f48996b5d0dac448b81236e3ed4aa157b7cdc5264b35ccea42bc4a06b1`.
 - `tests/test_community_preview_carrier_handoff_admission.py`: 34113 bytes, SHA256 `5085c8111211be4cc289e75f0205f395dd6fa380e34ff3b4826b4f42246f9995`.
-- CI stage: two verified original artifacts; parse and execute 36 original transaction tests, one real fixed-entry/adapter rollback integration added to the transaction module, five original adapter tests, and five fixed-entry guard tests.
+- CI stage: two verified original artifacts; parse and execute 38 transaction tests (36 previously verified plus 2 actual adapter/fixed-entry on-disk integration cases), 5 adapter tests, and 5 fixed-entry guard tests; exact-HEAD Hosted status must be verified independently.
 - External execution constraint: there is no currently bound and independently approved `authority_checker` at the unique installation Writer. The in-process call refuses without it; root/admin identity is not authorization. The current source delivery contains no standalone production shell command, because inventing one would bypass that gate.
 - Isolated cross-check: 48/48 on reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; this is not exact-head Hosted acceptance and does not verify Python 3.6.8.
 
