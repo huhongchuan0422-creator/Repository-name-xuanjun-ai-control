@@ -1,8 +1,12 @@
 """Run the R5 scoped suite with explicit legacy-environment exclusions."""
 from __future__ import print_function
 
+import os
 import sys
 import unittest
+
+ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
+if ROOT not in sys.path:sys.path.insert(0,ROOT)
 
 
 MODULES = (
