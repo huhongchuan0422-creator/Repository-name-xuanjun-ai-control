@@ -252,6 +252,110 @@ class Session:
         need(self.approved_stamp==resume.get('carrier_manifest_sha256')==self.pins(),'B_SOURCE_BINDING_CHANGED')
         self.resume_guard()
         return True
+    def configure_resumed_b_context(self):
+        """Bind the existing completed B evidence without running either B stage."""
+        self.resume_mode=True
+        self.b_path=B_RESUME_APPROVAL;self.freeze_path=RESUME_FREEZE
+        self.stage_permit_path=B_RESUME_STAGE_PERMIT
+        self.resume_raw=self.bind_resume_reference(resume_record_path())
+        resume=s.exact_json(self.resume_raw)
+        need(self.resume_raw==s.canonical(resume)
+             and set(resume)=={'format','mode','attempt','carrier_manifest_sha256',
+                'old_b_intent_sha256','old_b_approval_sha256','old_freeze_sha256',
+                'old_stage_permit_sha256','resume_approval_sha256','resume_freeze_sha256','actions'}
+             and type(resume['format']) is int and resume['format']==1
+             and resume['mode']==MODE and resume['attempt']==attempt()
+             and resume['actions']==['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES'],
+             'B_RESUME_RECORD_INVALID')
+        intent_raw=self.bind_resume_reference(b_records()['B-intent'])
+        old_braw=self.bind_resume_reference(B_APPROVAL)
+        old_freeze_raw=self.bind_resume_reference(s.FREEZE,16384)
+        old_b=s.exact_json(old_braw);old_freeze=s.exact_json(old_freeze_raw)
+        need(resume['old_b_intent_sha256']==s.sha(intent_raw)
+             and resume['old_b_approval_sha256']==s.sha(old_braw)
+             and resume['old_freeze_sha256']==s.sha(old_freeze_raw),
+             'B_RESUME_PROOF_BINDING_CHANGED')
+        need(old_braw==s.canonical(old_b)
+             and set(old_b)=={'format','host','mode','attempt','carrier_manifest_sha256',
+                'issued_at','expires_at','freeze_sha256','actions'}
+             and old_b['host']==p.HOST and old_b['mode']==MODE
+             and old_b['attempt']==attempt()
+             and old_b['actions']==['SNAPSHOT','THREE_ISOLATED_CLONES']
+             and intent_raw==s.canonical(s.exact_json(intent_raw))
+             and s.exact_json(intent_raw)==dict(format=1,mode=MODE,attempt=attempt(),
+                 approval_sha256=s.sha(old_braw),freeze_sha256=s.sha(old_freeze_raw)),
+             'PRIOR_B_EVIDENCE_MISMATCH')
+        self.braw=self.bind_resume_reference(self.b_path)
+        self.b=s.exact_json(self.braw)
+        need(self.braw==s.canonical(self.b)
+             and set(self.b)=={'format','host','mode','attempt','carrier_manifest_sha256',
+                'issued_at','expires_at','old_b_intent_sha256','old_b_approval_sha256',
+                'old_freeze_sha256','old_stage_permit_sha256','resume_freeze_sha256','actions'}
+             and type(self.b['format']) is int and self.b['format']==1
+             and self.b['host']==p.HOST and self.b['mode']==MODE and self.b['attempt']==attempt()
+             and self.b['actions']==['RESUME_SNAPSHOT','THREE_ISOLATED_CLONES']
+             and self.b['old_b_intent_sha256']==s.sha(intent_raw)
+             and self.b['old_b_approval_sha256']==s.sha(old_braw)
+             and self.b['old_freeze_sha256']==s.sha(old_freeze_raw)
+             and self.b['old_stage_permit_sha256']==resume['old_stage_permit_sha256'],
+             'EXACT_B_RESUME_APPROVAL_REQUIRED')
+        self.freeze=self.bind_resume_reference(self.freeze_path,16384)
+        need(self.b['resume_freeze_sha256']==s.sha(self.freeze)
+             and resume['resume_approval_sha256']==s.sha(self.braw)
+             and resume['resume_freeze_sha256']==s.sha(self.freeze),
+             'B_RESUME_EVIDENCE_BINDING_CHANGED')
+        self.resume_old_permit_absent=resume['old_stage_permit_sha256'] is None
+        if self.resume_old_permit_absent:
+            need(not exists_private(s.PERMIT),'B_PARTIAL_STATE_CONFLICT')
+        else:
+            prior=self.bind_resume_reference(s.PERMIT,16384)
+            need(s.sha(prior)==resume['old_stage_permit_sha256'],'B_RESUME_PROOF_BINDING_CHANGED')
+        self.approved_stamp=self.b['carrier_manifest_sha256']
+        need(self.approved_stamp==resume['carrier_manifest_sha256']==self.pins(),
+             'B_SOURCE_BINDING_CHANGED')
+        self.freeze_live()
+        self.resume_guard()
+        return resume
+
+    def resume_c_before_confirmation(self):
+        """Re-enter only the pre-proof C boundary for the same completed B attempt."""
+        need(self.journal is None and self.bdone is False,
+             'C_PRECONFIRMATION_RECOVERY_STATE_INVALID')
+        proof_path=PROOF
+        active_path=u.JOURNAL_PARENT+'/active-attempt.json'
+        attempt_path=u.JOURNAL_PARENT+'/'+attempt()
+        for path in (proof_path,active_path,attempt_path):
+            need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+        resume=self.configure_resumed_b_context()
+        self.boundary();self.stopped()
+        semantic=self.evidence(True)
+        self.boundary();self.stopped()
+        self.backup=open_private(s.BACKUP+'/clone-results.json')
+        candidate=self.candidate(semantic)
+        need(candidate['attempt']==attempt(),'C_RESUME_ATTEMPT_CHANGED')
+        # Prove the exact same stopped container inventory and no durable C
+        # mutation before the first new proof/active/checkpoint write.
+        c.exact_stopped_names(candidate,'PREPARED',None)
+        for path in (proof_path,active_path,attempt_path):
+            need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+        self.c_approval(candidate)
+        self.boundary();self.stopped()
+        acknowledge('STOPPED_UPDATE',candidate['plan_sha256'])
+        # TTY confirmation is a fresh, exact second check; do not infer approval
+        # from the earlier rejected read or from the existence of C approval.
+        self.boundary();self.stopped()
+        c.exact_stopped_names(candidate,'PREPARED',None)
+        for path in (proof_path,active_path,attempt_path):
+            need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+        self.c_approval(candidate)
+        proof=dict(format=1,mode=MODE,host=p.HOST,attempt=attempt(),
+             plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic)
+        fd=s.private_parent(s.BACKUP)
+        try:write_private(fd,os.path.basename(PROOF),proof)
+        finally:os.close(fd)
+        self.boundary()
+        return self.consume(proof,False)
+
     def pins(self):
         m,b=document(MANIFEST)
         need(set(m)=={'format','mode','install_root','files','updates_enabled'}
