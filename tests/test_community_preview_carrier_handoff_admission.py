@@ -74,6 +74,10 @@ class HandoffAdmission(unittest.TestCase):
                          'SWAPPED_OLD_RETAINED_IN_STAGE')
         self.assertEqual(h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)['state'],
                          'ROLLED_BACK_OLD_TARGET_RESTORED_NEW_STAGE_RETAINED')
+        self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_INTENT))
+        self.assertIsNotNone(h.childstat(self.jfd,h.ROLLBACK_RESULT))
+        with self.assertRaisesRegex(h.Hold,'ROLLBACK_ALREADY_ATTEMPTED'):
+            h.rollback(self.parent,self.jfd,self.entry,self.old,self.new,self.uid,self.entry_id)
         self.assertEqual(h.readfile(os.open(h.TARGET,os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent),
                                     'loader.py',self.uid),b'OLD_LOADER')
 
