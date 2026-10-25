@@ -361,7 +361,11 @@ class WholeEntry(unittest.TestCase):
         q.close()
         reopened=h.Session();reopened.acquire(recover=True)
         self.addCleanup(reopened.close);self.session=reopened
-        with patch.object(h,'acknowledge',return_value=None):
+        old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+            runtime_source_sha=None,version_source=None,observed_at=self.clock)
+        with patch.object(h,'acknowledge',return_value=None), \
+             patch.object(c,'BoundHttpsHealth',return_value=old_health):
             result=reopened.recover()
         self.assertIn(result['phase'],('ROLLED_BACK_PREVIEW_HOLD','COMMITTED'))
         self.assertEqual(reopened.journal.plan['plan_sha256'],candidate['plan_sha256'])
@@ -380,7 +384,7 @@ class WholeEntry(unittest.TestCase):
             'plan':candidate,'approval_sha256':'b'*64,'evidence':{},'approval_kind':'C_RESUME_APPROVAL'}
         owned_path=self.root/'owned-recovery-backup';owned_path.write_bytes(b'isolated-backup-fd')
         owned_fd=os.open(str(owned_path),os.O_RDONLY|os.O_NOFOLLOW)
-        self.addCleanup(lambda fd: os.close(fd) if fd>=0 else None,owned_fd)
+        # The Session owns and closes this descriptor; do not register a second close.
         with patch.object(h,'document',return_value=(proof,b'proof')),\
              patch.object(q,'configure_resumed_recovery',return_value=True),\
              patch.object(h,'open_private',return_value=owned_fd),\
