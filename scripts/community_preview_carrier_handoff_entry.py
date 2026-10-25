@@ -133,7 +133,10 @@ def _verify_runtime_sources():
             finally:os.close(fd)
         finally:os.close(dfd)
     package=sys.modules.get('scripts')
-    require(package is not None,'HANDOFF_PACKAGE_NOT_LOADED')
+    if package is None:
+        package=types.ModuleType('scripts')
+        package.__path__=[]
+        sys.modules['scripts']=package
     loaded={}
     for name in ('community_preview_carrier_handoff_admission.py',
                  'community_preview_carrier_handoff_call.py'):
