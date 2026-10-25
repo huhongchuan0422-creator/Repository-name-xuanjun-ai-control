@@ -169,7 +169,7 @@ def capture_history(refs,uid,carrier_parent=None,journal_parent=None,mode=None):
             need(dirident(os.fstat(pfd))==dirident(os.fstat(wanted_parent)),
                  'HISTORY_PARENT_ROLE_MISMATCH')
             need(name==HISTORY_NAMES[key],'HISTORY_PATH_NOT_FIXED')
-            if key in required:need(expected_file is not None and expected_sha is not None,'REQUIRED_HISTORY_MISSING')
+            if key in required:need(expected_file is not None and (expected_sha is not None or key=='backup_dir'),'REQUIRED_HISTORY_MISSING')
             if key in absent_keys:need(expected_file is None and expected_sha is None,'EXPECTED_ABSENCE_BINDING_REQUIRED')
         pst=os.fstat(pfd)
         need(stat.S_ISDIR(pst.st_mode) and pst.st_uid==uid
