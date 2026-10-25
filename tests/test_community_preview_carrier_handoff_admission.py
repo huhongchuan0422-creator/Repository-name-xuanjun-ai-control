@@ -93,6 +93,29 @@ class HandoffAdmission(unittest.TestCase):
                          self.parent_id,self.journal_id,self.entry_id,self.lock_id,'isolated-attempt-0001',
                          history_refs=self.history_refs,fault=fault)
 
+    def test_artifact_redirect_strips_authorization_and_signed_url_is_not_logged(self):
+        req=__import__('urllib.request',fromlist=['Request']).Request(
+            'https://api.github.com/repos/example/repo/actions/artifacts/123/zip',
+            headers={'Authorization':'Bearer DO_NOT_FORWARD','Accept':'application/vnd.github+json',
+                     'User-Agent':'issue76-fixture-verifier'})
+        handler=h.SafeArtifactRedirect()
+        redirected=handler.redirect_request(req,None,302,'Found',{},'https://productionresultssa.blob.core.windows.net/actions-results/signed?sig=SECRET')
+        self.assertIsNone(redirected.get_header('Authorization'))
+        self.assertIsNone(redirected.get_header('Cookie'))
+        self.assertEqual(redirected.get_header('Accept'),'application/vnd.github+json')
+        self.assertNotIn('SECRET',repr(redirected.headers))
+
+    def test_artifact_redirect_rejects_http_and_unlisted_hosts(self):
+        req=__import__('urllib.request',fromlist=['Request']).Request(
+            'https://api.github.com/repos/example/repo/actions/artifacts/123/zip',
+            headers={'Authorization':'Bearer DO_NOT_FORWARD'})
+        handler=h.SafeArtifactRedirect()
+        for target in ('http://productionresultssa.blob.core.windows.net/a?sig=x',
+                       'https://evil.example/a?sig=x',
+                       'https://api.github.com.evil.example/repos/a/b/actions/artifacts/123/zip'):
+            with self.assertRaisesRegex(h.Hold,'ARTIFACT_REDIRECT_DESTINATION_REJECTED'):
+                handler.redirect_request(req,None,302,'Found',{},target)
+
     def test_legal_exchange_and_owned_rollback(self):
         self.assertEqual(self.execute()['state'],'SWAPPED_OLD_RETAINED_IN_STAGE')
         self.assertEqual(h.status(self.parent,self.jfd,self.entry,self.lease,self.uid,self.old,self.new,self.parent_id,self.journal_id,self.entry_id,self.lock_id,self.history_refs)['state'],
