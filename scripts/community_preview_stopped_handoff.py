@@ -343,51 +343,99 @@ class Session:
         self.resume_guard()
         return resume
 
-    def require_original_c_plan_binding(self,candidate):
-        # The original C approval contains only a digest, not the full plan.
-        # If live observations changed and the candidate digest differs, do not
-        # treat the newly computed plan as the already-approved historical plan.
-        approval,_=document(C_APPROVAL)
-        need(type(approval) is dict and approval.get('attempt')==attempt(),
-             'EXACT_C_APPROVAL_REQUIRED')
-        if approval.get('plan_sha256')!=candidate.get('plan_sha256'):
-            raise u.Hold('ORIGINAL_C_PLAN_EVIDENCE_MISSING')
-        return True
+    def _c_resume_approval(self,candidate):
+        a,b=document(C_RESUME_APPROVAL)
+        need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256',
+                'plan_sha256','issued_at','expires_at','actions'}
+             and type(a['format']) is int and a['format']==1
+             and a['host']==p.HOST and a['mode']==MODE and a['attempt']==attempt()
+             and a['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+             and a['plan_sha256']==candidate['plan_sha256']
+             and a['actions']==C_ACTIONS,'EXACT_C_RESUME_APPROVAL_REQUIRED')
+        window(a);self.craw=b;return a
+
+    @staticmethod
+    def _without_observed_at(value):
+        if type(value) is dict:
+            return {k:Session._without_observed_at(v) for k,v in value.items() if k!='observed_at'}
+        if type(value) is list:return [Session._without_observed_at(v) for v in value]
+        return value
+
+    def _fixed_c_resume_plan(self,candidate,semantic):
+        evidence_sha=s.sha(s.canonical(semantic))
+        if exists_private(C_RESUME_PLAN):
+            saved,_=document(C_RESUME_PLAN,4*1024*1024)
+            need(set(saved)=={'format','host','mode','attempt','carrier_manifest_sha256',
+                    'evidence_sha256','plan','plan_sha256','issued_at','expires_at'}
+                 and type(saved['format']) is int and saved['format']==1
+                 and saved['host']==p.HOST and saved['mode']==MODE and saved['attempt']==attempt()
+                 and saved['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+                 and saved['evidence_sha256']==evidence_sha
+                 and saved['plan']['attempt']==attempt()
+                 and saved['plan_sha256']==s.sha(s.canonical(saved['plan']))
+                 and type(saved['issued_at']) is int and type(saved['expires_at']) is int
+                 and saved['issued_at']<=c.now()<=saved['expires_at']<=saved['issued_at']+600,
+                 'C_RESUME_PLAN_RECORD_INVALID')
+            need(self._without_observed_at(saved['plan'])==
+                 self._without_observed_at(candidate),
+                 'C_RESUME_PLAN_EVIDENCE_CHANGED')
+            candidate=saved['plan']
+        else:
+            record=dict(format=1,host=p.HOST,mode=MODE,attempt=attempt(),
+                carrier_manifest_sha256=self.approved_stamp,evidence_sha256=evidence_sha,
+                plan=candidate,plan_sha256=s.sha(s.canonical(candidate)),
+                issued_at=c.now(),expires_at=c.now()+600)
+            fd=s.private_parent(s.BACKUP)
+            try:
+                # EXCL: never replace a previous request or silently change plan.
+                write_private(fd,os.path.basename(C_RESUME_PLAN),record)
+            finally:os.close(fd)
+        print(json.dumps(dict(state='C_RESUME_PLAN_REQUIRES_FRESH_APPROVAL',
+            attempt=attempt(),plan_sha256=s.sha(s.canonical(candidate)),
+            plan=candidate,approval_path=C_RESUME_APPROVAL,expires_in_seconds=600,
+            site_update=False),sort_keys=True,separators=(',',':')),flush=True)
+        return candidate
 
     def resume_c_before_confirmation(self):
-        """Re-enter only the pre-proof C boundary for the same completed B attempt."""
-        # A fresh process/session has bdone=False by design. Completed B is
-        # proven below from bound admission, snapshot/clone and manifest evidence.
+        """Resume same attempt after B completion, before any C proof or journal."""
         need(self.journal is None,'C_PRECONFIRMATION_RECOVERY_STATE_INVALID')
         proof_path=PROOF
         active_path=u.JOURNAL_PARENT+'/active-attempt.json'
         attempt_path=u.JOURNAL_PARENT+'/'+attempt()
         for path in (proof_path,active_path,attempt_path):
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
-        resume=self.configure_resumed_b_context()
+        self.configure_resumed_b_context()
         self.boundary();self.stopped()
         semantic=self.evidence(True)
         self.boundary();self.stopped()
         self.backup=open_private(s.BACKUP+'/clone-results.json')
-        candidate=self.candidate(semantic)
-        need(candidate['attempt']==attempt(),'C_RESUME_ATTEMPT_CHANGED')
-        # Prove the exact same stopped container inventory and no durable C
-        # mutation before the first new proof/active/checkpoint write.
-        c.exact_stopped_names(candidate,'PREPARED',None)
+        computed=self.candidate(semantic)
+        need(computed['attempt']==attempt(),'C_RESUME_ATTEMPT_CHANGED')
+        c.exact_stopped_names(computed,'PREPARED',None)
         for path in (proof_path,active_path,attempt_path):
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
-        self.require_original_c_plan_binding(candidate)
-        self.c_approval(candidate)
+        candidate=self._fixed_c_resume_plan(computed,semantic)
+        deadline=time.monotonic()+120
+        while True:
+            self.boundary();self.stopped()
+            for path in (proof_path,active_path,attempt_path):
+                need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
+            c.exact_stopped_names(candidate,'PREPARED',None)
+            try:
+                self._c_resume_approval(candidate)
+                break
+            except FileNotFoundError:
+                need(time.monotonic()<deadline,'C_RESUME_APPROVAL_NOT_RECEIVED')
+                time.sleep(.1)
+        # Approval is operation-specific and bound to the complete, printed,
+        # persisted plan. Recheck it after the exact TTY confirmation.
         self.boundary();self.stopped()
         acknowledge('STOPPED_UPDATE',candidate['plan_sha256'])
-        # TTY confirmation is a fresh, exact second check; do not infer approval
-        # from the earlier rejected read or from the existence of C approval.
         self.boundary();self.stopped()
         c.exact_stopped_names(candidate,'PREPARED',None)
         for path in (proof_path,active_path,attempt_path):
             need(not exists_private(path),'C_ALREADY_STARTED_INSPECT_ORIGINAL_RECOVERY')
-        self.require_original_c_plan_binding(candidate)
-        self.c_approval(candidate)
+        self._c_resume_approval(candidate)
         proof=dict(format=1,mode=MODE,host=p.HOST,attempt=attempt(),
              plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic)
         fd=s.private_parent(s.BACKUP)
