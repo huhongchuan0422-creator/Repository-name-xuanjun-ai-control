@@ -9,9 +9,11 @@
 ## 已机械验证
 
 - `projection.schema=2`，七板块完整且空板块仍显示 `NO_DATA`。
-- 多项目、跨板块、部分板块、双租户隔离及依赖卡点投影由 Python 集成测试覆盖。
-- `task_center_digital_twin.test.cjs` 覆盖：总览、板块路由、项目筛选、异常直达、详情、返回定位参数。
-- 示例生成结果：2 个任务、7 个板块、1 个依赖异常；数据文件由 CLI 生成，`app.js` 不硬编码成功状态。
+- 多项目、跨板块、部分板块、双租户隔离、依赖卡点、HOLD 和 FAILURE 投影由 Python 集成测试覆盖。
+- 总图板块健康从同源任务事实计算；HOLD/FAILURE 不再冒充 STABLE。
+- 异常字段区分 `task_responsible_party` 与 `resolution_responsible_party`；缺少解除责任证据时明确为 `UNKNOWN`。
+- `task_center_digital_twin.test.cjs` 覆盖：总览、板块路由、项目筛选、异常直达、详情、返回定位参数及两类责任方渲染。
+- 示例数据由 CLI 从真实本地 TEST_ONLY 事件生成，`app.js` 不硬编码健康或成功状态。
 
 ## 未验证
 

@@ -1,8 +1,8 @@
-BASELINE_COMMIT=9ce4bf87f2d0b2b6faa1b30e80941249edc47c7c
-TREE=8758742e03cc11543af012f43ec020a0a8c7a5ce
-PYTHON=Python 3.6.8
-NODE=v24.21.0
-SQLITE=3.26.0
+7c32e3e0b4db28e6cc2e7c96e9926617a9eaed68
+03b026d8515cbc8562457d2ec37c55ccad4d8370
+Python 3.6.8
+v24.21.0
+SQLite 3.26.0
 test_5_10_15_recovery_is_bounded_and_no_takeover (tests.test_task_supervisor.SupervisorTests) ... ok
 test_ack_commit_blocks_old_attempt_before_new_claim (tests.test_task_supervisor.SupervisorTests) ... ok
 test_assigned_responsibility_is_bound_to_claim (tests.test_task_supervisor.SupervisorTests) ... ok
@@ -46,7 +46,7 @@ test_unknown_side_effects_preserved_in_visible_hold (tests.test_task_supervisor.
 test_v1_normal_open_is_zero_write_hold (tests.test_task_supervisor.SupervisorTests) ... ok
 
 ----------------------------------------------------------------------
-Ran 41 tests in 1.340s
+Ran 41 tests in 1.366s
 
 OK
 SUPPORTED_SUPERVISOR_EXIT=0 COUNT=41
@@ -147,9 +147,12 @@ test_dynamic_graph_and_two_tenant_isolation (tests.test_reusable_task_gateway.Ke
 test_expired_grant_and_restart_projection_consistency (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_full_wait_do_c_b_event_safe_yield_resume_a (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_gateway_scan_exempts_real_dependency_wait_from_ready_timeout (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_long_dependency_wait_unlocks_fresh_dispatch_clock_and_starts (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_multi_project_cross_board_partial_flow_and_tenant_projection (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_only_scheduler_and_twin_module_contracts_exist (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_projection_reports_hold_failure_and_distinct_resolver (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_resource_conflict_nonpreemptible_and_safe_release (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_restart_converges_claim_before_grant_consume_without_started (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_resume_race_rolls_back_claim_and_does_not_consume_twice (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_start_requires_ack_matching_evidence_and_resume_grant (tests.test_reusable_task_gateway.KernelTests) ... ok
 test_waiting_dependency_not_reported_timeout (tests.test_reusable_task_gateway.KernelTests) ... ok
@@ -158,23 +161,10 @@ test_arbitrary_graph_register_project_and_export_ui (tests.test_reusable_schedul
 test_demo_restarts_to_identical_projection (tests.test_reusable_scheduler_cli.SchedulerCliTests) ... ok
 
 ----------------------------------------------------------------------
-Ran 106 tests in 3.775s
+Ran 109 tests in 4.256s
 
 OK
 task_center_digital_twin.test: PASS
-{
-  "duplicate": false,
-  "graph_sha256": "03c952b4b9c07ab4d5855abdc6485a9d3551def53045a5d7395aade3279df597"
-}
-{
-  "anomalies": 1,
-  "output": "/tmp/tmp.oqLqLqcTwN/digital-twin-data.js",
-  "schema": 2,
-  "tasks": 2,
-  "tenant_id": "tenant-demo"
-}
-EXIT_SUMMARY supervisor=0 combined=0 ui=0 register=0 export=0 demo=0 restart=0 cmp=0 total_python=147 ui_tests=1
-RUN_ROOT=/tmp/tmp.oqLqLqcTwN
-
-ENVIRONMENT_LIMITATION v2_migration_tests=3 status=NOT_EXECUTED reason="SQLite 3.26.0 lacks ALTER TABLE DROP COLUMN used by fixture construction"
-BROWSER_STATUS enabled=true engine=chromium running=false detectedBrowser=null detectedExecutablePath=null result=BROWSER_UNVERIFIED
+EXIT_SUMMARY supported_supervisor=0 combined=0 ui=0 total_python=150 ui_tests=1
+ENVIRONMENT_LIMITATION v2_migration_tests=3 status=NOT_EXECUTED reason=SQLite_3.26.0_fixture_uses_ALTER_TABLE_DROP_COLUMN
+BROWSER_STATUS=BROWSER_UNVERIFIED

@@ -1,1213 +1,766 @@
-diff --git a/README.md b/README.md
-index 8f0b8811..5a9ebf30 100644
---- a/README.md
-+++ b/README.md
-@@ -20,10 +20,11 @@ Private control-plane repository for XuanJun AI / XuanJun Yunhui engineering orc
- The local-only reusable development-task scheduler and digital-twin projection
- candidate is documented in
- [REUSABLE_SCHEDULER_KERNEL_20261025.md](docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md).
--It reuses the canonical Supervisor SQLite ledger, does not deploy a service,
--and is limited to development-task governance for the original seven
--workstreams. It is not a business-request router and contains no OCR business
--adapter.
-+It reuses the canonical Supervisor SQLite ledger and includes a local offline
-+seven-board digital-twin view (operations, customer, R&D,
-+acceptance/delivery, maintenance, shared ecosystem, finance). It does not
-+deploy a service, is not a business-request router, and contains no OCR
-+business adapter.
- 
- ## Mandatory development execution rules
- 
 diff --git a/demos/task-center-digital-twin/app.js b/demos/task-center-digital-twin/app.js
-new file mode 100644
-index 00000000..10c30424
---- /dev/null
+index 10c30424..34efaa2f 100644
+--- a/demos/task-center-digital-twin/app.js
 +++ b/demos/task-center-digital-twin/app.js
-@@ -0,0 +1,24 @@
-+(function(root){
-+  'use strict';
-+  var boardNames={operations:'运营',customer:'客户','research-development':'研发','acceptance-delivery':'验收交付',maintenance:'维护','shared-ecosystem':'共享生态',finance:'财务'};
-+  function parseRoute(hash){
-+    var raw=(hash||'#overview').replace(/^#/,'').split('?');
-+    var parts=raw[0].split('/').filter(Boolean), query={};
-+    new URLSearchParams(raw[1]||'').forEach(function(v,k){query[k]=v;});
-+    return {view:parts[0]||'overview',board:parts[1]||null,task:parts[2]||null,query:query};
-+  }
-+  function href(view,board,task,query){
-+    var path='#'+view+(board?'/'+board:'')+(task?'/'+task:'');
-+    var params=new URLSearchParams(query||{}).toString(); return path+(params?'?'+params:'');
-+  }
-+  function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
-+  function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-+  function overview(data){return '<section><h1>七板块运行概况</h1><p class="meta">仅显示健康、阻塞与卡点；任务明细在板块工作台。</p><div class="grid">'+data.boards.map(function(b){return '<article class="card"><h2>'+esc(boardNames[b.board_id])+'</h2><div class="metric">'+b.task_count+'</div><p class="status '+esc(b.health)+'">'+esc(b.health)+'</p><p>阻塞 '+b.blocked_count+' · 活跃 '+b.active_count+'</p><button data-go="'+href('board',b.board_id,null,{})+'">进入工作台</button></article>';}).join('')+'</div><h2>异常定位</h2><div class="grid">'+(data.anomalies.length?data.anomalies.map(function(a){return '<article class="card anomaly"><h3>'+esc(a.task_id)+'</h3><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><button data-go="'+href('task',a.board_id,a.task_id,{project:a.project_id})+'">定位卡点</button></article>';}).join(''):'<div class="card empty">当前投影无异常</div>')+'</div></section>';}
-+  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
-+  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>负责人：'+esc(t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', '))+'</p><p>解决责任方：'+esc(anomaly.responsible_party)+'</p><p class="evidence">证据要求：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
-+  function render(data,route){if(!data||data.mode!=='TEST_ONLY')return '<div class="notice">未加载可信 TEST_ONLY 投影，请先运行 export-ui。</div>';return route.view==='board'?board(data,route):route.view==='task'?task(data,route):overview(data);}
-+  function boot(doc,win,data){var app=doc.getElementById('app');function paint(){var route=parseRoute(win.location.hash);app.innerHTML=render(data,route);app.querySelectorAll('[data-go]').forEach(function(x){x.onclick=function(){win.location.hash=x.getAttribute('data-go');};});var apply=doc.getElementById('applyFilter');if(apply)apply.onclick=function(){win.location.hash=href('board',route.board,null,{project:doc.getElementById('projectFilter').value,state:doc.getElementById('stateFilter').value,owner:doc.getElementById('ownerFilter').value});};}win.addEventListener('hashchange',paint);doc.getElementById('home').onclick=function(){win.location.hash='#overview';};paint();}
-+  var api={parseRoute:parseRoute,href:href,filterTasks:filterTasks,render:render,boot:boot};
-+  if(typeof module!=='undefined')module.exports=api;
-+  if(root.document)boot(root.document,root,root.XUANJUN_TWIN_DATA);
-+})(typeof window!=='undefined'?window:this);
+@@ -14,8 +14,8 @@
+   function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
+   function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+   function overview(data){return '<section><h1>七板块运行概况</h1><p class="meta">仅显示健康、阻塞与卡点；任务明细在板块工作台。</p><div class="grid">'+data.boards.map(function(b){return '<article class="card"><h2>'+esc(boardNames[b.board_id])+'</h2><div class="metric">'+b.task_count+'</div><p class="status '+esc(b.health)+'">'+esc(b.health)+'</p><p>阻塞 '+b.blocked_count+' · 活跃 '+b.active_count+'</p><button data-go="'+href('board',b.board_id,null,{})+'">进入工作台</button></article>';}).join('')+'</div><h2>异常定位</h2><div class="grid">'+(data.anomalies.length?data.anomalies.map(function(a){return '<article class="card anomaly"><h3>'+esc(a.task_id)+'</h3><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><button data-go="'+href('task',a.board_id,a.task_id,{project:a.project_id})+'">定位卡点</button></article>';}).join(''):'<div class="card empty">当前投影无异常</div>')+'</div></section>';}
+-  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
+-  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>负责人：'+esc(t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', '))+'</p><p>解决责任方：'+esc(anomaly.responsible_party)+'</p><p class="evidence">证据要求：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
++  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE','CANCELLED','CAPABILITY_UNAVAILABLE'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
++  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>任务负责人：'+esc(t.task_responsible_party||t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>影响：'+esc(anomaly.impact)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', ')||'无明确依赖')+'</p><p>任务负责人：'+esc(anomaly.task_responsible_party)+'</p><p>解除责任方：'+esc(anomaly.resolution_responsible_party)+'</p><p class="evidence">证据：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
+   function render(data,route){if(!data||data.mode!=='TEST_ONLY')return '<div class="notice">未加载可信 TEST_ONLY 投影，请先运行 export-ui。</div>';return route.view==='board'?board(data,route):route.view==='task'?task(data,route):overview(data);}
+   function boot(doc,win,data){var app=doc.getElementById('app');function paint(){var route=parseRoute(win.location.hash);app.innerHTML=render(data,route);app.querySelectorAll('[data-go]').forEach(function(x){x.onclick=function(){win.location.hash=x.getAttribute('data-go');};});var apply=doc.getElementById('applyFilter');if(apply)apply.onclick=function(){win.location.hash=href('board',route.board,null,{project:doc.getElementById('projectFilter').value,state:doc.getElementById('stateFilter').value,owner:doc.getElementById('ownerFilter').value});};}win.addEventListener('hashchange',paint);doc.getElementById('home').onclick=function(){win.location.hash='#overview';};paint();}
+   var api={parseRoute:parseRoute,href:href,filterTasks:filterTasks,render:render,boot:boot};
 diff --git a/demos/task-center-digital-twin/digital-twin-data.js b/demos/task-center-digital-twin/digital-twin-data.js
-new file mode 100644
-index 00000000..d99de17b
---- /dev/null
+index d99de17b..7678f468 100644
+--- a/demos/task-center-digital-twin/digital-twin-data.js
 +++ b/demos/task-center-digital-twin/digital-twin-data.js
-@@ -0,0 +1,135 @@
-+window.XUANJUN_TWIN_DATA = {
-+  "anomalies": [
-+    {
-+      "anomaly_id": "dependency:delivery-node",
-+      "board_id": "acceptance-delivery",
-+      "depends_on": [
-+        "qa-node"
-+      ],
-+      "evidence_ref": [
-+        "qa-report-demo"
-+      ],
-+      "impact": "TASK_START_BLOCKED",
-+      "missing": "DEPENDENCY_WAIT",
-+      "next_action": "WAIT_DEPENDENCIES",
-+      "node_id": "delivery",
-+      "project_id": "project-demo",
-+      "responsible_party": "developer",
-+      "task_id": "delivery-node"
-+    }
-+  ],
-+  "boards": [
-+    {
-+      "active_count": 0,
-+      "blocked_count": 1,
-+      "board_id": "acceptance-delivery",
-+      "health": "BLOCKED",
-+      "task_count": 1
-+    },
-+    {
-+      "active_count": 0,
+@@ -1,29 +1,11 @@
+ window.XUANJUN_TWIN_DATA = {
+-  "anomalies": [
+-    {
+-      "anomaly_id": "dependency:delivery-node",
+-      "board_id": "acceptance-delivery",
+-      "depends_on": [
+-        "qa-node"
+-      ],
+-      "evidence_ref": [
+-        "qa-report-demo"
+-      ],
+-      "impact": "TASK_START_BLOCKED",
+-      "missing": "DEPENDENCY_WAIT",
+-      "next_action": "WAIT_DEPENDENCIES",
+-      "node_id": "delivery",
+-      "project_id": "project-demo",
+-      "responsible_party": "developer",
+-      "task_id": "delivery-node"
+-    }
+-  ],
++  "anomalies": [],
+   "boards": [
+     {
+       "active_count": 0,
+-      "blocked_count": 1,
 +      "blocked_count": 0,
-+      "board_id": "customer",
-+      "health": "NO_DATA",
-+      "task_count": 0
-+    },
-+    {
-+      "active_count": 0,
-+      "blocked_count": 0,
-+      "board_id": "finance",
-+      "health": "NO_DATA",
-+      "task_count": 0
-+    },
-+    {
-+      "active_count": 0,
-+      "blocked_count": 0,
-+      "board_id": "maintenance",
-+      "health": "NO_DATA",
-+      "task_count": 0
-+    },
-+    {
-+      "active_count": 0,
-+      "blocked_count": 0,
-+      "board_id": "operations",
-+      "health": "NO_DATA",
-+      "task_count": 0
-+    },
-+    {
-+      "active_count": 0,
-+      "blocked_count": 0,
-+      "board_id": "research-development",
+       "board_id": "acceptance-delivery",
+-      "health": "BLOCKED",
 +      "health": "STABLE",
-+      "task_count": 1
-+    },
-+    {
-+      "active_count": 0,
-+      "blocked_count": 0,
-+      "board_id": "shared-ecosystem",
-+      "health": "NO_DATA",
-+      "task_count": 0
-+    }
-+  ],
-+  "mode": "TEST_ONLY",
-+  "production_status": "NOT_IMPLEMENTED",
-+  "schema": 2,
-+  "tasks": [
-+    {
-+      "attempt_id": "UNKNOWN",
-+      "authority_state": "NONE",
-+      "blocker": "DEPENDENCY_WAIT",
-+      "board_id": "acceptance-delivery",
-+      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-+      "checkpoints": [],
-+      "dependencies": [
-+        {
-+          "event_id": null,
-+          "producer_task_id": "qa-node",
-+          "required_evidence_ref": "qa-report-demo",
-+          "required_version": "accepted-v1",
-+          "state": "WAITING"
-+        }
-+      ],
-+      "epoch": null,
-+      "input_version": "accepted-v1",
-+      "module_id": "xuanjun.scheduler.kernel",
-+      "next_action": "WAIT_DEPENDENCIES",
-+      "node_id": "delivery",
-+      "output_version": "delivery-v1",
-+      "preemptible": true,
-+      "priority": 100,
-+      "project_id": "project-demo",
-+      "resources": [
-+        "fake:delivery/demo"
-+      ],
-+      "responsible_party": "developer",
-+      "state": "READY",
-+      "task_id": "delivery-node"
-+    },
-+    {
-+      "attempt_id": "UNKNOWN",
-+      "authority_state": "NONE",
+       "task_count": 1
+     },
+     {
+@@ -55,11 +37,11 @@ window.XUANJUN_TWIN_DATA = {
+       "task_count": 0
+     },
+     {
+-      "active_count": 0,
++      "active_count": 1,
+       "blocked_count": 0,
+       "board_id": "research-development",
+-      "health": "STABLE",
+-      "task_count": 1
++      "health": "ACTIVE",
++      "task_count": 2
+     },
+     {
+       "active_count": 0,
+@@ -74,36 +56,79 @@ window.XUANJUN_TWIN_DATA = {
+   "schema": 2,
+   "tasks": [
+     {
+-      "attempt_id": "UNKNOWN",
+-      "authority_state": "NONE",
+-      "blocker": "DEPENDENCY_WAIT",
+-      "board_id": "acceptance-delivery",
+-      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+-      "checkpoints": [],
++      "attempt_id": "demo-a-attempt",
++      "authority_state": "VALID",
 +      "blocker": null,
 +      "board_id": "research-development",
 +      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-+      "checkpoints": [],
++      "checkpoints": [
++        {
++          "attempt_id": "demo-a-prior",
++          "checkpoint_id": "demo-a-checkpoint",
++          "created_at": 1792914219.1551578,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:shared\"]"
++        }
++      ],
+       "dependencies": [
+         {
+-          "event_id": null,
+-          "producer_task_id": "qa-node",
+-          "required_evidence_ref": "qa-report-demo",
+-          "required_version": "accepted-v1",
+-          "state": "WAITING"
++          "event_attempt_id": "demo-b-attempt",
++          "event_id": "terminal-demo-b-attempt",
++          "producer_task_id": "demo-b",
++          "required_evidence_ref": "evid-demo-b",
++          "required_version": "b-v1",
++          "state": "RECEIVED"
+         }
+       ],
+-      "epoch": null,
+-      "input_version": "accepted-v1",
++      "epoch": 1,
++      "input_version": "input-v1",
+       "module_id": "xuanjun.scheduler.kernel",
+-      "next_action": "WAIT_DEPENDENCIES",
+-      "node_id": "delivery",
+-      "output_version": "delivery-v1",
++      "next_action": "RESUME_ADMISSION_REQUIRED",
++      "node_id": "node-demo-a",
++      "output_version": "a-v1",
+       "preemptible": true,
+       "priority": 100,
+-      "project_id": "project-demo",
++      "project_id": "demo-project",
+       "resources": [
+-        "fake:delivery/demo"
++        "fake:shared"
+       ],
+-      "responsible_party": "developer",
+-      "state": "READY",
+-      "task_id": "delivery-node"
++      "responsible_party": "test-executor",
++      "state": "STARTED",
++      "task_id": "demo-a",
++      "task_responsible_party": "test-executor"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "authority_state": "REVOKED",
++      "blocker": null,
++      "board_id": "acceptance-delivery",
++      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++      "checkpoints": [
++        {
++          "attempt_id": "demo-b-attempt",
++          "checkpoint_id": "terminal-checkpoint-demo-b-attempt",
++          "created_at": 1792914219.174842,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:demo-b\"]"
++        }
++      ],
 +      "dependencies": [],
-+      "epoch": null,
-+      "input_version": "candidate-v1",
++      "epoch": 1,
++      "input_version": "input-v1",
 +      "module_id": "xuanjun.scheduler.kernel",
-+      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
-+      "node_id": "qa-acceptance",
-+      "output_version": "accepted-v1",
++      "next_action": "DEPENDENCIES_RECHECK",
++      "node_id": "node-demo-b",
++      "output_version": "b-v1",
 +      "preemptible": true,
 +      "priority": 50,
-+      "project_id": "project-demo",
++      "project_id": "demo-project",
 +      "resources": [
-+        "fake:qa/demo"
++        "fake:demo-b"
 +      ],
-+      "responsible_party": "qa",
-+      "state": "READY",
-+      "task_id": "qa-node"
++      "responsible_party": "test-executor",
++      "state": "SUCCESS",
++      "task_id": "demo-b",
++      "task_responsible_party": "test-executor"
+     },
+     {
+       "attempt_id": "UNKNOWN",
+@@ -111,25 +136,107 @@ window.XUANJUN_TWIN_DATA = {
+       "blocker": null,
+       "board_id": "research-development",
+       "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-      "checkpoints": [],
++      "checkpoints": [
++        {
++          "attempt_id": "demo-c-attempt",
++          "checkpoint_id": "demo-c-checkpoint",
++          "created_at": 1792914219.2738826,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:shared\"]"
++        }
++      ],
+       "dependencies": [],
+       "epoch": null,
+-      "input_version": "candidate-v1",
++      "input_version": "input-v1",
+       "module_id": "xuanjun.scheduler.kernel",
+-      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
+-      "node_id": "qa-acceptance",
+-      "output_version": "accepted-v1",
+-      "preemptible": true,
+-      "priority": 50,
+-      "project_id": "project-demo",
++      "next_action": "RESUME_FROM_CHECKPOINT",
++      "node_id": "node-demo-c",
++      "output_version": "c-v1",
++      "preemptible": false,
++      "priority": 10,
++      "project_id": "demo-project",
+       "resources": [
+-        "fake:qa/demo"
++        "fake:shared"
+       ],
+-      "responsible_party": "qa",
++      "responsible_party": "test-executor",
+       "state": "READY",
+-      "task_id": "qa-node"
++      "task_id": "demo-c",
++      "task_responsible_party": "test-executor"
+     }
+   ],
+-  "tenant_id": "tenant-demo",
+-  "timeline": []
++  "tenant_id": "tenant-a",
++  "timeline": [
++    {
++      "attempt_id": "demo-c-attempt",
++      "event_id": "received-demo-c-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-c-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.1604135,
++      "task_id": "demo-c"
++    },
++    {
++      "attempt_id": "demo-c-attempt",
++      "event_id": "started-demo-c-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-c-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.1604135,
++      "task_id": "demo-c"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "received-demo-b-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-b-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.1680598,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "started-demo-b-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-b-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.1680598,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "demo-b-progress",
++      "evidence_kind": "TEST_RUN",
++      "evidence_ref": "demo-test-run",
++      "kind": "PROGRESS",
++      "observed_at": 1792914219.1724398,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "terminal-demo-b-attempt",
++      "evidence_kind": "TEST_RUN",
++      "evidence_ref": "test-terminal-demo-b-attempt",
++      "kind": "TERMINAL",
++      "observed_at": 1792914219.174842,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-a-attempt",
++      "event_id": "received-demo-a-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-a-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.3061314,
++      "task_id": "demo-a"
++    },
++    {
++      "attempt_id": "demo-a-attempt",
++      "event_id": "started-demo-a-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-a-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.3061314,
++      "task_id": "demo-a"
 +    }
-+  ],
-+  "tenant_id": "tenant-demo",
-+  "timeline": []
-+};
-diff --git a/demos/task-center-digital-twin/index.html b/demos/task-center-digital-twin/index.html
-new file mode 100644
-index 00000000..05c2713b
---- /dev/null
-+++ b/demos/task-center-digital-twin/index.html
-@@ -0,0 +1,15 @@
-+<!doctype html>
-+<html lang="zh-CN">
-+<head>
-+  <meta charset="utf-8">
-+  <meta name="viewport" content="width=device-width,initial-scale=1">
-+  <title>玄钧全生态数字孪生（TEST_ONLY）</title>
-+  <link rel="stylesheet" href="styles.css">
-+</head>
-+<body>
-+  <header><div><strong>玄钧全生态数字孪生</strong><span>TEST_ONLY · 非生产控制台</span></div><button id="home">七板块总览</button></header>
-+  <main id="app" aria-live="polite"></main>
-+  <script src="digital-twin-data.js"></script>
-+  <script src="app.js"></script>
-+</body>
-+</html>
-diff --git a/demos/task-center-digital-twin/styles.css b/demos/task-center-digital-twin/styles.css
-new file mode 100644
-index 00000000..ffe48e42
---- /dev/null
-+++ b/demos/task-center-digital-twin/styles.css
-@@ -0,0 +1 @@
-+:root{font-family:Inter,"Noto Sans SC",sans-serif;color:#10243e;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}header{min-height:64px;background:#10243e;color:white;display:flex;align-items:center;justify-content:space-between;padding:12px 24px}header span{display:block;font-size:12px;color:#9fc4e8;margin-top:3px}button,select,input{font:inherit;min-height:40px}button{cursor:pointer;border:1px solid #b8c8da;border-radius:8px;background:white;color:#163454;padding:8px 12px}main{max-width:1280px;margin:auto;padding:24px}.notice{padding:12px;border-left:4px solid #d77800;background:#fff6e8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.card{background:white;border:1px solid #d8e2ed;border-radius:12px;padding:16px;box-shadow:0 2px 10px #13304a0d}.card h2,.card h3{margin-top:0}.metric{font-size:28px;font-weight:700}.meta{color:#5e7187;font-size:13px}.status{display:inline-flex;gap:6px;align-items:center;font-weight:650}.status:before{content:"●"}.BLOCKED:before{content:"▲"}.NO_DATA:before{content:"○"}.ACTIVE:before{content:"▶"}.STABLE:before{content:"✓"}.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.task{display:grid;grid-template-columns:minmax(150px,2fr) repeat(3,minmax(100px,1fr));gap:10px;align-items:center}.anomaly{border-left:4px solid #bc2525}.crumb{margin-bottom:14px;color:#536a82}.evidence{overflow-wrap:anywhere}.empty{text-align:center;padding:48px;color:#64788e}@media(max-width:768px){main{padding:14px}.task{grid-template-columns:1fr}.toolbar>*{width:100%}header{padding:10px 14px}}
++  ]
+ };
 diff --git a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
-index 57014e54..a1190091 100644
+index a1190091..b7c5e8ad 100644
 --- a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
 +++ b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
-@@ -6,13 +6,20 @@
- - 复用：`task_supervisor.py` 的唯一 `tasks/events/outbox`、Schema v3、Writer fence 与 LOCAL_ONLY 锁。
- - 新增表只保存图元数据、依赖版本要求、消费 ACK、checkpoint、恢复许可、模块契约和读取投影；不复制任务终态。
- - 生产 Gateway、真实 Executor、云账户、部署与凭据均为 `NOT_IMPLEMENTED / NOT_EXECUTED`。
--- 范围仅为原7个开发子路共用的开发任务、依赖、执行状态、验收和交接。七子路身份继续引用原定义，本包不新造子路、不调度业务请求。
-+- 固定七板块为运营、客户、研发、验收交付、维护、共享生态、财务；框架只协调跨板块任务、依赖、执行状态、验收和交接，不把各模块的业务处理搬入调度内核。
- - OCR 业务接线已按 Owner 纠正明确排除；社区商家证照/OCR 仍由社区分账商家平台处理。调度中心只可承载“开发 OCR 模块”这类开发任务。
- 
- ## 本地运行
- 
- ```bash
--python3 -m unittest -v tests.test_reusable_task_gateway
-+python3 -m unittest -v \
-+  tests.test_reusable_task_gateway tests.test_reusable_scheduler_cli
-+node tests/task_center_digital_twin.test.cjs
-+python3 scripts/reusable_scheduler_cli.py \
-+  --db /tmp/xuanjun-scheduler-arbitrary.sqlite \
-+  --test-authority-key 0123456789abcdef0123456789abcdef \
-+  register --tenant tenant-demo \
-+  --graph examples/reusable-scheduler-task-graph.json
- python3 scripts/reusable_scheduler_cli.py \
-   --db /tmp/xuanjun-scheduler-test.sqlite \
+@@ -33,6 +33,11 @@ python3 scripts/reusable_scheduler_cli.py \
    --test-authority-key 0123456789abcdef0123456789abcdef \
-@@ -21,11 +28,18 @@ python3 scripts/reusable_scheduler_cli.py \
-   --db /tmp/xuanjun-scheduler-test.sqlite \
-   --test-authority-key 0123456789abcdef0123456789abcdef \
-   project --tenant tenant-a
+   export-ui --tenant tenant-a \
+   --output demos/task-center-digital-twin/digital-twin-data.js
 +python3 scripts/reusable_scheduler_cli.py \
 +  --db /tmp/xuanjun-scheduler-test.sqlite \
 +  --test-authority-key 0123456789abcdef0123456789abcdef \
-+  export-ui --tenant tenant-a \
-+  --output demos/task-center-digital-twin/digital-twin-data.js
++  recover-unstarted --tenant tenant-a \
++  --lock-root /tmp/xuanjun-scheduler-locks
  ```
- 
+
  CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
- `demo` 在同一数据库执行 TEST_ONLY 闭环；随后 `project` 是一次独立进程重启读取。
--接口图样例见 `examples/reusable-scheduler-task-graph.json`。
-+`register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
-+`examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
-+`digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
- 
+@@ -40,6 +45,8 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ `register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
+ `examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
+ `digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
++`recover-unstarted` 只能在已经确认旧 TEST_ONLY 进程退出后运行；它复用原 Fence
++的 drain、资源失效覆盖和 rollback，不猜测进程存活，也不签发新 Writer。
+
  ## 事实阶段
- 
-@@ -35,6 +49,23 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
- 4. `acknowledge_event` 校验租户、版本和证据后才写 `CONSUMED_ACK` 及依赖 `RECEIVED`。
- 5. `issue_resume_grant` 为 `ELIGIBLE`；`consume_resume_grant` 为 `STARTED`；任务成功仍由独立 TERMINAL 回执确定。
- 
-+## 本轮安全收口
-+
-+- `progress` 与 `complete_success` 在任何事件、outbox、checkpoint 写入前校验可信租户上下文；跨租户拒绝保持所有表零变化。
-+- 实际 `start` 同时验证完整消费 ACK、依赖版本/证据、未撤销事实、适用 checkpoint/resume grant，再进入 Writer claim。
-+- claim 资源必须与图登记的规范化资源集合完全相等；错误、额外或遗漏均在 claim 前拒绝。
-+- inbox、消费回执和依赖引用使用 `tenant + producer task + producer attempt + event` 完整身份，同名事件可跨任务合法并存。
-+- claim 后 grant CAS 遇过期/撤销时执行本地 fence revocation，并把未开始 claim 收敛回 READY；不会留下 VALID 半启动或重复消费。
-+- Gateway 每次从持久依赖表计算合法等待集合并显式传给原 `Supervisor.scan`；仅 READY 且仍等待的任务免于“未接单超时”，活跃任务不能被豁免。
-+
-+## 数字孪生界面
-+
-+- 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
-+- 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
-+- 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
-+- hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
-+- 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
-+
- ## SaaS 模块契约
- 
- | module_id | 状态 | 说明 |
-@@ -50,3 +81,4 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
- - 没有真实分布式锁、生产 Executor adapter 或外部消息投递 adapter。
- - `release_revoked_resources` 仅在同库已存在 checkpoint、零在途、对账完成、完整 revocation coverage 时释放 LOCAL_ONLY claim；生产资源释放需原资源系统回执。
- - 图注册已先做完整结构/环验证；当前 Supervisor 单任务注册 API 仍是逐任务提交，进程在注册中途崩溃时需要后续原生批量注册事务完善。
-+- 七板块投影与界面均为 TEST_ONLY 设计/模拟；生产数据采集、实时进程探测和真实控制入口仍为 `NOT_IMPLEMENTED`。
-diff --git a/examples/reusable-scheduler-task-graph.json b/examples/reusable-scheduler-task-graph.json
-index fdb578c7..f5475906 100644
---- a/examples/reusable-scheduler-task-graph.json
-+++ b/examples/reusable-scheduler-task-graph.json
-@@ -17,6 +17,7 @@
-       "priority": 50,
-       "preemptible": true,
-       "module_id": "xuanjun.scheduler.kernel",
-+      "board_id": "research-development",
-       "resources": ["fake:qa/demo"],
-       "dependencies": [],
-       "completion_evidence": [{"evidence_ref": "qa-report-demo"}]
-@@ -34,6 +35,7 @@
-       "priority": 100,
-       "preemptible": true,
-       "module_id": "xuanjun.scheduler.kernel",
-+      "board_id": "acceptance-delivery",
-       "resources": ["fake:delivery/demo"],
-       "dependencies": [{
-         "task_id": "qa-node",
+
+@@ -57,12 +64,16 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ - inbox、消费回执和依赖引用使用 `tenant + producer task + producer attempt + event` 完整身份，同名事件可跨任务合法并存。
+ - claim 后 grant CAS 遇过期/撤销时执行本地 fence revocation，并把未开始 claim 收敛回 READY；不会留下 VALID 半启动或重复消费。
+ - Gateway 每次从持久依赖表计算合法等待集合并显式传给原 `Supervisor.scan`；仅 READY 且仍等待的任务免于“未接单超时”，活跃任务不能被豁免。
++- claim 提交后进程退出形成的 `RECEIVED + VALID + 无 STARTED` 持久中间态，可在确认旧进程退出后经 `recover-unstarted` 收敛；旧 grant 标为 `INTERRUPTED`，资源 claim 清除，且不写伪造 STARTED。
++- 依赖等待时长不计入派发超时。完整版本/证据 ACK 被消费时，任务的解锁事实和监督期限在同一事务更新；不会刷新 resume grant 或复用过期许可。
++- 七板块健康同时识别依赖等待、HOLD、FAILURE、CANCELLED 和 CAPABILITY_UNAVAILABLE；任务负责人和解除责任方分字段，证据不足时为 `UNKNOWN`。
+
+ ## 数字孪生界面
+
+ - 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
+ - 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
+ - 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
++- 异常详情分别显示任务负责人、解除责任方、事实影响和证据；不再把受阻任务 owner 自动当成问题解决方。
+ - hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
+ - 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
+
 diff --git a/scripts/reusable_scheduler_cli.py b/scripts/reusable_scheduler_cli.py
-index cdded748..f24281a6 100644
+index f24281a6..e4001c2a 100644
 --- a/scripts/reusable_scheduler_cli.py
 +++ b/scripts/reusable_scheduler_cli.py
-@@ -25,6 +25,8 @@ def demo_graph(tenant):
-             'output_version': output, 'priority': priority,
-             'preemptible': preemptible,
-             'module_id': 'xuanjun.scheduler.kernel',
-+            'board_id': ('acceptance-delivery' if task_id == 'demo-b' else
-+                         'research-development'),
-             'resources': resources, 'dependencies': dependencies or [],
-             'completion_evidence': [{'evidence_ref': evidence}],
-         }
-@@ -66,7 +68,8 @@ def run_demo(gateway, authority, tenant, lock_root):
-         gateway.mark_outbox_sent(context, outbox['outbox_id'],
-                                  'test-transport-receipt')
-         gateway.receive_outbox(context, outbox['outbox_id'])
--        gateway.acknowledge_event(context, outbox['event_id'])
-+        gateway.acknowledge_event(
-+            context, 'demo-b', 'demo-b-attempt', outbox['event_id'])
-         gateway.save_checkpoint(
-             context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
-             {'cursor': 4}, [], 'RECONCILED', ['fake:shared'])
-@@ -101,6 +104,14 @@ def main(argv=None):
-     demo = sub.add_parser('demo')
-     demo.add_argument('--tenant', required=True)
-     demo.add_argument('--lock-root', required=True)
-+    register = sub.add_parser('register')
-+    register.add_argument('--tenant', required=True)
-+    register.add_argument('--principal', default='local-registrar')
-+    register.add_argument('--graph', required=True)
-+    export = sub.add_parser('export-ui')
-+    export.add_argument('--tenant', required=True)
-+    export.add_argument('--principal', default='local-viewer')
-+    export.add_argument('--output', required=True)
+@@ -112,6 +112,10 @@ def main(argv=None):
+     export.add_argument('--tenant', required=True)
+     export.add_argument('--principal', default='local-viewer')
+     export.add_argument('--output', required=True)
++    recover = sub.add_parser('recover-unstarted')
++    recover.add_argument('--tenant', required=True)
++    recover.add_argument('--principal', default='local-recovery-controller')
++    recover.add_argument('--lock-root', required=True)
      args = parser.parse_args(argv)
      if args.command is None:
          parser.error('a command is required')
-@@ -112,9 +123,27 @@ def main(argv=None):
-         if args.command == 'project':
+@@ -131,7 +135,7 @@ def main(argv=None):
+             with open(args.graph, 'r') as stream:
+                 graph = json.load(stream)
+             value = gateway.register_graph(context, graph)
+-        else:
++        elif args.command == 'export-ui':
              context = authority.issue(args.tenant, args.principal)
              value = gateway.projection(context)
--        else:
-+        elif args.command == 'demo':
-             value = run_demo(gateway, authority, args.tenant,
-                              os.path.realpath(args.lock_root))
-+        elif args.command == 'register':
-+            context = authority.issue(args.tenant, args.principal)
-+            with open(args.graph, 'r') as stream:
-+                graph = json.load(stream)
-+            value = gateway.register_graph(context, graph)
+             output = os.path.realpath(args.output)
+@@ -144,6 +148,14 @@ def main(argv=None):
+                      'tenant_id': value['tenant_id'],
+                      'tasks': len(value['tasks']),
+                      'anomalies': len(value['anomalies'])}
 +        else:
 +            context = authority.issue(args.tenant, args.principal)
-+            value = gateway.projection(context)
-+            output = os.path.realpath(args.output)
-+            with open(output, 'w') as stream:
-+                stream.write('window.XUANJUN_TWIN_DATA = ')
-+                stream.write(json.dumps(value, ensure_ascii=False,
-+                                        sort_keys=True, indent=2))
-+                stream.write(';\n')
-+            value = {'output': output, 'schema': value['schema'],
-+                     'tenant_id': value['tenant_id'],
-+                     'tasks': len(value['tasks']),
-+                     'anomalies': len(value['anomalies'])}
++            fence = Fence(supervisor, os.path.realpath(args.lock_root))
++            try:
++                value = {'recovered': TestOnlyExecutor(
++                    gateway, fence, context).recover_incomplete_starts()}
++            finally:
++                fence.close()
          print(json.dumps(value, ensure_ascii=False,
                           sort_keys=True, indent=2))
      finally:
 diff --git a/scripts/reusable_task_gateway.py b/scripts/reusable_task_gateway.py
-index e32e0f64..0658eb9d 100644
+index 0658eb9d..a8a443e1 100644
 --- a/scripts/reusable_task_gateway.py
 +++ b/scripts/reusable_task_gateway.py
-@@ -19,6 +19,9 @@ from task_writer_fence import Fence
- 
- 
- TEST_ONLY = 'TEST_ONLY'
-+BOARDS = frozenset(('operations', 'customer', 'research-development',
-+                    'acceptance-delivery', 'maintenance',
-+                    'shared-ecosystem', 'finance'))
- MODULE_CONTRACTS = (
-     {
-         'module_id': 'xuanjun.scheduler.kernel', 'version': '1.0.0-test',
-@@ -129,13 +132,14 @@ class GatewayKernel(object):
-               node_id TEXT NOT NULL,input_version TEXT NOT NULL,
-               output_version TEXT NOT NULL,priority INTEGER NOT NULL,
-               preemptible INTEGER NOT NULL,module_id TEXT NOT NULL,
--              resources_json TEXT NOT NULL,
-+              resources_json TEXT NOT NULL,board_id TEXT NOT NULL,
-               FOREIGN KEY(task_id) REFERENCES tasks(task_id),
-               FOREIGN KEY(graph_id) REFERENCES gateway_graphs(graph_id))''',
-             '''CREATE TABLE IF NOT EXISTS gateway_dependencies(
-               consumer_task_id TEXT NOT NULL,producer_task_id TEXT NOT NULL,
-               required_version TEXT NOT NULL,required_evidence_ref TEXT NOT NULL,
--              state TEXT NOT NULL DEFAULT 'WAITING',event_id TEXT,
-+              state TEXT NOT NULL DEFAULT 'WAITING',event_attempt_id TEXT,
-+              event_id TEXT,
-               updated_at REAL NOT NULL,
-               PRIMARY KEY(consumer_task_id,producer_task_id),
-               FOREIGN KEY(consumer_task_id) REFERENCES tasks(task_id),
-@@ -146,7 +150,7 @@ class GatewayKernel(object):
-               output_version TEXT NOT NULL,evidence_ref TEXT NOT NULL,
-               state TEXT NOT NULL,received_at REAL NOT NULL,acked_at REAL,
-               payload_sha256 TEXT NOT NULL,
--              PRIMARY KEY(tenant_id,event_id))''',
-+              PRIMARY KEY(tenant_id,producer_task_id,producer_attempt_id,event_id))''',
-             '''CREATE TABLE IF NOT EXISTS gateway_checkpoints(
-               task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,
-               checkpoint_id TEXT NOT NULL,payload_json TEXT NOT NULL,
-@@ -167,8 +171,10 @@ class GatewayKernel(object):
-               created_at REAL NOT NULL,used_at REAL,
-               FOREIGN KEY(task_id) REFERENCES tasks(task_id))''',
-             '''CREATE TABLE IF NOT EXISTS gateway_delivery_receipts(
--              event_id TEXT NOT NULL,phase TEXT NOT NULL,evidence_ref TEXT NOT NULL,
--              observed_at REAL NOT NULL,PRIMARY KEY(event_id,phase))''',
-+              task_id TEXT NOT NULL,attempt_id TEXT NOT NULL,event_id TEXT NOT NULL,
-+              phase TEXT NOT NULL,evidence_ref TEXT NOT NULL,
-+              observed_at REAL NOT NULL,
-+              PRIMARY KEY(task_id,attempt_id,event_id,phase))''',
-             '''CREATE TABLE IF NOT EXISTS gateway_module_contracts(
-               module_id TEXT NOT NULL,version TEXT NOT NULL,contract_json TEXT NOT NULL,
-               contract_sha256 TEXT NOT NULL,PRIMARY KEY(module_id,version))''',
-@@ -201,15 +207,18 @@ class GatewayKernel(object):
-         task_required = {'task_id', 'node_id', 'stage', 'owner', 'entry',
-                          'checkpoint_sha256', 'spec_sha256', 'input_version',
-                          'output_version', 'priority', 'preemptible',
--                         'module_id', 'resources', 'dependencies',
-+                         'module_id', 'resources', 'dependencies', 'board_id',
-                          'completion_evidence'}
-         ids = []
-         for task in value['tasks']:
-             if not isinstance(task, dict) or set(task) != task_required:
-                 raise ValueError('EXACT_GRAPH_TASK_REQUIRED')
-             for name in ('task_id', 'node_id', 'stage', 'owner', 'entry',
--                         'input_version', 'output_version', 'module_id'):
-+                         'input_version', 'output_version', 'module_id',
-+                         'board_id'):
-                 _text(task[name], name)
-+            if task['board_id'] not in BOARDS:
-+                raise ValueError('CANONICAL_BOARD_REQUIRED')
-             _sha(task['checkpoint_sha256'], 'checkpoint_sha256')
-             _sha(task['spec_sha256'], 'spec_sha256')
-             if (type(task['priority']) is not int or task['priority'] < 0
-@@ -294,17 +303,17 @@ class GatewayKernel(object):
-                  value['graph_version'], graph_sha, now))
-             for task in value['tasks']:
-                 self.db.execute('''INSERT INTO gateway_task_metadata
--                  VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
-                   (task['task_id'], value['graph_id'], tenant_id,
-                    value['project_id'], task['node_id'], task['input_version'],
-                    task['output_version'], task['priority'],
-                    int(task['preemptible']), task['module_id'],
--                   canonical(sorted(task['resources']))))
-+                   canonical(sorted(task['resources'])), task['board_id']))
-                 for dep in task['dependencies']:
-                     self.db.execute('''INSERT INTO gateway_dependencies
--                      VALUES (?,?,?,?,?,?,?)''',
-+                      VALUES (?,?,?,?,?,?,?,?)''',
-                       (task['task_id'], dep['task_id'], dep['version'],
--                       dep['evidence_ref'], 'WAITING', None, now))
-+                       dep['evidence_ref'], 'WAITING', None, None, now))
-         return {'duplicate': False, 'graph_sha256': graph_sha}
- 
-     def task_tenant(self, task_id):
-@@ -320,6 +329,20 @@ class GatewayKernel(object):
-             raise ValueError('CROSS_TENANT_ACCESS_REJECTED')
-         return tenant_id
- 
-+    def canonical_resources(self, task_id):
-+        row = self.db.execute('''SELECT resources_json FROM
-+          gateway_task_metadata WHERE task_id=?''', (task_id,)).fetchone()
-+        if row is None:
-+            raise KeyError(task_id)
-+        return json.loads(row['resources_json'])
-+
-+    def assert_claim_resources(self, context, task_id, resources):
-+        self.assert_task_context(context, task_id)
-+        if (not isinstance(resources, list)
-+                or sorted(resources) != self.canonical_resources(task_id)):
-+            raise ValueError('REGISTERED_RESOURCE_SCOPE_REQUIRED')
-+        return list(self.canonical_resources(task_id))
-+
-     def mark_outbox_sent(self, context, outbox_id, evidence_ref, now=None):
-         row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',
-                               (outbox_id,)).fetchone()
-@@ -331,8 +354,9 @@ class GatewayKernel(object):
-         self.db.execute('BEGIN IMMEDIATE')
-         with self.db:
-             self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
--              VALUES (?,?,?,?)''', (row['event_id'], 'SENT',
--                                    _text(evidence_ref, 'evidence_ref'), now))
-+              VALUES (?,?,?,?,?,?)''', (row['task_id'], row['attempt_id'],
-+                row['event_id'], 'SENT', _text(evidence_ref, 'evidence_ref'),
-+                now))
-         return result
- 
-     def receive_outbox(self, context, outbox_id, now=None):
-@@ -360,8 +384,10 @@ class GatewayKernel(object):
-         self.db.execute('BEGIN IMMEDIATE')
-         with self.db:
-             prior = self.db.execute('''SELECT * FROM gateway_inbox
--              WHERE tenant_id=? AND event_id=?''',
--              (tenant_id, row['event_id'])).fetchone()
-+              WHERE tenant_id=? AND producer_task_id=?
-+              AND producer_attempt_id=? AND event_id=?''',
-+              (tenant_id, row['task_id'], row['attempt_id'],
-+               row['event_id'])).fetchone()
-             exact = (tenant_id, row['event_id'], row['task_id'],
-                      row['attempt_id'], meta['output_version'], evidence_ref,
-                      payload_sha)
-@@ -380,14 +406,35 @@ class GatewayKernel(object):
-                payload_sha))
-         return {'duplicate': False, 'state': 'RECEIVED'}
- 
--    def acknowledge_event(self, context, event_id, now=None):
-+    def acknowledge_event(self, context, producer_task_id,
-+                          producer_attempt_id=None, event_id=None, now=None):
-+        # Compatibility for the original single-identity API is deliberately
-+        # limited to an unambiguous row.  New callers pass the complete event
-+        # identity: producer task + attempt + event.
-+        if event_id is None:
-+            if producer_attempt_id is not None:
-+                if now is not None:
-+                    raise ValueError('AMBIGUOUS_EVENT_ACK_ARGUMENTS')
-+                now = producer_attempt_id
-+            event_id = producer_task_id
-+            producer_task_id = None
-         tenant_id = self.tenants.verify(context)
-         now = self.clock() if now is None else _finite(now, 'time')
-         self.db.execute('BEGIN IMMEDIATE')
-         with self.db:
--            event = self.db.execute('''SELECT * FROM gateway_inbox
--              WHERE tenant_id=? AND event_id=?''',
--              (tenant_id, event_id)).fetchone()
-+            if producer_task_id is None:
-+                matches = list(self.db.execute('''SELECT * FROM gateway_inbox
-+                  WHERE tenant_id=? AND event_id=?''',
-+                  (tenant_id, event_id)))
-+                if len(matches) != 1:
-+                    raise ValueError('COMPLETE_EVENT_IDENTITY_REQUIRED')
-+                event = matches[0]
-+            else:
-+                event = self.db.execute('''SELECT * FROM gateway_inbox
-+                  WHERE tenant_id=? AND producer_task_id=?
-+                  AND producer_attempt_id=? AND event_id=?''',
-+                  (tenant_id, producer_task_id, producer_attempt_id,
-+                   event_id)).fetchone()
-             if event is None:
-                 raise KeyError(event_id)
-             if event['state'] == 'CONSUMED_ACK':
-@@ -406,18 +453,32 @@ class GatewayKernel(object):
-                         and dep['required_evidence_ref'] ==
-                             event['evidence_ref']):
-                     self.db.execute('''UPDATE gateway_dependencies
--                      SET state='RECEIVED',event_id=?,updated_at=?
-+                      SET state='RECEIVED',event_attempt_id=?,event_id=?,
-+                      updated_at=?
-                       WHERE consumer_task_id=? AND producer_task_id=?''',
--                      (event_id, now, dep['consumer_task_id'],
-+                      (event['producer_attempt_id'], event_id, now,
-+                       dep['consumer_task_id'],
-                        dep['producer_task_id']))
-                     matched += 1
-+                    remaining = self.db.execute('''SELECT COUNT(*) FROM
-+                      gateway_dependencies WHERE consumer_task_id=?
-+                      AND state!='RECEIVED' ''',
-+                      (dep['consumer_task_id'],)).fetchone()[0]
-+                    if remaining == 0:
-+                        self.db.execute('''UPDATE tasks SET
-+                          next_action='RESUME_ADMISSION_REQUIRED',updated_at=?
-+                          WHERE task_id=? AND state='READY' ''',
-+                          (now, dep['consumer_task_id']))
+@@ -466,9 +466,13 @@ class GatewayKernel(object):
+                       (dep['consumer_task_id'],)).fetchone()[0]
+                     if remaining == 0:
+                         self.db.execute('''UPDATE tasks SET
+-                          next_action='RESUME_ADMISSION_REQUIRED',updated_at=?
++                          next_action='RESUME_ADMISSION_REQUIRED',
++                          receipt_deadline=?,started_deadline=?,
++                          progress_deadline=?,terminal_deadline=?,
++                          handoff_deadline=?,updated_at=?
+                           WHERE task_id=? AND state='READY' ''',
+-                          (now, dep['consumer_task_id']))
++                          (now + 300, now + 600, now + 900, now + 3600,
++                           now + 900, now, dep['consumer_task_id']))
              self.db.execute('''UPDATE gateway_inbox
                SET state='CONSUMED_ACK',acked_at=?
--              WHERE tenant_id=? AND event_id=?''',
--              (now, tenant_id, event_id))
-+              WHERE tenant_id=? AND producer_task_id=?
-+              AND producer_attempt_id=? AND event_id=?''',
-+              (now, tenant_id, event['producer_task_id'],
-+               event['producer_attempt_id'], event_id))
-             self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
--              VALUES (?,?,?,?)''',
--              (event_id, 'CONSUMED_ACK', event['payload_sha256'], now))
+               WHERE tenant_id=? AND producer_task_id=?
+@@ -752,14 +756,28 @@ class GatewayKernel(object):
+             self.db.execute('''DELETE FROM resource_claims WHERE task_id=?
+               AND attempt_id=? AND state='REVOKED' ''',
+               (task_id, attempt_id))
++            interrupted = self.db.execute('''UPDATE gateway_resume_grants
++              SET state='INTERRUPTED' WHERE task_id=?
++              AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
++            interrupted_count = self.db.execute(
++                'SELECT changes()').fetchone()[0]
++            next_action = ('REISSUE_RESUME_GRANT' if interrupted_count
++                           else 'CLAIM_TEST_ONLY_EXECUTOR')
+             self.db.execute('''UPDATE tasks SET state='READY',
+               authority_state='NONE',authority_valid_until=NULL,
+               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
+-              epoch=NULL,next_action='RECHECK_RESUME_ADMISSION',
++              epoch=NULL,next_action=?,
+               writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
+               WHERE task_id=? AND authority_state='REVOKED' ''',
+-              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, now, task_id))
+-        return {'state': 'READY', 'claim_state': 'ROLLED_BACK'}
++              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, next_action, now, task_id))
++            self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
 +              VALUES (?,?,?,?,?,?)''',
-+              (event['producer_task_id'], event['producer_attempt_id'],
-+               event_id, 'CONSUMED_ACK', event['payload_sha256'], now))
-             return {'duplicate': False, 'state': 'CONSUMED_ACK',
-                     'matched_dependencies': matched}
- 
-@@ -548,7 +609,10 @@ class GatewayKernel(object):
-           LIMIT 1''' % placeholders, resources).fetchone()
-         if conflicts is not None:
-             raise ValueError('RESUME_RESOURCE_CONFLICT')
--        event_ids = [row['event_id'] for row in dependencies]
-+        event_ids = [{'producer_task_id': row['producer_task_id'],
-+                      'producer_attempt_id': row['event_attempt_id'],
-+                      'event_id': row['event_id']}
-+                     for row in dependencies]
-         grant_body = {'task_id': task_id, 'checkpoint_id': checkpoint_id,
-                       'dependency_event_ids': event_ids,
-                       'valid_until': valid_until}
-@@ -575,6 +639,44 @@ class GatewayKernel(object):
-             raise ValueError('RESUME_GRANT_EXPIRED')
-         return dict(row)
- 
-+    def assert_start_allowed(self, context, task_id, resources,
-+                             checkpoint_id=None, resume_grant_id=None,
-+                             now=None):
-+        """Validate all Gateway facts before source authority is claimed."""
-+        self.assert_claim_resources(context, task_id, resources)
-+        now = self.clock() if now is None else _finite(now, 'time')
-+        dependencies = list(self.db.execute('''SELECT * FROM
-+          gateway_dependencies WHERE consumer_task_id=?
-+          ORDER BY producer_task_id''', (task_id,)))
-+        for dep in dependencies:
-+            if (dep['state'] != 'RECEIVED' or not dep['event_attempt_id']
-+                    or not dep['event_id']):
-+                raise ValueError('DEPENDENCY_CONSUMED_ACK_REQUIRED')
-+            producer = self.supervisor._task(dep['producer_task_id'])
-+            meta = self.db.execute('''SELECT output_version FROM
-+              gateway_task_metadata WHERE task_id=?''',
-+              (dep['producer_task_id'],)).fetchone()
-+            inbox = self.db.execute('''SELECT * FROM gateway_inbox
-+              WHERE tenant_id=? AND producer_task_id=?
-+              AND producer_attempt_id=? AND event_id=?
-+              AND state='CONSUMED_ACK' LIMIT 1''',
-+              (self.task_tenant(task_id), dep['producer_task_id'],
-+               dep['event_attempt_id'], dep['event_id'])).fetchone()
-+            if (producer['state'] != 'SUCCESS' or inbox is None
-+                    or meta['output_version'] != dep['required_version']
-+                    or inbox['output_version'] != dep['required_version']
-+                    or inbox['evidence_ref'] != dep['required_evidence_ref']):
-+                raise ValueError('DEPENDENCY_VERSION_EVIDENCE_REQUIRED')
-+        checkpoint = self.db.execute('''SELECT 1 FROM gateway_checkpoints
-+          WHERE task_id=? LIMIT 1''', (task_id,)).fetchone()
-+        if checkpoint is not None or resume_grant_id is not None:
-+            if not resume_grant_id or not checkpoint_id:
-+                raise ValueError('APPLICABLE_RESUME_GRANT_REQUIRED')
-+            self.validate_resume_grant(context, task_id, resume_grant_id,
-+                                       checkpoint_id, now=now)
-+        return {'dependencies': len(dependencies),
-+                'resume_required': checkpoint is not None}
-+
-     def consume_resume_grant(self, context, task_id, grant_id, checkpoint_id,
-                              now=None):
-         self.assert_task_context(context, task_id)
-@@ -591,11 +693,17 @@ class GatewayKernel(object):
-                 self.db.execute('''UPDATE gateway_resume_grants
-                   SET state='EXPIRED' WHERE grant_id=?''', (grant_id,))
-                 raise ValueError('RESUME_GRANT_EXPIRED')
--            dependencies = list(self.db.execute('''SELECT state,event_id FROM
-+            dependencies = list(self.db.execute('''SELECT state,
-+              producer_task_id,event_attempt_id,event_id FROM
-               gateway_dependencies WHERE consumer_task_id=?''', (task_id,)))
-+            identities = [{'producer_task_id': dep['producer_task_id'],
-+                           'producer_attempt_id': dep['event_attempt_id'],
-+                           'event_id': dep['event_id']}
-+                          for dep in dependencies]
-             if (any(dep['state'] != 'RECEIVED' for dep in dependencies)
--                    or sorted(json.loads(row['dependency_event_ids_json'])) !=
--                       sorted(dep['event_id'] for dep in dependencies)):
-+                    or sorted(json.loads(row['dependency_event_ids_json']),
-+                              key=canonical) !=
-+                       sorted(identities, key=canonical)):
-                 raise ValueError('RESUME_DEPENDENCY_CHANGED')
-             self.db.execute('''UPDATE gateway_resume_grants
-               SET state='STARTED',used_at=? WHERE grant_id=?
-@@ -622,10 +730,37 @@ class GatewayKernel(object):
-             self.db.execute('''UPDATE gateway_resume_grants SET state=?
-               WHERE grant_id=? AND state='STARTED' ''', (result, grant_id))
-             self.db.execute('''INSERT INTO gateway_delivery_receipts
--              VALUES (?,?,?,?)''',
--              (grant_id, 'RESUME_' + result, evidence_ref, now))
-+              VALUES (?,?,?,?,?,?)''',
-+              (task_id, UNKNOWN, grant_id, 'RESUME_' + result,
-+               evidence_ref, now))
-         return {'grant_id': grant_id, 'started': True, 'result': result}
- 
-+    def rollback_unstarted_claim(self, context, task_id, attempt_id, now=None):
-+        """Converge a fenced claim when resume admission failed pre-STARTED."""
-+        self.assert_task_context(context, task_id)
-+        now = self.clock() if now is None else _finite(now, 'time')
-+        self.db.execute('BEGIN IMMEDIATE')
-+        with self.db:
-+            task = self.supervisor._task(task_id)
-+            started = self.db.execute('''SELECT 1 FROM events WHERE task_id=?
-+              AND attempt_id=? AND kind='STARTED' LIMIT 1''',
-+              (task_id, attempt_id)).fetchone()
-+            if (task['attempt_id'] != attempt_id
-+                    or task['authority_state'] != 'REVOKED'
-+                    or started is not None):
-+                raise ValueError('UNSTARTED_REVOKED_CLAIM_REQUIRED')
-+            self.db.execute('''DELETE FROM resource_claims WHERE task_id=?
-+              AND attempt_id=? AND state='REVOKED' ''',
-+              (task_id, attempt_id))
-+            self.db.execute('''UPDATE tasks SET state='READY',
-+              authority_state='NONE',authority_valid_until=NULL,
-+              run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
-+              epoch=NULL,next_action='RECHECK_RESUME_ADMISSION',
-+              writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
-+              WHERE task_id=? AND authority_state='REVOKED' ''',
-+              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, now, task_id))
-+        return {'state': 'READY', 'claim_state': 'ROLLED_BACK'}
-+
++              (task_id, attempt_id, 'unstarted-recovery:' + attempt_id,
++               'UNSTARTED_CLAIM_RECOVERED',
++               'NO_STARTED_EVENT_RESOURCE_COVERAGE_RECONCILED', now))
++        return {'state': 'READY', 'claim_state': 'ROLLED_BACK',
++                'interrupted_grants': interrupted_count,
++                'next_action': next_action}
+
      def preemption_decision(self, context, running_task_id, waiting_task_id):
          """Pure policy verdict; it never stops a process or transfers a lock."""
-         self.assert_task_context(context, running_task_id)
-@@ -656,6 +791,9 @@ class GatewayKernel(object):
-                 '''SELECT consumer_task_id FROM gateway_dependencies
-                    WHERE producer_task_id=?''', (producer_task_id,))]
-             for task_id in task_ids:
-+                self.db.execute('''UPDATE tasks SET
-+                  next_action='WAIT_DEPENDENCIES',updated_at=?
-+                  WHERE task_id=? AND state='READY' ''', (now, task_id))
-                 self.db.execute('''UPDATE gateway_resume_grants
-                   SET state='REVOKED' WHERE task_id=?
-                   AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
-@@ -682,17 +820,23 @@ class GatewayKernel(object):
-                             'observed_at': now})
-         return results
- 
-+    def scan(self, context, now=None):
-+        """Run the canonical Supervisor scan with durable wait exemptions."""
-+        self.tenants.verify(context)
-+        return self.supervisor.scan(now=now)
-+
-     def projection(self, context):
-         tenant_id = self.tenants.verify(context)
-         tasks = []
-         for row in self.db.execute('''SELECT t.*,m.project_id,m.node_id,
-           m.input_version,m.output_version,m.priority,m.preemptible,m.module_id,
--          m.resources_json
-+          m.resources_json,m.board_id
-           FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
-           WHERE m.tenant_id=? ORDER BY m.priority DESC,t.task_id''',
-           (tenant_id,)):
-             deps = [dict(x) for x in self.db.execute('''SELECT
--              producer_task_id,required_version,required_evidence_ref,state,event_id
-+              producer_task_id,required_version,required_evidence_ref,state,
-+              event_attempt_id,event_id
-               FROM gateway_dependencies WHERE consumer_task_id=?
-               ORDER BY producer_task_id''', (row['task_id'],))]
-             checkpoints = [dict(x) for x in self.db.execute('''SELECT
-@@ -710,6 +854,11 @@ class GatewayKernel(object):
-                 'priority': row['priority'],
-                 'preemptible': bool(row['preemptible']),
+@@ -843,6 +861,16 @@ class GatewayKernel(object):
+               attempt_id,checkpoint_id,effects_state,resources_json,created_at
+               FROM gateway_checkpoints WHERE task_id=? ORDER BY created_at''',
+               (row['task_id'],))]
++            dependency_blockers = [dep for dep in deps
++                                   if dep['state'] != 'RECEIVED']
++            blocker = None
++            if dependency_blockers:
++                blocker = 'DEPENDENCY_WAIT'
++            elif row['state'] == 'HOLD':
++                blocker = 'TASK_HOLD'
++            elif row['state'] in ('FAILURE', 'CANCELLED',
++                                  'CAPABILITY_UNAVAILABLE'):
++                blocker = 'TASK_TERMINAL_' + row['state']
+             tasks.append({
+                 'task_id': row['task_id'], 'project_id': row['project_id'],
+                 'node_id': row['node_id'], 'state': row['state'],
+@@ -856,9 +884,9 @@ class GatewayKernel(object):
                  'module_id': row['module_id'], 'dependencies': deps,
-+                'board_id': row['board_id'],
-+                'responsible_party': row['owner'],
-+                'next_action': row['next_action'],
-+                'blocker': ('DEPENDENCY_WAIT' if any(
-+                    dep['state'] != 'RECEIVED' for dep in deps) else None),
+                 'board_id': row['board_id'],
+                 'responsible_party': row['owner'],
++                'task_responsible_party': row['owner'],
+                 'next_action': row['next_action'],
+-                'blocker': ('DEPENDENCY_WAIT' if any(
+-                    dep['state'] != 'RECEIVED' for dep in deps) else None),
++                'blocker': blocker,
                  'resources': json.loads(row['resources_json']),
                  'checkpoints': checkpoints,
              })
-@@ -718,7 +867,40 @@ class GatewayKernel(object):
-           e.evidence_ref FROM events e JOIN gateway_task_metadata m
-           ON m.task_id=e.task_id WHERE m.tenant_id=?
-           ORDER BY e.observed_at,e.event_id''', (tenant_id,))]
--        return {'schema': 1, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
-+        boards = []
-+        anomalies = []
-+        for board_id in sorted(BOARDS):
-+            board_tasks = [task for task in tasks
-+                           if task['board_id'] == board_id]
-+            blocked = [task for task in board_tasks if task['blocker']]
-+            active = [task for task in board_tasks
-+                      if task['state'] in ('RECEIVED', 'STARTED', 'RUNNING')]
-+            boards.append({'board_id': board_id,
-+                           'task_count': len(board_tasks),
-+                           'active_count': len(active),
-+                           'blocked_count': len(blocked),
-+                           'health': ('BLOCKED' if blocked else
-+                                      'ACTIVE' if active else
-+                                      'NO_DATA' if not board_tasks else
-+                                      'STABLE')})
-+            for task in blocked:
-+                anomalies.append({
-+                    'anomaly_id': 'dependency:' + task['task_id'],
-+                    'board_id': board_id, 'project_id': task['project_id'],
-+                    'task_id': task['task_id'], 'node_id': task['node_id'],
-+                    'missing': task['blocker'],
-+                    'depends_on': [dep['producer_task_id'] for dep in
-+                                   task['dependencies']
-+                                   if dep['state'] != 'RECEIVED'],
-+                    'impact': 'TASK_START_BLOCKED',
-+                    'responsible_party': task['responsible_party'],
-+                    'next_action': task['next_action'],
-+                    'evidence_ref': [dep['required_evidence_ref'] for dep in
-+                                     task['dependencies']
-+                                     if dep['state'] != 'RECEIVED'],
-+                })
-+        return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
-+                'boards': boards, 'anomalies': anomalies,
-                 'tasks': tasks, 'timeline': events,
-                 'production_status': 'NOT_IMPLEMENTED'}
- 
-@@ -743,22 +925,34 @@ class TestOnlyExecutor(object):
- 
-     def start(self, task_id, attempt_id, resources, valid_until,
-               checkpoint_id=None, resume_grant_id=None):
--        self.gateway.assert_task_context(self.context, task_id)
-         now = self.clock()
--        if resume_grant_id is not None:
--            self.gateway.validate_resume_grant(
--                self.context, task_id, resume_grant_id, checkpoint_id,
--                now=now)
-+        self.gateway.assert_start_allowed(
-+            self.context, task_id, resources, checkpoint_id,
-+            resume_grant_id, now=now)
-         task = self.supervisor._task(task_id)
-         caller = self._caller(attempt_id)
+@@ -884,20 +912,52 @@ class GatewayKernel(object):
+                                       'NO_DATA' if not board_tasks else
+                                       'STABLE')})
+             for task in blocked:
++                unresolved_dependencies = [dep for dep in
++                                           task['dependencies']
++                                           if dep['state'] != 'RECEIVED']
++                resolver = UNKNOWN
++                evidence = []
++                depends_on = []
++                if task['blocker'] == 'DEPENDENCY_WAIT':
++                    depends_on = [dep['producer_task_id'] for dep in
++                                  unresolved_dependencies]
++                    owners = {self.supervisor._task(task_id)['owner']
++                              for task_id in depends_on}
++                    if len(owners) == 1:
++                        resolver = next(iter(owners))
++                    evidence = [dep['required_evidence_ref'] for dep in
++                                unresolved_dependencies]
++                    impact = 'DEPENDENT_TASK_NOT_STARTABLE'
++                else:
++                    terminal = [event for event in events
++                                if event['task_id'] == task['task_id']
++                                and event['kind'] in
++                                ('TERMINAL', 'SUPERVISION_ACTION')]
++                    evidence = [event['evidence_ref'] for event in terminal
++                                if event['evidence_ref']]
++                    impact = {
++                        'TASK_HOLD': 'TASK_EXECUTION_HELD',
++                        'TASK_TERMINAL_FAILURE': 'TASK_TERMINATED_FAILURE',
++                        'TASK_TERMINAL_CANCELLED': 'TASK_TERMINATED_CANCELLED',
++                        'TASK_TERMINAL_CAPABILITY_UNAVAILABLE':
++                            'TASK_CAPABILITY_UNAVAILABLE',
++                    }.get(task['blocker'], UNKNOWN)
++                if not evidence:
++                    evidence = [UNKNOWN]
+                 anomalies.append({
+-                    'anomaly_id': 'dependency:' + task['task_id'],
++                    'anomaly_id': task['blocker'].lower() + ':' +
++                                  task['task_id'],
+                     'board_id': board_id, 'project_id': task['project_id'],
+                     'task_id': task['task_id'], 'node_id': task['node_id'],
+                     'missing': task['blocker'],
+-                    'depends_on': [dep['producer_task_id'] for dep in
+-                                   task['dependencies']
+-                                   if dep['state'] != 'RECEIVED'],
+-                    'impact': 'TASK_START_BLOCKED',
+-                    'responsible_party': task['responsible_party'],
++                    'depends_on': depends_on,
++                    'impact': impact,
++                    'responsible_party': resolver,
++                    'task_responsible_party':
++                        task['task_responsible_party'],
++                    'resolution_responsible_party': resolver,
+                     'next_action': task['next_action'],
+-                    'evidence_ref': [dep['required_evidence_ref'] for dep in
+-                                     task['dependencies']
+-                                     if dep['state'] != 'RECEIVED'],
++                    'evidence_ref': evidence,
+                 })
+         return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+                 'boards': boards, 'anomalies': anomalies,
+@@ -908,7 +968,8 @@ class GatewayKernel(object):
+ class TestOnlyExecutor(object):
+     """Explicit local adapter that drives real Supervisor/Fence transitions."""
+
+-    def __init__(self, gateway, fence, context, clock=None):
++    def __init__(self, gateway, fence, context, clock=None,
++                 start_claim_hook=None):
+         if not isinstance(fence, Fence):
+             raise ValueError('SOURCE_ONLY_FENCE_REQUIRED')
+         self.gateway = gateway
+@@ -916,6 +977,40 @@ class TestOnlyExecutor(object):
+         self.fence = fence
+         self.context = context
+         self.clock = clock or gateway.clock
++        self.start_claim_hook = start_claim_hook
++
++    def recover_incomplete_starts(self, now=None):
++        """Converge proven-dead TEST_ONLY claims with no STARTED event.
++
++        The caller invokes this only after the prior local process has exited.
++        Existing Fence drain and source invalidation receipts remain the safety
++        proof; this method neither guesses process liveness nor creates a new
++        authority system.
++        """
++        now = self.clock() if now is None else _finite(now, 'time')
++        tenant_id = self.gateway.tenants.verify(self.context)
++        rows = list(self.gateway.db.execute('''SELECT t.task_id,t.attempt_id
++          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
++          WHERE m.tenant_id=? AND t.state='RECEIVED'
++          AND t.authority_state='VALID' AND NOT EXISTS(
++            SELECT 1 FROM events e WHERE e.task_id=t.task_id
++            AND e.attempt_id=t.attempt_id AND e.kind='STARTED')
++          ORDER BY t.task_id''', (tenant_id,)))
++        recovered = []
++        for row in rows:
++            controller = {'role': 'REVOCATION_CONTROLLER',
++                          'caller_id': 'test-restart-recovery'}
++            self.fence.begin_revocation(row['task_id'], controller)
++            self.fence.drain(row['task_id'], controller, timeout=1)
++            self.fence.invalidate_source_resources(
++                row['task_id'], 'restart-unstarted')
++            self.supervisor.complete_revocation(row['task_id'])
++            receipt = self.gateway.rollback_unstarted_claim(
++                self.context, row['task_id'], row['attempt_id'], now=now)
++            receipt.update({'task_id': row['task_id'],
++                            'attempt_id': row['attempt_id']})
++            recovered.append(receipt)
++        return recovered
+
+     def _caller(self, name):
+         return {'caller_id': 'test-writer-' + name,
+@@ -934,6 +1029,8 @@ class TestOnlyExecutor(object):
          ticket = self.fence.claim(
              task_id, attempt_id, task['owner'], task['entry'], caller,
              'lease-' + attempt_id, resources, valid_until)
--        now = self.clock()
--        if resume_grant_id is not None:
--            self.gateway.consume_resume_grant(
--                self.context, task_id, resume_grant_id, checkpoint_id,
--                now=now)
-+        try:
-+            now = self.clock()
-+            if resume_grant_id is not None:
-+                self.gateway.consume_resume_grant(
-+                    self.context, task_id, resume_grant_id, checkpoint_id,
-+                    now=now)
-+        except Exception:
-+            # A revocation/expiry between preflight and grant CAS must not
-+            # leave a VALID source claim without a STARTED fact.
-+            controller = {'role': 'REVOCATION_CONTROLLER',
-+                          'caller_id': 'test-start-rollback'}
-+            self.fence.begin_revocation(task_id, controller)
-+            self.fence.drain(task_id, controller, timeout=1)
-+            self.fence.invalidate_source_resources(task_id,
-+                                                   'start-rollback')
-+            self.supervisor.complete_revocation(task_id)
-+            self.gateway.rollback_unstarted_claim(
-+                self.context, task_id, attempt_id, now=self.clock())
-+            raise
-         self.supervisor.record(task_id, attempt_id,
-             'received-' + attempt_id, 'RECEIVED', now,
-             'PHASE_EXECUTION', 'test-received-' + attempt_id)
-@@ -768,6 +962,7 @@ class TestOnlyExecutor(object):
-         return {'ticket': ticket, 'caller': caller, 'state': 'STARTED'}
- 
-     def progress(self, task_id, attempt_id, event_id, evidence_ref, now=None):
-+        self.gateway.assert_task_context(self.context, task_id)
-         return self.supervisor.record(
-             task_id, attempt_id, event_id, 'PROGRESS',
-             self.clock() if now is None else now,
-@@ -777,6 +972,7 @@ class TestOnlyExecutor(object):
- 
-     def complete_success(self, task_id, attempt_id, artifact_sha256,
-                          completion_evidence, now=None):
-+        self.gateway.assert_task_context(self.context, task_id)
-         now = self.clock() if now is None else now
-         result = self.supervisor.record(
-             task_id, attempt_id, 'terminal-' + attempt_id, 'TERMINAL', now,
++        if self.start_claim_hook is not None:
++            self.start_claim_hook(task_id, attempt_id, ticket)
+         try:
+             now = self.clock()
+             if resume_grant_id is not None:
 diff --git a/scripts/task_supervisor.py b/scripts/task_supervisor.py
-index db25ad8c..31985057 100644
+index 31985057..db9b0a10 100644
 --- a/scripts/task_supervisor.py
 +++ b/scripts/task_supervisor.py
-@@ -1877,6 +1877,13 @@ class Supervisor(object):
-             rows = [dict(r) for r in self.db.execute(
-                 "SELECT * FROM tasks WHERE state IN ('READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING')")]
-             for task in rows:
-+                # A Gateway-registered dependency wait is a durable canonical
-+                # next action, not a missing writer receipt.  The Gateway only
-+                # changes this marker after its version/evidence-bound ACK is
-+                # consumed.  Active attempts are never exempt.
-+                if (task['state'] == 'READY'
-+                        and task['next_action'] == 'WAIT_DEPENDENCIES'):
-+                    continue
+@@ -1885,7 +1885,13 @@ class Supervisor(object):
+                         and task['next_action'] == 'WAIT_DEPENDENCIES'):
+                     continue
                  if task['state'] == 'READY':
-                     base = task['created_at']
+-                    base = task['created_at']
++                    # Dependency time is not dispatch latency.  Once the
++                    # Gateway consumes the exact dependency ACK it updates the
++                    # canonical next action and updated_at; supervision starts
++                    # from that durable unlock fact, not graph creation.
++                    base = (task['updated_at'] if task['next_action'] ==
++                            'RESUME_ADMISSION_REQUIRED'
++                            else task['created_at'])
                  elif task['state'] == 'RECEIVED':
-@@ -2030,5 +2037,3 @@ class Supervisor(object):
-               (attempts, next_at, error[:256], outbox_id))
-             return {'delivered': False, 'attempts': attempts,
-                     'next_attempt_at': next_at}
--
--
+                     base = task['received_at']
+                 elif task['state'] in ('STARTED','RUNNING'):
 diff --git a/tests/task_center_digital_twin.test.cjs b/tests/task_center_digital_twin.test.cjs
-new file mode 100644
-index 00000000..721c6ee5
---- /dev/null
+index 721c6ee5..a932ec11 100644
+--- a/tests/task_center_digital_twin.test.cjs
 +++ b/tests/task_center_digital_twin.test.cjs
-@@ -0,0 +1,12 @@
-+'use strict';
-+const assert=require('assert');
-+const ui=require('../demos/task-center-digital-twin/app.js');
-+const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'TASK_START_BLOCKED',depends_on:['t-b'],responsible_party:'dev',evidence_ref:['qa']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
-+assert.deepStrictEqual(ui.parseRoute('#task/research-development/t-a?project=p-1'),{view:'task',board:'research-development',task:'t-a',query:{project:'p-1'}});
-+assert.strictEqual(ui.filterTasks(data,ui.parseRoute('#board/research-development?project=p-1')).length,1);
-+assert.match(ui.render(data,ui.parseRoute('#overview')),/七板块运行概况/);
-+assert.match(ui.render(data,ui.parseRoute('#overview')),/定位卡点/);
-+assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/研发工作台/);
-+assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/异常证据/);
-+assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
-+console.log('task_center_digital_twin.test: PASS');
-diff --git a/tests/test_reusable_scheduler_cli.py b/tests/test_reusable_scheduler_cli.py
-new file mode 100644
-index 00000000..2f92ffc6
---- /dev/null
-+++ b/tests/test_reusable_scheduler_cli.py
-@@ -0,0 +1,59 @@
-+from __future__ import print_function
-+
-+import json
-+import os
-+import shutil
-+import subprocess
-+import tempfile
-+import unittest
-+
-+
-+ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
-+CLI = os.path.join(ROOT, 'scripts', 'reusable_scheduler_cli.py')
-+EXAMPLE = os.path.join(ROOT, 'examples',
-+                       'reusable-scheduler-task-graph.json')
-+KEY = '0123456789abcdef0123456789abcdef'
-+
-+
-+class SchedulerCliTests(unittest.TestCase):
-+    def setUp(self):
-+        self.root = tempfile.mkdtemp()
-+        self.db = os.path.join(self.root, 'state.sqlite3')
-+
-+    def tearDown(self):
-+        shutil.rmtree(self.root)
-+
-+    def run_cli(self, *args):
-+        command = ['python3', CLI, '--db', self.db,
-+                   '--test-authority-key', KEY] + list(args)
-+        output = subprocess.check_output(command, cwd=ROOT)
-+        return json.loads(output.decode('utf-8'))
-+
-+    def test_arbitrary_graph_register_project_and_export_ui(self):
-+        registered = self.run_cli(
-+            'register', '--tenant', 'tenant-demo', '--graph', EXAMPLE)
-+        self.assertFalse(registered['duplicate'])
-+        projection = self.run_cli('project', '--tenant', 'tenant-demo')
-+        self.assertEqual(projection['schema'], 2)
-+        self.assertEqual(len(projection['boards']), 7)
-+        self.assertEqual(len(projection['tasks']), 2)
-+        self.assertEqual(len(projection['anomalies']), 1)
-+        output = os.path.join(self.root, 'digital-twin-data.js')
-+        receipt = self.run_cli('export-ui', '--tenant', 'tenant-demo',
-+                               '--output', output)
-+        self.assertEqual(receipt['tasks'], 2)
-+        with open(output, 'r') as stream:
-+            body = stream.read()
-+        self.assertTrue(body.startswith('window.XUANJUN_TWIN_DATA = {'))
-+        self.assertIn('"production_status": "NOT_IMPLEMENTED"', body)
-+
-+    def test_demo_restarts_to_identical_projection(self):
-+        first = self.run_cli('demo', '--tenant', 'tenant-a', '--lock-root',
-+                             os.path.join(self.root, 'locks'))
-+        second = self.run_cli('project', '--tenant', 'tenant-a')
-+        self.assertEqual(first, second)
-+        self.assertEqual(len(second['tasks']), 3)
-+
-+
-+if __name__ == '__main__':
-+    unittest.main()
+@@ -1,12 +1,14 @@
+ 'use strict';
+ const assert=require('assert');
+ const ui=require('../demos/task-center-digital-twin/app.js');
+-const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'TASK_START_BLOCKED',depends_on:['t-b'],responsible_party:'dev',evidence_ref:['qa']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
++const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',evidence_ref:['qa-proof']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
+ assert.deepStrictEqual(ui.parseRoute('#task/research-development/t-a?project=p-1'),{view:'task',board:'research-development',task:'t-a',query:{project:'p-1'}});
+ assert.strictEqual(ui.filterTasks(data,ui.parseRoute('#board/research-development?project=p-1')).length,1);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/七板块运行概况/);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/定位卡点/);
+ assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/研发工作台/);
+ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/异常证据/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/任务负责人：dev/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/解除责任方：qa/);
+ assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
+ console.log('task_center_digital_twin.test: PASS');
 diff --git a/tests/test_reusable_task_gateway.py b/tests/test_reusable_task_gateway.py
-index 89c1a76f..f71f00c5 100644
+index f71f00c5..8ece76cd 100644
 --- a/tests/test_reusable_task_gateway.py
 +++ b/tests/test_reusable_task_gateway.py
-@@ -37,7 +37,8 @@ class KernelTests(unittest.TestCase):
- 
-     @staticmethod
-     def task(task_id, output, dependencies=None, priority=10,
--             preemptible=True, resources=None, evidence='evidence-v1'):
-+             preemptible=True, resources=None, evidence='evidence-v1',
-+             board='research-development'):
-         return {
-             'task_id': task_id, 'node_id': 'node-' + task_id,
-             'stage': 'development', 'owner': 'developer', 'entry': 'WORK',
-@@ -46,6 +47,7 @@ class KernelTests(unittest.TestCase):
-             'input_version': 'input-v1', 'output_version': output,
-             'priority': priority, 'preemptible': preemptible,
-             'module_id': 'xuanjun.scheduler.kernel',
-+            'board_id': board,
-             'resources': resources or ['fake:resource-' + task_id],
-             'dependencies': dependencies or [],
-             'completion_evidence': [{'evidence_ref': evidence}],
-@@ -149,7 +151,8 @@ class KernelTests(unittest.TestCase):
-         duplicate = self.gateway.acknowledge_event(self.a, outbox['event_id'], 1017)
-         self.assertTrue(duplicate['duplicate'])
-         self.supervisor.db.execute("""UPDATE gateway_dependencies
--          SET required_version='b-v4',state='WAITING',event_id=NULL
-+          SET required_version='b-v4',state='WAITING',event_attempt_id=NULL,
-+          event_id=NULL
-           WHERE consumer_task_id='task-a'""")
-         self.supervisor.db.commit()
-         # Replayed old event remains ACKed and cannot satisfy a new version.
-@@ -174,7 +177,7 @@ class KernelTests(unittest.TestCase):
-         decision = self.gateway.preemption_decision(
-             self.a, 'task-c', 'task-a')
-         self.assertEqual(decision['decision'], 'WAIT_NEXT_SAFE_POINT')
--        with self.assertRaisesRegex(ValueError, 'TASK_NOT_READY|CLAIMABLE'):
-+        with self.assertRaisesRegex(ValueError, 'DEPENDENCY_CONSUMED_ACK'):
-             exe.start('task-a', 'attempt-a1', ['fake:shared'], 3000)
-         self.gateway.save_checkpoint(self.a, 'task-c', 'attempt-c1',
-             'checkpoint-c1', {'work': 'saved'}, ['external-write'], UNKNOWN,
-@@ -316,6 +319,192 @@ class KernelTests(unittest.TestCase):
-         self.assertTrue(all(json.loads(x['contract_json'])['lifecycle'] ==
-                             'TEST_ONLY' for x in rows))
- 
-+    def test_cross_tenant_progress_and_terminal_reject_before_any_write(self):
-+        self.gateway.register_graph(self.a, self.graph(), now=1000)
-+        self.now = 1001
-+        self.executor().start('task-a', 'attempt-a1',
-+                              ['fake:resource-task-a'], 2000)
-+        before = {name: self.supervisor.db.execute(
-+            'SELECT COUNT(*) FROM ' + name).fetchone()[0]
-+            for name in ('tasks', 'events', 'outbox', 'gateway_checkpoints')}
-+        wrong = self.executor(self.b)
-+        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
-+            wrong.progress('task-a', 'attempt-a1', 'wrong-progress', 'x', 1002)
-+        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
-+            wrong.complete_success('task-a', 'attempt-a1', 'f' * 64,
-+                                   [{'evidence_ref': 'evidence-v1'}], 1003)
-+        after = {name: self.supervisor.db.execute(
-+            'SELECT COUNT(*) FROM ' + name).fetchone()[0]
-+            for name in before}
-+        self.assertEqual(before, after)
-+        self.assertEqual(self.supervisor._task('task-a')['state'], 'STARTED')
-+
-+    def test_start_requires_ack_matching_evidence_and_resume_grant(self):
+@@ -3,6 +3,7 @@ from __future__ import print_function
+ import json
+ import os
+ import shutil
++import subprocess
+ import tempfile
+ import unittest
+
+@@ -478,6 +479,141 @@ class KernelTests(unittest.TestCase):
+         self.assertEqual({row['task_id']: row['status'] for row in
+             self.gateway.monitor(self.a)}['task-a'], 'WAITING_DEPENDENCY')
+
++    def test_restart_converges_claim_before_grant_consume_without_started(self):
 +        self.register_wait_graph()
 +        self.gateway.save_waiting_checkpoint(
 +            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
 +            ['fake:shared'], 1001)
 +        outbox = self.start_complete_b()
-+        exe = self.executor()
-+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK'):
-+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000)
 +        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
 +        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
 +        self.gateway.acknowledge_event(
 +            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
-+        with self.assertRaisesRegex(ValueError, 'RESUME_GRANT'):
-+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000,
-+                      checkpoint_id='checkpoint-a0')
 +        grant = self.gateway.issue_resume_grant(
 +            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
-+        self.gateway.revoke_dependency(self.a, 'task-b', 'qa-revoked', 1017)
-+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK|ALREADY_USED'):
-+            exe.start('task-a', 'attempt-a1', ['fake:shared'], 2000,
-+                      checkpoint_id='checkpoint-a0',
-+                      resume_grant_id=grant['grant_id'])
-+        self.assertEqual(self.supervisor.db.execute(
-+            "SELECT COUNT(*) FROM resource_claims WHERE state='VALID'"
-+        ).fetchone()[0], 0)
-+
-+    def test_wrong_dependency_evidence_never_unlocks_start(self):
-+        producer = self.task('task-b', 'b-v3', evidence='actual-evidence')
-+        consumer = self.task('task-a', 'a-v1', dependencies=[{
-+            'task_id': 'task-b', 'version': 'b-v3',
-+            'evidence_ref': 'required-other-evidence'}],
-+            resources=['fake:shared'])
-+        self.gateway.register_graph(
-+            self.a, self.graph(tasks=[producer, consumer]), now=1000)
-+        exe = self.executor()
-+        self.now = 1010
-+        exe.start('task-b', 'attempt-b1', ['fake:resource-task-b'], 2000)
-+        self.now = 1013
-+        exe.complete_success('task-b', 'attempt-b1', 'f' * 64,
-+                             [{'evidence_ref': 'actual-evidence'}], self.now)
-+        outbox = self.supervisor.db.execute(
-+            "SELECT outbox_id,event_id FROM outbox WHERE task_id='task-b'"
-+        ).fetchone()
-+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
-+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
-+        ack = self.gateway.acknowledge_event(
-+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
-+        self.assertEqual(ack['matched_dependencies'], 0)
-+        with self.assertRaisesRegex(ValueError, 'CONSUMED_ACK'):
-+            self.executor().start('task-a', 'attempt-a1',
-+                                  ['fake:shared'], 2000)
-+
-+    def test_claim_requires_exact_registered_resource_set(self):
-+        self.gateway.register_graph(self.a, self.graph(), now=1000)
-+        exe = self.executor()
-+        for resources in ([], ['fake:wrong'],
-+                          ['fake:resource-task-a', 'fake:extra']):
-+            with self.assertRaisesRegex(ValueError, 'REGISTERED_RESOURCE'):
-+                exe.start('task-a', 'attempt-a1', resources, 2000)
-+        self.assertEqual(self.supervisor.db.execute(
-+            'SELECT COUNT(*) FROM resource_claims').fetchone()[0], 0)
-+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
-+
-+    def test_complete_event_identity_allows_same_attempt_event_per_task(self):
-+        one = self.task('task-a', 'v1', resources=['fake:a'])
-+        two = self.task('task-b', 'v1', resources=['fake:b'])
-+        self.gateway.register_graph(
-+            self.a, self.graph(tasks=[one, two]), now=1000)
-+        exe = self.executor()
-+        outboxes = []
-+        for task_id, resource in (('task-a', 'fake:a'), ('task-b', 'fake:b')):
-+            self.now += 1
-+            exe.start(task_id, 'same-attempt', [resource], 2000)
-+            self.now += 1
-+            exe.complete_success(task_id, 'same-attempt', 'f' * 64,
-+                [{'evidence_ref': 'evidence-v1'}], self.now)
-+            outboxes.append(self.supervisor.db.execute(
-+                'SELECT * FROM outbox WHERE task_id=?', (task_id,)).fetchone())
-+        for row in outboxes:
-+            self.now += 1
-+            self.gateway.mark_outbox_sent(
-+                self.a, row['outbox_id'], 'sent-' + row['task_id'], self.now)
-+            self.gateway.receive_outbox(self.a, row['outbox_id'], self.now)
-+            self.gateway.acknowledge_event(
-+                self.a, row['task_id'], 'same-attempt', row['event_id'],
-+                self.now)
-+        self.assertEqual(len(list(self.supervisor.db.execute(
-+            'SELECT * FROM gateway_inbox'))), 2)
 +        self.fence.close(); self.supervisor.close()
++        scripts = os.path.realpath(os.path.join(
++            os.path.dirname(__file__), '..', 'scripts'))
++        child = r'''
++import os,sys
++sys.path.insert(0,sys.argv[1])
++from task_supervisor import Supervisor
++from task_writer_fence import Fence
++from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
++clock=lambda:1020.0
++s=Supervisor(sys.argv[2],clock)
++a=TestTenantAuthority(b'k'*32)
++g=GatewayKernel(s,a,clock)
++f=Fence(s,sys.argv[3])
++e=TestOnlyExecutor(g,f,a.issue('tenant-a','owner-a'),clock,
++                   start_claim_hook=lambda *_:os._exit(73))
++e.start('task-a','attempt-a-crash',['fake:shared'],2000,
++        'checkpoint-a0',sys.argv[4])
++'''
++        completed = subprocess.run(
++            [sys.executable, '-c', child, scripts, self.path,
++             self.lock_root, grant['grant_id']], check=False)
++        self.assertEqual(completed.returncode, 73)
++        self.now = 1030
 +        self.supervisor = Supervisor(self.path, lambda: self.now)
 +        self.gateway = GatewayKernel(
 +            self.supervisor, self.authority, lambda: self.now)
 +        self.fence = Fence(self.supervisor, self.lock_root)
-+        for row in outboxes:
-+            self.assertTrue(self.gateway.receive_outbox(
-+                self.a, row['outbox_id'], self.now)['duplicate'])
++        task = self.supervisor._task('task-a')
++        self.assertEqual((task['state'], task['authority_state']),
++                         ('RECEIVED', 'VALID'))
++        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
++          gateway_resume_grants WHERE grant_id=?''',
++          (grant['grant_id'],)).fetchone()[0], 'ELIGIBLE')
++        recovered = self.executor().recover_incomplete_starts(now=self.now)
++        self.assertEqual(len(recovered), 1)
++        self.assertEqual(recovered[0]['interrupted_grants'], 1)
++        task = self.supervisor._task('task-a')
++        self.assertEqual((task['state'], task['authority_state'],
++                          task['next_action']),
++                         ('READY', 'NONE', 'REISSUE_RESUME_GRANT'))
++        self.assertEqual(self.supervisor.db.execute(
++            "SELECT COUNT(*) FROM resource_claims WHERE task_id='task-a'"
++        ).fetchone()[0], 0)
++        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
++          events WHERE task_id='task-a' AND kind='STARTED' ''').fetchone()[0], 0)
++        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
++          gateway_resume_grants WHERE grant_id=?''',
++          (grant['grant_id'],)).fetchone()[0], 'INTERRUPTED')
++        self.assertEqual(self.executor().recover_incomplete_starts(now=1031), [])
 +
-+    def test_resume_race_rolls_back_claim_and_does_not_consume_twice(self):
++    def test_long_dependency_wait_unlocks_fresh_dispatch_clock_and_starts(self):
 +        self.register_wait_graph()
 +        self.gateway.save_waiting_checkpoint(
 +            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
 +            ['fake:shared'], 1001)
-+        outbox = self.start_complete_b()
-+        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
-+        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
-+        self.gateway.acknowledge_event(
-+            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
-+        grant = self.gateway.issue_resume_grant(
-+            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
-+        original = self.gateway.consume_resume_grant
-+        def revoke_then_consume(*args, **kwargs):
-+            self.gateway.revoke_dependency(
-+                self.a, 'task-b', 'race-revoked', 1018)
-+            return original(*args, **kwargs)
-+        self.gateway.consume_resume_grant = revoke_then_consume
-+        self.now = 1018
-+        with self.assertRaisesRegex(ValueError, 'ALREADY_USED'):
-+            self.executor().start(
-+                'task-a', 'attempt-a1', ['fake:shared'], 2000,
-+                checkpoint_id='checkpoint-a0',
-+                resume_grant_id=grant['grant_id'])
-+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
-+        self.assertEqual(self.supervisor.db.execute(
-+            "SELECT COUNT(*) FROM resource_claims WHERE state='VALID'"
-+        ).fetchone()[0], 0)
-+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
-+          gateway_resume_grants WHERE grant_id=?''',
-+          (grant['grant_id'],)).fetchone()[0], 'REVOKED')
-+
-+    def test_gateway_scan_exempts_real_dependency_wait_from_ready_timeout(self):
-+        self.register_wait_graph()
 +        self.now = 10000
-+        actions = self.gateway.scan(self.a, now=self.now)
++        exe = self.executor()
++        exe.start('task-b', 'attempt-b-long',
++                  ['fake:resource-task-b'], 20000)
++        exe.complete_success('task-b', 'attempt-b-long', 'f' * 64,
++                             [{'evidence_ref': 'evid-b-v3'}], 10001)
++        outbox = self.supervisor.db.execute('''SELECT outbox_id,event_id FROM
++          outbox WHERE task_id='task-b' ''').fetchone()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 10002)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 10003)
++        self.gateway.acknowledge_event(
++            self.a, 'task-b', 'attempt-b-long', outbox['event_id'], 10004)
++        actions = self.gateway.scan(self.a, now=10005)
 +        self.assertNotIn('task-a', {row['task_id'] for row in actions})
-+        self.assertEqual(self.supervisor._task('task-a')['state'], 'READY')
-+        self.assertEqual({row['task_id']: row['status'] for row in
-+            self.gateway.monitor(self.a)}['task-a'], 'WAITING_DEPENDENCY')
++        task = self.supervisor._task('task-a')
++        self.assertEqual(task['updated_at'], 10004)
++        self.assertEqual(task['receipt_deadline'], 10304)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 11000, 10006)
++        self.now = 10007
++        started = self.executor().start(
++            'task-a', 'attempt-a-long', ['fake:shared'], 11000,
++            'checkpoint-a0', grant['grant_id'])
++        self.assertEqual(started['state'], 'STARTED')
 +
-+    def test_multi_project_cross_board_partial_flow_and_tenant_projection(self):
-+        ops = self.task('task-a', 'brief-v1', board='operations')
-+        dev = self.task('task-b', 'build-v1', dependencies=[{
-+            'task_id': 'task-a', 'version': 'brief-v1',
-+            'evidence_ref': 'evidence-v1'}], board='research-development')
-+        self.gateway.register_graph(
-+            self.a, self.graph(tasks=[ops, dev]), now=1000)
-+        finance_only = self.task('task-z', 'ledger-v1', board='finance')
++    def test_projection_reports_hold_failure_and_distinct_resolver(self):
++        producer = self.task('task-b', 'b-v1', board='acceptance-delivery')
++        producer['owner'] = 'acceptance-owner'
++        consumer = self.task('task-a', 'a-v1', dependencies=[{
++            'task_id': 'task-b', 'version': 'b-v1',
++            'evidence_ref': 'acceptance-proof'}])
++        consumer['owner'] = 'development-owner'
++        held = self.task('task-h', 'h-v1', board='operations')
++        failed = self.task('task-f', 'f-v1', board='customer')
 +        self.gateway.register_graph(self.a, self.graph(
-+            suffix='z', tasks=[finance_only]), now=1000)
-+        customer_only = self.task('task-y', 'request-v1', board='customer')
-+        self.gateway.register_graph(self.b, self.graph(
-+            tenant='tenant-b', suffix='y', tasks=[customer_only]), now=1000)
-+        pa = self.gateway.projection(self.a)
-+        pb = self.gateway.projection(self.b)
-+        self.assertEqual({task['project_id'] for task in pa['tasks']},
-+                         {'project-a', 'project-z'})
-+        self.assertEqual([task['task_id'] for task in pb['tasks']], ['task-y'])
-+        counts = {board['board_id']: board['task_count']
-+                  for board in pa['boards']}
-+        self.assertEqual(counts['operations'], 1)
-+        self.assertEqual(counts['research-development'], 1)
-+        self.assertEqual(counts['finance'], 1)
-+        self.assertEqual(counts['customer'], 0)
-+        self.assertEqual(pa['anomalies'][0]['task_id'], 'task-b')
-+        self.assertEqual(pa['anomalies'][0]['project_id'], 'project-a')
++            tasks=[producer, consumer, held, failed]), now=1000)
++        self.now = 1001
++        self.executor().start('task-f', 'attempt-f1',
++                              ['fake:resource-task-f'], 3000)
++        self.supervisor.record(
++            'task-f', 'attempt-f1', 'failed-f1', 'TERMINAL', 1002,
++            'TEST_RUN', 'failure-proof', {
++                'state': 'FAILURE', 'artifact_sha256': UNKNOWN,
++                'writer_stopped': UNKNOWN, 'effects_reconciled': UNKNOWN,
++                'next_action': 'INSPECT_FAILURE',
++                'completion_evidence': []})
++        self.gateway.scan(self.a, now=2000)
++        value = self.gateway.projection(self.a)
++        anomalies = {row['task_id']: row for row in value['anomalies']}
++        self.assertEqual(anomalies['task-a']['task_responsible_party'],
++                         'development-owner')
++        self.assertEqual(anomalies['task-a']['resolution_responsible_party'],
++                         'acceptance-owner')
++        self.assertEqual(anomalies['task-a']['impact'],
++                         'DEPENDENT_TASK_NOT_STARTABLE')
++        self.assertEqual(anomalies['task-f']['impact'],
++                         'TASK_TERMINATED_FAILURE')
++        self.assertEqual(anomalies['task-f']['resolution_responsible_party'],
++                         UNKNOWN)
++        self.assertEqual(anomalies['task-h']['impact'],
++                         'TASK_EXECUTION_HELD')
++        self.assertEqual(anomalies['task-h']['evidence_ref'][0],
++                         'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
++        boards = {row['board_id']: row for row in value['boards']}
++        self.assertEqual(boards['operations']['health'], 'BLOCKED')
++        self.assertEqual(boards['customer']['health'], 'BLOCKED')
 +
- 
- if __name__ == '__main__':
-     unittest.main()
+     def test_multi_project_cross_board_partial_flow_and_tenant_projection(self):
+         ops = self.task('task-a', 'brief-v1', board='operations')
+         dev = self.task('task-b', 'build-v1', dependencies=[{
