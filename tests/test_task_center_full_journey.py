@@ -1,11 +1,13 @@
 from __future__ import print_function
 
 import json
+import hashlib
 import os
 import shutil
 import socketserver
 import tempfile
 import threading
+import time
 import unittest
 import sys
 from http.server import BaseHTTPRequestHandler,HTTPServer
@@ -82,10 +84,13 @@ class FullJourneyTests(unittest.TestCase):
           'deliverables':['source','logs'],'acceptance':['tests','review'],
           'dependencies':[],'priority':80,'owner':'developer-1'}
         self.post({'action':'CREATE_PROJECT_TASK','task':task})
+        observed={'matches':[]}
         self.post({'action':'RECORD_ASSET_QUERY','task_id':'task-journey',
           'query_id':'query-journey-1','source_kind':'REGISTRY',
-          'source_version':'registry-v1','query':{'asset':'asset-v1'},
-          'result_digest':'e'*64})
+          'source_version':'registry-v1','query':{'lookup':{'asset':'asset-v1'},
+          'observed_result':observed,'evidence_ref':'registry://query-journey-1'},
+          'result_digest':hashlib.sha256(json.dumps(observed,sort_keys=True,
+          separators=(',',':')).encode()).hexdigest()})
         self.post({'action':'RECORD_DISPATCH_PREFLIGHT','task_id':'task-journey',
           'asset_version':'asset-v1','query_ids':['query-journey-1'],
           'outcome':'NOT_FOUND','reuse_reason':'verified new TEST_ONLY task'})
@@ -95,12 +100,29 @@ class FullJourneyTests(unittest.TestCase):
         self.assertEqual([x['task_id'] for x in listed],['task-journey'])
         context=self.mcp.call('task_read_context',{'task_id':'task-journey'})
         self.assertEqual(context['task']['attempt_id'],'attempt-1')
+        codex_provider={'provider_id':'codex-fixture','display_name':'Codex Fixture',
+          'adapter_type':'openai-compatible','base_url':'http://127.0.0.1:9',
+          'enabled':True,'price_state':'KNOWN_FREE','rate_limit_per_min':10,
+          'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0}
+        self.post({'action':'UPSERT_PROVIDER','config':codex_provider,
+          'secret':'fixture-codex-secret'})
+        self.post({'action':'SET_QUOTA_STATUS','provider_id':'codex-fixture',
+          'quota_state':'AVAILABLE','quota_source':'TEST_ONLY_INCLUDED_FIXTURE',
+          'verified_at':time.time(),'unavailable_reason':None})
+        self.post({'action':'UPSERT_CONNECTION','config':{
+          'connection_id':'codex-connection','provider_id':'codex-fixture',
+          'purpose':'CODEX_EXECUTION','auth_type':'API_KEY',
+          'destination_origin':'http://127.0.0.1:9','issuer':None,
+          'authorization_endpoint':None,'token_endpoint':None,
+          'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+          'scopes':[],'supports_refresh':False},'credential':'fixture-codex-key'})
         codex=self.post({'action':'CREATE_CODEX_INTENT',
           'task_id':'task-journey','transport_kind':'CODEX_SDK',
           'idempotency_key':'journey-codex-intent','context':{
           'goal':'deliver tested candidate','scope':['WRITE_SOURCE'],
           'acceptance':['tests','review'],'asset_version':'asset-v1',
-          'reuse_evidence':['query-journey-1']}},'developer-token-123456')
+          'reuse_evidence':['query-journey-1'],'connection_id':'codex-connection',
+          'provider_id':'codex-fixture'}},'developer-token-123456')
         self.assertEqual(codex['state'],'PENDING')
         self.assertEqual(self.post({'action':'CANCEL_CODEX_INTENT',
           'intent_id':codex['intent_id']},'developer-token-123456')['state'],
@@ -140,8 +162,9 @@ class FullJourneyTests(unittest.TestCase):
         self.assertEqual(self.post({'action':'RUN_SCHEDULER_ONCE'})['state'],
           'SUCCEEDED')
         checklist=self.post({'action':'REGISTER_CHECKLIST','task_id':'task-journey',
-          'items':[{'id':'journey-core','required':True,'result':'PASS',
-          'evidence':'fixture-log'}]})['content_sha256']
+          'items':[{'id':'tests','required':True,'result':'PASS',
+          'evidence':'fixture-test-log'},{'id':'review','required':True,
+          'result':'PASS','evidence':'fixture-review-plan'}]})['content_sha256']
         candidate=self.post({'action':'SUBMIT_CANDIDATE','task_id':'task-journey',
           'artifact_sha256':'a'*64,'checklist_sha256':checklist,
           'submitted_by':'developer-1'},'developer-token-123456')

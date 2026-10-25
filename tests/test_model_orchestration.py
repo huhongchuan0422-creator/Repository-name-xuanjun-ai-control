@@ -47,8 +47,10 @@ class ProviderHandler(BaseHTTPRequestHandler):
               'http://127.0.0.1:%d/v1/chat/completions'%self.server.server_port)
             self.end_headers();return
         if model=='slow':time.sleep(.2)
-        raw=json.dumps({'id':'fixture-'+model,'choices':[{'message':{'content':'ok-'+model}}],
-          'usage':{'prompt_tokens':3,'completion_tokens':2,'total_tokens':5}}).encode()
+        value={'id':'fixture-'+model,'choices':[{'message':{'content':'ok-'+model}}]}
+        if model!='no-usage':value['usage']={'prompt_tokens':3,
+          'completion_tokens':2,'total_tokens':5}
+        raw=json.dumps(value).encode()
         try:
             self.send_response(200);self.send_header('Content-Length',str(len(raw)))
             self.end_headers();self.wfile.write(raw)
@@ -115,7 +117,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         return self.control.assign('demo-b','developer','v1','developer-1')
 
     def checklist_sha(self):
-        return self.control.register_checklist('demo-b',[{'id':'core',
+        return self.control.register_checklist('demo-b',[{'id':'tests pass',
           'required':True,'result':'PASS','evidence':'test-log'}],
           'admin:owner')['content_sha256']
 
@@ -307,6 +309,9 @@ class ModelOrchestrationTests(unittest.TestCase):
         for cls in (OpenAICompatibleAdapter,SiliconFlowAdapter):
             adapter=cls();ok=adapter.invoke(self.url,SECRET,'ok',[{'role':'user','content':'x'}],1)
             self.assertEqual(ok['usage']['total_tokens'],5)
+            unknown=adapter.invoke(self.url,SECRET,'no-usage',[],1)
+            self.assertEqual(unknown['usage'],{'input_tokens':None,
+              'output_tokens':None,'total_tokens':None})
             with self.assertRaisesRegex(ProviderError,'AUTH'):adapter.invoke(self.url,SECRET,'auth',[],1)
             with self.assertRaisesRegex(ProviderError,'RATE_LIMIT'):adapter.invoke(self.url,SECRET,'rate',[],1)
             with self.assertRaisesRegex(ProviderError,'TIMEOUT_UNKNOWN'):adapter.invoke(self.url,SECRET,'slow',[],.05)
@@ -728,6 +733,45 @@ class ModelOrchestrationTests(unittest.TestCase):
           role_instances WHERE instance_id='developer-1' ''').fetchone()[0],
           'STOPPED')
 
+    def test_approved_skill_content_is_in_actual_outbound_request(self):
+        self.assigned();content={'instructions':'bounded','forbidden':['deploy']}
+        self.control.register_skill('reviewed','v1',content,'a'*64)
+        self.control.bind_skill('developer','v1','reviewed','v1','a'*64,'APPROVED')
+        self.control.queue_request('demo-b','developer',
+          [{'role':'user','content':'work'}],'skill-content')
+        captured=[]
+        class Capture(object):
+            def invoke(self,_url,_secret,_model,messages,*_args):
+                captured.extend(messages);return {'content':'ok',
+                  'usage':{'input_tokens':1,'output_tokens':1,'total_tokens':2},
+                  'provider_request_id':'skill-fixture'}
+        result=ModelScheduler(self.control,{'siliconflow':Capture(),
+          'openai-compatible':Capture()}).run_once()
+        self.assertEqual(result['state'],'SUCCEEDED')
+        injected=json.loads(captured[0]['content'])['approved_skills'][0]
+        self.assertEqual(injected['content'],content)
+        self.assertEqual(injected['skill_version'],'v1')
+
+    def test_success_without_complete_usage_remains_unknown_not_zero(self):
+        self.assigned()
+        for suffix,usage in (('missing',{}),('partial',{'input_tokens':3,
+          'output_tokens':None,'total_tokens':None})):
+            queued=self.control.queue_request('demo-b','developer',
+              [],'usage-'+suffix)
+            class UsageFixture(object):
+                def invoke(self,*_args):return {'content':'ok','usage':usage,
+                  'provider_request_id':'usage-'+suffix}
+            result=ModelScheduler(self.control,{'siliconflow':UsageFixture(),
+              'openai-compatible':UsageFixture()}).run_once()
+            self.assertEqual(result['state'],'SUCCEEDED')
+            row=self.supervisor.db.execute('''SELECT input_tokens,output_tokens,
+              cost_state,cost_value FROM model_usage_attempts WHERE request_id=?''',
+              (queued['request_id'],)).fetchone()
+            self.assertEqual(row['cost_state'],'UNKNOWN');self.assertIsNone(row['cost_value'])
+            if suffix=='missing':self.assertIsNone(row['input_tokens'])
+            self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+              model_usage_events WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],0)
+
     def test_paid_model_is_held_before_send_under_zero_new_spend_policy(self):
         self.provider('paid',price='KNOWN_PAID');self.model('paid','ok','KNOWN_PAID')
         self.supervisor.db.execute('''UPDATE model_catalog SET input_unit_cost=1,
@@ -748,12 +792,35 @@ class ModelOrchestrationTests(unittest.TestCase):
     def test_incomplete_or_unexecuted_checklist_cannot_freeze_candidate(self):
         self.assigned();developer=ModelControl(self.gateway,
           self.authority.issue('tenant-a','developer-1'),self.master)
-        receipt=self.control.register_checklist('demo-b',[{'id':'required',
-          'required':True,'result':'NOT_EXECUTED','evidence':'missing'}],
-          'admin:owner')
-        with self.assertRaisesRegex(ValueError,'CHECKLIST_INCOMPLETE'):
-            developer.submit_candidate('demo-b','a'*64,
-              receipt['content_sha256'],'developer-1')
+        with self.assertRaisesRegex(ValueError,'REQUIRED_CHECK_EVIDENCE_REQUIRED'):
+            self.control.register_checklist('demo-b',[{'id':'tests pass',
+              'required':True,'result':'NOT_EXECUTED','evidence':'missing'}],
+              'admin:owner')
+        with self.assertRaisesRegex(ValueError,'REQUIRED_CHECK_EVIDENCE_REQUIRED'):
+            self.control.register_checklist('demo-b',[{'id':'tests pass',
+              'required':False,'result':'FAIL','evidence':''}],'admin:owner')
+        with self.assertRaisesRegex(ValueError,'ACCEPTANCE_COVERAGE_MISMATCH'):
+            self.control.register_checklist('demo-b',[{'id':'other',
+              'required':True,'result':'PASS','evidence':'log'}],'admin:owner')
+
+    def test_fair_queue_reaches_healthy_101st_request(self):
+        self.provider('blocked');self.model('blocked');self.qualify('blocked','ok')
+        self.role();self.control.assign('demo-b','developer','v1','developer-1')
+        for index in range(100):
+            self.control.queue_request('demo-b','developer',[],
+              'blocked-%03d'%index)
+        self.provider('healthy-101');self.model('healthy-101');
+        self.qualify('healthy-101','ok')
+        self.supervisor.db.execute('''UPDATE model_assignments SET
+          provider_id='healthy-101' WHERE task_id='demo-b' AND role_id='developer' ''')
+        self.supervisor.db.commit()
+        healthy=self.control.queue_request('demo-b','developer',[],'healthy-101')
+        self.supervisor.db.execute('''UPDATE model_providers SET circuit_state='OPEN',
+          next_probe_at=? WHERE provider_id='blocked' ''',(time.time()+600,))
+        self.supervisor.db.commit()
+        result=ModelScheduler(self.control).run_once()
+        self.assertEqual(result['request_id'],healthy['request_id'])
+        self.assertEqual(result['state'],'SUCCEEDED')
 
     def test_frozen_task_spec_change_invalidates_later_review(self):
         self.assigned();self.role('reviewer','REVIEWER',['code'],False,'QA')

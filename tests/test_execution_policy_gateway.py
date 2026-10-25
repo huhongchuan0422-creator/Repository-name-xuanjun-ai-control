@@ -7,6 +7,7 @@ import time
 import unittest
 import sys
 import sqlite3
+import hashlib
 from cryptography.fernet import Fernet
 
 ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
@@ -14,7 +15,7 @@ sys.path.insert(0,os.path.join(ROOT,'scripts'))
 from execution_policy_gateway import ExecutionPolicyGateway
 from reusable_scheduler_cli import demo_graph
 from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
-from task_supervisor import Supervisor
+from task_supervisor import Supervisor,canonical
 from task_writer_fence import Fence
 from model_orchestration import ModelControl
 
@@ -317,8 +318,15 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
 
     def test_preflight_can_bind_real_query_receipt_and_reject_unknown_id(self):
         self.policy.record_unit(self.unit)
+        observed={'found':['existing-source']}
         self.policy.record_asset_query('demo-b','query-1','REGISTRY','registry-v3',
-          {'search':'existing-source'},'a'*64)
+          {'lookup':{'search':'existing-source'},'observed_result':observed,
+          'evidence_ref':'registry://query-1'},hashlib.sha256(
+          canonical(observed).encode()).hexdigest())
+        with self.assertRaisesRegex(ValueError,'RESULT_DIGEST_MISMATCH'):
+            self.policy.record_asset_query('demo-b','forged','REGISTRY','registry-v3',
+              {'lookup':{'search':'existing-source'},'observed_result':observed,
+              'evidence_ref':'registry://forged'},'a'*64)
         receipt=self.policy.record_preflight('demo-b',['registry'],'FOUND',
           'existing-source','asset-v1',False,'reuse checked','evidence',
           query_ids=['query-1'])

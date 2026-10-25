@@ -164,15 +164,24 @@ class OpenAICompatibleAdapter(object):
             if connection is not None:connection.close()
         try:
             content = value['choices'][0]['message']['content']
-            usage = value.get('usage') or {}
+            usage = value.get('usage')
             if not isinstance(content, str):
                 raise TypeError()
-            parsed_usage = {
-                'input_tokens': int(usage.get('prompt_tokens', 0)),
-                'output_tokens': int(usage.get('completion_tokens', 0)),
-                'total_tokens': int(usage.get('total_tokens', 0)),
-            }
-            if min(parsed_usage.values()) < 0:
+            if usage is not None and not isinstance(usage,dict):raise TypeError()
+            usage=usage or {}
+            def token(name):
+                value=usage.get(name)
+                if value is None:return None
+                if type(value) is not int or value<0:raise TypeError()
+                return value
+            parsed_usage = {'input_tokens':token('prompt_tokens'),
+              'output_tokens':token('completion_tokens'),
+              'total_tokens':token('total_tokens')}
+            if (parsed_usage['total_tokens'] is not None and
+                    parsed_usage['input_tokens'] is not None and
+                    parsed_usage['output_tokens'] is not None and
+                    parsed_usage['total_tokens'] != parsed_usage['input_tokens']+
+                    parsed_usage['output_tokens']):
                 raise TypeError()
         except Exception:
             raise ProviderError('PROTOCOL', 'INVALID_RESPONSE_SHAPE')
@@ -590,6 +599,14 @@ class ModelControl(object):
         self.gateway.assert_task_context(self.context,task_id)
         if created_by!=self._principal():raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
         if not isinstance(items,list) or not items:raise ValueError('CHECKLIST_ITEMS_REQUIRED')
+        spec=self.db.execute('''SELECT acceptance_json FROM task_work_specs WHERE
+          tenant_id=? AND task_id=?''',(self.tenant_id,task_id)).fetchone()
+        if spec is None:raise ValueError('TASK_WORK_SPEC_REQUIRED')
+        required_ids=json.loads(spec['acceptance_json'])
+        if (not isinstance(required_ids,list) or not required_ids or
+                any(not isinstance(x,str) or not x for x in required_ids) or
+                len(required_ids)!=len(set(required_ids))):
+            raise ValueError('SERVER_ACCEPTANCE_SET_REQUIRED')
         normalized=[]
         for item in items:
             if (not isinstance(item,dict) or set(item)!=
@@ -597,7 +614,13 @@ class ModelControl(object):
                 raise ValueError('EXACT_CHECKLIST_ITEM_REQUIRED')
             if item['result'] not in ('PASS','FAIL','NOT_EXECUTED'):
                 raise ValueError('CHECKLIST_RESULT_REQUIRED')
+            if (item['required'] is not True or item['result']!='PASS' or
+                    not isinstance(item['evidence'],str) or
+                    item['evidence'] in ('',UNKNOWN)):
+                raise ValueError('REQUIRED_CHECK_EVIDENCE_REQUIRED')
             normalized.append(item)
+        if sorted(x['id'] for x in normalized)!=sorted(required_ids):
+            raise ValueError('ACCEPTANCE_COVERAGE_MISMATCH')
         body=canonical(normalized);digest=hashlib.sha256(body.encode()).hexdigest()
         task=self.gateway.supervisor._task(task_id)
         checklist_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
@@ -1143,8 +1166,11 @@ class ModelControl(object):
                 result=adapter.invoke(provider['base_url'],secret,model_id,
                   json.loads(case['messages_json']),provider['timeout_seconds'],512)
                 ok=case['expected_contains'] in result['content']
-                passed+=int(ok);input_tokens+=result['usage']['input_tokens']
-                output_tokens+=result['usage']['output_tokens']
+                passed+=int(ok)
+                if result['usage']['input_tokens'] is not None:
+                    input_tokens+=result['usage']['input_tokens']
+                if result['usage']['output_tokens'] is not None:
+                    output_tokens+=result['usage']['output_tokens']
                 evidence.append({'case_id':case['case_id'],'passed':ok,
                   'provider_request_id':result['provider_request_id']})
             except ProviderError as exc:
@@ -1155,7 +1181,10 @@ class ModelControl(object):
             with self.db:
                 usage=(result or {}).get('usage') or {}
                 outcome=('SUCCEEDED' if result is not None else UNKNOWN)
-                if result is None or UNKNOWN in (provider['price_state'],model['price_state']):
+                usage_complete=(usage.get('input_tokens') is not None and
+                                usage.get('output_tokens') is not None)
+                if (result is None or not usage_complete or
+                        UNKNOWN in (provider['price_state'],model['price_state'])):
                     actual_state=UNKNOWN;actual_cost=None
                 elif 'KNOWN_PAID' in (provider['price_state'],model['price_state']):
                     actual_state='KNOWN';actual_cost=(usage.get('input_tokens',0)*
@@ -1189,7 +1218,10 @@ class ModelControl(object):
         _sha(artifact_sha256,'artifact_sha256')
         _sha(checklist_sha256,'checklist_sha256')
         task=self.gateway.supervisor._task(task_id)
-        if task['authority_state']!='VALID' or task['state'] not in ('STARTED','RUNNING'):
+        if (task['authority_state']!='VALID' or
+                task['authority_valid_until'] is None or
+                not now<task['authority_valid_until'] or
+                task['state'] not in ('STARTED','RUNNING')):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         in_flight=self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
           AND task_id=? AND attempt_id=? AND state IN ('RUNNING',?) LIMIT 1''',(
@@ -1308,7 +1340,10 @@ class ModelControl(object):
         if row is None:raise KeyError(candidate_id)
         task=self.gateway.supervisor._task(row['task_id'])
         if (task['attempt_id']!=row['attempt_id'] or
-                task['authority_state']!='VALID' or task['state'] not in ('STARTED','RUNNING')):
+                task['authority_state']!='VALID' or
+                task['authority_valid_until'] is None or
+                not now<task['authority_valid_until'] or
+                task['state'] not in ('STARTED','RUNNING')):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         if row['state'] not in ('SUBMITTED','QA_PASSED','SECURITY_PASSED'):
             raise ValueError('REVIEWABLE_CANDIDATE_REQUIRED')
@@ -1368,13 +1403,17 @@ class ModelControl(object):
                 'finding_count':len(findings)}
 
     def validate_accept_candidate(self, candidate_id, acceptor):
+        now=self.clock()
         row=self.db.execute('''SELECT rowid AS candidate_seq,* FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
         if row is None:raise KeyError(candidate_id)
         self._require_candidate_snapshot(row)
         task=self.gateway.supervisor._task(row['task_id'])
         current=((task['attempt_id']==row['attempt_id'] and
-                  task['authority_state']=='VALID' and task['state'] in ('STARTED','RUNNING')) or
+                  task['authority_state']=='VALID' and
+                  task['authority_valid_until'] is not None and
+                  now<task['authority_valid_until'] and
+                  task['state'] in ('STARTED','RUNNING')) or
                  (task['attempt_id']==row['attempt_id'] and
                   task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
         if not current:
@@ -1578,7 +1617,11 @@ class ModelScheduler(object):
                self.control.tenant_id,now))
             self.db.commit()
         except Exception:self.db.rollback();raise
-        candidates=list(self.db.execute('''SELECT r.*,b.provider_config_version,
+        candidates=list(self.db.execute('''WITH eligible AS (SELECT r.*,
+          ROW_NUMBER() OVER (PARTITION BY r.provider_id ORDER BY
+          r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
+          r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
+          r.next_attempt_at<=?) SELECT r.*,b.provider_config_version,
           b.connection_id,b.connection_config_version,b.expected_input_tokens,
           b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
           b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
@@ -1587,7 +1630,7 @@ class ModelScheduler(object):
           m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,
           a.principal_id AS instance_id,rt.phase AS role_phase,
           rt.writer_allowed AS role_writer_allowed
-          FROM model_requests r JOIN
+          FROM eligible r JOIN
           model_request_bindings b ON b.tenant_id=r.tenant_id AND
           b.request_id=r.request_id JOIN model_providers p ON
           r.tenant_id=p.tenant_id AND r.provider_id=p.provider_id JOIN
@@ -1596,9 +1639,8 @@ class ModelScheduler(object):
           model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id
           AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
           role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
-          AND rt.version=a.role_version WHERE
-          r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
-          r.next_attempt_at<=? ORDER BY r.created_at,r.request_id LIMIT 100''',
+          AND rt.version=a.role_version WHERE r.provider_rank=1
+          ORDER BY r.created_at,r.request_id LIMIT 100''',
           (self.control.tenant_id,now)))
         if not candidates:return {'state':'IDLE'}
         row=None;reservation=None;last_limit=None
@@ -1639,14 +1681,16 @@ class ModelScheduler(object):
                 if assignment is None:fatal='ASSIGNMENT_REVOKED'
                 else:
                     skills=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
-                      s.content_sha256,s.state FROM role_skill_bindings b JOIN
+                      s.content_sha256,s.content_json,s.state FROM role_skill_bindings b JOIN
                       approved_skills s ON s.tenant_id=b.tenant_id AND
                       s.skill_id=b.skill_id AND s.skill_version=b.skill_version
                       WHERE b.tenant_id=? AND b.role_id=? AND b.role_version=?
                       AND b.status='APPROVED' ORDER BY b.skill_id''',(
                       candidate['tenant_id'],candidate['role_id'],
                       assignment['role_version'])))
-                    current_skill=(hashlib.sha256(canonical([dict(x) for x in skills]).encode()).hexdigest()
+                    snapshot_skills=[{'skill_id':x['skill_id'],'skill_version':x['skill_version'],
+                      'content_sha256':x['content_sha256'],'state':x['state']} for x in skills]
+                    current_skill=(hashlib.sha256(canonical(snapshot_skills).encode()).hexdigest()
                                    if skills else None)
                     if current_skill!=candidate['skill_snapshot_sha256'] or any(
                             x['state']!='APPROVED' for x in skills):
@@ -1733,6 +1777,12 @@ class ModelScheduler(object):
                         'error':'CONNECTION_CONFIG_CHANGED'}
         else:secret=self.control.provider_secret(row['provider_id'])
         payload=json.loads(row['payload_json'])
+        if skills:
+            approved=[{'skill_id':x['skill_id'],'skill_version':x['skill_version'],
+              'content_sha256':x['content_sha256'],'content':json.loads(x['content_json'])}
+              for x in skills]
+            payload['messages']=[{'role':'system','content':canonical(
+              {'approved_skills':approved})}]+payload['messages']
         adapter=self.adapters[row['adapter_type']]
         try:
             result=adapter.invoke(row['base_url'],secret,row['model_id'],
@@ -1796,7 +1846,9 @@ class ModelScheduler(object):
     def _finish(self,row,state,error,result,now,reservation_id=None):
         usage=(result or {}).get('usage',{})
         prices=(row['provider_price'],row['model_price'])
-        if result is None or UNKNOWN in prices:
+        usage_complete=(usage.get('input_tokens') is not None and
+                        usage.get('output_tokens') is not None)
+        if result is None or not usage_complete or UNKNOWN in prices:
             cost_state=UNKNOWN;cost_value=None
         elif 'KNOWN_PAID' in prices:
             if row['input_unit_cost'] is None or row['output_unit_cost'] is None:
@@ -1828,11 +1880,11 @@ class ModelScheduler(object):
               usage.get('input_tokens') if result else None,
               usage.get('output_tokens') if result else None,cost_state,
               cost_value,state,now))
-            self.db.execute('''INSERT OR REPLACE INTO model_usage_events VALUES
-              (?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
-               row['provider_id'],row['model_id'],usage.get('input_tokens',0),
-               usage.get('output_tokens',0),cost_state,cost_value,
-               state,now))
+            if usage_complete:
+                self.db.execute('''INSERT OR REPLACE INTO model_usage_events VALUES
+                  (?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
+                   row['provider_id'],row['model_id'],usage['input_tokens'],
+                   usage['output_tokens'],cost_state,cost_value,state,now))
             self.db.execute('''UPDATE role_instances SET state=CASE WHEN
               desired_state='STOPPED' THEN 'STOPPED' ELSE 'IDLE' END,
               current_request_id=NULL,last_checkpoint_json=?,updated_at=? WHERE

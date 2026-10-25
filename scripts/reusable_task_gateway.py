@@ -498,6 +498,10 @@ class GatewayKernel(object):
         if task['attempt_id'] != attempt_id:
             raise ValueError('CHECKPOINT_ATTEMPT_MISMATCH')
         now = self.clock() if now is None else _finite(now, 'time')
+        if (task['authority_state'] != 'VALID' or
+                task['authority_valid_until'] is None or
+                not now < task['authority_valid_until']):
+            raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             self.db.execute('''INSERT INTO gateway_checkpoints VALUES

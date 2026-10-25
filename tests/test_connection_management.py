@@ -151,5 +151,40 @@ class ConnectionManagementTests(unittest.TestCase):
           self.authority.issue('tenant-b','admin:other'),self.master)
         self.assertEqual(other.projection(),[])
 
+    def test_revoke_invalidates_pending_and_inflight_exchange(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.revoke('oauth',now=1001)
+        with self.assertRaisesRegex(ValueError,'REPLAY'):
+            self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+              self.base,self.base+'/callback',now=1002)
+        self.manager.upsert(self.oauth_config(),now=1010)
+        flow=self.manager.begin_oauth('oauth',now=1011)
+        manager=self.manager
+        class RevokeDuringExchange(object):
+            def exchange(self,*_args):
+                manager.revoke('oauth',now=1012)
+                return {'access_token':'late-access','refresh_token':'late-refresh',
+                  'token_type':'Bearer','expires_in':60,
+                  'scope':'models.run tools.read'}
+        with self.assertRaisesRegex(ValueError,'REVOKED_OR_CONFIG_CHANGED'):
+            self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+              self.base,self.base+'/callback',adapter=RevokeDuringExchange(),now=1012)
+        row=self.supervisor.db.execute('''SELECT status,secret_cipher,
+          refresh_cipher FROM service_connections WHERE connection_id='oauth' ''').fetchone()
+        self.assertEqual(tuple(row),('REVOKED',None,None))
+
+    def test_refresh_unknown_failure_requires_new_authorization(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        class Broken(object):
+            def __init__(self):self.calls=0
+            def exchange(self,*_args):self.calls+=1;raise RuntimeError('lost')
+        broken=Broken()
+        with self.assertRaises(RuntimeError):self.manager.refresh('oauth',broken,now=1002)
+        with self.assertRaisesRegex(ValueError,'REAUTH_REQUIRED'):
+            self.manager.refresh('oauth',broken,now=1003)
+        self.assertEqual(broken.calls,1)
+
 
 if __name__=='__main__':unittest.main()

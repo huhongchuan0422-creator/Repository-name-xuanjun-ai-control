@@ -1,11 +1,14 @@
 from __future__ import print_function
 
 import json
+import hashlib
 import os
 import shutil
 import tempfile
 import time
 import unittest
+import sys
+import threading
 from cryptography.fernet import Fernet
 
 ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
@@ -15,9 +18,11 @@ from codex_execution_adapter import (CodexExecutionControl,CodexSDKTransport,
 from execution_policy_gateway import ExecutionPolicyGateway
 from reusable_scheduler_cli import demo_graph
 from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
-from task_supervisor import Supervisor
+from task_supervisor import Supervisor,canonical
 from task_writer_fence import Fence
 from model_orchestration import ModelControl
+from connection_management import ConnectionManager
+from task_center_app import CodexWorkerLoop
 
 KEY=b'0123456789abcdef0123456789abcdef'
 
@@ -32,23 +37,41 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.fence=Fence(self.supervisor,os.path.join(self.root,'locks'))
         TestOnlyExecutor(self.gateway,self.fence,self.context).start(
           'demo-b','attempt-b',['fake:demo-b'],time.time()+600)
-        ModelControl(self.gateway,self.context,Fernet.generate_key()).record_task_spec(
+        self.master=Fernet.generate_key()
+        models=ModelControl(self.gateway,self.context,self.master)
+        models.record_task_spec(
           'demo-b','bounded fixture execution',['artifact'],['tests'])
+        models.upsert_provider({'provider_id':'codex-fixture','display_name':'Codex fixture',
+          'adapter_type':'openai-compatible','base_url':'http://127.0.0.1:9',
+          'enabled':True,'price_state':'KNOWN_FREE','rate_limit_per_min':10,
+          'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0},'fixture-secret')
+        models.set_quota_status('codex-fixture','AVAILABLE',
+          'TEST_ONLY_INCLUDED_FIXTURE',verified_at=time.time(),unavailable_reason=None)
+        connections=ConnectionManager(self.gateway,self.context,self.master)
+        connections.upsert({'connection_id':'codex-connection',
+          'provider_id':'codex-fixture','purpose':'CODEX_EXECUTION','auth_type':'API_KEY',
+          'destination_origin':'http://127.0.0.1:9','issuer':None,
+          'authorization_endpoint':None,'token_endpoint':None,
+          'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+          'scopes':[],'supports_refresh':False},credential='fixture-credential')
         policy=ExecutionPolicyGateway(self.gateway,self.context)
         policy.record_unit({'task_id':'demo-b','delivery_stage':'implementation',
           'feature_unit':'codex-adapter','goal':'bounded fixture execution',
           'scope':['WRITE_SOURCE'],'acceptance':['tests'],
           'dependencies':['NONE'],'asset_version':'asset-v1',
           'responsible_party':'test-executor'})
-        policy.record_asset_query('demo-b','query-1','REGISTRY','registry-v1',
-          {'asset':'asset-v1'},'e'*64)
+        observed={'matches':[]};policy.record_asset_query('demo-b','query-1',
+          'REGISTRY','registry-v1',{'lookup':{'asset':'asset-v1'},
+          'observed_result':observed,'evidence_ref':'registry://query-1'},
+          hashlib.sha256(canonical(observed).encode()).hexdigest())
         policy.record_dispatch_preflight('demo-b','asset-v1',['query-1'],
           'NOT_FOUND','verified TEST_ONLY gap')
         self.worker_context=self.authority.issue('tenant-a','test-executor')
         self.control=CodexExecutionControl(self.gateway,self.worker_context)
         self.context_body={'goal':'bounded fixture execution',
           'scope':['WRITE_SOURCE'],'acceptance':['tests'],
-          'asset_version':'asset-v1','reuse_evidence':['query-1']}
+          'asset_version':'asset-v1','reuse_evidence':['query-1'],
+          'connection_id':'codex-connection','provider_id':'codex-fixture'}
 
     def tearDown(self):
         self.fence.close();self.supervisor.close();shutil.rmtree(self.root)
@@ -68,8 +91,8 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.supervisor.db.execute('''UPDATE codex_execution_intents SET
           state='SENDING' WHERE intent_id=?''',(second['intent_id'],))
         self.supervisor.db.commit()
-        self.assertEqual(self.control.reconcile_restart()['unknown_intents'],1)
-        self.assertEqual(self.control.projection()[1]['state'],'UNKNOWN')
+        self.assertEqual(self.control.reconcile_restart()['unknown_intents'],2)
+        self.assertTrue(all(x['state']=='UNKNOWN' for x in self.control.projection()))
 
     def test_timeout_cancel_and_late_old_attempt_never_advance(self):
         unknown=self.control.create_intent('demo-b','CODEX_SDK','unknown',
@@ -191,6 +214,74 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.assertTrue(first['accepted']);self.assertTrue(replay['duplicate'])
         with self.assertRaisesRegex(ValueError,'EVENT_ID_CONFLICT'):
             self.control.record_result(intent['intent_id'],'event-1','FAILED',{})
+
+    def test_quota_rechecked_before_send_and_unknown_is_zero_call(self):
+        intent=self.control.create_intent('demo-b','CODEX_SDK','quota-change',
+          self.context_body);called=[]
+        ModelControl(self.gateway,self.context,self.master).set_quota_status(
+          'codex-fixture','UNKNOWN','UNKNOWN',verified_at=None,
+          unavailable_reason='not verified')
+        result=self.control.dispatch_once({'CODEX_SDK':CodexSDKTransport(
+          lambda value:called.append(value))})
+        self.assertEqual(result['state'],'FAILED');self.assertEqual(called,[])
+        self.assertEqual(self.control.projection()[0]['error_kind'],
+          'CODEX_CONNECTION_OR_QUOTA_HOLD')
+
+    def test_cancel_during_send_keeps_late_ids_and_converges_cancelled(self):
+        intent=self.control.create_intent('demo-b','CODEX_SDK','cancel-race',
+          self.context_body)
+        def sending(_value):
+            self.control.cancel(intent['intent_id'])
+            return {'state':'ACKED','execution_id':'exec-late','session_id':'sess-late',
+              'thread_id':'thread-late','turn_id':'turn-late'}
+        result=self.control.dispatch_once({'CODEX_SDK':CodexSDKTransport(sending)})
+        self.assertEqual(result['state'],'CANCEL_REQUESTED')
+        row=self.control.projection()[0];self.assertEqual(row['turn_id'],'turn-late')
+        transport=CodexSDKTransport();transport.cancel=lambda _row:{
+          'state':'CANCELLED','execution_id':'exec-late','session_id':'sess-late',
+          'thread_id':'thread-late','turn_id':'turn-late'}
+        settled=self.control.dispatch_cancel_once({'CODEX_SDK':transport})
+        self.assertTrue(settled['accepted']);self.assertEqual(
+          self.control.projection()[0]['state'],'CANCELLED')
+
+    def test_concrete_app_server_stdio_protocol(self):
+        intent=self.control.create_intent('demo-b','CODEX_APP_SERVER','stdio-app',
+          self.context_body)
+        fixture=("import sys,json\n"
+          "for line in sys.stdin:\n"
+          " v=json.loads(line)\n"
+          " if 'id' not in v: continue\n"
+          " m=v.get('method');r={}\n"
+          " if m=='thread/start': r={'threadId':'fixture-thread'}\n"
+          " elif m=='turn/start': r={'turnId':'fixture-turn'}\n"
+          " elif m=='turn/interrupt': r={'cancelled':True}\n"
+          " print(json.dumps({'jsonrpc':'2.0','id':v['id'],'result':r}),flush=True)\n")
+        transport=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
+        result=self.control.dispatch_once({'CODEX_APP_SERVER':transport})
+        self.assertEqual(result['state'],'RUNNING')
+        row=self.control.projection()[0]
+        self.assertEqual((row['thread_id'],row['turn_id']),
+          ('fixture-thread','fixture-turn'))
+        proc=transport.processes['fixture-thread'];proc.terminate();proc.wait()
+        proc.stdin.close();proc.stdout.close();proc.stderr.close()
+        self.assertEqual(self.control.reconcile_restart()['unknown_intents'],1)
+        resumed=CodexAppServerTransport(command=[sys.executable,'-u','-c',fixture])
+        receipt=self.control.reconcile_transport_once({'CODEX_APP_SERVER':resumed})
+        self.assertTrue(receipt['accepted']);self.assertEqual(
+          self.control.projection()[0]['state'],'ACKED')
+        proc=resumed.processes['fixture-thread'];proc.terminate();proc.wait()
+        proc.stdin.close();proc.stdout.close();proc.stderr.close()
+
+    def test_service_worker_dispatches_persisted_intent_without_client(self):
+        intent=self.control.create_intent('demo-b','CODEX_SDK','worker-loop',
+          self.context_body);called=threading.Event()
+        transport=CodexSDKTransport(lambda _intent:(called.set() or {
+          'state':'ACKED','execution_id':'worker-exec','session_id':'worker-session'}))
+        worker=CodexWorkerLoop(self.db,KEY,'tenant-a',{'CODEX_SDK':transport},.05)
+        worker.start();self.assertTrue(called.wait(2));worker.stop()
+        row=self.supervisor.db.execute('''SELECT state,execution_id FROM
+          codex_execution_intents WHERE intent_id=?''',(intent['intent_id'],)).fetchone()
+        self.assertEqual(tuple(row),('ACKED','worker-exec'))
 
 
 if __name__=='__main__':unittest.main()

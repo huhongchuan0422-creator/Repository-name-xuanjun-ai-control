@@ -13,6 +13,7 @@ import signal
 import sqlite3
 import stat
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -23,7 +24,8 @@ from task_supervisor import Supervisor
 from task_writer_fence import Fence
 from execution_policy_gateway import ExecutionPolicyGateway
 from connection_management import ConnectionManager
-from codex_execution_adapter import CodexExecutionControl
+from codex_execution_adapter import (CodexExecutionControl,
+                                     CodexAppServerTransport)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -145,9 +147,37 @@ def _json_bytes(value):
                       separators=(',', ':')).encode('utf-8')
 
 
+class CodexWorkerLoop(object):
+    """Optional TEST_ONLY durable dispatcher using the canonical SQLite DB."""
+    def __init__(self,db_path,authority_key,tenant_id,transports,interval=1.0):
+        self.db_path=db_path;self.authority_key=authority_key;self.tenant_id=tenant_id
+        self.transports=transports;self.interval=interval;self.stop_event=threading.Event()
+        self.thread=threading.Thread(target=self._run,name='codex-test-only-worker')
+        self.thread.daemon=True
+    def start(self):self.thread.start()
+    def stop(self):self.stop_event.set();self.thread.join(5)
+    def _run(self):
+        supervisor=Supervisor(self.db_path)
+        try:
+            authority=TestTenantAuthority(self.authority_key)
+            control=CodexExecutionControl(GatewayKernel(supervisor,authority),
+              authority.issue(self.tenant_id,'admin:codex-worker'))
+            control.reconcile_restart()
+            while not self.stop_event.is_set():
+                reconciled=control.reconcile_transport_once(self.transports)
+                sent=control.dispatch_once(self.transports)
+                cancelled=control.dispatch_cancel_once(self.transports)
+                if (reconciled.get('state') in ('IDLE','UNKNOWN') and sent.get('state')=='IDLE'
+                        and cancelled.get('state')=='IDLE'):
+                    self.stop_event.wait(self.interval)
+        finally:supervisor.close()
+
+
 def build_handler(db_path, authority_key, tenant_id, principal_id,
-                  model_master_key=None, admin_token=None, actor_tokens=None):
+                  model_master_key=None, admin_token=None, actor_tokens=None,
+                  codex_transports=None):
     actor_tokens = dict(actor_tokens or {})
+    codex_transports = dict(codex_transports or {})
     class TaskCenterHandler(BaseHTTPRequestHandler):
         server_version = 'XuanjunTaskCenter/1.0-TEST_ONLY'
 
@@ -216,7 +246,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 supervisor, control=self._model_control()
                 try:
                     role_actions={'START_TEST_ONLY_TASK','CREATE_CODEX_INTENT',
-                                  'CANCEL_CODEX_INTENT','SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
+                                  'CANCEL_CODEX_INTENT','RUN_CODEX_ADAPTER_ONCE',
+                                  'RUN_CODEX_CANCEL_ONCE','SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
                                   'ACCEPT_CANDIDATE','REVIEW_SCOPE_CHANGE',
                                   'REPORT_TEST_ONLY_PROGRESS',
                                   'SAVE_TEST_ONLY_CHECKPOINT'}
@@ -385,6 +416,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='RECONCILE_CODEX_RESTART':
                         result=CodexExecutionControl(control.gateway,
                           control.context).reconcile_restart()
+                    elif action=='RUN_CODEX_ADAPTER_ONCE':
+                        result=CodexExecutionControl(control.gateway,
+                          control.context).dispatch_once(codex_transports)
+                    elif action=='RUN_CODEX_CANCEL_ONCE':
+                        result=CodexExecutionControl(control.gateway,
+                          control.context).dispatch_cancel_once(codex_transports)
                     elif action=='SUBMIT_CANDIDATE':
                         if value['submitted_by']!=actor:
                             raise ValueError('AUTHENTICATED_EXECUTOR_REQUIRED')
@@ -503,7 +540,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
 def make_server(db_path, authority_key, tenant_id, principal_id,
                 host='127.0.0.1', port=8765, model_master_key=None,
-                admin_token=None, actor_tokens=None):
+                admin_token=None, actor_tokens=None,codex_transports=None):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
@@ -524,8 +561,13 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         finally:supervisor.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
-                            admin_token, actor_tokens)
-    return HTTPServer((host, port), handler)
+                            admin_token, actor_tokens,codex_transports)
+    server=HTTPServer((host, port), handler)
+    server.codex_worker=None
+    if codex_transports:
+        server.codex_worker=CodexWorkerLoop(os.path.realpath(db_path),
+          authority_key,tenant_id,codex_transports);server.codex_worker.start()
+    return server
 
 
 def main(argv=None):
@@ -539,6 +581,7 @@ def main(argv=None):
     parser.add_argument('--model-master-key-file')
     parser.add_argument('--admin-token-file')
     parser.add_argument('--actor-token-file')
+    parser.add_argument('--codex-app-server-command-json')
     args = parser.parse_args(argv)
     key = args.test_authority_key.encode('utf-8')
     model_key = (load_master_key(args.model_master_key_file)
@@ -559,9 +602,13 @@ def main(argv=None):
                     or len(t)<16 for p,t in configured.items())):
             raise ValueError('VALID_ACTOR_TOKEN_MAP_REQUIRED')
         actor_tokens={token:principal for principal,token in configured.items()}
+    codex_transports={}
+    if args.codex_app_server_command_json:
+        command=json.loads(args.codex_app_server_command_json)
+        codex_transports['CODEX_APP_SERVER']=CodexAppServerTransport(command=command)
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
-                         actor_tokens)
+                         actor_tokens,codex_transports)
     receipt = {'state': 'STARTED', 'mode': 'TEST_ONLY',
                'url': 'http://%s:%d/' % server.server_address,
                'db': os.path.realpath(args.db), 'tenant_id': args.tenant,
@@ -581,6 +628,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     finally:
+        if getattr(server,'codex_worker',None):server.codex_worker.stop()
         server.server_close()
         signal.signal(signal.SIGTERM, previous_term)
         print(json.dumps({'state': 'STOPPED', 'mode': 'TEST_ONLY'},

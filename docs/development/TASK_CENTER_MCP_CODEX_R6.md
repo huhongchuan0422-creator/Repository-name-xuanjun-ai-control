@@ -4,8 +4,9 @@
 
 - `scripts/task_center_mcp.py` 是自建、stdio MCP 外壳；它只调用现有任务中心 HTTP 业务入口，不建立第二任务库，也不开放 Shell、SQL 或任意文件读取。
 - `scripts/codex_execution_adapter.py` 在同一 SQLite 中持久化发送意图、执行标识和事件；任务、attempt、Writer/fence/epoch 仍由原 Gateway/Supervisor 判定。
-- Codex SDK 与 App Server 共用上述执行意图和状态机。SDK 用于自动化执行边界；App Server 仅作为需要会话、审批和流式事件时的传输边界。
-- 本包没有安装 Codex SDK、没有启动 App Server、没有创建真实 OAuth grant、没有调用真实模型或部署服务。对应状态均为 `NOT_EXECUTED` / `UNVERIFIED`。
+- Codex SDK 与 App Server 共用上述执行意图和状态机。当前已实现具体的 App Server stdio JSON-RPC 传输：`initialize/initialized → thread/start 或 thread/resume → turn/start`，以及 `turn/interrupt` 取消；本地受控假进程已验证协议、重启附着和取消。SDK 仍只有明确的适配边界，具体 SDK transport 为 `NOT_IMPLEMENTED`。
+- `task_center_app.py` 可在显式提供固定 `--codex-app-server-command-json` 时启动 TEST_ONLY 后台循环；它从同一 SQLite 领取持久意图、恢复待对账执行并消费取消请求，网页关闭不影响该循环。命令来自服务启动配置，不来自任务或模型输出。
+- 本包没有安装 Codex SDK、没有连接真实 App Server 账户、没有创建真实 OAuth grant、没有调用真实模型或部署服务。真实账户及 Hosted 能力均为 `NOT_EXECUTED` / `UNVERIFIED`。
 - MCP 自建不代表模型调用无限免费。任何模型调用都必须通过 `model_quota_status`：资格、余量或费用为 `UNKNOWN` 时发送前 `HOLD`；`EXHAUSTED` 时停止；不自动切换付费 API、不充值。
 
 ## 连接类型
@@ -32,17 +33,26 @@
 取消、发送结果不明和迟到结果分别处理：
 
 - 发送前取消不发送；发送中取消进入 `CANCEL_REQUESTED`。
-- 超时、断线或重启发现 `SENDING` 均进入 `UNKNOWN`，不得自动再启动一份。
+- 超时、断线或重启发现 `SENDING/ACKED/RUNNING/WAITING_APPROVAL` 均进入 `UNKNOWN` 待对账，不得自动再启动一份；具有持久 `thread_id` 的 App Server 执行只做 `thread/resume` 附着，不创建新 turn。
+- 发送中收到取消时，迟到 ACK 仍保存 execution/session/thread/turn 标识；随后调用真实 transport cancel，只有取消回执才收敛为 `CANCELLED`。
 - 旧 attempt/fence 的迟到结果只写历史事件，`accepted=0`，不推进当前任务。
 - turn 完成、聊天结束或进程退出不是业务验收；成果仍需绑定 SHA、清单和独立审核。
 
 ## 本地启动顺序
 
 1. 按任务中心 README 生成本地 TEST_ONLY SQLite、Fernet key、管理员 token 和 actor token 文件。
-2. 启动 `scripts/task_center_app.py` 的 loopback HTTP 服务。
+2. 启动 `scripts/task_center_app.py` 的 loopback HTTP 服务。仅在已核准且本机已有 App Server 可执行文件时，额外传入例如 `--codex-app-server-command-json '["codex","app-server"]'`；本包没有替用户安装或启动真实账户连接。
 3. 将示例中的绝对路径、端口和绑定主体替换为本机值，再由支持 stdio MCP 的获准客户端加载。
 
 不应把 token 写入 JSON 示例、源码、日志或前端存储。Hosted/ChatGPT 插件安装、真实账户授权、真实 Codex SDK/App Server 连接和生产部署均需另行验收。
+
+## R6 集中收口门禁
+
+- Codex intent 必须绑定 `CODEX_EXECUTION` connection、其配置版本、provider 和一小时内核验为 `AVAILABLE` 的既有套餐/免费额度。入队后在发送前再次核验；`UNKNOWN/EXHAUSTED` 零调用且无付费 fallback。
+- OAuth revoke 原子失效 pending/exchanging flow 并递增连接版本；迟到兑换结果不能恢复 `ACTIVE`。刷新结果不明或解析失败会清除旧 refresh token 并要求重新授权，避免重放可能已旋转的 token。
+- 缺失或部分 usage 写入逐次记录为未知，不生成伪 0 token 汇总，预留费用维持 `UNKNOWN` 待对账。
+- Skill 的已审内容、版本和摘要由服务端装入真实出站 messages；撤销或错版在发送前归 HOLD。
+- 验收清单由任务冻结的 acceptance 集合决定；缺项、空证据、自降 `required`、FAIL/NOT_EXECUTED 或版本不符均拒绝。
 
 ## 官方协议依据
 

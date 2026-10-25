@@ -97,8 +97,15 @@ class ExecutionPolicyGateway(object):
         self.gateway.assert_task_context(self.context,task_id)
         if source_kind not in ('REGISTRY','GIT','ARTIFACT_STORE','CANONICAL_DB'):
             raise ValueError('TRUSTED_ASSET_QUERY_SOURCE_REQUIRED')
-        if not isinstance(query,dict) or not query:raise ValueError('ASSET_QUERY_REQUIRED')
-        if len(result_digest)!=64:raise ValueError('RESULT_DIGEST_REQUIRED')
+        _text(source_version,'source_version')
+        if (not isinstance(query,dict) or set(query)!=
+                {'lookup','observed_result','evidence_ref'} or
+                not isinstance(query['lookup'],dict) or not query['lookup'] or
+                not isinstance(query['evidence_ref'],str) or
+                query['evidence_ref'] in ('',UNKNOWN)):
+            raise ValueError('VERIFIABLE_ASSET_QUERY_RECEIPT_REQUIRED')
+        computed=hashlib.sha256(canonical(query['observed_result']).encode()).hexdigest()
+        if result_digest!=computed:raise ValueError('RESULT_DIGEST_MISMATCH')
         now=self.clock() if now is None else now
         self.db.execute('''INSERT INTO asset_query_receipts VALUES
           (?,?,?,?,?,?,?,?)''',(self.tenant_id,query_id,task_id,source_kind,

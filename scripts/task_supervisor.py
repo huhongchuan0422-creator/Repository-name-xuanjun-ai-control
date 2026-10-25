@@ -1002,6 +1002,14 @@ class Supervisor(object):
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             task = self._task(task_id)
+            accepted_at = self.clock()
+            if (kind in ('STARTED','PROGRESS','HEARTBEAT','TERMINAL','HANDOFF_REQUESTED',
+                         'HANDOFF_ACKNOWLEDGED') and
+                    task['authority_state'] != 'NONE' and
+                    (task['authority_state'] != 'VALID' or
+                     task['authority_valid_until'] is None or
+                     not accepted_at < task['authority_valid_until'])):
+                raise ValueError('CURRENT_WRITER_AUTHORITY_REQUIRED')
             if (task['authority_state'] == 'REVOKING'
                     and kind in ('STARTED','PROGRESS','TERMINAL',
                                  'HANDOFF_REQUESTED','HANDOFF_ACKNOWLEDGED')):
@@ -1031,7 +1039,6 @@ class Supervisor(object):
                 return {'duplicate': True, 'state': task['state']}
             if task['attempt_id'] != attempt_id:
                 raise ValueError('ATTEMPT_BINDING_MISMATCH')
-            accepted_at = self.clock()
             if (not finite(accepted_at) or observed_at < task['last_event_at']
                     or observed_at > accepted_at + 300):
                 raise ValueError('EVENT_TIME_RECONCILIATION_REQUIRED')

@@ -8,6 +8,8 @@ from __future__ import print_function
 
 import hashlib
 import json
+import select
+import subprocess
 import time
 
 from task_supervisor import UNKNOWN,canonical
@@ -37,14 +39,86 @@ class CodexSDKTransport(object):
 
 
 class CodexAppServerTransport(object):
-    """Adapter boundary for initialized Codex app-server JSON-RPC."""
+    """Concrete stdio JSON-RPC adapter for a fixed app-server command."""
     kind='CODEX_APP_SERVER'
-    def __init__(self,exchange=None):self.exchange=exchange
+    def __init__(self,exchange=None,command=None,timeout=5):
+        self.exchange=exchange;self.command=command;self.timeout=timeout
+        self.processes={}
+    def _rpc(self,proc,request):
+        proc.stdin.write((canonical(request)+'\n').encode('utf-8'));proc.stdin.flush()
+        ready,_,_=select.select([proc.stdout],[],[],self.timeout)
+        if not ready:raise CodexSendUnknown('APP_SERVER_TIMEOUT')
+        line=proc.stdout.readline()
+        if not line:raise CodexSendUnknown('APP_SERVER_EOF')
+        value=json.loads(line.decode('utf-8'))
+        if value.get('id')!=request.get('id') or 'error' in value:
+            raise CodexSendUnknown('APP_SERVER_RPC_ERROR')
+        return value.get('result') or {}
     def send(self,intent):
-        if self.exchange is None:
+        if self.exchange is not None:return self.exchange(intent)
+        if not self.command:
             raise CodexTransportUnavailable('CODEX_APP_SERVER_NOT_CONFIGURED')
-        # initialize/initialized, thread/start or resume, then turn/start.
-        return self.exchange(intent)
+        if (not isinstance(self.command,(list,tuple)) or not self.command or
+                any(not isinstance(x,str) or not x for x in self.command)):
+            raise CodexTransportUnavailable('FIXED_APP_SERVER_COMMAND_REQUIRED')
+        proc=subprocess.Popen(list(self.command),stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=0)
+        try:
+            self._rpc(proc,{'jsonrpc':'2.0','id':1,'method':'initialize',
+              'params':{'clientInfo':{'name':'xuanjun-task-center','version':'r6'}}})
+            proc.stdin.write((canonical({'jsonrpc':'2.0','method':'initialized',
+              'params':{}})+'\n').encode('utf-8'));proc.stdin.flush()
+            context=json.loads(intent['context_json'])
+            if intent.get('thread_id'):
+                self._rpc(proc,{'jsonrpc':'2.0','id':2,'method':'thread/resume',
+                  'params':{'threadId':intent['thread_id']}})
+                thread_id=intent['thread_id']
+            else:
+                thread=self._rpc(proc,{'jsonrpc':'2.0','id':2,
+                  'method':'thread/start','params':{'metadata':{'task_id':
+                  intent['task_id'],'attempt_id':intent['attempt_id']}}})
+                thread_id=thread.get('threadId') or thread.get('id')
+            if not thread_id:raise CodexSendUnknown('APP_SERVER_THREAD_ID_REQUIRED')
+            turn=self._rpc(proc,{'jsonrpc':'2.0','id':3,'method':'turn/start',
+              'params':{'threadId':thread_id,'input':[{'type':'text','text':
+              canonical(context)}]}})
+            turn_id=turn.get('turnId') or turn.get('id')
+            if not turn_id:raise CodexSendUnknown('APP_SERVER_TURN_ID_REQUIRED')
+            self.processes[thread_id]=proc
+            return {'state':'RUNNING','execution_id':turn_id,
+              'session_id':thread_id,'thread_id':thread_id,'turn_id':turn_id}
+        except Exception:
+            if proc.poll() is None:proc.terminate()
+            raise
+    def cancel(self,intent):
+        proc=self.processes.get(intent.get('thread_id'))
+        if proc is None or proc.poll() is not None:
+            raise CodexSendUnknown('CANCEL_TRANSPORT_STATE_UNKNOWN')
+        self._rpc(proc,{'jsonrpc':'2.0','id':4,'method':'turn/interrupt',
+          'params':{'threadId':intent['thread_id'],'turnId':intent['turn_id']}})
+        return {'state':'CANCELLED','thread_id':intent['thread_id'],
+          'turn_id':intent['turn_id']}
+    def reconcile(self,intent):
+        if self.exchange is not None:
+            return self.exchange(dict(intent,reconcile_only=True))
+        if not self.command or not intent.get('thread_id'):
+            raise CodexTransportUnavailable('APP_SERVER_RECONCILE_NOT_CONFIGURED')
+        proc=subprocess.Popen(list(self.command),stdin=subprocess.PIPE,
+          stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=0)
+        try:
+            self._rpc(proc,{'jsonrpc':'2.0','id':1,'method':'initialize',
+              'params':{'clientInfo':{'name':'xuanjun-task-center','version':'r6'}}})
+            proc.stdin.write((canonical({'jsonrpc':'2.0','method':'initialized',
+              'params':{}})+'\n').encode('utf-8'));proc.stdin.flush()
+            self._rpc(proc,{'jsonrpc':'2.0','id':2,'method':'thread/resume',
+              'params':{'threadId':intent['thread_id']}})
+            self.processes[intent['thread_id']]=proc
+            return {'state':'ACKED','execution_id':intent.get('execution_id'),
+              'session_id':intent.get('session_id'),'thread_id':intent['thread_id'],
+              'turn_id':intent.get('turn_id')}
+        except Exception:
+            if proc.poll() is None:proc.terminate()
+            raise
 
 
 class CodexExecutionControl(object):
@@ -79,6 +153,11 @@ class CodexExecutionControl(object):
             if 'requesting_principal' not in columns:
                 self.db.execute('''ALTER TABLE codex_execution_intents ADD COLUMN
                   requesting_principal TEXT''')
+            for name,kind in (('connection_id','TEXT'),
+                              ('connection_config_version','INTEGER'),
+                              ('provider_id','TEXT'),('quota_verified_at','REAL')):
+                if name not in columns:self.db.execute(
+                  'ALTER TABLE codex_execution_intents ADD COLUMN %s %s'%(name,kind))
 
     def _actor_allowed(self,task_id,attempt_id,principal,writer_principal):
         unit=self.db.execute('''SELECT responsible_party FROM execution_units
@@ -102,7 +181,8 @@ class CodexExecutionControl(object):
         if transport_kind not in ('CODEX_SDK','CODEX_APP_SERVER'):
             raise ValueError('CODEX_TRANSPORT_REQUIRED')
         if not isinstance(context,dict) or set(context)!={'goal','scope',
-              'acceptance','asset_version','reuse_evidence'}:
+              'acceptance','asset_version','reuse_evidence','connection_id',
+              'provider_id'}:
             raise ValueError('EXACT_CODEX_CONTEXT_REQUIRED')
         ready=ExecutionPolicyGateway(self.gateway,
           self.context).require_dispatch_ready(task_id)
@@ -141,6 +221,18 @@ class CodexExecutionControl(object):
               expected_reuse)).fetchone()[0]
             if found!=len(set(expected_reuse)):
                 raise ValueError('CODEX_REUSE_EVIDENCE_REQUIRED')
+        connection=self.db.execute('''SELECT provider_id,purpose,status,
+          config_version FROM service_connections WHERE tenant_id=? AND
+          connection_id=?''',(self.tenant_id,context['connection_id'])).fetchone()
+        quota=self.db.execute('''SELECT quota_state,verified_at FROM
+          model_quota_status WHERE tenant_id=? AND provider_id=?''',(
+          self.tenant_id,context['provider_id'])).fetchone()
+        if (connection is None or connection['provider_id']!=context['provider_id'] or
+                connection['purpose']!='CODEX_EXECUTION' or connection['status']!='ACTIVE'):
+            raise ValueError('ACTIVE_CODEX_CONNECTION_REQUIRED')
+        if (quota is None or quota['quota_state']!='AVAILABLE' or
+                quota['verified_at'] is None or now-quota['verified_at']>3600):
+            raise ValueError('CODEX_QUOTA_UNKNOWN_OR_UNAVAILABLE')
         seed=canonical({'tenant':self.tenant_id,'task':task_id,
           'attempt':task['attempt_id'],'idempotency':idempotency_key})
         intent_id=hashlib.sha256(seed.encode()).hexdigest()
@@ -156,12 +248,14 @@ class CodexExecutionControl(object):
           requesting_principal,writer_principal,writer_fence,writer_epoch,
           writer_valid_until,state,context_json,execution_id,session_id,thread_id,
           turn_id,artifact_sha256,error_kind,cancel_requested,lease_owner,
-          lease_until,created_at,updated_at) VALUES
-          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+          lease_until,created_at,updated_at,connection_id,
+          connection_config_version,provider_id,quota_verified_at) VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
           self.tenant_id,intent_id,idempotency_key,task_id,task['attempt_id'],
           transport_kind,principal,task['authority_caller_id'],task['fence'],task['epoch'],
           task['authority_valid_until'],'PENDING',canonical(context),None,None,
-          None,None,None,None,0,None,None,now,now));self.db.commit()
+          None,None,None,None,0,None,None,now,now,context['connection_id'],
+          connection['config_version'],context['provider_id'],quota['verified_at']));self.db.commit()
         return {'intent_id':intent_id,'state':'PENDING','duplicate':False}
 
     def cancel(self,intent_id,now=None):
@@ -189,10 +283,31 @@ class CodexExecutionControl(object):
     def reconcile_restart(self,now=None):
         now=self.clock() if now is None else now
         changed=self.db.execute('''UPDATE codex_execution_intents SET state=?,
-          error_kind='SEND_RESULT_UNKNOWN_AFTER_RESTART',lease_owner=NULL,
-          lease_until=NULL,updated_at=? WHERE tenant_id=? AND state='SENDING' ''',(
+          error_kind='EXECUTION_RECONCILIATION_REQUIRED_AFTER_RESTART',lease_owner=NULL,
+          lease_until=NULL,updated_at=? WHERE tenant_id=? AND state IN
+          ('SENDING','ACKED','RUNNING','WAITING_APPROVAL') ''',(
           UNKNOWN,now,self.tenant_id)).rowcount;self.db.commit()
         return {'unknown_intents':changed}
+
+    def reconcile_transport_once(self,transports,now=None):
+        now=self.clock() if now is None else now
+        row=self.db.execute('''SELECT * FROM codex_execution_intents WHERE
+          tenant_id=? AND state=? AND thread_id IS NOT NULL AND
+          cancel_requested=0 ORDER BY updated_at,intent_id LIMIT 1''',(
+          self.tenant_id,UNKNOWN)).fetchone()
+        if row is None:return {'state':'IDLE'}
+        transport=transports.get(row['transport_kind'])
+        if transport is None or not hasattr(transport,'reconcile'):
+            return {'intent_id':row['intent_id'],'state':UNKNOWN,
+                    'error':'TRANSPORT_RECONCILIATION_UNSUPPORTED'}
+        try:receipt=transport.reconcile(dict(row))
+        except Exception as exc:return {'intent_id':row['intent_id'],'state':UNKNOWN,
+          'error':'RECONCILIATION_UNKNOWN:'+type(exc).__name__}
+        if not isinstance(receipt,dict) or receipt.get('state') not in (
+                'ACKED','RUNNING','WAITING_APPROVAL','SUCCEEDED','FAILED'):
+            raise ValueError('VALID_CODEX_RECONCILIATION_RECEIPT_REQUIRED')
+        return self.record_result(row['intent_id'],'reconciled-'+row['intent_id'],
+          receipt['state'],receipt,now)
 
     def dispatch_once(self,transports,worker_id='codex-adapter',now=None):
         now=self.clock() if now is None else now
@@ -222,6 +337,22 @@ class CodexExecutionControl(object):
                   row['intent_id']))
                 self.db.commit();return {'intent_id':row['intent_id'],
                   'state':'FAILED'}
+            connection=self.db.execute('''SELECT status,config_version,provider_id,
+              purpose FROM service_connections WHERE tenant_id=? AND connection_id=?''',(
+              self.tenant_id,row['connection_id'])).fetchone()
+            quota=self.db.execute('''SELECT quota_state,verified_at FROM
+              model_quota_status WHERE tenant_id=? AND provider_id=?''',(
+              self.tenant_id,row['provider_id'])).fetchone()
+            if (connection is None or connection['status']!='ACTIVE' or
+                    connection['purpose']!='CODEX_EXECUTION' or
+                    connection['provider_id']!=row['provider_id'] or
+                    connection['config_version']!=row['connection_config_version'] or
+                    quota is None or quota['quota_state']!='AVAILABLE' or
+                    quota['verified_at'] is None or now-quota['verified_at']>3600):
+                self.db.execute('''UPDATE codex_execution_intents SET state='FAILED',
+                  error_kind='CODEX_CONNECTION_OR_QUOTA_HOLD',updated_at=? WHERE
+                  tenant_id=? AND intent_id=?''',(now,self.tenant_id,row['intent_id']))
+                self.db.commit();return {'intent_id':row['intent_id'],'state':'FAILED'}
             changed=self.db.execute('''UPDATE codex_execution_intents SET
               state='SENDING',lease_owner=?,lease_until=?,updated_at=? WHERE
               tenant_id=? AND intent_id=? AND state='PENDING' AND
@@ -262,21 +393,43 @@ class CodexExecutionControl(object):
               (UNKNOWN,'SEND_RESULT_UNKNOWN:'+type(exc).__name__,now,
                self.tenant_id,row['intent_id']));self.db.commit()
             return {'intent_id':row['intent_id'],'state':UNKNOWN}
-        fresh=self.db.execute('''SELECT cancel_requested FROM codex_execution_intents
+        fresh=self.db.execute('''SELECT cancel_requested,state FROM codex_execution_intents
           WHERE tenant_id=? AND intent_id=?''',(self.tenant_id,
           row['intent_id'])).fetchone()
         state='CANCEL_REQUESTED' if fresh['cancel_requested'] else receipt['state']
         self.db.execute('''UPDATE codex_execution_intents SET state=?,
           execution_id=?,session_id=?,thread_id=?,turn_id=?,lease_owner=NULL,
           lease_until=NULL,updated_at=? WHERE tenant_id=? AND intent_id=? AND
-          state='SENDING' ''',(state,receipt.get('execution_id'),
+          state IN ('SENDING','CANCEL_REQUESTED') ''',(state,receipt.get('execution_id'),
           receipt.get('session_id'),receipt.get('thread_id'),
           receipt.get('turn_id'),now,self.tenant_id,row['intent_id']))
         self.db.commit();return {'intent_id':row['intent_id'],'state':state}
 
+    def dispatch_cancel_once(self,transports,now=None):
+        now=self.clock() if now is None else now
+        row=self.db.execute('''SELECT * FROM codex_execution_intents WHERE
+          tenant_id=? AND state='CANCEL_REQUESTED' ORDER BY updated_at,intent_id
+          LIMIT 1''',(self.tenant_id,)).fetchone()
+        if row is None:return {'state':'IDLE'}
+        transport=transports.get(row['transport_kind'])
+        if transport is None or not hasattr(transport,'cancel'):
+            return {'intent_id':row['intent_id'],'state':UNKNOWN,
+                    'error':'CANCEL_CAPABILITY_UNVERIFIED'}
+        try:receipt=transport.cancel(dict(row))
+        except Exception as exc:
+            self.db.execute('''UPDATE codex_execution_intents SET error_kind=?,
+              updated_at=? WHERE tenant_id=? AND intent_id=? AND
+              state='CANCEL_REQUESTED' ''',('CANCEL_RESULT_UNKNOWN:'+type(exc).__name__,
+              now,self.tenant_id,row['intent_id']));self.db.commit()
+            return {'intent_id':row['intent_id'],'state':UNKNOWN}
+        if not isinstance(receipt,dict) or receipt.get('state')!='CANCELLED':
+            raise ValueError('VALID_CODEX_CANCEL_RECEIPT_REQUIRED')
+        return self.record_result(row['intent_id'],'cancelled-'+row['intent_id'],
+          'CANCELLED',receipt,now)
+
     def record_result(self,intent_id,event_id,state,payload,now=None):
         now=self.clock() if now is None else now
-        if state not in ('RUNNING','WAITING_APPROVAL','SUCCEEDED','FAILED',
+        if state not in ('ACKED','RUNNING','WAITING_APPROVAL','SUCCEEDED','FAILED',
                          'CANCELLED'):
             raise ValueError('CODEX_RESULT_STATE_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
@@ -301,7 +454,8 @@ class CodexExecutionControl(object):
               now<task['authority_valid_until'])
             if row['state'] in ('SUCCEEDED','FAILED','CANCELLED'):
                 current=False
-            accepted=int(current and not row['cancel_requested'])
+            cancellation=(row['cancel_requested'] and state=='CANCELLED')
+            accepted=int((current and not row['cancel_requested']) or cancellation)
             self.db.execute('''INSERT INTO codex_execution_events VALUES
               (?,?,?,?,?,?,?)''',(self.tenant_id,intent_id,event_id,state,body,
               accepted,now))
@@ -309,8 +463,13 @@ class CodexExecutionControl(object):
                 artifact=payload.get('artifact_sha256') if state=='SUCCEEDED' else None
                 if state=='SUCCEEDED':_sha(artifact,'artifact_sha256')
                 self.db.execute('''UPDATE codex_execution_intents SET state=?,
-                  artifact_sha256=COALESCE(?,artifact_sha256),updated_at=? WHERE
-                  tenant_id=? AND intent_id=?''',(state,artifact,now,
+                  artifact_sha256=COALESCE(?,artifact_sha256),
+                  execution_id=COALESCE(?,execution_id),
+                  session_id=COALESCE(?,session_id),thread_id=COALESCE(?,thread_id),
+                  turn_id=COALESCE(?,turn_id),updated_at=? WHERE
+                  tenant_id=? AND intent_id=?''',(state,artifact,
+                  payload.get('execution_id'),payload.get('session_id'),
+                  payload.get('thread_id'),payload.get('turn_id'),now,
                   self.tenant_id,intent_id))
             self.db.commit();return {'duplicate':False,'accepted':bool(accepted),
               'state':state if accepted else row['state']}

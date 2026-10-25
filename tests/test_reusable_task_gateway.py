@@ -170,6 +170,23 @@ class KernelTests(unittest.TestCase):
         self.assertEqual(status['task-a']['status'], 'WAITING_DEPENDENCY')
         self.assertEqual(status['task-a']['waiting_dependencies'], 1)
 
+    def test_expired_or_revoked_writer_cannot_progress_or_checkpoint(self):
+        self.gateway.register_graph(self.a,self.graph(),now=1000)
+        self.executor().start('task-a','attempt-a1',['fake:resource-task-a'],1010)
+        before_events=self.supervisor.db.execute('SELECT COUNT(*) FROM events').fetchone()[0]
+        before_points=self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM gateway_checkpoints').fetchone()[0]
+        self.now=1011
+        with self.assertRaisesRegex(ValueError,'CURRENT_WRITER_AUTHORITY_REQUIRED'):
+            self.executor().progress('task-a','attempt-a1','late-progress','evidence')
+        with self.assertRaisesRegex(ValueError,'CURRENT_WRITER_AUTHORITY_REQUIRED'):
+            self.gateway.save_checkpoint(self.a,'task-a','attempt-a1','late-point',
+              {'work':'late'},[],'RECONCILED',['fake:resource-task-a'],self.now)
+        self.assertEqual(self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM events').fetchone()[0],before_events)
+        self.assertEqual(self.supervisor.db.execute(
+          'SELECT COUNT(*) FROM gateway_checkpoints').fetchone()[0],before_points)
+
     def test_resource_conflict_nonpreemptible_and_safe_release(self):
         self.register_wait_graph()
         exe = self.executor()

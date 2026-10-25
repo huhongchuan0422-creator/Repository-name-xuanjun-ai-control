@@ -312,11 +312,14 @@ class ConnectionManager(object):
             changed=self.db.execute('''UPDATE service_connections SET
               secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
               status='ACTIVE',updated_at=? WHERE tenant_id=? AND connection_id=?
-              AND config_version=?''',(self.fernet.encrypt(access.encode()),
+              AND config_version=? AND status!='REVOKED' AND EXISTS(SELECT 1 FROM
+              oauth_flows f WHERE f.tenant_id=service_connections.tenant_id AND
+              f.flow_id=? AND f.connection_id=service_connections.connection_id
+              AND f.status='EXCHANGING')''',(self.fernet.encrypt(access.encode()),
               '••••'+access[-4:],self.fernet.encrypt(refresh.encode()) if refresh else None,
               now+expires_in,now,self.tenant_id,connection_id,
-              connection['config_version'])).rowcount
-            if changed!=1:raise ValueError('OAUTH_CONFIG_VERSION_MISMATCH')
+              connection['config_version'],flow_id)).rowcount
+            if changed!=1:raise ValueError('OAUTH_FLOW_REVOKED_OR_CONFIG_CHANGED')
             self.db.execute('''UPDATE oauth_flows SET status='COMPLETED' WHERE
               tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
               self.tenant_id,flow_id));self._audit('OAUTH_COMPLETED',connection_id,
@@ -336,12 +339,14 @@ class ConnectionManager(object):
             if row is None or row['auth_type']!='OAUTH2_AUTH_CODE_PKCE':
                 raise ValueError('OAUTH_CONNECTION_REQUIRED')
             if not row['supports_refresh']:raise ValueError('OAUTH_REFRESH_NOT_SUPPORTED')
+            if row['status'] not in ('ACTIVE','REFRESHING'):
+                raise ValueError('OAUTH_REAUTH_REQUIRED')
             if row['refresh_cipher'] is None:raise ValueError('OAUTH_REFRESH_TOKEN_REQUIRED')
             if row['status']=='REFRESHING':
                 if row['refresh_lease_until'] is not None and row['refresh_lease_until']>now:
                     raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
                 self.db.execute('''UPDATE service_connections SET
-                  status='REAUTH_REQUIRED',refresh_lease=NULL,
+                  status='REAUTH_REQUIRED',refresh_cipher=NULL,refresh_lease=NULL,
                   refresh_lease_until=NULL,updated_at=? WHERE tenant_id=? AND
                   connection_id=?''',(now,self.tenant_id,connection_id))
                 self.db.commit()
@@ -356,7 +361,7 @@ class ConnectionManager(object):
           'refresh_token':refresh,'client_id':row['client_id']})
         except Exception:
             self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
-              refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
+              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
               connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
               lease));self.db.commit();raise
         try:
@@ -373,7 +378,7 @@ class ConnectionManager(object):
             new_refresh=value.get('refresh_token') or refresh
         except Exception:
             self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
-              refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
+              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
               connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
               lease));self.db.commit();raise
         changed=self.db.execute('''UPDATE service_connections SET secret_cipher=?,
@@ -387,12 +392,18 @@ class ConnectionManager(object):
 
     def revoke(self,connection_id,now=None):
         self._admin();now=self.clock() if now is None else now
-        changed=self.db.execute('''UPDATE service_connections SET status='REVOKED',
-          secret_cipher=NULL,secret_mask=NULL,refresh_cipher=NULL,
-          access_expires_at=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
-          updated_at=? WHERE tenant_id=? AND connection_id=?''',(
-          now,self.tenant_id,connection_id)).rowcount;self.db.commit()
-        if changed!=1:raise KeyError(connection_id)
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            changed=self.db.execute('''UPDATE service_connections SET status='REVOKED',
+              secret_cipher=NULL,secret_mask=NULL,refresh_cipher=NULL,
+              access_expires_at=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+              config_version=config_version+1,updated_at=? WHERE tenant_id=? AND connection_id=?''',(
+              now,self.tenant_id,connection_id)).rowcount
+            if changed!=1:raise KeyError(connection_id)
+            self.db.execute('''UPDATE oauth_flows SET status='REVOKED',used_at=? WHERE
+              tenant_id=? AND connection_id=? AND status IN ('PENDING','EXCHANGING')''',
+              (now,self.tenant_id,connection_id));self.db.commit()
+        except Exception:self.db.rollback();raise
         return {'connection_id':connection_id,'status':'REVOKED',
           'external_revocation':'NOT_EXECUTED'}
 
