@@ -236,8 +236,6 @@ def run(operation, old_archive_bytes=None, new_archive_bytes=None):
     require(operation in OPERATIONS,'HANDOFF_OPERATION_DENIED')
     identify_admin()
     _verify_runtime_sources()
-    require(type(old_archive_bytes) is bytes and type(new_archive_bytes) is bytes,
-            'EXACT_PROTECTED_ARCHIVE_BYTES_REQUIRED')
     with contextlib.ExitStack() as stack:
         parent=_protected_path_directory(PARENT,stack)
         journal=_protected_path_directory(JOURNAL,stack)
