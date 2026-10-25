@@ -56,6 +56,18 @@ MODEL_TABLES = frozenset((
     'role_instances','acceptance_checklists','model_quota_status',
     'codex_execution_intents','codex_execution_events'))
 
+ROLE_ACTION_ROLES = {
+    'START_TEST_ONLY_TASK': 'TASK_EXECUTOR',
+    'CREATE_CODEX_INTENT': 'TASK_EXECUTOR',
+    'CANCEL_CODEX_INTENT': 'TASK_EXECUTOR',
+    'SUBMIT_CANDIDATE': 'TASK_EXECUTOR',
+    'REPORT_TEST_ONLY_PROGRESS': 'TASK_EXECUTOR',
+    'SAVE_TEST_ONLY_CHECKPOINT': 'TASK_EXECUTOR',
+    'REVIEW_CANDIDATE': 'TASK_REVIEWER',
+    'REVIEW_SCOPE_CHANGE': 'TASK_REVIEWER',
+    'ACCEPT_CANDIDATE': 'TASK_ACCEPTOR',
+}
+
 
 def _read_owned_secret_file(path, label):
     info=os.lstat(path)
@@ -303,29 +315,37 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                    '=; Path=/; SameSite=Strict; Max-Age=0')]);return
             if path != '/api/admin/model-control':
                 self._send(405,b'read only\n','text/plain; charset=utf-8');return
-            if not self._admin_allowed():
-                self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
-                           'application/json; charset=utf-8');return
             session=self._session()
-            if session is not None and not session_store.verify_csrf(session,
-                    self.headers.get('X-CSRF-Token')):
-                self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),
+            if session_store is not None:
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),
+                               'application/json; charset=utf-8');return
+                if not session_store.verify_csrf(session,
+                        self.headers.get('X-CSRF-Token')):
+                    self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),
+                               'application/json; charset=utf-8');return
+            elif not self._admin_allowed():
+                self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
                            'application/json; charset=utf-8');return
             try:
                 length=int(self.headers.get('Content-Length','0'))
                 if length<2 or length>65536:raise ValueError('BODY_LIMIT')
                 value=json.loads(self.rfile.read(length).decode('utf-8'))
                 action=value.pop('action')
+                required_role=ROLE_ACTION_ROLES.get(action)
+                if session is not None:
+                    if required_role is not None and required_role not in session['roles']:
+                        self._send(403,_json_bytes({'error':'ROLE_REQUIRED',
+                          'required_role':required_role}),
+                          'application/json; charset=utf-8');return
+                    if (required_role is None and
+                            'TASK_CENTER_ADMIN' not in session['roles']):
+                        self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
+                          'application/json; charset=utf-8');return
                 supervisor, control=self._model_control()
                 try:
-                    role_actions={'START_TEST_ONLY_TASK','CREATE_CODEX_INTENT',
-                                  'CANCEL_CODEX_INTENT','RUN_CODEX_ADAPTER_ONCE',
-                                  'RUN_CODEX_CANCEL_ONCE','SUBMIT_CANDIDATE','REVIEW_CANDIDATE',
-                                  'ACCEPT_CANDIDATE','REVIEW_SCOPE_CHANGE',
-                                  'REPORT_TEST_ONLY_PROGRESS',
-                                  'SAVE_TEST_ONLY_CHECKPOINT'}
                     actor=None
-                    if action in role_actions:
+                    if required_role is not None:
                         actor=self._actor_principal()
                         if actor is None:
                             raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')

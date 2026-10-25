@@ -31,6 +31,20 @@ python3 scripts/task_center_test_identity_cli.py \
   --roles TASK_CENTER_ADMIN,TASK_EXECUTOR
 ```
 
+跨角色验收需要分别创建登录主体；每次执行命令时使用不同用户名、主体和交互输入的
+不同测试密码，不能共享管理员身份：
+
+```bash
+python3 scripts/task_center_test_identity_cli.py --append --output /ABSOLUTE/TEST/DIR/identities.json --tenant tenant-test --username TEST_EXECUTOR --principal TEST_EXECUTOR_PRINCIPAL --roles TASK_EXECUTOR
+python3 scripts/task_center_test_identity_cli.py --append --output /ABSOLUTE/TEST/DIR/identities.json --tenant tenant-test --username TEST_QA --principal TEST_QA_PRINCIPAL --roles TASK_REVIEWER
+python3 scripts/task_center_test_identity_cli.py --append --output /ABSOLUTE/TEST/DIR/identities.json --tenant tenant-test --username TEST_SECURITY --principal TEST_SECURITY_PRINCIPAL --roles TASK_REVIEWER
+python3 scripts/task_center_test_identity_cli.py --append --output /ABSOLUTE/TEST/DIR/identities.json --tenant tenant-test --username TEST_ACCEPTOR --principal TEST_ACCEPTOR_PRINCIPAL --roles TASK_ACCEPTOR
+```
+
+管理员负责配置和登记完整验收集合；执行者只能提交其被分配任务的候选，QA/Security
+只能按各自正式审核分配操作，验收者只能验收。任一主体都不会因具备任务角色而取得
+`TASK_CENTER_ADMIN`。
+
 真实管理员凭据、持久权限和部署目录须由 Owner 对准确目标另行确认；本次交付没有
 生成这些真实值。
 
