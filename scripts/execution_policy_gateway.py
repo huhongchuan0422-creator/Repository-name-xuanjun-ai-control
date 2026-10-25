@@ -205,11 +205,21 @@ class ExecutionPolicyGateway(object):
         return {'change_id':change_id,'state':state}
 
     def request_action(self,value,now=None):
+        now=self.clock() if now is None else now
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            result=self._request_action_locked(value,now)
+            self.db.commit()
+            return result
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def _request_action_locked(self,value,now):
         required={'task_id','asset_version','action','scope','authorization_id',
           'writer_principal','idempotency_key','change_id'}
         if not isinstance(value,dict) or set(value)!=required:
             raise ValueError('EXACT_ACTION_REQUEST_REQUIRED')
-        now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,value['task_id'])
         task=self.gateway.supervisor._task(value['task_id'])
         unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
@@ -294,7 +304,7 @@ class ExecutionPolicyGateway(object):
           value['idempotency_key'],value['task_id'],task['attempt_id'],
           value['asset_version'],value['action'],value['scope'],
           value['authorization_id'],value['writer_principal'],value['change_id'],
-          'ADMITTED_TEST_ONLY',canonical(evidence),now));self.db.commit()
+          'ADMITTED_TEST_ONLY',canonical(evidence),now))
         return {'request_id':request_id,'state':'ADMITTED_TEST_ONLY',
                 'duplicate':False,'external_execution':'NOT_EXECUTED'}
 

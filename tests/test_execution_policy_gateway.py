@@ -6,6 +6,7 @@ import tempfile
 import time
 import unittest
 import sys
+import sqlite3
 from cryptography.fernet import Fernet
 
 ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
@@ -228,6 +229,39 @@ class ExecutionPolicyGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'CHANGE_REVIEWER_ROLE_CONFLICT'):
             self.policy.request_action(self.action(scope='DEPLOY',
               change_id='later-executor'))
+
+    def test_scope_reviewer_role_check_and_action_insert_are_atomic(self):
+        self.prepare();self.policy.propose_change('atomic-change','demo-b',
+          'asset-v1',['DEPLOY'],'x')
+        ModelControl(self.gateway,self.context,Fernet.generate_key())
+        reviewer=ExecutionPolicyGateway(self.gateway,
+          self.authority.issue('tenant-a','atomic-reviewer'))
+        reviewer.review_change('atomic-change','atomic-reviewer',True,'review')
+        self.supervisor.db.execute('''INSERT INTO role_templates VALUES
+          (?,?,?,?,?,?,?)''',('tenant-a','developer','v1','EXECUTOR','["code"]',1,1))
+        self.supervisor.db.commit();blocked=[]
+        def authorizer(action,table,*_args):
+            if action==sqlite3.SQLITE_INSERT and table=='execution_action_requests':
+                other=sqlite3.connect(self.db,timeout=0)
+                try:
+                    other.execute('''INSERT INTO model_assignments VALUES
+                      (?,?,?,?,?,?,?,?,?,?,?)''',('tenant-a','demo-b','attempt-b',
+                      'developer','v1','atomic-reviewer','p','m','ACTIVE','test',
+                      time.time()));other.commit()
+                except sqlite3.OperationalError as exc:blocked.append(str(exc))
+                finally:other.close()
+            return sqlite3.SQLITE_OK
+        self.supervisor.db.set_authorizer(authorizer)
+        try:
+            result=self.policy.request_action(self.action(scope='DEPLOY',
+              change_id='atomic-change'))
+        finally:self.supervisor.db.set_authorizer(None)
+        self.assertEqual(result['state'],'ADMITTED_TEST_ONLY')
+        self.assertTrue(any('locked' in value for value in blocked),blocked)
+        verify=sqlite3.connect(self.db)
+        try:self.assertEqual(verify.execute('''SELECT COUNT(*) FROM
+          model_assignments WHERE principal_id='atomic-reviewer' ''').fetchone()[0],0)
+        finally:verify.close()
 
     def test_accepted_request_never_claims_external_execution(self):
         self.prepare();result=self.policy.request_action(self.action())

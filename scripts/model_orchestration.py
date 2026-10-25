@@ -368,6 +368,13 @@ class ModelControl(object):
         existing = self.db.execute('''SELECT * FROM model_providers
           WHERE tenant_id=? AND provider_id=?''',
           (self.tenant_id,value['provider_id'])).fetchone()
+        if value['price_state']=='KNOWN_PAID':
+            incompatible=self.db.execute('''SELECT 1 FROM model_catalog WHERE
+              tenant_id=? AND provider_id=? AND (price_state!='KNOWN_PAID' OR
+              input_unit_cost IS NULL OR output_unit_cost IS NULL) LIMIT 1''',(
+              self.tenant_id,value['provider_id'])).fetchone()
+            if incompatible is not None:
+                raise ValueError('PAID_PROVIDER_MODELS_REQUIRE_EXPLICIT_COSTS')
         if existing is None and self.db.execute('''SELECT COUNT(*) FROM
           model_providers WHERE tenant_id=?''',(self.tenant_id,)).fetchone()[0] >= 10:
             raise ValueError('PROVIDER_LIMIT_10')

@@ -163,6 +163,14 @@ class ModelOrchestrationTests(unittest.TestCase):
               'enabled':True,'price_state':'KNOWN_FREE',
               'input_unit_cost':None,'output_unit_cost':None})
 
+    def test_free_provider_cannot_become_paid_while_free_model_remains(self):
+        self.provider('price-transition');self.model('price-transition','ok')
+        with self.assertRaisesRegex(ValueError,'PAID_PROVIDER_MODELS'):
+            self.provider('price-transition',price='KNOWN_PAID')
+        row=self.supervisor.db.execute('''SELECT price_state FROM model_providers
+          WHERE provider_id='price-transition' ''').fetchone()
+        self.assertEqual(row['price_state'],'KNOWN_FREE')
+
     def test_benchmark_calls_share_persistent_provider_rate_limit(self):
         self.control.upsert_provider({'provider_id':'limited','display_name':'limited',
           'adapter_type':'openai-compatible','base_url':self.url,'enabled':True,
