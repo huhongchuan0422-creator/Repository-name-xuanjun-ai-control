@@ -483,14 +483,14 @@ def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_parent_iden
              and childstat(parent,RETAINED) is None
              and ident(os.fstat(entryfd))==expected_entry_identity,
              'ROLLBACK_BOUNDARY_CHANGED')
-        result=status(parent,jfd,uid,old_entries,new_entries)
+        result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
         need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','ROLLBACK_BOUNDARY_CHANGED')
         rollback_attempted=True
         try:exchange(parent,TARGET,STAGE)
         except BaseException:raise Hold('ROLLBACK_EXCHANGE_UNKNOWN_INSPECT_ONLY') from None
         try:
             os.fsync(parent)
-            result=status(parent,jfd,uid,old_entries,new_entries)
+            result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
             need(result['state'] in ('PREPARED_OR_REVERTED','ROLLBACK_APPLIED_RESULT_UNKNOWN'),'ROLLBACK_UNKNOWN')
             writefile(jfd,ROLLBACK_RESULT,canonical({'format':1,'attempt':intent['attempt'],
                      'result':'OLD_RESTORED_NEW_RETAINED','rollback_intent_sha256':sha(canonical(intent))}),uid)
