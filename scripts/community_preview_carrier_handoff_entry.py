@@ -49,8 +49,8 @@ OLD_INPUT_NAME='control-stopped-v1-1d639.zip'
 NEW_INPUT_NAME='control-stopped-v1-005c.zip'
 POST_B_OLD_INPUT_NAME='control-stopped-v1-005c.zip'
 POST_B_NEW_INPUT_NAME='control-stopped-v1-post-b-candidate.zip'
-POST_B_NEW_ARCHIVE_SHA256=None
-POST_B_NEW_MANIFEST_SHA256=None
+POST_B_NEW_ARCHIVE_SHA256='8556531d52b81ca87f3346f2d098de7aea50cf7838106482aadcc86188c374eb'
+POST_B_NEW_MANIFEST_SHA256='f7118e9a45c77cf260ae516864635d45af4a9159055da3f9ab983ff4ca95f99e'
 INPUT_MAX=4*1024*1024
 APPROVAL_MAX=16384
 APPROVAL_TTL_MAX=600
@@ -194,7 +194,7 @@ def _open_fixed_scripts_dir():
 
 
 def _read_fixed_archive(parent,name,expected_sha,uid):
-    require(name in (OLD_INPUT_NAME,NEW_INPUT_NAME),'FIXED_INPUT_NAME_DENIED')
+    require(name in (OLD_INPUT_NAME,NEW_INPUT_NAME,POST_B_OLD_INPUT_NAME,POST_B_NEW_INPUT_NAME),'FIXED_INPUT_NAME_DENIED')
     fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
     try:
         st=os.fstat(fd)
@@ -224,7 +224,7 @@ def _canonical(raw):
     require(type(value) is dict and h.canonical(value)==raw,'APPROVAL_NONCANONICAL')
     return value
 
-def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,approval_name=APPROVAL_NAME):
+def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,approval_name=APPROVAL_NAME,pins=None):
     try:fd=os.open(approval_name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent)
     except FileNotFoundError:raise h.Hold('APPROVAL_MISSING')
     except OSError:raise h.Hold('APPROVAL_OPEN_REJECTED')
@@ -237,6 +237,7 @@ def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,
             'APPROVAL_FILE_IDENTITY_OR_MODE')
     record=_read_fd_exact(fd,APPROVAL_MAX)
     value=_canonical(record)
+    old_archive_sha,old_manifest_sha,new_archive_sha,new_manifest_sha=pins or (h.OLD_ARCHIVE,h.OLD_MANIFEST,h.NEW_ARCHIVE,h.NEW_MANIFEST)
     fields={'format','host','operation','attempt','old_archive_sha256',
             'old_manifest_sha256','new_archive_sha256','new_manifest_sha256',
             'issued_at','expires_at'}
@@ -244,10 +245,10 @@ def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,
             'APPROVAL_SCHEMA')
     require(value['host']==h.HOST and value['operation']==operation
             and value['attempt']==ATTEMPT,'APPROVAL_SCOPE_MISMATCH')
-    require(value['old_archive_sha256']==h.OLD_ARCHIVE
-            and value['old_manifest_sha256']==h.OLD_MANIFEST
-            and value['new_archive_sha256']==h.NEW_ARCHIVE
-            and value['new_manifest_sha256']==h.NEW_MANIFEST,
+    require(value['old_archive_sha256']==old_archive_sha
+            and value['old_manifest_sha256']==old_manifest_sha
+            and value['new_archive_sha256']==new_archive_sha
+            and value['new_manifest_sha256']==new_manifest_sha,
             'APPROVAL_PIN_MISMATCH')
     issued=value['issued_at'];expires=value['expires_at'];now=int(time.time())
     require(type(issued) is int and type(expires) is int and issued<=now<=expires
@@ -256,7 +257,7 @@ def _approval_fd(parent,operation,old_archive_bytes,new_archive_bytes,uid,stack,
             'APPROVAL_REPLACED')
     return fd,record,h.ident(st)
 
-def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_archive_bytes,new_archive_bytes,uid,approval_name=APPROVAL_NAME):
+def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_archive_bytes,new_archive_bytes,uid,approval_name=APPROVAL_NAME,pins=None):
     st=os.fstat(fd)
     require(h.ident(st)==expected_identity and h.ident(os.stat(approval_name,dir_fd=parent,follow_symlinks=False))==expected_identity,
             'APPROVAL_REPLACED')
@@ -264,12 +265,13 @@ def _recheck_approval(parent,fd,expected_raw,expected_identity,operation,old_arc
     require(raw==expected_raw,'APPROVAL_CONTENT_CHANGED')
     # Revalidate operation, pins and expiry at the last boundary before mutation.
     value=_canonical(raw)
+    old_archive_sha,old_manifest_sha,new_archive_sha,new_manifest_sha=pins or (h.OLD_ARCHIVE,h.OLD_MANIFEST,h.NEW_ARCHIVE,h.NEW_MANIFEST)
     require(value.get('operation')==operation and value.get('host')==h.HOST
             and value.get('attempt')==ATTEMPT
-            and value.get('old_archive_sha256')==h.OLD_ARCHIVE
-            and value.get('old_manifest_sha256')==h.OLD_MANIFEST
-            and value.get('new_archive_sha256')==h.NEW_ARCHIVE
-            and value.get('new_manifest_sha256')==h.NEW_MANIFEST,
+            and value.get('old_archive_sha256')==old_archive_sha
+            and value.get('old_manifest_sha256')==old_manifest_sha
+            and value.get('new_archive_sha256')==new_archive_sha
+            and value.get('new_manifest_sha256')==new_manifest_sha,
             'APPROVAL_SCOPE_MISMATCH')
     now=int(time.time())
     require(type(value.get('issued_at')) is int and type(value.get('expires_at')) is int
