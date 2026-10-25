@@ -11,7 +11,6 @@ import json
 import os
 import signal
 import sqlite3
-import stat
 import sys
 import threading
 from http.cookies import SimpleCookie
@@ -28,6 +27,7 @@ from connection_management import ConnectionManager
 from codex_execution_adapter import (CodexExecutionControl,
                                      CodexAppServerTransport)
 from task_center_session_auth import FileTestIdentityProvider, SessionStore
+from secure_file_input import read_owned_secret_file
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -70,13 +70,7 @@ ROLE_ACTION_ROLES = {
 
 
 def _read_owned_secret_file(path, label):
-    info=os.lstat(path)
-    if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1 or
-            info.st_uid!=os.getuid()):
-        raise ValueError('OWNED_REGULAR_%s_FILE_REQUIRED'%label)
-    if info.st_mode & 0o077:
-        raise ValueError('%s_FILE_MODE_0600_REQUIRED'%label)
-    with open(path) as stream:return stream.read()
+    return read_owned_secret_file(path, label)
 
 
 class _ReadOnlySupervisor(object):
@@ -753,7 +747,9 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
-    parser.add_argument('--test-authority-key', required=True)
+    authority = parser.add_mutually_exclusive_group(required=True)
+    authority.add_argument('--test-authority-key')
+    authority.add_argument('--test-authority-key-file')
     parser.add_argument('--tenant', required=True)
     parser.add_argument('--principal', default='local-ui-viewer')
     parser.add_argument('--host', default='127.0.0.1')
@@ -766,7 +762,12 @@ def main(argv=None):
     parser.add_argument('--session-ttl-seconds',type=int,default=1800)
     parser.add_argument('--allow-loopback-fixture-outbound',action='store_true')
     args = parser.parse_args(argv)
-    key = args.test_authority_key.encode('utf-8')
+    raw_key = (args.test_authority_key if args.test_authority_key is not None
+               else _read_owned_secret_file(args.test_authority_key_file,
+                                             'TEST_AUTHORITY_KEY').rstrip('\r\n'))
+    if not raw_key:
+        raise ValueError('VALID_TEST_AUTHORITY_KEY_REQUIRED')
+    key = raw_key.encode('utf-8')
     model_key = (load_master_key(args.model_master_key_file)
                  if args.model_master_key_file else None)
     admin_token = None

@@ -28,6 +28,9 @@ KEY='0123456789abcdef0123456789abcdef'
 class RuntimeLifecycleTests(unittest.TestCase):
     def setUp(self):
         self.root=tempfile.mkdtemp();self.db=os.path.join(self.root,'state.sqlite3')
+        self.authority_key=os.path.join(self.root,'authority.key')
+        with open(self.authority_key,'w') as stream:stream.write(KEY+'\n')
+        os.chmod(self.authority_key,0o600)
         supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY.encode())
         GatewayKernel(supervisor,authority).register_graph(
           authority.issue('tenant-runtime','seed'),demo_graph('tenant-runtime'))
@@ -45,7 +48,8 @@ class RuntimeLifecycleTests(unittest.TestCase):
         sock=socket.socket();sock.bind(('127.0.0.1',0));self.port=sock.getsockname()[1]
         sock.close();self.command=[sys.executable,
           os.path.join(ROOT,'scripts','task_center_app.py'),'--db',self.db,
-          '--test-authority-key',KEY,'--tenant','tenant-runtime','--host',
+          '--test-authority-key-file',self.authority_key,
+          '--tenant','tenant-runtime','--host',
           '127.0.0.1','--port',str(self.port),'--model-master-key-file',
           self.model_key,'--test-identity-file',self.identities]
 

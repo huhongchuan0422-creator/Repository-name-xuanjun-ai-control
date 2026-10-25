@@ -12,6 +12,7 @@ from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
                                     TestTenantAuthority)
 from task_supervisor import Supervisor
 from task_writer_fence import Fence
+from secure_file_input import read_owned_secret_file
 
 
 def demo_graph(tenant):
@@ -150,8 +151,11 @@ def run_app_demo(gateway, authority, tenant, lock_root):
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
-    parser.add_argument('--test-authority-key', required=True,
-                        help='TEST_ONLY key, minimum 32 characters')
+    authority_input = parser.add_mutually_exclusive_group(required=True)
+    authority_input.add_argument('--test-authority-key',
+                                 help='TEST_ONLY key, minimum 32 characters')
+    authority_input.add_argument('--test-authority-key-file',
+                                 help='owned mode-0600 TEST_ONLY key file')
     sub = parser.add_subparsers(dest='command')
     project = sub.add_parser('project')
     project.add_argument('--tenant', required=True)
@@ -177,10 +181,15 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.command is None:
         parser.error('a command is required')
+    raw_key = (args.test_authority_key if args.test_authority_key is not None
+               else read_owned_secret_file(args.test_authority_key_file,
+                                           'TEST_AUTHORITY_KEY').rstrip('\r\n'))
+    if not raw_key:
+        raise ValueError('VALID_TEST_AUTHORITY_KEY_REQUIRED')
     supervisor = Supervisor(args.db)
     try:
         authority = TestTenantAuthority(
-            args.test_authority_key.encode('utf-8'))
+            raw_key.encode('utf-8'))
         gateway = GatewayKernel(supervisor, authority)
         if args.command == 'project':
             context = authority.issue(args.tenant, args.principal)
