@@ -576,7 +576,7 @@ def rollback(parent,jfd,entryfd,leasefd,old_entries,new_entries,uid,expected_par
             if 'rollback_attempted' in locals() and rollback_attempted:
                 raise Hold('ROLLBACK_CLOSE_UNKNOWN_INSPECT_ONLY') from None
             raise
-)
+
 _DOWNLOAD_HOSTS=('objects.githubusercontent.com','release-assets.githubusercontent.com')
 def _safe_https_url(url):
     try:
@@ -610,82 +610,3 @@ class SafeArtifactRedirect(urllib.request.HTTPRedirectHandler):
 
 def github_artifact_opener():
     return urllib.request.build_opener(SafeArtifactRedirect())
-
-HOST='iZd7oeikknn1z21sq6ji6zZ'
-TARGET='control-stopped-v1'
-ENTRY_NAME='site-prepare-v1.py'
-JOURNAL_DIR='update-journal'
-STAGE='control-stopped-v1.handoff-stage-v1'
-RETAINED='control-stopped-v1.handoff-retained-old-v1'
-STATE='carrier-handoff-intent-v1.json'
-PREINTENT='carrier-handoff-preintent-v1.json'
-ROLLBACK_INTENT='carrier-handoff-rollback-intent-v1.json'
-ROLLBACK_RESULT='carrier-handoff-rollback-result-v1.json'
-LOCK='community-update.lock'
-OLD_MANIFEST='e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a'
-NEW_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
-OLD_ARCHIVE='5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4'
-NEW_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
-MAX_ZIP=4*1024*1024
-MAX_FILE=131072
-MAX_FILES=100
-ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
-JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt'}
-REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
-ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','backup_dir'}
-HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
-               'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
-               'snapshot_permit':ORIGINAL_ATTEMPT+'-snapshot-permit.json',
-               'validate_clones_result':ORIGINAL_ATTEMPT+'-validate-clones-result.json',
-               'validate_clones_permit':ORIGINAL_ATTEMPT+'-validate-clones-permit.json',
-               'active_attempt':'active-attempt.json',
-               'b_approval':'bc-b-approval.json','freeze':'writer-freeze-reference.json',
-               'old_stage_permit':'site-prepare-approval.json','c_approval':'bc-c-approval.json',
-               'resume_approval':'bc-b-resume-approval.json','resume_freeze':'writer-freeze-resume-reference.json',
-               'resume_stage_permit':'site-prepare-resume-approval.json','backup_dir':'backup-2330-to-f131-v1'}
-
-class Hold(RuntimeError):pass
-
-def need(ok,reason):
-    if not ok:raise Hold(reason)
-
-)
-
-HOST='iZd7oeikknn1z21sq6ji6zZ'
-TARGET='control-stopped-v1'
-ENTRY_NAME='site-prepare-v1.py'
-JOURNAL_DIR='update-journal'
-STAGE='control-stopped-v1.handoff-stage-v1'
-RETAINED='control-stopped-v1.handoff-retained-old-v1'
-STATE='carrier-handoff-intent-v1.json'
-PREINTENT='carrier-handoff-preintent-v1.json'
-ROLLBACK_INTENT='carrier-handoff-rollback-intent-v1.json'
-ROLLBACK_RESULT='carrier-handoff-rollback-result-v1.json'
-LOCK='community-update.lock'
-OLD_MANIFEST='e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a'
-NEW_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
-OLD_ARCHIVE='5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4'
-NEW_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
-MAX_ZIP=4*1024*1024
-MAX_FILE=131072
-MAX_FILES=100
-ORIGINAL_ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
-JOURNAL_HISTORY_KEYS={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt'}
-REQUIRED_HISTORY={'b_intent','b_approval','freeze'}
-ABSENT_HISTORY={'snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit','active_attempt','c_approval','resume_approval','resume_freeze','resume_stage_permit','backup_dir'}
-HISTORY_NAMES={'b_intent':ORIGINAL_ATTEMPT+'-B-intent.json',
-               'snapshot_result':ORIGINAL_ATTEMPT+'-snapshot-result.json',
-               'snapshot_permit':ORIGINAL_ATTEMPT+'-snapshot-permit.json',
-               'validate_clones_result':ORIGINAL_ATTEMPT+'-validate-clones-result.json',
-               'validate_clones_permit':ORIGINAL_ATTEMPT+'-validate-clones-permit.json',
-               'active_attempt':'active-attempt.json',
-               'b_approval':'bc-b-approval.json','freeze':'writer-freeze-reference.json',
-               'old_stage_permit':'site-prepare-approval.json','c_approval':'bc-c-approval.json',
-               'resume_approval':'bc-b-resume-approval.json','resume_freeze':'writer-freeze-resume-reference.json',
-               'resume_stage_permit':'site-prepare-resume-approval.json','backup_dir':'backup-2330-to-f131-v1'}
-
-class Hold(RuntimeError):pass
-
-def need(ok,reason):
-    if not ok:raise Hold(reason)
-
