@@ -10,6 +10,8 @@ import stat
 import contextlib
 import json
 import time
+import sys
+import types
 from types import SimpleNamespace
 from scripts import community_preview_carrier_handoff_admission as h
 from scripts import community_preview_carrier_handoff_call as call
@@ -82,29 +84,52 @@ def _read_fd_exact(fd,limit):
     return bytes(body)
 
 def _verify_runtime_sources():
-    """Verify the exact fixed carrier files before transaction entry."""
-    require(os.path.abspath(getattr(h,'__file__',''))==
+    """Verify and execute the exact pinned source bytes before transaction entry."""
+    global h,call
+    expected_paths={
+        'community_preview_carrier_handoff_admission.py':
             SCRIPTS_DIR+'/community_preview_carrier_handoff_admission.py',
-            'HANDOFF_MODULE_PATH_MISMATCH')
-    require(os.path.abspath(getattr(call,'__file__',''))==
-            SCRIPTS_DIR+'/community_preview_carrier_handoff_call.py',
-            'HANDOFF_CALL_PATH_MISMATCH')
+        'community_preview_carrier_handoff_call.py':
+            SCRIPTS_DIR+'/community_preview_carrier_handoff_call.py'
+    }
+    raw_by_name={}
     for name,wanted in MODULE_PINS.items():
-        fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,
-                   dir_fd=_open_fixed_scripts_dir())
+        full=expected_paths[name]
+        dfd=_open_fixed_scripts_dir()
         try:
-            st=os.fstat(fd)
-            require(stat.S_ISREG(st.st_mode) and st.st_uid==ROOT_UID
-                    and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1,
-                    'HANDOFF_MODULE_IDENTITY_OR_MODE')
-            raw=_read_fd_exact(fd,262144)
-            require(h.sha(raw)==wanted,'HANDOFF_MODULE_SHA_MISMATCH')
-            dfd=_open_fixed_scripts_dir()
+            fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=dfd)
             try:
+                st=os.fstat(fd)
+                require(stat.S_ISREG(st.st_mode) and st.st_uid==ROOT_UID
+                        and stat.S_IMODE(st.st_mode)==0o600 and st.st_nlink==1,
+                        'HANDOFF_MODULE_IDENTITY_OR_MODE')
+                raw=_read_fd_exact(fd,262144)
+                require(h.sha(raw)==wanted,'HANDOFF_MODULE_SHA_MISMATCH')
                 require(h.ident(st)==h.ident(os.stat(name,dir_fd=dfd,follow_symlinks=False)),
                         'HANDOFF_MODULE_PATH_REPLACED')
-            finally:os.close(dfd)
-        finally:os.close(fd)
+                raw_by_name[name]=(full,raw)
+            finally:os.close(fd)
+        finally:os.close(dfd)
+    package=sys.modules.get('scripts')
+    require(package is not None,'HANDOFF_PACKAGE_NOT_LOADED')
+    loaded={}
+    for name in ('community_preview_carrier_handoff_admission.py',
+                 'community_preview_carrier_handoff_call.py'):
+        short=name[:-3]
+        full,raw=raw_by_name[name]
+        module=types.ModuleType('scripts.'+short)
+        module.__file__=full
+        module.__package__='scripts'
+        sys.modules[module.__name__]=module
+        exec(compile(raw,full,'exec'),module.__dict__)
+        setattr(package,short,module)
+        loaded[short]=module
+    h=loaded['community_preview_carrier_handoff_admission']
+    call=loaded['community_preview_carrier_handoff_call']
+    require(os.path.abspath(h.__file__)==expected_paths['community_preview_carrier_handoff_admission.py']
+            and os.path.abspath(call.__file__)==expected_paths['community_preview_carrier_handoff_call.py'],
+            'HANDOFF_MODULE_LOAD_PATH_MISMATCH')
+    return True
 
 def _open_fixed_scripts_dir():
     fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -119,6 +144,7 @@ def _open_fixed_scripts_dir():
     except BaseException:
         os.close(fd)
         raise
+
 
 def _canonical(raw):
     def pairs(rows):
