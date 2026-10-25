@@ -105,7 +105,7 @@ class ApprovalRecord(unittest.TestCase):
         with open(os.path.join(scripts_dir,'community_preview_carrier_handoff_admission.py'),'wb') as stream:stream.write(raw)
         os.chmod(os.path.join(scripts_dir,'community_preview_carrier_handoff_admission.py'),0o600)
         with patch.object(entry,'ROOT_UID',self.uid),patch.object(entry,'SCRIPTS_DIR',scripts_dir),\
-             patch.object(entry,'_open_fixed_scripts_dir',return_value=os.open(scripts_dir,os.O_RDONLY|os.O_DIRECTORY)),\
+             patch.object(entry,'_open_fixed_scripts_dir',side_effect=lambda:os.open(scripts_dir,os.O_RDONLY|os.O_DIRECTORY)),\
              patch.object(entry,'MODULE_PINS',dict(entry.MODULE_PINS,
                  **{'community_preview_carrier_handoff_admission.py':'0'*64})):
             with self.assertRaisesRegex(h.Hold,'HANDOFF_MODULE_SHA_MISMATCH'):
