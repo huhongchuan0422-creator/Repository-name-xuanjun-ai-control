@@ -16,6 +16,8 @@ import zipfile
 
 HOST='iZd7oeikknn1z21sq6ji6zZ'
 TARGET='control-stopped-v1'
+ENTRY_NAME='site-prepare-v1.py'
+JOURNAL_DIR='update-journal'
 STAGE='control-stopped-v1.handoff-stage-v1'
 RETAINED='control-stopped-v1.handoff-retained-old-v1'
 STATE='carrier-handoff-intent-v1.json'
@@ -277,14 +279,27 @@ def journal(jfd,uid):
     try:v=json.loads(b.decode('utf8'))
     except (UnicodeError,ValueError):raise Hold('JOURNAL_JSON_UNKNOWN')
     fields={'format','attempt','old_manifest','new_manifest','old_identity','stage_identity',
-            'old_tree_sha','new_tree_sha','entry_identity','journal_parent_identity'}
+            'old_tree_sha','new_tree_sha','history','entry_identity','journal_parent_identity'}
     need(type(v) is dict and set(v)==fields and type(v['format']) is int
          and v['format']==1 and type(v['attempt']) is str
          and v['old_manifest']==OLD_MANIFEST and v['new_manifest']==NEW_MANIFEST
          and b==canonical(v),'JOURNAL_SCHEMA_OR_BINDING')
     return v
 
-def _locks(jfd,entryfd,uid,expected_entry_identity):
+def _check_paths(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity):
+    checked_dir(parent,uid)
+    need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
+    need(dirident(os.fstat(jfd))==expected_journal_identity
+         and dirident(os.stat(JOURNAL_DIR,dir_fd=parent,follow_symlinks=False))==expected_journal_identity,
+         'JOURNAL_PARENT_PATH_CHANGED')
+    st=os.fstat(entryfd)
+    need(stat.S_ISREG(st.st_mode) and st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o600
+         and st.st_nlink==1 and ident(st)==expected_entry_identity
+         and ident(os.stat(ENTRY_NAME,dir_fd=parent,follow_symlinks=False))==expected_entry_identity,
+         'ORIGINAL_ENTRY_FD_PATH_CHANGED')
+
+def _locks(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity):
+    _check_paths(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
     checked_dir(jfd,uid)
     entry_stat=os.fstat(entryfd)
     need(stat.S_ISREG(entry_stat.st_mode) and entry_stat.st_uid==uid
@@ -304,15 +319,25 @@ def _locks(jfd,entryfd,uid,expected_entry_identity):
         return lease
     except BaseException:os.close(lease);raise
 
-def status(parent,jfd,uid,old_entries,new_entries,history_refs=None):
+def status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs=None):
+    _check_paths(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
     if childstat(jfd,STATE) is None:
         if childstat(jfd,PREINTENT) is not None:
-            readfile(jfd,PREINTENT,uid,8192)
+            pre_raw=readfile(jfd,PREINTENT,uid,8192)
+            try:pre=json.loads(pre_raw.decode('utf8'))
+            except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
+            need(pre_raw==canonical(pre) and pre.get('format')==1
+                 and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST,
+                 'PREINTENT_BINDING_UNKNOWN')
+            need(history_refs is not None and pre.get('history')==capture_history(history_refs,uid),
+                 'PREINTENT_HISTORY_CHANGED')
         return {'state':'UNKNOWN_INSPECT_ONLY','retry_safe':False}
     verified_old_inventory(old_entries)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
     current_history=capture_history(history_refs,uid)
     j=journal(jfd,uid)
+    need(j['journal_parent_identity']==expected_journal_identity
+         and j['entry_identity']==expected_entry_identity,'JOURNAL_OWNER_BINDING_CHANGED')
     pre_raw=readfile(jfd,PREINTENT,uid,8192)
     try:pre=json.loads(pre_raw.decode('utf8'))
     except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
@@ -365,13 +390,12 @@ def status(parent,jfd,uid,old_entries,new_entries,history_refs=None):
     return {'state':state,'retry_safe':False,'attempt':j['attempt']}
 
 def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_identity,
-            expected_entry_identity,attempt,history_refs=None,fault=None):
+            expected_journal_identity,expected_entry_identity,attempt,history_refs=None,fault=None):
     """One-shot isolated transaction; caller supplies immutable old inventory and fd witnesses."""
     need(type(attempt) is str and 8<=len(attempt)<=80 and
          all(c.isalnum() or c in '-_' for c in attempt),'ATTEMPT_REQUIRED')
-    checked_dir(parent,uid)
-    need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
-    lease=_locks(jfd,entryfd,uid,expected_entry_identity)
+    _check_paths(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
+    lease=_locks(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
     try:
         need(childstat(jfd,STATE) is None and childstat(jfd,PREINTENT) is None and childstat(parent,STAGE) is None
              and childstat(parent,RETAINED) is None,'EXISTING_TRANSACTION_INSPECT_ONLY')
@@ -386,7 +410,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
                  old_manifest=OLD_MANIFEST,new_manifest=NEW_MANIFEST,
                  entry_identity=expected_entry_identity,
                  parent_identity=expected_parent_identity,
-                 journal_parent_identity=parent_ident(os.fstat(jfd)),history=history,
+                 journal_parent_identity=dirident(os.fstat(jfd)),history=history,
                  old_tree_sha=sha(canonical({x:sha(y) for x,y in old_entries.items()})),
                  new_tree_sha=sha(canonical({x:sha(y) for x,y in new_entries.items()})))
         writefile(jfd,PREINTENT,canonical(pre),uid)
@@ -399,11 +423,12 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
            'old_tree_sha':sha(canonical({x:sha(y) for x,y in old_entries.items()})),
            'new_tree_sha':sha(canonical({x:sha(y) for x,y in new_entries.items()})),
            'history':history,'entry_identity':expected_entry_identity,
-           'journal_parent_identity':parent_ident(os.fstat(jfd))}
+           'journal_parent_identity':dirident(os.fstat(jfd))}
         writefile(jfd,STATE,canonical(j),uid)
         if fault:fault('intent_fsynced')
         need(parent_ident(os.fstat(parent))==expected_parent_identity
-             and parent_ident(os.fstat(jfd))==j['journal_parent_identity']
+             and dirident(os.fstat(jfd))==j['journal_parent_identity']
+             and dirident(os.stat(JOURNAL_DIR,dir_fd=parent,follow_symlinks=False))==j['journal_parent_identity']
              and ident(os.fstat(entryfd))==expected_entry_identity
              and ident(os.fstat(lease))==ident(os.stat(LOCK,dir_fd=jfd,follow_symlinks=False)),
              'FINAL_LEASE_OR_PARENT_CHANGED')
@@ -416,7 +441,7 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
         try:
             if fault:fault('after_exchange')
             os.fsync(parent)
-            result=status(parent,jfd,uid,old_entries,new_entries,history_refs)
+            result=status(parent,jfd,entryfd,uid,old_entries,new_entries,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs)
             need(result['state']=='SWAPPED_OLD_RETAINED_IN_STAGE','SWITCH_STATUS_UNKNOWN')
             return result
         except BaseException:raise Hold('POST_SWITCH_UNKNOWN_INSPECT_ONLY')
@@ -425,10 +450,10 @@ def execute(parent,jfd,entryfd,old_entries,new_archive,uid,expected_parent_ident
 def _close_lease(fd):
     os.close(fd)
 
-def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_entry_identity,history_refs=None):
-    checked_dir(parent,uid)
+def rollback(parent,jfd,entryfd,old_entries,new_entries,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,history_refs=None):
+    _check_paths(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
     need(history_refs is not None,'HISTORICAL_BINDINGS_REQUIRED')
-    lease=_locks(jfd,entryfd,uid,expected_entry_identity)
+    lease=_locks(parent,jfd,entryfd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity)
     try:
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,RETAINED) is None,'ROLLBACK_CONFLICT')
         capture_history(history_refs,uid)
