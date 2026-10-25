@@ -54,8 +54,8 @@ SCRIPTS_DIR=PARENT
 MODULE_PINS={
     # Updated together with this fixed entry after isolated review. Runtime still
     # requires these exact bytes; post-B adds no alternate import/execution path.
-    'community_preview_carrier_handoff_admission.py':'0000000000000000000000000000000000000000000000000000000000000000',
-    'community_preview_carrier_handoff_call.py':'0000000000000000000000000000000000000000000000000000000000000000'
+    'community_preview_carrier_handoff_admission.py':'23291b8f3433461962721e31cc8f5ea38aef3413',
+    'community_preview_carrier_handoff_call.py':'52d6db8d4a45b64c5a0de6202920da9f0033666c'
 }
 ATTEMPT='community-update-f13155ed63a3-818fe0b0622c-stopped-v1'
 OPERATIONS=('execute','status','rollback','post-b-execute','post-b-status','post-b-rollback')
