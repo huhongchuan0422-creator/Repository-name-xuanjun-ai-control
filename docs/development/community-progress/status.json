@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-10-25T01:29:12.623267+00:00",
+  "checked_at": "2026-10-25T06:37:29.059288+00:00",
   "branch": "feature/chatgpt-community-wechat-sp-offline-20261017",
-  "head_sha": "a279aad8a014304519b3dae73c7a39766cab90d4",
+  "head_sha": "0d81c7970b40aab81ff43f4d35fb88c2f5fe9ec1",
   "current_module": "最终候选需求交叉追踪与外部接线证据核对（阶段仍为PARTIAL）",
   "phases": {
     "1": {
@@ -13,11 +13,19 @@
       "remaining": 7
     }
   },
-  "last_code_sha": "1f5e60d4a6d84342f430922509eb71c9c06b1475",
-  "last_code_at": "2026-10-24T23:17:55Z",
-  "status": "无提交进展",
-  "ci": [],
-  "ci_status": "NOT_RUN_OR_NOT_FOUND",
+  "last_code_sha": "abc9b23ed79425d000e7aff0760081b37cf75c95",
+  "last_code_at": "2026-10-25T06:20:45Z",
+  "status": "最近20分钟有代码提交",
+  "ci": [
+    {
+      "id": 40168761919,
+      "name": "Community WeChat SP Offline Gate",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/40168761919"
+    }
+  ],
+  "ci_status": "SEE_RUN_RESULTS",
   "blockers": [
     "当前候选版本的真实商户、产品权限和接线验收回执待核实；不据缺少回执判断账号未配置",
     "最终源码、12组/40叶多对多追踪与准确版本CI需统一后集中独立审核；基线回执不覆盖后续提交",
