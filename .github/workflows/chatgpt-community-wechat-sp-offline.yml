@@ -725,7 +725,7 @@ jobs:
               carrier_archive_sha256=hashlib.sha256((dest/'control-stopped-v1.zip').read_bytes()).hexdigest(),
               carrier_manifest_sha256=hashlib.sha256((dest/'manifest.json').read_bytes()).hexdigest(),
               install_authorized=False,site_executed=False,bc_executed=False,files=files)
-          (dest/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\\n')
+          (dest/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\n')
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
