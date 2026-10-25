@@ -4,7 +4,7 @@ The fixed caller now verifies and compiles the exact hash-pinned transaction/cal
 
 
 
-At the current source head, the fixed caller is `scripts/community_preview_carrier_handoff_entry.py`, 16414 UTF-8 bytes, SHA256 `a1ae8e2f290da83e6ce6b095721007e31513568fe440aaddff286e7e5a842071`. It reads only fixed old/new input filenames, validates both archive pins, verifies and loads exact hash-pinned transaction/call module bytes from the protected parent, and reads a short-lived operation-bound approval record. It has a fixed CLI with no approval bypass flags; root/admin identity alone is not authorization. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
+At the current source head, the fixed caller is `scripts/community_preview_carrier_handoff_entry.py`, 16564 UTF-8 bytes, SHA256 `7d2b997a4df4ab20b48016cf03f27530db779aa6a76cbe943bacd7ec6a5776a6`. It reads only fixed old/new input filenames, validates both archive pins, verifies and loads exact hash-pinned transaction/call module bytes from the protected parent, and reads a short-lived operation-bound approval record. It has a fixed CLI with no approval bypass flags; root/admin identity alone is not authorization. The caller reads the exact fixed inputs from the existing protected parent; it does not accept caller-supplied archive bytes.
 
 Fixed input files (must already exist; code never creates or downloads them):
 - `/opt/xuanjun-community-preview/control-stopped-v1-1d639.zip`
@@ -52,10 +52,10 @@ This is source/caller implementation only. The original installer has not been e
 
 ### Current fixed caller hashes and acceptance boundary
 
-- Caller `scripts/community_preview_carrier_handoff_entry.py`: 16414 bytes, SHA256 `a1ae8e2f290da83e6ce6b095721007e31513568fe440aaddff286e7e5a842071`, Git blob `de68be5edc296297b2ddd1b0cb449a2254411fba`.
+- Caller `scripts/community_preview_carrier_handoff_entry.py`: 16564 bytes, SHA256 `7d2b997a4df4ab20b48016cf03f27530db779aa6a76cbe943bacd7ec6a5776a6`, Git blob `de68be5edc296297b2ddd1b0cb449a2254411fba`.
 - Transaction module `scripts/community_preview_carrier_handoff_admission.py`: 35329 bytes, SHA256 `c23f183753e726dd25a117f730d4180da4f59dcde379591d1dfae5258f74f386`.
 - Call module `scripts/community_preview_carrier_handoff_call.py`: 3461 bytes, SHA256 `a597e426c0cd696621594c8c62f0fc300fc2a67d17e67236891c0421b8f0a5bc`.
-- Entry tests `tests/test_community_preview_carrier_handoff_entry.py`: 10492 bytes, SHA256 `21f65643cc66a047dc4b72447f0ef59366b25466b1be81e513cbb337a464593c`.
+- Entry tests `tests/test_community_preview_carrier_handoff_entry.py`: 10982 bytes, SHA256 `e06ce3d1e9094e0522b6df7e97e8d6accf3367efe7aa131d617ba88aae0833e5`.
 - Existing fixed `resume-b-partial.sh`: 1883 bytes, SHA256 `40c3a03ae9da44d404e2cdf8c58b5507f73825c244d08ddd70b0ceee5a27b42f`; unchanged.
 
 The fixed caller no longer accepts an external `authority_checker`. It reads the exact old/new archives from fixed root-owned 0600 single-link files, validates archive/manifest pins, loads only transaction/call modules matching pinned SHA from the protected parent, and requires the fixed short-lived approval record for the requested operation. The approval schema above is illustrative only; no real approval is embedded in source. Missing/expired/mismatched approval or input holds before transaction mutation.
@@ -66,7 +66,7 @@ sudo -n /usr/bin/python3 -I -B -S /opt/xuanjun-community-preview/community_previ
 ```
 On UNKNOWN, do not repeat execute. Obtain a fresh operation-bound status approval and call `status` read-only. Rollback requires a separate operation-bound approval and the transaction's exact ownership/history/absence guards. No approval bypass flags exist.
 
-The earlier 48/48 local evidence was from reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; it is **not** an exact-current-HEAD Hosted result. Current exact HEAD CI/raw log is not verified by the available connector. `REAL_PYTHON_3_6_8=NOT_RUN`. The original installation operator must deliver exact caller/module/input files through the already-approved delivery path and create a real short-lived approval only after package review and explicit per-operation site approval. No production action was performed by this source task.
+The earlier 48/48 local evidence was from reconstructed e96 source plus scope-equivalent patches under Python 3.13.5; it predates the protected approval-record and standalone caller changes, so it is **not** evidence for this current candidate. Current expected scope is 38 transaction tests + 5 call-adapter tests + 15 entry/approval tests = 58 tests; exact-current-HEAD execution is pending. Current exact HEAD CI/raw log is not verified by the available connector. `REAL_PYTHON_3_6_8=NOT_RUN`. The original installation operator must deliver exact caller/module/input files through the already-approved delivery path and create a real short-lived approval only after package review and explicit per-operation site approval. No production action was performed by this source task.
 
 ---
 
