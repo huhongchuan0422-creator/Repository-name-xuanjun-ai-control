@@ -318,6 +318,10 @@ def run(operation):
     post_b=operation.startswith('post-b-');base_operation=operation[7:] if post_b else operation
     approval_name=POST_B_APPROVAL_NAME if post_b else APPROVAL_NAME
     approval_operation=operation if post_b else base_operation
+    if post_b:
+        require(type(POST_B_NEW_ARCHIVE_SHA256) is str and len(POST_B_NEW_ARCHIVE_SHA256)==64
+                and type(POST_B_NEW_MANIFEST_SHA256) is str and len(POST_B_NEW_MANIFEST_SHA256)==64,
+                'POST_B_CANDIDATE_PINS_NOT_REGISTERED')
     identify_admin()
     _verify_runtime_sources()
     with contextlib.ExitStack() as stack:
