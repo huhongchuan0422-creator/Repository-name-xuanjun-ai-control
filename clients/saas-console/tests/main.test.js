@@ -126,3 +126,68 @@ test('CUS008 renders accepted revision, correction basis, historical download an
  const submit=find(root,x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(submit);await submit.onclick();
  assert.deepEqual(transitionArgs,['A','license',4,'submit','']);assert.ok(checks>=2);assert.equal(app.current.id,'A');
 });
+
+test('CUS008 uncertain submit refreshes server state and restores button only when still actionable',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','csrf');let transitionCalls=0,checkCalls=0;
+ const item={id:'license',title:'企业授权',purpose:'核实签约关系',required:true,state:'PARTIAL',revision:1,accepted_revision:null,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[]};
+ const a={id:'A',title:'A',role:'OWNER'};
+ const api=apiBase({
+  checklist:async()=>{checkCalls++;return{requirements_revision:1,overall:'PARTIAL',items:[item]}},
+  transition:async()=>{transitionCalls++;const e=Error('lost');e.uncertain=true;e.status=0;throw e},
+  downloadUrl:()=>'/unused'
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const first=find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(first);
+ await first.onclick();
+ assert.equal(transitionCalls,1);assert.ok(checkCalls>=2);
+ const recovered=find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(recovered);assert.equal(recovered.disabled,false);
+ assert.match(d.m.get('status').textContent,/不会自动重投/);
+});
+
+test('CUS008 submit button blocks duplicate clicks while request is in flight',async()=>{
+ const d=doc(),s=ss(),pending=deferred();s.setItem('xj_csrf','csrf');let transitionCalls=0,state='PARTIAL';
+ const item=()=>({id:'license',title:'企业授权',purpose:'核实签约关系',required:true,state,revision:1,accepted_revision:null,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[]});
+ const a={id:'A',title:'A',role:'OWNER'};
+ const api=apiBase({
+  checklist:async()=>({requirements_revision:1,overall:'PARTIAL',items:[item()]}),
+  transition:async()=>{transitionCalls++;return pending.promise},
+  downloadUrl:()=>'/unused'
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const submit=find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(submit);
+ const first=submit.onclick();assert.equal(submit.disabled,true);await submit.onclick();assert.equal(transitionCalls,1);
+ state='SUBMITTED';pending.resolve({state:'SUBMITTED',revision:2,accepted_revision:null});await first;
+ assert.equal(transitionCalls,1);assert.equal(find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核'),null);
+});
+
+test('CUS008 late submit success from A cannot reopen A after switching to B',async()=>{
+ const d=doc(),s=ss(),pending=deferred();s.setItem('xj_csrf','csrf');let transitionCalls=0;
+ const a={id:'A',title:'A',role:'OWNER'},b={id:'B',title:'B',role:'OWNER'};
+ const item={id:'license',title:'企业授权',purpose:'核实签约关系',required:true,state:'PARTIAL',revision:1,accepted_revision:null,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[]};
+ const api=apiBase({
+  checklist:async id=>({requirements_revision:1,overall:'PARTIAL',items:id==='A'?[item]:[]}),
+  transition:async()=>{transitionCalls++;return pending.promise},
+  downloadUrl:()=>'/unused'
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const submit=find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(submit);
+ const inflight=submit.onclick();await app.open(b);assert.equal(app.current.id,'B');
+ pending.resolve({state:'SUBMITTED',revision:2,accepted_revision:null});await inflight;
+ assert.equal(transitionCalls,1);assert.equal(app.current.id,'B');assert.equal(d.m.get('title').textContent,'B');assert.equal(d.m.get('detail').hidden,false);
+});
+
+test('CUS008 uncertain submit that already committed refreshes to SUBMITTED and removes stale button',async()=>{
+ const d=doc(),s=ss();s.setItem('xj_csrf','csrf');let transitionCalls=0,checks=0;
+ const a={id:'A',title:'A',role:'OWNER'};
+ const base={id:'license',title:'企业授权',purpose:'核实签约关系',required:true,revision:1,accepted_revision:null,submission_type:'PRIVATE_DOCUMENT',valid_until:null,versions:[]};
+ const api=apiBase({
+  checklist:async()=>{checks++;return{requirements_revision:1,overall:'PARTIAL',items:[{...base,state:checks===1?'PARTIAL':'SUBMITTED',revision:checks===1?1:2}]}},
+  transition:async()=>{transitionCalls++;const e=Error('lost after commit');e.uncertain=true;e.status=0;throw e},
+  downloadUrl:()=>'/unused'
+ });
+ const app=createConsoleApp({document:d,storage:ss(),session:s,api});await app.open(a);
+ const submit=find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核');assert.ok(submit);await submit.onclick();
+ assert.equal(transitionCalls,1);assert.ok(checks>=2);
+ assert.equal(find(d.m.get('requirements'),x=>x.tagName==='button'&&x.textContent==='提交审核'),null);
+ assert.ok(find(d.m.get('requirements'),x=>x.textContent.includes('状态：SUBMITTED')));
+});
