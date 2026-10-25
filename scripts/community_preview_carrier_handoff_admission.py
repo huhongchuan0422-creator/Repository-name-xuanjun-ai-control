@@ -49,6 +49,12 @@ def childstat(fd,name):
     try:return os.stat(name,dir_fd=fd,follow_symlinks=False)
     except FileNotFoundError:return None
 
+def checked_parent(fd,uid):
+    st=os.fstat(fd)
+    need(stat.S_ISDIR(st.st_mode) and st.st_uid==uid
+         and not(stat.S_IMODE(st.st_mode)&0o022),'UNTRUSTED_PARENT_DIR')
+    return parent_ident(st)
+
 def checked_dir(fd,uid):
     st=os.fstat(fd)
     need(stat.S_ISDIR(st.st_mode) and st.st_uid==uid and stat.S_IMODE(st.st_mode)==0o700,
@@ -290,7 +296,7 @@ def journal(jfd,uid):
     return v
 
 def _check_paths(parent,jfd,entryfd,leasefd,uid,expected_parent_identity,expected_journal_identity,expected_entry_identity,expected_lock_identity):
-    checked_dir(parent,uid)
+    checked_parent(parent,uid)
     need(parent_ident(os.fstat(parent))==expected_parent_identity,'PARENT_IDENTITY_CHANGED')
     need(dirident(os.fstat(jfd))==expected_journal_identity
          and dirident(os.stat(JOURNAL_DIR,dir_fd=parent,follow_symlinks=False))==expected_journal_identity,
@@ -327,8 +333,9 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
             pre_raw=readfile(jfd,PREINTENT,uid,8192)
             try:pre=json.loads(pre_raw.decode('utf8'))
             except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
-            need(pre_raw==canonical(pre) and pre.get('format')==1
-                 and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST
+            need(type(pre) is dict and set(pre)=={'format','attempt','old_identity','old_manifest','new_manifest','entry_identity','parent_identity','journal_parent_identity','lock_identity','history','old_tree_sha','new_tree_sha'}
+                 and type(pre.get('format')) is int and pre.get('format')==1
+                 and pre_raw==canonical(pre) and pre.get('old_manifest')==OLD_MANIFEST and pre.get('new_manifest')==NEW_MANIFEST
                  and pre.get('parent_identity')==expected_parent_identity
                  and pre.get('journal_parent_identity')==expected_journal_identity
                  and pre.get('entry_identity')==expected_entry_identity
@@ -347,7 +354,9 @@ def status(parent,jfd,entryfd,leasefd,uid,old_entries,new_entries,expected_paren
     pre_raw=readfile(jfd,PREINTENT,uid,8192)
     try:pre=json.loads(pre_raw.decode('utf8'))
     except (ValueError,UnicodeError):raise Hold('PREINTENT_UNKNOWN')
-    need(pre_raw==canonical(pre) and pre['attempt']==j['attempt']
+    need(type(pre) is dict and set(pre)=={'format','attempt','old_identity','old_manifest','new_manifest','entry_identity','parent_identity','journal_parent_identity','lock_identity','history','old_tree_sha','new_tree_sha'}
+         and type(pre.get('format')) is int and pre.get('format')==1
+         and pre_raw==canonical(pre) and pre['attempt']==j['attempt']
          and pre['old_identity']==j['old_identity']
          and pre['old_manifest']==OLD_MANIFEST
          and pre['new_manifest']==NEW_MANIFEST
