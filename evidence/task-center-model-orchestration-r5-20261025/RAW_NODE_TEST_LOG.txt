@@ -1,0 +1,2 @@
+task_center_digital_twin.test: PASS
+EXIT_CODE=0

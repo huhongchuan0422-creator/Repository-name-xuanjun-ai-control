@@ -1,0 +1,254 @@
+SCOPED_EXECUTIONS=213
+SCOPED_DISTINCT_IDS=168
+EXCLUDED_LEGACY_MIGRATION=3
+NOT_EXECUTED=tests.test_task_supervisor.SupervisorTests.test_v2_active_attempt_migrates_to_unknown_hold
+NOT_EXECUTED=tests.test_task_supervisor.SupervisorTests.test_v2_migration_failpoints_rollback_and_restart_cleanly
+NOT_EXECUTED=tests.test_task_supervisor.SupervisorTests.test_v2_normal_open_is_zero_write_then_explicit_migration
+test_5_10_15_recovery_is_bounded_and_no_takeover (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ack_commit_blocks_old_attempt_before_new_claim (tests.test_task_supervisor.SupervisorTests) ... ok
+test_assigned_responsibility_is_bound_to_claim (tests.test_task_supervisor.SupervisorTests) ... ok
+test_deadlines_trigger_even_before_generic_age (tests.test_task_supervisor.SupervisorTests) ... ok
+test_delayed_exact_replay_remains_idempotent (tests.test_task_supervisor.SupervisorTests) ... ok
+test_development_contract_is_canonical_idempotent_and_conflicting (tests.test_task_supervisor.SupervisorTests) ... ok
+test_event_id_reuse_with_different_bytes_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_exact_handoff_allows_new_claim_only_after_reconciliation (tests.test_task_supervisor.SupervisorTests) ... ok
+test_failed_development_completion_never_unlocks_dependency (tests.test_task_supervisor.SupervisorTests) ... ok
+test_fence_and_epoch_must_increase_after_handoff (tests.test_task_supervisor.SupervisorTests) ... ok
+test_future_or_reordered_event_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_future_schema_version_fails_closed (tests.test_task_supervisor.SupervisorTests) ... ok
+test_handoff_ack_exact_replay_survives_attempt_clear (tests.test_task_supervisor.SupervisorTests) ... ok
+test_handoff_rejects_empty_new_identity (tests.test_task_supervisor.SupervisorTests) ... ok
+test_heartbeat_cannot_delay_ten_or_fifteen_minute_actions (tests.test_task_supervisor.SupervisorTests) ... ok
+test_heartbeat_does_not_refresh_progress (tests.test_task_supervisor.SupervisorTests) ... ok
+test_late_handoff_requires_fresh_attempt_deadlines (tests.test_task_supervisor.SupervisorTests) ... ok
+test_lost_completion_notification_retries_bounded (tests.test_task_supervisor.SupervisorTests) ... ok
+test_malformed_auxiliary_schema_fails_at_initialization (tests.test_task_supervisor.SupervisorTests) ... ok
+test_missing_foreign_key_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_normal_exit_without_receipt_becomes_visible_hold_action (tests.test_task_supervisor.SupervisorTests) ... ok
+test_old_writer_cannot_resume_after_ack_and_new_attempt (tests.test_task_supervisor.SupervisorTests) ... ok
+test_quota_unavailable_is_terminal_durable_and_not_fake_running (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ready_fair_scan_and_dependencies (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ready_scan_does_not_starve_later_eligible_task (tests.test_task_supervisor.SupervisorTests) ... ok
+test_real_progress_requires_bound_evidence (tests.test_task_supervisor.SupervisorTests) ... ok
+test_real_progress_resets_recovery_budget (tests.test_task_supervisor.SupervisorTests) ... ok
+test_receiver_without_ack_cannot_release_responsibility (tests.test_task_supervisor.SupervisorTests) ... ok
+test_recovery_generation_prevents_outbox_collision_after_progress (tests.test_task_supervisor.SupervisorTests) ... ok
+test_single_writer_cas_and_duplicate_event (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervision_action_and_hold_survive_restart (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervisor_liveness_never_claims_process_verified (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervisor_liveness_survives_restart (tests.test_task_supervisor.SupervisorTests) ... ok
+test_terminal_artifact_hash_is_strict (tests.test_task_supervisor.SupervisorTests) ... ok
+test_terminal_outbox_survives_restart_and_deduplicates (tests.test_task_supervisor.SupervisorTests) ... ok
+test_two_connections_serialize_ack_and_old_terminal (tests.test_task_supervisor.SupervisorTests) ... ok
+test_two_connections_serialize_terminal_and_l3_scan (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unclaimed_or_unsafe_success_cannot_unlock_dependency (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unknown_database_rejected_without_journal_mutation (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unknown_side_effects_preserved_in_visible_hold (tests.test_task_supervisor.SupervisorTests) ... ok
+test_v1_normal_open_is_zero_write_hold (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ack_binds_scope_and_coverage_and_is_append_once (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_arbitrary_or_missing_field_invalidation_receipt_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_clock_rollback_and_expiry_use_supervisor_clock_only (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_commit_api_has_no_per_call_lock_root_or_time_override (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_complete_revocation_cannot_bypass_drain_or_unknown (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_confirm_rejects_missing_fields_wrong_marker_and_content_match (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_cross_task_same_resource_conflicts (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_dispatch_current_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_drain_current_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_duplicate_operation_concurrent_has_one_row (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_fake_transaction_sink_produces_attributable_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_final_receipt_store_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_gapless_takeover_rejects_old_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_git_observed_revision_is_persisted_and_immutable (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_invalidation_receipt_must_bind_old_identity_spec_scope_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_kill_restart_preserves_dispatching_as_unresolved (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_local_only_production_verdict_is_fixed_hold_and_unknown_is_hold (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_lock_root_mode_symlink_and_path_swap_fail_closed (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_multi_resource_claim_rolls_back_atomically (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_offline_git_cas_binds_commit_and_canonical_segments (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_operation_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_os_exit_releases_shared_lock_but_unresolved_effect_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_prepared_can_only_reconcile_not_applied (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_reconcile_unknown_without_redispatch_and_one_final_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_resource_alias_whitespace_control_and_dot_paths_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoke_waits_shared_lease_times_out_then_resumes_same_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoking_rejects_new_intent_and_effect (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_stolen_ticket_caller_only_change_is_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_store_allocates_exact_max_plus_one_and_binds_caller (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_two_connections_claim_single_winner (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_full_source_recovery_persists_inventory_then_takeover (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_observations_append_without_consuming_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_recovery_insufficient_or_conflicting_inventory_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_changed_bundle_and_canonical_event_id_mismatch_rejected (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_completion_restart_idempotent_and_conflict_stays_closed (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_development_action_holds_without_existing_inputs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_and_finalize_entry_uses_existing_ledger_and_git (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_flow_is_isolated_across_two_same_process_runs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_duplicate_module_import_keeps_controlled_fixture_isolated (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_exact_reviews_revoke_coverage_then_unlock_registered_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_final_completion_api_has_no_caller_now_override (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_missing_reviewer_holds_and_does_not_unlock_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_pass_does_not_complete_or_unlock_before_revocation (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_policy_and_wrong_commit_cannot_replace_canonical_contract (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_revoking_and_unresolved_operation_block_final_success (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_ack_binds_scope_and_coverage_and_is_append_once (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_arbitrary_or_missing_field_invalidation_receipt_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_clock_rollback_and_expiry_use_supervisor_clock_only (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_commit_api_has_no_per_call_lock_root_or_time_override (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_complete_revocation_cannot_bypass_drain_or_unknown (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_confirm_rejects_missing_fields_wrong_marker_and_content_match (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_cross_task_same_resource_conflicts (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_dispatch_current_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_drain_current_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_duplicate_operation_concurrent_has_one_row (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_fake_transaction_sink_produces_attributable_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_final_receipt_store_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_gapless_takeover_rejects_old_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_git_observed_revision_is_persisted_and_immutable (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_invalidation_receipt_must_bind_old_identity_spec_scope_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_kill_restart_preserves_dispatching_as_unresolved (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_local_only_production_verdict_is_fixed_hold_and_unknown_is_hold (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_lock_root_mode_symlink_and_path_swap_fail_closed (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_multi_resource_claim_rolls_back_atomically (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_offline_git_cas_binds_commit_and_canonical_segments (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_operation_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_os_exit_releases_shared_lock_but_unresolved_effect_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_prepared_can_only_reconcile_not_applied (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_reconcile_unknown_without_redispatch_and_one_final_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_resource_alias_whitespace_control_and_dot_paths_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoke_waits_shared_lease_times_out_then_resumes_same_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoking_rejects_new_intent_and_effect (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_stolen_ticket_caller_only_change_is_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_store_allocates_exact_max_plus_one_and_binds_caller (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_two_connections_claim_single_winner (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_full_source_recovery_persists_inventory_then_takeover (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_observations_append_without_consuming_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_recovery_insufficient_or_conflicting_inventory_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_all_tasks_are_assessed_without_first_task_shortcut (tests.test_entry_review_gate.BatchTests) ... ok
+test_bad_inventory_visible_and_no_unbounded_scan (tests.test_entry_review_gate.BatchTests) ... ok
+test_one_forged_receipt_does_not_hide_other_overdue_tasks (tests.test_entry_review_gate.BatchTests) ... ok
+test_receiver_without_ack_never_closes_handoff (tests.test_entry_review_gate.BatchTests) ... ok
+test_changed_bundle_and_canonical_event_id_mismatch_rejected (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_completion_restart_idempotent_and_conflict_stays_closed (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_development_action_holds_without_existing_inputs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_and_finalize_entry_uses_existing_ledger_and_git (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_flow_is_isolated_across_two_same_process_runs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_duplicate_module_import_keeps_controlled_fixture_isolated (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_exact_reviews_revoke_coverage_then_unlock_registered_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_final_completion_api_has_no_caller_now_override (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_missing_reviewer_holds_and_does_not_unlock_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_pass_does_not_complete_or_unlock_before_revocation (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_policy_and_wrong_commit_cannot_replace_canonical_contract (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_revoking_and_unresolved_operation_block_final_success (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_all_policy_fields_bound_to_digest (tests.test_entry_review_gate.ReviewTests) ... ok
+test_changed_code_invalidates_reviews (tests.test_entry_review_gate.ReviewTests) ... ok
+test_clock_drift (tests.test_entry_review_gate.ReviewTests) ... ok
+test_each_canonical_binding_field_rejects_unrelated_evidence (tests.test_entry_review_gate.ReviewTests) ... ok
+test_exact_authorized_file_set_required (tests.test_entry_review_gate.ReviewTests) ... ok
+test_handoff_requires_full_same_attempt_proof (tests.test_entry_review_gate.ReviewTests) ... ok
+test_invalid_task_repository_and_policy_paths (tests.test_entry_review_gate.ReviewTests) ... ok
+test_paths_encoding_and_limits (tests.test_entry_review_gate.ReviewTests) ... ok
+test_read_heartbeat_and_missing_progress_do_not_close (tests.test_entry_review_gate.ReviewTests) ... ok
+test_real_progress_and_bound_hold (tests.test_entry_review_gate.ReviewTests) ... ok
+test_same_key_cannot_claim_two_independent_reviewers (tests.test_entry_review_gate.ReviewTests) ... ok
+test_stale_future_unsigned_evidence_rejected (tests.test_entry_review_gate.ReviewTests) ... ok
+test_string_policy_and_duplicate_identity_rejected (tests.test_entry_review_gate.ReviewTests) ... ok
+test_tampered_forged_or_duplicate_reviews (tests.test_entry_review_gate.ReviewTests) ... ok
+test_three_entries_require_authenticated_independent_review (tests.test_entry_review_gate.ReviewTests) ... ok
+test_atomic_terminal_outbox_and_sent_ack_are_distinct (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_checkpoint_match_grant_once_expiry_and_revoke (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_claim_requires_exact_registered_resource_set (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_complete_event_identity_allows_same_attempt_event_per_task (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_complete_resume_keeps_started_fact_and_records_failure (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_cross_tenant_progress_and_terminal_reject_before_any_write (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_cycle_and_duplicate_graph_conflict_rejected (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_duplicate_delivery_and_out_of_order_old_version (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_dynamic_graph_and_two_tenant_isolation (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_expired_grant_and_restart_projection_consistency (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_full_wait_do_c_b_event_safe_yield_resume_a (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_gateway_scan_exempts_real_dependency_wait_from_ready_timeout (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_long_dependency_wait_unlocks_fresh_dispatch_clock_and_starts (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_multi_project_cross_board_partial_flow_and_tenant_projection (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_only_scheduler_and_twin_module_contracts_exist (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_projection_reports_hold_failure_and_distinct_resolver (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_resource_conflict_nonpreemptible_and_safe_release (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_restart_converges_claim_before_grant_consume_without_started (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_resume_race_rolls_back_claim_and_does_not_consume_twice (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_start_requires_ack_matching_evidence_and_resume_grant (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_waiting_dependency_not_reported_timeout (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_wrong_dependency_evidence_never_unlocks_start (tests.test_reusable_task_gateway.KernelTests) ... ok
+test_app_demo_is_multi_project_dynamic_and_restart_rebuilds (tests.test_reusable_scheduler_cli.SchedulerCliTests) ... ok
+test_arbitrary_graph_register_project_and_export_ui (tests.test_reusable_scheduler_cli.SchedulerCliTests) ... ok
+test_demo_restarts_to_identical_projection (tests.test_reusable_scheduler_cli.SchedulerCliTests) ... ok
+test_model_admin_api_is_server_backed_masked_and_authorized (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_mutation_and_path_escape_are_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_non_loopback_bind_is_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_get_is_read_only_with_active_wal (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_rejects_existing_database_with_missing_schema (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_cross_tenant_and_wrong_version_reject_without_writes (tests.test_task_center_execution_contract.ExternalReceiptContractTests) ... ok
+test_p2_p3_phase_mapping_is_validation_only (tests.test_task_center_execution_contract.ExternalReceiptContractTests) ... ok
+test_raw_tenant_or_unknown_source_cannot_bypass_context (tests.test_task_center_execution_contract.ExternalReceiptContractTests) ... ok
+test_accepted_request_never_claims_external_execution (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_cross_tenant_action_is_rejected_without_writes (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_duplicate_and_restart_are_idempotent_not_reexecuted (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_expired_authorization_is_not_current_permission (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_historical_or_read_only_capability_cannot_authorize_write (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_missing_goal_or_acceptance_is_rejected (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_unapproved_scope_expansion_and_self_review_are_rejected (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_unknown_asset_state_cannot_be_new_or_admitted (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_wrong_writer_and_wrong_asset_version_are_rejected (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_429_is_bounded_retry_and_disable_cancels_queue (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cancel_before_call_and_cost_unknown_are_truthful (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_circuit_breaker_opens_after_three_real_failures (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_expired_worker_lease_converges_unknown_without_retry (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_free_capable_first_and_self_review_forbidden (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_independent_review_rework_and_acceptance_gates (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_master_key_file_requires_0600 (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_persistent_queue_idempotency_success_usage_and_restart (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_rate_and_concurrency_limits_leave_request_queued (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_real_http_adapters_parse_success_auth_rate_and_timeout (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_scheduler_runtime_once_continues_without_browser (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_secret_encrypted_masked_and_never_audited_or_projected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_skill_binding_requires_review (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_stale_attempt_or_revoked_writer_never_calls_provider (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_ten_provider_limit_and_tenant_isolation (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_timeout_is_unknown_not_blind_retry (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unknown_price_not_treated_free_and_paid_requires_authority (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unknown_price_usage_remains_unknown_not_zero (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unqualified_writer_model_is_rejected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_project_to_model_to_independent_review_acceptance (tests.test_task_center_full_journey.FullJourneyTests) ... task-center-app: "GET /api/admin/model-control HTTP/1.1" 403 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /admin.html HTTP/1.1" 200 -
+task-center-app: "POST /api/projection HTTP/1.1" 405 -
+task-center-app: "GET /../../etc/passwd HTTP/1.1" 404 -
+task-center-app: "GET /api/projection HTTP/1.1" 200 -
+task-center-app: "GET /api/projection HTTP/1.1" 200 -
+task-center-app: "GET / HTTP/1.1" 200 -
+task-center-app: "GET /api/projection HTTP/1.1" 500 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/projection HTTP/1.1" 200 -
+ok
+
+----------------------------------------------------------------------
+Ran 213 tests in 22.976s
+
+OK

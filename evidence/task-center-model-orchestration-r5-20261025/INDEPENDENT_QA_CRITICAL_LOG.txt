@@ -1,0 +1,18 @@
+test_scope_reviewer_role_check_and_action_insert_are_atomic (tests.test_execution_policy_gateway.ExecutionPolicyGatewayTests) ... ok
+test_provider_and_model_price_transitions_are_transactional (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_model_insert_and_provider_price_change_are_transactional (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_free_provider_cannot_become_paid_while_free_model_remains (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_paid_provider_cannot_disguise_model_as_free_without_costs (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_independent_review_rework_and_acceptance_gates (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_older_review_passed_candidate_cannot_supersede_new_submission (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_candidate_hash_identity_and_current_attempt_are_enforced (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cross_task_idempotency_conflict_and_late_worker_result_rejected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_persistent_queue_idempotency_success_usage_and_restart (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_terminal_artifact_hash_is_strict (tests.test_task_supervisor.SupervisorTests) ... ok
+test_terminal_outbox_survives_restart_and_deduplicates (tests.test_task_supervisor.SupervisorTests) ... ok
+test_delayed_exact_replay_remains_idempotent (tests.test_task_supervisor.SupervisorTests) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 5.103s
+
+OK
