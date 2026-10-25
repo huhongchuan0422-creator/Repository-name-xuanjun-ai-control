@@ -1,0 +1,46 @@
+{
+  "graph_id": "customer-delivery-demo-v1",
+  "tenant_id": "tenant-demo",
+  "project_id": "project-demo",
+  "graph_version": "v1",
+  "tasks": [
+    {
+      "task_id": "qa-node",
+      "node_id": "qa-acceptance",
+      "stage": "QA",
+      "owner": "qa",
+      "entry": "TEST_ONLY",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "input_version": "candidate-v1",
+      "output_version": "accepted-v1",
+      "priority": 50,
+      "preemptible": true,
+      "module_id": "xuanjun.scheduler.kernel",
+      "resources": ["fake:qa/demo"],
+      "dependencies": [],
+      "completion_evidence": [{"evidence_ref": "qa-report-demo"}]
+    },
+    {
+      "task_id": "delivery-node",
+      "node_id": "delivery",
+      "stage": "DELIVERY",
+      "owner": "developer",
+      "entry": "TEST_ONLY",
+      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "spec_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "input_version": "accepted-v1",
+      "output_version": "delivery-v1",
+      "priority": 100,
+      "preemptible": true,
+      "module_id": "xuanjun.scheduler.kernel",
+      "resources": ["fake:delivery/demo"],
+      "dependencies": [{
+        "task_id": "qa-node",
+        "version": "accepted-v1",
+        "evidence_ref": "qa-report-demo"
+      }],
+      "completion_evidence": [{"evidence_ref": "delivery-receipt-demo"}]
+    }
+  ]
+}

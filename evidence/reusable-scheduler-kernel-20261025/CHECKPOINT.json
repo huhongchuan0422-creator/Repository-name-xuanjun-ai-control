@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "status": "LOCAL_TEST_CANDIDATE",
+  "base_commit": "8aa66c43ebfa19a760e5270157e14464f2f46c1c",
+  "branch": "feature/reusable-scheduler-kernel-20261025",
+  "completed": [
+    "dynamic development task graph",
+    "canonical SQLite event/outbox integration",
+    "durable inbox dedupe and version/evidence gate",
+    "checkpoint safe-yield and one-shot resume grant",
+    "trusted TEST_ONLY tenant context",
+    "restart-rebuild digital twin projection",
+    "scheduler and twin module contracts",
+    "scope correction removes OCR business adapter"
+  ],
+  "tests": {
+    "new_integration": "11/11 PASS",
+    "unchanged_supported_and_integration": "41/41 + 77/77 PASS",
+    "restart_projection": "PASS",
+    "unchanged_v2_migration_on_sqlite_3_26": "NOT_EXECUTED"
+  },
+  "inflight": [],
+  "blocked": [
+    "three unchanged v2 migration fixtures require SQLite DROP COLUMN support"
+  ],
+  "not_implemented": [
+    "production gateway/executor adapters",
+    "distributed resource locks",
+    "production identity provider",
+    "browser and deployed digital twin",
+    "atomic multi-task registration API in canonical Supervisor"
+  ],
+  "resume": "Read docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md and this checkpoint; verify manifest before continuing."
+}
