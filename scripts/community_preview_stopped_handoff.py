@@ -416,9 +416,9 @@ class Session:
                 # Expired successor is allowed only before any C execution trace.
                 proof_path=PROOF;active_path=u.JOURNAL_PARENT+'/active-attempt.json'
                 attempt_path=u.JOURNAL_PARENT+'/'+attempt()
-                checkpoint_path=attempt_path+'/checkpoint.json'
-                checkpoint_tmp=attempt_path+'/checkpoint.tmp'
-                for path in (proof_path,active_path,attempt_path,checkpoint_path,checkpoint_tmp):
+                # The fixed attempt path is a whole-tree fence: if it exists at all,
+                # empty or not, checkpoint/event/unknown contents are already forbidden.
+                for path in (proof_path,active_path,attempt_path):
                     need(not exists_private(path),'C_SUCCESSOR_EXECUTION_TRACE_PRESENT')
                 need(exists_private(C_RESUME_APPROVAL),'C_SUCCESSOR_PREDECESSOR_APPROVAL_REQUIRED')
                 old_approval,old_approval_raw=document(C_RESUME_APPROVAL,16384)
@@ -467,7 +467,7 @@ class Session:
                     need(raw(C_RESUME_PLAN,4*1024*1024)==saved_raw
                          and raw(C_RESUME_APPROVAL,16384)==old_approval_raw,
                          'C_SUCCESSOR_PREDECESSOR_REPLACED')
-                    for path in (proof_path,active_path,attempt_path,checkpoint_path,checkpoint_tmp):
+                    for path in (proof_path,active_path,attempt_path):
                         need(not exists_private(path),'C_SUCCESSOR_EXECUTION_TRACE_PRESENT')
                     fd=s.private_parent(s.BACKUP)
                     try:write_private(fd,os.path.basename(plan_path),record)
