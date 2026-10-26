@@ -1330,6 +1330,13 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
 
 
+    def test_initialize_validator_reason_is_preserved_as_safe_hold(self):
+        output=self._initialize_inspect_output()
+        with patch.object(c.observation,'capture',return_value=output), \
+             patch.object(c.original,'validate',side_effect=c.original.Rejected('CONTAINER_ISOLATION_CHANGED')):
+            with self.assertRaisesRegex(c.controller.Hold,'CONTAINER_ISOLATION_CHANGED'):
+                c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
+
     def test_initialize_network_mode_is_exactly_none(self):
         output=self._initialize_inspect_output()
         with patch.object(c.observation,'capture',return_value=output):
