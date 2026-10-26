@@ -916,7 +916,7 @@ def main(argv=None):
         code=0
     except BaseException as error:
         import re,traceback
-        reason=str(error) if type(error) in (u.Hold,s.Hold) and re.fullmatch('[A-Z][A-Z0-9_]{0,95}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
+        reason=str(error) if type(error) in (u.Hold,s.Hold,c.original.Rejected) and re.fullmatch('[A-Z][A-Z0-9_]{0,95}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
         # Safe diagnostics only: never emit exception text, argv, paths or secrets.
         frames=traceback.extract_tb(error.__traceback__)
         trail=[f.name for f in frames[-4:] if re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,63}',f.name)]
