@@ -628,6 +628,110 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_PLAN_REQUIRED_FOR_RECOVERY'):
             q._restore_c_resume_paths(proof)
 
+    def test_format4_recovery_real_pty_resume_boundary_execute_and_reopen_recovery(self):
+        """Current-site format4 lane crosses both production TTY boundaries."""
+        import pty,select,time,signal,errno,re
+        worker="""import sys
+sys.path[:0]=[REPO,REPO+'/tests']
+from unittest.mock import patch
+from test_community_preview_stopped_handoff import WholeEntry
+from scripts import community_preview_stopped_handoff as h
+from scripts import community_preview_site_prepare as s
+from scripts import community_preview_update_checkpoint as u
+from scripts import community_preview_update_composition as c
+from scripts import community_preview_release_plan as p
+t=WholeEntry();t.tty_actual=True;t.setUp()
+try:
+ with patch.object(h,'acknowledge'):
+  q,_=t._prepare_completed_b_before_c_proof()
+ semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+ first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+ predecessor=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+  carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
+  issued_at=t.clock,expires_at=t.clock+600,actions=h.C_ACTIONS)
+ t.write(h.C_RESUME_APPROVAL,s.canonical(predecessor))
+ t.clock=h.document(h.C_RESUME_PLAN)[0]['expires_at']+1;q.last=None
+ semantic=q.evidence(True);successor=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+ successor_record,successor_raw=h.document(q.c_resume_plan_path,4*1024*1024)
+ successor_approval_path=q.c_resume_approval_path
+ successor_approval=dict(format=2,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+  carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+  predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+  predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+  issued_at=t.clock,expires_at=t.clock+600,actions=h.C_ACTIONS)
+ t.write(successor_approval_path,s.canonical(successor_approval))
+ t.clock=successor_record['expires_at']+1;q.last=None
+ semantic=q.evidence(True);successor=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+ renewal_path=q.c_resume_approval_path
+ renewal=dict(format=3,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+  carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+  predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+  predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+  successor_plan_record_sha256=s.sha(successor_raw),
+  successor_approval_sha256=s.sha(s.canonical(successor_approval)),
+  issued_at=t.clock,expires_at=t.clock+600,actions=h.C_ACTIONS)
+ t.write(renewal_path,s.canonical(renewal))
+ t.clock=renewal['expires_at']+1;q.last=None
+ semantic=q.evidence(True);successor=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+ recovery_path=q.c_resume_approval_path
+ assert 'successor-recovery-' in recovery_path
+ recovery=dict(format=4,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+  carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+  predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+  predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+  successor_plan_record_sha256=s.sha(successor_raw),
+  successor_approval_sha256=s.sha(s.canonical(renewal)),
+  issued_at=t.clock,expires_at=t.clock+600,actions=h.C_ACTIONS)
+ t.write(recovery_path,s.canonical(recovery));q.backup=None
+ original=u.Update.replace_and_verify
+ def known(updater):
+  updater.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+   scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+   runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=t.clock)
+  return original(updater)
+ try:
+  with patch.object(u.Update,'replace_and_verify',known):q.resume_c_before_confirmation()
+  raise AssertionError('KNOWN_FAILURE_REQUIRED')
+ except u.Hold as error:
+  assert 'KNOWN_FAILURE' in str(error)
+ proof=h.document(h.PROOF)[0]
+ assert proof['approval_path']==recovery_path and proof['approval_sha256']==s.sha(open(recovery_path,'rb').read())
+ q.close()
+ reopened=h.Session();reopened.acquire(recover=True);t.session=reopened
+ old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+  scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+  runtime_source_sha=None,version_source=None,observed_at=t.clock)
+ with patch.object(c,'BoundHttpsHealth',return_value=old_health):result=reopened.recover()
+ assert result['phase'] in ('ROLLED_BACK_PREVIEW_HOLD','COMMITTED')
+ assert reopened.c_resume_approval_path==recovery_path and reopened.craw==open(recovery_path,'rb').read()
+ print('FORMAT4_REAL_PTY_CHAIN_OK',flush=True)
+finally:
+ t.doCleanups()
+""".replace('REPO',repr(str(Path.cwd())))
+        pid,fd=pty.fork()
+        if pid==0:os.execv(sys.executable,[sys.executable,'-I','-B','-S','-c',worker])
+        data=b'';sent=[];done=False;end=time.monotonic()+30
+        try:
+            while time.monotonic()<end:
+                if select.select([fd],[],[],.05)[0]:
+                    try:b=os.read(fd,65536)
+                    except OSError as error:
+                        if error.errno==errno.EIO:break
+                        raise
+                    if not b:break
+                    data+=b
+                    for line in re.findall(rb'APPROVE_(?:STOPPED_UPDATE|KNOWN_FAILURE_RECOVER) [0-9a-f]{64}',data):
+                        if line not in sent:os.write(fd,line+b'\n');sent.append(line)
+            got,status=os.waitpid(pid,0 if b'FORMAT4_REAL_PTY_CHAIN_OK' in data else os.WNOHANG);done=got==pid
+            self.assertTrue(done,data.decode(errors='replace'))
+            self.assertEqual(os.waitstatus_to_exitcode(status),0,data.decode(errors='replace'))
+            self.assertEqual([x.split()[0] for x in sent],
+                [b'APPROVE_STOPPED_UPDATE',b'APPROVE_KNOWN_FAILURE_RECOVER'])
+            self.assertIn(b'FORMAT4_REAL_PTY_CHAIN_OK',data)
+        finally:
+            if not done:os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
+            os.close(fd)
+
     def test_known_failure_recovery_uses_new_c_resume_approval_provenance(self):
         q=self.fresh_session()
         candidate={'attempt':h.attempt(),'plan_sha256':'a'*64}
