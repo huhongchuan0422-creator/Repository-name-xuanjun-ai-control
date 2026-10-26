@@ -415,6 +415,7 @@ class WholeEntry(unittest.TestCase):
         self.assertEqual(reopened['plan_sha256'],successor['plan_sha256'])
         self.assertEqual(q.c_resume_plan_path,successor_path)
         self.assertEqual(Path(successor_path).read_bytes(),successor_raw)
+
         self.assertIn('successor-renewal-',q.c_resume_approval_path)
         renewal=dict(format=3,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
             carrier_manifest_sha256=current_carrier,plan_sha256=successor['plan_sha256'],
@@ -430,6 +431,29 @@ class WholeEntry(unittest.TestCase):
         with patch.object(q,'pins',return_value=current_carrier):
             with self.assertRaisesRegex(u.Hold,'APPROVAL_EXPIRED'):
                 q._c_resume_approval(reopened)
+        self.assertEqual(Path(successor_path).read_bytes(),successor_raw)
+
+        recovery_path=q._successor_recovery_path(s.sha(s.canonical(renewal)))
+        recovery=dict(format=4,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=current_carrier,plan_sha256=successor['plan_sha256'],
+            predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+            predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+            successor_plan_record_sha256=s.sha(successor_raw),
+            successor_approval_sha256=s.sha(s.canonical(renewal)),
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(recovery_path,s.canonical(recovery))
+        self.clock=recovery['expires_at']+1;q.last=None
+        with patch.object(q,'pins',return_value=current_carrier):
+            reopened=q._fixed_c_resume_plan(fresh_candidate,fresh_semantic)
+        self.assertIn('successor-correction-',q.c_resume_approval_path)
+        self.assertFalse(Path(q.c_resume_approval_path).exists())
+        correction=dict(recovery,format=5,carrier_manifest_sha256=current_carrier,
+            successor_approval_sha256=s.sha(s.canonical(recovery)),
+            issued_at=self.clock,expires_at=self.clock+600)
+        self.write(q.c_resume_approval_path,s.canonical(correction))
+        with patch.object(q,'pins',return_value=current_carrier):
+            self.assertEqual(q._c_resume_approval(reopened)['format'],5)
+            q.boundary()
         self.assertEqual(Path(successor_path).read_bytes(),successor_raw)
 
     def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
