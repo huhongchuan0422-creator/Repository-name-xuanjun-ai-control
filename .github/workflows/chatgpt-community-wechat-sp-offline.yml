@@ -84,7 +84,7 @@ jobs:
           if not b or not b.endswith(b'\0'):raise SystemExit('PUSH_DELTA_UNKNOWN')
           rows=b[:-1].split(b'\0')
           if len(rows)>10000 or any(not x or b'\n' in x or b'\r' in x for x in rows):raise SystemExit('PUSH_DELTA_UNKNOWN')
-          allowed={b'scripts/community_preview_stopped_handoff.py',b'scripts/community_preview_bc_build.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json',b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md'}
+          allowed={b'scripts/community_preview_stopped_handoff.py',b'scripts/community_preview_update_checkpoint.py',b'scripts/community_preview_bc_build.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json',b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md'}
           handoff={b'scripts/community_preview_carrier_handoff_admission.py',
                    b'scripts/community_preview_carrier_handoff_call.py',
                    b'scripts/community_preview_carrier_handoff_entry.py',
@@ -333,7 +333,7 @@ jobs:
             git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
             cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
-            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
+            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_checkpoint.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
             PYTHONPATH=.:tests python -B -m unittest \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_permit_appearing_after_admission_is_hold \
@@ -365,6 +365,9 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
               test_community_preview_stopped_handoff.WholeEntry.test_known_failure_recovery_uses_new_c_resume_approval_provenance \
+              test_community_preview_stopped_handoff.WholeEntry.test_successor_dynamic_approval_survives_tty_known_failure_reopen_recovery \
+              test_community_preview_stopped_handoff.WholeEntry.test_recovery_rejects_unbound_dynamic_approval_path_before_consume \
+              test_community_preview_stopped_handoff.WholeEntry.test_format4_recovery_real_pty_resume_boundary_execute_and_reopen_recovery \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof \
               test_community_preview_stopped_handoff.WholeEntry.test_real_pty_production_ack_prompt_then_input_eof_timeout \
