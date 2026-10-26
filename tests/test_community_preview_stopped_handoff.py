@@ -381,7 +381,7 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_STABLE_PLAN_CHANGED'):
             q._fixed_c_resume_plan(changed,fresh_semantic)
 
-    def test_successor_predecessor_replacement_or_second_expiry_uses_one_renewal(self):
+    def test_successor_predecessor_replacement_or_second_expiry_holds(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
         first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
