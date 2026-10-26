@@ -339,6 +339,24 @@ class WholeEntry(unittest.TestCase):
         self.write(q.c_resume_approval_path,s.canonical(successor_approval))
         self.assertEqual(q._c_resume_approval(successor)['plan_sha256'],successor['plan_sha256'])
 
+    def test_expired_successor_keeps_historical_carrier_and_binds_current_manifest(self):
+        q,historical=self._prepare_completed_b_before_c_proof()
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+        historical_carrier=q.approved_stamp
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=historical_carrier,plan_sha256=first['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+        self.clock=1601
+        current_carrier='f'*64
+        q.approved_stamp=current_carrier
+        with patch.object(q,'pins',return_value=current_carrier):
+            successor=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        self.assertEqual(h.document(h.C_RESUME_PLAN)[0]['carrier_manifest_sha256'],historical_carrier)
+        self.assertEqual(successor['carrier_manifest_sha256'],current_carrier)
+        self.assertEqual(h.document(q.c_resume_plan_path)[0]['carrier_manifest_sha256'],current_carrier)
+
     def test_expired_successor_rejects_execution_trace_and_stable_drift(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
