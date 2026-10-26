@@ -179,12 +179,15 @@ class HandoffAdmission(unittest.TestCase):
         clone_result=h.canonical(dict(format=1,attempt=attempt,stage='validate-clones',
             approval_sha256=h.sha(resume_approval_raw),permit_sha256=h.sha(clone_permit),result=clone_summary))
         for key,body in (('snapshot_result',snapshot_result),('snapshot_permit',snapshot_permit),
-                         ('validate_clones_result',clone_result),('validate_clones_permit',clone_permit),
-                         ('resume_stage_permit',clone_permit)):
+                         ('validate_clones_result',clone_result),('validate_clones_permit',clone_permit)):
             pfd=self.jfd if key in h.JOURNAL_HISTORY_KEYS else self.parent
             name=h.HISTORY_NAMES[key];h.writefile(pfd,name,body,self.uid)
             st=os.stat(name,dir_fd=pfd,follow_symlinks=False)
             refs[key]=(pfd,name,h.parent_ident(os.fstat(pfd)),h.ident(st),h.sha(body))
+        try:os.unlink(h.HISTORY_NAMES['resume_stage_permit'],dir_fd=self.parent)
+        except FileNotFoundError:pass
+        refs['resume_stage_permit']=(self.parent,h.HISTORY_NAMES['resume_stage_permit'],
+            h.parent_ident(os.fstat(self.parent)),None,None)
         st=os.stat(h.HISTORY_NAMES['backup_dir'],dir_fd=self.parent,follow_symlinks=False)
         refs['backup_dir']=(self.parent,h.HISTORY_NAMES['backup_dir'],h.parent_ident(os.fstat(self.parent)),h.dirident(st),None)
         return refs
