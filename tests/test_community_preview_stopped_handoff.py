@@ -10,7 +10,7 @@ import sys
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 from scripts import community_preview_stopped_handoff as h
 from scripts import community_preview_bc_build as build
 from scripts import community_preview_site_prepare as s
@@ -823,6 +823,62 @@ finally:
         self.assertFalse(fake.acquired)
         self.assertEqual(fake.called,1)
         self.assertTrue(fake.closed)
+
+    def test_prepared_reopen_cli_dispatches_only_exact_reopen_mode(self):
+        class FakeSession:
+            def __init__(self):self.acquired=None;self.called=0;self.closed=False
+            def acquire(self,recover=False):self.acquired=recover
+            def reopen_prepared(self):self.called+=1;return {'phase':'COMMITTED'}
+            def close(self):self.closed=True
+        fake=FakeSession()
+        with patch.object(h,'Session',return_value=fake),contextlib.redirect_stdout(io.StringIO()):
+            code=h.main(['--reopen-prepared'])
+        self.assertEqual(code,0);self.assertTrue(fake.acquired)
+        self.assertEqual(fake.called,1);self.assertTrue(fake.closed)
+
+    def test_update_prepared_reopen_requires_exact_sequence_one_then_uses_stopped_path(self):
+        state=dict(phase='PREPARED',sequence=1,new_id=None)
+        journal=Mock(state=state,read=Mock(return_value=dict(state)),validate_history=Mock())
+        update=object.__new__(u.Update);update.journal=journal
+        with patch.object(u.Update,'run_stopped',return_value={'phase':'COMMITTED'}) as run:
+            self.assertEqual(update.reopen_prepared_stopped()['phase'],'COMMITTED')
+        journal.validate_history.assert_called_once_with();run.assert_called_once_with()
+        for changed in (dict(state,sequence=2),dict(state,phase='KNOWN_FAILURE'),dict(state,new_id='9'*64)):
+            journal.state=changed;journal.read.return_value=dict(changed)
+            with self.assertRaisesRegex(u.Hold,'EXACT_PREPARED_REOPEN_REQUIRED'):
+                update.reopen_prepared_stopped()
+
+    def test_persisted_prepared_reopens_same_attempt_with_separate_exact_authority(self):
+        q,_=self._prepare_completed_b_before_c_proof()
+        # Persist the dynamic plan first, then register its ordinary approval.
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+        candidate=self._register_c_resume_approval_from_persisted_plan(q)
+        original_guard=u.Update.guard;first=[True]
+        def transient(update,running):
+            if first[0]:first[0]=False;raise u.Hold('PROTECTED_BINDING_CHANGED')
+            return original_guard(update,running)
+        with patch.object(u.Update,'guard',transient),self.assertRaisesRegex(u.Hold,'PROTECTED_BINDING_CHANGED'):
+            q.resume_c_before_confirmation()
+        self.assertEqual(q.journal.state['phase'],'PREPARED');self.assertEqual(q.journal.state['sequence'],1)
+        self.assertEqual(self.calls,[])
+        proof,proof_raw=h.document(h.PROOF);prior=proof['approval_sha256']
+        q.close();self.clock=h.document(h.C_RESUME_APPROVAL)[0]['expires_at']+1
+        reopened=h.Session();reopened.acquire(recover=True);self.addCleanup(reopened.close);self.session=reopened
+        reopened.configure_resumed_recovery(proof);reopened.approved_stamp=reopened.pins()
+        active=Path(u.JOURNAL_PARENT,'active-attempt.json').read_bytes()
+        checkpoint=Path(u.JOURNAL_PARENT,candidate['attempt'],'checkpoint.json').read_bytes()
+        permit=dict(format=1,kind=h.PREPARED_REOPEN_KIND,host=p.HOST,mode=h.MODE,
+            attempt=candidate['attempt'],carrier_manifest_sha256=reopened.pins(),
+            plan_sha256=candidate['plan_sha256'],proof_sha256=s.sha(proof_raw),
+            prior_approval_sha256=prior,active_attempt_sha256=s.sha(active),
+            checkpoint_sha256=s.sha(checkpoint),issued_at=self.clock,expires_at=self.clock+600,
+            actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT'])
+        self.write(reopened._prepared_reopen_path(s.sha(proof_raw)),s.canonical(permit))
+        result=reopened.reopen_prepared()
+        self.assertEqual(result['phase'],'COMMITTED')
+        self.assertEqual([row[3] for row in self.calls],['rename','run'])
+        self.assertEqual(proof_raw,Path(h.PROOF).read_bytes())
 
     def test_actual_b_classes_same_lease_to_c_success_no_old_stop_start(self):
         self.prepare_b_and_c();result=self.session.update()

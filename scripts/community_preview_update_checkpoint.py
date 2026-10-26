@@ -325,6 +325,15 @@ class Update:
         try:self.handoff.check()
         except BaseException:self.hold('HANDOFF_CHANGED_AFTER_ACCEPTANCE')
         return self.replace_and_verify()
+    def reopen_prepared_stopped(self):
+        """Continue the exact durable PREPARED attempt; never create a new one."""
+        if self.journal.state != self.journal.read():raise Hold('PREPARED_CHECKPOINT_CHANGED')
+        if (self.journal.state.get('phase')!='PREPARED'
+                or self.journal.state.get('sequence')!=1
+                or self.journal.state.get('new_id') is not None):
+            raise Hold('EXACT_PREPARED_REOPEN_REQUIRED')
+        self.journal.validate_history()
+        return self.run_stopped()
     def replace_and_verify(self):
         j=self.journal;p=j.plan;c=p['current']
         self.action('OLD_RENAME_INTENT',p['actions'][2]['argv']);j.write('OLD_RETAINED')

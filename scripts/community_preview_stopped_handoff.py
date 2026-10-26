@@ -32,6 +32,7 @@ PROOF=s.BACKUP+'/stopped-handoff-v1.json'
 C_ACTIONS=['STOPPED_HANDOFF_RENAME_RUN','KNOWN_FAILURE_SERIAL_RECOVERY','JOURNAL_WRITES']
 CORRECTION_KIND='C_SUCCESSOR_INDEPENDENT_CORRECTION_V1'
 CORRECTION_REISSUE_KIND='C_SUCCESSOR_INDEPENDENT_CORRECTION_REISSUE_V1'
+PREPARED_REOPEN_KIND='C_SUCCESSOR_PREPARED_REOPEN_V1'
 CLONES=('restore-old','verify-f131','verify-downgrade')
 A_ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 
@@ -157,6 +158,7 @@ class Session:
         self.c_resume_plan_path=C_RESUME_PLAN;self.c_resume_approval_path=C_RESUME_APPROVAL
         self.successor_approval_sha256=None;self.successor_renewal_sha256=None;self.successor_recovery_sha256=None;self.successor_correction_sha256=None
         self.resume_history={};self.resume_absent=();self.resume_old_permit_absent=False
+        self.prepared_reopen_path=None;self.prepared_reopen_raw=None
         self.started=time.monotonic();self.captured={};self.recovering=False;self.cleanup_unproven=False
     def acquire(self,recover=False):
         self.owner=operator();self.recovering=recover
@@ -455,6 +457,41 @@ class Session:
     def _successor_correction_reissue_path(self,correction_sha):
         need(p.exact_hex(correction_sha,64),'SUCCESSOR_CORRECTION_SHA_REQUIRED')
         return s.BASE+'/bc-c-resume-approval-successor-independent-correction-reissue-'+correction_sha[:16]+'.json'
+
+    def _prepared_reopen_path(self,proof_sha):
+        need(p.exact_hex(proof_sha,64),'PREPARED_PROOF_SHA_REQUIRED')
+        return s.BASE+'/bc-c-resume-approval-successor-prepared-reopen-'+proof_sha[:16]+'.json'
+
+    def _prepared_reopen_approval(self,proof):
+        proof_raw=raw(PROOF,4*1024*1024);proof_sha=s.sha(proof_raw)
+        need(s.exact_json(proof_raw)==proof,'PREPARED_PROOF_CHANGED')
+        active_path=u.JOURNAL_PARENT+'/active-attempt.json'
+        attempt_path=u.JOURNAL_PARENT+'/'+proof['plan']['attempt']
+        checkpoint_path=attempt_path+'/checkpoint.json';event_path=attempt_path+'/event-000001.json'
+        active=raw(active_path,16384);checkpoint=raw(checkpoint_path,16384);event=raw(event_path,16384)
+        state=s.exact_json(checkpoint)
+        need(checkpoint==event and state==dict(approval_sha256=proof['approval_sha256'],
+             handoff_sha256=state.get('handoff_sha256'),new_id=None,
+             phase='PREPARED',plan_sha256=proof['plan']['plan_sha256'],sequence=1),
+             'EXACT_PREPARED_CHECKPOINT_REQUIRED')
+        path=self._prepared_reopen_path(proof_sha);approval,body=document(path,16384)
+        expected={'format','kind','host','mode','attempt','carrier_manifest_sha256','plan_sha256',
+            'proof_sha256','prior_approval_sha256','active_attempt_sha256','checkpoint_sha256',
+            'issued_at','expires_at','actions'}
+        need(set(approval)==expected and type(approval['format']) is int and approval['format']==1
+             and approval['kind']==PREPARED_REOPEN_KIND and approval['host']==p.HOST
+             and approval['mode']==MODE and approval['attempt']==attempt()
+             and approval['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+             and approval['plan_sha256']==proof['plan']['plan_sha256']
+             and approval['proof_sha256']==proof_sha
+             and approval['prior_approval_sha256']==proof['approval_sha256']
+             and approval['active_attempt_sha256']==s.sha(active)
+             and approval['checkpoint_sha256']==s.sha(checkpoint)
+             and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT'],
+             'EXACT_C_PREPARED_REOPEN_APPROVAL_REQUIRED')
+        window(approval)
+        self.prepared_reopen_path=path;self.prepared_reopen_raw=body
+        return approval
 
     def _restore_c_resume_paths(self,proof):
         """Rebuild the exact dynamic plan/approval lane from durable proof."""
@@ -810,7 +847,10 @@ class Session:
         if self.approved_stamp is not None:need(stamp==self.approved_stamp,'CARRIER_STAMP_CHANGED')
         if self.braw is not None:need(raw(self.b_path)==self.braw,'B_REFERENCE_REPLACED')
         if self.resume_raw is not None:need(raw(resume_record_path())==self.resume_raw,'B_RESUME_RECORD_REPLACED')
-        if self.craw is not None:
+        if self.prepared_reopen_raw is not None:
+            v,b=document(self.prepared_reopen_path,16384)
+            need(b==self.prepared_reopen_raw,'C_PREPARED_REOPEN_APPROVAL_REVOKED');window(v)
+        elif self.craw is not None:
             approval_path=self.c_resume_approval_path if getattr(self,'c_preconfirm_mode',False) else C_APPROVAL
             v,b=document(approval_path);need(b==self.craw,'C_APPROVAL_REVOKED');window(v)
         elif self.braw is not None and not getattr(self,'c_preconfirm_mode',False):
@@ -1105,7 +1145,7 @@ class Session:
                 rows.append([path,s.sha(body),meta])
             finally:os.close(fd)
         return c.digest(rows)
-    def consume(self,proof,recover):
+    def consume(self,proof,recover,prepared_reopen=False):
         need(type(proof) is dict and set(proof) in ({'format','mode','host','attempt','plan','approval_sha256','evidence'},
              {'format','mode','host','attempt','plan','approval_sha256','evidence','approval_kind','approval_path'}),
              'EXACT_HANDOFF_DOCUMENT_REQUIRED')
@@ -1116,11 +1156,16 @@ class Session:
             self.c_preconfirm_mode=True
             if self.c_resume_approval_path==C_RESUME_APPROVAL:
                 self._restore_c_resume_paths(proof)
-            self._c_resume_approval(candidate)
+            if not prepared_reopen:self._c_resume_approval(candidate)
+            else:
+                bound=self.bind_resume_reference(self.c_resume_approval_path,16384)
+                need(bound==raw(self.c_resume_approval_path,16384)
+                     and s.sha(bound)==proof['approval_sha256'],'PROOF_APPROVAL_CHANGED')
+                self.craw=bound
         else:self.c_approval(candidate)
         need(proof['approval_sha256']==s.sha(self.craw),'PROOF_APPROVAL_CHANGED')
         binding=dict(approval_sha256=s.sha(self.craw),handoff_sha256=self.reference_digest())
-        if recover:
+        if recover or prepared_reopen:
             active=raw(u.JOURNAL_PARENT+'/active-attempt.json')
             need(active==json.dumps(dict(attempt=candidate['attempt'],plan_sha256=candidate['plan_sha256']),sort_keys=True).encode(),
                  'EXISTING_SAME_ATTEMPT_REQUIRED')
@@ -1135,7 +1180,22 @@ class Session:
         if recover:
             c.recovery_admission(self.journal,transport,h.bindings)
             return update.recover()
+        if prepared_reopen:return update.reopen_prepared_stopped()
         return update.run_stopped()
+
+    def reopen_prepared(self):
+        proof,_=document(PROOF)
+        need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
+        need(self.configure_resumed_recovery(proof),'PREPARED_RESUME_CONTEXT_REQUIRED')
+        # Restore and bind the original proof authority without treating its
+        # expired window as new execution authority.  The journal continues to
+        # carry that immutable hash; the separate permit below authorizes only
+        # reopening this exact PREPARED checkpoint.
+        self._restore_c_resume_paths(proof);self.approved_stamp=self.pins()
+        self.backup=open_private(s.BACKUP+'/clone-results.json')
+        self._prepared_reopen_approval(proof)
+        acknowledge('PREPARED_REOPEN',proof['plan']['plan_sha256'])
+        return self.consume(proof,False,prepared_reopen=True)
     def recover(self):
         proof,_=document(PROOF)
         need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
@@ -1216,18 +1276,20 @@ def main(argv=None):
     group.add_argument('--resume-b-partial',action='store_true')
     group.add_argument('--resume-c-before-confirmation',action='store_true')
     group.add_argument('--recover-known-failure',action='store_true')
+    group.add_argument('--reopen-prepared',action='store_true')
     args=parser.parse_args(argv)
-    if not args.owner_bc and not args.resume_b_partial and not args.recover_known_failure and not args.resume_c_before_confirmation:
+    if not args.owner_bc and not args.resume_b_partial and not args.recover_known_failure and not args.resume_c_before_confirmation and not args.reopen_prepared:
         print('{"state":"BC_DEFAULT_HOLD","site_executed":false}');return 2
     session=Session();result=None;code=2
     try:
-        session.acquire(recover=args.recover_known_failure)
+        session.acquire(recover=args.recover_known_failure or args.reopen_prepared)
         if args.owner_bc:
             session.run_b();result=session.update()
         elif args.resume_b_partial:
             session.resume_b_partial();result=session.update()
         elif args.resume_c_before_confirmation:
             result=session.resume_c_before_confirmation()
+        elif args.reopen_prepared:result=session.reopen_prepared()
         else:result=session.recover()
         need(result['phase'] in ('COMMITTED','ROLLED_BACK_PREVIEW_HOLD'),'NONTERMINAL_NOT_SUCCESS')
         code=0
