@@ -1,11 +1,13 @@
 'use strict';
 const assert=require('assert');
 const ui=require('../demos/task-center-digital-twin/app.js');
-const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',next_action:'WAIT',evidence_ref:['qa-proof']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',runtime_status:'WAITING_DEPENDENCY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a',writer_identity:'UNKNOWN',run_id:'UNKNOWN',session_id:'UNKNOWN',session_state:'UNKNOWN',process_state:'UNKNOWN',last_real_progress_at:null,effects_reconciled:'UNKNOWN',writer_stopped:'UNKNOWN'}]};
+const data={mode:'TEST_ONLY',production_status:'NOT_IMPLEMENTED',integration_boundaries:[{integration_id:'P2',status:'NOT_IMPLEMENTED',execution:'NOT_EXECUTED',evidence_ref:'contract-p2'},{integration_id:'P3',status:'NOT_IMPLEMENTED',execution:'NOT_EXECUTED',evidence_ref:'contract-p3'},{integration_id:'COMMUNITY_B5',status:'NOT_CONNECTED_EXTERNAL_FLOW',execution:'NOT_EXECUTED',evidence_ref:'contract-b5'}],boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',next_action:'WAIT',evidence_ref:['qa-proof']}],timeline:[{task_id:'t-a',attempt_id:'attempt-1',event_id:'event-1',kind:'PROGRESS',observed_at:100,evidence_kind:'TEST_RUN',evidence_ref:'proof-1'}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',runtime_status:'WAITING_DEPENDENCY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a',writer_identity:'UNKNOWN',run_id:'UNKNOWN',session_id:'UNKNOWN',session_state:'UNKNOWN',process_state:'UNKNOWN',last_real_progress_at:null,effects_reconciled:'UNKNOWN',writer_stopped:'UNKNOWN',input_version:'input-v1',output_version:'output-v1',module_id:'task-center',resources:['git:test/repo']}]};
 assert.deepStrictEqual(ui.parseRoute('#task/research-development/t-a?project=p-1'),{view:'task',board:'research-development',task:'t-a',query:{project:'p-1'}});
 assert.strictEqual(ui.filterTasks(data,ui.parseRoute('#board/research-development?project=p-1')).length,1);
 assert.match(ui.render(data,ui.parseRoute('#overview')),/七板块运行概况/);
 assert.match(ui.render(data,ui.parseRoute('#overview')),/定位卡点/);
+assert.match(ui.render(data,ui.parseRoute('#overview')),/P2/);
+assert.match(ui.render(data,ui.parseRoute('#overview')),/NOT_CONNECTED_EXTERNAL_FLOW/);
 assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/研发工作台/);
 assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/项目详情/);
 assert.match(ui.render(data,ui.parseRoute('#project\/research-development\/p-1')),/1 个任务/);
@@ -14,6 +16,10 @@ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?projec
 assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/解除责任方：qa/);
 assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/进程：UNKNOWN/);
 assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/运行投影：WAITING_DEPENDENCY/);
+assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/材料与资源/);
+assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/git:test\/repo/);
+assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/回执时间线/);
+assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/proof-1/);
 assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
 for(const id of ['task-normal','任务/设计','task with space']){
   const target=ui.href('task','research-development',id,{project:'项目/一'});

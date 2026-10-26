@@ -1002,7 +1002,27 @@ class GatewayKernel(object):
                 'observed_at': projection_time,
                 'boards': boards, 'anomalies': anomalies,
                 'tasks': tasks, 'timeline': events,
-                'production_status': 'NOT_IMPLEMENTED'}
+                'production_status': 'NOT_IMPLEMENTED',
+                # These are explicit integration boundaries, not inferred
+                # runtime states.  They prevent the TEST_ONLY UI from
+                # presenting an unconnected execution path as available.
+                'integration_boundaries': [
+                    {'integration_id': 'P2',
+                     'status': 'NOT_IMPLEMENTED',
+                     'execution': 'NOT_EXECUTED',
+                     'evidence_ref':
+                     'docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md'},
+                    {'integration_id': 'P3',
+                     'status': 'NOT_IMPLEMENTED',
+                     'execution': 'NOT_EXECUTED',
+                     'evidence_ref':
+                     'docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md'},
+                    {'integration_id': 'COMMUNITY_B5',
+                     'status': 'NOT_CONNECTED_EXTERNAL_FLOW',
+                     'execution': 'NOT_EXECUTED',
+                     'evidence_ref':
+                     'docs/development/TASK_CENTER_MODEL_ORCHESTRATION_R5_20261025.md'},
+                ]}
 
 
 class TestOnlyExecutor(object):

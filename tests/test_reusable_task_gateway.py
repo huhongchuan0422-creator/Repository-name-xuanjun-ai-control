@@ -716,6 +716,12 @@ e.start('task-a','attempt-a-crash',['fake:shared'],2000,
         self.assertEqual(counts['customer'], 0)
         self.assertEqual(pa['anomalies'][0]['task_id'], 'task-b')
         self.assertEqual(pa['anomalies'][0]['project_id'], 'project-a')
+        boundaries = {row['integration_id']: row
+                      for row in pa['integration_boundaries']}
+        self.assertEqual(boundaries['P2']['status'], 'NOT_IMPLEMENTED')
+        self.assertEqual(boundaries['P3']['execution'], 'NOT_EXECUTED')
+        self.assertEqual(boundaries['COMMUNITY_B5']['status'],
+                         'NOT_CONNECTED_EXTERNAL_FLOW')
 
 
 if __name__ == '__main__':
