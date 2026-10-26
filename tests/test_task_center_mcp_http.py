@@ -1,0 +1,226 @@
+from __future__ import print_function
+
+import base64
+import hashlib
+import http.cookies
+import json
+import os
+import shutil
+import sys
+import tempfile
+import threading
+import time
+import unittest
+import socketserver
+from http.server import BaseHTTPRequestHandler,HTTPServer
+from urllib.parse import parse_qs,urlsplit,urlencode
+from urllib.request import Request,urlopen
+from urllib.error import HTTPError
+
+from cryptography.fernet import Fernet
+
+ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
+sys.path.insert(0,os.path.join(ROOT,'scripts'))
+from reusable_task_gateway import GatewayKernel,TestTenantAuthority
+from connection_management import ConnectionManager
+from model_orchestration import ModelControl
+from provider_onboarding import ensure_schema as ensure_onboarding_schema
+from task_center_app import make_server
+from task_center_session_auth import FileTestIdentityProvider,SessionStore,password_hash
+from task_supervisor import Supervisor
+
+KEY=b'0123456789abcdef0123456789abcdef'
+HOST='mcp.example.com'
+
+class ThreadServer(socketserver.ThreadingMixIn,HTTPServer):daemon_threads=True
+class ModelFixture(BaseHTTPRequestHandler):
+    calls=0
+    def log_message(self,*_args):pass
+    def do_POST(self):
+        type(self).calls+=1
+        length=int(self.headers.get('Content-Length','0'));self.rfile.read(length)
+        body=json.dumps({'id':'remote-mcp-result','choices':[{'message':{
+          'content':'{"label":"safe","reason":"remote-fixture"}'}}],
+          'usage':{'prompt_tokens':5,'completion_tokens':3,
+          'total_tokens':8}}).encode()
+        self.send_response(200);self.send_header('Content-Length',str(len(body)))
+        self.end_headers();self.wfile.write(body)
+
+
+class MCPHTTPTests(unittest.TestCase):
+    def setUp(self):
+        ModelFixture.calls=0
+        self.root=tempfile.mkdtemp();self.db=os.path.join(self.root,'state.sqlite3')
+        self.model=ThreadServer(('127.0.0.1',0),ModelFixture)
+        self.model_thread=threading.Thread(target=self.model.serve_forever)
+        self.model_thread.daemon=True;self.model_thread.start()
+        self.master=Fernet.generate_key();supervisor=Supervisor(self.db)
+        authority=TestTenantAuthority(KEY);gateway=GatewayKernel(supervisor,authority)
+        context=authority.issue('tenant-mcp','admin:fixture')
+        control=ModelControl(gateway,context,self.master)
+        provider={'provider_id':'fixture','display_name':'Fixture',
+          'adapter_type':'openai-compatible','base_url':'http://127.0.0.1:%d'%
+          self.model.server_port,'enabled':True,'price_state':'KNOWN_FREE',
+          'rate_limit_per_min':10,'concurrency_limit':1,'timeout_seconds':1,
+          'retry_limit':0}
+        control.upsert_provider(provider,'fixture-secret')
+        control.set_quota_status('fixture','AVAILABLE','TEST_ONLY_LOCAL_FIXTURE',
+          time.time(),None)
+        control.upsert_model({'provider_id':'fixture','model_id':'fixture-chat',
+          'capabilities':['general'],'enabled':True,'price_state':'KNOWN_FREE',
+          'input_unit_cost':0,'output_unit_cost':0})
+        ConnectionManager(gateway,context,self.master).upsert({
+          'connection_id':'fixture-connection','provider_id':'fixture',
+          'purpose':'MODEL_INFERENCE','auth_type':'API_KEY',
+          'destination_origin':provider['base_url'],'issuer':None,
+          'authorization_endpoint':None,'token_endpoint':None,
+          'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+          'scopes':[],'supports_refresh':False},'fixture-secret')
+        control.register_benchmark_suite('mcp-v1',[{'case_id':'general-1',
+          'capability':'general','messages':[{'role':'user','content':'classify'}],
+          'expected_contains':'label'}])
+        control.run_benchmark('fixture','fixture-chat','mcp-v1')
+        ensure_onboarding_schema(supervisor.db)
+        supervisor.db.execute('''INSERT INTO provider_onboarding_configs VALUES
+          (?,?,?,?,?,?,?,?,?,?,?,?)''',('tenant-mcp','fixture-platform',
+          'fixture-connection','fixture','fixture-chat','SUCCEEDED','RETRIEVED',
+          'TESTED_SUCCEEDED','fixture-chat',json.dumps(['fixture-chat']),
+          '••••cret',time.time()))
+        supervisor.db.commit();supervisor.close()
+        identity_path=os.path.join(self.root,'identities.json')
+        with open(identity_path,'w') as stream:json.dump({'users':{'owner':{
+          'enabled':True,'password_hash':password_hash('test-password-12'),
+          'tenant_id':'tenant-mcp','principal_id':'owner-1',
+          'roles':['TASK_CENTER_ADMIN']}}},stream)
+        os.chmod(identity_path,0o600)
+        identity=FileTestIdentityProvider(identity_path)
+        def connect():
+            import sqlite3
+            db=sqlite3.connect(self.db);db.row_factory=sqlite3.Row;return db
+        sessions=SessionStore(connect,'tenant-mcp')
+        self.server=make_server(self.db,KEY,'tenant-mcp','owner',port=0,
+          model_master_key=self.master,identity_provider=identity,
+          session_store=sessions,outbound_enabled=False,
+          external_origin='https://'+HOST,base_path='/task-center-test/',
+          mcp_enabled=True,mcp_model_worker_enabled=True)
+        self.thread=threading.Thread(target=self.server.serve_forever)
+        self.thread.daemon=True;self.thread.start()
+        self.base='http://127.0.0.1:%d/task-center-test'%self.server.server_port
+
+    def tearDown(self):
+        self.server.shutdown();self.server.server_close();self.thread.join(2)
+        self.model.shutdown();self.model.server_close();self.model_thread.join(2)
+        shutil.rmtree(self.root)
+
+    def request(self,path,method='GET',body=None,headers=None):
+        values={'Host':HOST};values.update(headers or {})
+        req=Request(self.base+path,method=method,data=body,headers=values)
+        return urlopen(req,timeout=3)
+
+    def test_oauth_pkce_and_streamable_http_discovery(self):
+        metadata=json.loads(self.request('/.well-known/oauth-protected-resource').read())
+        self.assertEqual(metadata['resource'],'https://'+HOST+'/task-center-test/mcp')
+        dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
+          'grant_types':['authorization_code'],'response_types':['code'],
+          'token_endpoint_auth_method':'none','client_name':'ChatGPT test'}
+        client=json.loads(self.request('/oauth/register','POST',
+          json.dumps(dcr).encode(),{'Content-Type':'application/json'}).read())
+        login=self.request('/api/session/login','POST',json.dumps({
+          'username':'owner','password':'test-password-12'}).encode(),{
+          'Content-Type':'application/json','Origin':'https://'+HOST})
+        cookies=login.headers.get_all('Set-Cookie');session_cookie=cookies[0].split(';',1)[0]
+        verifier='v'*64
+        challenge=base64.urlsafe_b64encode(hashlib.sha256(
+          verifier.encode()).digest()).decode().rstrip('=')
+        self.assertTrue(session_cookie.startswith('xuanjun_task_center_session='))
+        self.assertEqual(client['token_endpoint_auth_method'],'none')
+
+    def test_full_oauth_without_following_external_redirect(self):
+        class NoRedirect(__import__('urllib.request').request.HTTPRedirectHandler):
+            def redirect_request(self,*_args,**_kwargs):return None
+        opener=__import__('urllib.request').request.build_opener(NoRedirect)
+        def raw(path,method='GET',body=None,headers=None):
+            h={'Host':HOST};h.update(headers or {})
+            req=Request(self.base+path,method=method,data=body,headers=h)
+            try:return opener.open(req,timeout=3)
+            except HTTPError as exc:
+                if exc.code in (301,302,303,307,308):return exc
+                raise
+        dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
+          'grant_types':['authorization_code'],'response_types':['code'],
+          'token_endpoint_auth_method':'none'}
+        client=json.loads(raw('/oauth/register','POST',json.dumps(dcr).encode(),
+          {'Content-Type':'application/json'}).read())
+        login=raw('/api/session/login','POST',json.dumps({'username':'owner',
+          'password':'test-password-12'}).encode(),{'Content-Type':'application/json',
+          'Origin':'https://'+HOST})
+        cookie=login.headers.get_all('Set-Cookie')[0].split(';',1)[0]
+        verifier='z'*64;challenge=base64.urlsafe_b64encode(hashlib.sha256(
+          verifier.encode()).digest()).decode().rstrip('=')
+        resource='https://'+HOST+'/task-center-test/mcp'
+        params={'response_type':'code','client_id':client['client_id'],
+          'redirect_uri':dcr['redirect_uris'][0],'code_challenge':challenge,
+          'code_challenge_method':'S256','state':'s','resource':resource,
+          'scope':'task:read task:submit'}
+        redirect=raw('/oauth/authorize?'+urlencode(params),headers={'Cookie':cookie})
+        location=redirect.headers['Location'];query=parse_qs(urlsplit(location).query)
+        self.assertEqual(query['state'],['s']);self.assertIn('iss',query)
+        exchange={'grant_type':'authorization_code','code':query['code'][0],
+          'client_id':client['client_id'],'redirect_uri':dcr['redirect_uris'][0],
+          'code_verifier':verifier,'resource':resource}
+        token=json.loads(raw('/oauth/token','POST',urlencode(exchange).encode(),{
+          'Content-Type':'application/x-www-form-urlencoded'}).read())
+        with self.assertRaises(HTTPError) as replay:
+            raw('/oauth/token','POST',urlencode(exchange).encode(),{
+              'Content-Type':'application/x-www-form-urlencoded'})
+        self.assertEqual(replay.exception.code,400)
+        rpc={'jsonrpc':'2.0','id':1,'method':'initialize','params':{}}
+        initialized=json.loads(raw('/mcp','POST',json.dumps(rpc).encode(),{
+          'Content-Type':'application/json','Authorization':'Bearer '+
+          token['access_token']}).read())
+        self.assertEqual(initialized['result']['serverInfo']['name'],
+                         'xuanjun-task-center')
+        listed=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0','id':2,
+          'method':'tools/list','params':{}}).encode(),{'Content-Type':
+          'application/json','Authorization':'Bearer '+token['access_token']}).read())
+        self.assertEqual([x['name'] for x in listed['result']['tools']],
+          ['task_capabilities','task_submit','task_get','task_query_result'])
+        authorization={'Content-Type':'application/json','Authorization':'Bearer '+
+          token['access_token']}
+        capabilities=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',
+          'id':3,'method':'tools/call','params':{'name':'task_capabilities',
+          'arguments':{}}}).encode(),authorization).read())
+        self.assertIn('fixture-connection',capabilities['result']['content'][0]['text'])
+        submitted=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',
+          'id':4,'method':'tools/call','params':{'name':'task_submit','arguments':{
+          'project_id':'project-mcp','task_type':'TEXT_CLASSIFICATION',
+          'input_text':'Classify: hello','idempotency_key':'remote-idem-1',
+          'connection_id':'fixture-connection','max_output_tokens':32}}}).encode(),
+          authorization).read())
+        task_id=json.loads(submitted['result']['content'][0]['text'])['task_id']
+        deadline=time.time()+3;result=None
+        while time.time()<deadline:
+            response=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',
+              'id':5,'method':'tools/call','params':{'name':'task_query_result',
+              'arguments':{'task_id':task_id}}}).encode(),authorization).read())
+            result=json.loads(response['result']['content'][0]['text'])
+            if result['state']=='SUCCEEDED':break
+            time.sleep(.05)
+        self.assertEqual(result['state'],'SUCCEEDED')
+        self.assertIn('remote-fixture',result['result']['content'])
+        # Same idempotency key returns the same task and does not call again.
+        duplicate=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',
+          'id':6,'method':'tools/call','params':{'name':'task_submit','arguments':{
+          'project_id':'project-mcp','task_type':'TEXT_CLASSIFICATION',
+          'input_text':'Classify: hello','idempotency_key':'remote-idem-1',
+          'connection_id':'fixture-connection','max_output_tokens':32}}}).encode(),
+          authorization).read())
+        self.assertEqual(json.loads(duplicate['result']['content'][0]['text'])['task_id'],task_id)
+        self.assertEqual(ModelFixture.calls,2) # one benchmark + one task
+        with self.assertRaises(HTTPError) as denied:
+            raw('/mcp','POST',json.dumps(rpc).encode(),{
+              'Content-Type':'application/json'})
+        self.assertEqual(denied.exception.code,401)
+
+
+if __name__=='__main__':unittest.main()

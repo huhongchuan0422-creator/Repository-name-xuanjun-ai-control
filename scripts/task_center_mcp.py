@@ -50,6 +50,61 @@ TOOLS = (
      'task_id':{'type':'string'}},'additionalProperties':False}},
 )
 
+REMOTE_TOOLS = (
+  {'name':'task_capabilities','description':
+   'List TEST_ONLY model execution capabilities, limits, and current holds.',
+   'inputSchema':{'type':'object','properties':{},'additionalProperties':False},
+   'annotations':{'readOnlyHint':True,'openWorldHint':False}},
+  {'name':'task_submit','description':
+   'Submit one scoped asynchronous text-classification task. Returns a persistent task_id immediately.',
+   'inputSchema':{'type':'object','required':['project_id','task_type',
+     'input_text','idempotency_key','connection_id','max_output_tokens'],
+     'properties':{'project_id':{'type':'string'},
+       'task_type':{'type':'string','enum':['TEXT_CLASSIFICATION']},
+       'input_text':{'type':'string','maxLength':4000},
+       'idempotency_key':{'type':'string','maxLength':128},
+       'connection_id':{'type':'string'},
+       'max_output_tokens':{'type':'integer','minimum':1,'maximum':128}},
+     'additionalProperties':False},
+   'annotations':{'readOnlyHint':False,'destructiveHint':False,
+                  'idempotentHint':True,'openWorldHint':True}},
+  {'name':'task_get','description':'Read status for one task in the authorized project.',
+   'inputSchema':{'type':'object','required':['task_id'],'properties':{
+     'task_id':{'type':'string'}},'additionalProperties':False},
+   'annotations':{'readOnlyHint':True,'openWorldHint':False}},
+  {'name':'task_query_result','description':
+   'Read the persisted model result, usage state, or exact failure for one task.',
+   'inputSchema':{'type':'object','required':['task_id'],'properties':{
+     'task_id':{'type':'string'}},'additionalProperties':False},
+   'annotations':{'readOnlyHint':True,'openWorldHint':False}},
+)
+
+
+class RemoteTaskCenterMCP(object):
+    """Stateless JSON-RPC surface over an authenticated MCPTaskService."""
+    def __init__(self,service):self.service=service
+    def call(self,name,args):
+        if name=='task_capabilities':return self.service.capabilities()
+        if name=='task_submit':return self.service.submit(args)
+        if name=='task_get':return self.service.status(args['task_id'])
+        if name=='task_query_result':return self.service.result(args['task_id'])
+        raise ValueError('UNKNOWN_MCP_TOOL')
+    def rpc(self,value):
+        method=value.get('method');rpc_id=value.get('id')
+        if method=='initialize':
+            result={'protocolVersion':'2025-06-18','capabilities':{'tools':{}},
+              'serverInfo':{'name':'xuanjun-task-center','version':'mcp-v1'}}
+        elif method=='tools/list':result={'tools':list(REMOTE_TOOLS)}
+        elif method=='tools/call':
+            params=value.get('params') or {}
+            result={'content':[{'type':'text','text':json.dumps(
+              self.call(params.get('name'),params.get('arguments') or {}),
+              ensure_ascii=False,sort_keys=True)}]}
+        elif method in ('notifications/initialized','ping'):
+            result={}
+        else:raise ValueError('UNSUPPORTED_MCP_METHOD')
+        return {'jsonrpc':'2.0','id':rpc_id,'result':result}
+
 
 def _owned_secret(path):
     import stat

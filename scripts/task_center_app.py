@@ -33,6 +33,10 @@ from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
                                  public_presets, projection as onboarding_projection,
                                  saved_credential, test_connection, test_model,
                                  issue_receipt, save as save_onboarding)
+from task_center_mcp import RemoteTaskCenterMCP
+from task_center_mcp_auth import MCPAuthorizationStore
+from task_center_mcp_service import (MCPModelWorkerLoop,MCPTaskService,
+                                     ensure_schema as ensure_mcp_task_schema)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -221,7 +225,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   codex_transports=None, identity_provider=None,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
-                  external_origin=None, base_path='/'):
+                  external_origin=None, base_path='/',mcp_auth_store=None):
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
     base_path = _normalize_base_path(base_path)
@@ -275,6 +279,47 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._send(503,_json_bytes({'state':'NOT_READY',
                       'detail':str(exc)}),'application/json; charset=utf-8')
                 return
+            if path == '/.well-known/oauth-protected-resource':
+                if mcp_auth_store is None:
+                    self._send(404,b'not found\n','text/plain; charset=utf-8');return
+                self._send(200,_json_bytes(
+                  mcp_auth_store.protected_resource_metadata()),
+                  'application/json; charset=utf-8');return
+            if path == '/.well-known/oauth-authorization-server':
+                if mcp_auth_store is None:
+                    self._send(404,b'not found\n','text/plain; charset=utf-8');return
+                base=(external_origin or ('http://'+self.headers.get('Host')))+(
+                  base_path[:-1] if base_path!='/' else '')
+                self._send(200,_json_bytes(
+                  mcp_auth_store.authorization_server_metadata(base)),
+                  'application/json; charset=utf-8');return
+            if path == '/oauth/authorize':
+                if mcp_auth_store is None:
+                    self._send(404,b'not found\n','text/plain; charset=utf-8');return
+                session=self._session()
+                if session is None:
+                    target=self.path
+                    self.send_response(302);self.send_header('Location',
+                      self._external_path('/login.html')+'?next='+
+                      __import__('urllib.parse').parse.quote(target,safe=''))
+                    self.send_header('Cache-Control','no-store');self.end_headers();return
+                if 'TASK_CENTER_ADMIN' not in session['roles']:
+                    self._send(403,_json_bytes({'error':'MCP_OWNER_REQUIRED'}),
+                      'application/json; charset=utf-8');return
+                try:
+                    query=__import__('urllib.parse').parse.parse_qs(
+                      urlsplit(self.path).query,keep_blank_values=True)
+                    params={key:values[-1] for key,values in query.items()}
+                    location=mcp_auth_store.authorize(session,params)
+                    self.send_response(302);self.send_header('Location',location)
+                    self.send_header('Cache-Control','no-store');self.end_headers()
+                except Exception as exc:
+                    self._send(400,_json_bytes({'error':type(exc).__name__,
+                      'detail':str(exc)}),'application/json; charset=utf-8')
+                return
+            if path == '/mcp':
+                self._send(405,_json_bytes({'error':'MCP_POST_REQUIRED'}),
+                  'application/json; charset=utf-8',[('Allow','POST')]);return
             if path == '/api/session':
                 session=self._session()
                 if session is None:
@@ -325,12 +370,17 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 self._send(200, stream.read(), asset[1])
 
         def do_POST(self):
-            if not self._host_allowed() or not self._origin_allowed():
-                self._send(403,_json_bytes({'error':'SAME_ORIGIN_REQUIRED'}),
+            if not self._host_allowed():
+                self._send(421,_json_bytes({'error':'HOST_REQUIRED'}),
                   'application/json; charset=utf-8');return
             path = self._route_path()
             if path is None:
                 self._send(404,b'not found\n','text/plain; charset=utf-8');return
+            if path in ('/oauth/register','/oauth/token','/mcp'):
+                return self._mcp_post(path)
+            if not self._origin_allowed():
+                self._send(403,_json_bytes({'error':'SAME_ORIGIN_REQUIRED'}),
+                  'application/json; charset=utf-8');return
             if path == '/api/session/login':
                 return self._login()
             if path == '/api/session/logout':
@@ -729,6 +779,51 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             item=cookie.get(session_store.COOKIE)
             return item.value if item is not None else None
 
+        def _mcp_post(self,path):
+            if mcp_auth_store is None or model_master_key is None:
+                self._send(404,b'not found\n','text/plain; charset=utf-8');return
+            try:
+                length=int(self.headers.get('Content-Length','0'))
+                if length<1 or length>65536:raise ValueError('BODY_LIMIT')
+                raw=self.rfile.read(length)
+                if path=='/oauth/register':
+                    value=json.loads(raw.decode('utf-8'))
+                    result=mcp_auth_store.register(value)
+                    self._send(201,_json_bytes(result),
+                      'application/json; charset=utf-8');return
+                if path=='/oauth/token':
+                    parsed=__import__('urllib.parse').parse.parse_qs(
+                      raw.decode('utf-8'),keep_blank_values=True)
+                    params={key:values[-1] for key,values in parsed.items()}
+                    result=mcp_auth_store.exchange(params)
+                    self._send(200,_json_bytes(result),
+                      'application/json; charset=utf-8');return
+                value=json.loads(raw.decode('utf-8'))
+                method=value.get('method')
+                scope=('task:submit' if method=='tools/call' and
+                  (value.get('params') or {}).get('name')=='task_submit'
+                  else 'task:read')
+                identity=mcp_auth_store.authenticate(
+                  self.headers.get('Authorization'),scope)
+                if identity is None:
+                    metadata=((external_origin or
+                      ('http://'+self.headers.get('Host')))+
+                      (base_path if base_path!='/' else '/')+
+                      '.well-known/oauth-protected-resource')
+                    self._send(401,_json_bytes({'error':'MCP_AUTH_REQUIRED'}),
+                      'application/json; charset=utf-8',[('WWW-Authenticate',
+                      'Bearer resource_metadata="%s", scope="%s"'%(metadata,scope))]);return
+                service=MCPTaskService(db_path,authority_key,tenant_id,
+                  model_master_key,identity['principal_id'],identity['project_id'])
+                result=RemoteTaskCenterMCP(service).rpc(value)
+                if value.get('id') is None:
+                    self._send(202,b'','application/json; charset=utf-8');return
+                self._send(200,_json_bytes(result),
+                  'application/json; charset=utf-8')
+            except Exception as exc:
+                self._send(400,_json_bytes({'error':type(exc).__name__,
+                  'detail':str(exc)}),'application/json; charset=utf-8')
+
         def _host_allowed(self):
             supplied=self.headers.get('Host','')
             if external_host is not None:
@@ -807,7 +902,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 admin_token=None, actor_tokens=None,codex_transports=None,
                 identity_provider=None,session_store=None,
                 outbound_enabled=True,provider_connection_test_enabled=False,
-                external_origin=None,base_path='/'):
+                external_origin=None,base_path='/',mcp_enabled=False,
+                mcp_model_worker_enabled=False,mcp_worker_adapters=None):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
@@ -827,17 +923,37 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             CodexExecutionControl(gateway,authority.issue(tenant_id,
               'admin:'+principal_id))
         finally:supervisor.close()
+    mcp_auth_store=None
+    if mcp_enabled:
+        if identity_provider is None or session_store is None or external_origin is None:
+            raise ValueError('MCP_SESSION_AND_HTTPS_REQUIRED')
+        def mcp_connect():
+            db=sqlite3.connect(os.path.realpath(db_path),timeout=5)
+            db.row_factory=sqlite3.Row;return db
+        normalized_base=_normalize_base_path(base_path)
+        issuer=external_origin+(normalized_base[:-1] if normalized_base!='/' else '')
+        resource=external_origin+(normalized_base if normalized_base!='/' else '/')+'mcp'
+        mcp_auth_store=MCPAuthorizationStore(mcp_connect,tenant_id,issuer,resource)
+        mcp_db=mcp_connect()
+        try:ensure_mcp_task_schema(mcp_db)
+        finally:mcp_db.close()
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
                             admin_token, actor_tokens,codex_transports,
                             identity_provider,session_store,outbound_enabled,
                             provider_connection_test_enabled,
-                            external_origin,base_path)
+                            external_origin,base_path,mcp_auth_store)
     server=HTTPServer((host, port), handler)
     server.codex_worker=None
     if codex_transports:
         server.codex_worker=CodexWorkerLoop(os.path.realpath(db_path),
           authority_key,tenant_id,codex_transports);server.codex_worker.start()
+    server.mcp_worker=None
+    if mcp_model_worker_enabled:
+        if not mcp_enabled:raise ValueError('MCP_WORKER_REQUIRES_MCP')
+        server.mcp_worker=MCPModelWorkerLoop(os.path.realpath(db_path),
+          authority_key,tenant_id,model_master_key,adapters=mcp_worker_adapters)
+        server.mcp_worker.start()
     return server
 
 
@@ -861,6 +977,8 @@ def main(argv=None):
     parser.add_argument('--allow-provider-connection-test',action='store_true')
     parser.add_argument('--external-origin')
     parser.add_argument('--base-path',default='/')
+    parser.add_argument('--enable-mcp',action='store_true')
+    parser.add_argument('--allow-mcp-model-outbound',action='store_true')
     args = parser.parse_args(argv)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
@@ -909,7 +1027,8 @@ def main(argv=None):
                          actor_tokens,codex_transports,identity_provider,
                          session_store,args.allow_loopback_fixture_outbound,
                          args.allow_provider_connection_test,
-                         args.external_origin,args.base_path)
+                         args.external_origin,args.base_path,args.enable_mcp,
+                         args.allow_mcp_model_outbound)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
@@ -928,6 +1047,9 @@ def main(argv=None):
                                   'DISABLED'),
                'provider_connection_test': ('ENABLED' if
                   args.allow_provider_connection_test else 'DISABLED'),
+               'mcp': ('ENABLED' if args.enable_mcp else 'DISABLED'),
+               'mcp_model_outbound': ('ENABLED_ZERO_SPEND_GATES' if
+                  args.allow_mcp_model_outbound else 'DISABLED'),
                'production_status': 'NOT_IMPLEMENTED'}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)
@@ -939,6 +1061,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     finally:
+        if getattr(server,'mcp_worker',None):server.mcp_worker.stop()
         if getattr(server,'codex_worker',None):server.codex_worker.stop()
         server.server_close()
         signal.signal(signal.SIGTERM, previous_term)

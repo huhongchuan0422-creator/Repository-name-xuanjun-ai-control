@@ -827,7 +827,7 @@ class ModelControl(object):
         return {'skill_id':skill_id,'status':status}
 
     def assign(self, task_id, role_id, role_version, principal_id,
-               allow_paid=False, now=None):
+               allow_paid=False, now=None, provider_id=None, model_id=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -854,6 +854,8 @@ class ModelControl(object):
                     'EXECUTOR' in held)):
             raise ValueError('SELF_APPROVAL_FORBIDDEN')
         capabilities=set(json.loads(role['capabilities_json']))
+        if (provider_id is None) != (model_id is None):
+            raise ValueError('EXACT_MODEL_BINDING_PAIR_REQUIRED')
         candidates=[]
         for row in self.db.execute('''SELECT p.provider_id,p.price_state AS
           provider_price,m.model_id,m.price_state,m.capabilities_json,
@@ -863,6 +865,10 @@ class ModelControl(object):
           q.tenant_id=p.tenant_id AND q.provider_id=p.provider_id
           WHERE p.tenant_id=? AND p.enabled=1
           AND m.enabled=1 AND p.circuit_state='CLOSED' ''',(self.tenant_id,)):
+            if (provider_id is not None and
+                    (row['provider_id'] != provider_id or
+                     row['model_id'] != model_id)):
+                continue
             if capabilities.issubset(set(json.loads(row['capabilities_json']))):
                 qualified=self.db.execute('''SELECT state,quality_score,
                   duration_ms,retries,rework_count FROM model_evaluations
