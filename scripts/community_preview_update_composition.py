@@ -81,23 +81,39 @@ def backup_reference(fd):
     return digest({'path':path,'metadata':value})
 
 
-def inspect_bound(cid,image):
+INITIALIZE_ENTRYPOINT=['python']
+INITIALIZE_CMD=['-B','-m','scripts.community_first_install','--plan',
+    plan.ROOT+'/config/initialize.json','--center-keys',plan.ROOT+'/config/center-keys.json']
+NORMAL_ENTRYPOINT=['python','-B','-m','scripts.community_platform_host']
+NORMAL_CMD=['--plan',plan.ROOT+'/config/host.json','--center-keys',
+    plan.ROOT+'/config/center-keys.json','--wechat-secret',plan.ROOT+'/config/wechat.json']
+
+
+def inspect_bound(cid,image,historical_initialize=False):
     # Same original typed projection/validation, with bounded original readonly
     # child transport; additionally prove no published port/device/cap addition.
+    # The one historical initialize container has its own exact, source-backed
+    # CLI contract. All non-command security and resource checks remain original.
     fields=original.INSPECT_FIELDS+[('ports','.HostConfig.PortBindings'),
         ('published','.NetworkSettings.Ports'),('devices','.HostConfig.Devices'),('capadd','.HostConfig.CapAdd')]
-    fmt='\n'.join('{{json '+field+'}}' for _,field in fields)
+    fmt='\\n'.join('{{json '+field+'}}' for _,field in fields)
     rows=observation.capture(plan.DOCKER+['container','inspect','--format',fmt,cid],timeout=8,budget=32768).splitlines()
     require(len(rows)==len(fields),'CURRENT_INSPECT_SHAPE')
     value={key:observation.exact_json(raw) for (key,_),raw in zip(fields,rows)}
     require(type(value['running']) is bool,'CURRENT_RUNNING_UNKNOWN')
     for key in ('cpu','memory','swap','pids'):require(type(value[key]) is int,'CURRENT_RESOURCE_TYPE')
     for key in ('readonly','privileged'):require(type(value[key]) is bool,'CURRENT_ISOLATION_TYPE')
-    original.validate(value,image,cid,running=value['running'])
+    validation_value=value
+    if historical_initialize:
+        require(value['entrypoint']==INITIALIZE_ENTRYPOINT,'LEGACY_INITIALIZE_ENTRYPOINT_CHANGED')
+        require(value['cmd']==INITIALIZE_CMD,'LEGACY_INITIALIZE_CMD_CHANGED')
+        validation_value=dict(value)
+        validation_value['entrypoint']=NORMAL_ENTRYPOINT
+        validation_value['cmd']=NORMAL_CMD
+    original.validate(validation_value,image,cid,running=value['running'])
     require(value['ports'] in (None,{}) and value['published'] in (None,{})
             and value['devices'] in (None,[]) and value['capadd'] in (None,[]),'NO_NEW_PORT_DEVICE_CAPABILITY')
     return value
-
 
 # Historical denied-request diagnostics only; never an acceptance path.
 PRIVATE_PROBE = r"""import http.client,json,socket
@@ -468,7 +484,7 @@ def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
          'LEGACY_INITIALIZE_NOT_STOPPED'))
     for name,cid,image,error in historical:
         if name in names:
-            require(names[name]==cid and inspect_bound(cid,image)['running'] is False,error)
+            require(names[name]==cid and inspect_bound(cid,image,historical_initialize=(name==initialize))['running'] is False,error)
     old=candidate['current']['container_id'];rb=candidate['rollback_name'];failed=candidate['failed_name']
     pre=('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT')
     retained=('OLD_RETAINED','NEW_RUN_INTENT')
