@@ -1353,6 +1353,8 @@ class CBoundaryReasonClassification(unittest.TestCase):
                 self.assertEqual(h.main(['--resume-c-before-confirmation']),2)
         record=json.loads(output.call_args.args[0])
         self.assertEqual(record['result']['reason'],'BC_BOUNDARY_UNKNOWN')
+        self.assertEqual(record['result']['error_type'],'RuntimeError')
+        self.assertTrue(record['result']['safe_call_trail'])
         self.assertNotIn('PRIVATE_VALUE',json.dumps(record))
 
 if __name__=='__main__':unittest.main()
