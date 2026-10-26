@@ -8,6 +8,11 @@ from __future__ import print_function
 
 import hashlib
 import json
+import errno
+import fcntl
+import os
+import stat
+import threading
 import time
 
 from execution_policy_gateway import ExecutionPolicyGateway
@@ -22,6 +27,41 @@ from task_writer_fence import Fence
 ROLE_ID = 'mcp-text-executor'
 ROLE_VERSION = 'v1'
 TASK_TYPE = 'TEXT_CLASSIFICATION'
+_SERVICE_LOCK_GUARD=threading.Lock()
+_SERVICE_LOCK_PATHS=set()
+
+
+class MCPServiceLease(object):
+    """Process-lifetime proof that only one MCP service owns this ledger."""
+    def __init__(self,path):
+        self.path=os.path.realpath(path);self.fd=None
+        if self.path!=path:raise ValueError('CANONICAL_MCP_SERVICE_LOCK_REQUIRED')
+        fd=os.open(path,os.O_RDWR|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
+        try:
+            info=os.fstat(fd);current=os.lstat(path)
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid() or
+                    stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1 or
+                    (info.st_dev,info.st_ino)!=(current.st_dev,current.st_ino)):
+                raise ValueError('UNSAFE_MCP_SERVICE_LOCK')
+            with _SERVICE_LOCK_GUARD:
+                if path in _SERVICE_LOCK_PATHS:
+                    raise ValueError('MCP_SERVICE_ALREADY_RUNNING')
+                try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                except OSError as exc:
+                    if exc.errno in (errno.EACCES,errno.EAGAIN):
+                        raise ValueError('MCP_SERVICE_ALREADY_RUNNING')
+                    raise
+                _SERVICE_LOCK_PATHS.add(path)
+            self.fd=fd
+        except Exception:
+            os.close(fd);raise
+
+    def close(self):
+        if self.fd is None:return
+        try:fcntl.flock(self.fd,fcntl.LOCK_UN)
+        finally:
+            os.close(self.fd);self.fd=None
+            with _SERVICE_LOCK_GUARD:_SERVICE_LOCK_PATHS.discard(self.path)
 
 
 def ensure_schema(db):

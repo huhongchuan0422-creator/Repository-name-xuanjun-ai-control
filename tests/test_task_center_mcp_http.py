@@ -26,8 +26,10 @@ from connection_management import ConnectionManager
 from model_orchestration import ModelControl
 from provider_onboarding import ensure_schema as ensure_onboarding_schema
 from task_center_app import make_server
+from task_center_mcp_service import MCPTaskService
 from task_center_session_auth import FileTestIdentityProvider,SessionStore,password_hash
 from task_supervisor import Supervisor
+from task_writer_fence import Fence
 
 KEY=b'0123456789abcdef0123456789abcdef'
 HOST='mcp.example.com'
@@ -93,14 +95,14 @@ class MCPHTTPTests(unittest.TestCase):
           'tenant_id':'tenant-mcp','principal_id':'owner-1',
           'roles':['TASK_CENTER_ADMIN']}}},stream)
         os.chmod(identity_path,0o600)
-        identity=FileTestIdentityProvider(identity_path)
+        self.identity=FileTestIdentityProvider(identity_path)
         def connect():
             import sqlite3
             db=sqlite3.connect(self.db);db.row_factory=sqlite3.Row;return db
-        sessions=SessionStore(connect,'tenant-mcp')
+        self.sessions=SessionStore(connect,'tenant-mcp')
         self.server=make_server(self.db,KEY,'tenant-mcp','owner',port=0,
-          model_master_key=self.master,identity_provider=identity,
-          session_store=sessions,outbound_enabled=False,
+          model_master_key=self.master,identity_provider=self.identity,
+          session_store=self.sessions,outbound_enabled=False,
           external_origin='https://'+HOST,base_path='/task-center-test/',
           mcp_enabled=True,mcp_model_worker_enabled=True)
         self.thread=threading.Thread(target=self.server.serve_forever)
@@ -140,6 +142,47 @@ class MCPHTTPTests(unittest.TestCase):
           verifier.encode()).digest()).decode().rstrip('=')
         self.assertTrue(session_cookie.startswith('xuanjun_task_center_session='))
         self.assertEqual(client['token_endpoint_auth_method'],'none')
+
+    def test_live_service_blocks_competing_startup_recovery(self):
+        def stop(phase):
+            if phase=='CONTRACT_PERSISTED':raise RuntimeError('STOP_AFTER_CONTRACT')
+        service=MCPTaskService(self.db,KEY,'tenant-mcp',self.master,'owner-1',
+          'project-mcp',phase_hook=stop)
+        value={'project_id':'project-mcp','task_type':'TEXT_CLASSIFICATION',
+          'input_text':'Classify: lease safety','idempotency_key':'lease-safety',
+          'connection_id':'fixture-connection','max_output_tokens':32}
+        with self.assertRaisesRegex(RuntimeError,'STOP_AFTER_CONTRACT'):
+            service.submit(value)
+        supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY)
+        gateway=GatewayKernel(supervisor,authority)
+        binding=supervisor.db.execute('''SELECT task_id FROM mcp_task_bindings
+          WHERE tenant_id=? AND idempotency_key=?''',('tenant-mcp',
+          'lease-safety')).fetchone();task_id=binding['task_id']
+        attempt_id='attempt-'+task_id[4:]
+        fence=Fence(supervisor,self.db+'.test-only-locks')
+        try:
+            fence.claim(task_id,attempt_id,'mcp-worker','model-scheduler-runtime',{
+              'caller_id':'test-writer-'+attempt_id,
+              'run_id':'test-run-'+attempt_id,
+              'session_id':'test-session-'+attempt_id,
+              'gateway_id':'test-gateway'},'lease-'+attempt_id,
+              gateway.canonical_resources(task_id),time.time()+600)
+        finally:fence.close();supervisor.close()
+        with self.assertRaisesRegex(ValueError,'MCP_SERVICE_ALREADY_RUNNING'):
+            make_server(self.db,KEY,'tenant-mcp','owner',port=0,
+              model_master_key=self.master,identity_provider=self.identity,
+              session_store=self.sessions,outbound_enabled=False,
+              external_origin='https://'+HOST,
+              base_path='/task-center-test/',mcp_enabled=True)
+        supervisor=Supervisor(self.db)
+        try:
+            task=supervisor._task(task_id)
+            self.assertEqual((task['state'],task['authority_state']),
+                             ('RECEIVED','VALID'))
+            claim=supervisor.db.execute('''SELECT state FROM resource_claims
+              WHERE task_id=?''',(task_id,)).fetchone()
+            self.assertEqual(claim['state'],'VALID')
+        finally:supervisor.close()
 
     def test_full_oauth_without_following_external_redirect(self):
         class NoRedirect(__import__('urllib.request').request.HTTPRedirectHandler):

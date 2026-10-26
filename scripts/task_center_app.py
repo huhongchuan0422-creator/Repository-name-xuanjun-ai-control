@@ -35,12 +35,27 @@ from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
                                  issue_receipt, save as save_onboarding)
 from task_center_mcp import RemoteTaskCenterMCP
 from task_center_mcp_auth import MCPAuthorizationStore
-from task_center_mcp_service import (MCPModelWorkerLoop,MCPTaskService,
+from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
+                                     MCPTaskService,
                                      ensure_schema as ensure_mcp_task_schema,
                                      recover_incomplete_mcp_starts)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+
+
+class TaskCenterHTTPServer(HTTPServer):
+    """HTTP listener whose close also releases the MCP ledger lease."""
+    def server_close(self):
+        try:
+            HTTPServer.server_close(self)
+        finally:
+            lease=getattr(self,'mcp_service_lease',None)
+            if lease is not None:
+                self.mcp_service_lease=None
+                lease.close()
+
+
 ASSET_ROOT = os.path.join(ROOT, 'demos', 'task-center-digital-twin')
 ASSETS = {
     '/': ('index.html', 'text/html; charset=utf-8'),
@@ -916,6 +931,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
         raise ValueError('CANONICAL_SQLITE_REQUIRED')
+    if mcp_model_worker_enabled and not mcp_enabled:
+        raise ValueError('MCP_WORKER_REQUIRES_MCP')
     # Schema initialization is an explicit startup phase.  GET handlers remain
     # pure read-only and never migrate or create tables.
     if model_master_key is not None:
@@ -931,7 +948,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             CodexExecutionControl(gateway,authority.issue(tenant_id,
               'admin:'+principal_id))
         finally:supervisor.close()
-    mcp_auth_store=None
+    mcp_auth_store=None;mcp_service_lease=None;server=None
     if mcp_enabled:
         if identity_provider is None or session_store is None or external_origin is None:
             raise ValueError('MCP_SESSION_AND_HTTPS_REQUIRED')
@@ -945,29 +962,37 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         mcp_db=mcp_connect()
         try:ensure_mcp_task_schema(mcp_db)
         finally:mcp_db.close()
-        # A fresh service process proves the prior local process stopped.  Only
-        # then may the existing fenced recovery contract revoke incomplete MCP
-        # claims that never produced a STARTED receipt.
-        recover_incomplete_mcp_starts(os.path.realpath(db_path),authority_key,
-                                      tenant_id)
-    handler = build_handler(os.path.realpath(db_path), authority_key,
-                            tenant_id, principal_id, model_master_key,
-                            admin_token, actor_tokens,codex_transports,
-                            identity_provider,session_store,outbound_enabled,
-                            provider_connection_test_enabled,
-                            external_origin,base_path,mcp_auth_store)
-    server=HTTPServer((host, port), handler)
-    server.codex_worker=None
-    if codex_transports:
-        server.codex_worker=CodexWorkerLoop(os.path.realpath(db_path),
-          authority_key,tenant_id,codex_transports);server.codex_worker.start()
-    server.mcp_worker=None
-    if mcp_model_worker_enabled:
-        if not mcp_enabled:raise ValueError('MCP_WORKER_REQUIRES_MCP')
-        server.mcp_worker=MCPModelWorkerLoop(os.path.realpath(db_path),
-          authority_key,tenant_id,model_master_key,adapters=mcp_worker_adapters)
-        server.mcp_worker.start()
-    return server
+        # The lease is held across listener bind, recovery and the full service
+        # lifetime.  It protects the ledger even on a different TCP port.
+        mcp_service_lease=MCPServiceLease(os.path.realpath(db_path)+
+                                          '.mcp-service.lock')
+    try:
+        handler = build_handler(os.path.realpath(db_path), authority_key,
+                                tenant_id, principal_id, model_master_key,
+                                admin_token, actor_tokens,codex_transports,
+                                identity_provider,session_store,outbound_enabled,
+                                provider_connection_test_enabled,
+                                external_origin,base_path,mcp_auth_store)
+        server=TaskCenterHTTPServer((host, port), handler)
+        server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
+        server.codex_worker=None;server.mcp_worker=None
+        if mcp_enabled:
+            # Bind first while holding the unique ledger lease.  Only then is
+            # it safe to revoke a prior process's unstarted fenced claim.
+            recover_incomplete_mcp_starts(os.path.realpath(db_path),
+                                          authority_key,tenant_id)
+        if codex_transports:
+            server.codex_worker=CodexWorkerLoop(os.path.realpath(db_path),
+              authority_key,tenant_id,codex_transports);server.codex_worker.start()
+        if mcp_model_worker_enabled:
+            server.mcp_worker=MCPModelWorkerLoop(os.path.realpath(db_path),
+              authority_key,tenant_id,model_master_key,
+              adapters=mcp_worker_adapters);server.mcp_worker.start()
+        return server
+    except Exception:
+        if server is not None:server.server_close()
+        elif mcp_service_lease is not None:mcp_service_lease.close()
+        raise
 
 
 def main(argv=None):
