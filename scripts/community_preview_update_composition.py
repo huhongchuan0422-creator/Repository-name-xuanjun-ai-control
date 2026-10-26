@@ -110,10 +110,22 @@ def inspect_bound(cid,image,historical_initialize=False):
         # The one historical first-install container is intentionally network-isolated.
         # Pin this exception exactly; never permit network=none for normal service containers.
         require(value['network']=='none','LEGACY_INITIALIZE_NETWORK_CHANGED')
+        # Historical initializer predates the runtime socket mount: exactly two binds.
+        expected_initialize_mounts={
+            (plan.ROOT+'/config',plan.ROOT+'/config',False),
+            (plan.ROOT+'/data',plan.ROOT+'/data',True)}
+        mounts=value['mounts']
+        require(len(mounts)==2 and all(m.get('Type')=='bind' for m in mounts)
+                and {(m['Source'],m['Destination'],m['RW']) for m in mounts}==expected_initialize_mounts,
+                'LEGACY_INITIALIZE_MOUNTS_CHANGED')
         validation_value=dict(value)
         validation_value['entrypoint']=NORMAL_ENTRYPOINT
         validation_value['cmd']=NORMAL_CMD
         validation_value['network']='bridge'
+        # The shared normal-service validator expects the later runtime socket mount.
+        # Add it only to the temporary validation projection, never to observed facts.
+        validation_value['mounts']=list(mounts)+[
+            {'Type':'bind','Source':plan.RUN,'Destination':plan.RUN,'RW':True}]
     try:
         original.validate(validation_value,image,cid,running=value['running'])
     except original.Rejected as error:
