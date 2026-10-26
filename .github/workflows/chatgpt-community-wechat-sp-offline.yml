@@ -303,7 +303,7 @@ jobs:
               print(label.upper()+'_OUTER_SHA='+outer_sha+' INNER_ARCHIVE_SHA='+archive_sha+' MANIFEST_SHA='+manifest_sha)
           FIXTURE
       - name: Issue76 exact historical container inventory tests
-        if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]')
+        if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]')
         run: |
           set -euo pipefail
           python -B -m py_compile scripts/community_preview_update_composition.py tests/test_community_preview_stopped_handoff.py 2>&1 | tee historical-container-tests.log
@@ -695,8 +695,14 @@ jobs:
             docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
           retention-days: 14
+      - name: Build stopped-handoff source for historical inventory candidate
+        if: contains(github.event.head_commit.message, '[preview-historical-container-scope]')
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python -B scripts/community_preview_bc_build.py
+          cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
       - name: Build exact post-B C-resume delivery index
-        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
         run: |
           set -euo pipefail
           python - <<'INDEX'
@@ -762,7 +768,7 @@ jobs:
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
-        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
         uses: actions/upload-artifact@v4
         with:
           name: community-post-b-c-resume-source
@@ -779,7 +785,7 @@ jobs:
           retention-days: 14
 
       - name: Preserve stopped handoff proposal evidence (no site execution)
-        if: always() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]'))
+        if: always() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
         uses: actions/upload-artifact@v4
         with:
           name: community-stopped-handoff-v1
