@@ -339,6 +339,9 @@ class WholeEntry(unittest.TestCase):
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(q.c_resume_approval_path,s.canonical(successor_approval))
         self.assertEqual(q._c_resume_approval(successor)['plan_sha256'],successor['plan_sha256'])
+        # Once the operation-specific approval is bound, every later boundary
+        # must re-read that exact path rather than the fixed predecessor path.
+        q.boundary()
 
     def test_expired_successor_keeps_historical_carrier_and_binds_current_manifest(self):
         q,historical=self._prepare_completed_b_before_c_proof()
