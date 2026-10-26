@@ -361,12 +361,17 @@ class Session:
             bound=self.bind_resume_reference(approval_path,16384)
         a,b=document(approval_path)
         need(bound==b,'C_RESUME_APPROVAL_REPLACED')
-        need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256',
-                'plan_sha256','issued_at','expires_at','actions'}
-             and type(a['format']) is int and a['format']==1
+        successor='predecessor_plan_sha256' in candidate
+        expected={'format','host','mode','attempt','carrier_manifest_sha256',
+                  'plan_sha256','issued_at','expires_at','actions'}
+        if successor:expected|={'predecessor_plan_sha256','predecessor_approval_sha256'}
+        need(set(a)==expected
+             and type(a['format']) is int and a['format']==(2 if successor else 1)
              and a['host']==p.HOST and a['mode']==MODE and a['attempt']==attempt()
              and a['carrier_manifest_sha256']==self.approved_stamp==self.pins()
              and a['plan_sha256']==candidate['plan_sha256']
+             and (not successor or (a['predecessor_plan_sha256']==candidate['predecessor_plan_sha256']
+                  and a['predecessor_approval_sha256']==candidate['predecessor_approval_sha256']))
              and a['actions']==C_ACTIONS,'EXACT_C_RESUME_APPROVAL_REQUIRED')
         window(a);self.craw=b;return a
 
