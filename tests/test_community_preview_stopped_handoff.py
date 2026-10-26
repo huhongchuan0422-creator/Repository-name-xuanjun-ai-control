@@ -1308,9 +1308,9 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
             'tmpfs':{'/tmp':'rw,noexec,nosuid,nodev,size=16777216,mode=1777'},
             'log':{'Type':'json-file','Config':{'max-size':'10m','max-file':'2'}},
             'ports':None,'published':None,'devices':[],'capadd':[]}
-        fields=old.INSPECT_FIELDS+[('ports','.HostConfig.PortBindings'),
+        fields=c.original.INSPECT_FIELDS+[('ports','.HostConfig.PortBindings'),
             ('published','.NetworkSettings.Ports'),('devices','.HostConfig.Devices'),('capadd','.HostConfig.CapAdd')]
-        return '\\n'.join(json.dumps(info[key],separators=(',',':')) for key,_ in fields)
+        return '\n'.join(json.dumps(info[key],separators=(',',':')) for key,_ in fields)
 
     def test_initialize_uses_real_typed_validate_chain_and_exact_source_contract(self):
         output=self._initialize_inspect_output()
