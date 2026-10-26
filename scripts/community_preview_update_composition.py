@@ -114,7 +114,14 @@ def inspect_bound(cid,image,historical_initialize=False):
         validation_value['entrypoint']=NORMAL_ENTRYPOINT
         validation_value['cmd']=NORMAL_CMD
         validation_value['network']='bridge'
-    original.validate(validation_value,image,cid,running=value['running'])
+    try:
+        original.validate(validation_value,image,cid,running=value['running'])
+    except original.Rejected as error:
+        # Convert only the fixed validator's enum-like reason; never surface raw details.
+        reason=str(error)
+        require(re.fullmatch('[A-Z][A-Z0-9_]{0,95}',reason) is not None,
+                'LEGACY_INITIALIZE_VALIDATION_UNKNOWN')
+        raise controller.Hold(reason) from None
     require(value['ports'] in (None,{}) and value['published'] in (None,{})
             and value['devices'] in (None,[]) and value['capadd'] in (None,[]),'NO_NEW_PORT_DEVICE_CAPABILITY')
     return value
