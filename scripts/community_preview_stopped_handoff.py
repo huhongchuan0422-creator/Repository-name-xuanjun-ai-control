@@ -916,7 +916,7 @@ def main(argv=None):
         code=0
     except BaseException as error:
         import re
-        reason=str(error) if type(error) in (u.Hold,s.Hold) and re.fullmatch('[A-Z_]{1,96}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
+        reason=str(error) if type(error) in (u.Hold,s.Hold) and re.fullmatch('[A-Z][A-Z0-9_]{0,95}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
         result=dict(phase='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',reason=reason)
     finally:
         try:session.close()
