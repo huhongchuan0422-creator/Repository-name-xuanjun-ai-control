@@ -381,7 +381,7 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_STABLE_PLAN_CHANGED'):
             q._fixed_c_resume_plan(changed,fresh_semantic)
 
-    def test_successor_predecessor_replacement_or_second_expiry_holds(self):
+    def test_successor_predecessor_replacement_or_second_expiry_uses_one_renewal(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
         first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
@@ -392,10 +392,42 @@ class WholeEntry(unittest.TestCase):
         self.clock=h.document(h.C_RESUME_PLAN)[0]['expires_at']+1;q.last=None
         fresh_semantic=q.evidence(True);fresh_candidate=q.candidate(fresh_semantic)
         successor=q._fixed_c_resume_plan(fresh_candidate,fresh_semantic)
-        self.clock=h.document(q.c_resume_plan_path)[0]['expires_at']+1;q.last=None
+        successor_path=q.c_resume_plan_path;successor_raw=Path(successor_path).read_bytes()
+        successor_approval=dict(format=2,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+            predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+            predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(q.c_resume_approval_path,s.canonical(successor_approval))
+        self.clock=h.document(successor_path)[0]['expires_at']+1;q.last=None
         fresh_semantic=q.evidence(True);fresh_candidate=q.candidate(fresh_semantic)
-        with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXPIRED_NO_SECOND_SUCCESSOR'):
-            q._fixed_c_resume_plan(fresh_candidate,fresh_semantic)
+        current_carrier='f'*64;q.approved_stamp=current_carrier
+        active=Path(u.JOURNAL_PARENT)/'active-attempt.json';self.write(str(active),b'{}')
+        with patch.object(q,'pins',return_value=current_carrier):
+            with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXECUTION_TRACE_PRESENT'):
+                q._fixed_c_resume_plan(fresh_candidate,fresh_semantic)
+        active.unlink()
+        with patch.object(q,'pins',return_value=current_carrier):
+            reopened=q._fixed_c_resume_plan(fresh_candidate,fresh_semantic)
+        self.assertEqual(reopened['plan_sha256'],successor['plan_sha256'])
+        self.assertEqual(q.c_resume_plan_path,successor_path)
+        self.assertEqual(Path(successor_path).read_bytes(),successor_raw)
+        self.assertIn('successor-renewal-',q.c_resume_approval_path)
+        renewal=dict(format=3,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=current_carrier,plan_sha256=successor['plan_sha256'],
+            predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+            predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+            successor_plan_record_sha256=s.sha(successor_raw),
+            successor_approval_sha256=s.sha(s.canonical(successor_approval)),
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(q.c_resume_approval_path,s.canonical(renewal))
+        with patch.object(q,'pins',return_value=current_carrier):
+            self.assertEqual(q._c_resume_approval(reopened)['format'],3)
+        self.clock=renewal['expires_at']+1;q.last=None
+        with patch.object(q,'pins',return_value=current_carrier):
+            with self.assertRaisesRegex(u.Hold,'APPROVAL_EXPIRED'):
+                q._c_resume_approval(reopened)
+        self.assertEqual(Path(successor_path).read_bytes(),successor_raw)
 
     def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
         q,historical=self._prepare_completed_b_before_c_proof()
