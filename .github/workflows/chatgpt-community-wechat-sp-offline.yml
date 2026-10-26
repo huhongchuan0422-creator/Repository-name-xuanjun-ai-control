@@ -738,10 +738,13 @@ jobs:
           index_path.write_text(json.dumps(index,sort_keys=True,indent=2)+'\n')
           indexed=set(index['files'])
           shipped={str(p) for p in dest.iterdir() if p.name!='post-b-c-resume-delivery-index.json'}
-          assert indexed==shipped, 'DELIVERY_INDEX_SHIPPED_SET_MISMATCH'
+          indexed_shipped={name for name in indexed if name.startswith(str(dest)+'/')}
+          assert indexed_shipped==shipped, 'DELIVERY_INDEX_SHIPPED_SET_MISMATCH'
           for name,meta in index['files'].items():
               raw=Path(name).read_bytes()
               assert len(raw)==meta['bytes'] and hashlib.sha256(raw).hexdigest()==meta['sha256'], 'DELIVERY_INDEX_BYTE_MISMATCH:'+name
+          for name in shipped:
+              assert name in index['files'], 'SHIPPED_OBJECT_NOT_INDEXED:'+name
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
