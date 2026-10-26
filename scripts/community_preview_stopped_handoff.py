@@ -416,7 +416,7 @@ class Session:
                 self.c_resume_plan_path=C_RESUME_PLAN
                 self.c_resume_approval_path=C_RESUME_APPROVAL
             else:
-                # Expired successor is allowed only before any C execution trace.
+                # Expired successor is allowed only before any C execution trace; predecessor carrier remains historical.
                 proof_path=PROOF;active_path=u.JOURNAL_PARENT+'/active-attempt.json'
                 attempt_path=u.JOURNAL_PARENT+'/'+attempt()
                 # The fixed attempt path is a whole-tree fence: if it exists at all,
