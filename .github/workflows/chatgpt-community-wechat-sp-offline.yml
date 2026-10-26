@@ -358,6 +358,9 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan \
+              test_community_preview_stopped_handoff.WholeEntry.test_expired_plan_and_approval_create_one_preserved_successor \
+              test_community_preview_stopped_handoff.WholeEntry.test_expired_successor_rejects_execution_trace_and_stable_drift \
+              test_community_preview_stopped_handoff.WholeEntry.test_successor_predecessor_replacement_or_second_expiry_holds \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
               test_community_preview_stopped_handoff.WholeEntry.test_known_failure_recovery_uses_new_c_resume_approval_provenance \
