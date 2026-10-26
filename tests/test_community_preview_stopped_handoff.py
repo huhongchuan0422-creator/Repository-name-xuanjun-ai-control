@@ -331,6 +331,13 @@ class WholeEntry(unittest.TestCase):
         self.assertEqual(successor_path.read_bytes(),before)
         self.assertNotEqual(q.c_resume_approval_path,h.C_RESUME_APPROVAL)
         with self.assertRaises(FileNotFoundError):q._c_resume_approval(successor)
+        successor_approval=dict(format=2,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+            predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+            predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(q.c_resume_approval_path,s.canonical(successor_approval))
+        self.assertEqual(q._c_resume_approval(successor)['plan_sha256'],successor['plan_sha256'])
 
     def test_expired_successor_rejects_execution_trace_and_stable_drift(self):
         q,historical=self._prepare_completed_b_before_c_proof()
