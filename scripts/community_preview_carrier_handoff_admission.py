@@ -50,8 +50,8 @@ POST_B_ROLLBACK_RESULT='post-b-carrier-handoff-rollback-result-v1.json'
 POST_B_STAGE='control-stopped-v1.post-b-handoff-stage-v1'
 POST_B_RETAINED='control-stopped-v1.post-b-handoff-retained-old-v1'
 POST_B_REQUIRED={'b_intent','snapshot_result','snapshot_permit','validate_clones_result','validate_clones_permit',
-                 'b_approval','freeze','resume_approval','resume_freeze','resume_stage_permit','resume_admission','backup_dir','backup_manifest','backup_clone_results','clone_restore_old','clone_verify_f131','clone_verify_downgrade','c_approval'}
-POST_B_ABSENT={'active_attempt'}
+                 'b_approval','freeze','resume_approval','resume_freeze','resume_admission','backup_dir','backup_manifest','backup_clone_results','clone_restore_old','clone_verify_f131','clone_verify_downgrade','c_approval'}
+POST_B_ABSENT={'active_attempt','resume_stage_permit'}
 POST_B_OLD_MANIFEST='d1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd'
 POST_B_OLD_ARCHIVE='2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff'
 POST_B_NEW_MANIFEST='f7118e9a45c77cf260ae516864635d45af4a9159055da3f9ab983ff4ca95f99e'
@@ -633,6 +633,7 @@ def execute(parent,jfd,entryfd,leasefd,old_entries,new_archive,uid,expected_pare
         need(childstat(jfd,'active-attempt.json') is None and childstat(parent,retained_name) is None,
              'HANDOFF_CONFLICT_BEFORE_SWITCH')
         if fault:fault('before_switch')
+        if mode==POST_B_MODE:post_b_c_not_started(parent,jfd,uid)
         switch_attempted=True
         try:exchange(parent,TARGET,stage_name)
         except BaseException:raise Hold('EXCHANGE_RESULT_UNKNOWN_INSPECT_ONLY') from None
