@@ -249,6 +249,44 @@ class HandoffAdmission(unittest.TestCase):
             h.rollback(self.parent,self.jfd,self.entry,self.lease,old_entries,new_entries,self.uid,
                 self.parent_id,self.journal_id,self.entry_id,self.lock_id,refs,mode=h.POST_B_MODE)
 
+    def test_post_b_c_started_after_staging_before_exchange_is_rejected_zero_exchange(self):
+        for kind in ('proof','attempt','checkpoint'):
+            with self.subTest(kind=kind):
+                refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+                exchanged=[]
+                original_exchange=h.exchange
+                def fault(point):
+                    if point!='before_switch':return
+                    if kind=='proof':
+                        backup=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+                        try:h.writefile(backup,'stopped-handoff-v1.json',b'C_PROOF_APPEARED',self.uid)
+                        finally:os.close(backup)
+                    elif kind=='attempt':
+                        h.writefile(self.jfd,'active-attempt.json',b'{}',self.uid)
+                    else:
+                        os.mkdir(h.ORIGINAL_ATTEMPT,0o700,dir_fd=self.jfd)
+                def exchange(*args):
+                    exchanged.append(args);return original_exchange(*args)
+                with patch.object(h,'exchange',side_effect=exchange):
+                    with self.assertRaisesRegex(h.Hold,'POST_B_C_ALREADY_STARTED|POST_B_C_PROOF_ALREADY_EXISTS'):
+                        h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
+                            self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-late-c-'+kind,
+                            history_refs=refs,mode=h.POST_B_MODE,fault=fault)
+                self.assertEqual(exchanged,[])
+                # Per-subtest fixture is intentionally one-shot; remove only the injected C marker.
+                if kind=='proof':
+                    backup=os.open(h.HISTORY_NAMES['backup_dir'],os.O_RDONLY|os.O_DIRECTORY,dir_fd=self.parent)
+                    try:os.unlink('stopped-handoff-v1.json',dir_fd=backup)
+                    finally:os.close(backup)
+                elif kind=='attempt':os.unlink('active-attempt.json',dir_fd=self.jfd)
+                else:os.rmdir(h.ORIGINAL_ATTEMPT,dir_fd=self.jfd)
+                # Remove the pre-switch transaction created before the late C marker.
+                for name in (h.POST_B_STATE,h.POST_B_PREINTENT):
+                    try:os.unlink(name,dir_fd=self.jfd)
+                    except FileNotFoundError:pass
+                try:__import__('shutil').rmtree(os.path.join(self.tmp.name,'carrier',h.POST_B_STAGE))
+                except FileNotFoundError:pass
+
     def test_post_b_interrupted_after_exchange_is_inspect_only_not_replayed(self):
         refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
         def interrupt(point):
