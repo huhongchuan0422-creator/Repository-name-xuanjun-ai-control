@@ -399,7 +399,7 @@ class Session:
                     'evidence_sha256','plan','plan_sha256','plan_document_sha256','issued_at','expires_at'}
                  and type(saved['format']) is int and saved['format']==1
                  and saved['host']==p.HOST and saved['mode']==MODE and saved['attempt']==attempt()
-                 and saved['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+                 and p.exact_hex(saved['carrier_manifest_sha256'],64)
                  and type(saved['plan']) is dict and saved['plan'].get('attempt')==attempt()
                  and saved['plan_sha256']==saved['plan'].get('plan_sha256')
                  and saved['plan_document_sha256']==s.sha(s.canonical(saved['plan']))
@@ -407,6 +407,8 @@ class Session:
                  and saved['issued_at']<=saved['expires_at']<=saved['issued_at']+600)
             need(base_ok,'C_RESUME_PLAN_RECORD_INVALID')
             if now<=saved['expires_at']:
+                need(saved['carrier_manifest_sha256']==self.approved_stamp==self.pins(),
+                     'C_RESUME_PLAN_CARRIER_CHANGED')
                 need(saved['evidence_sha256']==evidence_sha,'C_RESUME_PLAN_EVIDENCE_CHANGED')
                 need(self._without_observed_at(saved['plan'])==
                      self._without_observed_at(candidate),'C_RESUME_PLAN_EVIDENCE_CHANGED')
@@ -427,7 +429,7 @@ class Session:
                         'plan_sha256','issued_at','expires_at','actions'}
                      and old_approval['host']==p.HOST and old_approval['mode']==MODE
                      and old_approval['attempt']==attempt()
-                     and old_approval['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+                     and old_approval['carrier_manifest_sha256']==saved['carrier_manifest_sha256']
                      and old_approval['plan_sha256']==saved['plan_sha256']
                      and old_approval['actions']==C_ACTIONS
                      and type(old_approval['issued_at']) is int and type(old_approval['expires_at']) is int
