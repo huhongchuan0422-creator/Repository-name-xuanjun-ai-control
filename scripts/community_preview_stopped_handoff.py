@@ -152,6 +152,7 @@ class Session:
         self.owner=None;self.thread=threading.get_ident();self.last=None
         self.braw=None;self.craw=None;self.freeze=None;self.bdone=False;self.approved_stamp=None
         self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_raw=None;self.resume_mode=False
+        self.c_resume_plan_path=C_RESUME_PLAN;self.c_resume_approval_path=C_RESUME_APPROVAL
         self.resume_history={};self.resume_absent=();self.resume_old_permit_absent=False
         self.started=time.monotonic();self.captured={};self.recovering=False;self.cleanup_unproven=False
     def acquire(self,recover=False):
@@ -352,12 +353,13 @@ class Session:
         return resume
 
     def _c_resume_approval(self,candidate):
-        if C_RESUME_APPROVAL in self.resume_history:
+        approval_path=self.c_resume_approval_path
+        if approval_path in self.resume_history:
             self.resume_guard()
-            bound,meta,limit=self.resume_history[C_RESUME_APPROVAL]
+            bound,meta,limit=self.resume_history[approval_path]
         else:
-            bound=self.bind_resume_reference(C_RESUME_APPROVAL,16384)
-        a,b=document(C_RESUME_APPROVAL)
+            bound=self.bind_resume_reference(approval_path,16384)
+        a,b=document(approval_path)
         need(bound==b,'C_RESUME_APPROVAL_REPLACED')
         need(set(a)=={'format','host','mode','attempt','carrier_manifest_sha256',
                 'plan_sha256','issued_at','expires_at','actions'}
@@ -375,44 +377,116 @@ class Session:
         if type(value) is list:return [Session._without_observed_at(v) for v in value]
         return value
 
+    def _successor_paths(self,predecessor_plan_sha):
+        need(p.exact_hex(predecessor_plan_sha,64),'PREDECESSOR_PLAN_SHA_REQUIRED')
+        suffix=predecessor_plan_sha[:16]
+        return (s.BACKUP+'/c-preconfirmation-resume-plan-successor-'+suffix+'.json',
+                s.BASE+'/bc-c-resume-approval-successor-'+suffix+'.json')
+
     def _fixed_c_resume_plan(self,candidate,semantic):
         stable_semantic=self._without_observed_at(semantic)
         evidence_sha=s.sha(s.canonical(stable_semantic))
+        now=c.now()
         if exists_private(C_RESUME_PLAN):
-            saved,_=document(C_RESUME_PLAN,4*1024*1024)
-            need(set(saved)=={'format','host','mode','attempt','carrier_manifest_sha256',
+            saved,saved_raw=document(C_RESUME_PLAN,4*1024*1024)
+            base_ok=(set(saved)=={'format','host','mode','attempt','carrier_manifest_sha256',
                     'evidence_sha256','plan','plan_sha256','plan_document_sha256','issued_at','expires_at'}
                  and type(saved['format']) is int and saved['format']==1
                  and saved['host']==p.HOST and saved['mode']==MODE and saved['attempt']==attempt()
                  and saved['carrier_manifest_sha256']==self.approved_stamp==self.pins()
-                 and saved['evidence_sha256']==evidence_sha
                  and type(saved['plan']) is dict and saved['plan'].get('attempt')==attempt()
                  and saved['plan_sha256']==saved['plan'].get('plan_sha256')
                  and saved['plan_document_sha256']==s.sha(s.canonical(saved['plan']))
                  and type(saved['issued_at']) is int and type(saved['expires_at']) is int
-                 and saved['issued_at']<=c.now()<=saved['expires_at']<=saved['issued_at']+600,
-                 'C_RESUME_PLAN_RECORD_INVALID')
-            need(self._without_observed_at(saved['plan'])==
-                 self._without_observed_at(candidate),
-                 'C_RESUME_PLAN_EVIDENCE_CHANGED')
-            candidate=saved['plan']
+                 and saved['issued_at']<=saved['expires_at']<=saved['issued_at']+600)
+            need(base_ok,'C_RESUME_PLAN_RECORD_INVALID')
+            if now<=saved['expires_at']:
+                need(saved['evidence_sha256']==evidence_sha,'C_RESUME_PLAN_EVIDENCE_CHANGED')
+                need(self._without_observed_at(saved['plan'])==
+                     self._without_observed_at(candidate),'C_RESUME_PLAN_EVIDENCE_CHANGED')
+                candidate=saved['plan']
+                self.c_resume_plan_path=C_RESUME_PLAN
+                self.c_resume_approval_path=C_RESUME_APPROVAL
+            else:
+                # Expired successor is allowed only before any C execution trace.
+                proof_path=PROOF;active_path=u.JOURNAL_PARENT+'/active-attempt.json'
+                attempt_path=u.JOURNAL_PARENT+'/'+attempt()
+                checkpoint_path=attempt_path+'/checkpoint.json'
+                checkpoint_tmp=attempt_path+'/checkpoint.tmp'
+                for path in (proof_path,active_path,attempt_path,checkpoint_path,checkpoint_tmp):
+                    need(not exists_private(path),'C_SUCCESSOR_EXECUTION_TRACE_PRESENT')
+                need(exists_private(C_RESUME_APPROVAL),'C_SUCCESSOR_PREDECESSOR_APPROVAL_REQUIRED')
+                old_approval,old_approval_raw=document(C_RESUME_APPROVAL,16384)
+                need(set(old_approval)=={'format','host','mode','attempt','carrier_manifest_sha256',
+                        'plan_sha256','issued_at','expires_at','actions'}
+                     and old_approval['host']==p.HOST and old_approval['mode']==MODE
+                     and old_approval['attempt']==attempt()
+                     and old_approval['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+                     and old_approval['plan_sha256']==saved['plan_sha256']
+                     and old_approval['actions']==C_ACTIONS
+                     and type(old_approval['issued_at']) is int and type(old_approval['expires_at']) is int
+                     and old_approval['issued_at']<=old_approval['expires_at']<=old_approval['issued_at']+600
+                     and now>old_approval['expires_at'],'C_SUCCESSOR_PREDECESSOR_APPROVAL_INVALID')
+                need(saved['evidence_sha256']==evidence_sha,'C_SUCCESSOR_STABLE_EVIDENCE_CHANGED')
+                need(self._without_observed_at(saved['plan'])==
+                     self._without_observed_at(candidate),'C_SUCCESSOR_STABLE_PLAN_CHANGED')
+                plan_path,approval_path=self._successor_paths(saved['plan_sha256'])
+                successor=dict(candidate)
+                successor.pop('plan_sha256',None)
+                successor['predecessor_plan_sha256']=saved['plan_sha256']
+                successor['predecessor_plan_record_sha256']=s.sha(saved_raw)
+                successor['predecessor_approval_sha256']=s.sha(old_approval_raw)
+                successor['carrier_manifest_sha256']=self.approved_stamp
+                successor['plan_sha256']=s.sha(s.canonical(successor))
+                # Recompute once with the final self-contained hash convention.
+                successor['plan_sha256']=s.sha(s.canonical({k:v for k,v in successor.items() if k!='plan_sha256'}))
+                record=dict(format=2,host=p.HOST,mode=MODE,attempt=attempt(),
+                    carrier_manifest_sha256=self.approved_stamp,evidence_sha256=evidence_sha,
+                    predecessor_plan_sha256=saved['plan_sha256'],
+                    predecessor_plan_record_sha256=s.sha(saved_raw),
+                    predecessor_approval_sha256=s.sha(old_approval_raw),
+                    plan=successor,plan_sha256=successor['plan_sha256'],
+                    plan_document_sha256=s.sha(s.canonical(successor)),
+                    issued_at=now,expires_at=now+600)
+                if exists_private(plan_path):
+                    existing,existing_raw=document(plan_path,4*1024*1024)
+                    need(existing_raw==s.canonical(existing)
+                         and existing.get('predecessor_plan_record_sha256')==s.sha(saved_raw)
+                         and existing.get('predecessor_approval_sha256')==s.sha(old_approval_raw)
+                         and existing.get('plan_sha256')==existing.get('plan',{}).get('plan_sha256'),
+                         'C_SUCCESSOR_ALREADY_EXISTS_CONFLICT')
+                    need(now<=existing.get('expires_at',0),'C_SUCCESSOR_EXPIRED_NO_SECOND_SUCCESSOR')
+                    successor=existing['plan']
+                else:
+                    # Recheck predecessor bytes and execution absence immediately before EXCL publish.
+                    need(raw(C_RESUME_PLAN,4*1024*1024)==saved_raw
+                         and raw(C_RESUME_APPROVAL,16384)==old_approval_raw,
+                         'C_SUCCESSOR_PREDECESSOR_REPLACED')
+                    for path in (proof_path,active_path,attempt_path,checkpoint_path,checkpoint_tmp):
+                        need(not exists_private(path),'C_SUCCESSOR_EXECUTION_TRACE_PRESENT')
+                    fd=s.private_parent(s.BACKUP)
+                    try:write_private(fd,os.path.basename(plan_path),record)
+                    finally:os.close(fd)
+                self.c_resume_plan_path=plan_path
+                self.c_resume_approval_path=approval_path
+                candidate=successor
         else:
             need(not exists_private(C_RESUME_APPROVAL),'C_RESUME_APPROVAL_PREEXISTS_WITHOUT_PLAN')
             record=dict(format=1,host=p.HOST,mode=MODE,attempt=attempt(),
                 carrier_manifest_sha256=self.approved_stamp,evidence_sha256=evidence_sha,
                 plan=candidate,plan_sha256=candidate['plan_sha256'],
                 plan_document_sha256=s.sha(s.canonical(candidate)),
-                issued_at=c.now(),expires_at=c.now()+600)
+                issued_at=now,expires_at=now+600)
             fd=s.private_parent(s.BACKUP)
-            try:
-                # EXCL: never replace a previous request or silently change plan.
-                write_private(fd,os.path.basename(C_RESUME_PLAN),record)
+            try:write_private(fd,os.path.basename(C_RESUME_PLAN),record)
             finally:os.close(fd)
-        bound_plan=self.bind_resume_reference(C_RESUME_PLAN,4*1024*1024)
+            self.c_resume_plan_path=C_RESUME_PLAN
+            self.c_resume_approval_path=C_RESUME_APPROVAL
+        bound_plan=self.bind_resume_reference(self.c_resume_plan_path,4*1024*1024)
         self.resume_guard()
         print(json.dumps(dict(state='C_RESUME_PLAN_REQUIRES_FRESH_APPROVAL',
             attempt=attempt(),plan_sha256=candidate['plan_sha256'],
-            plan=candidate,approval_path=C_RESUME_APPROVAL,expires_in_seconds=600,
+            plan=candidate,approval_path=self.c_resume_approval_path,expires_in_seconds=600,
             site_update=False),sort_keys=True,separators=(',',':')),flush=True)
         return candidate
 
