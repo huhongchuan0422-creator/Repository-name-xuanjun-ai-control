@@ -320,7 +320,7 @@ jobs:
             git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
             cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
-            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
+            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
             PYTHONPATH=.:tests python -B -m unittest \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_permit_appearing_after_admission_is_hold \
@@ -351,6 +351,7 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof \
               test_community_preview_stopped_handoff.WholeEntry.test_real_pty_production_ack_prompt_then_input_eof_timeout \
+              test_community_preview_stopped_handoff.ExactHistoricalInitializeInventoryTests \
               tests.test_community_preview_carrier_handoff_admission \
               tests.test_community_preview_carrier_handoff_call \
               tests.test_community_preview_carrier_handoff_entry \
