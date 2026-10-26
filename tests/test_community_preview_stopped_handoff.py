@@ -1352,7 +1352,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
         values=[json.loads(x) for x in rows]
         idx=[k for k,_ in fields].index('mounts')
         values[idx].append({'Type':'bind','Source':p.RUN,'Destination':p.RUN,'RW':True})
-        changed='\\n'.join(json.dumps(v,separators=(',',':')) for v in values)
+        changed='\n'.join(json.dumps(v,separators=(',',':')) for v in values)
         with patch.object(c.observation,'capture',return_value=changed):
             with self.assertRaisesRegex(Exception,'LEGACY_INITIALIZE_MOUNTS_CHANGED'):
                 c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
