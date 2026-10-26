@@ -315,7 +315,7 @@ class WholeEntry(unittest.TestCase):
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
         original_approval_raw=Path(h.C_RESUME_APPROVAL).read_bytes()
-        self.clock=1601
+        self.clock=1601;q.last=None
         successor=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
         self.assertEqual(Path(h.C_RESUME_PLAN).read_bytes(),original_plan_raw)
         self.assertEqual(Path(h.C_RESUME_APPROVAL).read_bytes(),original_approval_raw)
@@ -348,7 +348,7 @@ class WholeEntry(unittest.TestCase):
             carrier_manifest_sha256=historical_carrier,plan_sha256=first['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
-        self.clock=1601
+        self.clock=1601;q.last=None
         current_carrier='f'*64
         q.approved_stamp=current_carrier
         with patch.object(q,'pins',return_value=current_carrier):
@@ -365,7 +365,7 @@ class WholeEntry(unittest.TestCase):
             carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
-        self.clock=1601
+        self.clock=1601;q.last=None
         active=Path(u.JOURNAL_PARENT)/'active-attempt.json';self.write(str(active),b'{}')
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXECUTION_TRACE_PRESENT'):
             q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
@@ -386,9 +386,9 @@ class WholeEntry(unittest.TestCase):
             carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
             issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
         self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
-        self.clock=1601
+        self.clock=1601;q.last=None
         successor=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
-        self.clock=2202
+        self.clock=2202;q.last=None
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXPIRED_NO_SECOND_SUCCESSOR'):
             q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
 
