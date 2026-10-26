@@ -147,6 +147,42 @@ class MCPTaskServiceTests(unittest.TestCase):
         changed=self.submit_value();changed['input_text']='different'
         with self.assertRaisesRegex(ValueError,'IDEMPOTENCY_CONFLICT'):
             self.service.submit(changed)
+        changed=self.submit_value();changed['max_output_tokens']=31
+        with self.assertRaisesRegex(ValueError,'IDEMPOTENCY_CONFLICT'):
+            self.service.submit(changed)
+
+    def test_failpoint_restart_resumes_one_binding_and_one_request(self):
+        phases=('BINDING_PERSISTED','GRAPH_PERSISTED','CONTRACT_PERSISTED',
+          'WRITER_STARTED','MODEL_ASSIGNED','QUEUED')
+        for index,phase in enumerate(phases):
+            with self.subTest(phase=phase):
+                value=self.submit_value()
+                value['idempotency_key']='recovery-%d'%index
+                fired=[False]
+                def fail_once(observed):
+                    if observed==phase and not fired[0]:
+                        fired[0]=True;raise RuntimeError('FAILPOINT_'+phase)
+                interrupted=MCPTaskService(self.db,KEY,'tenant-mcp',self.master,
+                  'owner-1','project-mcp',phase_hook=fail_once)
+                with self.assertRaisesRegex(RuntimeError,'FAILPOINT_'+phase):
+                    interrupted.submit(value)
+                recovered=MCPTaskService(self.db,KEY,'tenant-mcp',self.master,
+                  'owner-1','project-mcp').submit(value)
+                self.assertEqual(recovered['state'],'QUEUED')
+                supervisor=Supervisor(self.db)
+                try:
+                    binding=supervisor.db.execute('''SELECT task_id,request_id,
+                      submit_state FROM mcp_task_bindings WHERE tenant_id=? AND
+                      principal_id=? AND project_id=? AND idempotency_key=?''',(
+                      'tenant-mcp','owner-1','project-mcp',
+                      value['idempotency_key'])).fetchall()
+                    self.assertEqual(len(binding),1)
+                    self.assertEqual(binding[0]['submit_state'],'QUEUED')
+                    count=supervisor.db.execute('''SELECT COUNT(*) FROM
+                      model_requests WHERE tenant_id=? AND request_id=?''',(
+                      'tenant-mcp',binding[0]['request_id'])).fetchone()[0]
+                    self.assertEqual(count,1)
+                finally:supervisor.close()
 
 
 if __name__=='__main__':unittest.main()

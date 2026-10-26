@@ -120,6 +120,12 @@ class MCPHTTPTests(unittest.TestCase):
     def test_oauth_pkce_and_streamable_http_discovery(self):
         metadata=json.loads(self.request('/.well-known/oauth-protected-resource').read())
         self.assertEqual(metadata['resource'],'https://'+HOST+'/task-center-test/mcp')
+        standard=Request('http://127.0.0.1:%d/.well-known/'%
+          self.server.server_port+'oauth-authorization-server/task-center-test',
+          headers={'Host':HOST})
+        authorization_server=json.loads(urlopen(standard,timeout=3).read())
+        self.assertEqual(authorization_server['issuer'],
+          'https://'+HOST+'/task-center-test')
         dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
           'grant_types':['authorization_code'],'response_types':['code'],
           'token_endpoint_auth_method':'none','client_name':'ChatGPT test'}

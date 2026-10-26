@@ -843,6 +843,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
         def _route_path(self):
             raw=self.path.split('?',1)[0]
+            # RFC 8414 section 3.1 inserts a path-bearing issuer after the
+            # well-known prefix.  Keep the historical below-base alias for
+            # compatibility, while also exposing the standards-derived path
+            # used by remote MCP clients.
+            issuer_path=(base_path[:-1] if base_path!='/' else '')
+            if raw=='/.well-known/oauth-authorization-server'+issuer_path:
+                return '/.well-known/oauth-authorization-server'
             if base_path == '/':return raw
             prefix=base_path[:-1]
             if raw == prefix:return '/'

@@ -30,21 +30,36 @@ def ensure_schema(db):
     db.execute('''CREATE TABLE IF NOT EXISTS mcp_task_bindings(
       tenant_id TEXT NOT NULL,principal_id TEXT NOT NULL,project_id TEXT NOT NULL,
       idempotency_key TEXT NOT NULL,task_id TEXT NOT NULL,request_id TEXT NOT NULL,
-      input_sha256 TEXT NOT NULL,connection_id TEXT NOT NULL,provider_id TEXT NOT NULL,
-      model_id TEXT NOT NULL,created_at REAL NOT NULL,
+      input_sha256 TEXT NOT NULL,request_sha256 TEXT NOT NULL,
+      connection_id TEXT NOT NULL,provider_id TEXT NOT NULL,
+      model_id TEXT NOT NULL,max_output_tokens INTEGER NOT NULL,
+      submit_state TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL,
       PRIMARY KEY(tenant_id,principal_id,project_id,idempotency_key),
       UNIQUE(tenant_id,task_id))''')
+    columns={row['name'] for row in db.execute(
+      'PRAGMA table_info(mcp_task_bindings)')}
+    additions=(('request_sha256','TEXT'),('max_output_tokens','INTEGER'),
+      ('submit_state','TEXT'),('updated_at','REAL'))
+    for name,kind in additions:
+        if name not in columns:
+            db.execute('ALTER TABLE mcp_task_bindings ADD COLUMN %s %s'%(name,kind))
+    db.execute('''UPDATE mcp_task_bindings SET
+      request_sha256=COALESCE(request_sha256,input_sha256),
+      max_output_tokens=COALESCE(max_output_tokens,0),
+      submit_state=COALESCE(submit_state,'LEGACY_COMPLETE'),
+      updated_at=COALESCE(updated_at,created_at)''')
     db.commit()
 
 
 class MCPTaskService(object):
     """Authenticated, project-scoped adapter for the minimal MCP journey."""
     def __init__(self, db_path, authority_key, tenant_id, master_key,
-                 principal_id, project_id, clock=None):
+                 principal_id, project_id, clock=None,phase_hook=None):
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.principal_id=principal_id;self.project_id=project_id
         self.clock=clock or time.time
+        self.phase_hook=phase_hook
 
     def _open(self):
         supervisor=Supervisor(self.db_path)
@@ -115,11 +130,140 @@ class MCPTaskService(object):
         if type(value['max_output_tokens']) is not int or not 1<=value['max_output_tokens']<=128:
             raise ValueError('MCP_OUTPUT_LIMIT')
 
+    def _phase(self,supervisor,task_id,state):
+        now=self.clock()
+        supervisor.db.execute('''UPDATE mcp_task_bindings SET submit_state=?,
+          updated_at=? WHERE tenant_id=? AND task_id=?''',(state,now,
+          self.tenant_id,task_id));supervisor.db.commit()
+        if self.phase_hook is not None:self.phase_hook(state)
+
+    def _ensure_graph(self,supervisor,gateway,context,graph,now):
+        body=canonical(graph);graph_sha=hashlib.sha256(body.encode()).hexdigest()
+        row=supervisor.db.execute('''SELECT graph_sha256 FROM gateway_graphs
+          WHERE graph_id=?''',(graph['graph_id'],)).fetchone()
+        if row is not None:
+            if row['graph_sha256']!=graph_sha:raise ValueError('TASK_GRAPH_ID_CONFLICT')
+            return
+        task_spec=graph['tasks'][0];task_id=task_spec['task_id']
+        task=supervisor.db.execute('SELECT * FROM tasks WHERE task_id=?',
+          (task_id,)).fetchone()
+        if task is None:
+            gateway.register_graph(context,graph,now=now);return
+        expected=(graph['project_id'],task_spec['stage'],task_spec['owner'],
+          task_spec['entry'],task_spec['checkpoint_sha256'],task_spec['spec_sha256'])
+        actual=(task['parent_task_id'],task['stage'],task['owner'],task['entry'],
+          task['checkpoint_sha256'],task['spec_sha256'])
+        if actual!=expected:raise ValueError('MCP_PARTIAL_GRAPH_CONFLICT')
+        # Recover the only non-atomic boundary in register_graph: Supervisor
+        # task registration may have committed just before graph metadata.
+        supervisor.db.execute('BEGIN IMMEDIATE')
+        try:
+            supervisor.db.execute('INSERT INTO gateway_graphs VALUES (?,?,?,?,?,?)',(
+              graph['graph_id'],self.tenant_id,graph['project_id'],
+              graph['graph_version'],graph_sha,now))
+            supervisor.db.execute('''INSERT INTO gateway_task_metadata
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',(task_id,graph['graph_id'],
+              self.tenant_id,graph['project_id'],task_spec['node_id'],
+              task_spec['input_version'],task_spec['output_version'],
+              task_spec['priority'],int(task_spec['preemptible']),
+              task_spec['module_id'],canonical(sorted(task_spec['resources'])),
+              task_spec['board_id']))
+            supervisor.db.commit()
+        except Exception:supervisor.db.rollback();raise
+
+    def _ensure_task_spec(self,supervisor,control,task_id,spec,now):
+        expected=(spec['goal'],canonical(spec['deliverables']),
+          canonical(spec['acceptance']))
+        row=supervisor.db.execute('''SELECT goal,deliverables_json,
+          acceptance_json FROM task_work_specs WHERE tenant_id=? AND task_id=?''',
+          (self.tenant_id,task_id)).fetchone()
+        if row is None:
+            control.record_task_spec(task_id,spec['goal'],spec['deliverables'],
+              spec['acceptance'],now=now);return
+        if tuple(row)!=expected:raise ValueError('MCP_TASK_SPEC_CONFLICT')
+
+    def _ensure_unit(self,supervisor,policy,unit,now):
+        row=supervisor.db.execute('''SELECT delivery_stage,feature_unit,goal,
+          scope_json,acceptance_json,dependency_json,asset_version,
+          responsible_party FROM execution_units WHERE tenant_id=? AND task_id=?''',
+          (self.tenant_id,unit['task_id'])).fetchone()
+        expected=(unit['delivery_stage'],unit['feature_unit'],unit['goal'],
+          canonical(unit['scope']),canonical(unit['acceptance']),
+          canonical(unit['dependencies']),unit['asset_version'],
+          unit['responsible_party'])
+        if row is None:policy.record_unit(unit,now=now);return
+        if tuple(row)!=expected:raise ValueError('MCP_EXECUTION_UNIT_CONFLICT')
+
+    def _ensure_preflight(self,supervisor,policy,task_id,spec,query_id,query,
+                          observed,now):
+        row=supervisor.db.execute('''SELECT query_json,result_digest FROM
+          asset_query_receipts WHERE tenant_id=? AND query_id=?''',(
+          self.tenant_id,query_id)).fetchone()
+        digest=hashlib.sha256(canonical(observed).encode()).hexdigest()
+        if row is None:
+            policy.record_asset_query(task_id,query_id,'CANONICAL_DB','v1',query,
+              digest,now=now)
+        elif (row['query_json'],row['result_digest'])!=(canonical(query),digest):
+            raise ValueError('MCP_ASSET_QUERY_CONFLICT')
+        existing=supervisor.db.execute('''SELECT asset_version,query_ids_json,
+          outcome,reuse_reason FROM dispatch_preflights WHERE tenant_id=? AND
+          task_id=? ORDER BY observed_at DESC,preflight_id DESC LIMIT 1''',(
+          self.tenant_id,task_id)).fetchone()
+        expected=(spec['asset_version'],canonical([query_id]),'NOT_FOUND',
+          'verified isolated MCP task')
+        if existing is None:
+            policy.record_dispatch_preflight(task_id,spec['asset_version'],
+              [query_id],'NOT_FOUND',expected[3],now=now)
+        elif tuple(existing)!=expected:raise ValueError('MCP_PREFLIGHT_CONFLICT')
+
+    def _ensure_started(self,supervisor,gateway,context,task_id,attempt_id,now):
+        task=supervisor._task(task_id)
+        if task['attempt_id']==attempt_id and task['authority_state']=='VALID':
+            received=supervisor.db.execute('''SELECT 1 FROM events WHERE task_id=?
+              AND attempt_id=? AND event_id=?''',(task_id,attempt_id,
+              'received-'+attempt_id)).fetchone()
+            observed=task['received_at']
+            if received is None:
+                supervisor.record(task_id,attempt_id,'received-'+attempt_id,
+                  'RECEIVED',observed,'PHASE_EXECUTION',
+                  'test-received-'+attempt_id)
+            task=supervisor._task(task_id)
+            started=supervisor.db.execute('''SELECT 1 FROM events WHERE task_id=?
+              AND attempt_id=? AND event_id=?''',(task_id,attempt_id,
+              'started-'+attempt_id)).fetchone()
+            if started is None:
+                supervisor.record(task_id,attempt_id,'started-'+attempt_id,
+                  'STARTED',max(observed,task['last_event_at']),
+                  'PHASE_EXECUTION','test-started-'+attempt_id)
+            return
+        if task['state']!='READY' or task['authority_state']!='NONE':
+            raise ValueError('MCP_PARTIAL_START_RECONCILIATION_HOLD')
+        fence=Fence(supervisor,self.db_path+'.test-only-locks')
+        try:
+            TestOnlyExecutor(gateway,fence,context).start(task_id,attempt_id,
+              gateway.canonical_resources(task_id),now+600)
+        finally:fence.close()
+
+    def _ensure_assignment(self,supervisor,control,task_id,attempt_id,
+                           connection,now):
+        row=supervisor.db.execute('''SELECT principal_id,provider_id,model_id
+          FROM model_assignments WHERE tenant_id=? AND task_id=? AND
+          attempt_id=? AND role_id=?''',(self.tenant_id,task_id,attempt_id,
+          ROLE_ID)).fetchone()
+        expected=('mcp-worker',connection['provider_id'],connection['model_id'])
+        if row is None:
+            control.assign(task_id,ROLE_ID,ROLE_VERSION,'mcp-worker',False,now,
+              connection['provider_id'],connection['model_id']);return
+        if tuple(row)!=expected:raise ValueError('MCP_ASSIGNMENT_CONFLICT')
+
     def submit(self,value):
         self._validate_submit(value)
         if value['project_id']!=self.project_id:
             raise ValueError('MCP_PROJECT_SCOPE_REJECTED')
         now=self.clock();input_sha=hashlib.sha256(value['input_text'].encode()).hexdigest()
+        request_sha=hashlib.sha256(canonical({'task_type':value['task_type'],
+          'input_sha256':input_sha,'connection_id':value['connection_id'],
+          'max_output_tokens':value['max_output_tokens']}).encode()).hexdigest()
         identity={'tenant_id':self.tenant_id,'principal_id':self.principal_id,
           'project_id':self.project_id,'idempotency_key':value['idempotency_key']}
         task_id='mcp-'+hashlib.sha256(canonical(identity).encode()).hexdigest()[:24]
@@ -131,15 +275,17 @@ class MCPTaskService(object):
               idempotency_key=?''',(self.tenant_id,self.principal_id,
               self.project_id,value['idempotency_key'])).fetchone()
             if existing is not None:
-                if (existing['input_sha256']!=input_sha or
-                        existing['connection_id']!=value['connection_id']):
+                if (existing['request_sha256']!=request_sha or
+                        existing['connection_id']!=value['connection_id'] or
+                        existing['max_output_tokens']!=value['max_output_tokens']):
                     raise ValueError('MCP_IDEMPOTENCY_CONFLICT')
                 request=supervisor.db.execute('''SELECT state FROM model_requests
                   WHERE tenant_id=? AND request_id=?''',(self.tenant_id,
                   existing['request_id'])).fetchone()
-                return {'task_id':existing['task_id'],
-                  'request_id':existing['request_id'],'state':request['state'],
-                  'duplicate':True}
+                if request is not None:
+                    return {'task_id':existing['task_id'],
+                      'request_id':existing['request_id'],'state':request['state'],
+                      'duplicate':True}
             connection=supervisor.db.execute('''SELECT c.provider_id,c.status,
               c.purpose,o.model_id FROM service_connections c JOIN
               provider_onboarding_configs o ON o.tenant_id=c.tenant_id AND
@@ -155,6 +301,25 @@ class MCPTaskService(object):
               x['connection_id']==value['connection_id'] and
               x['model_id']==connection['model_id'] and x['dispatch_ready']]
             if not ready:raise ValueError('MODEL_CAPABILITY_OR_FREE_QUOTA_HOLD')
+            request_identity={'tenant':self.tenant_id,'task':task_id,
+              'attempt':attempt_id,'role':ROLE_ID,
+              'provider':connection['provider_id'],'model':connection['model_id'],
+              'idempotency':'mcp:'+self.principal_id+':'+value['idempotency_key']}
+            request_id=hashlib.sha256(canonical(request_identity).encode()).hexdigest()
+            if existing is None:
+                supervisor.db.execute('''INSERT INTO mcp_task_bindings VALUES
+                  (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,
+                  self.principal_id,self.project_id,value['idempotency_key'],task_id,
+                  request_id,input_sha,request_sha,value['connection_id'],
+                  connection['provider_id'],connection['model_id'],
+                  value['max_output_tokens'],'PREPARING',now,now))
+                supervisor.db.commit()
+                self._phase(supervisor,task_id,'BINDING_PERSISTED')
+            else:
+                if (existing['request_id']!=request_id or
+                        existing['provider_id']!=connection['provider_id'] or
+                        existing['model_id']!=connection['model_id']):
+                    raise ValueError('MCP_IDEMPOTENCY_BINDING_CONFLICT')
             if supervisor.db.execute('''SELECT 1 FROM role_templates WHERE
               tenant_id=? AND role_id=? AND version=?''',(self.tenant_id,
               ROLE_ID,ROLE_VERSION)).fetchone() is None:
@@ -180,43 +345,38 @@ class MCPTaskService(object):
               'resources':['fake:'+task_id],'dependencies':[],
               'board_id':'research-development',
               'completion_evidence':['model_result_persisted']}]}
-            gateway.register_graph(context,graph,now=now)
-            control.record_task_spec(task_id,spec['goal'],spec['deliverables'],
-                                     spec['acceptance'],now=now)
+            self._ensure_graph(supervisor,gateway,context,graph,now)
+            self._phase(supervisor,task_id,'GRAPH_PERSISTED')
+            self._ensure_task_spec(supervisor,control,task_id,spec,now)
             policy=ExecutionPolicyGateway(gateway,context)
-            policy.record_unit({'task_id':task_id,'delivery_stage':'mcp-test',
+            unit={'task_id':task_id,'delivery_stage':'mcp-test',
               'feature_unit':'text-classification','goal':spec['goal'],
               'scope':['MODEL_INFERENCE'],'acceptance':spec['acceptance'],
               'dependencies':['NONE'],'asset_version':spec['asset_version'],
-              'responsible_party':'mcp-worker'},now=now)
+              'responsible_party':'mcp-worker'}
+            self._ensure_unit(supervisor,policy,unit,now)
             observed={'matches':[]};query_id='query-'+task_id
             query={'lookup':{'asset_key':spec['asset_version']},
               'observed_result':observed,'evidence_ref':'canonical-db://%s@v1'%
               spec['asset_version']}
-            policy.record_asset_query(task_id,query_id,'CANONICAL_DB','v1',query,
-              hashlib.sha256(canonical(observed).encode()).hexdigest(),now=now)
-            policy.record_dispatch_preflight(task_id,spec['asset_version'],
-              [query_id],'NOT_FOUND','verified isolated MCP task',now=now)
-            fence=Fence(supervisor,self.db_path+'.test-only-locks')
-            try:
-                TestOnlyExecutor(gateway,fence,context).start(
-                  task_id,attempt_id,gateway.canonical_resources(task_id),now+600)
-            finally:fence.close()
-            control.assign(task_id,ROLE_ID,ROLE_VERSION,'mcp-worker',False,now,
-              connection['provider_id'],connection['model_id'])
+            self._ensure_preflight(supervisor,policy,task_id,spec,query_id,query,
+              observed,now)
+            self._phase(supervisor,task_id,'CONTRACT_PERSISTED')
+            self._ensure_started(supervisor,gateway,context,task_id,attempt_id,now)
+            self._phase(supervisor,task_id,'WRITER_STARTED')
+            self._ensure_assignment(supervisor,control,task_id,attempt_id,
+              connection,now)
+            self._phase(supervisor,task_id,'MODEL_ASSIGNED')
             queued=control.queue_request(task_id,ROLE_ID,[
               {'role':'system','content':'Return JSON with keys label and reason.'},
               {'role':'user','content':value['input_text']}],
               'mcp:'+self.principal_id+':'+value['idempotency_key'],
               value['max_output_tokens'],value['connection_id'],now=now)
-            supervisor.db.execute('''INSERT INTO mcp_task_bindings VALUES
-              (?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,self.principal_id,
-              self.project_id,value['idempotency_key'],task_id,
-              queued['request_id'],input_sha,value['connection_id'],
-              connection['provider_id'],connection['model_id'],now))
-            supervisor.db.commit()
+            if queued['request_id']!=request_id:
+                raise ValueError('MCP_REQUEST_ID_RECONCILIATION_FAILED')
+            self._phase(supervisor,task_id,'QUEUED')
             return {'task_id':task_id,'request_id':queued['request_id'],
-              'state':queued['state'],'duplicate':False}
+              'state':queued['state'],'duplicate':existing is not None}
         finally:supervisor.close()
 
     def _binding(self,task_id):
@@ -230,13 +390,17 @@ class MCPTaskService(object):
     def status(self,task_id):
         supervisor,binding=self._binding(task_id)
         try:
-            task=supervisor._task(task_id)
+            task=supervisor.db.execute('SELECT * FROM tasks WHERE task_id=?',
+              (task_id,)).fetchone()
             request=supervisor.db.execute('''SELECT request_id,state,attempts,
               error_kind,lease_owner,lease_until,last_heartbeat,created_at,
               updated_at FROM model_requests WHERE tenant_id=? AND request_id=?''',(
               self.tenant_id,binding['request_id'])).fetchone()
-            return {'task_id':task_id,'canonical_task_state':task['state'],
-              'request':dict(request),'provider_id':binding['provider_id'],
+            return {'task_id':task_id,'canonical_task_state':(
+              task['state'] if task is not None else 'PREPARING'),
+              'submit_state':binding['submit_state'],
+              'request':dict(request) if request is not None else None,
+              'provider_id':binding['provider_id'],
               'model_id':binding['model_id']}
         finally:supervisor.close()
 
@@ -246,12 +410,17 @@ class MCPTaskService(object):
             request=supervisor.db.execute('''SELECT request_id,state,result_json,
               error_kind,attempts FROM model_requests WHERE tenant_id=? AND
               request_id=?''',(self.tenant_id,binding['request_id'])).fetchone()
+            if request is None:
+                return {'task_id':task_id,'request_id':binding['request_id'],
+                  'state':'PREPARING','submit_state':binding['submit_state'],
+                  'result':None,'error_kind':None,'attempts':0,'usage':None}
             usage=supervisor.db.execute('''SELECT input_tokens,output_tokens,
               cost_state,cost_value,outcome,observed_at FROM model_usage_events
               WHERE tenant_id=? AND request_id=?''',(self.tenant_id,
               binding['request_id'])).fetchone()
             return {'task_id':task_id,'request_id':request['request_id'],
-              'state':request['state'],'result':(json.loads(request['result_json'])
+              'state':request['state'],'submit_state':binding['submit_state'],
+              'result':(json.loads(request['result_json'])
               if request['result_json'] else None),'error_kind':request['error_kind'],
               'attempts':request['attempts'],'usage':dict(usage) if usage else None}
         finally:supervisor.close()
