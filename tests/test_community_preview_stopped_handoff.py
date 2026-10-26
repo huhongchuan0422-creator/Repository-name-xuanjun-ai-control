@@ -1242,7 +1242,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 self.assertTrue(c.exact_stopped_names(self.candidate,'PREPARED'))
         self.assertEqual(inspect.call_args_list,[
             unittest.mock.call(self.BEFORE_ID,self.IMAGE),
-            unittest.mock.call(self.INITIALIZE_ID,self.IMAGE)])
+            unittest.mock.call(self.INITIALIZE_ID,self.IMAGE,True)])
     def test_unknown_prefix_name_still_rejected(self):
         extra={'id':'a'*64,'name':'xuanjun-community-preview-initialize-rogue'}
         with self.assertRaisesRegex(u.Hold,'STOPPED_NAME_INVENTORY_CHANGED'):
@@ -1252,7 +1252,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'LEGACY_BEFORE_2330_NOT_STOPPED'):
             self.run_inventory(self.current,changed,self.initialize)
     def test_before_2330_changed_image_rejected(self):
-        def inspect(cid,image):
+        def inspect(cid,image,*args):
             if cid==self.BEFORE_ID:
                 self.assertEqual(image,self.IMAGE)
                 raise u.Hold('CONTAINER_IMAGE_MISMATCH')
@@ -1262,7 +1262,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 with self.assertRaisesRegex(u.Hold,'CONTAINER_IMAGE_MISMATCH'):
                     c.exact_stopped_names(self.candidate,'PREPARED')
     def test_before_2330_running_rejected(self):
-        def inspect(cid,image):return {'running':cid==self.BEFORE_ID}
+        def inspect(cid,image,*args):return {'running':cid==self.BEFORE_ID}
         with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
             with patch.object(c,'inspect_bound',side_effect=inspect):
                 with self.assertRaisesRegex(u.Hold,'LEGACY_BEFORE_2330_NOT_STOPPED'):
@@ -1274,7 +1274,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
                     c.exact_stopped_names(self.candidate,'PREPARED')
     def test_initialize_changed_image_rejected(self):
-        def inspect(cid,image):
+        def inspect(cid,image,*args):
             if cid==self.INITIALIZE_ID:
                 self.assertEqual(image,self.IMAGE)
                 raise u.Hold('CONTAINER_IMAGE_MISMATCH')
@@ -1284,7 +1284,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 with self.assertRaisesRegex(u.Hold,'CONTAINER_IMAGE_MISMATCH'):
                     c.exact_stopped_names(self.candidate,'PREPARED')
     def test_initialize_running_rejected(self):
-        def inspect(cid,image):return {'running':cid==self.INITIALIZE_ID}
+        def inspect(cid,image,*args):return {'running':cid==self.INITIALIZE_ID}
         with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
             with patch.object(c,'inspect_bound',side_effect=inspect):
                 with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
