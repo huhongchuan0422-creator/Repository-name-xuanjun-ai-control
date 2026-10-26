@@ -107,9 +107,13 @@ def inspect_bound(cid,image,historical_initialize=False):
     if historical_initialize:
         require(value['entrypoint']==INITIALIZE_ENTRYPOINT,'LEGACY_INITIALIZE_ENTRYPOINT_CHANGED')
         require(value['cmd']==INITIALIZE_CMD,'LEGACY_INITIALIZE_CMD_CHANGED')
+        # The one historical first-install container is intentionally network-isolated.
+        # Pin this exception exactly; never permit network=none for normal service containers.
+        require(value['network']=='none','LEGACY_INITIALIZE_NETWORK_CHANGED')
         validation_value=dict(value)
         validation_value['entrypoint']=NORMAL_ENTRYPOINT
         validation_value['cmd']=NORMAL_CMD
+        validation_value['network']='bridge'
     original.validate(validation_value,image,cid,running=value['running'])
     require(value['ports'] in (None,{}) and value['published'] in (None,{})
             and value['devices'] in (None,[]) and value['capadd'] in (None,[]),'NO_NEW_PORT_DEVICE_CAPABILITY')
