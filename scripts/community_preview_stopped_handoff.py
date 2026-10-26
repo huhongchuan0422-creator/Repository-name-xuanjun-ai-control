@@ -254,6 +254,7 @@ class Session:
         historical_carrier=self.b['carrier_manifest_sha256']
         need(historical_carrier==resume.get('carrier_manifest_sha256'),'B_HISTORICAL_CARRIER_BINDING_CHANGED')
         if self.c_preconfirm_mode:
+            self._restore_c_resume_paths(proof)
             self.approved_stamp=self.pins()
         else:
             self.approved_stamp=historical_carrier
@@ -364,19 +365,18 @@ class Session:
         successor='predecessor_plan_sha256' in candidate
         renewal='successor-renewal-' in os.path.basename(approval_path)
         recovery='successor-recovery-' in os.path.basename(approval_path)
-        correction='successor-correction-' in os.path.basename(approval_path)
         expected={'format','host','mode','attempt','carrier_manifest_sha256',
                   'plan_sha256','issued_at','expires_at','actions'}
         if successor:expected|={'predecessor_plan_sha256','predecessor_approval_sha256'}
-        if renewal or recovery or correction:expected|={'successor_plan_record_sha256','successor_approval_sha256'}
+        if renewal or recovery:expected|={'successor_plan_record_sha256','successor_approval_sha256'}
         need(set(a)==expected
-             and type(a['format']) is int and a['format']==(5 if correction else (4 if recovery else (3 if renewal else (2 if successor else 1))))
+             and type(a['format']) is int and a['format']==(4 if recovery else (3 if renewal else (2 if successor else 1)))
              and a['host']==p.HOST and a['mode']==MODE and a['attempt']==attempt()
              and a['carrier_manifest_sha256']==self.approved_stamp==self.pins()
              and a['plan_sha256']==candidate['plan_sha256']
              and (not successor or (a['predecessor_plan_sha256']==candidate['predecessor_plan_sha256']
                   and a['predecessor_approval_sha256']==candidate['predecessor_approval_sha256']))
-             and (not (renewal or recovery or correction) or (a['successor_plan_record_sha256']==s.sha(raw(self.c_resume_plan_path,4*1024*1024))
+             and (not (renewal or recovery) or (a['successor_plan_record_sha256']==s.sha(raw(self.c_resume_plan_path,4*1024*1024))
                   and a['successor_approval_sha256']==self.successor_approval_sha256))
              and a['actions']==C_ACTIONS,'EXACT_C_RESUME_APPROVAL_REQUIRED')
         window(a);self.craw=b;return a
@@ -403,9 +403,40 @@ class Session:
         need(p.exact_hex(renewal_sha,64),'SUCCESSOR_RENEWAL_SHA_REQUIRED')
         return s.BASE+'/bc-c-resume-approval-successor-recovery-'+renewal_sha[:16]+'.json'
 
-    def _successor_correction_path(self,recovery_sha):
-        need(p.exact_hex(recovery_sha,64),'SUCCESSOR_RECOVERY_SHA_REQUIRED')
-        return s.BASE+'/bc-c-resume-approval-successor-correction-'+recovery_sha[:16]+'.json'
+    def _restore_c_resume_paths(self,proof):
+        """Rebuild the exact dynamic plan/approval lane from durable proof."""
+        candidate=proof.get('plan') if type(proof) is dict else None
+        approval_path=proof.get('approval_path') if type(proof) is dict else None
+        need(type(candidate) is dict and type(approval_path) is str,
+             'C_RESUME_PROOF_APPROVAL_PATH_REQUIRED')
+        if 'predecessor_plan_sha256' not in candidate:
+            need(approval_path==C_RESUME_APPROVAL,'C_RESUME_PROOF_APPROVAL_PATH_INVALID')
+            self.c_resume_plan_path=C_RESUME_PLAN
+            self.c_resume_approval_path=C_RESUME_APPROVAL
+            return
+        plan_path,successor_path=self._successor_paths(candidate['predecessor_plan_sha256'])
+        need(exists_private(plan_path),'C_SUCCESSOR_PLAN_REQUIRED_FOR_RECOVERY')
+        plan_record,plan_raw=document(plan_path,4*1024*1024)
+        need(plan_record.get('plan')==candidate
+             and plan_record.get('plan_sha256')==candidate.get('plan_sha256'),
+             'C_SUCCESSOR_PLAN_CHANGED_FOR_RECOVERY')
+        allowed=[successor_path]
+        if exists_private(successor_path):
+            successor_raw=raw(successor_path,16384)
+            renewal_path=self._successor_renewal_path(candidate['plan_sha256'])
+            allowed.append(renewal_path)
+            if exists_private(renewal_path):
+                renewal_raw=raw(renewal_path,16384)
+                allowed.append(self._successor_recovery_path(s.sha(renewal_raw)))
+        need(approval_path in allowed,'C_RESUME_PROOF_APPROVAL_PATH_INVALID')
+        need(exists_private(approval_path)
+             and s.sha(raw(approval_path,16384))==proof.get('approval_sha256'),
+             'C_RESUME_PROOF_APPROVAL_REPLACED')
+        self.c_resume_plan_path=plan_path
+        self.c_resume_approval_path=approval_path
+        if approval_path!=successor_path:
+            prior=successor_raw if approval_path==renewal_path else renewal_raw
+            self.successor_approval_sha256=s.sha(prior)
 
     @staticmethod
     def _successor_base(value):
@@ -447,24 +478,6 @@ class Session:
              and type(approval['issued_at']) is int and type(approval['expires_at']) is int
              and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
              and now>approval['expires_at'],'C_SUCCESSOR_RECOVERY_PREDECESSOR_INVALID')
-        return approval_raw
-
-    def _expired_successor_recovery(self,path,successor,successor_raw,prior_sha,now):
-        approval,approval_raw=document(path,16384)
-        expected={'format','host','mode','attempt','carrier_manifest_sha256','plan_sha256',
-                  'predecessor_plan_sha256','predecessor_approval_sha256','issued_at','expires_at',
-                  'actions','successor_plan_record_sha256','successor_approval_sha256'}
-        need(set(approval)==expected and type(approval['format']) is int and approval['format']==4
-             and approval['host']==p.HOST and approval['mode']==MODE and approval['attempt']==attempt()
-             and approval['plan_sha256']==successor['plan_sha256']
-             and approval['predecessor_plan_sha256']==successor['predecessor_plan_sha256']
-             and approval['predecessor_approval_sha256']==successor['predecessor_approval_sha256']
-             and approval['successor_plan_record_sha256']==s.sha(successor_raw)
-             and approval['successor_approval_sha256']==prior_sha
-             and approval['actions']==C_ACTIONS
-             and type(approval['issued_at']) is int and type(approval['expires_at']) is int
-             and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
-             and now>approval['expires_at'],'C_SUCCESSOR_CORRECTION_PREDECESSOR_INVALID')
         return approval_raw
 
     def _fixed_c_resume_plan(self,candidate,semantic):
@@ -558,11 +571,6 @@ class Session:
                                 approval_path,successor,existing_raw,self.successor_approval_sha256,now)
                             self.successor_approval_sha256=s.sha(renewal_raw)
                             approval_path=self._successor_recovery_path(self.successor_approval_sha256)
-                            if exists_private(approval_path):
-                                recovery_raw=self._expired_successor_recovery(
-                                    approval_path,successor,existing_raw,self.successor_approval_sha256,now)
-                                self.successor_approval_sha256=s.sha(recovery_raw)
-                                approval_path=self._successor_correction_path(self.successor_approval_sha256)
                 else:
                     need(saved['evidence_sha256']==evidence_sha,'C_SUCCESSOR_STABLE_EVIDENCE_CHANGED')
                     need(self._without_observed_at(saved['plan'])==
@@ -641,7 +649,7 @@ class Session:
         self._c_resume_approval(candidate)
         proof=dict(format=1,mode=MODE,host=p.HOST,attempt=attempt(),
              plan=candidate,approval_sha256=s.sha(self.craw),evidence=semantic,
-             approval_kind='C_RESUME_APPROVAL')
+             approval_kind='C_RESUME_APPROVAL',approval_path=self.c_resume_approval_path)
         fd=s.private_parent(s.BACKUP)
         try:write_private(fd,os.path.basename(PROOF),proof)
         finally:os.close(fd)
@@ -959,7 +967,8 @@ class Session:
     def reference_digest(self):
         rows=[]
         base=[PROOF,C_APPROVAL,self.b_path,self.freeze_path,s.BACKUP+'/private-manifest.json',s.BACKUP+'/clone-results.json']
-        if getattr(self,'c_preconfirm_mode',False):base += [C_RESUME_APPROVAL,C_RESUME_PLAN]
+        if getattr(self,'c_preconfirm_mode',False):
+            base += [self.c_resume_approval_path,self.c_resume_plan_path]
         if self.resume_mode:
             base += [B_APPROVAL,s.FREEZE,resume_record_path()]
             resume=s.exact_json(self.resume_raw)
@@ -976,13 +985,16 @@ class Session:
         return c.digest(rows)
     def consume(self,proof,recover):
         need(type(proof) is dict and set(proof) in ({'format','mode','host','attempt','plan','approval_sha256','evidence'},
-             {'format','mode','host','attempt','plan','approval_sha256','evidence','approval_kind'}),
+             {'format','mode','host','attempt','plan','approval_sha256','evidence','approval_kind','approval_path'}),
              'EXACT_HANDOFF_DOCUMENT_REQUIRED')
         need(proof['mode']==MODE and proof['host']==p.HOST and proof['attempt']==attempt()
              and type(proof['format']) is int and proof['format']==1,'EXACT_PROOF_SCOPE_REQUIRED')
         candidate=proof['plan']
         if proof.get('approval_kind')=='C_RESUME_APPROVAL':
-            self.c_preconfirm_mode=True;self._c_resume_approval(candidate)
+            self.c_preconfirm_mode=True
+            if self.c_resume_approval_path==C_RESUME_APPROVAL:
+                self._restore_c_resume_paths(proof)
+            self._c_resume_approval(candidate)
         else:self.c_approval(candidate)
         need(proof['approval_sha256']==s.sha(self.craw),'PROOF_APPROVAL_CHANGED')
         binding=dict(approval_sha256=s.sha(self.craw),handoff_sha256=self.reference_digest())
