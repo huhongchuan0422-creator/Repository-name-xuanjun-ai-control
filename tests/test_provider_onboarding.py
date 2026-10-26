@@ -14,8 +14,10 @@ ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
 sys.path.insert(0,os.path.join(ROOT,'scripts'))
 
 from model_orchestration import ModelControl, OpenAICompatibleAdapter, ProviderError
-from provider_onboarding import (PRESETS, public_presets, issue_receipt,
-    save, test_connection, test_model, verify_receipt)
+from provider_onboarding import (PRESETS, ensure_schema, projection,
+    public_presets, issue_receipt, save, test_connection, test_model,
+    verify_receipt)
+from connection_management import ConnectionManager
 from reusable_task_gateway import GatewayKernel, TestTenantAuthority
 from task_supervisor import Supervisor
 
@@ -66,6 +68,30 @@ class ProviderOnboardingTests(unittest.TestCase):
         self.supervisor.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
         self.supervisor.db.commit()
         with open(self.db,'rb') as stream:self.assertNotIn(SECRET.encode(),stream.read())
+
+    def test_previous_single_connection_and_model_are_unambiguously_recovered(self):
+        value=PRESETS['siliconflow']
+        self.control.upsert_provider({'provider_id':'siliconflow',
+          'display_name':'硅基流动','adapter_type':'siliconflow',
+          'base_url':value['base_url'],'enabled':True,'price_state':'UNKNOWN',
+          'rate_limit_per_min':10,'concurrency_limit':2,
+          'timeout_seconds':10,'retry_limit':0},SECRET)
+        self.control.upsert_model({'provider_id':'siliconflow',
+          'model_id':'chosen-chat','capabilities':['general'],'enabled':True,
+          'price_state':'UNKNOWN','input_unit_cost':None,'output_unit_cost':None})
+        ConnectionManager(self.gateway,self.context,self.master).upsert({
+          'connection_id':'siliconflow-custom','provider_id':'siliconflow',
+          'purpose':'MODEL_INFERENCE','auth_type':'API_KEY',
+          'destination_origin':value['base_url'],'issuer':None,
+          'authorization_endpoint':None,'token_endpoint':None,
+          'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+          'scopes':[],'supports_refresh':False},SECRET)
+        ensure_schema(self.supervisor.db)
+        saved=projection(self.supervisor.db,'tenant-a')
+        self.assertEqual(saved[0]['connection_id'],'siliconflow-custom')
+        self.assertEqual(saved[0]['model_id'],'chosen-chat')
+        self.assertEqual(saved[0]['model_callable_state'],
+                         'UNVERIFIED_NO_INFERENCE')
 
     def test_tampered_expired_or_unlisted_model_receipt_is_rejected_before_save(self):
         now=time.time();token=issue_receipt(self.master,'tenant-a','deepseek',

@@ -85,6 +85,31 @@ def ensure_schema(db):
       tested_model_id TEXT, models_json TEXT NOT NULL,
       secret_mask TEXT, updated_at REAL NOT NULL,
       PRIMARY KEY(tenant_id,platform))''')
+    # One-time compatibility projection for the immediately preceding build:
+    # only recover a selection when both the active connection and enabled
+    # model are unambiguous.  Never choose the first catalogue entry.
+    actual={row[0] for row in db.execute(
+      "SELECT name FROM sqlite_master WHERE type='table'")}
+    if {'service_connections','model_catalog'}.issubset(actual):
+        for platform,value in PRESETS.items():
+            connections=list(db.execute('''SELECT tenant_id,connection_id,
+              secret_mask,updated_at FROM service_connections WHERE provider_id=?
+              AND purpose='MODEL_INFERENCE' AND auth_type='API_KEY'
+              AND status='ACTIVE' ORDER BY updated_at DESC''',(
+              value['provider_id'],)))
+            by_tenant={}
+            for row in connections:by_tenant.setdefault(row['tenant_id'],[]).append(row)
+            for tenant,rows in by_tenant.items():
+                models=list(db.execute('''SELECT model_id FROM model_catalog
+                  WHERE tenant_id=? AND provider_id=? AND enabled=1''',(
+                  tenant,value['provider_id'])))
+                if len(rows)==1 and len(models)==1:
+                    db.execute('''INSERT OR IGNORE INTO provider_onboarding_configs
+                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(tenant,platform,
+                      rows[0]['connection_id'],None,models[0]['model_id'],
+                      'SUCCEEDED','SAVED','UNVERIFIED_NO_INFERENCE',None,
+                      canonical([models[0]['model_id']]),rows[0]['secret_mask'],
+                      rows[0]['updated_at']))
     db.commit()
 
 
@@ -104,6 +129,11 @@ def projection(db,tenant_id):
 
 def saved_credential(control,master_key,platform,name=None):
     value=preset(platform);cid=connection_id(platform,name)
+    if name is None or not str(name).strip():
+        row=control.gateway.supervisor.db.execute('''SELECT connection_id FROM
+          provider_onboarding_configs WHERE tenant_id=? AND platform=?''',(
+          control.tenant_id,platform)).fetchone()
+        if row is not None:cid=row['connection_id']
     manager=ConnectionManager(control.gateway,control.context,master_key)
     secret,version=manager.credential(cid,value['base_url'],'MODEL_INFERENCE')
     return secret,cid,version
@@ -265,7 +295,9 @@ def save(control,master_key,platform,name,credential,model_id,receipt,
           existing['tested_model_id']==model_id and
           existing['model_callable_state']=='TESTED_SUCCEEDED'):
         callable_state='TESTED_SUCCEEDED'
-    cid=connection_id(platform,name);provider_id=value['provider_id']
+    cid=(existing['connection_id'] if existing is not None and
+      (name is None or not str(name).strip()) else connection_id(platform,name))
+    provider_id=value['provider_id']
     provider=control.upsert_provider({'provider_id':provider_id,
       'display_name':value['label'],'adapter_type':value['adapter_type'],
       'base_url':value['base_url'],'enabled':True,'price_state':'UNKNOWN',
