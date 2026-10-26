@@ -449,6 +449,7 @@ def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
     rows=observation.capture(plan.DOCKER+['container','ls','--all','--no-trunc','--format',fmt,
         '--filter','name=^/xuanjun-community-preview'],timeout=8,budget=16384).splitlines()
     require(len(rows)<=64,'CONTAINER_NAMES_UNKNOWN')
+    names={}
     before='xuanjun-community-preview-before-2330dd55'
     initialize='xuanjun-community-preview-initialize'
     allowed={plan.NAME,candidate['rollback_name'],candidate['failed_name'],before,initialize}
