@@ -382,6 +382,7 @@ class Session:
         if type(value) is list:return [Session._without_observed_at(v) for v in value]
         return value
 
+    # Expired authority renewal stays on the original B-resume/C-preconfirmation lane.
     def _successor_paths(self,predecessor_plan_sha):
         need(p.exact_hex(predecessor_plan_sha,64),'PREDECESSOR_PLAN_SHA_REQUIRED')
         suffix=predecessor_plan_sha[:16]
