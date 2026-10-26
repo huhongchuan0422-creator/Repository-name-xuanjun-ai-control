@@ -484,7 +484,7 @@ def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
          'LEGACY_INITIALIZE_NOT_STOPPED'))
     for name,cid,image,error in historical:
         if name in names:
-            require(names[name]==cid and inspect_bound(cid,image,historical_initialize=(name==initialize))['running'] is False,error)
+            require(names[name]==cid and (inspect_bound(cid,image,True) if name==initialize else inspect_bound(cid,image))['running'] is False,error)
     old=candidate['current']['container_id'];rb=candidate['rollback_name'];failed=candidate['failed_name']
     pre=('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT')
     retained=('OLD_RETAINED','NEW_RUN_INTENT')
