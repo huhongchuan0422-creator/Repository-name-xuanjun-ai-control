@@ -1292,7 +1292,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
 
 
     # Exact source-backed initialize contract; never allowlist the live hash alone.
-    def _initialize_inspect_output(self, entrypoint=None, cmd=None):
+    def _initialize_inspect_output(self, entrypoint=None, cmd=None, network='none'):
         root=p.ROOT
         info={
             'id':self.INITIALIZE_ID,'image':self.IMAGE,'running':False,'status':'exited',
@@ -1304,7 +1304,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                 {'Type':'bind','Source':root+'/data','Destination':root+'/data','RW':True},
                 {'Type':'bind','Source':p.RUN,'Destination':p.RUN,'RW':True}],
             'cpu':500000000,'memory':536870912,'swap':536870912,'pids':64,
-            'readonly':True,'privileged':False,'restart':'no','network':'bridge',
+            'readonly':True,'privileged':False,'restart':'no','network':network,
             'capdrop':['ALL'],'security':['no-new-privileges'],
             'tmpfs':{'/tmp':'rw,noexec,nosuid,nodev,size=16777216,mode=1777'},
             'log':{'Type':'json-file','Config':{'max-size':'10m','max-file':'2'}},
@@ -1327,6 +1327,19 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
         output=self._initialize_inspect_output(entrypoint=['/bin/sh'])
         with patch.object(c.observation,'capture',return_value=output):
             with self.assertRaisesRegex(Exception,'LEGACY_INITIALIZE_ENTRYPOINT_CHANGED'):
+                c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
+
+
+    def test_initialize_network_mode_is_exactly_none(self):
+        output=self._initialize_inspect_output()
+        with patch.object(c.observation,'capture',return_value=output):
+            value=c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
+        self.assertEqual(value['network'],'none')
+
+    def test_initialize_network_drift_rejected_by_real_validate_chain(self):
+        output=self._initialize_inspect_output(network='bridge')
+        with patch.object(c.observation,'capture',return_value=output):
+            with self.assertRaisesRegex(Exception,'LEGACY_INITIALIZE_NETWORK_CHANGED'):
                 c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
 
     def test_initialize_cmd_drift_rejected_by_real_validate_chain(self):
