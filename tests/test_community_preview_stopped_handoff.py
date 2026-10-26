@@ -304,6 +304,65 @@ class WholeEntry(unittest.TestCase):
         self.assertEqual(len(self.calls),before)
         self.assertFalse(Path(h.PROOF).exists())
 
+    def test_expired_plan_and_approval_create_one_preserved_successor(self):
+        q,historical=self._prepare_completed_b_before_c_proof()
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        candidate=q.candidate(semantic)
+        first=q._fixed_c_resume_plan(candidate,semantic)
+        original_plan_raw=Path(h.C_RESUME_PLAN).read_bytes()
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+        original_approval_raw=Path(h.C_RESUME_APPROVAL).read_bytes()
+        self.clock=1601
+        successor=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        self.assertEqual(Path(h.C_RESUME_PLAN).read_bytes(),original_plan_raw)
+        self.assertEqual(Path(h.C_RESUME_APPROVAL).read_bytes(),original_approval_raw)
+        self.assertEqual(successor['predecessor_plan_sha256'],first['plan_sha256'])
+        self.assertEqual(successor['predecessor_plan_record_sha256'],s.sha(original_plan_raw))
+        self.assertEqual(successor['predecessor_approval_sha256'],s.sha(original_approval_raw))
+        self.assertNotEqual(successor['plan_sha256'],first['plan_sha256'])
+        successor_path=Path(q.c_resume_plan_path)
+        self.assertTrue(successor_path.exists())
+        before=successor_path.read_bytes()
+        same=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        self.assertEqual(same['plan_sha256'],successor['plan_sha256'])
+        self.assertEqual(successor_path.read_bytes(),before)
+        self.assertNotEqual(q.c_resume_approval_path,h.C_RESUME_APPROVAL)
+        with self.assertRaises(FileNotFoundError):q._c_resume_approval(successor)
+
+    def test_expired_successor_rejects_execution_trace_and_stable_drift(self):
+        q,historical=self._prepare_completed_b_before_c_proof()
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+        self.clock=1601
+        active=Path(u.JOURNAL_PARENT)/'active-attempt.json';self.write(str(active),b'{}')
+        with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXECUTION_TRACE_PRESENT'):
+            q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        active.unlink()
+        changed=q.candidate(q.evidence(True));changed['current']['routing_sha256']='0'*64
+        with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_STABLE_PLAN_CHANGED'):
+            q._fixed_c_resume_plan(changed,q.evidence(True))
+
+    def test_successor_predecessor_replacement_or_second_expiry_holds(self):
+        q,historical=self._prepare_completed_b_before_c_proof()
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        first=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+        approval=dict(format=1,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+            carrier_manifest_sha256=q.pins(),plan_sha256=first['plan_sha256'],
+            issued_at=self.clock,expires_at=self.clock+600,actions=h.C_ACTIONS)
+        self.write(h.C_RESUME_APPROVAL,s.canonical(approval))
+        self.clock=1601
+        successor=q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        self.clock=2202
+        with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXPIRED_NO_SECOND_SUCCESSOR'):
+            q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+
     def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
