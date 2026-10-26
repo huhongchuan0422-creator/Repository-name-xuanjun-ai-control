@@ -915,9 +915,13 @@ def main(argv=None):
         need(result['phase'] in ('COMMITTED','ROLLED_BACK_PREVIEW_HOLD'),'NONTERMINAL_NOT_SUCCESS')
         code=0
     except BaseException as error:
-        import re
+        import re,traceback
         reason=str(error) if type(error) in (u.Hold,s.Hold) and re.fullmatch('[A-Z][A-Z0-9_]{0,95}',str(error)) else 'BC_BOUNDARY_UNKNOWN'
-        result=dict(phase='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',reason=reason)
+        # Safe diagnostics only: never emit exception text, argv, paths or secrets.
+        frames=traceback.extract_tb(error.__traceback__)
+        trail=[f.name for f in frames[-4:] if re.fullmatch('[A-Za-z_][A-Za-z0-9_]{0,63}',f.name)]
+        result=dict(phase='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT',reason=reason,
+                    error_type=type(error).__name__,safe_call_trail=trail)
     finally:
         try:session.close()
         except BaseException:code=2;result=dict(phase='HOLD_CLEANUP_UNKNOWN')
