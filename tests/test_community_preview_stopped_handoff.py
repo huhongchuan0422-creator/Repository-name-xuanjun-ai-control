@@ -1269,8 +1269,10 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                     c.exact_stopped_names(self.candidate,'PREPARED')
     def test_initialize_changed_id_rejected(self):
         changed=dict(self.initialize,id='e'*64)
-        with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
-            self.run_inventory(self.current,self.before,changed)
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,changed)):
+            with patch.object(c,'inspect_bound',return_value={'running':False}):
+                with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
+                    c.exact_stopped_names(self.candidate,'PREPARED')
     def test_initialize_changed_image_rejected(self):
         def inspect(cid,image):
             if cid==self.INITIALIZE_ID:
