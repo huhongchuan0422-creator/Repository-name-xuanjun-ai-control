@@ -872,13 +872,27 @@ finally:
             attempt=candidate['attempt'],carrier_manifest_sha256=reopened.pins(),
             plan_sha256=candidate['plan_sha256'],proof_sha256=s.sha(proof_raw),
             prior_approval_sha256=prior,active_attempt_sha256=s.sha(active),
-            checkpoint_sha256=s.sha(checkpoint),issued_at=self.clock,expires_at=self.clock+600,
-            actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT'])
+            prepared_event_sha256=s.sha(checkpoint),issued_at=self.clock,expires_at=self.clock+600,
+            actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
         self.write(reopened._prepared_reopen_path(s.sha(proof_raw)),s.canonical(permit))
-        result=reopened.reopen_prepared()
-        self.assertEqual(result['phase'],'COMMITTED')
+        original_replace=u.Update.replace_and_verify
+        def known_failure(update):
+            update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+                scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+                runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=self.clock)
+            return original_replace(update)
+        with patch.object(u.Update,'replace_and_verify',known_failure),self.assertRaisesRegex(u.Hold,'KNOWN_FAILURE'):
+            reopened.reopen_prepared()
+        self.assertEqual(reopened.journal.state['phase'],'KNOWN_FAILURE')
         self.assertEqual([row[3] for row in self.calls],['rename','run'])
         self.assertEqual(proof_raw,Path(h.PROOF).read_bytes())
+        reopened.close();recovery=h.Session();recovery.acquire(recover=True);self.addCleanup(recovery.close);self.session=recovery
+        old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+            runtime_source_sha=None,version_source=None,observed_at=self.clock)
+        with patch.object(c,'BoundHttpsHealth',return_value=old_health):result=recovery.recover()
+        self.assertEqual(result['phase'],'ROLLED_BACK_PREVIEW_HOLD')
+        self.assertIn('start',[row[3] for row in self.calls])
 
     def test_actual_b_classes_same_lease_to_c_success_no_old_stop_start(self):
         self.prepare_b_and_c();result=self.session.update()

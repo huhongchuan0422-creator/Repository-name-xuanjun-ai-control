@@ -462,21 +462,23 @@ class Session:
         need(p.exact_hex(proof_sha,64),'PREPARED_PROOF_SHA_REQUIRED')
         return s.BASE+'/bc-c-resume-approval-successor-prepared-reopen-'+proof_sha[:16]+'.json'
 
-    def _prepared_reopen_approval(self,proof):
+    def _prepared_reopen_approval(self,proof,phase='PREPARED'):
         proof_raw=raw(PROOF,4*1024*1024);proof_sha=s.sha(proof_raw)
         need(s.exact_json(proof_raw)==proof,'PREPARED_PROOF_CHANGED')
         active_path=u.JOURNAL_PARENT+'/active-attempt.json'
         attempt_path=u.JOURNAL_PARENT+'/'+proof['plan']['attempt']
         checkpoint_path=attempt_path+'/checkpoint.json';event_path=attempt_path+'/event-000001.json'
         active=raw(active_path,16384);checkpoint=raw(checkpoint_path,16384);event=raw(event_path,16384)
-        state=s.exact_json(checkpoint)
-        need(checkpoint==event and state==dict(approval_sha256=proof['approval_sha256'],
-             handoff_sha256=state.get('handoff_sha256'),new_id=None,
+        prepared=s.exact_json(event);state=s.exact_json(checkpoint)
+        need(prepared==dict(approval_sha256=proof['approval_sha256'],
+             handoff_sha256=prepared.get('handoff_sha256'),new_id=None,
              phase='PREPARED',plan_sha256=proof['plan']['plan_sha256'],sequence=1),
              'EXACT_PREPARED_CHECKPOINT_REQUIRED')
+        need(phase in ('PREPARED','KNOWN_FAILURE') and state.get('phase')==phase,
+             'EXACT_PREPARED_REOPEN_PHASE_REQUIRED')
         path=self._prepared_reopen_path(proof_sha);approval,body=document(path,16384)
         expected={'format','kind','host','mode','attempt','carrier_manifest_sha256','plan_sha256',
-            'proof_sha256','prior_approval_sha256','active_attempt_sha256','checkpoint_sha256',
+            'proof_sha256','prior_approval_sha256','active_attempt_sha256','prepared_event_sha256',
             'issued_at','expires_at','actions'}
         need(set(approval)==expected and type(approval['format']) is int and approval['format']==1
              and approval['kind']==PREPARED_REOPEN_KIND and approval['host']==p.HOST
@@ -486,8 +488,8 @@ class Session:
              and approval['proof_sha256']==proof_sha
              and approval['prior_approval_sha256']==proof['approval_sha256']
              and approval['active_attempt_sha256']==s.sha(active)
-             and approval['checkpoint_sha256']==s.sha(checkpoint)
-             and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT'],
+             and approval['prepared_event_sha256']==s.sha(event)
+             and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'],
              'EXACT_C_PREPARED_REOPEN_APPROVAL_REQUIRED')
         window(approval)
         self.prepared_reopen_path=path;self.prepared_reopen_raw=body
@@ -1205,10 +1207,16 @@ class Session:
         self.backup=open_private(s.BACKUP+'/clone-results.json')
         # No B rerun, no new plan, no automatic recovery of intents/UNKNOWN.
         if proof.get('approval_kind')=='C_RESUME_APPROVAL':
-            self.c_preconfirm_mode=True;self._c_resume_approval(proof['plan'])
+            self.c_preconfirm_mode=True;self._restore_c_resume_paths(proof);self.approved_stamp=self.pins()
+            prepared_path=self._prepared_reopen_path(s.sha(raw(PROOF,4*1024*1024)))
+            if exists_private(prepared_path):
+                self._prepared_reopen_approval(proof,'KNOWN_FAILURE')
+                bound=self.bind_resume_reference(self.c_resume_approval_path,16384)
+                need(s.sha(bound)==proof['approval_sha256'],'PROOF_APPROVAL_CHANGED');self.craw=bound
+            else:self._c_resume_approval(proof['plan'])
         else:self.c_approval(proof['plan'])
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
-        return self.consume(proof,True)
+        return self.consume(proof,True,prepared_reopen=self.prepared_reopen_raw is not None)
     def close(self):
         if self.cleanup_unproven:raise u.Hold('BC_CLEANUP_UNKNOWN')
         unproven_close=False
