@@ -19,8 +19,10 @@ from connection_management import ConnectionManager
 from model_orchestration import ModelControl,ModelScheduler,ProviderError
 from provider_onboarding import ensure_schema as ensure_onboarding_schema
 from reusable_task_gateway import GatewayKernel,TestTenantAuthority
-from task_center_mcp_service import MCPTaskService,ensure_schema as ensure_mcp_schema
+from task_center_mcp_service import (MCPTaskService,
+  ensure_schema as ensure_mcp_schema,recover_incomplete_mcp_starts)
 from task_supervisor import Supervisor,canonical
+from task_writer_fence import Fence
 
 
 KEY=b'0123456789abcdef0123456789abcdef'
@@ -153,7 +155,7 @@ class MCPTaskServiceTests(unittest.TestCase):
 
     def test_failpoint_restart_resumes_one_binding_and_one_request(self):
         phases=('BINDING_PERSISTED','GRAPH_PERSISTED','CONTRACT_PERSISTED',
-          'WRITER_STARTED','MODEL_ASSIGNED','QUEUED')
+          'WRITER_STARTED','MODEL_ASSIGNED','REQUEST_COMMITTED','QUEUED')
         for index,phase in enumerate(phases):
             with self.subTest(phase=phase):
                 value=self.submit_value()
@@ -183,6 +185,62 @@ class MCPTaskServiceTests(unittest.TestCase):
                       'tenant-mcp',binding[0]['request_id'])).fetchone()[0]
                     self.assertEqual(count,1)
                 finally:supervisor.close()
+
+    def _interrupt_after_contract(self,idempotency_key):
+        value=self.submit_value();value['idempotency_key']=idempotency_key
+        def stop(phase):
+            if phase=='CONTRACT_PERSISTED':raise RuntimeError('STOP_AFTER_CONTRACT')
+        service=MCPTaskService(self.db,KEY,'tenant-mcp',self.master,
+          'owner-1','project-mcp',phase_hook=stop)
+        with self.assertRaisesRegex(RuntimeError,'STOP_AFTER_CONTRACT'):
+            service.submit(value)
+        task_id='mcp-'+__import__('hashlib').sha256(canonical({
+          'tenant_id':'tenant-mcp','principal_id':'owner-1',
+          'project_id':'project-mcp','idempotency_key':idempotency_key
+          }).encode()).hexdigest()[:24]
+        return value,task_id,'attempt-'+task_id[4:]
+
+    def test_different_writer_incomplete_claim_is_never_adopted(self):
+        value,task_id,attempt_id=self._interrupt_after_contract('foreign-writer')
+        supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY)
+        gateway=GatewayKernel(supervisor,authority);fence=Fence(supervisor,
+          self.db+'.test-only-locks')
+        try:
+            fence.claim(task_id,attempt_id,'mcp-worker','model-scheduler-runtime',{
+              'caller_id':'different-writer','run_id':'different-run',
+              'session_id':'different-session','gateway_id':'different-gateway'},
+              'lease-'+attempt_id,gateway.canonical_resources(task_id),
+              time.time()+600)
+        finally:fence.close();supervisor.close()
+        with self.assertRaisesRegex(ValueError,'WRITER_AUTHORITY_CONFLICT'):
+            self.service.submit(value)
+
+    def test_startup_recovery_revokes_exact_incomplete_mcp_claim_then_resumes(self):
+        value,task_id,attempt_id=self._interrupt_after_contract('own-writer-crash')
+        supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY)
+        gateway=GatewayKernel(supervisor,authority);fence=Fence(supervisor,
+          self.db+'.test-only-locks')
+        try:
+            fence.claim(task_id,attempt_id,'mcp-worker','model-scheduler-runtime',{
+              'caller_id':'test-writer-'+attempt_id,
+              'run_id':'test-run-'+attempt_id,
+              'session_id':'test-session-'+attempt_id,
+              'gateway_id':'test-gateway'},'lease-'+attempt_id,
+              gateway.canonical_resources(task_id),time.time()+600)
+        finally:fence.close();supervisor.close()
+        recovered=recover_incomplete_mcp_starts(self.db,KEY,'tenant-mcp')
+        self.assertEqual([x['task_id'] for x in recovered],[task_id])
+        submitted=self.service.submit(value)
+        self.assertEqual(submitted['state'],'QUEUED')
+        supervisor=Supervisor(self.db)
+        try:
+            task=supervisor._task(task_id)
+            self.assertEqual(task['authority_caller_id'],
+              'test-writer-'+attempt_id)
+            self.assertEqual(supervisor.db.execute('''SELECT COUNT(*) FROM
+              model_requests WHERE tenant_id=? AND task_id=?''',(
+              'tenant-mcp',task_id)).fetchone()[0],1)
+        finally:supervisor.close()
 
 
 if __name__=='__main__':unittest.main()

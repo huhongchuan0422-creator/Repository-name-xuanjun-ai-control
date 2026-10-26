@@ -51,6 +51,57 @@ def ensure_schema(db):
     db.commit()
 
 
+def _expected_writer(task_id,attempt_id,lock_provider_id):
+    return {'owner':'mcp-worker','entry':'model-scheduler-runtime',
+      'attempt_id':attempt_id,'lease_id':'lease-'+attempt_id,
+      'authority_caller_id':'test-writer-'+attempt_id,
+      'authority_run_id':'test-run-'+attempt_id,
+      'authority_session_id':'test-session-'+attempt_id,
+      'authority_gateway_id':'test-gateway',
+      'authority_lock_provider_id':lock_provider_id,
+      'resource_scope_json':canonical(['fake:'+task_id])}
+
+
+def _assert_expected_writer(supervisor,task,lock_provider_id):
+    expected=_expected_writer(task['task_id'],task['attempt_id'],lock_provider_id)
+    for name,value in expected.items():
+        if task[name]!=value:raise ValueError('MCP_WRITER_AUTHORITY_CONFLICT')
+    if (type(task['fence']) is not int or type(task['epoch']) is not int or
+            task['fence']<1 or task['epoch']<1):
+        raise ValueError('MCP_WRITER_AUTHORITY_CONFLICT')
+    claims=list(supervisor.db.execute('''SELECT resource_key,task_id,attempt_id,
+      fence,epoch,state FROM resource_claims WHERE task_id=?''',(task['task_id'],)))
+    exact=[('fake:'+task['task_id'],task['task_id'],task['attempt_id'],
+      task['fence'],task['epoch'],'VALID')]
+    if [tuple(row) for row in claims]!=exact:
+        raise ValueError('MCP_WRITER_AUTHORITY_CONFLICT')
+
+
+def recover_incomplete_mcp_starts(db_path,authority_key,tenant_id):
+    """Startup-only recovery after the prior service process is proven dead."""
+    supervisor=Supervisor(db_path);authority=TestTenantAuthority(authority_key)
+    gateway=GatewayKernel(supervisor,authority)
+    context=authority.issue(tenant_id,'admin:mcp-startup-recovery')
+    fence=Fence(supervisor,db_path+'.test-only-locks')
+    try:
+        task_ids=[row['task_id'] for row in supervisor.db.execute('''SELECT
+          b.task_id FROM mcp_task_bindings b JOIN tasks t ON t.task_id=b.task_id
+          WHERE b.tenant_id=? AND b.submit_state='CONTRACT_PERSISTED' AND
+          t.state='RECEIVED' AND t.authority_state='VALID' AND NOT EXISTS(
+            SELECT 1 FROM events e WHERE e.task_id=t.task_id AND
+            e.attempt_id=t.attempt_id AND e.kind='STARTED') ORDER BY b.task_id''',
+          (tenant_id,))]
+        executor=TestOnlyExecutor(gateway,fence,context)
+        recovered=[]
+        for task_id in task_ids:
+            task=supervisor._task(task_id)
+            _assert_expected_writer(supervisor,task,fence.locks.provider_id)
+            recovered.extend(executor.recover_incomplete_starts(
+              task_ids=[task_id]))
+        return recovered
+    finally:fence.close();supervisor.close()
+
+
 class MCPTaskService(object):
     """Authenticated, project-scoped adapter for the minimal MCP journey."""
     def __init__(self, db_path, authority_key, tenant_id, master_key,
@@ -219,22 +270,20 @@ class MCPTaskService(object):
     def _ensure_started(self,supervisor,gateway,context,task_id,attempt_id,now):
         task=supervisor._task(task_id)
         if task['attempt_id']==attempt_id and task['authority_state']=='VALID':
-            received=supervisor.db.execute('''SELECT 1 FROM events WHERE task_id=?
-              AND attempt_id=? AND event_id=?''',(task_id,attempt_id,
-              'received-'+attempt_id)).fetchone()
-            observed=task['received_at']
-            if received is None:
-                supervisor.record(task_id,attempt_id,'received-'+attempt_id,
-                  'RECEIVED',observed,'PHASE_EXECUTION',
-                  'test-received-'+attempt_id)
-            task=supervisor._task(task_id)
-            started=supervisor.db.execute('''SELECT 1 FROM events WHERE task_id=?
-              AND attempt_id=? AND event_id=?''',(task_id,attempt_id,
+            fence=Fence(supervisor,self.db_path+'.test-only-locks')
+            try:_assert_expected_writer(supervisor,task,fence.locks.provider_id)
+            finally:fence.close()
+            started=supervisor.db.execute('''SELECT kind,evidence_kind,
+              evidence_ref FROM events WHERE task_id=? AND attempt_id=? AND
+              event_id=?''',(task_id,attempt_id,
               'started-'+attempt_id)).fetchone()
-            if started is None:
-                supervisor.record(task_id,attempt_id,'started-'+attempt_id,
-                  'STARTED',max(observed,task['last_event_at']),
-                  'PHASE_EXECUTION','test-started-'+attempt_id)
+            if (task['state'] not in ('STARTED','RUNNING') or started is None or
+                    tuple(started)!=('STARTED','PHASE_EXECUTION',
+                    'test-started-'+attempt_id)):
+                # Never manufacture STARTED for an authority whose prior
+                # process liveness is not proven here.  Service startup owns
+                # the existing controlled incomplete-start recovery.
+                raise ValueError('MCP_INCOMPLETE_START_RECOVERY_REQUIRED')
             return
         if task['state']!='READY' or task['authority_state']!='NONE':
             raise ValueError('MCP_PARTIAL_START_RECONCILIATION_HOLD')
@@ -255,6 +304,30 @@ class MCPTaskService(object):
             control.assign(task_id,ROLE_ID,ROLE_VERSION,'mcp-worker',False,now,
               connection['provider_id'],connection['model_id']);return
         if tuple(row)!=expected:raise ValueError('MCP_ASSIGNMENT_CONFLICT')
+
+    def _reconcile_queued(self,supervisor,binding,request,value):
+        attempt_id='attempt-'+binding['task_id'][4:]
+        expected=(binding['request_id'],'mcp:'+self.principal_id+':'+
+          value['idempotency_key'],binding['task_id'],attempt_id,ROLE_ID,
+          binding['provider_id'],binding['model_id'])
+        actual=tuple(request[name] for name in ('request_id','idempotency_key',
+          'task_id','attempt_id','role_id','provider_id','model_id'))
+        detail=supervisor.db.execute('''SELECT connection_id,max_output_tokens,
+          writer_principal FROM model_request_bindings WHERE tenant_id=? AND
+          request_id=?''',(self.tenant_id,binding['request_id'])).fetchone()
+        expected_detail=(value['connection_id'],value['max_output_tokens'],
+          'test-writer-'+attempt_id)
+        if actual!=expected or detail is None or tuple(detail)!=expected_detail:
+            raise ValueError('MCP_QUEUED_REQUEST_RECONCILIATION_FAILED')
+        if binding['submit_state']!='QUEUED':
+            supervisor.db.execute('''UPDATE mcp_task_bindings SET
+              submit_state='QUEUED',updated_at=? WHERE tenant_id=? AND
+              task_id=? AND request_id=?''',(self.clock(),self.tenant_id,
+              binding['task_id'],binding['request_id']))
+            if supervisor.db.execute('SELECT changes()').fetchone()[0]!=1:
+                supervisor.db.rollback()
+                raise ValueError('MCP_QUEUED_BINDING_CAS_FAILED')
+            supervisor.db.commit()
 
     def submit(self,value):
         self._validate_submit(value)
@@ -279,10 +352,11 @@ class MCPTaskService(object):
                         existing['connection_id']!=value['connection_id'] or
                         existing['max_output_tokens']!=value['max_output_tokens']):
                     raise ValueError('MCP_IDEMPOTENCY_CONFLICT')
-                request=supervisor.db.execute('''SELECT state FROM model_requests
+                request=supervisor.db.execute('''SELECT * FROM model_requests
                   WHERE tenant_id=? AND request_id=?''',(self.tenant_id,
                   existing['request_id'])).fetchone()
                 if request is not None:
+                    self._reconcile_queued(supervisor,existing,request,value)
                     return {'task_id':existing['task_id'],
                       'request_id':existing['request_id'],'state':request['state'],
                       'duplicate':True}
@@ -374,6 +448,7 @@ class MCPTaskService(object):
               value['max_output_tokens'],value['connection_id'],now=now)
             if queued['request_id']!=request_id:
                 raise ValueError('MCP_REQUEST_ID_RECONCILIATION_FAILED')
+            if self.phase_hook is not None:self.phase_hook('REQUEST_COMMITTED')
             self._phase(supervisor,task_id,'QUEUED')
             return {'task_id':task_id,'request_id':queued['request_id'],
               'state':queued['state'],'duplicate':existing is not None}

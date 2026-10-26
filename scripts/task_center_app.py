@@ -36,7 +36,8 @@ from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
 from task_center_mcp import RemoteTaskCenterMCP
 from task_center_mcp_auth import MCPAuthorizationStore
 from task_center_mcp_service import (MCPModelWorkerLoop,MCPTaskService,
-                                     ensure_schema as ensure_mcp_task_schema)
+                                     ensure_schema as ensure_mcp_task_schema,
+                                     recover_incomplete_mcp_starts)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -944,6 +945,11 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         mcp_db=mcp_connect()
         try:ensure_mcp_task_schema(mcp_db)
         finally:mcp_db.close()
+        # A fresh service process proves the prior local process stopped.  Only
+        # then may the existing fenced recovery contract revoke incomplete MCP
+        # claims that never produced a STARTED receipt.
+        recover_incomplete_mcp_starts(os.path.realpath(db_path),authority_key,
+                                      tenant_id)
     handler = build_handler(os.path.realpath(db_path), authority_key,
                             tenant_id, principal_id, model_master_key,
                             admin_token, actor_tokens,codex_transports,

@@ -1039,7 +1039,7 @@ class TestOnlyExecutor(object):
         self.clock = clock or gateway.clock
         self.start_claim_hook = start_claim_hook
 
-    def recover_incomplete_starts(self, now=None):
+    def recover_incomplete_starts(self, now=None, task_ids=None):
         """Converge proven-dead TEST_ONLY claims with no STARTED event.
 
         The caller invokes this only after the prior local process has exited.
@@ -1056,6 +1056,11 @@ class TestOnlyExecutor(object):
             SELECT 1 FROM events e WHERE e.task_id=t.task_id
             AND e.attempt_id=t.attempt_id AND e.kind='STARTED')
           ORDER BY t.task_id''', (tenant_id,)))
+        if task_ids is not None:
+            exact=set(task_ids)
+            if (not exact or any(not isinstance(x,str) or not x for x in exact)):
+                raise ValueError('EXACT_RECOVERY_TASK_IDS_REQUIRED')
+            rows=[row for row in rows if row['task_id'] in exact]
         recovered = []
         for row in rows:
             controller = {'role': 'REVOCATION_CONTROLLER',
