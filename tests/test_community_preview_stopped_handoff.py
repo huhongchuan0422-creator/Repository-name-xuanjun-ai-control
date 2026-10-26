@@ -628,8 +628,8 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_PLAN_REQUIRED_FOR_RECOVERY'):
             q._restore_c_resume_paths(proof)
 
-    def test_format4_recovery_real_pty_resume_boundary_execute_and_reopen_recovery(self):
-        """Current-site format4 lane crosses both production TTY boundaries."""
+    def test_independent_correction_after_format4_real_pty_execute_and_recovery(self):
+        """Expired format4 is preserved; its one correction crosses both real TTY boundaries."""
         import pty,select,time,signal,errno,re
         worker="""import sys
 sys.path[:0]=[REPO,REPO+'/tests']
@@ -682,7 +682,22 @@ try:
   successor_plan_record_sha256=s.sha(successor_raw),
   successor_approval_sha256=s.sha(s.canonical(renewal)),
   issued_at=t.clock,expires_at=t.clock+600,actions=h.C_ACTIONS)
- t.write(recovery_path,s.canonical(recovery));q.backup=None
+ recovery_raw=s.canonical(recovery);t.write(recovery_path,recovery_raw)
+ t.clock=recovery['expires_at']+1;q.last=None
+ semantic=q.evidence(True);successor=q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+ correction_path=q.c_resume_approval_path
+ assert 'successor-independent-correction-' in correction_path and not h.exists_private(correction_path)
+ correction=dict(format=1,kind=h.CORRECTION_KIND,host=p.HOST,mode=h.MODE,attempt=h.attempt(),
+  carrier_manifest_sha256=q.pins(),plan_sha256=successor['plan_sha256'],
+  predecessor_plan_sha256=successor['predecessor_plan_sha256'],
+  predecessor_plan_record_sha256=successor['predecessor_plan_record_sha256'],
+  predecessor_approval_sha256=successor['predecessor_approval_sha256'],
+  successor_plan_record_sha256=s.sha(successor_raw),
+  successor_approval_sha256=s.sha(s.canonical(successor_approval)),
+  successor_renewal_sha256=s.sha(s.canonical(renewal)),
+  successor_recovery_sha256=s.sha(recovery_raw),issued_at=t.clock,expires_at=t.clock+600,
+  actions=h.C_ACTIONS)
+ t.write(correction_path,s.canonical(correction));q.backup=None
  original=u.Update.replace_and_verify
  def known(updater):
   updater.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
@@ -695,7 +710,7 @@ try:
  except u.Hold as error:
   assert 'KNOWN_FAILURE' in str(error)
  proof=h.document(h.PROOF)[0]
- assert proof['approval_path']==recovery_path and proof['approval_sha256']==s.sha(open(recovery_path,'rb').read())
+ assert proof['approval_path']==correction_path and proof['approval_sha256']==s.sha(open(correction_path,'rb').read())
  q.close()
  reopened=h.Session();reopened.acquire(recover=True);t.session=reopened
  old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
@@ -703,8 +718,9 @@ try:
   runtime_source_sha=None,version_source=None,observed_at=t.clock)
  with patch.object(c,'BoundHttpsHealth',return_value=old_health):result=reopened.recover()
  assert result['phase'] in ('ROLLED_BACK_PREVIEW_HOLD','COMMITTED')
- assert reopened.c_resume_approval_path==recovery_path and reopened.craw==open(recovery_path,'rb').read()
- print('FORMAT4_REAL_PTY_CHAIN_OK',flush=True)
+ assert reopened.c_resume_approval_path==correction_path and reopened.craw==open(correction_path,'rb').read()
+ assert open(recovery_path,'rb').read()==recovery_raw
+ print('INDEPENDENT_CORRECTION_REAL_PTY_CHAIN_OK',flush=True)
 finally:
  t.doCleanups()
 """.replace('REPO',repr(str(Path.cwd())))
@@ -722,12 +738,12 @@ finally:
                     data+=b
                     for line in re.findall(rb'APPROVE_(?:STOPPED_UPDATE|KNOWN_FAILURE_RECOVER) [0-9a-f]{64}',data):
                         if line not in sent:os.write(fd,line+b'\n');sent.append(line)
-            got,status=os.waitpid(pid,0 if b'FORMAT4_REAL_PTY_CHAIN_OK' in data else os.WNOHANG);done=got==pid
+            got,status=os.waitpid(pid,0 if b'INDEPENDENT_CORRECTION_REAL_PTY_CHAIN_OK' in data else os.WNOHANG);done=got==pid
             self.assertTrue(done,data.decode(errors='replace'))
             self.assertEqual(os.waitstatus_to_exitcode(status),0,data.decode(errors='replace'))
             self.assertEqual([x.split()[0] for x in sent],
                 [b'APPROVE_STOPPED_UPDATE',b'APPROVE_KNOWN_FAILURE_RECOVER'])
-            self.assertIn(b'FORMAT4_REAL_PTY_CHAIN_OK',data)
+            self.assertIn(b'INDEPENDENT_CORRECTION_REAL_PTY_CHAIN_OK',data)
         finally:
             if not done:os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
             os.close(fd)
