@@ -62,7 +62,24 @@ class Journal:
             if lease_fd is None:raise Hold('STOPPED_HANDOFF_CONTINUOUS_LEASE_REQUIRED')
             if type(handoff_binding) is not dict or set(handoff_binding)!={'approval_sha256','handoff_sha256'} or not all(plan.exact_hex(v,64) for v in handoff_binding.values()):raise Hold('EXACT_HANDOFF_BINDING_REQUIRED')
         elif handoff_binding is not None or lease_fd is not None:raise Hold('LEGACY_JOURNAL_NO_HANDOFF_ARGUMENTS')
-        if candidate!=rebuilt:raise Hold('EXACT_COMPILED_PLAN_REQUIRED')
+        if candidate!=rebuilt:
+            # A preserved expired-plan successor is the exact compiled stopped
+            # plan plus four authorization-chain fields and its own digest.
+            # Transaction actions/evidence remain byte-for-byte rebuilt here;
+            # ordinary plans receive no relaxed comparison.
+            extra={'carrier_manifest_sha256','predecessor_plan_sha256',
+                   'predecessor_plan_record_sha256','predecessor_approval_sha256'}
+            base={k:v for k,v in candidate.items() if k not in extra}
+            base['plan_sha256']=rebuilt.get('plan_sha256')
+            chained=(stopped and set(candidate)==set(rebuilt)|extra
+                and base==rebuilt
+                and all(plan.exact_hex(candidate.get(k),64) for k in extra)
+                and plan.exact_hex(candidate.get('plan_sha256'),64)
+                and candidate['plan_sha256']==hashlib.sha256(json.dumps(
+                    {k:v for k,v in candidate.items() if k!='plan_sha256'},
+                    sort_keys=True,separators=(',',':'),ensure_ascii=True,
+                    allow_nan=False).encode('ascii')).hexdigest())
+            if not chained:raise Hold('EXACT_COMPILED_PLAN_REQUIRED')
         self.plan=candidate;self.parent=os.dup(parent_fd);self.fd=None;self.lock=None;self.poisoned=False;self.owner=threading.get_ident();self.cleanup_unproven=False
         try:
             if lease_fd is None:
