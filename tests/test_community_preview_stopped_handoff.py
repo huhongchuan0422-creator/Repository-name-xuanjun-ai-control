@@ -220,10 +220,14 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
@@ -276,10 +280,14 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
@@ -299,10 +307,14 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
@@ -325,10 +337,14 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
@@ -349,10 +365,14 @@ class WholeEntry(unittest.TestCase):
     def test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
@@ -371,10 +391,14 @@ class WholeEntry(unittest.TestCase):
     def test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval(self):
         q,historical=self._prepare_completed_b_before_c_proof()
         self.assertFalse(Path(h.C_RESUME_PLAN).exists());self.assertFalse(Path(h.C_RESUME_APPROVAL).exists())
-        ticks=[0]
+        real_monotonic=h.time.monotonic
+        deadline_reads=[0]
         def monotonic():
-            ticks[0]+=61
-            return ticks[0]
+            import inspect
+            if inspect.currentframe().f_back.f_code.co_name=='resume_c_before_confirmation':
+                deadline_reads[0]+=1
+                return 0 if deadline_reads[0]==1 else 121
+            return real_monotonic()
         with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
