@@ -30,7 +30,8 @@ from codex_execution_adapter import (CodexExecutionControl,
 from task_center_session_auth import FileTestIdentityProvider, SessionStore
 from secure_file_input import read_owned_secret_file
 from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
-                                 public_presets, test_connection, test_model,
+                                 public_presets, projection as onboarding_projection,
+                                 saved_credential, test_connection, test_model,
                                  issue_receipt, save as save_onboarding)
 
 
@@ -58,7 +59,8 @@ MODEL_TABLES = frozenset((
     'model_call_attempts','model_request_bindings','model_call_reservations',
     'model_usage_attempts','model_runtime_limits','approved_skills',
     'role_instances','acceptance_checklists','model_quota_status',
-    'codex_execution_intents','codex_execution_events'))
+    'codex_execution_intents','codex_execution_events',
+    'provider_onboarding_configs'))
 
 ROLE_ACTION_ROLES = {
     'START_TEST_ONLY_TASK': 'TASK_EXECUTOR',
@@ -141,6 +143,7 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
         codex.db=connection;codex.tenant_id=tenant_id
         result['codex_executions']=codex.projection()
         result['provider_presets']=public_presets()
+        result['provider_onboarding']=onboarding_projection(connection,tenant_id)
         actual = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
         if {'execution_units','asset_preflight_checks',
@@ -389,21 +392,36 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='TEST_PROVIDER_CONNECTION':
                         if not provider_connection_test_enabled:
                             raise ValueError('PROVIDER_CONNECTION_TEST_DISABLED')
-                        tested=test_connection(value['platform'],value['credential'])
+                        credential=value.get('credential')
+                        if not credential:
+                            credential,_,_=saved_credential(control,
+                              model_master_key,value['platform'],
+                              value.get('connection_name'))
+                        tested=test_connection(value['platform'],credential)
                         tested['test_receipt']=issue_receipt(model_master_key,
-                          tenant_id,value['platform'],value['credential'],
+                          tenant_id,value['platform'],credential,
                           tested['models'])
                         result=tested
                     elif action=='SAVE_PROVIDER_ONBOARDING':
+                        credential=value.get('credential')
+                        if not credential:
+                            credential,_,_=saved_credential(control,
+                              model_master_key,value['platform'],
+                              value.get('connection_name'))
                         result=save_onboarding(control,model_master_key,
                           value['platform'],value.get('connection_name'),
-                          value['credential'],value['model_id'],
+                          credential,value['model_id'],
                           value['test_receipt'],value.get('call_receipt'))
                     elif action=='TEST_PROVIDER_MODEL':
                         if not provider_connection_test_enabled:
                             raise ValueError('PROVIDER_CONNECTION_TEST_DISABLED')
+                        credential=value.get('credential')
+                        if not credential:
+                            credential,_,_=saved_credential(control,
+                              model_master_key,value['platform'],
+                              value.get('connection_name'))
                         result=test_model(control,model_master_key,tenant_id,
-                          value['platform'],value['credential'],value['model_id'],
+                          value['platform'],credential,value['model_id'],
                           value['test_receipt'],value.get('confirm_paid_test') is True)
                     elif action=='UPSERT_CONNECTION':
                         result=ConnectionManager(control.gateway,control.context,

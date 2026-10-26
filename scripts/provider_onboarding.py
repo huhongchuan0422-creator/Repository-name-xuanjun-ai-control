@@ -25,7 +25,8 @@ PRESETS={
   'siliconflow':{
     'label':'硅基流动','provider_id':'siliconflow','adapter_type':'siliconflow',
     'base_url':'https://api.siliconflow.cn','auth_type':'API_KEY',
-    'extra_field':None,'timeout_seconds':10},
+    'extra_field':None,'timeout_seconds':10,
+    'free_default_model':'Qwen/Qwen2.5-7B-Instruct'},
   'openai':{
     'label':'OpenAI API','provider_id':'openai','adapter_type':'openai-compatible',
     'base_url':'https://api.openai.com','auth_type':'API_KEY',
@@ -62,6 +63,7 @@ ERROR_ZH={
 def public_presets():
     values=[{'platform':key,'label':value['label'],
       'auth_type':value['auth_type'],'extra_field':value['extra_field'],
+      'free_default_model':value.get('free_default_model'),
       'availability':'SUPPORTED'} for key,value in sorted(PRESETS.items())]
     values.extend({'platform':key,'label':value['label'],
       'auth_type':value['auth_type'],'extra_field':value['extra_field'],
@@ -75,7 +77,36 @@ def ensure_schema(db):
       tenant_id TEXT NOT NULL, receipt_sha256 TEXT NOT NULL,
       state TEXT NOT NULL, started_at REAL NOT NULL,
       PRIMARY KEY(tenant_id,receipt_sha256))''')
+    db.execute('''CREATE TABLE IF NOT EXISTS provider_onboarding_configs(
+      tenant_id TEXT NOT NULL, platform TEXT NOT NULL,
+      connection_id TEXT NOT NULL, connection_name TEXT,
+      model_id TEXT NOT NULL, auth_state TEXT NOT NULL,
+      catalog_state TEXT NOT NULL, model_callable_state TEXT NOT NULL,
+      tested_model_id TEXT, models_json TEXT NOT NULL,
+      secret_mask TEXT, updated_at REAL NOT NULL,
+      PRIMARY KEY(tenant_id,platform))''')
     db.commit()
+
+
+def projection(db,tenant_id):
+    actual={row[0] for row in db.execute(
+      "SELECT name FROM sqlite_master WHERE type='table'")}
+    if 'provider_onboarding_configs' not in actual:return []
+    result=[]
+    for row in db.execute('''SELECT platform,connection_id,connection_name,
+      model_id,auth_state,catalog_state,model_callable_state,tested_model_id,
+      models_json,secret_mask,updated_at FROM provider_onboarding_configs
+      WHERE tenant_id=? ORDER BY platform''',(tenant_id,)):
+        item=dict(row);item['models']=json.loads(item.pop('models_json'))
+        result.append(item)
+    return result
+
+
+def saved_credential(control,master_key,platform,name=None):
+    value=preset(platform);cid=connection_id(platform,name)
+    manager=ConnectionManager(control.gateway,control.context,master_key)
+    secret,version=manager.credential(cid,value['base_url'],'MODEL_INFERENCE')
+    return secret,cid,version
 
 
 def preset(platform):
@@ -213,12 +244,26 @@ def connection_id(platform,name):
 
 def save(control,master_key,platform,name,credential,model_id,receipt,
          call_receipt=None):
-    value=preset(platform);verify_receipt(master_key,control.tenant_id,platform,
-      credential,model_id,receipt)
+    value=preset(platform);ensure_schema(control.gateway.supervisor.db)
+    existing=control.gateway.supervisor.db.execute('''SELECT * FROM
+      provider_onboarding_configs WHERE tenant_id=? AND platform=?''',(
+      control.tenant_id,platform)).fetchone()
+    if receipt:
+        receipt_body=verify_receipt(master_key,control.tenant_id,platform,
+          credential,model_id,receipt)
+        models=receipt_body['models']
+    else:
+        if existing is None:raise ValueError('CONNECTION_TEST_REQUIRED_FOR_FIRST_SAVE')
+        models=json.loads(existing['models_json'])
+        if model_id not in models:raise ValueError('MODEL_NOT_IN_SAVED_CATALOG')
     callable_state='UNVERIFIED_NO_INFERENCE'
     if call_receipt:
         verify_call_receipt(master_key,control.tenant_id,platform,credential,
                             model_id,call_receipt)
+        callable_state='TESTED_SUCCEEDED'
+    elif (existing is not None and existing['model_id']==model_id and
+          existing['tested_model_id']==model_id and
+          existing['model_callable_state']=='TESTED_SUCCEEDED'):
         callable_state='TESTED_SUCCEEDED'
     cid=connection_id(platform,name);provider_id=value['provider_id']
     provider=control.upsert_provider({'provider_id':provider_id,
@@ -236,6 +281,13 @@ def save(control,master_key,platform,name,credential,model_id,receipt,
     model=control.upsert_model({'provider_id':provider_id,'model_id':model_id,
       'capabilities':['general'],'enabled':True,'price_state':'UNKNOWN',
       'input_unit_cost':None,'output_unit_cost':None})
+    tested_model=model_id if callable_state=='TESTED_SUCCEEDED' else None
+    control.gateway.supervisor.db.execute('''INSERT OR REPLACE INTO
+      provider_onboarding_configs VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',(
+      control.tenant_id,platform,cid,name,model_id,'SUCCEEDED','RETRIEVED',
+      callable_state,tested_model,canonical(models),connection['secret_mask'],
+      time.time()))
+    control.gateway.supervisor.db.commit()
     return {'configuration_state':'SAVED','auth_state':'SUCCEEDED',
       'model_catalog_state':'SAVED','model_callable_state':callable_state,
       'provider_id':provider['provider_id'],'connection_id':cid,

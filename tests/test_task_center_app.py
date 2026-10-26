@@ -201,8 +201,34 @@ class TaskCenterAppTests(unittest.TestCase):
         projection=json.loads(urlopen(req,timeout=3).read().decode('utf-8'))
         encoded=json.dumps(projection,ensure_ascii=False)
         self.assertNotIn(secret,encoded);self.assertIn('••••6789',encoded)
+        saved_projection=projection['provider_onboarding'][0]
+        self.assertEqual(saved_projection['model_id'],'model-a')
+        self.assertEqual(saved_projection['model_callable_state'],'TESTED_SUCCEEDED')
+        self.assertEqual(saved_projection['models'],['model-a','model-b'])
+        # Refresh/re-login paths use the persisted encrypted credential.  An
+        # empty browser field neither replaces nor discloses it.
+        saved_again=self.post({'action':'SAVE_PROVIDER_ONBOARDING',
+          'platform':'siliconflow','connection_name':'默认连接',
+          'credential':None,'model_id':'model-a','test_receipt':None,
+          'call_receipt':None})
+        self.assertEqual(saved_again['secret_mask'],'••••6789')
+        self.assertEqual(saved_again['model_callable_state'],'TESTED_SUCCEEDED')
+        changed=self.post({'action':'SAVE_PROVIDER_ONBOARDING',
+          'platform':'siliconflow','connection_name':'默认连接',
+          'credential':None,'model_id':'model-b','test_receipt':None,
+          'call_receipt':None})
+        self.assertEqual(changed['model_callable_state'],'UNVERIFIED_NO_INFERENCE')
+        self.post({'action':'SAVE_PROVIDER_ONBOARDING','platform':'siliconflow',
+          'connection_name':'默认连接','credential':None,'model_id':'not-in-catalog',
+          'test_receipt':None},'MODEL_NOT_IN_SAVED_CATALOG')
+        projection=json.loads(urlopen(req,timeout=3).read().decode('utf-8'))
+        self.assertEqual(projection['provider_onboarding'][0]['model_id'],'model-b')
         self.assertEqual({x['platform'] for x in projection['provider_presets']},
           {'siliconflow','bailian','deepseek','openai','chatgpt'})
+        silicon=[x for x in projection['provider_presets']
+          if x['platform']=='siliconflow'][0]
+        self.assertEqual(silicon['free_default_model'],
+          'Qwen/Qwen2.5-7B-Instruct')
 
     def test_provider_connection_test_flag_is_separate_from_runtime_outbound(self):
         disabled=make_server(self.db,KEY,'tenant-ui','viewer',port=0,
