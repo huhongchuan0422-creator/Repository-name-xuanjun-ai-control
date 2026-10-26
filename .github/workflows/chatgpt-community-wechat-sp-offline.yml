@@ -369,6 +369,9 @@ jobs:
               test_community_preview_stopped_handoff.WholeEntry.test_successor_dynamic_approval_survives_tty_known_failure_reopen_recovery \
               test_community_preview_stopped_handoff.WholeEntry.test_recovery_rejects_unbound_dynamic_approval_path_before_consume \
               test_community_preview_stopped_handoff.WholeEntry.test_independent_correction_reissue_real_pty_execute_and_recovery \
+              test_community_preview_stopped_handoff.WholeEntry.test_prepared_reopen_cli_dispatches_only_exact_reopen_mode \
+              test_community_preview_stopped_handoff.WholeEntry.test_update_prepared_reopen_requires_exact_sequence_one_then_uses_stopped_path \
+              test_community_preview_stopped_handoff.WholeEntry.test_persisted_prepared_reopens_same_attempt_with_separate_exact_authority \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
               test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof \
               test_community_preview_stopped_handoff.WholeEntry.test_real_pty_production_ack_prompt_then_input_eof_timeout \
