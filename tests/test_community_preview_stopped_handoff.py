@@ -1301,8 +1301,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
             'cmd':c.INITIALIZE_CMD if cmd is None else cmd,
             'mounts':[
                 {'Type':'bind','Source':root+'/config','Destination':root+'/config','RW':False},
-                {'Type':'bind','Source':root+'/data','Destination':root+'/data','RW':True},
-                {'Type':'bind','Source':p.RUN,'Destination':p.RUN,'RW':True}],
+                {'Type':'bind','Source':root+'/data','Destination':root+'/data','RW':True}],
             'cpu':500000000,'memory':536870912,'swap':536870912,'pids':64,
             'readonly':True,'privileged':False,'restart':'no','network':network,
             'capdrop':['ALL'],'security':['no-new-privileges'],
@@ -1335,6 +1334,27 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
         with patch.object(c.observation,'capture',return_value=output), \
              patch.object(c.original,'validate',side_effect=c.original.Rejected('CONTAINER_ISOLATION_CHANGED')):
             with self.assertRaisesRegex(c.controller.Hold,'CONTAINER_ISOLATION_CHANGED'):
+                c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
+
+    def test_initialize_mounts_are_exactly_original_two_binds(self):
+        output=self._initialize_inspect_output()
+        with patch.object(c.observation,'capture',return_value=output):
+            value=c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
+        self.assertEqual(len(value['mounts']),2)
+        self.assertFalse(next(m for m in value['mounts'] if m['Destination']==p.ROOT+'/config')['RW'])
+        self.assertTrue(next(m for m in value['mounts'] if m['Destination']==p.ROOT+'/data')['RW'])
+
+    def test_initialize_extra_or_changed_mount_rejected(self):
+        output=self._initialize_inspect_output()
+        fields=c.original.INSPECT_FIELDS+[('ports','.HostConfig.PortBindings'),
+            ('published','.NetworkSettings.Ports'),('devices','.HostConfig.Devices'),('capadd','.HostConfig.CapAdd')]
+        rows=output.splitlines()
+        values=[json.loads(x) for x in rows]
+        idx=[k for k,_ in fields].index('mounts')
+        values[idx].append({'Type':'bind','Source':p.RUN,'Destination':p.RUN,'RW':True})
+        changed='\\n'.join(json.dumps(v,separators=(',',':')) for v in values)
+        with patch.object(c.observation,'capture',return_value=changed):
+            with self.assertRaisesRegex(Exception,'LEGACY_INITIALIZE_MOUNTS_CHANGED'):
                 c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
 
     def test_initialize_network_mode_is_exactly_none(self):
