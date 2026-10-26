@@ -352,6 +352,10 @@ class WholeEntry(unittest.TestCase):
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXECUTION_TRACE_PRESENT'):
             q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
         active.unlink()
+        attempt_dir=Path(u.JOURNAL_PARENT)/h.attempt();attempt_dir.mkdir(mode=0o700)
+        with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_EXECUTION_TRACE_PRESENT'):
+            q._fixed_c_resume_plan(q.candidate(q.evidence(True)),q.evidence(True))
+        attempt_dir.rmdir()
         changed=q.candidate(q.evidence(True));changed['current']['routing_sha256']='0'*64
         with self.assertRaisesRegex(u.Hold,'C_SUCCESSOR_STABLE_PLAN_CHANGED'):
             q._fixed_c_resume_plan(changed,q.evidence(True))
