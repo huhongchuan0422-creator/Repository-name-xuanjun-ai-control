@@ -449,18 +449,25 @@ def exact_stopped_names(candidate,phase,new_id=None,pre_action=False):
     rows=observation.capture(plan.DOCKER+['container','ls','--all','--no-trunc','--format',fmt,
         '--filter','name=^/xuanjun-community-preview'],timeout=8,budget=16384).splitlines()
     require(len(rows)<=64,'CONTAINER_NAMES_UNKNOWN')
-    names={};legacy='xuanjun-community-preview-initialize'
-    allowed={plan.NAME,candidate['rollback_name'],candidate['failed_name'],legacy}
+    before='xuanjun-community-preview-before-2330dd55'
+    initialize='xuanjun-community-preview-initialize'
+    allowed={plan.NAME,candidate['rollback_name'],candidate['failed_name'],before,initialize}
     for row in rows:
         value=observation.exact_json(row)
         require(type(value) is dict and set(value)=={'id','name'} and plan.exact_hex(value['id'],64)
              and value['name'] in allowed and value['name'] not in names
              and value['id'] not in names.values(),'STOPPED_NAME_INVENTORY_CHANGED')
         names[value['name']]=value['id']
-    if legacy in names:
-        cid='ef62749e3efb1b41f69d241f0fe4aab5d6a4fb7356c2f732eff4522f947ffa21'
-        image='sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30'
-        require(names[legacy]==cid and inspect_bound(cid,image)['running'] is False,'LEGACY_INITIALIZE_NOT_STOPPED')
+    historical=(
+        (before,'36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc',
+         'sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30',
+         'LEGACY_BEFORE_2330_NOT_STOPPED'),
+        (initialize,'ef62749e3efb1b41f69d241f0fe4aab5d6a4fb7356c2f732eff4522f947ffa21',
+         'sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30',
+         'LEGACY_INITIALIZE_NOT_STOPPED'))
+    for name,cid,image,error in historical:
+        if name in names:
+            require(names[name]==cid and inspect_bound(cid,image)['running'] is False,error)
     old=candidate['current']['container_id'];rb=candidate['rollback_name'];failed=candidate['failed_name']
     pre=('PREPARED','STOPPED_HANDOFF_ACCEPTED','OLD_RENAME_INTENT')
     retained=('OLD_RETAINED','NEW_RUN_INTENT')
