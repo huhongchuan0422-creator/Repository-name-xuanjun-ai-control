@@ -1218,43 +1218,75 @@ session.close();print('REAL_LOADER_B_OK')
         self.assertEqual(row['result']['phase'],'HOLD_CLEANUP_UNKNOWN');self.assertFalse(row['production_acceptance'])
 
 class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
+    BEFORE_NAME='xuanjun-community-preview-before-2330dd55'
+    BEFORE_ID='36b54db9973ee39bc71e5e8f8532ee52b79390531c79f593ce57d553a91122cc'
+    INITIALIZE_NAME='xuanjun-community-preview-initialize'
+    INITIALIZE_ID='ef62749e3efb1b41f69d241f0fe4aab5d6a4fb7356c2f732eff4522f947ffa21'
+    IMAGE='sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30'
     def setUp(self):
         self.candidate={'handoff_mode':'STOPPED_HANDOFF_V1',
             'current':{'container_id':s.OLD_ID},
             'rollback_name':'xuanjun-community-preview-rollback-fixture',
             'failed_name':'xuanjun-community-preview-failed-fixture'}
-        self.old={'id':s.OLD_ID,'name':p.NAME}
-        self.legacy={'id':'ef62749e3efb1b41f69d241f0fe4aab5d6a4fb7356c2f732eff4522f947ffa21',
-            'name':'xuanjun-community-preview-initialize'}
+        self.current={'id':s.OLD_ID,'name':p.NAME}
+        self.before={'id':self.BEFORE_ID,'name':self.BEFORE_NAME}
+        self.initialize={'id':self.INITIALIZE_ID,'name':self.INITIALIZE_NAME}
     def inventory(self,*rows):
         return '\n'.join(json.dumps(x,separators=(',',':')) for x in rows).encode()
-    def test_exact_historical_initialize_identity_and_stopped_image_is_allowed(self):
-        with patch.object(c.observation,'capture',return_value=self.inventory(self.old,self.legacy)):
+    def run_inventory(self,*rows):
+        with patch.object(c.observation,'capture',return_value=self.inventory(*rows)):
+            return c.exact_stopped_names(self.candidate,'PREPARED')
+    def test_owner_exact_three_container_inventory_allows_both_stopped_historical_objects(self):
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
             with patch.object(c,'inspect_bound',return_value={'running':False}) as inspect:
                 self.assertTrue(c.exact_stopped_names(self.candidate,'PREPARED'))
-        inspect.assert_called_once_with(self.legacy['id'],'sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30')
+        self.assertEqual(inspect.call_args_list,[
+            unittest.mock.call(self.BEFORE_ID,self.IMAGE),
+            unittest.mock.call(self.INITIALIZE_ID,self.IMAGE)])
     def test_unknown_prefix_name_still_rejected(self):
         extra={'id':'a'*64,'name':'xuanjun-community-preview-initialize-rogue'}
-        with patch.object(c.observation,'capture',return_value=self.inventory(self.old,extra)):
-            with self.assertRaisesRegex(u.Hold,'STOPPED_NAME_INVENTORY_CHANGED'):
-                c.exact_stopped_names(self.candidate,'PREPARED')
+        with self.assertRaisesRegex(u.Hold,'STOPPED_NAME_INVENTORY_CHANGED'):
+            self.run_inventory(self.current,self.before,self.initialize,extra)
+    def test_before_2330_changed_id_rejected(self):
+        changed=dict(self.before,id='a'*64)
+        with self.assertRaisesRegex(u.Hold,'LEGACY_BEFORE_2330_NOT_STOPPED'):
+            self.run_inventory(self.current,changed,self.initialize)
+    def test_before_2330_changed_image_rejected(self):
+        def inspect(cid,image):
+            if cid==self.BEFORE_ID:
+                self.assertEqual(image,self.IMAGE)
+                raise u.Hold('CONTAINER_IMAGE_MISMATCH')
+            return {'running':False}
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
+            with patch.object(c,'inspect_bound',side_effect=inspect):
+                with self.assertRaisesRegex(u.Hold,'CONTAINER_IMAGE_MISMATCH'):
+                    c.exact_stopped_names(self.candidate,'PREPARED')
+    def test_before_2330_running_rejected(self):
+        def inspect(cid,image):return {'running':cid==self.BEFORE_ID}
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
+            with patch.object(c,'inspect_bound',side_effect=inspect):
+                with self.assertRaisesRegex(u.Hold,'LEGACY_BEFORE_2330_NOT_STOPPED'):
+                    c.exact_stopped_names(self.candidate,'PREPARED')
     def test_initialize_changed_id_rejected(self):
-        changed=dict(self.legacy,id='e'*64)
-        with patch.object(c.observation,'capture',return_value=self.inventory(self.old,changed)):
-            with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
-                c.exact_stopped_names(self.candidate,'PREPARED')
-    def test_initialize_changed_image_or_running_rejected(self):
-        for reason in ('image','running'):
-            with self.subTest(reason=reason):
-                def inspect(cid,image):
-                    if reason=='image':
-                        self.assertEqual(image,'sha256:7fb56688456d5f4d46599d34e2bf8496cbbbd3f3181ded3bab70a2de953e6c30')
-                        raise u.Hold('CONTAINER_IMAGE_MISMATCH')
-                    return {'running':True}
-                with patch.object(c.observation,'capture',return_value=self.inventory(self.old,self.legacy)):
-                    with patch.object(c,'inspect_bound',side_effect=inspect):
-                        with self.assertRaises(u.Hold):
-                            c.exact_stopped_names(self.candidate,'PREPARED')
+        changed=dict(self.initialize,id='e'*64)
+        with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
+            self.run_inventory(self.current,self.before,changed)
+    def test_initialize_changed_image_rejected(self):
+        def inspect(cid,image):
+            if cid==self.INITIALIZE_ID:
+                self.assertEqual(image,self.IMAGE)
+                raise u.Hold('CONTAINER_IMAGE_MISMATCH')
+            return {'running':False}
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
+            with patch.object(c,'inspect_bound',side_effect=inspect):
+                with self.assertRaisesRegex(u.Hold,'CONTAINER_IMAGE_MISMATCH'):
+                    c.exact_stopped_names(self.candidate,'PREPARED')
+    def test_initialize_running_rejected(self):
+        def inspect(cid,image):return {'running':cid==self.INITIALIZE_ID}
+        with patch.object(c.observation,'capture',return_value=self.inventory(self.current,self.before,self.initialize)):
+            with patch.object(c,'inspect_bound',side_effect=inspect):
+                with self.assertRaisesRegex(u.Hold,'LEGACY_INITIALIZE_NOT_STOPPED'):
+                    c.exact_stopped_names(self.candidate,'PREPARED')
 
 if __name__=='__main__':unittest.main()
 
