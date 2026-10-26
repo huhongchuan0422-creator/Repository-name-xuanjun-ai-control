@@ -96,7 +96,7 @@ def inspect_bound(cid,image,historical_initialize=False):
     # CLI contract. All non-command security and resource checks remain original.
     fields=original.INSPECT_FIELDS+[('ports','.HostConfig.PortBindings'),
         ('published','.NetworkSettings.Ports'),('devices','.HostConfig.Devices'),('capadd','.HostConfig.CapAdd')]
-    fmt='\\n'.join('{{json '+field+'}}' for _,field in fields)
+    fmt='\n'.join('{{json '+field+'}}' for _,field in fields)
     rows=observation.capture(plan.DOCKER+['container','inspect','--format',fmt,cid],timeout=8,budget=32768).splitlines()
     require(len(rows)==len(fields),'CURRENT_INSPECT_SHAPE')
     value={key:observation.exact_json(raw) for (key,_),raw in zip(fields,rows)}
