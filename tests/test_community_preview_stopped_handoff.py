@@ -1291,6 +1291,7 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
                     c.exact_stopped_names(self.candidate,'PREPARED')
 
 
+    # Exact source-backed initialize contract; never allowlist the live hash alone.
     def _initialize_inspect_output(self, entrypoint=None, cmd=None):
         root=p.ROOT
         info={
