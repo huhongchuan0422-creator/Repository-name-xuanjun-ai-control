@@ -1336,5 +1336,24 @@ class ExactHistoricalInitializeInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception,'LEGACY_INITIALIZE_CMD_CHANGED'):
                 c.inspect_bound(self.INITIALIZE_ID,self.IMAGE,historical_initialize=True)
 
+
+class CBoundaryReasonClassification(unittest.TestCase):
+    def test_known_numeric_hold_code_is_reported_without_secret(self):
+        with patch.object(h,'Session') as session:
+            session.return_value.acquire.side_effect=h.u.Hold('V2_SOURCE_CHANGED')
+            with patch('builtins.print') as output:
+                self.assertEqual(h.main(['--resume-c-before-confirmation']),2)
+        record=json.loads(output.call_args.args[0])
+        self.assertEqual(record['result']['reason'],'V2_SOURCE_CHANGED')
+
+    def test_untrusted_exception_text_remains_redacted(self):
+        with patch.object(h,'Session') as session:
+            session.return_value.acquire.side_effect=RuntimeError('secret=PRIVATE_VALUE')
+            with patch('builtins.print') as output:
+                self.assertEqual(h.main(['--resume-c-before-confirmation']),2)
+        record=json.loads(output.call_args.args[0])
+        self.assertEqual(record['result']['reason'],'BC_BOUNDARY_UNKNOWN')
+        self.assertNotIn('PRIVATE_VALUE',json.dumps(record))
+
 if __name__=='__main__':unittest.main()
 
