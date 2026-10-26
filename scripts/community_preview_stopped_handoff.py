@@ -653,7 +653,7 @@ class Session:
         if self.braw is not None:need(raw(self.b_path)==self.braw,'B_REFERENCE_REPLACED')
         if self.resume_raw is not None:need(raw(resume_record_path())==self.resume_raw,'B_RESUME_RECORD_REPLACED')
         if self.craw is not None:
-            approval_path=C_RESUME_APPROVAL if getattr(self,'c_preconfirm_mode',False) else C_APPROVAL
+            approval_path=self.c_resume_approval_path if getattr(self,'c_preconfirm_mode',False) else C_APPROVAL
             v,b=document(approval_path);need(b==self.craw,'C_APPROVAL_REVOKED');window(v)
         elif self.braw is not None and not getattr(self,'c_preconfirm_mode',False):
             v,b=document(self.b_path);need(b==self.braw,'B_APPROVAL_REVOKED');window(v)
