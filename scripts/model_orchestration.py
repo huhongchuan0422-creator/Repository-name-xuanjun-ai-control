@@ -73,7 +73,8 @@ class OpenAICompatibleAdapter(object):
     def __init__(self, opener=None):
         self.opener = opener
 
-    def _pinned_open(self, parsed, body, headers, timeout):
+    def _pinned_open(self, parsed, body, headers, timeout, method='POST',
+                     endpoint_path=None):
         """Resolve once, validate, then connect to that exact address.
 
         Keeping the TLS server name separate from the connected address closes
@@ -111,11 +112,12 @@ class OpenAICompatibleAdapter(object):
         connection=cls(parsed.hostname,port=port,timeout=timeout,
           context=ssl.create_default_context()) if parsed.scheme=='https' else cls(
           parsed.hostname,port=port,timeout=timeout)
-        path=(parsed.path.rstrip('/')+'/v1/chat/completions') or '/v1/chat/completions'
+        path=(parsed.path.rstrip('/')+(endpoint_path or '/v1/chat/completions'))
+        path=path or (endpoint_path or '/v1/chat/completions')
         if parsed.query:path+='?'+parsed.query
         request_headers=dict(headers);request_headers['Host']=parsed.netloc
         try:
-            connection.request('POST',path,body=body,headers=request_headers)
+            connection.request(method,path,body=body,headers=request_headers)
             return connection,connection.getresponse()
         except Exception:
             connection.close()
@@ -187,6 +189,58 @@ class OpenAICompatibleAdapter(object):
             raise ProviderError('PROTOCOL', 'INVALID_RESPONSE_SHAPE')
         return {'content': content, 'usage': parsed_usage,
                 'provider_request_id': value.get('id', UNKNOWN)}
+
+    def list_models(self, base_url, secret, timeout):
+        """Authenticate with the provider and read its model catalogue.
+
+        This GET performs no inference and never treats a successful catalogue
+        response as proof that a model can be called or that usage is free.
+        """
+        parsed=urlparse(base_url);url=base_url.rstrip('/')+'/v1/models'
+        headers={'Authorization':'Bearer '+secret,'Accept':'application/json',
+          'User-Agent':'Xuanjun-TEST-ONLY-Connection-Test'}
+        request=urllib.request.Request(url,method='GET',headers=headers)
+        connection=None
+        try:
+            if self.opener is None:
+                connection,response=self._pinned_open(parsed,None,headers,timeout,
+                  method='GET',endpoint_path='/v1/models')
+                status=response.status
+                if status in (401,403,429) or status>=300:
+                    kind=('AUTH' if status in (401,403) else
+                          'RATE_LIMIT' if status==429 else 'HTTP')
+                    raise ProviderError(kind,'HTTP_%d'%status,
+                      status==429 or status>=500)
+            else:response=self.opener(request,timeout=timeout)
+            raw=response.read(2*1024*1024+1)
+            if len(raw)>2*1024*1024:
+                raise ProviderError('RESPONSE_TOO_LARGE','body limit')
+            value=json.loads(raw.decode('utf-8'))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401,403):raise ProviderError('AUTH','HTTP_%d'%exc.code)
+            if exc.code==429:raise ProviderError('RATE_LIMIT','HTTP_429',True)
+            raise ProviderError('HTTP','HTTP_%d'%exc.code,500<=exc.code<600)
+        except (TimeoutError,socket_timeout()):
+            raise ProviderError('TIMEOUT','timeout',False)
+        except ProviderError:raise
+        except Exception as exc:
+            raise ProviderError('TRANSPORT',type(exc).__name__,False)
+        finally:
+            if connection is not None:connection.close()
+        try:
+            rows=value['data']
+            if not isinstance(rows,list):raise TypeError()
+            models=[]
+            for row in rows:
+                model_id=row.get('id') if isinstance(row,dict) else None
+                if isinstance(model_id,str) and model_id and len(model_id)<=256:
+                    models.append(model_id)
+            models=sorted(set(models))
+            if not models:raise TypeError()
+            if len(models)>500:models=models[:500]
+        except Exception:
+            raise ProviderError('PROTOCOL','INVALID_MODEL_LIST')
+        return models
 
 
 class SiliconFlowAdapter(OpenAICompatibleAdapter):

@@ -29,6 +29,9 @@ from codex_execution_adapter import (CodexExecutionControl,
                                      CodexAppServerTransport)
 from task_center_session_auth import FileTestIdentityProvider, SessionStore
 from secure_file_input import read_owned_secret_file
+from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
+                                 public_presets, test_connection, test_model,
+                                 issue_receipt, save as save_onboarding)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -137,6 +140,7 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
         codex=CodexExecutionControl.__new__(CodexExecutionControl)
         codex.db=connection;codex.tenant_id=tenant_id
         result['codex_executions']=codex.projection()
+        result['provider_presets']=public_presets()
         actual = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
         if {'execution_units','asset_preflight_checks',
@@ -213,6 +217,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   model_master_key=None, admin_token=None, actor_tokens=None,
                   codex_transports=None, identity_provider=None,
                   session_store=None, outbound_enabled=False,
+                  provider_connection_test_enabled=False,
                   external_origin=None, base_path='/'):
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
@@ -253,7 +258,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             if path == '/healthz':
                 self._send(200, _json_bytes({'state':'UP','mode':'TEST_ONLY',
                   'outbound':'DISABLED' if not outbound_enabled else
-                  'TEST_FIXTURE_ONLY'}),'application/json; charset=utf-8');return
+                  'TEST_FIXTURE_ONLY','provider_connection_test':
+                  'ENABLED' if provider_connection_test_enabled else 'DISABLED'}),
+                  'application/json; charset=utf-8');return
             if path == '/readyz':
                 try:
                     connection=_read_only_connection(db_path,PROJECTION_TABLES)
@@ -379,6 +386,25 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           model_master_key)
                     if action=='UPSERT_PROVIDER':
                         result=control.upsert_provider(value['config'],value.get('secret'))
+                    elif action=='TEST_PROVIDER_CONNECTION':
+                        if not provider_connection_test_enabled:
+                            raise ValueError('PROVIDER_CONNECTION_TEST_DISABLED')
+                        tested=test_connection(value['platform'],value['credential'])
+                        tested['test_receipt']=issue_receipt(model_master_key,
+                          tenant_id,value['platform'],value['credential'],
+                          tested['models'])
+                        result=tested
+                    elif action=='SAVE_PROVIDER_ONBOARDING':
+                        result=save_onboarding(control,model_master_key,
+                          value['platform'],value.get('connection_name'),
+                          value['credential'],value['model_id'],
+                          value['test_receipt'],value.get('call_receipt'))
+                    elif action=='TEST_PROVIDER_MODEL':
+                        if not provider_connection_test_enabled:
+                            raise ValueError('PROVIDER_CONNECTION_TEST_DISABLED')
+                        result=test_model(control,model_master_key,tenant_id,
+                          value['platform'],value['credential'],value['model_id'],
+                          value['test_receipt'],value.get('confirm_paid_test') is True)
                     elif action=='UPSERT_CONNECTION':
                         result=ConnectionManager(control.gateway,control.context,
                           model_master_key).upsert(value['config'],value.get('credential'))
@@ -762,7 +788,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 host='127.0.0.1', port=8765, model_master_key=None,
                 admin_token=None, actor_tokens=None,codex_transports=None,
                 identity_provider=None,session_store=None,
-                outbound_enabled=True,external_origin=None,base_path='/'):
+                outbound_enabled=True,provider_connection_test_enabled=False,
+                external_origin=None,base_path='/'):
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
@@ -776,6 +803,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             gateway=GatewayKernel(supervisor,authority)
             ModelControl(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
+            ensure_onboarding_schema(supervisor.db)
             ConnectionManager(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
             CodexExecutionControl(gateway,authority.issue(tenant_id,
@@ -785,6 +813,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                             tenant_id, principal_id, model_master_key,
                             admin_token, actor_tokens,codex_transports,
                             identity_provider,session_store,outbound_enabled,
+                            provider_connection_test_enabled,
                             external_origin,base_path)
     server=HTTPServer((host, port), handler)
     server.codex_worker=None
@@ -811,6 +840,7 @@ def main(argv=None):
     parser.add_argument('--test-identity-file')
     parser.add_argument('--session-ttl-seconds',type=int,default=1800)
     parser.add_argument('--allow-loopback-fixture-outbound',action='store_true')
+    parser.add_argument('--allow-provider-connection-test',action='store_true')
     parser.add_argument('--external-origin')
     parser.add_argument('--base-path',default='/')
     args = parser.parse_args(argv)
@@ -860,6 +890,7 @@ def main(argv=None):
                          args.host, args.port, model_key, admin_token,
                          actor_tokens,codex_transports,identity_provider,
                          session_store,args.allow_loopback_fixture_outbound,
+                         args.allow_provider_connection_test,
                          args.external_origin,args.base_path)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
@@ -877,6 +908,8 @@ def main(argv=None):
                'real_outbound': ('TEST_FIXTURE_ONLY' if
                                   args.allow_loopback_fixture_outbound else
                                   'DISABLED'),
+               'provider_connection_test': ('ENABLED' if
+                  args.allow_provider_connection_test else 'DISABLED'),
                'production_status': 'NOT_IMPLEMENTED'}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)

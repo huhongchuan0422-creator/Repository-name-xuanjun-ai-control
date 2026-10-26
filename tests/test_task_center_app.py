@@ -8,6 +8,7 @@ import tempfile
 import threading
 import unittest
 import sqlite3
+from unittest import mock
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from cryptography.fernet import Fernet
@@ -18,6 +19,7 @@ import sys
 sys.path.insert(0, sys_path)
 from reusable_scheduler_cli import demo_graph
 from reusable_task_gateway import GatewayKernel, TestTenantAuthority
+import task_center_app
 from task_center_app import make_server
 from task_supervisor import Supervisor
 
@@ -36,7 +38,8 @@ class TaskCenterAppTests(unittest.TestCase):
         supervisor.close()
         self.server = make_server(self.db, KEY, 'tenant-ui', 'viewer',
                                   port=0,model_master_key=Fernet.generate_key(),
-                                  admin_token='test-admin-token-123456')
+                                  admin_token='test-admin-token-123456',
+                                  provider_connection_test_enabled=True)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
@@ -156,6 +159,70 @@ class TaskCenterAppTests(unittest.TestCase):
         self.assertIn('••••alue',encoded)
         status,_,body=self.get('/admin.html')
         self.assertEqual(status,200);self.assertIn(b'sessionIdentity',body)
+
+    def test_simple_provider_onboarding_http_chain_is_real_server_backed(self):
+        secret='sk-ui-test-123456789'
+        fake={'platform':'siliconflow','auth_state':'SUCCEEDED',
+          'catalog_state':'RETRIEVED','model_callable_state':'UNVERIFIED_NO_INFERENCE',
+          'models':['model-a','model-b'],'message_zh':'鉴权成功并已读取模型'}
+        with mock.patch.object(task_center_app,'test_connection',return_value=fake):
+            tested=self.post({'action':'TEST_PROVIDER_CONNECTION',
+              'platform':'siliconflow','credential':secret})
+        self.assertEqual(tested['auth_state'],'SUCCEEDED')
+        self.assertIn('test_receipt',tested)
+        called={'model_callable_state':'TESTED_SUCCEEDED','usage_state':'KNOWN',
+          'usage':{'input_tokens':4,'output_tokens':1,'total_tokens':5},
+          'provider_request_id':'fixture','call_receipt':'fixture-replaced',
+          'message_zh':'模型真实调用成功'}
+        # Use the real receipt issuer through the real helper while only the
+        # outbound adapter result is isolated.
+        from provider_onboarding import test_model as real_test_model
+        class Adapter(object):
+            def invoke(self,*args,**kwargs):return {'content':'OK','usage':{
+              'input_tokens':4,'output_tokens':1,'total_tokens':5},
+              'provider_request_id':'fixture'}
+        def isolated_model(control,master,tenant,platform,credential,model,receipt,confirmed):
+            return real_test_model(control,master,tenant,platform,credential,model,
+              receipt,confirmed,Adapter())
+        with mock.patch.object(task_center_app,'test_model',side_effect=isolated_model):
+            called=self.post({'action':'TEST_PROVIDER_MODEL',
+              'platform':'siliconflow','credential':secret,'model_id':'model-a',
+              'test_receipt':tested['test_receipt'],'confirm_paid_test':True})
+        saved=self.post({'action':'SAVE_PROVIDER_ONBOARDING',
+          'platform':'siliconflow','connection_name':'默认连接',
+          'credential':secret,'model_id':'model-a',
+          'test_receipt':tested['test_receipt'],
+          'call_receipt':called['call_receipt']})
+        self.assertEqual(saved['configuration_state'],'SAVED')
+        self.assertEqual(saved['model_callable_state'],'TESTED_SUCCEEDED')
+        self.assertEqual(saved['paid_inference'],'NOT_EXECUTED')
+        req=Request(self.base+'/api/admin/model-control',headers={
+          'X-Test-Admin-Token':'test-admin-token-123456'})
+        projection=json.loads(urlopen(req,timeout=3).read().decode('utf-8'))
+        encoded=json.dumps(projection,ensure_ascii=False)
+        self.assertNotIn(secret,encoded);self.assertIn('••••6789',encoded)
+        self.assertEqual({x['platform'] for x in projection['provider_presets']},
+          {'siliconflow','bailian','deepseek','openai','chatgpt'})
+
+    def test_provider_connection_test_flag_is_separate_from_runtime_outbound(self):
+        disabled=make_server(self.db,KEY,'tenant-ui','viewer',port=0,
+          model_master_key=Fernet.generate_key(),
+          admin_token='test-admin-token-123456',outbound_enabled=False,
+          provider_connection_test_enabled=False)
+        thread=threading.Thread(target=disabled.serve_forever);thread.daemon=True
+        thread.start()
+        try:
+            request=Request('http://127.0.0.1:%d/api/admin/model-control'%
+              disabled.server_port,method='POST',data=json.dumps({
+              'action':'TEST_PROVIDER_CONNECTION','platform':'deepseek',
+              'credential':'sk-test-only-123456'}).encode(),headers={
+              'Content-Type':'application/json',
+              'X-Test-Admin-Token':'test-admin-token-123456'})
+            with self.assertRaises(HTTPError) as caught:urlopen(request,timeout=3)
+            self.assertIn('PROVIDER_CONNECTION_TEST_DISABLED',
+              caught.exception.read().decode())
+        finally:
+            disabled.shutdown();disabled.server_close();thread.join(2)
 
     def test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects(self):
         bad={'project_id':'project-zero','task_id':'task-zero',

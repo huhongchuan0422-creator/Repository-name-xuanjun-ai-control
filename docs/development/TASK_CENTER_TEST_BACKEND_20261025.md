@@ -84,6 +84,24 @@ python3 scripts/task_center_app.py \
 OAuth 页可配置固定 issuer/endpoints/redirect URI 并生成 PKCE 流程；回调占位页明确
 `待真实授权`。本包没有真实 OAuth 客户端、grant 或外部换令牌验证。
 
+### 简化的平台接入流程（2026-10-26 增量）
+
+显式启用 `--allow-provider-connection-test` 后，管理员页默认仅要求选择平台、可选连接
+名称和 API Key。服务端预设目的地、adapter、认证方式和 connection ID；页面不要求
+普通用户理解内部 ID 或端点。首批真实 API Key 兼容入口为硅基流动、阿里云百炼兼容
+模式、DeepSeek API 和 OpenAI API。ChatGPT 订阅登录仅显示为未接通，绝不冒充 OpenAI
+API 权限。
+
+“测试连接并获取模型”只执行一次认证后的 `GET /v1/models`，不产生推理；结果分别标明
+配置是否保存、鉴权是否成功、模型目录是否取得和模型调用是否验证。若管理员额外勾选
+可能计费确认，“真实测试所选模型”才允许一次请求，固定最多 2 个输出 token、不自动
+重试；同一模型目录测试回执只能消费一次，重启后仍不能重放。该确认不授权任务队列、
+付费 fallback 或后续模型调用。保存后的价格、资格和额度继续为 `UNKNOWN/HOLD`，直到
+另有可信核验。API Key 只写服务端加密字段，页面和投影只回读掩码。
+
+该开关与 `--allow-loopback-fixture-outbound` 分离：前者仅开放上述连接/单次模型测试，
+后者仍保持关闭，因此原任务调度、Codex 和 benchmark 不会被同时放开。
+
 ## 数据、回滚与未完成
 
 - 只允许使用新隔离 DB。旧 3 项 SQLite 迁移对空白新库不适用，未在业务库执行。
