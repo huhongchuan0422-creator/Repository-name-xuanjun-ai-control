@@ -700,15 +700,24 @@ jobs:
                  'resume-c-before-confirmation.sh','delivery.json')
           for name in names:shutil.copyfile(source/name,dest/name)
           shutil.copyfile(source/'control-stopped-v1.zip',dest/'control-stopped-v1-post-b-candidate.zip')
+          shipped_sources=(
+              'scripts/community_preview_carrier_handoff_admission.py',
+              'scripts/community_preview_carrier_handoff_call.py',
+              'scripts/community_preview_carrier_handoff_entry.py',
+              'tests/test_community_preview_carrier_handoff_admission.py',
+              'tests/test_community_preview_carrier_handoff_entry.py')
+          for name in shipped_sources:
+              target=dest/Path(name).name
+              shutil.copyfile(name,target)
           required=[
             dest/'control-stopped-v1.zip',dest/'manifest.json',
             dest/'resume-c-before-confirmation.sh',dest/'delivery.json',
             dest/'control-stopped-v1-post-b-candidate.zip',
-            Path('scripts/community_preview_carrier_handoff_admission.py'),
-            Path('scripts/community_preview_carrier_handoff_call.py'),
-            Path('scripts/community_preview_carrier_handoff_entry.py'),
-            Path('tests/test_community_preview_carrier_handoff_admission.py'),
-            Path('tests/test_community_preview_carrier_handoff_entry.py'),
+            dest/'community_preview_carrier_handoff_admission.py',
+            dest/'community_preview_carrier_handoff_call.py',
+            dest/'community_preview_carrier_handoff_entry.py',
+            dest/'test_community_preview_carrier_handoff_admission.py',
+            dest/'test_community_preview_carrier_handoff_entry.py',
             Path('scripts/community_preview_stopped_handoff.py'),
             Path('scripts/community_preview_update_composition.py'),
             Path('scripts/community_preview_update_checkpoint.py'),
@@ -725,7 +734,14 @@ jobs:
               carrier_archive_sha256=hashlib.sha256((dest/'control-stopped-v1.zip').read_bytes()).hexdigest(),
               carrier_manifest_sha256=hashlib.sha256((dest/'manifest.json').read_bytes()).hexdigest(),
               install_authorized=False,site_executed=False,bc_executed=False,files=files)
-          (dest/'post-b-c-resume-delivery-index.json').write_text(json.dumps(index,sort_keys=True,indent=2)+'\n')
+          index_path=dest/'post-b-c-resume-delivery-index.json'
+          index_path.write_text(json.dumps(index,sort_keys=True,indent=2)+'\n')
+          indexed=set(index['files'])
+          shipped={str(p) for p in dest.iterdir() if p.name!='post-b-c-resume-delivery-index.json'}
+          assert indexed==shipped, 'DELIVERY_INDEX_SHIPPED_SET_MISMATCH'
+          for name,meta in index['files'].items():
+              raw=Path(name).read_bytes()
+              assert len(raw)==meta['bytes'] and hashlib.sha256(raw).hexdigest()==meta['sha256'], 'DELIVERY_INDEX_BYTE_MISMATCH:'+name
           print(json.dumps(index,sort_keys=True))
           INDEX
       - name: Preserve exact post-B C-resume source candidate
