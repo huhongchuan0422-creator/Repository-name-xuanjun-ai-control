@@ -1199,7 +1199,7 @@ class Session:
         acknowledge('PREPARED_REOPEN',proof['plan']['plan_sha256'])
         return self.consume(proof,False,prepared_reopen=True)
     def recover(self):
-        proof,_=document(PROOF)
+        proof,proof_raw=document(PROOF)
         need(type(proof) is dict and 'plan' in proof,'PROOF_REQUIRED')
         if not self.configure_resumed_recovery(proof):
             self.b_path=B_APPROVAL;self.freeze_path=s.FREEZE;self.stage_permit_path=s.PERMIT;self.resume_mode=False
@@ -1207,16 +1207,18 @@ class Session:
         self.backup=open_private(s.BACKUP+'/clone-results.json')
         # No B rerun, no new plan, no automatic recovery of intents/UNKNOWN.
         if proof.get('approval_kind')=='C_RESUME_APPROVAL':
-            self.c_preconfirm_mode=True;self._restore_c_resume_paths(proof);self.approved_stamp=self.pins()
-            prepared_path=self._prepared_reopen_path(s.sha(raw(PROOF,4*1024*1024)))
+            self.c_preconfirm_mode=True
+            prepared_path=self._prepared_reopen_path(s.sha(proof_raw))
             if exists_private(prepared_path):
+                self._restore_c_resume_paths(proof);self.approved_stamp=self.pins()
                 self._prepared_reopen_approval(proof,'KNOWN_FAILURE')
                 bound=self.bind_resume_reference(self.c_resume_approval_path,16384)
                 need(s.sha(bound)==proof['approval_sha256'],'PROOF_APPROVAL_CHANGED');self.craw=bound
             else:self._c_resume_approval(proof['plan'])
         else:self.c_approval(proof['plan'])
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
-        return self.consume(proof,True,prepared_reopen=self.prepared_reopen_raw is not None)
+        if self.prepared_reopen_raw is not None:return self.consume(proof,True,prepared_reopen=True)
+        return self.consume(proof,True)
     def close(self):
         if self.cleanup_unproven:raise u.Hold('BC_CLEANUP_UNKNOWN')
         unproven_close=False
