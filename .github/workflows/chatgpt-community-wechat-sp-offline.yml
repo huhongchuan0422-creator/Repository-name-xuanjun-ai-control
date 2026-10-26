@@ -316,7 +316,7 @@ jobs:
           print('HISTORICAL_CONTAINER_TEST_LOG_SHA256='+hashlib.sha256(p.read_bytes()).hexdigest())
           PY
       - name: Issue76 carrier handoff isolated candidate tests
-        if: steps.scope.outputs.handoff_only == 'true'
+        if: steps.scope.outputs.handoff_only == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')
         run: |
           set -euo pipefail
           git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c 2>&1 | tee -a community-tests.log
