@@ -302,6 +302,19 @@ jobs:
                   env.write('HANDOFF_'+label.upper()+'_MANIFEST='+str(mpath)+'\n')
               print(label.upper()+'_OUTER_SHA='+outer_sha+' INNER_ARCHIVE_SHA='+archive_sha+' MANIFEST_SHA='+manifest_sha)
           FIXTURE
+      - name: Issue76 exact historical container inventory tests
+        if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]')
+        run: |
+          set -euo pipefail
+          python -B -m py_compile scripts/community_preview_update_composition.py tests/test_community_preview_stopped_handoff.py 2>&1 | tee historical-container-tests.log
+          PYTHONPATH=.:tests python -B -m unittest test_community_preview_stopped_handoff.ExactHistoricalInitializeInventoryTests -v 2>&1 | tee -a historical-container-tests.log
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p=Path('historical-container-tests.log')
+          print('HISTORICAL_CONTAINER_TEST_LOG_BYTES='+str(p.stat().st_size))
+          print('HISTORICAL_CONTAINER_TEST_LOG_SHA256='+hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
       - name: Issue76 carrier handoff isolated candidate tests
         if: steps.scope.outputs.handoff_only == 'true'
         run: |
