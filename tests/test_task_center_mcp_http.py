@@ -6,6 +6,7 @@ import http.cookies
 import json
 import os
 import shutil
+import socket
 import sys
 import tempfile
 import threading
@@ -119,6 +120,138 @@ class MCPHTTPTests(unittest.TestCase):
         req=Request(self.base+path,method=method,data=body,headers=values)
         return urlopen(req,timeout=3)
 
+    def raw_chunked(self,path,value,headers=None):
+        body=json.dumps(value,separators=(',',':')).encode()
+        values={'Host':HOST,'Content-Type':'application/json',
+          'Transfer-Encoding':'chunked','Connection':'close'}
+        values.update(headers or {})
+        request=('POST /task-center-test%s HTTP/1.1\r\n'%path)
+        for name,value in values.items():request+='%s: %s\r\n'%(name,value)
+        request+='\r\n'
+        client=socket.create_connection(('127.0.0.1',self.server.server_port),3)
+        try:
+            client.sendall(request.encode()+('%x\r\n'%len(body)).encode()+
+              body+b'\r\n0\r\n\r\n')
+            response=b''
+            while True:
+                part=client.recv(65536)
+                if not part:break
+                response+=part
+        finally:client.close()
+        head,payload=response.split(b'\r\n\r\n',1)
+        status=int(head.split(b' ',2)[1])
+        parsed={}
+        for line in head.split(b'\r\n')[1:]:
+            name,value=line.split(b':',1)
+            parsed[name.decode().lower()]=value.decode().strip()
+        return status,parsed,payload
+
+    def raw_request(self,path,headers,body=b''):
+        request=('POST /task-center-test%s HTTP/1.1\r\n'%path)
+        values={'Host':HOST,'Connection':'close'};values.update(headers)
+        for name,value in values.items():request+='%s: %s\r\n'%(name,value)
+        client=socket.create_connection(('127.0.0.1',self.server.server_port),3)
+        try:
+            client.sendall((request+'\r\n').encode()+body)
+            response=b''
+            while True:
+                part=client.recv(65536)
+                if not part:break
+                response+=part
+        finally:client.close()
+        head,payload=response.split(b'\r\n\r\n',1)
+        return int(head.split(b' ',2)[1]),json.loads(payload)
+
+    def oauth_record_counts(self):
+        import sqlite3
+        db=sqlite3.connect(self.db)
+        try:return tuple(db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0]
+          for table in ('mcp_oauth_clients','mcp_oauth_codes','mcp_oauth_tokens'))
+        finally:db.close()
+
+    def refresh_record_count(self):
+        import sqlite3
+        db=sqlite3.connect(self.db)
+        try:return db.execute(
+          'SELECT COUNT(*) FROM mcp_oauth_refresh_tokens').fetchone()[0]
+        finally:db.close()
+
+    def test_chunked_mcp_probe_challenges_and_dcr_registers(self):
+        rpc={'jsonrpc':'2.0','id':1,'method':'initialize','params':{}}
+        status,headers,body=self.raw_chunked('/mcp',rpc)
+        self.assertEqual(status,401)
+        self.assertIn('resource_metadata=',headers['www-authenticate'])
+        self.assertEqual(json.loads(body)['error'],'MCP_AUTH_REQUIRED')
+        self.assertEqual(headers['connection'],'close')
+        status,headers,body=self.raw_chunked('/mcp',rpc)
+        self.assertEqual(status,401)
+        self.assertEqual(self.oauth_record_counts(),(0,0,0))
+        status,headers,body=self.raw_chunked('/mcp',rpc,{
+          'Authorization':'Bearer invalid'})
+        self.assertEqual(status,401)
+        dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
+          'grant_types':['authorization_code','refresh_token'],
+          'response_types':['code'],
+          'token_endpoint_auth_method':'none','client_name':'Synthetic ChatGPT'}
+        status,headers,body=self.raw_chunked('/oauth/register',dcr)
+        self.assertEqual(status,201)
+        self.assertEqual(json.loads(body)['token_endpoint_auth_method'],'none')
+        self.assertEqual(json.loads(body)['grant_types'],
+          ['authorization_code','refresh_token'])
+        self.assertEqual(self.oauth_record_counts(),(1,0,0))
+
+    def test_dcr_rejections_are_bounded_and_create_no_records(self):
+        cases=(({},'invalid_redirect_uri','DCR_REDIRECT_URIS_REQUIRED'),
+          ({'redirect_uris':['https://evil.example/callback']},
+           'invalid_redirect_uri','CHATGPT_REDIRECT_URI_REQUIRED'),
+          ({'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
+            'token_endpoint_auth_method':'client_secret_post'},
+           'invalid_client_metadata','PUBLIC_PKCE_CLIENT_REQUIRED'),
+          ({'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
+            'grant_types':['client_credentials']},
+           'invalid_client_metadata','DCR_GRANT_TYPES_REJECTED'))
+        for value,error,expected in cases:
+            with self.subTest(expected=expected):
+                with self.assertRaises(HTTPError) as rejected:
+                    self.request('/oauth/register','POST',json.dumps(value).encode(),
+                      {'Content-Type':'application/json'})
+                self.assertEqual(rejected.exception.code,400)
+                result=json.loads(rejected.exception.read())
+                self.assertEqual(result,{'error':error,
+                  'error_description':expected})
+                self.assertEqual(rejected.exception.headers['Connection'],'close')
+        value={'redirect_uris':[
+          'https://chatgpt.com/connector_platform_oauth_redirect'],
+          'grant_types':['client_credentials']}
+        for unused in range(2):
+            with self.assertRaises(HTTPError) as repeated:
+                self.request('/oauth/register','POST',json.dumps(value).encode(),
+                  {'Content-Type':'application/json'})
+            self.assertEqual(repeated.exception.code,400)
+        self.assertEqual(self.oauth_record_counts(),(0,0,0))
+
+    def test_dcr_body_framing_and_json_rejections_are_explicit(self):
+        status,result=self.raw_request('/oauth/register',{
+          'Content-Type':'application/json'},b'{}')
+        self.assertEqual((status,result['error_description']),
+                         (400,'BODY_LENGTH_REQUIRED'))
+        status,result=self.raw_request('/oauth/register',{
+          'Content-Type':'application/json','Content-Length':'1'},b'{')
+        self.assertEqual((status,result['error_description']),
+                         (400,'JSON_INVALID'))
+        status,result=self.raw_request('/oauth/register',{
+          'Content-Type':'application/json','Content-Length':'65537'},b'')
+        self.assertEqual((status,result['error_description']),(400,'BODY_LIMIT'))
+        status,result=self.raw_request('/oauth/register',{
+          'Content-Type':'application/json','Content-Length':'2',
+          'Transfer-Encoding':'chunked'},b'{}')
+        self.assertEqual((status,result['error_description']),
+                         (400,'BODY_FRAMING_CONFLICT'))
+        status,result=self.raw_request('/oauth/register',{
+          'Content-Type':'application/json','Content-Length':'10'},b'{}')
+        self.assertEqual((status,result['error_description']),(400,'BODY_TIMEOUT'))
+        self.assertEqual(self.oauth_record_counts(),(0,0,0))
+
     def test_oauth_pkce_and_streamable_http_discovery(self):
         metadata=json.loads(self.request('/.well-known/oauth-protected-resource').read())
         self.assertEqual(metadata['resource'],'https://'+HOST+'/task-center-test/mcp')
@@ -128,6 +261,8 @@ class MCPHTTPTests(unittest.TestCase):
         authorization_server=json.loads(urlopen(standard,timeout=3).read())
         self.assertEqual(authorization_server['issuer'],
           'https://'+HOST+'/task-center-test')
+        self.assertEqual(authorization_server['grant_types_supported'],
+          ['authorization_code','refresh_token'])
         dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
           'grant_types':['authorization_code'],'response_types':['code'],
           'token_endpoint_auth_method':'none','client_name':'ChatGPT test'}
@@ -196,7 +331,8 @@ class MCPHTTPTests(unittest.TestCase):
                 if exc.code in (301,302,303,307,308):return exc
                 raise
         dcr={'redirect_uris':['https://chatgpt.com/connector_platform_oauth_redirect'],
-          'grant_types':['authorization_code'],'response_types':['code'],
+          'grant_types':['authorization_code','refresh_token'],
+          'response_types':['code'],
           'token_endpoint_auth_method':'none'}
         client=json.loads(raw('/oauth/register','POST',json.dumps(dcr).encode(),
           {'Content-Type':'application/json'}).read())
@@ -219,10 +355,27 @@ class MCPHTTPTests(unittest.TestCase):
           'code_verifier':verifier,'resource':resource}
         token=json.loads(raw('/oauth/token','POST',urlencode(exchange).encode(),{
           'Content-Type':'application/x-www-form-urlencoded'}).read())
+        self.assertIn('refresh_token',token)
         with self.assertRaises(HTTPError) as replay:
             raw('/oauth/token','POST',urlencode(exchange).encode(),{
               'Content-Type':'application/x-www-form-urlencoded'})
         self.assertEqual(replay.exception.code,400)
+        self.assertEqual(json.loads(replay.exception.read())['error_description'],
+                         'OAUTH_CODE_REPLAY_REJECTED')
+        refresh={'grant_type':'refresh_token','refresh_token':token['refresh_token'],
+          'client_id':client['client_id'],'resource':resource}
+        rotated=json.loads(raw('/oauth/token','POST',urlencode(refresh).encode(),{
+          'Content-Type':'application/x-www-form-urlencoded'}).read())
+        self.assertNotEqual(rotated['refresh_token'],token['refresh_token'])
+        with self.assertRaises(HTTPError) as refresh_replay:
+            raw('/oauth/token','POST',urlencode(refresh).encode(),{
+              'Content-Type':'application/x-www-form-urlencoded'})
+        self.assertEqual(refresh_replay.exception.code,400)
+        self.assertEqual(json.loads(
+          refresh_replay.exception.read())['error_description'],
+          'OAUTH_REFRESH_REPLAY_REJECTED')
+        self.assertEqual(self.refresh_record_count(),2)
+        token['access_token']=rotated['access_token']
         rpc={'jsonrpc':'2.0','id':1,'method':'initialize','params':{}}
         initialized=json.loads(raw('/mcp','POST',json.dumps(rpc).encode(),{
           'Content-Type':'application/json','Authorization':'Bearer '+

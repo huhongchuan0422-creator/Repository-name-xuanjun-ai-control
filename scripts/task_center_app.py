@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import signal
+import socket
 import sqlite3
 import sys
 import threading
@@ -42,6 +43,7 @@ from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+MCP_BODY_READ_TIMEOUT_SECONDS = 2
 
 
 class TaskCenterHTTPServer(HTTPServer):
@@ -270,6 +272,114 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 self.send_header(name, value)
             self.end_headers()
             self.wfile.write(body)
+
+        def _read_bounded_body(self, limit=65536):
+            previous=self.connection.gettimeout()
+            self.connection.settimeout(MCP_BODY_READ_TIMEOUT_SECONDS)
+            try:return self._read_bounded_body_inner(limit)
+            except socket.timeout:raise ValueError('BODY_TIMEOUT')
+            finally:self.connection.settimeout(previous)
+
+        def _read_bounded_body_inner(self, limit):
+            """Read a bounded request body without assuming Content-Length.
+
+            nginx may forward an HTTP/1.1 request using chunked transfer
+            encoding.  Reject ambiguous framing and trailers, and keep the
+            same 64 KiB application limit for both framing modes.
+            """
+            length_values=self.headers.get_all('Content-Length') or []
+            transfer_values=self.headers.get_all('Transfer-Encoding') or []
+            if len(length_values)>1 or len(transfer_values)>1:
+                raise ValueError('BODY_FRAMING_CONFLICT')
+            length_value=(length_values[0] if length_values else None)
+            transfer=(transfer_values[0] if transfer_values else None)
+            if transfer is not None:
+                if length_value is not None:
+                    raise ValueError('BODY_FRAMING_CONFLICT')
+                encodings=[x.strip().lower() for x in transfer.split(',')]
+                if encodings!=['chunked']:
+                    raise ValueError('TRANSFER_ENCODING_REJECTED')
+                chunks=[];total=0;chunk_count=0
+                while True:
+                    line=self.rfile.readline(130)
+                    if (not line.endswith(b'\r\n') or len(line)>129):
+                        raise ValueError('CHUNK_HEADER_REJECTED')
+                    size_text=line[:-2].split(b';',1)[0]
+                    try:size=int(size_text,16)
+                    except (TypeError,ValueError):
+                        raise ValueError('CHUNK_HEADER_REJECTED')
+                    if size<0 or total+size>limit:
+                        raise ValueError('BODY_LIMIT')
+                    if size==0:
+                        # Trailers are unnecessary for these JSON/form
+                        # endpoints and create avoidable ambiguity.
+                        if self.rfile.readline(4098)!=b'\r\n':
+                            raise ValueError('CHUNK_TRAILER_REJECTED')
+                        break
+                    chunk_count+=1
+                    if chunk_count>1024:
+                        raise ValueError('CHUNK_COUNT_LIMIT')
+                    chunk=self.rfile.read(size)
+                    if len(chunk)!=size or self.rfile.read(2)!=b'\r\n':
+                        raise ValueError('BODY_INCOMPLETE')
+                    chunks.append(chunk);total+=size
+                if total<1:raise ValueError('BODY_LIMIT')
+                return b''.join(chunks)
+            if length_value is None:
+                raise ValueError('BODY_LENGTH_REQUIRED')
+            try:length=int(length_value)
+            except (TypeError,ValueError):
+                raise ValueError('BODY_LENGTH_REJECTED')
+            if length<1 or length>limit:raise ValueError('BODY_LIMIT')
+            raw=self.rfile.read(length)
+            if len(raw)!=length:raise ValueError('BODY_INCOMPLETE')
+            return raw
+
+        def _mcp_challenge(self,scope,close=False):
+            metadata=((external_origin or
+              ('http://'+self.headers.get('Host')))+
+              (base_path if base_path!='/' else '/')+
+              '.well-known/oauth-protected-resource')
+            extra=[('WWW-Authenticate',
+              'Bearer resource_metadata="%s", scope="%s"'%(metadata,scope))]
+            if close:extra.append(('Connection','close'))
+            self._send(401,_json_bytes({'error':'MCP_AUTH_REQUIRED'}),
+              'application/json; charset=utf-8',extra)
+
+        def _mcp_post_rejection(self,path,exc):
+            allowed=frozenset((
+              'BODY_FRAMING_CONFLICT','TRANSFER_ENCODING_REJECTED',
+              'CHUNK_HEADER_REJECTED','CHUNK_TRAILER_REJECTED',
+              'CHUNK_COUNT_LIMIT','BODY_LIMIT',
+              'BODY_LENGTH_REQUIRED','BODY_LENGTH_REJECTED','BODY_INCOMPLETE',
+              'BODY_TIMEOUT',
+              'JSON_INVALID','JSON_OBJECT_REQUIRED','DCR_OBJECT_REQUIRED',
+              'DCR_REDIRECT_URIS_REQUIRED','CHATGPT_REDIRECT_URI_REQUIRED',
+              'PUBLIC_PKCE_CLIENT_REQUIRED','DCR_GRANT_TYPES_REJECTED',
+              'CODE_RESPONSE_ONLY','OAUTH_TOKEN_PARAMETERS_REQUIRED',
+              'OAUTH_GRANT_REJECTED','OAUTH_RESOURCE_MISMATCH',
+              'OAUTH_CODE_OR_PKCE_REJECTED','OAUTH_CODE_REPLAY_REJECTED',
+              'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED'))
+            detail=str(exc)
+            if isinstance(exc,(UnicodeDecodeError,json.JSONDecodeError)):
+                detail='JSON_INVALID'
+            if detail not in allowed:
+                detail='REQUEST_REJECTED'
+            self.close_connection=True
+            stage=('DCR_REGISTER' if path=='/oauth/register' else
+              'TOKEN' if path=='/oauth/token' else 'MCP')
+            sys.stderr.write('task-center-app: reject stage=%s code=%s\n'%(
+              stage,detail))
+            if path=='/oauth/register':
+                error=('invalid_redirect_uri' if detail in (
+                  'DCR_REDIRECT_URIS_REQUIRED','CHATGPT_REDIRECT_URI_REQUIRED')
+                  else 'invalid_client_metadata')
+                body={'error':error,
+                      'error_description':detail}
+            else:
+                body={'error':'invalid_request','error_description':detail}
+            self._send(400,_json_bytes(body),'application/json; charset=utf-8',
+              [('Connection','close')])
 
         def do_GET(self):
             if not self._host_allowed():
@@ -798,10 +908,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
         def _mcp_post(self,path):
             if mcp_auth_store is None or model_master_key is None:
                 self._send(404,b'not found\n','text/plain; charset=utf-8');return
+            if path=='/mcp' and not self.headers.get('Authorization'):
+                # Challenge before decoding an unauthenticated probe.  Close
+                # the upstream connection because its body remains unread.
+                self.close_connection=True
+                self._mcp_challenge('task:read',close=True);return
             try:
-                length=int(self.headers.get('Content-Length','0'))
-                if length<1 or length>65536:raise ValueError('BODY_LIMIT')
-                raw=self.rfile.read(length)
+                raw=self._read_bounded_body()
                 if path=='/oauth/register':
                     value=json.loads(raw.decode('utf-8'))
                     result=mcp_auth_store.register(value)
@@ -815,6 +928,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._send(200,_json_bytes(result),
                       'application/json; charset=utf-8');return
                 value=json.loads(raw.decode('utf-8'))
+                if not isinstance(value,dict):
+                    raise ValueError('JSON_OBJECT_REQUIRED')
                 method=value.get('method')
                 scope=('task:submit' if method=='tools/call' and
                   (value.get('params') or {}).get('name')=='task_submit'
@@ -822,13 +937,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 identity=mcp_auth_store.authenticate(
                   self.headers.get('Authorization'),scope)
                 if identity is None:
-                    metadata=((external_origin or
-                      ('http://'+self.headers.get('Host')))+
-                      (base_path if base_path!='/' else '/')+
-                      '.well-known/oauth-protected-resource')
-                    self._send(401,_json_bytes({'error':'MCP_AUTH_REQUIRED'}),
-                      'application/json; charset=utf-8',[('WWW-Authenticate',
-                      'Bearer resource_metadata="%s", scope="%s"'%(metadata,scope))]);return
+                    self._mcp_challenge(scope);return
                 service=MCPTaskService(db_path,authority_key,tenant_id,
                   model_master_key,identity['principal_id'],identity['project_id'])
                 result=RemoteTaskCenterMCP(service).rpc(value)
@@ -836,9 +945,16 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),
                   'application/json; charset=utf-8')
-            except Exception as exc:
-                self._send(400,_json_bytes({'error':type(exc).__name__,
-                  'detail':str(exc)}),'application/json; charset=utf-8')
+            except (ValueError,TypeError,UnicodeDecodeError,
+                    json.JSONDecodeError) as exc:
+                self._mcp_post_rejection(path,exc)
+            except Exception:
+                self.close_connection=True
+                sys.stderr.write('task-center-app: reject stage=INTERNAL '
+                  'code=INTERNAL_ERROR\n')
+                self._send(500,_json_bytes({'error':'server_error',
+                  'error_description':'INTERNAL_ERROR'}),
+                  'application/json; charset=utf-8')
 
         def _host_allowed(self):
             supplied=self.headers.get('Host','')
