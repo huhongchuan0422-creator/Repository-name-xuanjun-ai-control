@@ -4,6 +4,11 @@ import os
 import tempfile
 import unittest
 import io
+import pty
+import re
+import select
+import subprocess
+import sys
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -70,6 +75,12 @@ class PreparedResumeDelivery(unittest.TestCase):
                 if parent==root.parent:break
                 os.chmod(parent,0o700)
             self.write(path,body)
+    def append(self,sequence,phase,new_id=None):
+        value=canon({'approval_sha256':'b'*64,'handoff_sha256':'c'*64,
+                     'new_id':new_id,'phase':phase,'plan_sha256':'a'*64,
+                     'sequence':sequence})
+        self.write(self.attempt/('event-%06d.json'%sequence),value)
+        self.write(self.attempt/'checkpoint.json',value)
     def test_existing_prepared_atomic_update_resume_query_and_recover(self):
         before=(self.base/'bc-c-resume-approval-old.json').read_bytes()
         self.assertEqual(d.inspect()['phase'],'PREPARED')
@@ -79,11 +90,35 @@ class PreparedResumeDelivery(unittest.TestCase):
         self.assertEqual((self.base/'bc-c-resume-approval-old.json').read_bytes(),before)
         self.assertEqual(d.inspect()['new_id'],None)
         self.assertEqual(d.invoke('resume'),0)
-        known=canon({'approval_sha256':'b'*64,'handoff_sha256':'c'*64,'new_id':'d'*64,'phase':'KNOWN_FAILURE','plan_sha256':'a'*64,'sequence':2})
-        self.write(self.attempt/'event-000002.json',known);self.write(self.attempt/'checkpoint.json',known)
-        queried=d.query();self.assertEqual((queried['phase'],queried['sequence'],queried['new_id']),('KNOWN_FAILURE',2,'d'*64))
+        for sequence,phase,new_id in (
+            (2,'STOPPED_HANDOFF_ACCEPTED',None),(3,'OLD_RENAME_INTENT',None),
+            (4,'OLD_RETAINED',None),(5,'NEW_RUN_INTENT',None),
+            (6,'NEW_KNOWN','d'*64),(7,'KNOWN_FAILURE','d'*64)):
+            self.append(sequence,phase,new_id)
+        queried=d.query();self.assertEqual((queried['phase'],queried['sequence'],queried['new_id']),('KNOWN_FAILURE',7,'d'*64))
         self.assertEqual(d.invoke('recover'),0)
+        for sequence,phase in ((8,'RECOVERY_STOP_NEW_INTENT'),
+                               (9,'RECOVERY_RENAME_NEW_INTENT'),
+                               (10,'RECOVERY_RESTORE_OLD_INTENT'),
+                               (11,'RECOVERY_START_OLD_INTENT'),
+                               (12,'ROLLED_BACK_PREVIEW_HOLD')):
+            self.append(sequence,phase,'d'*64)
+        self.assertEqual(d.query()['phase'],'ROLLED_BACK_PREVIEW_HOLD')
         self.assertEqual(self.marker.read_text().splitlines(),['--reopen-prepared','--recover-known-failure'])
+
+    def test_query_accepts_exact_normal_success_history_and_rejects_jump(self):
+        d.update()
+        for sequence,phase,new_id in (
+            (2,'STOPPED_HANDOFF_ACCEPTED',None),(3,'OLD_RENAME_INTENT',None),
+            (4,'OLD_RETAINED',None),(5,'NEW_RUN_INTENT',None),
+            (6,'NEW_KNOWN','d'*64),(7,'COMMITTED','d'*64)):
+            self.append(sequence,phase,new_id)
+        self.assertEqual(d.query()['phase'],'COMMITTED')
+        bad=canon({'approval_sha256':'b'*64,'handoff_sha256':'c'*64,
+                   'new_id':'d'*64,'phase':'RECOVERY_START_OLD_INTENT',
+                   'plan_sha256':'a'*64,'sequence':7})
+        self.write(self.attempt/'event-000007.json',bad);self.write(self.attempt/'checkpoint.json',bad)
+        with self.assertRaisesRegex(d.Hold,'EVENT_PHASE_TRANSITION'):d.query()
 
     def test_recover_refuses_prepared_without_calling_loader(self):
         d.update()
@@ -112,6 +147,32 @@ class PreparedResumeDelivery(unittest.TestCase):
             return part
         with patch.object(d.os,'read',replace_after_first),self.assertRaisesRegex(d.Hold,'FILE_CHANGED_DURING_READ'):
             d.read(str(path),131072,os.getuid(),0o600)
+
+    def test_shell_bootstrap_preserves_real_pty_stdin(self):
+        fixture=Path(self.tmp.name)/'delivery.py'
+        body=("import os\n"
+              "def cli(args):\n"
+              " print('TTY='+str(os.isatty(0)),flush=True)\n"
+              " return 0 if input('PROMPT:')=='ACK' else 2\n").encode()
+        self.write(fixture,body)
+        source=Path('deploy/community-preview/issue76-prepared-resume-r18.sh').read_text()
+        source=source.replace('/home/admin/community_preview_prepared_resume_delivery.py',str(fixture))
+        source=re.sub(r"expected='[0-9a-f]{64}'","expected='%s'"%sha(body),source,count=1)
+        source=source.replace("pwd.getpwnam('admin').pw_uid",str(os.getuid()))
+        source=source.replace('sudo -n /usr/bin/python3',sys.executable)
+        wrapper=Path(self.tmp.name)/'entry.sh';wrapper.write_text(source);os.chmod(wrapper,0o700)
+        master,slave=pty.openpty()
+        process=subprocess.Popen([str(wrapper),'resume'],stdin=slave,stdout=slave,stderr=slave,close_fds=True)
+        os.close(slave);output=b''
+        try:
+            while b'PROMPT:' not in output:
+                ready,_,_=select.select([master],[],[],5);self.assertTrue(ready,'PTY_PROMPT_TIMEOUT')
+                output+=os.read(master,4096)
+            os.write(master,b'ACK\n');self.assertEqual(process.wait(timeout=5),0)
+        finally:
+            os.close(master)
+            if process.poll() is None:process.kill();process.wait()
+        self.assertIn(b'TTY=True',output)
     def test_interruption_after_exchange_reopens_without_second_exchange(self):
         original=d.exchange;calls=[]
         def crash(a,b):original(a,b);calls.append((a,b));raise d.Hold('INJECTED_AFTER_EXCHANGE')
