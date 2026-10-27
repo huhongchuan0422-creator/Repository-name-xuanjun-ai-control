@@ -46,11 +46,22 @@ RECEIPT=DELIVERY+'/update-receipt.json'
 STAGE='control-stopped-v1.prepared-resume-76ca971e826f85e8.stage'
 RETAINED='control-stopped-v1.prepared-resume-76ca971e826f85e8.previous'
 SHA=re.compile(r'[0-9a-f]{64}\Z')
-PHASES={'PREPARED','OLD_STOP_INTENT','OLD_STOPPED','OLD_RENAME_INTENT','OLD_RENAMED',
-        'NEW_RUN_INTENT','NEW_KNOWN','KNOWN_FAILURE','RECOVERY_STOP_NEW_INTENT',
-        'RECOVERY_NEW_STOPPED','RECOVERY_RENAME_NEW_INTENT','RECOVERY_NEW_RENAMED',
-        'RECOVERY_OLD_RENAME_INTENT','RECOVERY_OLD_RENAMED','RECOVERY_OLD_START_INTENT',
-        'COMMITTED','ROLLED_BACK_PREVIEW_HOLD','HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT'}
+HOLD_PHASE='HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT'
+TRANSITIONS={
+    'PREPARED':{'OLD_STOP_INTENT','STOPPED_HANDOFF_ACCEPTED'},
+    'STOPPED_HANDOFF_ACCEPTED':{'OLD_RENAME_INTENT'},'OLD_STOP_INTENT':{'OLD_STOPPED'},
+    'OLD_STOPPED':{'OLD_RENAME_INTENT'},'OLD_RENAME_INTENT':{'OLD_RETAINED'},
+    'OLD_RETAINED':{'NEW_RUN_INTENT'},'NEW_RUN_INTENT':{'NEW_KNOWN'},
+    'NEW_KNOWN':{'KNOWN_FAILURE','COMMITTED'},
+    'KNOWN_FAILURE':{'RECOVERY_STOP_NEW_INTENT','RECOVERY_RENAME_NEW_INTENT'},
+    'RECOVERY_STOP_NEW_INTENT':{'RECOVERY_RENAME_NEW_INTENT'},
+    'RECOVERY_RENAME_NEW_INTENT':{'RECOVERY_RESTORE_OLD_INTENT'},
+    'RECOVERY_RESTORE_OLD_INTENT':{'RECOVERY_START_OLD_INTENT'},
+    'RECOVERY_START_OLD_INTENT':{'ROLLED_BACK_PREVIEW_HOLD'},
+    'COMMITTED':set(),'ROLLED_BACK_PREVIEW_HOLD':set(),HOLD_PHASE:set()}
+ID_PHASES={'NEW_KNOWN','KNOWN_FAILURE','COMMITTED','RECOVERY_STOP_NEW_INTENT',
+           'RECOVERY_RENAME_NEW_INTENT','RECOVERY_RESTORE_OLD_INTENT',
+           'RECOVERY_START_OLD_INTENT','ROLLED_BACK_PREVIEW_HOLD'}
 
 class Hold(RuntimeError):pass
 def need(v,r):
@@ -126,17 +137,21 @@ def journal_state():
     names=sorted(os.listdir(directory));need('checkpoint.tmp' not in names,'PARTIAL_CHECKPOINT_INSPECT_ONLY')
     checkpoint_raw=read(CHECKPOINT,65536);checkpoint=json.loads(checkpoint_raw.decode('ascii'))
     need(type(checkpoint) is dict and set(checkpoint)=={'approval_sha256','handoff_sha256','new_id','phase','plan_sha256','sequence'},'CHECKPOINT_SHAPE')
-    need(checkpoint.get('plan_sha256')==PLAN and checkpoint.get('phase') in PHASES and type(checkpoint.get('sequence')) is int and 1<=checkpoint['sequence']<=64,'CHECKPOINT_BINDING_CHANGED')
+    need(checkpoint.get('plan_sha256')==PLAN and checkpoint.get('phase') in TRANSITIONS and type(checkpoint.get('sequence')) is int and 1<=checkpoint['sequence']<=64,'CHECKPOINT_BINDING_CHANGED')
     need(checkpoint_raw in (canonical(checkpoint),json.dumps(checkpoint,sort_keys=True).encode()),'NONCANONICAL_CHECKPOINT')
     events=['event-%06d.json'%i for i in range(1,checkpoint['sequence']+1)]
     need(names==sorted(events+['checkpoint.json']),'PARTIAL_EVENT_HISTORY_INSPECT_ONLY')
     hashes=[];last=None
     for i,name in enumerate(events,1):
         raw=read(directory+'/'+name,65536);value=json.loads(raw.decode('ascii'))
-        need(type(value) is dict and set(value)==set(checkpoint) and value.get('plan_sha256')==PLAN and value.get('sequence')==i and value.get('phase') in PHASES,'EVENT_BINDING_CHANGED')
+        need(type(value) is dict and set(value)==set(checkpoint) and value.get('plan_sha256')==PLAN and value.get('sequence')==i and value.get('phase') in TRANSITIONS,'EVENT_BINDING_CHANGED')
         need(raw in (canonical(value),json.dumps(value,sort_keys=True).encode()),'NONCANONICAL_EVENT_INSPECT_ONLY')
-        if last is not None:
+        need((value['new_id'] is not None)==(value['phase'] in ID_PHASES),'EVENT_ID_PHASE_CHANGED')
+        if last is None:need(value['phase']=='PREPARED' and value['sequence']==1,'EVENT_INITIAL_STATE')
+        else:
             need(value['approval_sha256']==last['approval_sha256'] and value['handoff_sha256']==last['handoff_sha256'],'JOURNAL_HANDOFF_BINDING_CHANGED')
+            allowed=TRANSITIONS[last['phase']]|({HOLD_PHASE} if last['phase']!=HOLD_PHASE else set())
+            need(value['phase'] in allowed,'EVENT_PHASE_TRANSITION')
             if last['new_id'] is not None:need(value['new_id']==last['new_id'],'EVENT_ID_CHANGED')
         hashes.append(sha(raw));last=value
     need(last==checkpoint,'EVENT_CHECKPOINT_MISMATCH')
