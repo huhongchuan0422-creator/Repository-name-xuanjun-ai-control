@@ -84,7 +84,7 @@ jobs:
           if not b or not b.endswith(b'\0'):raise SystemExit('PUSH_DELTA_UNKNOWN')
           rows=b[:-1].split(b'\0')
           if len(rows)>10000 or any(not x or b'\n' in x or b'\r' in x for x in rows):raise SystemExit('PUSH_DELTA_UNKNOWN')
-          allowed={b'scripts/community_preview_stopped_handoff.py',b'scripts/community_preview_update_checkpoint.py',b'scripts/community_preview_bc_build.py',b'tests/test_community_preview_stopped_handoff.py',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json',b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md'}
+          allowed={b'scripts/community_preview_stopped_handoff.py',b'scripts/community_preview_update_checkpoint.py',b'scripts/community_preview_bc_build.py',b'scripts/community_preview_prepared_resume_delivery.py',b'tests/test_community_preview_stopped_handoff.py',b'tests/test_community_preview_prepared_resume_delivery.py',b'deploy/community-preview/issue76-prepared-resume-r18.sh',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json',b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md'}
           handoff={b'scripts/community_preview_carrier_handoff_admission.py',
                    b'scripts/community_preview_carrier_handoff_call.py',
                    b'scripts/community_preview_carrier_handoff_entry.py',
@@ -334,8 +334,10 @@ jobs:
             git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
             PYTHONPATH=. python -B scripts/community_preview_bc_build.py
             cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
-            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_checkpoint.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py tests/test_community_preview_stopped_handoff.py
+            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_checkpoint.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py scripts/community_preview_prepared_resume_delivery.py tests/test_community_preview_stopped_handoff.py tests/test_community_preview_prepared_resume_delivery.py
+            sh -n deploy/community-preview/issue76-prepared-resume-r18.sh
             PYTHONPATH=.:tests python -B -m unittest \
+              tests.test_community_preview_prepared_resume_delivery \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_permit_appearing_after_admission_is_hold \
               test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_prior_permit_changed_between_reads_rejected \
@@ -755,6 +757,9 @@ jobs:
             Path('scripts/community_preview_release_plan.py'),
             Path('scripts/community_preview_bc_build.py'),
             Path('tests/test_community_preview_stopped_handoff.py'),
+            Path('scripts/community_preview_prepared_resume_delivery.py'),
+            Path('tests/test_community_preview_prepared_resume_delivery.py'),
+            Path('deploy/community-preview/issue76-prepared-resume-r18.sh'),
             Path('docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md')]
           files={}
           for path in required:
@@ -790,7 +795,10 @@ jobs:
             scripts/community_preview_update_checkpoint.py
             scripts/community_preview_release_plan.py
             scripts/community_preview_bc_build.py
+            scripts/community_preview_prepared_resume_delivery.py
             tests/test_community_preview_stopped_handoff.py
+            tests/test_community_preview_prepared_resume_delivery.py
+            deploy/community-preview/issue76-prepared-resume-r18.sh
             docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
           if-no-files-found: error
           retention-days: 14
