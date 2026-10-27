@@ -33,6 +33,7 @@ C_ACTIONS=['STOPPED_HANDOFF_RENAME_RUN','KNOWN_FAILURE_SERIAL_RECOVERY','JOURNAL
 CORRECTION_KIND='C_SUCCESSOR_INDEPENDENT_CORRECTION_V1'
 CORRECTION_REISSUE_KIND='C_SUCCESSOR_INDEPENDENT_CORRECTION_REISSUE_V1'
 PREPARED_REOPEN_KIND='C_SUCCESSOR_PREPARED_REOPEN_V1'
+PREPARED_REOPEN_REISSUE_KIND='C_SUCCESSOR_PREPARED_REOPEN_REISSUE_V1'
 CLONES=('restore-old','verify-f131','verify-downgrade')
 A_ENTRY_SHA='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 
@@ -462,6 +463,10 @@ class Session:
         need(p.exact_hex(proof_sha,64),'PREPARED_PROOF_SHA_REQUIRED')
         return s.BASE+'/bc-c-resume-approval-successor-prepared-reopen-'+proof_sha[:16]+'.json'
 
+    def _prepared_reopen_reissue_path(self,prior_sha):
+        need(p.exact_hex(prior_sha,64),'PREPARED_REOPEN_SHA_REQUIRED')
+        return s.BASE+'/bc-c-resume-approval-successor-prepared-reopen-reissue-'+prior_sha[:16]+'.json'
+
     def _prepared_reopen_approval(self,proof,phase='PREPARED'):
         proof_raw=raw(PROOF,4*1024*1024);proof_sha=s.sha(proof_raw)
         need(s.exact_json(proof_raw)==proof,'PREPARED_PROOF_CHANGED')
@@ -483,7 +488,7 @@ class Session:
         need(set(approval)==expected and type(approval['format']) is int and approval['format']==1
              and approval['kind']==PREPARED_REOPEN_KIND and approval['host']==p.HOST
              and approval['mode']==MODE and approval['attempt']==attempt()
-             and approval['carrier_manifest_sha256']==self.approved_stamp==self.pins()
+             and p.exact_hex(approval['carrier_manifest_sha256'],64)
              and approval['plan_sha256']==proof['plan']['plan_sha256']
              and approval['proof_sha256']==proof_sha
              and approval['prior_approval_sha256']==proof['approval_sha256']
@@ -491,7 +496,31 @@ class Session:
              and approval['prepared_event_sha256']==s.sha(event)
              and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'],
              'EXACT_C_PREPARED_REOPEN_APPROVAL_REQUIRED')
-        window(approval)
+        current=self.approved_stamp==self.pins()
+        if approval['carrier_manifest_sha256']==self.approved_stamp:
+            window(approval)
+        else:
+            now=c.now()
+            need(type(approval['issued_at']) is int and type(approval['expires_at']) is int
+                 and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
+                 and now>approval['expires_at'],'PREPARED_REOPEN_NOT_EXPIRED')
+            prior_sha=s.sha(body);path=self._prepared_reopen_reissue_path(prior_sha)
+            approval,body=document(path,16384)
+            expected=expected|{'prior_prepared_reopen_sha256'}
+            need(set(approval)==expected and type(approval['format']) is int and approval['format']==1
+                 and approval['kind']==PREPARED_REOPEN_REISSUE_KIND and approval['host']==p.HOST
+                 and approval['mode']==MODE and approval['attempt']==attempt()
+                 and approval['carrier_manifest_sha256']==self.approved_stamp
+                 and approval['plan_sha256']==proof['plan']['plan_sha256']
+                 and approval['proof_sha256']==proof_sha
+                 and approval['prior_approval_sha256']==proof['approval_sha256']
+                 and approval['prior_prepared_reopen_sha256']==prior_sha
+                 and approval['active_attempt_sha256']==s.sha(active)
+                 and approval['prepared_event_sha256']==s.sha(event)
+                 and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'],
+                 'EXACT_C_PREPARED_REOPEN_REISSUE_REQUIRED')
+            window(approval)
+        need(current,'CARRIER_STAMP_CHANGED')
         self.prepared_reopen_path=path;self.prepared_reopen_raw=body
         return approval
 

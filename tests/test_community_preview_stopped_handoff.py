@@ -894,6 +894,136 @@ finally:
         self.assertEqual(result['phase'],'ROLLED_BACK_PREVIEW_HOLD')
         self.assertIn('start',[row[3] for row in self.calls])
 
+    def test_expired_prepared_reopen_uses_one_bound_reissue_and_recovers_same_attempt(self):
+        q,_=self._prepare_completed_b_before_c_proof()
+        semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+        q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+        candidate=self._register_c_resume_approval_from_persisted_plan(q)
+        with patch.object(u.Update,'guard',side_effect=u.Hold('PROTECTED_BINDING_CHANGED')), \
+             self.assertRaisesRegex(u.Hold,'PROTECTED_BINDING_CHANGED'):
+            q.resume_c_before_confirmation()
+        proof,proof_raw=h.document(h.PROOF);q.close();self.clock=4000
+        reopened=h.Session();reopened.acquire(recover=True);self.addCleanup(reopened.close);self.session=reopened
+        reopened.configure_resumed_recovery(proof);reopened.approved_stamp=reopened.pins()
+        active=Path(u.JOURNAL_PARENT,'active-attempt.json').read_bytes()
+        checkpoint=Path(u.JOURNAL_PARENT,candidate['attempt'],'checkpoint.json').read_bytes()
+        old=dict(format=1,kind=h.PREPARED_REOPEN_KIND,host=p.HOST,mode=h.MODE,
+            attempt=candidate['attempt'],carrier_manifest_sha256='1'*64,
+            plan_sha256=candidate['plan_sha256'],proof_sha256=s.sha(proof_raw),
+            prior_approval_sha256=proof['approval_sha256'],active_attempt_sha256=s.sha(active),
+            prepared_event_sha256=s.sha(checkpoint),issued_at=3000,expires_at=3600,
+            actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
+        old_raw=s.canonical(old);self.write(reopened._prepared_reopen_path(s.sha(proof_raw)),old_raw)
+        fresh=dict(old,kind=h.PREPARED_REOPEN_REISSUE_KIND,
+            carrier_manifest_sha256=reopened.pins(),prior_prepared_reopen_sha256=s.sha(old_raw),
+            issued_at=self.clock,expires_at=self.clock+600)
+        self.write(reopened._prepared_reopen_reissue_path(s.sha(old_raw)),s.canonical(fresh))
+        original_replace=u.Update.replace_and_verify
+        def known_failure(update):
+            update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+                scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+                runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=self.clock)
+            return original_replace(update)
+        with patch.object(u.Update,'replace_and_verify',known_failure),self.assertRaisesRegex(u.Hold,'KNOWN_FAILURE'):
+            reopened.reopen_prepared()
+        self.assertEqual(reopened.journal.state['phase'],'KNOWN_FAILURE')
+        self.assertEqual([row[3] for row in self.calls],['rename','run'])
+        reopened.close();recovery=h.Session();recovery.acquire(recover=True);self.addCleanup(recovery.close);self.session=recovery
+        old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+            scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+            runtime_source_sha=None,version_source=None,observed_at=self.clock)
+        with patch.object(c,'BoundHttpsHealth',return_value=old_health):result=recovery.recover()
+        self.assertEqual(result['phase'],'ROLLED_BACK_PREVIEW_HOLD')
+        self.assertIn('start',[row[3] for row in self.calls])
+
+    def test_expired_prepared_reopen_reissue_real_pty_full_chain(self):
+        """The current PREPARED reissue crosses both real TTY gates and reopens recovery."""
+        import pty,select,time,signal,errno,re
+        worker="""import sys
+sys.path[:0]=[REPO,REPO+'/tests']
+from pathlib import Path
+from unittest.mock import patch
+from test_community_preview_stopped_handoff import WholeEntry
+from scripts import community_preview_stopped_handoff as h
+from scripts import community_preview_site_prepare as s
+from scripts import community_preview_update_checkpoint as u
+from scripts import community_preview_update_composition as c
+from scripts import community_preview_release_plan as p
+t=WholeEntry();t.tty_actual=True;t.setUp()
+try:
+ with patch.object(h,'acknowledge'):
+  q,_=t._prepare_completed_b_before_c_proof()
+  semantic=q.evidence(True);q.backup=h.open_private(s.BACKUP+'/clone-results.json')
+  q._fixed_c_resume_plan(q.candidate(semantic),semantic)
+  candidate=t._register_c_resume_approval_from_persisted_plan(q)
+  try:
+   with patch.object(u.Update,'guard',side_effect=u.Hold('PROTECTED_BINDING_CHANGED')):q.resume_c_before_confirmation()
+   raise AssertionError('PREPARED_HOLD_REQUIRED')
+  except u.Hold as error:assert 'PROTECTED_BINDING_CHANGED' in str(error)
+ proof,proof_raw=h.document(h.PROOF);q.close();t.clock=4000
+ reopened=h.Session();reopened.acquire(recover=True);t.session=reopened
+ reopened.configure_resumed_recovery(proof);reopened.approved_stamp=reopened.pins()
+ active=Path(u.JOURNAL_PARENT,'active-attempt.json').read_bytes()
+ event=Path(u.JOURNAL_PARENT,candidate['attempt'],'event-000001.json').read_bytes()
+ old=dict(format=1,kind=h.PREPARED_REOPEN_KIND,host=p.HOST,mode=h.MODE,
+  attempt=candidate['attempt'],carrier_manifest_sha256='1'*64,
+  plan_sha256=candidate['plan_sha256'],proof_sha256=s.sha(proof_raw),
+  prior_approval_sha256=proof['approval_sha256'],active_attempt_sha256=s.sha(active),
+  prepared_event_sha256=s.sha(event),issued_at=3000,expires_at=3600,
+  actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
+ old_raw=s.canonical(old);t.write(reopened._prepared_reopen_path(s.sha(proof_raw)),old_raw)
+ fresh=dict(old,kind=h.PREPARED_REOPEN_REISSUE_KIND,
+  carrier_manifest_sha256=reopened.pins(),prior_prepared_reopen_sha256=s.sha(old_raw),
+  issued_at=t.clock,expires_at=t.clock+600)
+ fresh_raw=s.canonical(fresh);fresh_path=reopened._prepared_reopen_reissue_path(s.sha(old_raw))
+ t.write(fresh_path,fresh_raw)
+ original=u.Update.replace_and_verify
+ def known(update):
+  update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
+   scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+   runtime_source_sha=s.PRODUCT,version_source='IMAGE_BUILD_STAMP',observed_at=t.clock)
+  return original(update)
+ try:
+  with patch.object(u.Update,'replace_and_verify',known):reopened.reopen_prepared()
+  raise AssertionError('KNOWN_FAILURE_REQUIRED')
+ except u.Hold as error:assert 'KNOWN_FAILURE' in str(error)
+ assert reopened.journal.state['phase']=='KNOWN_FAILURE'
+ assert reopened.prepared_reopen_path==fresh_path and reopened.prepared_reopen_raw==fresh_raw
+ reopened.close();recovery=h.Session();recovery.acquire(recover=True);t.session=recovery
+ old_health=lambda:dict(http_status=200,url=p.URL,status='READY',
+  scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
+  runtime_source_sha=None,version_source=None,observed_at=t.clock)
+ with patch.object(c,'BoundHttpsHealth',return_value=old_health):result=recovery.recover()
+ assert result['phase'] in ('ROLLED_BACK_PREVIEW_HOLD','COMMITTED')
+ assert recovery.prepared_reopen_path==fresh_path and recovery.prepared_reopen_raw==fresh_raw
+ print('PREPARED_REOPEN_REISSUE_REAL_PTY_FULL_CHAIN_OK',flush=True)
+finally:
+ t.doCleanups()
+""".replace('REPO',repr(str(Path.cwd())))
+        pid,fd=pty.fork()
+        if pid==0:os.execv(sys.executable,[sys.executable,'-I','-B','-S','-c',worker])
+        data=b'';sent=[];done=False;end=time.monotonic()+30
+        try:
+            while time.monotonic()<end:
+                if select.select([fd],[],[],.05)[0]:
+                    try:b=os.read(fd,65536)
+                    except OSError as error:
+                        if error.errno==errno.EIO:break
+                        raise
+                    if not b:break
+                    data+=b
+                    for line in re.findall(rb'APPROVE_(?:PREPARED_REOPEN|KNOWN_FAILURE_RECOVER) [0-9a-f]{64}',data):
+                        if line not in sent:os.write(fd,line+b'\n');sent.append(line)
+            got,status=os.waitpid(pid,0 if b'PREPARED_REOPEN_REISSUE_REAL_PTY_FULL_CHAIN_OK' in data else os.WNOHANG);done=got==pid
+            self.assertTrue(done,data.decode(errors='replace'))
+            self.assertEqual(os.waitstatus_to_exitcode(status),0,data.decode(errors='replace'))
+            self.assertEqual([x.split()[0] for x in sent],
+                [b'APPROVE_PREPARED_REOPEN',b'APPROVE_KNOWN_FAILURE_RECOVER'])
+            self.assertIn(b'PREPARED_REOPEN_REISSUE_REAL_PTY_FULL_CHAIN_OK',data)
+        finally:
+            if not done:os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
+            os.close(fd)
+
     def test_actual_b_classes_same_lease_to_c_success_no_old_stop_start(self):
         self.prepare_b_and_c();result=self.session.update()
         self.assertEqual(result['phase'],'COMMITTED')
