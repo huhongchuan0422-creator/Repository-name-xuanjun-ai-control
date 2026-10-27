@@ -153,6 +153,21 @@ class MCPTaskServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'IDEMPOTENCY_CONFLICT'):
             self.service.submit(changed)
 
+    def test_disabled_execution_rejects_before_any_task_persistence(self):
+        disabled=MCPTaskService(self.db,KEY,'tenant-mcp',self.master,
+          'owner-1','project-mcp',execution_enabled=False)
+        with self.assertRaisesRegex(ValueError,'MCP_MODEL_OUTBOUND_DISABLED'):
+            disabled.submit(self.submit_value())
+        supervisor=Supervisor(self.db)
+        try:
+            self.assertEqual(supervisor.db.execute('''SELECT COUNT(*) FROM
+              mcp_task_bindings WHERE tenant_id=? AND idempotency_key=?''',(
+              'tenant-mcp','idem-1')).fetchone()[0],0)
+            self.assertEqual(supervisor.db.execute('''SELECT COUNT(*) FROM
+              model_requests WHERE tenant_id=? AND idempotency_key LIKE ?''',(
+              'tenant-mcp','%:idem-1')).fetchone()[0],0)
+        finally:supervisor.close()
+
     def test_failpoint_restart_resumes_one_binding_and_one_request(self):
         phases=('BINDING_PERSISTED','GRAPH_PERSISTED','CONTRACT_PERSISTED',
           'WRITER_STARTED','MODEL_ASSIGNED','REQUEST_COMMITTED','QUEUED')

@@ -511,6 +511,17 @@ class MCPHTTPTests(unittest.TestCase):
           'id':3,'method':'tools/call','params':{'name':'task_capabilities',
           'arguments':{}}}).encode(),authorization).read())
         self.assertIn('fixture-connection',capabilities['result']['content'][0]['text'])
+        rejected_rpc={'jsonrpc':'2.0','id':'scope-reject','method':'tools/call',
+          'params':{'name':'task_submit','arguments':{
+          'project_id':'other-project','task_type':'TEXT_CLASSIFICATION',
+          'input_text':'Classify: hello','idempotency_key':'rejected-idem',
+          'connection_id':'fixture-connection','max_output_tokens':32}}}
+        with self.assertRaises(HTTPError) as scoped:
+            raw('/mcp','POST',json.dumps(rejected_rpc).encode(),authorization)
+        self.assertEqual(scoped.exception.code,400)
+        self.assertEqual(json.loads(scoped.exception.read()),{
+          'error':'invalid_request',
+          'error_description':'MCP_PROJECT_SCOPE_REJECTED'})
         submitted=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',
           'id':4,'method':'tools/call','params':{'name':'task_submit','arguments':{
           'project_id':'project-mcp','task_type':'TEXT_CLASSIFICATION',

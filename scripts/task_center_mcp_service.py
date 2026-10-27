@@ -145,12 +145,14 @@ def recover_incomplete_mcp_starts(db_path,authority_key,tenant_id):
 class MCPTaskService(object):
     """Authenticated, project-scoped adapter for the minimal MCP journey."""
     def __init__(self, db_path, authority_key, tenant_id, master_key,
-                 principal_id, project_id, clock=None,phase_hook=None):
+                 principal_id, project_id, clock=None,phase_hook=None,
+                 execution_enabled=True):
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.principal_id=principal_id;self.project_id=project_id
         self.clock=clock or time.time
         self.phase_hook=phase_hook
+        self.execution_enabled=bool(execution_enabled)
 
     def _open(self):
         supervisor=Supervisor(self.db_path)
@@ -400,6 +402,8 @@ class MCPTaskService(object):
                     return {'task_id':existing['task_id'],
                       'request_id':existing['request_id'],'state':request['state'],
                       'duplicate':True}
+            if not self.execution_enabled:
+                raise ValueError('MCP_MODEL_OUTBOUND_DISABLED')
             connection=supervisor.db.execute('''SELECT c.provider_id,c.status,
               c.purpose,o.model_id FROM service_connections c JOIN
               provider_onboarding_configs o ON o.tenant_id=c.tenant_id AND

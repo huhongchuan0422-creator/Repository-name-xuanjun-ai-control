@@ -244,7 +244,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   codex_transports=None, identity_provider=None,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
-                  external_origin=None, base_path='/',mcp_auth_store=None):
+                  external_origin=None, base_path='/',mcp_auth_store=None,
+                  mcp_model_worker_enabled=False):
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
     base_path = _normalize_base_path(base_path)
@@ -366,7 +367,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             self._send(401,_json_bytes({'error':'MCP_AUTH_REQUIRED'}),
               'application/json; charset=utf-8',extra)
 
-        def _mcp_post_rejection(self,path,exc):
+        def _mcp_post_rejection(self,path,exc,stage=None):
             allowed=frozenset((
               'BODY_FRAMING_CONFLICT','TRANSFER_ENCODING_REJECTED',
               'CHUNK_HEADER_REJECTED','CHUNK_TRAILER_REJECTED',
@@ -383,10 +384,33 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             detail=str(exc)
             if isinstance(exc,(UnicodeDecodeError,json.JSONDecodeError)):
                 detail='JSON_INVALID'
+            public_submit={
+              'EXACT_MCP_SUBMIT_REQUIRED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'VALID_PROJECT_ID_REQUIRED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'VALID_INPUT_TEXT_REQUIRED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'VALID_IDEMPOTENCY_KEY_REQUIRED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'VALID_CONNECTION_ID_REQUIRED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'MCP_INPUT_LIMIT':'MCP_REQUEST_CONTRACT_REJECTED',
+              'TASK_TYPE_NOT_SUPPORTED':'MCP_REQUEST_CONTRACT_REJECTED',
+              'MCP_OUTPUT_LIMIT':'MCP_REQUEST_CONTRACT_REJECTED',
+              'MCP_PROJECT_SCOPE_REJECTED':'MCP_PROJECT_SCOPE_REJECTED',
+              'MCP_IDEMPOTENCY_CONFLICT':'MCP_IDEMPOTENCY_CONFLICT',
+              'MCP_IDEMPOTENCY_BINDING_CONFLICT':'MCP_IDEMPOTENCY_CONFLICT',
+              'MCP_MODEL_OUTBOUND_DISABLED':'MCP_EXECUTION_DISABLED',
+              'ACTIVE_MODEL_CONNECTION_REQUIRED':'MCP_MODEL_ADMISSION_HOLD',
+              'MODEL_CAPABILITY_OR_FREE_QUOTA_HOLD':'MCP_MODEL_ADMISSION_HOLD',
+              'MCP_QUEUED_REQUEST_RECONCILIATION_FAILED':
+                'MCP_PERSISTENCE_RECONCILIATION_HOLD',
+              'MCP_QUEUED_BINDING_CAS_FAILED':
+                'MCP_PERSISTENCE_RECONCILIATION_HOLD',
+              'MCP_REQUEST_ID_RECONCILIATION_FAILED':
+                'MCP_PERSISTENCE_RECONCILIATION_HOLD'}
+            detail=public_submit.get(detail,detail)
+            allowed=allowed|frozenset(public_submit.values())
             if detail not in allowed:
                 detail='REQUEST_REJECTED'
             self.close_connection=True
-            stage=('DCR_REGISTER' if path=='/oauth/register' else
+            stage=stage or ('DCR_REGISTER' if path=='/oauth/register' else
               'TOKEN' if path=='/oauth/token' else 'MCP')
             sys.stderr.write('task-center-app: reject stage=%s code=%s\n'%(
               stage,detail))
@@ -937,6 +961,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 # the upstream connection because its body remains unread.
                 self.close_connection=True
                 self._mcp_challenge('task:read',close=True);return
+            rejection_stage=('DCR_REGISTER' if path=='/oauth/register' else
+              'TOKEN' if path=='/oauth/token' else 'MCP_BODY')
             try:
                 raw=self._read_bounded_body()
                 if path=='/oauth/register':
@@ -954,6 +980,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 value=json.loads(raw.decode('utf-8'))
                 if not isinstance(value,dict):
                     raise ValueError('JSON_OBJECT_REQUIRED')
+                rejection_stage='MCP_PROTOCOL'
                 method=value.get('method')
                 scope=('task:submit' if method=='tools/call' and
                   (value.get('params') or {}).get('name')=='task_submit'
@@ -963,7 +990,11 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 if identity is None:
                     self._mcp_challenge(scope);return
                 service=MCPTaskService(db_path,authority_key,tenant_id,
-                  model_master_key,identity['principal_id'],identity['project_id'])
+                  model_master_key,identity['principal_id'],identity['project_id'],
+                  execution_enabled=mcp_model_worker_enabled)
+                rejection_stage=('MCP_TASK_SUBMIT' if method=='tools/call' and
+                  (value.get('params') or {}).get('name')=='task_submit'
+                  else 'MCP_TOOL_CALL')
                 result=RemoteTaskCenterMCP(service).rpc(value)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
@@ -971,7 +1002,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'application/json; charset=utf-8')
             except (ValueError,TypeError,UnicodeDecodeError,
                     json.JSONDecodeError) as exc:
-                self._mcp_post_rejection(path,exc)
+                self._mcp_post_rejection(path,exc,rejection_stage)
             except Exception:
                 self.close_connection=True
                 sys.stderr.write('task-center-app: reject stage=INTERNAL '
@@ -1112,7 +1143,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 admin_token, actor_tokens,codex_transports,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
-                                external_origin,base_path,mcp_auth_store)
+                                external_origin,base_path,mcp_auth_store,
+                                mcp_model_worker_enabled)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.codex_worker=None;server.mcp_worker=None
