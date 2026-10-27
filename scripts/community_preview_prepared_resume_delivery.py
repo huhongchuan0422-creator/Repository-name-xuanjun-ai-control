@@ -93,6 +93,14 @@ def journal_json(raw):
     need(raw in (canonical(v),json.dumps(v,sort_keys=True).encode()),'CANONICAL_JSON_REQUIRED')
     return v
 
+def validate_journal_record(value):
+    need(type(value) is dict and set(value)=={'approval_sha256','handoff_sha256','new_id','phase','plan_sha256','sequence'},'CHECKPOINT_SHAPE')
+    need(value.get('plan_sha256')==PLAN and value.get('phase') in TRANSITIONS and type(value.get('sequence')) is int and 1<=value['sequence']<=64,'CHECKPOINT_BINDING_CHANGED')
+    new_id=value['new_id']
+    need(new_id is None or type(new_id) is str and SHA.fullmatch(new_id),'CHECKPOINT_ID')
+    need(value['phase'] not in ID_PHASES or new_id is not None,'CHECKPOINT_ID_REQUIRED')
+    need(value['phase'] in ID_PHASES|{HOLD_PHASE} or new_id is None,'CHECKPOINT_UNEXPECTED_ID')
+
 def write_exclusive(path,raw):
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     try:
@@ -136,17 +144,15 @@ def journal_state():
     directory=JOURNAL+'/'+ATTEMPT
     names=sorted(os.listdir(directory));need('checkpoint.tmp' not in names,'PARTIAL_CHECKPOINT_INSPECT_ONLY')
     checkpoint_raw=read(CHECKPOINT,65536);checkpoint=json.loads(checkpoint_raw.decode('ascii'))
-    need(type(checkpoint) is dict and set(checkpoint)=={'approval_sha256','handoff_sha256','new_id','phase','plan_sha256','sequence'},'CHECKPOINT_SHAPE')
-    need(checkpoint.get('plan_sha256')==PLAN and checkpoint.get('phase') in TRANSITIONS and type(checkpoint.get('sequence')) is int and 1<=checkpoint['sequence']<=64,'CHECKPOINT_BINDING_CHANGED')
+    validate_journal_record(checkpoint)
     need(checkpoint_raw in (canonical(checkpoint),json.dumps(checkpoint,sort_keys=True).encode()),'NONCANONICAL_CHECKPOINT')
     events=['event-%06d.json'%i for i in range(1,checkpoint['sequence']+1)]
     need(names==sorted(events+['checkpoint.json']),'PARTIAL_EVENT_HISTORY_INSPECT_ONLY')
     hashes=[];last=None
     for i,name in enumerate(events,1):
         raw=read(directory+'/'+name,65536);value=json.loads(raw.decode('ascii'))
-        need(type(value) is dict and set(value)==set(checkpoint) and value.get('plan_sha256')==PLAN and value.get('sequence')==i and value.get('phase') in TRANSITIONS,'EVENT_BINDING_CHANGED')
+        validate_journal_record(value);need(value.get('sequence')==i,'EVENT_BINDING_CHANGED')
         need(raw in (canonical(value),json.dumps(value,sort_keys=True).encode()),'NONCANONICAL_EVENT_INSPECT_ONLY')
-        need((value['new_id'] is not None)==(value['phase'] in ID_PHASES),'EVENT_ID_PHASE_CHANGED')
         if last is None:need(value['phase']=='PREPARED' and value['sequence']==1,'EVENT_INITIAL_STATE')
         else:
             need(value['approval_sha256']==last['approval_sha256'] and value['handoff_sha256']==last['handoff_sha256'],'JOURNAL_HANDOFF_BINDING_CHANGED')
