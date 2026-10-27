@@ -862,6 +862,20 @@ class Session:
             body=raw(CONTROL+'/'+name,131072)
             need(meta==dict(bytes=len(body),sha256=s.sha(body),uid=0,mode='0600'),'V2_SOURCE_CHANGED')
         return s.sha(b)
+    def frozen_image_boundary(self,clock):
+        if clock<s.EXPIRES:return
+        # The original artifact window governs acquiring/loading the image.  A
+        # persisted same-attempt PREPARED reopen may outlive that window only
+        # when its separately approved permit is bound and the exact reviewed
+        # image is already present in Docker.  This is read-only and is repeated
+        # at every boundary; it never authorizes another image or a new attempt.
+        need(self.recovering and self.prepared_reopen_raw is not None,
+             'FROZEN_IMAGE_ARTIFACT_EXPIRED')
+        fmt='{{json .Id}}\n{{json (index .Config.Labels "org.opencontainers.image.revision")}}\n{{json .Config.User}}'
+        rows=c.observation.capture(p.DOCKER+['image','inspect','--format',fmt,s.NEW_IMAGE],
+                                   timeout=8,budget=4096).splitlines()
+        need(len(rows)==3 and [s.exact_json(v) for v in rows]==
+             [s.NEW_IMAGE,s.PRODUCT,'10001:1008'],'EXACT_LOADED_IMAGE_REQUIRED')
     def boundary(self):
         need(threading.get_ident()==self.thread and operator()==self.owner,'OWNER_THREAD_CHANGED')
         need(time.monotonic()-self.started<=600,'WHOLE_ENTRY_TIME_BUDGET')
@@ -872,7 +886,7 @@ class Session:
              'CONTINUOUS_ENTRY_LOCK_REPLACED')
         need(s.sha(raw(s.ENTRY,131072))=='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55',
              'A_INSTALLED_ENTRY_CHANGED')
-        stamp=self.pins();t=c.now();need(t<s.EXPIRES,'FROZEN_IMAGE_ARTIFACT_EXPIRED')
+        stamp=self.pins();t=c.now();self.frozen_image_boundary(t)
         need(self.last is None or t>=self.last,'CLOCK_BACKWARDS');self.last=t
         if self.resume_mode and self.resume_history:self.resume_guard()
         if self.approved_stamp is not None:need(stamp==self.approved_stamp,'CARRIER_STAMP_CHANGED')

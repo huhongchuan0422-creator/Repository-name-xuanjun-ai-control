@@ -848,6 +848,17 @@ finally:
             with self.assertRaisesRegex(u.Hold,'EXACT_PREPARED_REOPEN_REQUIRED'):
                 update.reopen_prepared_stopped()
 
+    def test_expired_artifact_window_allows_only_bound_prepared_reopen_with_exact_loaded_image(self):
+        q=self.session
+        self.clock=s.EXPIRES
+        with self.assertRaisesRegex(u.Hold,'FROZEN_IMAGE_ARTIFACT_EXPIRED'):
+            q.frozen_image_boundary(self.clock)
+        q.recovering=True;q.prepared_reopen_raw=b'BOUND_SEPARATE_PREPARED_REOPEN'
+        q.frozen_image_boundary(self.clock)
+        with patch.object(c.observation,'capture',return_value=b'"sha256:bad"\n"bad"\n"0:0"'):
+            with self.assertRaisesRegex(u.Hold,'EXACT_LOADED_IMAGE_REQUIRED'):
+                q.frozen_image_boundary(self.clock)
+
     def test_persisted_prepared_reopens_same_attempt_with_separate_exact_authority(self):
         q,_=self._prepare_completed_b_before_c_proof()
         # Persist the dynamic plan first, then register its ordinary approval.
@@ -960,7 +971,7 @@ try:
    with patch.object(u.Update,'guard',side_effect=u.Hold('PROTECTED_BINDING_CHANGED')):q.resume_c_before_confirmation()
    raise AssertionError('PREPARED_HOLD_REQUIRED')
   except u.Hold as error:assert 'PROTECTED_BINDING_CHANGED' in str(error)
- proof,proof_raw=h.document(h.PROOF);q.close();t.clock=4000
+ proof,proof_raw=h.document(h.PROOF);q.close();t.clock=4000;s.EXPIRES=3500
  reopened=h.Session();reopened.acquire(recover=True);t.session=reopened
  reopened.configure_resumed_recovery(proof);reopened.approved_stamp=reopened.pins()
  active=Path(u.JOURNAL_PARENT,'active-attempt.json').read_bytes()
