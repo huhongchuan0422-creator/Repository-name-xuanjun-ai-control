@@ -53,7 +53,24 @@ class MCPAuthorizationStore(object):
               principal_id TEXT NOT NULL,project_id TEXT NOT NULL,
               resource TEXT NOT NULL,scope_json TEXT NOT NULL,
               created_at REAL NOT NULL,expires_at REAL NOT NULL,used_at REAL,
+              family_id TEXT NOT NULL,revoked_at REAL,
               PRIMARY KEY(tenant_id,token_hash))''')
+            refresh_columns={row[1] for row in db.execute(
+              'PRAGMA table_info(mcp_oauth_refresh_tokens)')}
+            legacy_refresh=('family_id' not in refresh_columns)
+            if 'family_id' not in refresh_columns:
+                db.execute('ALTER TABLE mcp_oauth_refresh_tokens '
+                  'ADD COLUMN family_id TEXT')
+            if 'revoked_at' not in refresh_columns:
+                db.execute('ALTER TABLE mcp_oauth_refresh_tokens '
+                  'ADD COLUMN revoked_at REAL')
+            db.execute('''UPDATE mcp_oauth_refresh_tokens SET family_id=token_hash
+              WHERE family_id IS NULL''')
+            if legacy_refresh:
+                # Pre-family refresh records cannot be linked safely after the
+                # fact.  Revoke them instead of silently preserving rotation.
+                db.execute('''UPDATE mcp_oauth_refresh_tokens SET revoked_at=?
+                  WHERE revoked_at IS NULL''',(self.clock(),))
             db.commit()
         finally:db.close()
 
@@ -166,10 +183,14 @@ class MCPAuthorizationStore(object):
               self.tenant_id,row['client_id']))}
             refresh=(secrets.token_urlsafe(48) if 'refresh_token' in grants else None)
             if refresh is not None:
-                db.execute('''INSERT INTO mcp_oauth_refresh_tokens VALUES
-                  (?,?,?,?,?,?,?,?,?,NULL)''',(self.tenant_id,_hash(refresh),
+                family=secrets.token_urlsafe(24)
+                db.execute('''INSERT INTO mcp_oauth_refresh_tokens(
+                  tenant_id,token_hash,client_id,principal_id,project_id,
+                  resource,scope_json,created_at,expires_at,used_at,family_id,
+                  revoked_at) VALUES (?,?,?,?,?,?,?,?,?,NULL,?,NULL)''',(
+                  self.tenant_id,_hash(refresh),
                   row['client_id'],row['principal_id'],row['project_id'],
-                  self.resource,row['scope_json'],now,now+2592000))
+                  self.resource,row['scope_json'],now,now+2592000,family))
             db.commit()
         except Exception:db.rollback();raise
         finally:db.close()
@@ -183,7 +204,7 @@ class MCPAuthorizationStore(object):
         if any(not params.get(x) for x in required):
             raise ValueError('OAUTH_TOKEN_PARAMETERS_REQUIRED')
         if params['resource']!=self.resource:raise ValueError('OAUTH_RESOURCE_MISMATCH')
-        now=self.clock();db=self.connect()
+        now=self.clock();db=self.connect();replay=False;result=None
         try:
             db.execute('BEGIN IMMEDIATE')
             row=db.execute('''SELECT * FROM mcp_oauth_refresh_tokens WHERE
@@ -194,23 +215,41 @@ class MCPAuthorizationStore(object):
                     row['resource']!=self.resource):
                 raise ValueError('OAUTH_REFRESH_REJECTED')
             if row['used_at'] is not None:
-                raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
-            changed=db.execute('''UPDATE mcp_oauth_refresh_tokens SET used_at=?
-              WHERE tenant_id=? AND token_hash=? AND used_at IS NULL''',(now,
-              self.tenant_id,_hash(params['refresh_token']))).rowcount
-            if changed!=1:raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
-            access=secrets.token_urlsafe(40);refresh=secrets.token_urlsafe(48)
-            db.execute('INSERT INTO mcp_oauth_tokens VALUES (?,?,?,?,?,?,?,?,?,NULL)',(
-              self.tenant_id,_hash(access),row['client_id'],row['principal_id'],
-              row['project_id'],self.resource,row['scope_json'],now,now+3600))
-            db.execute('''INSERT INTO mcp_oauth_refresh_tokens VALUES
-              (?,?,?,?,?,?,?,?,?,NULL)''',(self.tenant_id,_hash(refresh),
-              row['client_id'],row['principal_id'],row['project_id'],self.resource,
-              row['scope_json'],now,now+2592000));db.commit()
+                # Commit family revocation before surfacing the replay error.
+                # Raising inside this transaction would roll the protection back.
+                db.execute('''UPDATE mcp_oauth_refresh_tokens SET revoked_at=?
+                  WHERE tenant_id=? AND family_id=? AND revoked_at IS NULL''',(
+                  now,self.tenant_id,row['family_id']))
+                db.commit();replay=True
+            elif row['revoked_at'] is not None:
+                raise ValueError('OAUTH_REFRESH_REJECTED')
+            else:
+                changed=db.execute('''UPDATE mcp_oauth_refresh_tokens SET used_at=?
+                  WHERE tenant_id=? AND token_hash=? AND used_at IS NULL AND
+                  revoked_at IS NULL''',(now,self.tenant_id,
+                  _hash(params['refresh_token']))).rowcount
+                if changed!=1:raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
+                access=secrets.token_urlsafe(40);refresh=secrets.token_urlsafe(48)
+                db.execute('''INSERT INTO mcp_oauth_tokens VALUES
+                  (?,?,?,?,?,?,?,?,?,NULL)''',(self.tenant_id,_hash(access),
+                  row['client_id'],row['principal_id'],row['project_id'],
+                  self.resource,row['scope_json'],now,now+3600))
+                db.execute('''INSERT INTO mcp_oauth_refresh_tokens(
+                  tenant_id,token_hash,client_id,principal_id,project_id,
+                  resource,scope_json,created_at,expires_at,used_at,family_id,
+                  revoked_at) VALUES (?,?,?,?,?,?,?,?,?,NULL,?,NULL)''',(
+                  self.tenant_id,
+                  _hash(refresh),row['client_id'],row['principal_id'],
+                  row['project_id'],self.resource,row['scope_json'],now,
+                  now+2592000,row['family_id']))
+                db.commit()
+                result={'access_token':access,'refresh_token':refresh,
+                  'token_type':'Bearer','expires_in':3600,
+                  'scope':' '.join(json.loads(row['scope_json']))}
         except Exception:db.rollback();raise
         finally:db.close()
-        return {'access_token':access,'refresh_token':refresh,'token_type':'Bearer',
-          'expires_in':3600,'scope':' '.join(json.loads(row['scope_json']))}
+        if replay:raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
+        return result
 
     def authenticate(self,authorization,required_scope):
         if not authorization or not authorization.startswith('Bearer '):

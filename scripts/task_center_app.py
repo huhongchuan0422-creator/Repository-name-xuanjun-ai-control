@@ -14,6 +14,7 @@ import socket
 import sqlite3
 import sys
 import threading
+import time
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlsplit
@@ -275,12 +276,31 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
 
         def _read_bounded_body(self, limit=65536):
             previous=self.connection.gettimeout()
-            self.connection.settimeout(MCP_BODY_READ_TIMEOUT_SECONDS)
-            try:return self._read_bounded_body_inner(limit)
+            deadline=time.monotonic()+MCP_BODY_READ_TIMEOUT_SECONDS
+            try:return self._read_bounded_body_inner(limit,deadline)
             except socket.timeout:raise ValueError('BODY_TIMEOUT')
             finally:self.connection.settimeout(previous)
 
-        def _read_bounded_body_inner(self, limit):
+        def _body_read(self,size,deadline):
+            parts=[];remaining=size
+            while remaining:
+                budget=deadline-time.monotonic()
+                if budget<=0:raise ValueError('BODY_TIMEOUT')
+                self.connection.settimeout(budget)
+                reader=getattr(self.rfile,'read1',self.rfile.read)
+                chunk=reader(min(remaining,8192))
+                if not chunk:raise ValueError('BODY_INCOMPLETE')
+                parts.append(chunk);remaining-=len(chunk)
+            return b''.join(parts)
+
+        def _body_readline(self,limit,deadline):
+            value=b''
+            while len(value)<limit:
+                value+=self._body_read(1,deadline)
+                if value.endswith(b'\r\n'):return value
+            raise ValueError('CHUNK_HEADER_REJECTED')
+
+        def _read_bounded_body_inner(self, limit, deadline):
             """Read a bounded request body without assuming Content-Length.
 
             nginx may forward an HTTP/1.1 request using chunked transfer
@@ -301,39 +321,39 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     raise ValueError('TRANSFER_ENCODING_REJECTED')
                 chunks=[];total=0;chunk_count=0
                 while True:
-                    line=self.rfile.readline(130)
-                    if (not line.endswith(b'\r\n') or len(line)>129):
+                    line=self._body_readline(130,deadline)
+                    if len(line)>129:
                         raise ValueError('CHUNK_HEADER_REJECTED')
                     size_text=line[:-2].split(b';',1)[0]
-                    try:size=int(size_text,16)
-                    except (TypeError,ValueError):
+                    if (not size_text or any(char not in
+                            b'0123456789abcdefABCDEF' for char in size_text)):
                         raise ValueError('CHUNK_HEADER_REJECTED')
+                    size=int(size_text,16)
                     if size<0 or total+size>limit:
                         raise ValueError('BODY_LIMIT')
                     if size==0:
                         # Trailers are unnecessary for these JSON/form
                         # endpoints and create avoidable ambiguity.
-                        if self.rfile.readline(4098)!=b'\r\n':
+                        if self._body_readline(4098,deadline)!=b'\r\n':
                             raise ValueError('CHUNK_TRAILER_REJECTED')
                         break
                     chunk_count+=1
                     if chunk_count>1024:
                         raise ValueError('CHUNK_COUNT_LIMIT')
-                    chunk=self.rfile.read(size)
-                    if len(chunk)!=size or self.rfile.read(2)!=b'\r\n':
+                    chunk=self._body_read(size,deadline)
+                    if self._body_read(2,deadline)!=b'\r\n':
                         raise ValueError('BODY_INCOMPLETE')
                     chunks.append(chunk);total+=size
                 if total<1:raise ValueError('BODY_LIMIT')
                 return b''.join(chunks)
             if length_value is None:
                 raise ValueError('BODY_LENGTH_REQUIRED')
-            try:length=int(length_value)
-            except (TypeError,ValueError):
+            if (not length_value or any(char<'0' or char>'9'
+                    for char in length_value)):
                 raise ValueError('BODY_LENGTH_REJECTED')
+            length=int(length_value,10)
             if length<1 or length>limit:raise ValueError('BODY_LIMIT')
-            raw=self.rfile.read(length)
-            if len(raw)!=length:raise ValueError('BODY_INCOMPLETE')
-            return raw
+            return self._body_read(length,deadline)
 
         def _mcp_challenge(self,scope,close=False):
             metadata=((external_origin or
@@ -376,6 +396,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   else 'invalid_client_metadata')
                 body={'error':error,
                       'error_description':detail}
+            elif path=='/oauth/token' and detail in (
+                    'OAUTH_CODE_OR_PKCE_REJECTED','OAUTH_CODE_REPLAY_REJECTED',
+                    'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED'):
+                body={'error':'invalid_grant','error_description':detail}
             else:
                 body={'error':'invalid_request','error_description':detail}
             self._send(400,_json_bytes(body),'application/json; charset=utf-8',

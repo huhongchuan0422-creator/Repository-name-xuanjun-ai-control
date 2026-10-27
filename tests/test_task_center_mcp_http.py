@@ -27,6 +27,8 @@ from connection_management import ConnectionManager
 from model_orchestration import ModelControl
 from provider_onboarding import ensure_schema as ensure_onboarding_schema
 from task_center_app import make_server
+import task_center_app as task_center_app_module
+from task_center_mcp_auth import MCPAuthorizationStore
 from task_center_mcp_service import MCPTaskService
 from task_center_session_auth import FileTestIdentityProvider,SessionStore,password_hash
 from task_supervisor import Supervisor
@@ -176,6 +178,32 @@ class MCPHTTPTests(unittest.TestCase):
           'SELECT COUNT(*) FROM mcp_oauth_refresh_tokens').fetchone()[0]
         finally:db.close()
 
+    def oauth_store(self):
+        def connect():
+            import sqlite3
+            db=sqlite3.connect(self.db,timeout=5);db.row_factory=sqlite3.Row
+            return db
+        return MCPAuthorizationStore(connect,'tenant-mcp',
+          'https://'+HOST+'/task-center-test',
+          'https://'+HOST+'/task-center-test/mcp')
+
+    def issue_refresh(self,store,client_id,marker):
+        verifier=marker*64
+        challenge=base64.urlsafe_b64encode(hashlib.sha256(
+          verifier.encode()).digest()).decode().rstrip('=')
+        redirect_uri='https://chatgpt.com/connector_platform_oauth_redirect'
+        location=store.authorize({'principal_id':'owner-1'},
+          {'response_type':'code','client_id':client_id,
+           'redirect_uri':redirect_uri,'code_challenge':challenge,
+           'code_challenge_method':'S256','state':marker,
+           'resource':'https://'+HOST+'/task-center-test/mcp',
+           'scope':'task:read'})
+        code=parse_qs(urlsplit(location).query)['code'][0]
+        return store.exchange({'grant_type':'authorization_code','code':code,
+          'client_id':client_id,'redirect_uri':redirect_uri,
+          'code_verifier':verifier,
+          'resource':'https://'+HOST+'/task-center-test/mcp'})
+
     def test_chunked_mcp_probe_challenges_and_dcr_registers(self):
         rpc={'jsonrpc':'2.0','id':1,'method':'initialize','params':{}}
         status,headers,body=self.raw_chunked('/mcp',rpc)
@@ -250,7 +278,90 @@ class MCPHTTPTests(unittest.TestCase):
         status,result=self.raw_request('/oauth/register',{
           'Content-Type':'application/json','Content-Length':'10'},b'{}')
         self.assertEqual((status,result['error_description']),(400,'BODY_TIMEOUT'))
+        for value in ('+2','0_2','0x2'):
+            status,result=self.raw_request('/oauth/register',{
+              'Content-Type':'application/json','Content-Length':value},b'{}')
+            self.assertEqual((status,result['error_description']),
+                             (400,'BODY_LENGTH_REJECTED'))
+        for value in (b'+2',b'0_2',b'0x2'):
+            status,result=self.raw_request('/oauth/register',{
+              'Content-Type':'application/json','Transfer-Encoding':'chunked'},
+              value+b'\r\n{}\r\n0\r\n\r\n')
+            self.assertEqual((status,result['error_description']),
+                             (400,'CHUNK_HEADER_REJECTED'))
         self.assertEqual(self.oauth_record_counts(),(0,0,0))
+
+    def test_body_read_uses_one_total_deadline_for_slow_fragments(self):
+        old=task_center_app_module.MCP_BODY_READ_TIMEOUT_SECONDS
+        task_center_app_module.MCP_BODY_READ_TIMEOUT_SECONDS=.2
+        client=socket.create_connection(('127.0.0.1',self.server.server_port),3)
+        started=time.monotonic()
+        try:
+            client.sendall(('POST /task-center-test/oauth/register HTTP/1.1\r\n'
+              'Host: %s\r\nContent-Type: application/json\r\n'
+              'Content-Length: 3\r\nConnection: close\r\n\r\n{'%HOST).encode())
+            time.sleep(.12)
+            client.sendall(b'}')
+            response=b''
+            while True:
+                part=client.recv(65536)
+                if not part:break
+                response+=part
+        finally:
+            client.close()
+            task_center_app_module.MCP_BODY_READ_TIMEOUT_SECONDS=old
+        elapsed=time.monotonic()-started
+        head,payload=response.split(b'\r\n\r\n',1)
+        self.assertEqual(int(head.split(b' ',2)[1]),400)
+        self.assertEqual(json.loads(payload)['error_description'],'BODY_TIMEOUT')
+        self.assertLess(elapsed,.30)
+
+    def test_refresh_replay_revokes_only_its_family_under_concurrency(self):
+        store=self.oauth_store()
+        client=store.register({'redirect_uris':[
+          'https://chatgpt.com/connector_platform_oauth_redirect'],
+          'grant_types':['authorization_code','refresh_token'],
+          'response_types':['code'],'token_endpoint_auth_method':'none'})
+        family_a=self.issue_refresh(store,client['client_id'],'a')
+        family_b=self.issue_refresh(store,client['client_id'],'b')
+        params={'grant_type':'refresh_token',
+          'refresh_token':family_a['refresh_token'],
+          'client_id':client['client_id'],
+          'resource':'https://'+HOST+'/task-center-test/mcp'}
+        barrier=threading.Barrier(3);results=[];lock=threading.Lock()
+        def rotate():
+            barrier.wait()
+            try:value=('SUCCESS',store.exchange(dict(params)))
+            except ValueError as exc:value=('REJECTED',str(exc))
+            with lock:results.append(value)
+        workers=[threading.Thread(target=rotate) for unused in range(2)]
+        for worker in workers:worker.start()
+        barrier.wait()
+        for worker in workers:worker.join(5)
+        self.assertFalse(any(worker.is_alive() for worker in workers))
+        self.assertEqual([item[0] for item in results].count('SUCCESS'),1)
+        self.assertEqual([item[1] for item in results if item[0]=='REJECTED'],
+          ['OAUTH_REFRESH_REPLAY_REJECTED'])
+        successor=[item[1]['refresh_token'] for item in results
+          if item[0]=='SUCCESS'][0]
+        with self.assertRaisesRegex(ValueError,'OAUTH_REFRESH_REJECTED'):
+            store.exchange(dict(params,refresh_token=successor))
+        unaffected=store.exchange(dict(params,
+          refresh_token=family_b['refresh_token']))
+        self.assertIn('refresh_token',unaffected)
+        import sqlite3
+        db=sqlite3.connect(self.db);db.row_factory=sqlite3.Row
+        try:
+            rows=db.execute('''SELECT family_id,revoked_at FROM
+              mcp_oauth_refresh_tokens WHERE tenant_id=?''',(
+              'tenant-mcp',)).fetchall()
+        finally:db.close()
+        families={}
+        for row in rows:families.setdefault(row['family_id'],[]).append(
+          row['revoked_at'])
+        self.assertEqual(len(families),2)
+        self.assertEqual(sorted(all(value is not None for value in values)
+          for values in families.values()),[False,True])
 
     def test_oauth_pkce_and_streamable_http_discovery(self):
         metadata=json.loads(self.request('/.well-known/oauth-protected-resource').read())
@@ -360,8 +471,9 @@ class MCPHTTPTests(unittest.TestCase):
             raw('/oauth/token','POST',urlencode(exchange).encode(),{
               'Content-Type':'application/x-www-form-urlencoded'})
         self.assertEqual(replay.exception.code,400)
-        self.assertEqual(json.loads(replay.exception.read())['error_description'],
-                         'OAUTH_CODE_REPLAY_REJECTED')
+        replay_error=json.loads(replay.exception.read())
+        self.assertEqual(replay_error,{'error':'invalid_grant',
+          'error_description':'OAUTH_CODE_REPLAY_REJECTED'})
         refresh={'grant_type':'refresh_token','refresh_token':token['refresh_token'],
           'client_id':client['client_id'],'resource':resource}
         rotated=json.loads(raw('/oauth/token','POST',urlencode(refresh).encode(),{
@@ -371,9 +483,15 @@ class MCPHTTPTests(unittest.TestCase):
             raw('/oauth/token','POST',urlencode(refresh).encode(),{
               'Content-Type':'application/x-www-form-urlencoded'})
         self.assertEqual(refresh_replay.exception.code,400)
-        self.assertEqual(json.loads(
-          refresh_replay.exception.read())['error_description'],
-          'OAUTH_REFRESH_REPLAY_REJECTED')
+        refresh_error=json.loads(refresh_replay.exception.read())
+        self.assertEqual(refresh_error,{'error':'invalid_grant',
+          'error_description':'OAUTH_REFRESH_REPLAY_REJECTED'})
+        with self.assertRaises(HTTPError) as revoked_successor:
+            raw('/oauth/token','POST',urlencode(dict(refresh,
+              refresh_token=rotated['refresh_token'])).encode(),{
+              'Content-Type':'application/x-www-form-urlencoded'})
+        self.assertEqual(json.loads(revoked_successor.exception.read()),{
+          'error':'invalid_grant','error_description':'OAUTH_REFRESH_REJECTED'})
         self.assertEqual(self.refresh_record_count(),2)
         token['access_token']=rotated['access_token']
         rpc={'jsonrpc':'2.0','id':1,'method':'initialize','params':{}}
