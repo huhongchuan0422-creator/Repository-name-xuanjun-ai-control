@@ -37,6 +37,9 @@ class PreparedResumeDelivery(unittest.TestCase):
         self.write(self.backup/'stopped-handoff-v1.json',proof);self.write(self.journal/'active-attempt.json',active)
         self.write(self.attempt/'checkpoint.json',checkpoint);self.write(self.attempt/'event-000001.json',checkpoint)
         self.write(self.base/'bc-c-resume-approval-old.json',canon({'old':True}))
+        real_read=d.read
+        def fixture_read(path,limit=8*1024*1024,uid=0,mode=0o600):
+            return real_read(path,limit,os.getuid() if uid==0 else uid,mode)
         self.patches=[
             patch.object(d,'BASE',str(self.base)),patch.object(d,'CONTROL',str(self.base/'control-stopped-v1')),
             patch.object(d,'JOURNAL',str(self.journal)),patch.object(d,'ATTEMPT','attempt'),patch.object(d,'PLAN','a'*64),
@@ -47,6 +50,7 @@ class PreparedResumeDelivery(unittest.TestCase):
             patch.object(d,'DELIVERY',str(self.base/'delivery')),patch.object(d,'INTENT',str(self.base/'delivery/intent.json')),
             patch.object(d,'RECEIPT',str(self.base/'delivery/receipt.json')),patch.object(d,'STAGE','stage'),patch.object(d,'RETAINED','retained'),
             patch.object(d,'source',lambda:(json.loads(self.new_manifest),dict(self.new_bodies))),
+            patch.object(d,'read',fixture_read),patch.object(d.os,'fchown',lambda *args:None),
         ]
         for p in self.patches:p.start()
     def tearDown(self):
