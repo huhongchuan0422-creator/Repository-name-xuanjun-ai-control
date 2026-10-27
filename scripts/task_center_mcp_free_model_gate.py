@@ -9,12 +9,13 @@ from __future__ import print_function
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
 import re
 import sys
 import time
-from urllib.parse import urlparse
+from urllib.parse import urljoin,urlparse
 
 sys.path.insert(0,os.path.dirname(__file__))
 from model_orchestration import (ModelControl, SiliconFlowAdapter,
@@ -27,6 +28,8 @@ from task_supervisor import Supervisor
 CONNECTION_ID='siliconflow-siliconflow-default'
 MODEL_ID='Qwen/Qwen2.5-7B-Instruct'
 PRICING_URL='https://siliconflow.cn/pricing'
+PRICING_HOSTS=('siliconflow.cn','www.siliconflow.cn')
+PRICING_MAX_REDIRECTS=3
 SUITE_VERSION='owner-mcp-classification-20261027-v1'
 
 
@@ -87,20 +90,65 @@ def parse_zero_price_page(raw):
       'source_sha256':hashlib.sha256(raw).hexdigest()}
 
 
-def fetch_pricing(adapter,timeout):
-    parsed=urlparse(PRICING_URL);headers={'Accept':'text/html',
-      'User-Agent':'Xuanjun-TEST-ONLY-Pricing-Verification'}
-    connection=None
+def pricing_url(value):
+    parsed=urlparse(value);host=(parsed.hostname or '').lower()
+    if parsed.scheme!='https':raise ValueError('PRICING_REDIRECT_HTTPS_REQUIRED')
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError('PRICING_REDIRECT_USERINFO_FORBIDDEN')
+    try:port=parsed.port
+    except ValueError:raise ValueError('PRICING_REDIRECT_PORT')
+    if port not in (None,443):raise ValueError('PRICING_REDIRECT_PORT')
     try:
-        connection,response=adapter._pinned_open(parsed,None,headers,timeout,
-          method='GET',endpoint_path='')
-        content_type=response.getheader('Content-Type','').lower()
-        if response.status!=200:raise ValueError('PRICING_HTTP_STATUS')
-        if 'text/html' not in content_type:raise ValueError('PRICING_CONTENT_TYPE')
-        raw=response.read(2*1024*1024+1)
-    finally:
-        if connection is not None:connection.close()
-    return parse_zero_price_page(raw)
+        address=ipaddress.ip_address(host)
+        if (address.is_private or address.is_loopback or address.is_link_local or
+                address.is_multicast or address.is_reserved or
+                address.is_unspecified):
+            raise ValueError('PRICING_REDIRECT_PRIVATE_TARGET')
+    except ValueError as exc:
+        if str(exc)=='PRICING_REDIRECT_PRIVATE_TARGET':raise
+    if host not in PRICING_HOSTS:
+        raise ValueError('PRICING_REDIRECT_OFFICIAL_HOST_REQUIRED')
+    if parsed.path!='/pricing' or parsed.query or parsed.fragment:
+        raise ValueError('PRICING_REDIRECT_EXACT_PATH_REQUIRED')
+    return parsed
+
+
+def fetch_pricing(adapter,timeout):
+    headers={'Accept':'text/html',
+      'User-Agent':'Xuanjun-TEST-ONLY-Pricing-Verification'}
+    deadline=time.monotonic()+timeout;current=PRICING_URL
+    visited=[];statuses=[]
+    for redirect_count in range(PRICING_MAX_REDIRECTS+1):
+        parsed=pricing_url(current)
+        canonical_url='https://'+parsed.hostname+'/pricing'
+        if canonical_url in visited:raise ValueError('PRICING_REDIRECT_LOOP')
+        visited.append(canonical_url);connection=None
+        try:
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise ValueError('PRICING_TOTAL_TIMEOUT')
+            connection,response=adapter._pinned_open(parsed,None,headers,
+              remaining,method='GET',endpoint_path='')
+            statuses.append(response.status)
+            if response.status in (301,302,303,307,308):
+                if redirect_count>=PRICING_MAX_REDIRECTS:
+                    raise ValueError('PRICING_REDIRECT_LIMIT')
+                location=response.getheader('Location','')
+                if not location:raise ValueError('PRICING_REDIRECT_LOCATION')
+                current=urljoin(canonical_url,location)
+                pricing_url(current)
+                continue
+            content_type=response.getheader('Content-Type','').lower()
+            if response.status!=200:raise ValueError('PRICING_HTTP_STATUS')
+            if 'text/html' not in content_type:
+                raise ValueError('PRICING_CONTENT_TYPE')
+            raw=response.read(2*1024*1024+1)
+        finally:
+            if connection is not None:connection.close()
+        result=parse_zero_price_page(raw)
+        result.update({'source_uri':PRICING_URL,'final_source_uri':canonical_url,
+          'status_chain':statuses,'redirect_count':len(statuses)-1})
+        return result
+    raise ValueError('PRICING_REDIRECT_LIMIT')
 
 
 def registered_suite(control):

@@ -63,6 +63,58 @@ class FreeModelGateTests(unittest.TestCase):
         self.assertEqual(observed,[('GET','/pricing'),
           ('GET','/v1/models'),('POST','/v1/chat/completions')])
 
+    def test_pricing_follows_one_official_https_redirect_and_parses_zero(self):
+        page=self.page().encode('utf-8')
+        class Response(object):
+            def __init__(self,status,headers=None,body=b''):
+                self.status=status;self.headers=headers or {};self.body=body
+            def getheader(self,name,default=''):
+                return self.headers.get(name,default)
+            def read(self,limit):return self.body[:limit]
+        class Connection(object):
+            def close(self):pass
+        class Adapter(object):
+            def __init__(self):self.calls=[]
+            def _pinned_open(inner,parsed,body,headers,timeout,method,
+                             endpoint_path):
+                inner.calls.append((parsed.geturl(),method,endpoint_path))
+                if len(inner.calls)==1:
+                    return Connection(),Response(301,{'Location':
+                      'https://www.siliconflow.cn/pricing'})
+                return Connection(),Response(200,{'Content-Type':
+                  'text/html; charset=utf-8'},page)
+        adapter=Adapter();result=gate.fetch_pricing(adapter,10)
+        self.assertEqual(adapter.calls,[('https://siliconflow.cn/pricing',
+          'GET',''),('https://www.siliconflow.cn/pricing','GET','')])
+        self.assertEqual(result['status_chain'],[301,200])
+        self.assertEqual(result['final_source_uri'],
+                         'https://www.siliconflow.cn/pricing')
+        self.assertEqual((result['prompt_price'],result['completion_price']),
+                         ('0','0'))
+
+    def test_pricing_redirect_rejects_nonofficial_downgrade_private_and_loop(self):
+        class Response(object):
+            status=301
+            def __init__(self,location):self.location=location
+            def getheader(self,name,default=''):
+                return self.location if name=='Location' else default
+        class Connection(object):
+            def close(self):pass
+        for location,error in (
+          ('https://example.com/pricing','OFFICIAL_HOST_REQUIRED'),
+          ('http://www.siliconflow.cn/pricing','HTTPS_REQUIRED'),
+          ('https://127.0.0.1/pricing','PRIVATE_TARGET')):
+            class Adapter(object):
+                def _pinned_open(self,*args,**kwargs):
+                    return Connection(),Response(location)
+            with self.assertRaisesRegex(ValueError,error):
+                gate.fetch_pricing(Adapter(),10)
+        class LoopAdapter(object):
+            def _pinned_open(self,*args,**kwargs):
+                return Connection(),Response('https://siliconflow.cn/pricing')
+        with self.assertRaisesRegex(ValueError,'REDIRECT_LOOP'):
+            gate.fetch_pricing(LoopAdapter(),10)
+
     def test_connection_id_resolves_real_provider_without_rebinding(self):
         db=sqlite3.connect(':memory:');db.row_factory=sqlite3.Row
         db.executescript('''
