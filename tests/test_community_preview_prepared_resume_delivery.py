@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts import community_preview_prepared_resume_delivery as d
+from scripts import community_preview_update_checkpoint as u
 
 
 def canon(v):return json.dumps(v,sort_keys=True,separators=(',',':')).encode()
@@ -119,6 +120,45 @@ class PreparedResumeDelivery(unittest.TestCase):
                    'plan_sha256':'a'*64,'sequence':7})
         self.write(self.attempt/'event-000007.json',bad);self.write(self.attempt/'checkpoint.json',bad)
         with self.assertRaisesRegex(d.Hold,'EVENT_PHASE_TRANSITION'):d.query()
+
+    def test_unknown_preserves_known_id_and_exact_id_contract_matches_checkpoint(self):
+        d.update()
+        for sequence,phase,new_id in (
+            (2,'STOPPED_HANDOFF_ACCEPTED',None),(3,'OLD_RENAME_INTENT',None),
+            (4,'OLD_RETAINED',None),(5,'NEW_RUN_INTENT',None),
+            (6,'NEW_KNOWN','d'*64),(7,d.HOLD_PHASE,'d'*64)):
+            self.append(sequence,phase,new_id)
+        result=d.query();self.assertEqual((result['phase'],result['new_id']),(d.HOLD_PHASE,'d'*64))
+        cases=(
+            (d.HOLD_PHASE,'x'*64,'CHECKPOINT_ID'),
+            (d.HOLD_PHASE,'d'*63,'CHECKPOINT_ID'),
+            ('NEW_KNOWN',None,'CHECKPOINT_ID_REQUIRED'),
+            ('OLD_RETAINED','d'*64,'CHECKPOINT_UNEXPECTED_ID'),
+            (d.HOLD_PHASE,'e'*64,'EVENT_ID_CHANGED'),
+        )
+        for phase,new_id,reason in cases:
+            with self.subTest(phase=phase,new_id=new_id,reason=reason):
+                self.append(7,phase,new_id)
+                with self.assertRaisesRegex(d.Hold,reason):d.query()
+        self.append(7,d.HOLD_PHASE,None)
+        with self.assertRaisesRegex(d.Hold,'EVENT_ID_CHANGED'):d.query()
+
+    def test_read_side_acceptance_matches_original_validator_for_every_phase_and_id_class(self):
+        original=object.__new__(u.Journal)
+        original.plan={'plan_sha256':'a'*64}
+        original.handoff_binding={'approval_sha256':'b'*64,'handoff_sha256':'c'*64}
+        ids=(None,'d'*64,'d'*63,'x'*64,1)
+        for phase in sorted(u.TRANSITIONS):
+            for new_id in ids:
+                value={'approval_sha256':'b'*64,'handoff_sha256':'c'*64,
+                       'new_id':new_id,'phase':phase,'plan_sha256':'a'*64,
+                       'sequence':1}
+                with self.subTest(phase=phase,new_id=new_id):
+                    try:original.validate_record(value);expected=True
+                    except u.Hold:expected=False
+                    try:d.validate_journal_record(value);actual=True
+                    except d.Hold:actual=False
+                    self.assertEqual(actual,expected)
 
     def test_recover_refuses_prepared_without_calling_loader(self):
         d.update()
