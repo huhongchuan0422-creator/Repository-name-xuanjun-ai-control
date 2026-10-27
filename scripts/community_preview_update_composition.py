@@ -21,12 +21,17 @@ REFERENCE_UID=0  # fixed production root owner; no argument/environment override
 APPROVAL='/opt/xuanjun-community-preview/update-approval.json'  # proposed, never created
 PRODUCT='f13155ed63a3137d41766ee587d9b4b96a81477f'
 CONTROL='a9324156f94040bb6ff0243815bb91abe2f67b2a'
-PINS={controller:'e9029ca3e0c36fb1656995fcbe77f46739ee7abfc490adbd0cf4808f0e41b826',
+PINS={controller:'def3dd75f4ee71eef9e48ac97448b39b9eba1446df334e43d901c64fdb63014b',
       plan:'81c01a2f94ff71c0af4555b9026a60db0b5ce226a158601e1cf1b6aa4b646fae',
       original:'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee',
       observation:'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3'}
 RECEIPT_SHA='cba144af0ca2f753413f7bdcec92625c370c479c4708b1d4a1db0b35907c8b45'
 ACTIONS=['ORIGINAL_CONTAINER_STOP_RENAME_RUN','KNOWN_FAILURE_SERIAL_RECOVERY','JOURNAL_WRITES']
+ROUTE_TRANSITION={
+    'saved_routing_sha256':'ea0d1f01f92f80f1d603b2bc2d219b7f675b11f5b84eccdf89918f17e933a3eb',
+    'live_routing_sha256':'5d889dcedebfd02ce44b2d7330cf921cad099adbbe0b6eb2c0b3245eb77151f4',
+    'community_sha256':'df55f5f11413c623d3f9d966b6feacf54fda25ecfe42ee11d70052d544f2ca83',
+    'shared_vhost_sha256':'416f1644c3e45357233fbc5510a8adf2a288ec2a3950c1fbef08cde8c1ff7302'}
 
 
 def require(ok,reason):
@@ -43,6 +48,22 @@ def canonical_isolation(value):
     if result.get('security')==['no-new-privileges:true']:
         result['security']=['no-new-privileges']
     return result
+
+
+def stopped_route_transition(saved,live):
+    """Accept the one reviewed P2 shared-vhost transition, never a new baseline."""
+    if (saved.get('routing_sha256')!=ROUTE_TRANSITION['saved_routing_sha256']
+            or live.get('routing_sha256')!=ROUTE_TRANSITION['live_routing_sha256']):return False
+    community,community_raw=observation.safe_file(observation.ROUTE_PATHS['community_route'],body=True)
+    shared,shared_raw=observation.safe_file(observation.ROUTE_PATHS['shared_vhost_file_digest_only'],body=True)
+    if (community['sha256']!=ROUTE_TRANSITION['community_sha256']
+            or shared['sha256']!=ROUTE_TRANSITION['shared_vhost_sha256']):return False
+    marker=b'include /etc/nginx/community-preview.inc;'
+    if shared_raw.count(marker)!=1:return False
+    # Syntax validation is read-only and is repeated at every phase boundary;
+    # no reload, rewrite, or adoption of later shared-vhost bytes occurs here.
+    original.command(['/usr/sbin/nginx','-t'])
+    return True
 
 
 def now():

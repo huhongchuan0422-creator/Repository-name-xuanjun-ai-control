@@ -848,6 +848,30 @@ finally:
             with self.assertRaisesRegex(u.Hold,'EXACT_PREPARED_REOPEN_REQUIRED'):
                 update.reopen_prepared_stopped()
 
+    def test_reviewed_shared_vhost_transition_keeps_exact_community_route(self):
+        saved={'routing_sha256':c.ROUTE_TRANSITION['saved_routing_sha256']}
+        live={'routing_sha256':c.ROUTE_TRANSITION['live_routing_sha256']}
+        marker=b'include /etc/nginx/community-preview.inc;'
+        def route(path,body=False):
+            if path==c.observation.ROUTE_PATHS['community_route']:
+                return ({'sha256':c.ROUTE_TRANSITION['community_sha256']},b'community')
+            return ({'sha256':c.ROUTE_TRANSITION['shared_vhost_sha256']},b'server { '+marker+b' }')
+        with patch.object(c.observation,'safe_file',side_effect=route), \
+             patch.object(c.original,'command',return_value='') as nginx:
+            self.assertTrue(c.stopped_route_transition(saved,live))
+        nginx.assert_called_once_with(['/usr/sbin/nginx','-t'])
+
+    def test_reviewed_shared_vhost_transition_denies_unbound_or_missing_include(self):
+        saved={'routing_sha256':c.ROUTE_TRANSITION['saved_routing_sha256']}
+        live={'routing_sha256':c.ROUTE_TRANSITION['live_routing_sha256']}
+        def route(path,body=False):
+            key='community_sha256' if path==c.observation.ROUTE_PATHS['community_route'] else 'shared_vhost_sha256'
+            return ({'sha256':c.ROUTE_TRANSITION[key]},b'no include')
+        with patch.object(c.observation,'safe_file',side_effect=route),patch.object(c.original,'command') as nginx:
+            self.assertFalse(c.stopped_route_transition(saved,live))
+            self.assertFalse(c.stopped_route_transition({'routing_sha256':'0'*64},live))
+        nginx.assert_not_called()
+
     def test_expired_artifact_window_allows_only_bound_prepared_reopen_with_exact_loaded_image(self):
         # Remote artifact retention expiry is not expiry of the exact verified local image.
         q=self.session

@@ -1235,7 +1235,8 @@ class Session:
             self.resume_guard()
         self.journal=u.Journal(self.parent,candidate,lease_fd=self.lease,handoff_binding=binding)
         h=VerifiedHandoff(self,proof,self.journal)
-        transport=u.OriginalTransport(h.bindings,c.BoundHttpsHealth(self.journal,h.bindings))
+        transport=u.OriginalTransport(h.bindings,c.BoundHttpsHealth(self.journal,h.bindings),
+            route_transition=c.stopped_route_transition)
         update=u.Update(self.journal,transport,execution_enabled=True,clock=c.now,handoff=h)
         if recover:
             c.recovery_admission(self.journal,transport,h.bindings)

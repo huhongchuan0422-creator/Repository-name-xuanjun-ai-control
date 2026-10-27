@@ -59,6 +59,32 @@ class Checkpoints(unittest.TestCase):
     def test_default_disabled_zero_transport_actions(self):
         with self.assertRaisesRegex(u.Hold,'DISABLED'):u.Update(self.j,self.t).run()
         self.assertEqual(self.calls,[])
+    def test_stopped_exact_reviewed_route_transition_only(self):
+        self.old=False
+        live=dict(self.p['current'],running=False,routing_sha256='9'*64)
+        accepted=[]
+        handoff=Mock(check=Mock())
+        t=u.OriginalTransport(lambda:dict(live),self.health,
+            route_transition=lambda saved,current:accepted.append((saved,current)) or True)
+        update=object.__new__(u.Update);update.journal=self.j;update.t=t;update.enabled=True
+        update.clock=lambda:self.now;update.last=None;update.handoff=handoff
+        self.assertEqual(update.guard(False),1000)
+        self.assertEqual(len(accepted),1)
+        live['config_identity_sha256']='8'*64
+        with self.assertRaisesRegex(u.Hold,'PROTECTED_BINDING_CHANGED'):update.guard(False)
+        self.assertEqual(len(accepted),1)
+    def test_route_transition_is_default_denied_and_stopped_only(self):
+        live=dict(self.p['current'],running=True,routing_sha256='9'*64)
+        t=u.OriginalTransport(lambda:dict(live),self.health,route_transition=lambda *_:True)
+        with self.assertRaisesRegex(u.Hold,'PROTECTED_BINDING_CHANGED'):
+            u.Update(self.j,t,execution_enabled=True,clock=lambda:self.now).guard(True)
+        live['running']=False
+        handoff=Mock(check=Mock())
+        denied=u.OriginalTransport(lambda:dict(live),self.health,route_transition=lambda *_:False)
+        update=object.__new__(u.Update);update.journal=self.j;update.t=denied;update.enabled=True
+        update.clock=lambda:self.now;update.last=None;update.handoff=handoff
+        with self.assertRaisesRegex(u.Hold,'PROTECTED_BINDING_CHANGED'):
+            update.guard(False)
     def test_real_fsync_journal_serial_success_reopen_and_no_replay(self):
         r=self.update().run();self.assertEqual(r['phase'],'COMMITTED');self.assertFalse(self.old);self.assertTrue(self.new)
         self.j.close();self.j=u.Journal(self.parent,self.p);self.addCleanup(self.j.close)

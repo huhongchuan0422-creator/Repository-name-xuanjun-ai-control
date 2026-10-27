@@ -222,9 +222,10 @@ class Journal:
 
 
 class OriginalTransport:
-    def __init__(self,protected_bindings,health_reader):
+    def __init__(self,protected_bindings,health_reader,route_transition=None):
         if not callable(protected_bindings) or not callable(health_reader):raise Hold('ORIGINAL_LIVE_READERS_REQUIRED')
-        self.bindings=protected_bindings;self.health=health_reader
+        if route_transition is not None and not callable(route_transition):raise Hold('ROUTE_TRANSITION_READER_REQUIRED')
+        self.bindings=protected_bindings;self.health=health_reader;self.route_transition=route_transition
     def inspect(self,cid,image,running):
         value=original.inspect(cid);original.validate(value,image,cid,running=running);return value
     def mutate(self,argv):return original.mutate(argv,20).strip()
@@ -260,7 +261,16 @@ class Update:
         live=self.t.bindings()
         if type(live) is not dict or set(live)!=set(c):raise Hold('LIVE_BINDING_SHAPE')
         if any(type(live[k]) is not type(c[k]) for k in c):raise Hold('LIVE_BINDING_SHAPE')
-        if any(live[k]!=c[k] for k in c if k not in ('observed_at','running')):raise Hold('PROTECTED_BINDING_CHANGED')
+        changed={k for k in c if k not in ('observed_at','running') and live[k]!=c[k]}
+        if changed:
+            # The shared owner vhost is maintained by a separate, serialized P2
+            # transaction.  A stopped PREPARED continuation may accept its one
+            # reviewed transition only through a fail-closed original reader;
+            # all community-owned route bytes and every other binding remain
+            # exact.  Ordinary/running updates have no such compatibility path.
+            compatible=(changed=={'routing_sha256'} and self.handoff is not None
+                and self.t.route_transition is not None and self.t.route_transition(c,live) is True)
+            if not compatible:raise Hold('PROTECTED_BINDING_CHANGED')
         if old_running is not None and live['running'] is not old_running:raise Hold('OLD_WRITER_PHASE_CHANGED')
         if not now-600<=live['observed_at']<=now+30:raise Hold('CURRENT_OBSERVATION_EXPIRED')
         if self.handoff is not None:self.handoff.check()
