@@ -499,7 +499,8 @@ class Session:
         # These preserved files are immutable scope evidence, not a renewed
         # execution permit.  Live execution authority is the exact TTY gate in
         # reopen_prepared(); therefore elapsed time must not force another
-        # permit file for this already-PREPARED same attempt.
+        # permit file for this already-PREPARED same attempt.  Expiry remains
+        # recorded and checked as history; it is never rewritten or extended.
         now=c.now();current=self.approved_stamp==self.pins()
         if approval['carrier_manifest_sha256']==self.approved_stamp:
             need(type(approval['issued_at']) is int and type(approval['expires_at']) is int
