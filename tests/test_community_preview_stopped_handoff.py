@@ -849,6 +849,8 @@ finally:
                 update.reopen_prepared_stopped()
 
     def test_reviewed_shared_vhost_transition_keeps_exact_community_route(self):
+        # PREPARED resume scope: the P2-owned vhost may take this one reviewed
+        # transition, while the community-owned include remains byte-exact.
         saved={'routing_sha256':c.ROUTE_TRANSITION['saved_routing_sha256']}
         live={'routing_sha256':c.ROUTE_TRANSITION['live_routing_sha256']}
         marker=b'include /etc/nginx/community-preview.inc;'
