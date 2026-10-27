@@ -1443,6 +1443,27 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 详细DNS逐项台账、服务器事实与未知项、部署验收、回滚、Work/Dots协作锚点统一放在 `plans/XUANJUN_DOMAIN_DNS_UK_DOMESTIC_MIGRATION_MASTER_20261015.md`。本次工具容器和公共网页没有获得主域实际站点响应，`WEBSITE_ACTUAL_HOST=UNKNOWN`，`FIRST_PARTY_CUSTOMER_PREVIEW_GATE=HOLD`，不得宣称已完成部署。所有任务写回原PR/Issue与资产复用台账，不新建平行产品和生产写入者。
 
+### 8.2.9 固定版本交付、OpenClaw 与 root 长期接入职责（2026-10-27 补充）
+
+本节同步 Owner 当日最新分工，保留 8.2.3—8.2.8 的历史事实和仍适用的完整性、安全、恢复要求；不是新的审批层，也不是服务器执行许可。权威交接沿原 PR17 与 PR122，不建立第二套队列或任务状态。
+
+**角色与路径。** 原源码 Writer 在任务指定分支完成代码、适用测试，交固定 repo/ref/Commit/Tree、基础来源、制品 Manifest/SHA 与完整执行入口；独立审核按同版本、实际影响范围完成。OpenClaw 仅负责已有授权的固定版本取件、核验及确定性非 root 步骤，不取浮动 HEAD，不将机械收件当执行开始。需要 root 的安装、服务变更和服务器部署，由 Owner 本对话指定的协调执行角色通过原长期接入受控通道统一负责；其他 AI 角色不直接使用 root 长期接入，也不给 OpenClaw 通用 root/Shell。该职责声明不创建权限、凭据或云角色，不擅自撤销现有访问，也不证明执行通道已可用。
+
+后续服务器采购和新服务器部署由该 root 责任角色统筹，仍以有效客户订单、资金/预算、目标与适用付款确认作为前提；新增或扩大持久访问、凭据、安全设置、不可恢复删除等继续遵守必要确认。不能把本节当任意采购或跨项目执行授权。
+
+**能力状态与收件。** GitHub 上的代码、评论或制品发布，只证明交付记录存在。既有 development-entry-intake 工作流只验证接件，不执行代码。GitHub 事件到 OpenClaw 执行的真实入口、SENT、ACK、task/attempt、执行回执须分别核实；未接通标 UNKNOWN/NOT_EXECUTED，不能用“可消费”代替实际接线。聊天结束不等于后台停止；模型回复“开始执行”不证明调用了工具。当前受限对话模型不能被默认当作可执行服务器动作的角色。
+
+**官网分层推进。** 静态官网的源码、compose 与非 root 取件准备不以长期接入全量能力完成为前置；实际需要 root 的步骤按上述唯一职责和有效入口执行，不绕过权限。原 caaac435 品牌候选的 Artifact12280831332 为 release 包装与控制/overlay，不能当完整网站正文覆盖 current；须沿精确 pinned 基础来源与 overlay compose 后核完整 public 闭包。LOGIN_ONLY 可沿 e7f75975 的 OFFICIAL_LOGIN_ONLY_V1 与已有受保护数据 key、backup key、SMTP 合同单独准备；缺输入只阻塞登录，不生成假凭据、不拖住独立静态准备。FULL 客户中心待真实 Identity/CRM/authority 等输入齐备后再原地升级，不把 LOGIN_ONLY 宣称为 FULL。
+
+**最小执行与恢复。** 沿原唯一 Writer、任务和 attempt：固定取件核验 → 当前版本/在途/必要安全事实对账 → 有效授权入口执行 → query/检查点续接或限定恢复 → 真实同版验收。已确认且范围未变不重复索批，已过且版本未变成果复用；失败保留历史，不从头重装、不创建新 attempt 掩盖失败。UNKNOWN 先对账，禁止盲重放。载体的 TTY、JSON、退出码与平台版本兼容在交付前验证，不让现场反复替源码试错。长期接入自身的当前维护仍使用其已经明确确认的 Owner Workbench 限定载体；不据本节自动发起维护或授予其他项目安装权限。
+
+**费用与证据。** Git fetch、哈希、确定性安装/健康/恢复脚本可无模型调用，但不意味着云资源、网络和存储免费。对话、AI诊断和代码修复按实际模型额度/费用记录，不自动回退付费模型。源码、本地隔离、Hosted CI、服务器实测、生产/客户验收分别记录，未知金额不填零。开始安装必须有真实接收/执行证据，完成必须有准确版本、current/服务/健康结果和恢复点，不以评论发布或 CI 成功代替。
+
+同步记录：
+- PR17 路径与职责：[6445889969](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/17#issuecomment-6445889969)
+- PR122 分层交付：[6445842876](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/122#issuecomment-6445842876)，overlay 用途校正：[6445860897](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/122#issuecomment-6445860897)
+- PR122 最新职责及执行能力事实补充：[6445936147](https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/pull/122#issuecomment-6445936147)
+
 ### 8.3 购买前就绪检查
 
 PRE_PURCHASE_READINESS_CHECK 必须在正式付款前执行，以 NO_POST_PAYMENT_SURPRISE 为原则。
