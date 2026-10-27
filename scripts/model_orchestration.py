@@ -1310,6 +1310,7 @@ class ModelControl(object):
         started=time.monotonic();passed=0;input_tokens=0;output_tokens=0;evidence=[]
         input_complete=True;output_complete=True
         secret=self.provider_secret(provider_id)
+        benchmark_output_tokens=(128 if allow_unverified_free_probe else 512)
         for index,case in enumerate(cases,1):
             request_id=hashlib.sha256(canonical({'tenant':self.tenant_id,
               'provider':provider_id,'model':model_id,'suite':suite_version,
@@ -1318,7 +1319,8 @@ class ModelControl(object):
             try:
                 self.db.execute('BEGIN IMMEDIATE')
                 reservation=self._reserve_call_locked(provider_id,model_id,
-                  request_id,'BENCHMARK:'+suite_version,1,estimated,512,
+                  request_id,'BENCHMARK:'+suite_version,1,estimated,
+                  benchmark_output_tokens,
                   bool(allow_paid),provider['config_version'],now,
                   allow_unverified_free_probe=allow_unverified_free_probe)
                 self.db.execute('''INSERT INTO model_call_attempts VALUES
@@ -1332,7 +1334,8 @@ class ModelControl(object):
                 continue
             try:
                 result=adapter.invoke(provider['base_url'],secret,model_id,
-                  json.loads(case['messages_json']),provider['timeout_seconds'],512)
+                  json.loads(case['messages_json']),provider['timeout_seconds'],
+                  benchmark_output_tokens)
                 ok=case['expected_contains'] in result['content']
                 passed+=int(ok)
                 if result['usage'].get('input_tokens') is not None:

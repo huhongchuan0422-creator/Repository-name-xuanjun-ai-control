@@ -24,7 +24,7 @@ from secure_file_input import read_owned_secret_file
 from task_supervisor import Supervisor
 
 
-PROVIDER_ID='siliconflow-siliconflow-default'
+CONNECTION_ID='siliconflow-siliconflow-default'
 MODEL_ID='Qwen/Qwen2.5-7B-Instruct'
 PRICING_URL='https://siliconflow.cn/pricing'
 SUITE_VERSION='owner-mcp-classification-20261027-v1'
@@ -120,32 +120,42 @@ def registered_suite(control):
         raise ValueError('BENCHMARK_SUITE_DRIFT')
 
 
-def existing_probe(control):
+def existing_probe(control,provider_id):
     attempted=control.db.execute('''SELECT COUNT(*) FROM model_call_attempts
       WHERE tenant_id=? AND provider_id=? AND model_id=? AND worker_id=?''',(
-      control.tenant_id,PROVIDER_ID,MODEL_ID,'benchmark:'+SUITE_VERSION)).fetchone()[0]
+      control.tenant_id,provider_id,MODEL_ID,'benchmark:'+SUITE_VERSION)).fetchone()[0]
     evaluation=control.db.execute('''SELECT evaluation_id,state,quality_score,
       observed_at FROM model_evaluations WHERE tenant_id=? AND provider_id=?
       AND model_id=? AND suite_version=? ORDER BY observed_at DESC LIMIT 1''',(
-      control.tenant_id,PROVIDER_ID,MODEL_ID,SUITE_VERSION)).fetchone()
+      control.tenant_id,provider_id,MODEL_ID,SUITE_VERSION)).fetchone()
     quota=control.db.execute('''SELECT quota_state,quota_source,verified_at,
       unavailable_reason FROM model_quota_status WHERE tenant_id=? AND
-      provider_id=?''',(control.tenant_id,PROVIDER_ID)).fetchone()
+      provider_id=?''',(control.tenant_id,provider_id)).fetchone()
     return attempted,(dict(evaluation) if evaluation else None),(
       dict(quota) if quota else None)
 
 
 def run_gate(control,adapter,now):
     pricing=fetch_pricing(adapter,10)
+    binding=control.db.execute('''SELECT c.provider_id,c.status,c.purpose,
+      o.model_id FROM service_connections c JOIN provider_onboarding_configs o
+      ON o.tenant_id=c.tenant_id AND o.connection_id=c.connection_id WHERE
+      c.tenant_id=? AND c.connection_id=?''',(control.tenant_id,
+      CONNECTION_ID)).fetchone()
+    if (binding is None or binding['status']!='ACTIVE' or
+            binding['purpose']!='MODEL_INFERENCE' or
+            binding['model_id']!=MODEL_ID):
+        raise ValueError('EXACT_ACTIVE_CONNECTION_BINDING_REQUIRED')
+    provider_id=binding['provider_id']
     provider=control.db.execute('''SELECT base_url,timeout_seconds,retry_limit
       FROM model_providers WHERE tenant_id=? AND provider_id=? AND enabled=1''',(
-      control.tenant_id,PROVIDER_ID)).fetchone()
+      control.tenant_id,provider_id)).fetchone()
     if provider is None:raise ValueError('ACTIVE_PROVIDER_REQUIRED')
     if provider['retry_limit']!=0:raise ValueError('ZERO_RETRY_PROVIDER_REQUIRED')
     models=adapter.list_models(provider['base_url'],control.provider_secret(
-      PROVIDER_ID),provider['timeout_seconds'])
+      provider_id),provider['timeout_seconds'])
     if MODEL_ID not in models:raise ValueError('EXACT_MODEL_NOT_VISIBLE')
-    attempted,evaluation,quota=existing_probe(control)
+    attempted,evaluation,quota=existing_probe(control,provider_id)
     if attempted:
         qualified=(attempted==1 and evaluation is not None and
           evaluation['state']=='QUALIFIED' and quota is not None and
@@ -153,18 +163,20 @@ def run_gate(control,adapter,now):
           quota['quota_source']==
           'REAL_BENCHMARK_CALL_SUCCEEDED_NOT_BALANCE:'+SUITE_VERSION)
         return {'state':'QUALIFIED_REUSED' if qualified else 'HOLD_NO_RETRY',
-          'provider_id':PROVIDER_ID,'model_id':MODEL_ID,
+          'connection_id':CONNECTION_ID,'provider_id':provider_id,
+          'model_id':MODEL_ID,
           'pricing':pricing,'model_visible':True,'model_count':len(models),
           'attempt_count':attempted,'evaluation':evaluation,'quota':quota,
           'quota_balance':'NOT_ASSERTED','external_calls_this_run':0}
-    control.record_free_model_preflight(PROVIDER_ID,MODEL_ID,PRICING_URL,
+    control.record_free_model_preflight(provider_id,MODEL_ID,PRICING_URL,
       pricing['source_sha256'],now,now,now=now)
     registered_suite(control)
-    result=control.run_benchmark(PROVIDER_ID,MODEL_ID,SUITE_VERSION,
+    result=control.run_benchmark(provider_id,MODEL_ID,SUITE_VERSION,
       adapter=adapter,allow_paid=False,now=now,
       allow_unverified_free_probe=True)
-    attempted,evaluation,quota=existing_probe(control)
-    return {'state':result['state'],'provider_id':PROVIDER_ID,
+    attempted,evaluation,quota=existing_probe(control,provider_id)
+    return {'state':result['state'],'connection_id':CONNECTION_ID,
+      'provider_id':provider_id,
       'model_id':MODEL_ID,'pricing':pricing,'model_visible':True,
       'model_count':len(models),'attempt_count':attempted,
       'evaluation':evaluation,'quota':quota,'quota_balance':'NOT_ASSERTED',

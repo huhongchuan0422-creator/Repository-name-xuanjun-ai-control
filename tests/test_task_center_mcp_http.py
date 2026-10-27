@@ -187,6 +187,13 @@ class MCPHTTPTests(unittest.TestCase):
           'https://'+HOST+'/task-center-test',
           'https://'+HOST+'/task-center-test/mcp')
 
+    def test_health_reports_actual_worker_thread_state(self):
+        value=json.loads(self.request('/healthz').read().decode())
+        self.assertEqual(value['mcp_model_worker'],'RUNNING')
+        self.server.mcp_worker.stop()
+        value=json.loads(self.request('/healthz').read().decode())
+        self.assertEqual(value['mcp_model_worker'],'STOPPED')
+
     def issue_refresh(self,store,client_id,marker):
         verifier=marker*64
         challenge=base64.urlsafe_b64encode(hashlib.sha256(

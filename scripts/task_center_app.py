@@ -437,10 +437,16 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             if path is None:
                 self._send(404,b'not found\n','text/plain; charset=utf-8');return
             if path == '/healthz':
+                worker=getattr(self.server,'mcp_worker',None)
+                worker_thread=getattr(worker,'thread',None)
+                worker_state=('RUNNING' if worker_thread is not None and
+                  worker_thread.is_alive() else 'DISABLED' if worker is None
+                  else 'STOPPED')
                 self._send(200, _json_bytes({'state':'UP','mode':'TEST_ONLY',
                   'outbound':'DISABLED' if not outbound_enabled else
                   'TEST_FIXTURE_ONLY','provider_connection_test':
-                  'ENABLED' if provider_connection_test_enabled else 'DISABLED'}),
+                  'ENABLED' if provider_connection_test_enabled else 'DISABLED',
+                  'mcp_model_worker':worker_state}),
                   'application/json; charset=utf-8');return
             if path == '/readyz':
                 try:

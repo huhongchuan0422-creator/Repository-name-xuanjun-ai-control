@@ -238,6 +238,7 @@ class ModelOrchestrationTests(unittest.TestCase):
         result=self.control.run_benchmark('probe',model,'free-probe-success',
           Success(),now=1001,allow_unverified_free_probe=True)
         self.assertEqual(result['state'],'QUALIFIED');self.assertEqual(len(calls),1)
+        self.assertEqual(calls[0][-1],128)
         quota=self.supervisor.db.execute('''SELECT * FROM model_quota_status
           WHERE tenant_id='tenant-a' AND provider_id='probe' ''').fetchone()
         self.assertEqual(quota['quota_state'],'AVAILABLE')
