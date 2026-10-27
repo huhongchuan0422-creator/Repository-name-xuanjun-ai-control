@@ -445,3 +445,15 @@ remains UNKNOWN and the consumed fd integer is never retried.
 `retry_safe=false`. Receipt-consumption tests execute the actual second inline Python parser extracted
 from the reviewed shell itself. Success requires exactly one complete success receipt plus exit 0;
 nonzero, missing, truncated, malformed, multiple or oversized receipt input remains inspect-only UNKNOWN.
+# Same-attempt PREPARED continuation
+
+For an already persisted `PREPARED` attempt, remote artifact retention expiry
+does not invalidate an exact image that is still loaded locally and matches the
+reviewed image ID, OCI revision, and runtime user.  Preserved expired approval
+files remain immutable scope evidence; they are not renewed or treated as live
+authority.  The exact `APPROVE_PREPARED_REOPEN <plan_sha256>` TTY gate supplies
+the one current execution confirmation.  A durable known failure from that
+same execution is recovered from its checkpoint without another approval-file
+layer or a second attempt.  Identity, manifest, lock, proof, active-attempt,
+checkpoint, image, rollback, and no-duplicate-execution checks remain required.
+
