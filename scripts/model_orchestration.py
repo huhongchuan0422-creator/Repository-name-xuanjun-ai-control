@@ -112,8 +112,12 @@ class OpenAICompatibleAdapter(object):
         connection=cls(parsed.hostname,port=port,timeout=timeout,
           context=ssl.create_default_context()) if parsed.scheme=='https' else cls(
           parsed.hostname,port=port,timeout=timeout)
-        path=(parsed.path.rstrip('/')+(endpoint_path or '/v1/chat/completions'))
-        path=path or (endpoint_path or '/v1/chat/completions')
+        # None means the adapter's default inference endpoint.  An explicit
+        # empty suffix means the parsed URL itself (for example /pricing).
+        # Do not collapse those two contracts with truthiness.
+        suffix='/v1/chat/completions' if endpoint_path is None else endpoint_path
+        path=parsed.path.rstrip('/')+suffix
+        path=path or '/'
         if parsed.query:path+='?'+parsed.query
         request_headers=dict(headers);request_headers['Host']=parsed.netloc
         try:

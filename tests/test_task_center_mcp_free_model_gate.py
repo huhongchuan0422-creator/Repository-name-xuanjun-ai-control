@@ -1,17 +1,21 @@
 from __future__ import print_function
 
 import os
+import http.client
 import json
+import socket
 import sqlite3
 import sys
 import tempfile
 import unittest
 from unittest import mock
+from urllib.parse import urlparse
 
 ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
 sys.path.insert(0,os.path.join(ROOT,'scripts'))
 import task_center_mcp_free_model_gate as gate
 from task_center_mcp_free_model_gate import parse_zero_price_page
+from model_orchestration import OpenAICompatibleAdapter
 
 
 class FreeModelGateTests(unittest.TestCase):
@@ -36,6 +40,28 @@ class FreeModelGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'EXACT_FREE_MODEL_FIELDS'):
             parse_zero_price_page(self.page(display=
               'Qwen2.5-7B-Instruct (Pro)').encode('utf-8'))
+
+    def test_pinned_transport_receives_exact_price_models_and_chat_paths(self):
+        adapter=OpenAICompatibleAdapter();response=mock.Mock(status=200)
+        address=[(socket.AF_INET,socket.SOCK_STREAM,6,'',('1.1.1.1',443))]
+        with mock.patch.object(socket,'getaddrinfo',return_value=address), \
+             mock.patch.object(http.client.HTTPSConnection,'request',
+               autospec=True) as request, \
+             mock.patch.object(http.client.HTTPSConnection,'getresponse',
+               autospec=True,return_value=response):
+            connections=[]
+            connections.append(adapter._pinned_open(urlparse(
+              'https://siliconflow.cn/pricing'),None,{},10,method='GET',
+              endpoint_path='')[0])
+            connections.append(adapter._pinned_open(urlparse(
+              'https://api.siliconflow.cn'),None,{},10,method='GET',
+              endpoint_path='/v1/models')[0])
+            connections.append(adapter._pinned_open(urlparse(
+              'https://api.siliconflow.cn'),b'{}',{},10)[0])
+            for connection in connections:connection.close()
+        observed=[(item[0][1],item[0][2]) for item in request.call_args_list]
+        self.assertEqual(observed,[('GET','/pricing'),
+          ('GET','/v1/models'),('POST','/v1/chat/completions')])
 
     def test_connection_id_resolves_real_provider_without_rebinding(self):
         db=sqlite3.connect(':memory:');db.row_factory=sqlite3.Row
