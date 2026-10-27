@@ -516,7 +516,12 @@ class Session:
             need(set(approval)==expected and type(approval['format']) is int and approval['format']==1
                  and approval['kind']==PREPARED_REOPEN_REISSUE_KIND and approval['host']==p.HOST
                  and approval['mode']==MODE and approval['attempt']==attempt()
-                 and approval['carrier_manifest_sha256']==self.approved_stamp
+                 # A preserved reissue records the carrier that was current
+                 # when it was issued.  A later, integrity-checked carrier
+                 # update must not rewrite that history or turn its elapsed
+                 # window into a new execution gate.  pins()/boundary() bind
+                 # the live carrier independently at every action boundary.
+                 and p.exact_hex(approval['carrier_manifest_sha256'],64)
                  and approval['plan_sha256']==proof['plan']['plan_sha256']
                  and approval['proof_sha256']==proof_sha
                  and approval['prior_approval_sha256']==proof['approval_sha256']

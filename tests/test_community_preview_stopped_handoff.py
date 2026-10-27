@@ -928,7 +928,7 @@ finally:
             actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
         old_raw=s.canonical(old);self.write(reopened._prepared_reopen_path(s.sha(proof_raw)),old_raw)
         fresh=dict(old,kind=h.PREPARED_REOPEN_REISSUE_KIND,
-            carrier_manifest_sha256=reopened.pins(),prior_prepared_reopen_sha256=s.sha(old_raw),
+            carrier_manifest_sha256='2'*64,prior_prepared_reopen_sha256=s.sha(old_raw),
             issued_at=self.clock,expires_at=self.clock+600)
         self.write(reopened._prepared_reopen_reissue_path(s.sha(old_raw)),s.canonical(fresh))
         self.clock=fresh['expires_at']+1
@@ -987,7 +987,7 @@ try:
   actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
  old_raw=s.canonical(old);t.write(reopened._prepared_reopen_path(s.sha(proof_raw)),old_raw)
  fresh=dict(old,kind=h.PREPARED_REOPEN_REISSUE_KIND,
-  carrier_manifest_sha256=reopened.pins(),prior_prepared_reopen_sha256=s.sha(old_raw),
+  carrier_manifest_sha256='2'*64,prior_prepared_reopen_sha256=s.sha(old_raw),
   issued_at=t.clock,expires_at=t.clock+600)
  fresh_raw=s.canonical(fresh);fresh_path=reopened._prepared_reopen_reissue_path(s.sha(old_raw))
  t.write(fresh_path,fresh_raw)
