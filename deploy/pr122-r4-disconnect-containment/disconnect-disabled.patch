@@ -1,0 +1,23 @@
+--- secure_secrets_portal_server.py.deployed
++++ secure_secrets_portal_server.py.disconnect-disabled
+@@ -1384,14 +1384,12 @@
+             self._send(status, json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n", content_type="application/json; charset=utf-8")
+             return
+         if parsed.path == TIKTOK_DISCONNECT_PATH:
+-            payload = TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / "tiktok-token-state").disconnect()
+-            self.server.portal_service.operations_store.record_audit({
+-                "operation": "TIKTOK_DISCONNECT",
+-                "provider": "tiktok",
+-                "result": "PASS",
+-                "secret_value_exposed": False,
+-            })
+-            self._send(HTTPStatus.OK, json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n", content_type="application/json; charset=utf-8")
++            sys.stderr.write("security_event=TIKTOK_DISCONNECT_HTTP_DENIED\n")
++            self._send(HTTPStatus.FORBIDDEN, json.dumps({
++                "status": "REJECTED",
++                "sanitized_error_code": "DISCONNECT_DISABLED_AUTH_NOT_INTEGRATED",
++                "operation_performed": False,
++            }, ensure_ascii=True, sort_keys=True) + "\n", content_type="application/json; charset=utf-8")
+             return
+         if parsed.path not in {"/submit/siliconflow", "/submit/wecom", "/submit/wecom-customer-service", "/submit/wecom-customer-contact", "/submit/wecom-novel", "/p/wecom-novel-callback-submit", "/p/wecom-novel-identity-submit", "/submit/telegram", "/submit/feishu-customer-app-secret", "/submit/finance-collection-readonly", "/submit/douyin", "/submit/tiktok"}:
+             self._send(HTTPStatus.NOT_FOUND, "NOT_FOUND\n")

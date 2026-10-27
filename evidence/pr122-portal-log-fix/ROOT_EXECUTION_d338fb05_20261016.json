@@ -1,0 +1,92 @@
+{
+  "after": {
+    "apply_started": true,
+    "authority": "PERSISTENT_FIXED_ACTIONS",
+    "backup": "/var/lib/xuanjun-pr122-portal-logfix-capability/source.before.py",
+    "candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+    "checks": [
+      {
+        "address": "47.245.53.152",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "address": "47.245.53.152",
+        "method": "HEAD",
+        "status": 501
+      },
+      {
+        "address": "47.101.152.210",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "address": "47.101.152.210",
+        "method": "HEAD",
+        "status": 501
+      }
+    ],
+    "original_gid": 1000,
+    "original_uid": 1000,
+    "restart_attempted_for": "apply",
+    "rollback_started": false,
+    "scope": "OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION",
+    "source_replaced_for": "apply",
+    "source_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
+    "status": "LIVE_HEAD_GET_PASS"
+  },
+  "apply": {
+    "apply_started": true,
+    "candidate_sha256": "d5ab592a6a23dd5ebfa8689c95aaa453e371127aab9a39bc2fe7eba0febbbdf0",
+    "checks": [
+      {
+        "address": "47.245.53.152",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "address": "47.245.53.152",
+        "method": "HEAD",
+        "status": 501
+      },
+      {
+        "address": "47.101.152.210",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "address": "47.101.152.210",
+        "method": "HEAD",
+        "status": 501
+      }
+    ],
+    "original_gid": 1000,
+    "original_uid": 1000,
+    "restart_attempted_for": "apply",
+    "rollback_started": false,
+    "source_replaced_for": "apply",
+    "source_sha256": "528a3b5bd13dfbb5067731b3f0ae1305b28cba888658aacc09bf64cbed8b5006",
+    "status": "LIVE_HEAD_GET_PASS"
+  },
+  "apply_exit": 0,
+  "apply_invocations_this_job": 1,
+  "before": {
+    "apply_started": false,
+    "authority": "PERSISTENT_FIXED_ACTIONS",
+    "backup": "/var/lib/xuanjun-pr122-portal-logfix-capability/source.before.py",
+    "rollback_started": false,
+    "scope": "OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION",
+    "status": "READY"
+  },
+  "bridge_tunnel_changed": false,
+  "delivery_commit": "d338fb057b9618f1356ce877c2453f9309423c5f",
+  "dns_change": false,
+  "host": "iZ6wee8q9z4t03hvqumwfhZ",
+  "installed_helper_sha256": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
+  "owner_grant": "OWNER_LONG_TERM_DOMESTIC_TOKYO_MIGRATION",
+  "patch_approval": "PR122#6204793589",
+  "schema_version": 1,
+  "status": "LIVE_PATCH_ACCEPTANCE_PASS",
+  "tokyo_retirement": false,
+  "website_files_changed": false
+}

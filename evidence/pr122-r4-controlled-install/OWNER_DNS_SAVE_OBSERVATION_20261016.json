@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "event": "OWNER_REPORTED_APEX_A_SAVED",
+  "date": "2026-10-16",
+  "timezone": "Asia/Shanghai",
+  "evidence": {
+    "screenshot": "image(20261016-021723).png",
+    "display": "saved record-list row",
+    "type": "A",
+    "name": "apex wenwenwenyiyiyi.work (UI truncated; edit screenshot supplies full name)",
+    "content": "47.101.152.210",
+    "proxy": "DNS_ONLY",
+    "ttl": "AUTO"
+  },
+  "prior_content_historical": "47.245.53.152",
+  "owner_reported_saved": true,
+  "developer_dns_writes": 0,
+  "ip_release": "PENDING",
+  "formal_dns_release": "HOLD_NOT_ESTABLISHED",
+  "missing": [
+    "AAAA management-plane enumeration",
+    "exact record ID and presave snapshot",
+    "authoritative and resolver propagation observation",
+    "bounded IP audit release decision"
+  ],
+  "next_action": "single existing-queue nonroot public DNS/TLS/homepage observation; no OAuth/POST/source/config/service/DNS writes",
+  "work_site_protection": "no production files/current changes authorized by this observation"
+}

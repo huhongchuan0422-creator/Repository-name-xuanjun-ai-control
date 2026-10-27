@@ -1,0 +1,20 @@
+{
+  "approved_builder_sha256": "1afc01c6b19cb8bfc82c16eab257a06dd95b0420118dc6a0dc4726f25a0d6d93",
+  "archive_entries": 11,
+  "bound_files": 10,
+  "commit": "22e120d7ddd1bf5d9fb9c09c795eda23f0112675",
+  "dns_change": false,
+  "fixture": "SYNTHETIC_TEMPORARY_ROOT_FILESYSTEM",
+  "installation_plan_approval": "PENDING",
+  "installer_sha256": "883d89ef15e3c2ee6535100c71c18f69a6d39bbfce20a2a1aa9dd96f2ca94e45",
+  "production_install": false,
+  "production_post": false,
+  "production_root": false,
+  "production_stop_restart": false,
+  "reused_engine_sha256": "0e61a4cab72a18e94ed8b97c81e035ee023dfe0969c871c50651cf75792cbcbe",
+  "source_scope_approval": "PR122#6205371670",
+  "status": "PASS_SYNTHETIC_INSTALL_MODEL_ONLY",
+  "tar_sha256": "4e7015641ea76de7afc250e58553b9f621cb70bae0a7e163bfec4f09b7da1c20",
+  "tar_size": 34948,
+  "tests": 20
+}

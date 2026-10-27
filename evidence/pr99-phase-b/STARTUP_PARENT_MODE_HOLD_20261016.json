@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "status": "OWNER_REPORTED_PRE_ADMISSION_HANDOFF_HOLD",
+  "approval_comment_id": 6208766288,
+  "owner_observed_at": "2026-10-16T13:35:02+08:00",
+  "entry_sha256": "25f263d4dc2f2ca70d00cb8b1a0ff35bd0af2ce3bacd062a32d8df16fe1ddb3b",
+  "reason": "PRIVATE_MODE:/root",
+  "cause": "Developer handoff wrongly required /root exact0700 instead of root-owned nonlink directory with no group/other write.",
+  "actual_parent_mode": "NOT_REPORTED; do not guess0755/0750",
+  "control_flow_inference": {
+    "stage_creation": "NOT_REACHED",
+    "old_anchor_read": "NOT_REACHED",
+    "old_anchor_update": "NOT_REACHED",
+    "finalizer_subprocess": "NOT_REACHED",
+    "lock_inspection_or_release": "NOT_REACHED",
+    "note": "Derived from exact hash-matched entry ordering and Owner output, not direct server root reads. Outer launcher directory and download exist."
+  },
+  "preserve": [
+    "/root/pr99-startup-launch-6208766288",
+    "/root/pr99-offline-finalize-19f0e27d",
+    "/etc/xuanjun-pr99-release/offline-finalize-admission.json",
+    "/run/xuanjun-binance-install.lock"
+  ],
+  "retry": "NO_RETRY_UNTIL_EXPLICIT_NEW_APPROVAL",
+  "candidate_source": "19f0e27de89b50eb990573f5b2a3ad13bdd7b3eb",
+  "candidate_unchanged": true,
+  "tests": {
+    "script_sha256": "450f2ced5b32b7923cda77ee555bf3cfc41e76b41837f845001277207515b5b7",
+    "scope": "LOCAL_ACTUAL_FILESYSTEM_PERMISSION_CHECKS_NOT_SERVER_ACCEPTANCE",
+    "tests": [
+      {
+        "case": "protected_parent_0o700",
+        "result": "PASS"
+      },
+      {
+        "case": "dedicated_private_directory_0o700",
+        "result": "PASS"
+      },
+      {
+        "case": "protected_parent_0o750",
+        "result": "PASS"
+      },
+      {
+        "case": "dedicated_private_directory_0o750",
+        "result": "PASS"
+      },
+      {
+        "case": "protected_parent_0o755",
+        "result": "PASS"
+      },
+      {
+        "case": "dedicated_private_directory_0o755",
+        "result": "PASS"
+      },
+      {
+        "case": "reject_writable_0o720",
+        "result": "PASS"
+      },
+      {
+        "case": "reject_writable_0o777",
+        "result": "PASS"
+      },
+      {
+        "case": "reject_link",
+        "result": "PASS"
+      },
+      {
+        "case": "reject_writable_ancestor",
+        "result": "PASS"
+      },
+      {
+        "case": "anchor_0600_pass_0644_reject",
+        "result": "PASS"
+      }
+    ],
+    "pass_count": 11,
+    "not_exercised": [
+      "Non-root ownership fixture: local chown returned EINVAL; no ownership-test PASS claimed."
+    ],
+    "exact_diff": "Only remove private=True from STAGE.parent check. Dedicated directories/anchors/locks keep strict private mode."
+  },
+  "phase_c": "HOLD",
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD"
+}

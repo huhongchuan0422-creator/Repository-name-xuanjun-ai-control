@@ -44,6 +44,17 @@ class OfflineBatch(unittest.TestCase):
     v=self.proof();v["signature"]="a"*64
     with self.assertRaisesRegex(ValueError,"INVALID_ATTESTATION_SIGNATURE"):
         inspect_test_attestation(self.orders,"ord1","tenantA",v,KEY,30)
+ def test_37_non_ascii_signature_fail_closed(self):
+    v=self.proof();v["signature"]="汉"*64
+    with self.assertRaisesRegex(ValueError,"INVALID_ATTESTATION"):
+        inspect_test_attestation(self.orders,"ord1","tenantA",v,KEY,30)
+ def test_38_uppercase_signature_rejected(self):
+    v=self.proof();v["signature"]=v["signature"].upper()
+    with self.assertRaisesRegex(ValueError,"INVALID_ATTESTATION"):
+        inspect_test_attestation(self.orders,"ord1","tenantA",v,KEY,30)
+ def test_39_unsafe_fixture_time_rejected(self):
+    with self.assertRaisesRegex(ValueError,"INVALID_TIME"):
+        make_test_attestation(self.claim(),"proof1",9007199254740992,KEY)
  def test_10_proof_bad_key_reject(self):
     with self.assertRaisesRegex(ValueError,"INVALID_TEST_KEY"):
         inspect_test_attestation(self.orders,"ord1","tenantA",self.proof(),b"small",30)

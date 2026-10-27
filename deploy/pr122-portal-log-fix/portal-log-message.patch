@@ -1,0 +1,26 @@
+--- a/scripts/secure_secrets_portal_server.py
++++ b/scripts/secure_secrets_portal_server.py
+@@ -1202,11 +1202,21 @@
+     server_version = "SecureSecretsPortal/1.0"
+ 
+     def log_message(self, fmt, *args):
+-        path = urllib.parse.urlsplit(self.path).path
++        try:
++            path = urllib.parse.urlsplit(self.path).path
++        except ValueError:
++            path = "[INVALID_PATH]"
++        safe_args = tuple(
++            arg if type(arg) in (int, float) else "[REDACTED]" for arg in args
++        )
++        try:
++            message = fmt % safe_args
++        except (TypeError, ValueError, OverflowError):
++            message = "[REDACTED]"
+         sys.stderr.write("%s - - [%s] %s\n" % (
+             self.client_address[0],
+             self.log_date_time_string(),
+-            fmt % args if "%s" not in fmt else fmt % tuple("[REDACTED]" for _ in args),
++            message,
+         ))
+         sys.stderr.write("path=%s\n" % path)
+ 

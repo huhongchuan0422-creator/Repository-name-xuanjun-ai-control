@@ -1,0 +1,448 @@
+{
+  "schema_version": 1,
+  "feature_id": "LEGAL_CONTRACT_CENTER",
+  "status": "CANDIDATE_DRAFT_ONLY",
+  "production_enabled": false,
+  "documents": [
+    {
+      "id": "merchant-onboarding",
+      "title": "社区分账商户入驻协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "商户",
+        "平台"
+      ],
+      "placement": [
+        "商户入驻提交前",
+        "商户工作台"
+      ],
+      "source": "docs/legal/templates/merchant-onboarding.md",
+      "source_sha256": "79223f66ac57885752e8476144d6d7b94d1ee765bdbbef8b3d1d6e86b892ff5a",
+      "preview": "demos/legal/merchant-onboarding.html",
+      "planned_route": "/legal/merchant-onboarding/",
+      "signature_enabled": false
+    },
+    {
+      "id": "community-split",
+      "title": "社区交易多方分账协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "商户A",
+        "社区",
+        "分账方2—N",
+        "平台"
+      ],
+      "placement": [
+        "分账规则确认/变更",
+        "社区后台",
+        "分账方后台"
+      ],
+      "source": "docs/legal/templates/community-split.md",
+      "source_sha256": "7a1df8607c15b73fa3e0708615a5293ce681ab54587a5ce2e4eb320c3016194c",
+      "preview": "demos/legal/community-split.html",
+      "planned_route": "/legal/community-split/",
+      "signature_enabled": false
+    },
+    {
+      "id": "community-service",
+      "title": "社区分账技术服务与消费者使用条款",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "消费者",
+        "商户",
+        "平台"
+      ],
+      "placement": [
+        "付款前",
+        "消费者帮助中心"
+      ],
+      "source": "docs/legal/templates/community-service.md",
+      "source_sha256": "f52700c7bccb39474fcbda9f3ab51d71a2459b0bbcd2b9d40f1c4d2db6c2a221",
+      "preview": "demos/legal/community-service.html",
+      "planned_route": "/legal/community-service/",
+      "signature_enabled": false
+    },
+    {
+      "id": "privacy",
+      "title": "玄钧云汇隐私政策",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "所有用户"
+      ],
+      "placement": [
+        "站点页脚",
+        "注册",
+        "入驻",
+        "反馈",
+        "购买"
+      ],
+      "source": "docs/legal/templates/privacy.md",
+      "source_sha256": "1c74e3a6f2f64e254066414c64f646d3ba623b7f737a0d0e1ba4a1fff78e064b",
+      "preview": "demos/legal/privacy.html",
+      "planned_route": "/legal/privacy/",
+      "signature_enabled": false
+    },
+    {
+      "id": "refund-responsibility",
+      "title": "社区交易退款、分账冲回与责任规则",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "消费者",
+        "商户",
+        "社区",
+        "分账方",
+        "平台"
+      ],
+      "placement": [
+        "支付确认前",
+        "退款申请",
+        "商户/分账方对账"
+      ],
+      "source": "docs/legal/templates/refund-responsibility.md",
+      "source_sha256": "d33cdff30f7ee76b8cbc9fa80bed5c1a58c553ce079a16fdf7bc5eb78f680904",
+      "preview": "demos/legal/refund-responsibility.html",
+      "planned_route": "/legal/refund-responsibility/",
+      "signature_enabled": false
+    },
+    {
+      "id": "platform-terms",
+      "title": "玄钧云汇平台服务协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "个人用户",
+        "企业用户"
+      ],
+      "placement": [
+        "注册",
+        "平台页脚"
+      ],
+      "source": "docs/legal/templates/platform-terms.md",
+      "source_sha256": "d9fd0186510861ddbcacf21549fd231f0404dd0577ad5a8cf5b7a2100425a7ce",
+      "preview": "demos/legal/platform-terms.html",
+      "planned_route": "/legal/platform-terms/",
+      "signature_enabled": false
+    },
+    {
+      "id": "saas-order",
+      "title": "SaaS模块订阅、买断与订单条款",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "SaaS客户"
+      ],
+      "placement": [
+        "模块购买前",
+        "SaaS工作台"
+      ],
+      "source": "docs/legal/templates/saas-order.md",
+      "source_sha256": "bf3631173da090242a2386efd47019f305730280ab6525502762a858b6003265",
+      "preview": "demos/legal/saas-order.html",
+      "planned_route": "/legal/saas-order/",
+      "signature_enabled": false
+    },
+    {
+      "id": "custom-development",
+      "title": "软件与AI定制开发主合同",
+      "version": "2026-10-15-draft.2",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "定制客户",
+        "玄钧运营主体"
+      ],
+      "placement": [
+        "客户项目签约",
+        "合同中心"
+      ],
+      "source": "docs/legal/templates/custom-development.md",
+      "source_sha256": "d417c663dffe6011cb979351c1c4a5aa218e955824fd5c31cca781e193ea6a92",
+      "preview": "demos/legal/custom-development.html",
+      "planned_route": "/legal/custom-development/",
+      "signature_enabled": false
+    },
+    {
+      "id": "custom-sow",
+      "title": "定制项目需求范围、报价与验收任务书",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "客户项目负责人",
+        "开发方"
+      ],
+      "placement": [
+        "定制合同附件A"
+      ],
+      "source": "docs/legal/templates/custom-sow.md",
+      "source_sha256": "91b08af5be0d7758628a3b23ab84ae2be595a79ab2c33c048e05d4872bcd1b1e",
+      "preview": "demos/legal/custom-sow.html",
+      "planned_route": "/legal/custom-sow/",
+      "signature_enabled": false
+    },
+    {
+      "id": "change-acceptance",
+      "title": "项目变更单与阶段验收交付单",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "客户",
+        "开发方"
+      ],
+      "placement": [
+        "项目变更",
+        "阶段/最终验收"
+      ],
+      "source": "docs/legal/templates/change-acceptance.md",
+      "source_sha256": "fbfd3d9e8d22e5112421ab440175a5bb59f46859624f1d535b4ec4fd2f39bf4d",
+      "preview": "demos/legal/change-acceptance.html",
+      "planned_route": "/legal/change-acceptance/",
+      "signature_enabled": false
+    },
+    {
+      "id": "nda",
+      "title": "双向保密协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "客户",
+        "合作方",
+        "员工/分包方"
+      ],
+      "placement": [
+        "需求交流前",
+        "分包合作"
+      ],
+      "source": "docs/legal/templates/nda.md",
+      "source_sha256": "5d26f39c146c228aeb648f1a7e0507de0e7be8d7db910fabdc01227829b7e812",
+      "preview": "demos/legal/nda.html",
+      "planned_route": "/legal/nda/",
+      "signature_enabled": false
+    },
+    {
+      "id": "data-processing",
+      "title": "个人信息与客户数据委托处理附件",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "企业客户",
+        "平台",
+        "受托方"
+      ],
+      "placement": [
+        "企业合同附件",
+        "供应商接入"
+      ],
+      "source": "docs/legal/templates/data-processing.md",
+      "source_sha256": "0fcd5b0cdd68df7a15ba8963cf0de15b0da41fbd2a3ae684060fde5cf2b797a1",
+      "preview": "demos/legal/data-processing.html",
+      "planned_route": "/legal/data-processing/",
+      "signature_enabled": false
+    },
+    {
+      "id": "sla",
+      "title": "托管部署、维护与服务等级协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "运维客户",
+        "SaaS客户"
+      ],
+      "placement": [
+        "部署/维护订单附件"
+      ],
+      "source": "docs/legal/templates/sla.md",
+      "source_sha256": "112dbd326d4bc4ff16b2b578f36c0dc8d1c787e892216197f0f6a6118efbe54c",
+      "preview": "demos/legal/sla.html",
+      "planned_route": "/legal/sla/",
+      "signature_enabled": false
+    },
+    {
+      "id": "procurement",
+      "title": "第三方订阅与云资源代购委托协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "代购客户"
+      ],
+      "placement": [
+        "代购付款前"
+      ],
+      "source": "docs/legal/templates/procurement.md",
+      "source_sha256": "3401d84d09adc26bcc4820cf5730677d6c61ec6b8055d904ef1b387fa0910f43",
+      "preview": "demos/legal/procurement.html",
+      "planned_route": "/legal/procurement/",
+      "signature_enabled": false
+    },
+    {
+      "id": "ai-service",
+      "title": "AI服务、BYOK与模型使用附加条款",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "AI服务客户"
+      ],
+      "placement": [
+        "AI功能启用",
+        "模型付款/配置"
+      ],
+      "source": "docs/legal/templates/ai-service.md",
+      "source_sha256": "ffd69dfd3358ab456a5ed9f2d864e55ad83047217b3fd4ef22a53e65e663798f",
+      "preview": "demos/legal/ai-service.html",
+      "planned_route": "/legal/ai-service/",
+      "signature_enabled": false
+    },
+    {
+      "id": "service-package-rights",
+      "title": "专项服务包、赠送权益与抵扣规则",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "服务包购买者",
+        "活动用户"
+      ],
+      "placement": [
+        "服务包购买前",
+        "权益中心"
+      ],
+      "source": "docs/legal/templates/service-package-rights.md",
+      "source_sha256": "bf2306d87dc51d4f41b91df4463f41a8ab819127b5329076084a04d4c9e243dc",
+      "preview": "demos/legal/service-package-rights.html",
+      "planned_route": "/legal/service-package-rights/",
+      "signature_enabled": false
+    },
+    {
+      "id": "referral",
+      "title": "推荐合作与佣金结算协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "推荐合作方"
+      ],
+      "placement": [
+        "推荐计划加入前",
+        "佣金工作台"
+      ],
+      "source": "docs/legal/templates/referral.md",
+      "source_sha256": "0d9472a99710e33e793184faa65ebf86d5e7c1457d56c2f9c6a7dd683004e1cf",
+      "preview": "demos/legal/referral.html",
+      "planned_route": "/legal/referral/",
+      "signature_enabled": false
+    },
+    {
+      "id": "developer-marketplace",
+      "title": "开发者合作、模块上架与知识产权协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "开发者",
+        "供应商"
+      ],
+      "placement": [
+        "开发者入驻",
+        "模块上架"
+      ],
+      "source": "docs/legal/templates/developer-marketplace.md",
+      "source_sha256": "0dad3dc4c48b569f6e6f266840f60592578fe3cd1757729d56b9794b5a3b2a59",
+      "preview": "demos/legal/developer-marketplace.html",
+      "planned_route": "/legal/developer-marketplace/",
+      "signature_enabled": false
+    },
+    {
+      "id": "advertising",
+      "title": "广告投放与素材授权服务合同",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "广告主",
+        "商户"
+      ],
+      "placement": [
+        "广告下单",
+        "素材提交"
+      ],
+      "source": "docs/legal/templates/advertising.md",
+      "source_sha256": "3aabb1e92fecb8f04c6720a01ca60a6eefb630139e69561fad9e19ecb6f25257",
+      "preview": "demos/legal/advertising.html",
+      "planned_route": "/legal/advertising/",
+      "signature_enabled": false
+    },
+    {
+      "id": "charity",
+      "title": "公益项目合作与信息披露协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "合格公益主体",
+        "商户",
+        "平台"
+      ],
+      "placement": [
+        "公益项目接入前"
+      ],
+      "source": "docs/legal/templates/charity.md",
+      "source_sha256": "80210c7380ee05bfa0d1db6c9aba4f4490254c1994652b6c339f53b9dbe59d01",
+      "preview": "demos/legal/charity.html",
+      "planned_route": "/legal/charity/",
+      "signature_enabled": false
+    },
+    {
+      "id": "content-license",
+      "title": "内容创作、小说与素材委托及授权协议",
+      "version": "2026-10-15-draft.1",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "创作客户",
+        "作者",
+        "平台"
+      ],
+      "placement": [
+        "小说/内容项目签约"
+      ],
+      "source": "docs/legal/templates/content-license.md",
+      "source_sha256": "74abccb4f53cd9502db3a39f9ce8e0ced31fb726dd51f70bd0a53a94b100939b",
+      "preview": "demos/legal/content-license.html",
+      "planned_route": "/legal/content-license/",
+      "signature_enabled": false
+    },
+    {
+      "id": "esign-evidence",
+      "title": "电子签约、授权与合同证据规则",
+      "version": "2026-10-15-draft.2",
+      "status": "DRAFT_NOT_FOR_SIGNATURE",
+      "audience": [
+        "所有签约方",
+        "合同管理员"
+      ],
+      "placement": [
+        "正式签约前",
+        "合同中心"
+      ],
+      "source": "docs/legal/templates/esign-evidence.md",
+      "source_sha256": "4d686d814c02f856a6e4a48e85ff2d42db53f3389b68dc351b8656ec9a3ef324",
+      "preview": "demos/legal/esign-evidence.html",
+      "planned_route": "/legal/esign-evidence/",
+      "signature_enabled": false
+    }
+  ],
+  "required_before_signature": [
+    "operator_legal_name",
+    "operator_registration_id",
+    "operator_address",
+    "operator_contact",
+    "counterparty_identity_and_authority",
+    "business_scope",
+    "price_currency_tax",
+    "duration",
+    "refund_terms",
+    "privacy_data_inventory_and_retention",
+    "actual_provider_and_payment_qualifications",
+    "applicable_law_and_dispute_forum",
+    "independent_legal_review",
+    "owner_release_gate"
+  ],
+  "data_rule": "No real identity, customer data, private keys or actual signed contracts in this public repository."
+}

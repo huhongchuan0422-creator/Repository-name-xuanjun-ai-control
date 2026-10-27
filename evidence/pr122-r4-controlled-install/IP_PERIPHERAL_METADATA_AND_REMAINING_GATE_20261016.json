@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "source_review": 6206608746,
+  "observed_dns_acceptance": "CLOSED_PASS_WITH_SCOPE_LIMITS",
+  "exact_probe_commit": "de30ac366cd907e6b8337c4c7eba74d146254e8d",
+  "run_id": 38840397178,
+  "jobs": [
+    {
+      "id": 116778914372,
+      "name": "ip-peripheral-metadata (domestic, xuanjun-domestic-ops)",
+      "conclusion": "success"
+    },
+    {
+      "id": 116778914578,
+      "name": "ip-peripheral-metadata (tokyo, xuanjun-tokyo-readonly)",
+      "conclusion": "success"
+    }
+  ],
+  "receipts": {
+    "tokyo": {
+      "commands": {
+        "installed_services": {
+          "exit": 0
+        },
+        "loaded_services": {
+          "exit": 0
+        },
+        "process_names": {
+          "exit": 0
+        },
+        "unit:aegis.service": {
+          "exit": 0
+        },
+        "unit:aliyun.service": {
+          "exit": 0
+        },
+        "unit:auditd.service": {
+          "exit": 0
+        },
+        "unit:rsyslog.service": {
+          "exit": 0
+        }
+      },
+      "configuration_contents_read": false,
+      "credentials_or_business_data_read": false,
+      "delivery_commit": "de30ac366cd907e6b8337c4c7eba74d146254e8d",
+      "directory_metadata": [
+        {
+          "exists": false,
+          "path": "/etc/fail2ban"
+        },
+        {
+          "exists": false,
+          "path": "/etc/crowdsec"
+        },
+        {
+          "exists": false,
+          "path": "/etc/modsecurity"
+        },
+        {
+          "exists": false,
+          "path": "/etc/filebeat"
+        },
+        {
+          "exists": false,
+          "path": "/etc/fluent-bit"
+        },
+        {
+          "exists": false,
+          "path": "/etc/logstash"
+        },
+        {
+          "exists": false,
+          "path": "/etc/promtail"
+        },
+        {
+          "exists": false,
+          "path": "/etc/vector"
+        },
+        {
+          "exists": true,
+          "is_directory": true,
+          "is_symlink": false,
+          "mode": "0o755",
+          "path": "/etc/rsyslog.d",
+          "uid": 0
+        }
+      ],
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "http_requests": 0,
+      "limitations": [
+        "No service config, firewall rules, cloud policy, log contents or environment inspected",
+        "Unmatched/custom agents and remote log consumers remain unverified",
+        "Absent named unit does not prove no IP-dependent policy",
+        "Owner IP audit acceptance and independent release decision remain pending"
+      ],
+      "matched_process_names": [
+        "AliYunDun",
+        "AliYunDunMonito",
+        "AliYunDunUpdate",
+        "aliyun-service.",
+        "auditd",
+        "kauditd",
+        "rsyslogd"
+      ],
+      "matched_unit_count": 4,
+      "observed_epoch": 1792117569,
+      "post_requests": 0,
+      "production_writes": 0,
+      "raw_logs_read": false,
+      "root_calls": 0,
+      "schema_version": 1,
+      "scope": "BOUNDED_NAMED_LOCAL_SERVICE_PROCESS_AND_DIRECTORY_METADATA_ONLY",
+      "side": "tokyo",
+      "status": "READONLY_PERIPHERAL_METADATA_COLLECTED",
+      "uid": 1001,
+      "unit_inventory_truncated": false,
+      "units": [
+        {
+          "ActiveState": "inactive",
+          "FragmentPath": "/etc/systemd/system/aegis.service",
+          "Id": "aegis.service",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "SubState": "dead",
+          "UnitFileState": "enabled",
+          "requested_unit": "aegis.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/etc/systemd/system/aliyun.service",
+          "Id": "aliyun.service",
+          "LoadState": "loaded",
+          "MainPID": "2493174",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "aliyun.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/usr/lib/systemd/system/auditd.service",
+          "Id": "auditd.service",
+          "LoadState": "loaded",
+          "MainPID": "646",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "auditd.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/usr/lib/systemd/system/rsyslog.service",
+          "Id": "rsyslog.service",
+          "LoadState": "loaded",
+          "MainPID": "682",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "rsyslog.service"
+        }
+      ]
+    },
+    "domestic": {
+      "commands": {
+        "installed_services": {
+          "exit": 0
+        },
+        "loaded_services": {
+          "exit": 0
+        },
+        "process_names": {
+          "exit": 0
+        },
+        "unit:aegis.service": {
+          "exit": 0
+        },
+        "unit:aliyun.service": {
+          "exit": 0
+        },
+        "unit:auditd.service": {
+          "exit": 0
+        },
+        "unit:rsyslog.service": {
+          "exit": 0
+        }
+      },
+      "configuration_contents_read": false,
+      "credentials_or_business_data_read": false,
+      "delivery_commit": "de30ac366cd907e6b8337c4c7eba74d146254e8d",
+      "directory_metadata": [
+        {
+          "exists": false,
+          "path": "/etc/fail2ban"
+        },
+        {
+          "exists": false,
+          "path": "/etc/crowdsec"
+        },
+        {
+          "exists": false,
+          "path": "/etc/modsecurity"
+        },
+        {
+          "exists": false,
+          "path": "/etc/filebeat"
+        },
+        {
+          "exists": false,
+          "path": "/etc/fluent-bit"
+        },
+        {
+          "exists": false,
+          "path": "/etc/logstash"
+        },
+        {
+          "exists": false,
+          "path": "/etc/promtail"
+        },
+        {
+          "exists": false,
+          "path": "/etc/vector"
+        },
+        {
+          "exists": true,
+          "is_directory": true,
+          "is_symlink": false,
+          "mode": "0o755",
+          "path": "/etc/rsyslog.d",
+          "uid": 0
+        }
+      ],
+      "host": "iZvt5t8tlrm8oiZ",
+      "http_requests": 0,
+      "limitations": [
+        "No service config, firewall rules, cloud policy, log contents or environment inspected",
+        "Unmatched/custom agents and remote log consumers remain unverified",
+        "Absent named unit does not prove no IP-dependent policy",
+        "Owner IP audit acceptance and independent release decision remain pending"
+      ],
+      "matched_process_names": [
+        "AliYunDun",
+        "AliYunDunMonito",
+        "AliYunDunUpdate",
+        "aliyun-service.",
+        "auditd",
+        "kauditd",
+        "rsyslogd"
+      ],
+      "matched_unit_count": 4,
+      "observed_epoch": 1792117570,
+      "post_requests": 0,
+      "production_writes": 0,
+      "raw_logs_read": false,
+      "root_calls": 0,
+      "schema_version": 1,
+      "scope": "BOUNDED_NAMED_LOCAL_SERVICE_PROCESS_AND_DIRECTORY_METADATA_ONLY",
+      "side": "domestic",
+      "status": "READONLY_PERIPHERAL_METADATA_COLLECTED",
+      "uid": 1002,
+      "unit_inventory_truncated": false,
+      "units": [
+        {
+          "ActiveState": "inactive",
+          "FragmentPath": "/etc/systemd/system/aegis.service",
+          "Id": "aegis.service",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "SubState": "dead",
+          "UnitFileState": "enabled",
+          "requested_unit": "aegis.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/etc/systemd/system/aliyun.service",
+          "Id": "aliyun.service",
+          "LoadState": "loaded",
+          "MainPID": "891",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "aliyun.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/usr/lib/systemd/system/auditd.service",
+          "Id": "auditd.service",
+          "LoadState": "loaded",
+          "MainPID": "527",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "auditd.service"
+        },
+        {
+          "ActiveState": "active",
+          "FragmentPath": "/usr/lib/systemd/system/rsyslog.service",
+          "Id": "rsyslog.service",
+          "LoadState": "loaded",
+          "MainPID": "558",
+          "SubState": "running",
+          "UnitFileState": "enabled",
+          "requested_unit": "rsyslog.service"
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "classification": "LOCAL_NAMED_TOOLS_NOT_OBSERVED",
+      "fact": "No named fail2ban/crowdsec/modsecurity/filebeat/fluent-bit/logstash/promtail/vector units or fixed directory paths observed in this bounded metadata inventory",
+      "limit": "Not a proof against custom/remote policy or other names"
+    },
+    {
+      "classification": "RUNNING_SECURITY_AGENT_VISIBLE_NOT_A_CONFIRMED_DEFECT",
+      "fact": "Both hosts have active aliyun.service plus AliYunDun/Monitor/Update process names; aegis.service inactive does not imply the agent is stopped",
+      "consequence": "Do not assert cloud/host security policies absent; applicable cloud policy and source-IP rule/log consumer behavior not inspected"
+    },
+    {
+      "classification": "RUNNING_LOGGING_AUDIT_SERVICES_VISIBLE",
+      "fact": "auditd and rsyslog active on both hosts",
+      "consequence": "No config or log consumption rules read; presence does not prove IP-dependent blocking or authentication"
+    }
+  ],
+  "remaining_minimum_decisions": {
+    "owner_ip_audit_acceptance": "NOT_GIVEN; only Tokyo peer/header/log visitor attribution difference would be accepted, not unknown security bypass",
+    "cloud_security_policy": "Need bounded legitimate management/policy evidence for this apex traffic, especially any source-IP blocking/rate-limit/log consumer; current nonroot runner metadata cannot prove it",
+    "review": "Review only existing source IP packet plus these named peripheral facts; identify a concrete affected policy before demanding further work",
+    "no_additional_code_defect_confirmed": true
+  },
+  "backend_next_scope": {
+    "portal": "Reuse approved seven-module OAuth candidate; protected legacy-session/provider/account/state custody mapping remains required before Domestic activation",
+    "telegram_wecom": "Keep existing edge/callback/token/dedup authority; no provider changes",
+    "bridge": "Keep19443/18443 unchanged",
+    "finance_pr99": "Status only; no PR122 migration or timer changes"
+  },
+  "production_actions": 0
+}

@@ -1,0 +1,11 @@
+--- evidence/pr99-phase-b/startup-6208766288.py
++++ pending-new-approved-startup.py
+@@ -81,7 +81,7 @@
+          "REQUIRE_PYTHON311_ISOLATED_MINUS_B")
+     need(not any(k.startswith(("PYTHON", "KOREA_")) for k in os.environ), "UNCLEAN_ENV")
+     os.umask(0o077)
+-    trusted(STAGE.parent, directory=True, private=True)
++    trusted(STAGE.parent, directory=True)
+     need(not os.path.lexists(STAGE), "NEW_STAGE_EXISTS_NO_RETRY")
+     trusted(PIN.parent, directory=True, private=True)
+     old_pin = read(PIN, private=True)

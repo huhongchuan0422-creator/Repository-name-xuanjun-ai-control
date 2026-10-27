@@ -40,6 +40,7 @@ jobs:
           node --test demos/community-local-e2e/app.test.mjs
           node --test demos/community-local-e2e/merchant.test.mjs
           node --test demos/community-local-e2e/platform.test.mjs
+          node --test demos/community-local-e2e/saas-panel.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
       - name: Actual Chromium end-to-end simulation
