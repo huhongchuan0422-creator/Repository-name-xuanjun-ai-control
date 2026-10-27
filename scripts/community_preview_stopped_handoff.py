@@ -496,11 +496,16 @@ class Session:
              and approval['prepared_event_sha256']==s.sha(event)
              and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'],
              'EXACT_C_PREPARED_REOPEN_APPROVAL_REQUIRED')
-        current=self.approved_stamp==self.pins()
+        # These preserved files are immutable scope evidence, not a renewed
+        # execution permit.  Live execution authority is the exact TTY gate in
+        # reopen_prepared(); therefore elapsed time must not force another
+        # permit file for this already-PREPARED same attempt.
+        now=c.now();current=self.approved_stamp==self.pins()
         if approval['carrier_manifest_sha256']==self.approved_stamp:
-            window(approval)
+            need(type(approval['issued_at']) is int and type(approval['expires_at']) is int
+                 and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
+                 and now>approval['expires_at'],'PREPARED_REOPEN_EVIDENCE_NOT_HISTORICAL')
         else:
-            now=c.now()
             need(type(approval['issued_at']) is int and type(approval['expires_at']) is int
                  and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
                  and now>approval['expires_at'],'PREPARED_REOPEN_NOT_EXPIRED')
@@ -519,7 +524,9 @@ class Session:
                  and approval['prepared_event_sha256']==s.sha(event)
                  and approval['actions']==['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'],
                  'EXACT_C_PREPARED_REOPEN_REISSUE_REQUIRED')
-            window(approval)
+            need(type(approval['issued_at']) is int and type(approval['expires_at']) is int
+                 and approval['issued_at']<=approval['expires_at']<=approval['issued_at']+600
+                 and now>approval['expires_at'],'PREPARED_REOPEN_REISSUE_NOT_HISTORICAL')
         need(current,'CARRIER_STAMP_CHANGED')
         self.prepared_reopen_path=path;self.prepared_reopen_raw=body
         return approval
@@ -866,7 +873,7 @@ class Session:
         if clock<s.EXPIRES:return
         # The original artifact window governs acquiring/loading the image.  A
         # persisted same-attempt PREPARED reopen may outlive that window only
-        # when its separately approved permit is bound and the exact reviewed
+        # when its immutable authority history is bound and the exact reviewed
         # image is already present in Docker.  This is read-only and is repeated
         # at every boundary; it never authorizes another image or a new attempt.
         need(self.recovering and self.prepared_reopen_raw is not None,
@@ -894,7 +901,9 @@ class Session:
         if self.resume_raw is not None:need(raw(resume_record_path())==self.resume_raw,'B_RESUME_RECORD_REPLACED')
         if self.prepared_reopen_raw is not None:
             v,b=document(self.prepared_reopen_path,16384)
-            need(b==self.prepared_reopen_raw,'C_PREPARED_REOPEN_APPROVAL_REVOKED');window(v)
+            need(b==self.prepared_reopen_raw
+                 and v.get('kind') in (PREPARED_REOPEN_KIND,PREPARED_REOPEN_REISSUE_KIND),
+                 'C_PREPARED_REOPEN_EVIDENCE_CHANGED')
         elif self.craw is not None:
             approval_path=self.c_resume_approval_path if getattr(self,'c_preconfirm_mode',False) else C_APPROVAL
             v,b=document(approval_path);need(b==self.craw,'C_APPROVAL_REVOKED');window(v)
@@ -1259,8 +1268,9 @@ class Session:
                 need(s.sha(bound)==proof['approval_sha256'],'PROOF_APPROVAL_CHANGED');self.craw=bound
             else:self._c_resume_approval(proof['plan'])
         else:self.c_approval(proof['plan'])
+        if self.prepared_reopen_raw is not None:
+            return self.consume(proof,True,prepared_reopen=True)
         acknowledge('KNOWN_FAILURE_RECOVER',proof['plan']['plan_sha256'])
-        if self.prepared_reopen_raw is not None:return self.consume(proof,True,prepared_reopen=True)
         return self.consume(proof,True)
     def close(self):
         if self.cleanup_unproven:raise u.Hold('BC_CLEANUP_UNKNOWN')

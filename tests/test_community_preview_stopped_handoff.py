@@ -887,6 +887,7 @@ finally:
             prepared_event_sha256=s.sha(checkpoint),issued_at=self.clock,expires_at=self.clock+600,
             actions=['REOPEN_EXACT_PREPARED_SAME_ATTEMPT','KNOWN_FAILURE_SERIAL_RECOVERY'])
         self.write(reopened._prepared_reopen_path(s.sha(proof_raw)),s.canonical(permit))
+        self.clock=permit['expires_at']+1
         original_replace=u.Update.replace_and_verify
         def known_failure(update):
             update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
@@ -930,6 +931,7 @@ finally:
             carrier_manifest_sha256=reopened.pins(),prior_prepared_reopen_sha256=s.sha(old_raw),
             issued_at=self.clock,expires_at=self.clock+600)
         self.write(reopened._prepared_reopen_reissue_path(s.sha(old_raw)),s.canonical(fresh))
+        self.clock=fresh['expires_at']+1
         original_replace=u.Update.replace_and_verify
         def known_failure(update):
             update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
@@ -949,7 +951,7 @@ finally:
         self.assertIn('start',[row[3] for row in self.calls])
 
     def test_expired_prepared_reopen_reissue_real_pty_full_chain(self):
-        """The current PREPARED reissue crosses both real TTY gates and reopens recovery."""
+        """One real TTY gate reopens PREPARED and its bound known-failure recovery."""
         import pty,select,time,signal,errno,re
         worker="""import sys
 sys.path[:0]=[REPO,REPO+'/tests']
@@ -989,6 +991,7 @@ try:
   issued_at=t.clock,expires_at=t.clock+600)
  fresh_raw=s.canonical(fresh);fresh_path=reopened._prepared_reopen_reissue_path(s.sha(old_raw))
  t.write(fresh_path,fresh_raw)
+ t.clock=fresh['expires_at']+1
  original=u.Update.replace_and_verify
  def known(update):
   update.t.health=lambda:dict(http_status=503,url=p.URL,status='UNAVAILABLE',
@@ -1029,8 +1032,7 @@ finally:
             got,status=os.waitpid(pid,0 if b'PREPARED_REOPEN_REISSUE_REAL_PTY_FULL_CHAIN_OK' in data else os.WNOHANG);done=got==pid
             self.assertTrue(done,data.decode(errors='replace'))
             self.assertEqual(os.waitstatus_to_exitcode(status),0,data.decode(errors='replace'))
-            self.assertEqual([x.split()[0] for x in sent],
-                [b'APPROVE_PREPARED_REOPEN',b'APPROVE_KNOWN_FAILURE_RECOVER'])
+            self.assertEqual([x.split()[0] for x in sent],[b'APPROVE_PREPARED_REOPEN'])
             self.assertIn(b'PREPARED_REOPEN_REISSUE_REAL_PTY_FULL_CHAIN_OK',data)
         finally:
             if not done:os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
