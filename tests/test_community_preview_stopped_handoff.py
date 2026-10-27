@@ -849,6 +849,7 @@ finally:
                 update.reopen_prepared_stopped()
 
     def test_expired_artifact_window_allows_only_bound_prepared_reopen_with_exact_loaded_image(self):
+        # Remote artifact retention expiry is not expiry of the exact verified local image.
         q=self.session
         self.clock=s.EXPIRES
         with self.assertRaisesRegex(u.Hold,'FROZEN_IMAGE_ARTIFACT_EXPIRED'):
