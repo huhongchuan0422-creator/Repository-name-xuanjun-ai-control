@@ -3,6 +3,8 @@ import json
 import os
 import tempfile
 import unittest
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,7 +34,7 @@ class PreparedResumeDelivery(unittest.TestCase):
         self.old_manifest=self.manifest(self.old_bodies);self.new_manifest=self.manifest(self.new_bodies)
         self.old_bodies['manifest.json']=self.old_manifest;self.new_bodies['manifest.json']=self.new_manifest
         self.write_tree(self.base/'control-stopped-v1',self.old_bodies)
-        proof=canon({'proof':'preserved'});active=canon({'attempt':'attempt','plan_sha256':'a'*64})
+        proof=canon({'proof':'preserved'});active=json.dumps({'attempt':'attempt','plan_sha256':'a'*64},sort_keys=True).encode()
         checkpoint=canon({'approval_sha256':'b'*64,'handoff_sha256':'c'*64,'new_id':None,'phase':'PREPARED','plan_sha256':'a'*64,'sequence':1})
         self.write(self.backup/'stopped-handoff-v1.json',proof);self.write(self.journal/'active-attempt.json',active)
         self.write(self.attempt/'checkpoint.json',checkpoint);self.write(self.attempt/'event-000001.json',checkpoint)
@@ -76,8 +78,40 @@ class PreparedResumeDelivery(unittest.TestCase):
         self.assertTrue((self.base/'retained').is_dir())
         self.assertEqual((self.base/'bc-c-resume-approval-old.json').read_bytes(),before)
         self.assertEqual(d.inspect()['new_id'],None)
-        self.assertEqual(d.invoke('resume'),0);self.assertEqual(d.invoke('recover'),0)
+        self.assertEqual(d.invoke('resume'),0)
+        known=canon({'approval_sha256':'b'*64,'handoff_sha256':'c'*64,'new_id':'d'*64,'phase':'KNOWN_FAILURE','plan_sha256':'a'*64,'sequence':2})
+        self.write(self.attempt/'event-000002.json',known);self.write(self.attempt/'checkpoint.json',known)
+        queried=d.query();self.assertEqual((queried['phase'],queried['sequence'],queried['new_id']),('KNOWN_FAILURE',2,'d'*64))
+        self.assertEqual(d.invoke('recover'),0)
         self.assertEqual(self.marker.read_text().splitlines(),['--reopen-prepared','--recover-known-failure'])
+
+    def test_recover_refuses_prepared_without_calling_loader(self):
+        d.update()
+        with self.assertRaisesRegex(d.Hold,'KNOWN_FAILURE_REQUIRED'):d.invoke('recover')
+        self.assertFalse(self.marker.exists())
+
+    def test_cli_preserves_success_exit_and_does_not_claim_unexecuted_after_boundary(self):
+        with patch.object(d,'main',return_value=0):self.assertEqual(d.cli(['resume']),0)
+        output=io.StringIO()
+        with patch.object(d,'main',side_effect=d.Hold('BOUNDARY_HOLD')),redirect_stdout(output):
+            self.assertEqual(d.cli(['resume']),2)
+        self.assertEqual(json.loads(output.getvalue())['site_executed'],'UNKNOWN')
+        output=io.StringIO()
+        with patch.object(d,'main',side_effect=d.Hold('INSPECT_HOLD')),redirect_stdout(output):
+            self.assertEqual(d.cli(['inspect']),2)
+        self.assertIs(json.loads(output.getvalue())['site_executed'],False)
+
+    def test_entry_file_replacement_during_stable_read_is_rejected(self):
+        path=Path(self.tmp.name)/'entry.py';self.write(path,b'x'*70000)
+        real_read=os.read;changed=[]
+        def replace_after_first(fd,size):
+            part=real_read(fd,size)
+            if not changed:
+                replacement=path.with_suffix('.new');self.write(replacement,b'y'*70000)
+                os.replace(replacement,path);changed.append(True)
+            return part
+        with patch.object(d.os,'read',replace_after_first),self.assertRaisesRegex(d.Hold,'FILE_CHANGED_DURING_READ'):
+            d.read(str(path),131072,os.getuid(),0o600)
     def test_interruption_after_exchange_reopens_without_second_exchange(self):
         original=d.exchange;calls=[]
         def crash(a,b):original(a,b);calls.append((a,b));raise d.Hold('INJECTED_AFTER_EXCHANGE')
