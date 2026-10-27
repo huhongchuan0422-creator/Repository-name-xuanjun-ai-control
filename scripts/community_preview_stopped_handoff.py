@@ -1324,8 +1324,11 @@ class VerifiedHandoff:
         before=self.before_new()
         need(q.evidence(before)==proof['evidence'],'HANDOFF_EVIDENCE_CHANGED')
         live=self.bindings();base=j.plan['current']
-        need(all(type(live[k]) is type(base[k]) and live[k]==base[k] for k in base if k not in ('running','observed_at')),
-             'LIVE_HANDOFF_BINDING_CHANGED')
+        changed={k for k in base if k not in ('running','observed_at')
+                 and (type(live[k]) is not type(base[k]) or live[k]!=base[k])}
+        compatible=(changed=={'routing_sha256'}
+                    and c.stopped_route_transition(base,live) is True)
+        need(not changed or compatible,'LIVE_HANDOFF_BINDING_CHANGED')
         need(c.now()-600<=live['observed_at']<=c.now()+30,'CURRENT_STALE')
         if before:
             need(live['running'] is False,'OLD_REVIVED');q.freeze_live();q.boundary()

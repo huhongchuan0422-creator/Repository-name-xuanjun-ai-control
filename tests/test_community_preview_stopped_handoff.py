@@ -901,6 +901,26 @@ finally:
         self.assertEqual(q.journal.state['phase'],'PREPARED');self.assertEqual(q.journal.state['sequence'],1)
         self.assertEqual(self.calls,[])
         proof,proof_raw=h.document(h.PROOF);prior=proof['approval_sha256']
+        # Exercise the real production path that previously passed Update.guard
+        # but was rejected a second time by VerifiedHandoff.check.  Only the
+        # separately-owned shared vhost changes; the community include is exact.
+        community_path=self.root/c.observation.ROUTE_PATHS['community_route'].lstrip('/')
+        shared_path=self.root/c.observation.ROUTE_PATHS['shared_vhost_file_digest_only'].lstrip('/')
+        shared_raw=b'server { include /etc/nginx/community-preview.inc; }\n'
+        shared_path.write_bytes(shared_raw);shared_path.chmod(0o600)
+        community_raw=community_path.read_bytes()
+        route_hashes={
+            c.observation.ROUTE_PATHS['community_route']:s.sha(community_raw),
+            c.observation.ROUTE_PATHS['shared_vhost_file_digest_only']:s.sha(shared_raw),
+        }
+        transition=dict(saved_routing_sha256=proof['plan']['current']['routing_sha256'],
+            live_routing_sha256=c.digest(route_hashes),community_sha256=s.sha(community_raw),
+            shared_vhost_sha256=s.sha(shared_raw))
+        self.stack.enter_context(patch.object(c,'ROUTE_TRANSITION',transition))
+        def route_command(argv):
+            if argv==['/usr/sbin/nginx','-t']:return ''
+            return self.command(argv)
+        self.stack.enter_context(patch.object(c.original,'command',side_effect=route_command))
         q.close();self.clock=h.document(h.C_RESUME_APPROVAL)[0]['expires_at']+1
         reopened=h.Session();reopened.acquire(recover=True);self.addCleanup(reopened.close);self.session=reopened
         reopened.configure_resumed_recovery(proof);reopened.approved_stamp=reopened.pins()
