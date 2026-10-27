@@ -5,7 +5,7 @@ case "$1" in inspect|update|resume|query|recover) ;; *) echo HOLD_OPERATION >&2;
 bootstrap=$(/usr/bin/cat <<'PY'
 import hashlib,os,pwd,stat,sys
 path='/home/admin/community_preview_prepared_resume_delivery.py'
-expected='b06c5bacb38a807380b44933a88f293ad8b8bd7476f78e67d93b7b1188bf7e87'
+expected='4bb22238837df15f856538b3cdb9daffef02603ea7fcc41fa414064e25614724'
 admin=pwd.getpwnam('admin').pw_uid
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
 try:
