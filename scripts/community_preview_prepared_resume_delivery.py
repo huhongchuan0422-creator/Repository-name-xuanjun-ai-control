@@ -46,6 +46,11 @@ RECEIPT=DELIVERY+'/update-receipt.json'
 STAGE='control-stopped-v1.prepared-resume-76ca971e826f85e8.stage'
 RETAINED='control-stopped-v1.prepared-resume-76ca971e826f85e8.previous'
 SHA=re.compile(r'[0-9a-f]{64}\Z')
+PHASES={'PREPARED','OLD_STOP_INTENT','OLD_STOPPED','OLD_RENAME_INTENT','OLD_RENAMED',
+        'NEW_RUN_INTENT','NEW_KNOWN','KNOWN_FAILURE','RECOVERY_STOP_NEW_INTENT',
+        'RECOVERY_NEW_STOPPED','RECOVERY_RENAME_NEW_INTENT','RECOVERY_NEW_RENAMED',
+        'RECOVERY_OLD_RENAME_INTENT','RECOVERY_OLD_RENAMED','RECOVERY_OLD_START_INTENT',
+        'COMMITTED','ROLLED_BACK_PREVIEW_HOLD','HOLD_UNKNOWN_INSPECT_SAME_ATTEMPT'}
 
 class Hold(RuntimeError):pass
 def need(v,r):
@@ -70,6 +75,12 @@ def exact_json(raw):
     try:v=json.loads(raw.decode('ascii'))
     except (ValueError,UnicodeError):raise Hold('EXACT_JSON_REQUIRED') from None
     need(raw==canonical(v),'CANONICAL_JSON_REQUIRED');return v
+
+def journal_json(raw):
+    try:v=json.loads(raw.decode('ascii'))
+    except (ValueError,UnicodeError):raise Hold('EXACT_JSON_REQUIRED') from None
+    need(raw in (canonical(v),json.dumps(v,sort_keys=True).encode()),'CANONICAL_JSON_REQUIRED')
+    return v
 
 def write_exclusive(path,raw):
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -103,8 +114,33 @@ def state():
     need(sha(proof)==PROOF_SHA and sha(active)==ACTIVE_SHA and sha(checkpoint)==PREPARED_SHA and checkpoint==event,'EXACT_PREPARED_BYTES_REQUIRED')
     value=exact_json(checkpoint)
     need(value.get('phase')=='PREPARED' and value.get('sequence')==1 and value.get('new_id') is None and value.get('plan_sha256')==PLAN,'EXACT_PREPARED_STATE_REQUIRED')
-    need(exact_json(active)=={'attempt':ATTEMPT,'plan_sha256':PLAN},'EXACT_ACTIVE_ATTEMPT_REQUIRED')
+    need(journal_json(active)=={'attempt':ATTEMPT,'plan_sha256':PLAN},'EXACT_ACTIVE_ATTEMPT_REQUIRED')
     return value
+
+def journal_state():
+    """Read the existing journal without pretending a terminal state is PREPARED."""
+    proof=read(PROOF,16384);active=read(ACTIVE,16384)
+    need(sha(proof)==PROOF_SHA and sha(active)==ACTIVE_SHA,'FIXED_AUTHORITY_CHANGED')
+    need(journal_json(active)=={'attempt':ATTEMPT,'plan_sha256':PLAN},'EXACT_ACTIVE_ATTEMPT_REQUIRED')
+    directory=JOURNAL+'/'+ATTEMPT
+    names=sorted(os.listdir(directory));need('checkpoint.tmp' not in names,'PARTIAL_CHECKPOINT_INSPECT_ONLY')
+    checkpoint_raw=read(CHECKPOINT,65536);checkpoint=json.loads(checkpoint_raw.decode('ascii'))
+    need(type(checkpoint) is dict and set(checkpoint)=={'approval_sha256','handoff_sha256','new_id','phase','plan_sha256','sequence'},'CHECKPOINT_SHAPE')
+    need(checkpoint.get('plan_sha256')==PLAN and checkpoint.get('phase') in PHASES and type(checkpoint.get('sequence')) is int and 1<=checkpoint['sequence']<=64,'CHECKPOINT_BINDING_CHANGED')
+    need(checkpoint_raw in (canonical(checkpoint),json.dumps(checkpoint,sort_keys=True).encode()),'NONCANONICAL_CHECKPOINT')
+    events=['event-%06d.json'%i for i in range(1,checkpoint['sequence']+1)]
+    need(names==sorted(events+['checkpoint.json']),'PARTIAL_EVENT_HISTORY_INSPECT_ONLY')
+    hashes=[];last=None
+    for i,name in enumerate(events,1):
+        raw=read(directory+'/'+name,65536);value=json.loads(raw.decode('ascii'))
+        need(type(value) is dict and set(value)==set(checkpoint) and value.get('plan_sha256')==PLAN and value.get('sequence')==i and value.get('phase') in PHASES,'EVENT_BINDING_CHANGED')
+        need(raw in (canonical(value),json.dumps(value,sort_keys=True).encode()),'NONCANONICAL_EVENT_INSPECT_ONLY')
+        if last is not None:
+            need(value['approval_sha256']==last['approval_sha256'] and value['handoff_sha256']==last['handoff_sha256'],'JOURNAL_HANDOFF_BINDING_CHANGED')
+            if last['new_id'] is not None:need(value['new_id']==last['new_id'],'EVENT_ID_CHANGED')
+        hashes.append(sha(raw));last=value
+    need(last==checkpoint,'EVENT_CHECKPOINT_MISMATCH')
+    return checkpoint,hashes
 
 def tree_manifest(root):
     raw=read(root+'/manifest.json',65536);manifest=exact_json(raw)
@@ -157,6 +193,17 @@ def inspect():
         return {'record':'ISSUE76_PREPARED_RESUME_INSPECT','attempt':ATTEMPT,'phase':s['phase'],'sequence':s['sequence'],'new_id':s['new_id'],'current_manifest_sha256':current,'target_manifest_sha256':NEW_MANIFEST,'proof_sha256':PROOF_SHA,'active_attempt_sha256':ACTIVE_SHA,'checkpoint_sha256':PREPARED_SHA,'authority_set_sha256':sha(canonical(authority)),'update_receipt':RECEIPT,'site_executed':False}
     finally:os.close(entry);os.close(lease)
 
+def query():
+    lease,entry=locks()
+    try:
+        current,events=journal_state();manifest,_=tree_manifest(CONTROL)
+        return {'record':'ISSUE76_PREPARED_RESUME_QUERY','attempt':ATTEMPT,
+                'phase':current['phase'],'sequence':current['sequence'],
+                'new_id':current['new_id'],'current_manifest_sha256':manifest,
+                'target_manifest_sha256':NEW_MANIFEST,'event_sha256':events,
+                'update_receipt_present':os.path.isfile(RECEIPT)}
+    finally:os.close(entry);os.close(lease)
+
 def receipt_value(authority_sha):
     return {'format':1,'record':'ISSUE76_PREPARED_RESUME_CARRIER_UPDATED','attempt':ATTEMPT,'phase':'PREPARED','sequence':1,'new_id':None,'old_manifest_sha256':OLD_MANIFEST,'new_manifest_sha256':NEW_MANIFEST,'source_artifact_sha256':SOURCE_SHA,'carrier_archive_sha256':INNER_SHA,'loader_sha256':LOADER_SHA,'authority_set_sha256':authority_sha,'retained_path':BASE+'/'+RETAINED,'B_rerun':False,'post_b_replayed':False,'C_started':False,'updated':True}
 
@@ -192,20 +239,31 @@ def load():
     ns={'__name__':'fixed_stopped_loader'};exec(compile(raw,CONTROL+'/loader.py','exec'),ns);return ns['load'](NEW_MANIFEST)
 
 def invoke(operation):
-    need(os.path.isfile(RECEIPT),'UPDATE_RECEIPT_REQUIRED');state();need(tree_manifest(CONTROL)[0]==NEW_MANIFEST,'UPDATED_CARRIER_REQUIRED')
+    need(os.path.isfile(RECEIPT),'UPDATE_RECEIPT_REQUIRED')
+    current=state() if operation=='resume' else journal_state()[0]
+    if operation=='recover':need(current['phase']=='KNOWN_FAILURE' and current['new_id'] is not None,'KNOWN_FAILURE_REQUIRED')
+    need(tree_manifest(CONTROL)[0]==NEW_MANIFEST,'UPDATED_CARRIER_REQUIRED')
     module=load();arg={'resume':'--reopen-prepared','recover':'--recover-known-failure'}[operation]
     return module.main([arg])
 
 def main(argv=None):
     p=argparse.ArgumentParser();p.add_argument('operation',choices=('inspect','update','resume','query','recover'));a=p.parse_args(argv)
     need(os.getresuid()==(0,0,0) and socket.gethostname().split('.')[0]==HOST,'EXACT_ROOT_HOST_REQUIRED')
-    if a.operation in ('inspect','query'):result=inspect()
+    if a.operation=='inspect':result=inspect()
+    elif a.operation=='query':result=query()
     elif a.operation=='update':result=update()
     else:return invoke(a.operation)
     print(json.dumps(result,sort_keys=True,separators=(',',':')));return 0
 
+def cli(argv=None):
+    args=sys.argv[1:] if argv is None else argv
+    operation=args[0] if len(args)==1 else None
+    try:return main(args)
+    except Hold as e:
+        reason=str(e) if re.fullmatch(r'[A-Z0-9_]+',str(e)) else 'PREPARED_RESUME_UNKNOWN'
+        executed=False if operation in ('inspect','update','query') else 'UNKNOWN'
+        print(json.dumps({'record':'ISSUE76_PREPARED_RESUME_HOLD','reason':reason,'retry_safe':False,'site_executed':executed},sort_keys=True,separators=(',',':')))
+        return 2
+
 if __name__=='__main__':
-    try:raise SystemExit(main())
-    except BaseException as e:
-        reason=str(e) if type(e) is Hold and re.fullmatch(r'[A-Z0-9_]+',str(e)) else 'PREPARED_RESUME_UNKNOWN'
-        print(json.dumps({'record':'ISSUE76_PREPARED_RESUME_HOLD','reason':reason,'retry_safe':False,'site_executed':False},sort_keys=True,separators=(',',':')));raise SystemExit(2)
+    raise SystemExit(cli())
