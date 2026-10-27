@@ -2,10 +2,10 @@
 set -eu
 [ "$#" -eq 1 ] || { echo 'usage: issue76-prepared-resume-r18.sh inspect|update|resume|query|recover' >&2; exit 2; }
 case "$1" in inspect|update|resume|query|recover) ;; *) echo HOLD_OPERATION >&2; exit 2;; esac
-exec sudo -n /usr/bin/python3 -I -B -S - "$1" <<'PY'
+bootstrap=$(/usr/bin/cat <<'PY'
 import hashlib,os,pwd,stat,sys
 path='/home/admin/community_preview_prepared_resume_delivery.py'
-expected='ca97c8764f3e9096d2ce26b5f2b411a3b515445841b6b0b8d9c5c4f6956badad'
+expected='b06c5bacb38a807380b44933a88f293ad8b8bd7476f78e67d93b7b1188bf7e87'
 admin=pwd.getpwnam('admin').pw_uid
 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
 try:
@@ -23,3 +23,5 @@ ns={'__name__':'issue76_prepared_resume_delivery'}
 exec(compile(raw,path,'exec'),ns)
 raise SystemExit(ns['cli']([sys.argv[1]]))
 PY
+)
+exec sudo -n /usr/bin/python3 -I -B -S -c "$bootstrap" "$1"
