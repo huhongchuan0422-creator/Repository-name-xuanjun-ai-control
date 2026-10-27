@@ -127,7 +127,8 @@ def current_projection():
     config={p:approved.stable_metadata(p) for p in (v.ROOT+'/config',v.ROOT+'/config/host.json',v.ROOT+'/config/center-keys.json',v.ROOT+'/config/wechat.json')}
     data={p:approved.stable_metadata(p) for p in (v.ROOT+'/data',v.RUN)}
     routes={p:v.safe_file(p,True)[0]['sha256'] for p in v.ROUTE_PATHS.values()}
-    isolation={k:value for k,value in info.items() if k not in ('id','image','running','status')}
+    isolation=approved.canonical_isolation(
+        {k:value for k,value in info.items() if k not in ('id','image','running','status')})
     # Exactly the four calculable composition digests. No invented backup file
     # capability: the fifth field must remain UNKNOWN without a real reference.
     return dict(status='OBSERVED_PARTIAL_NO_BACKUP_BINDING',container_id=cid,image_id=image,

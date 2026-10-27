@@ -36,6 +36,15 @@ def require(ok,reason):
 def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
+def canonical_isolation(value):
+    """Canonicalize only Docker spellings already accepted by validate()."""
+    result=dict(value)
+    if result.get('network')=='default':result['network']='bridge'
+    if result.get('security')==['no-new-privileges:true']:
+        result['security']=['no-new-privileges']
+    return result
+
+
 def now():
     value=time.time()
     require(type(value) in (int,float) and math.isfinite(value) and value>0,'CLOCK_UNKNOWN')
@@ -297,7 +306,7 @@ def read_current(cid,image,backup_fd):
         plan.ROOT+'/config/center-keys.json',plan.ROOT+'/config/wechat.json')}
     data={path:stable_metadata(path) for path in (plan.ROOT+'/data',plan.RUN)}
     routes={path:observation.safe_file(path,body=True)[0]['sha256'] for path in observation.ROUTE_PATHS.values()}
-    isolation={k:v for k,v in value.items() if k not in ('id','image','running','status')}
+    isolation=canonical_isolation({k:v for k,v in value.items() if k not in ('id','image','running','status')})
     live=dict(container_id=value['id'],image_id=value['image'],oci_revision=plan.OBSERVED_OCI,
         running=value['running'],user=value['user'],observed_at=now(),
         config_identity_sha256=digest(config),data_identity_sha256=digest(data),routing_sha256=digest(routes),

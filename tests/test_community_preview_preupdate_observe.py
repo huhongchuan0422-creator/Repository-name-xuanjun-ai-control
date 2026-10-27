@@ -90,8 +90,14 @@ class FiveObjectReadonly(unittest.TestCase):
         r=p.current_projection();a=p.approved
         config={q:a.stable_metadata(q) for q in (p.v.ROOT+'/config',p.v.ROOT+'/config/host.json',p.v.ROOT+'/config/center-keys.json',p.v.ROOT+'/config/wechat.json')}
         self.assertEqual(r['config_identity_sha256'],a.digest(config))
-        isolation={k:v for k,v in self.info.items() if k not in ('id','image','running','status')}
+        isolation=a.canonical_isolation({k:v for k,v in self.info.items() if k not in ('id','image','running','status')})
         self.assertEqual(r['isolation_sha256'],a.digest(isolation))
+    def test_allowed_docker_isolation_spellings_are_stable_but_real_drift_is_not(self):
+        canonical=self.report()['sections']['current']['isolation_sha256']
+        self.info['network']='default';self.info['security']=['no-new-privileges:true']
+        self.assertEqual(self.report()['sections']['current']['isolation_sha256'],canonical)
+        self.info['network']='host'
+        self.assertEqual(self.report()['sections']['current']['status'],'HOLD_UNKNOWN')
     def test_no_private_bodies_no_path_search_no_receipt_recheck(self):
         real=p.v.os.read
         def read(fd,n):
@@ -206,7 +212,7 @@ class FiveObjectReadonly(unittest.TestCase):
             with self.assertRaises(ValueError):bundle.build()
         ns={'__name__':'readonly_isolated_bundle'};exec(compile(python,'<bundle>','exec'),ns)
         helpers=bundle.selected((bundle.ROOT/'scripts/community_preview_update_composition.py').read_text(),
-            {'require','digest','stable_metadata','inspect_bound','PRIVATE_PROBE'})
+            {'require','digest','canonical_isolation','stable_metadata','inspect_bound','PRIVATE_PROBE'})
         self.assertIn(repr(helpers),python.decode())
         ns['v'].ROOT_ANCHOR=str(self.root);ns['v'].ROOT_UID=os.getuid();ns['v'].PROJECT_UID=os.getuid()
         ns['v'].capture=self.capture;ns['wall']=p.wall

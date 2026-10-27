@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PINS={
  'scripts/community_preview_version_inspect.py':'98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3',
- 'scripts/community_preview_update_composition.py':'f3007cdd26d53e7348164d404186602335ee5f237963f5d6f627e5376cfdc4f1',
+ 'scripts/community_preview_update_composition.py':'6fb687b06aa6410ccc390611cdb572357534067615cf3588c32ca3c9ce006100',
  'scripts/community_preview_upgrade.py':'2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee'}
 
 
@@ -32,7 +32,7 @@ def build():
         sources[path]=raw.decode()
     observer=sources['scripts/community_preview_version_inspect.py']
     old=selected(sources['scripts/community_preview_upgrade.py'],{'ROOT','RUN','INSPECT_FIELDS','Rejected','validate'})
-    helpers=selected(sources['scripts/community_preview_update_composition.py'],{'require','digest','stable_metadata','inspect_bound','PRIVATE_PROBE'})
+    helpers=selected(sources['scripts/community_preview_update_composition.py'],{'require','digest','canonical_isolation','stable_metadata','inspect_bound','PRIVATE_PROBE'})
     prefix='''# Generated exact readonly helper composition; no site installation or mutation.
 import types,hashlib,json,os,re,stat
 v=types.ModuleType('fixed_approved_observer')
