@@ -614,6 +614,74 @@ class ModelControl(object):
                 'quota_source':quota_source,'verified_at':verified_at,
                 'unavailable_reason':unavailable_reason}
 
+    def record_free_model_preflight(self,provider_id,model_id,source_uri,
+                                    source_sha256,price_observed_at,
+                                    visibility_observed_at,now=None):
+        """Record attributable zero-price evidence without claiming quota.
+
+        Model visibility and a public zero price do not prove remaining quota
+        or current callability.  This method deliberately leaves the dynamic
+        quota/callability gate UNKNOWN until one controlled real benchmark
+        succeeds.
+        """
+        principal=self._admin();now=self.clock() if now is None else now
+        if source_uri!='https://siliconflow.cn/pricing':
+            raise ValueError('OFFICIAL_PRICING_SOURCE_REQUIRED')
+        _sha(source_sha256,'source_sha256')
+        _number(price_observed_at,'price_observed_at')
+        _number(visibility_observed_at,'visibility_observed_at')
+        if (price_observed_at>now+5 or now-price_observed_at>300 or
+                visibility_observed_at>now+5 or
+                now-visibility_observed_at>300):
+            raise ValueError('CURRENT_PRICE_EVIDENCE_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            provider=self.db.execute('''SELECT * FROM model_providers WHERE
+              tenant_id=? AND provider_id=? AND enabled=1''',(self.tenant_id,
+              provider_id)).fetchone()
+            model=self.db.execute('''SELECT * FROM model_catalog WHERE tenant_id=?
+              AND provider_id=? AND model_id=? AND enabled=1''',(self.tenant_id,
+              provider_id,model_id)).fetchone()
+            if provider is None or model is None:
+                raise ValueError('ACTIVE_MODEL_REQUIRED')
+            parsed=urlparse(provider['base_url'])
+            if (provider['adapter_type']!='siliconflow' or
+                    (parsed.hostname or '').lower()!='api.siliconflow.cn' or
+                    model_id!='Qwen/Qwen2.5-7B-Instruct'):
+                raise ValueError('EXACT_SILICONFLOW_FREE_MODEL_REQUIRED')
+            self.db.execute('''UPDATE model_providers SET price_state='KNOWN_FREE',
+              updated_at=? WHERE tenant_id=? AND provider_id=?''',(now,
+              self.tenant_id,provider_id))
+            self.db.execute('''UPDATE model_catalog SET price_state='KNOWN_FREE',
+              input_unit_cost=0,output_unit_cost=0 WHERE tenant_id=? AND
+              provider_id=? AND model_id=?''',(self.tenant_id,provider_id,
+              model_id))
+            self.db.execute('''INSERT OR REPLACE INTO model_quota_status VALUES
+              (?,?,?,?,?,?,?)''',(self.tenant_id,provider_id,UNKNOWN,
+              'PRICE_ZERO_AND_MODEL_VISIBLE_CALLABILITY_UNPROVEN',None,
+              'REAL_BENCHMARK_REQUIRED_NO_BALANCE_ASSERTION',now))
+            self._audit(principal,'ZERO_PRICE_EVIDENCE_VERIFIED',model_id,
+              {'provider_id':provider_id,'model_id':model_id,
+               'source_uri':source_uri,'source_sha256':source_sha256,
+               'price_source_observed_at':price_observed_at,
+               'model_visibility_source':'AUTHENTICATED_GET_/v1/models',
+               'model_visibility_observed_at':visibility_observed_at,
+               'model_visibility_result':'EXACT_MODEL_VISIBLE_NOT_QUOTA',
+               'input_unit_cost':0,'output_unit_cost':0,
+               'quota_balance':'NOT_ASSERTED'},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        return {'provider_id':provider_id,'model_id':model_id,
+                'price_state':'KNOWN_FREE','input_unit_cost':0,
+                'output_unit_cost':0,'source_uri':source_uri,
+                'source_sha256':source_sha256,
+                'price_source_observed_at':price_observed_at,
+                'model_visibility_source':'AUTHENTICATED_GET_/v1/models',
+                'model_visibility_observed_at':visibility_observed_at,
+                'quota_state':UNKNOWN,
+                'quota_source':'PRICE_ZERO_AND_MODEL_VISIBLE_CALLABILITY_UNPROVEN'}
+
     def set_runtime_limits(self,provider_id,tpm_limit,max_output_tokens,
                            tenant_budget=None,task_budget=None,now=None):
         self._admin();now=self.clock() if now is None else now
@@ -1065,7 +1133,8 @@ class ModelControl(object):
     def _reserve_call_locked(self,provider_id,model_id,request_id,task_id,
                              attempt_number,input_tokens,output_tokens,
                              allow_paid,config_version,now,
-                             require_qualified=False):
+                             require_qualified=False,
+                             allow_unverified_free_probe=False):
         """One transactional gate shared by benchmark and queued calls."""
         provider=self.db.execute('''SELECT * FROM model_providers WHERE
           tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
@@ -1078,6 +1147,12 @@ class ModelControl(object):
           tenant_id=? AND provider_id=?''',(self.tenant_id,provider_id)).fetchone()
         if provider is None or model is None or not provider['enabled'] or not model['enabled']:
             raise ValueError('ACTIVE_MODEL_REQUIRED')
+        effective=(UNKNOWN if UNKNOWN in (provider['price_state'],model['price_state'])
+          else 'KNOWN_PAID' if 'KNOWN_PAID' in
+          (provider['price_state'],model['price_state']) else 'KNOWN_FREE')
+        free_probe=(allow_unverified_free_probe and not require_qualified and
+          task_id.startswith('BENCHMARK:') and not allow_paid and
+          effective=='KNOWN_FREE' and provider['retry_limit']==0)
         if require_qualified:
             evaluation=self.db.execute('''SELECT state FROM model_evaluations
               WHERE tenant_id=? AND provider_id=? AND model_id=? ORDER BY
@@ -1087,20 +1162,19 @@ class ModelControl(object):
                 raise ValueError('MODEL_QUALIFICATION_NOT_CURRENT_HOLD')
         if provider['config_version']!=config_version:
             raise ValueError('PROVIDER_CONFIG_CHANGED_REQUEUE_REQUIRED')
-        if quota is None or quota['quota_state']==UNKNOWN:
+        if (quota is None or quota['quota_state']==UNKNOWN) and not free_probe:
             raise ValueError('PROVIDER_QUOTA_UNKNOWN_HOLD')
-        if quota['quota_state']=='EXHAUSTED':
+        if quota is not None and quota['quota_state']=='EXHAUSTED':
             raise ValueError('PROVIDER_QUOTA_EXHAUSTED_HOLD')
-        if quota['quota_state']!='AVAILABLE' or quota['verified_at'] is None:
+        if (not free_probe and (quota['quota_state']!='AVAILABLE' or
+                quota['verified_at'] is None)):
             raise ValueError('PROVIDER_QUOTA_UNAVAILABLE_HOLD')
-        if now-quota['verified_at']>QUOTA_VERIFICATION_MAX_AGE_SECONDS:
+        if (not free_probe and
+                now-quota['verified_at']>QUOTA_VERIFICATION_MAX_AGE_SECONDS):
             raise ValueError('PROVIDER_QUOTA_VERIFICATION_STALE_HOLD')
         if provider['circuit_state']=='OPEN' and (provider['next_probe_at'] is None or
                                                   provider['next_probe_at']>now):
             raise ValueError('CIRCUIT_OPEN')
-        effective=(UNKNOWN if UNKNOWN in (provider['price_state'],model['price_state'])
-          else 'KNOWN_PAID' if 'KNOWN_PAID' in
-          (provider['price_state'],model['price_state']) else 'KNOWN_FREE')
         if effective==UNKNOWN:
             raise ValueError('UNKNOWN_PRICE_HOLD')
         if effective=='KNOWN_PAID':
@@ -1200,7 +1274,8 @@ class ModelControl(object):
         return {'suite_version':suite_version,'case_count':len(normalized)}
 
     def run_benchmark(self, provider_id, model_id, suite_version,
-                      adapter=None, allow_paid=False, now=None):
+                      adapter=None, allow_paid=False, now=None,
+                      allow_unverified_free_probe=False):
         """Run the registered TEST_ONLY cases through the real adapter path."""
         self._admin();now=self.clock() if now is None else now
         provider=self.db.execute('''SELECT * FROM model_providers WHERE
@@ -1214,6 +1289,22 @@ class ModelControl(object):
           suite_version)))
         if provider is None or model is None or not cases:
             raise ValueError('ACTIVE_MODEL_AND_SUITE_REQUIRED')
+        if allow_unverified_free_probe:
+            effective=(UNKNOWN if UNKNOWN in
+              (provider['price_state'],model['price_state']) else
+              'KNOWN_PAID' if 'KNOWN_PAID' in
+              (provider['price_state'],model['price_state']) else 'KNOWN_FREE')
+            if (allow_paid or effective!='KNOWN_FREE' or
+                    provider['retry_limit']!=0):
+                raise ValueError('ZERO_COST_NO_RETRY_PROBE_REQUIRED')
+            if len(cases)!=1:
+                raise ValueError('SINGLE_CASE_FREE_PROBE_REQUIRED')
+            prior=self.db.execute('''SELECT 1 FROM model_call_attempts WHERE
+              tenant_id=? AND provider_id=? AND model_id=? AND worker_id=?
+              LIMIT 1''',(self.tenant_id,provider_id,model_id,
+              'benchmark:'+suite_version)).fetchone()
+            if prior is not None:
+                raise ValueError('FREE_PROBE_ALREADY_ATTEMPTED_RECONCILE')
         adapter=adapter or ({'siliconflow':SiliconFlowAdapter(),
           'openai-compatible':OpenAICompatibleAdapter()}[provider['adapter_type']])
         started=time.monotonic();passed=0;input_tokens=0;output_tokens=0;evidence=[]
@@ -1228,7 +1319,8 @@ class ModelControl(object):
                 self.db.execute('BEGIN IMMEDIATE')
                 reservation=self._reserve_call_locked(provider_id,model_id,
                   request_id,'BENCHMARK:'+suite_version,1,estimated,512,
-                  bool(allow_paid),provider['config_version'],now)
+                  bool(allow_paid),provider['config_version'],now,
+                  allow_unverified_free_probe=allow_unverified_free_probe)
                 self.db.execute('''INSERT INTO model_call_attempts VALUES
                   (?,?,?,?,?,?,?)''',(self.tenant_id,request_id,1,provider_id,
                   model_id,'benchmark:'+suite_version,now))
@@ -1291,6 +1383,27 @@ class ModelControl(object):
           output_tokens,0,0,state,canonical(evidence),now,
           'KNOWN' if input_complete else ('PARTIAL' if input_tokens else UNKNOWN),
           'KNOWN' if output_complete else ('PARTIAL' if output_tokens else UNKNOWN)));
+        if allow_unverified_free_probe:
+            if state=='QUALIFIED':
+                quota=('AVAILABLE',
+                  'REAL_BENCHMARK_CALL_SUCCEEDED_NOT_BALANCE:'+suite_version,
+                  now,None)
+                action='FREE_MODEL_CALLABILITY_VERIFIED'
+            else:
+                kinds=sorted(set(item.get('error_kind','QUALITY_MISMATCH')
+                  for item in evidence if not item['passed']))
+                quota=(UNKNOWN,'REAL_BENCHMARK_NOT_QUALIFIED:'+suite_version,
+                  now,'NO_RETRY_'+('_'.join(kinds) if kinds else
+                  'QUALITY_MISMATCH'))
+                action='FREE_MODEL_CALLABILITY_NOT_VERIFIED'
+            self.db.execute('''INSERT OR REPLACE INTO model_quota_status VALUES
+              (?,?,?,?,?,?,?)''',(self.tenant_id,provider_id,quota[0],quota[1],
+              quota[2],quota[3],now))
+            self._audit(self._principal(),action,model_id,
+              {'provider_id':provider_id,'model_id':model_id,
+               'suite_version':suite_version,'evaluation_id':evaluation_id,
+               'evaluation_state':state,'quota_balance':'NOT_ASSERTED',
+               'automatic_retry':False},now)
         self.db.commit()
         return {'evaluation_id':evaluation_id,'state':state,
                 'quality_score':score,'duration_ms':duration}

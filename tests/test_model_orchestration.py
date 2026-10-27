@@ -195,6 +195,99 @@ class ModelOrchestrationTests(unittest.TestCase):
           now=3701)
         self.assertEqual(result['state'],'NOT_QUALIFIED');self.assertEqual(called,[])
 
+    def free_probe_preflight(self,pid='probe',model='Qwen/Qwen2.5-7B-Instruct',
+                             now=1000):
+        self.control.upsert_provider({'provider_id':pid,'display_name':pid,
+          'adapter_type':'siliconflow','base_url':'https://api.siliconflow.cn',
+          'enabled':True,
+          'price_state':'UNKNOWN','rate_limit_per_min':10,
+          'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0},SECRET,
+          now=now)
+        self.model(pid,model,'UNKNOWN',['general'])
+        return self.control.record_free_model_preflight(pid,model,
+          'https://siliconflow.cn/pricing','a'*64,now,now,now=now)
+
+    def test_free_preflight_records_sources_but_does_not_claim_quota(self):
+        receipt=self.free_probe_preflight()
+        self.assertEqual(receipt['price_state'],'KNOWN_FREE')
+        self.assertEqual(receipt['quota_state'],'UNKNOWN')
+        self.assertEqual(receipt['model_visibility_source'],
+                         'AUTHENTICATED_GET_/v1/models')
+        quota=self.supervisor.db.execute('''SELECT * FROM model_quota_status
+          WHERE tenant_id='tenant-a' AND provider_id='probe' ''').fetchone()
+        self.assertEqual(quota['quota_state'],'UNKNOWN')
+        self.assertIn('CALLABILITY_UNPROVEN',quota['quota_source'])
+        audit=json.loads(self.supervisor.db.execute('''SELECT detail_json FROM
+          model_audit WHERE action='ZERO_PRICE_EVIDENCE_VERIFIED' ''').fetchone()[0])
+        self.assertEqual(audit['quota_balance'],'NOT_ASSERTED')
+        self.assertEqual(audit['model_visibility_result'],
+                         'EXACT_MODEL_VISIBLE_NOT_QUOTA')
+
+    def test_single_free_probe_success_qualifies_without_balance_claim(self):
+        model='Qwen/Qwen2.5-7B-Instruct';self.free_probe_preflight(model=model)
+        self.control.register_benchmark_suite('free-probe-success',[{
+          'case_id':'classification','capability':'general',
+          'messages':[{'role':'user','content':'fixed public fixture'}],
+          'expected_contains':'category_a'}])
+        calls=[]
+        class Success(object):
+            def invoke(inner,*args):
+                calls.append(args);return {'content':'category_a',
+                  'usage':{'input_tokens':3,'output_tokens':1,'total_tokens':4},
+                  'provider_request_id':'fixture-probe-success'}
+        result=self.control.run_benchmark('probe',model,'free-probe-success',
+          Success(),now=1001,allow_unverified_free_probe=True)
+        self.assertEqual(result['state'],'QUALIFIED');self.assertEqual(len(calls),1)
+        quota=self.supervisor.db.execute('''SELECT * FROM model_quota_status
+          WHERE tenant_id='tenant-a' AND provider_id='probe' ''').fetchone()
+        self.assertEqual(quota['quota_state'],'AVAILABLE')
+        self.assertIn('NOT_BALANCE',quota['quota_source'])
+        with self.assertRaisesRegex(ValueError,'ALREADY_ATTEMPTED'):
+            self.control.run_benchmark('probe',model,'free-probe-success',
+              Success(),now=1002,allow_unverified_free_probe=True)
+        self.assertEqual(len(calls),1)
+
+    def test_failed_free_probes_are_unknown_and_never_retried(self):
+        model='Qwen/Qwen2.5-7B-Instruct'
+        for index,kind in enumerate(('RATE_LIMIT','TIMEOUT_UNKNOWN','RESULT_UNKNOWN')):
+            pid='probe-fail-%d'%index;suite='probe-fail-%d'%index
+            self.free_probe_preflight(pid,model,1000+index)
+            self.control.register_benchmark_suite(suite,[{
+              'case_id':'classification','capability':'general','messages':[],
+              'expected_contains':'category_a'}])
+            calls=[]
+            class Fails(object):
+                def invoke(inner,*args):
+                    calls.append(args);raise ProviderError(kind,'redacted',False)
+            result=self.control.run_benchmark(pid,model,suite,Fails(),
+              now=1001+index,allow_unverified_free_probe=True)
+            self.assertEqual(result['state'],'NOT_QUALIFIED')
+            self.assertEqual(len(calls),1)
+            quota=self.supervisor.db.execute('''SELECT * FROM model_quota_status
+              WHERE tenant_id='tenant-a' AND provider_id=?''',(pid,)).fetchone()
+            self.assertEqual(quota['quota_state'],'UNKNOWN')
+            self.assertIn('NO_RETRY_'+kind,quota['unavailable_reason'])
+            with self.assertRaisesRegex(ValueError,'ALREADY_ATTEMPTED'):
+                self.control.run_benchmark(pid,model,suite,Fails(),
+                  now=1010+index,allow_unverified_free_probe=True)
+            self.assertEqual(len(calls),1)
+
+    def test_free_probe_rejects_paid_multicase_and_ordinary_bypass(self):
+        model='Qwen/Qwen2.5-7B-Instruct';self.free_probe_preflight(model=model)
+        self.control.register_benchmark_suite('probe-multiple',[{
+          'case_id':'one','capability':'general','messages':[],
+          'expected_contains':'one'},{'case_id':'two','capability':'general',
+          'messages':[],'expected_contains':'two'}])
+        with self.assertRaisesRegex(ValueError,'SINGLE_CASE'):
+            self.control.run_benchmark('probe',model,'probe-multiple',
+              allow_unverified_free_probe=True,now=1001)
+        calls=[]
+        class Never(object):
+            def invoke(inner,*args):calls.append(args);raise AssertionError()
+        result=self.control.run_benchmark('probe',model,'probe-multiple',Never(),
+          now=1001)
+        self.assertEqual(result['state'],'NOT_QUALIFIED');self.assertEqual(calls,[])
+
     def test_paid_model_requires_explicit_unit_costs(self):
         self.provider('paid',price='KNOWN_PAID')
         with self.assertRaisesRegex(ValueError,'KNOWN_PAID_UNIT_COSTS'):
