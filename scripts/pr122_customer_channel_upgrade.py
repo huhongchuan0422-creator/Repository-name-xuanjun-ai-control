@@ -28,6 +28,10 @@ OLD_CODE='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
 OLD_TAR='7dd77ef573c338201ddc886b23585422ad4a07ae563a9c6ff92fe5b2f9d97b98'
 ARCHIVE='PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz'
 FROZEN_ZIP='a662b76d6c3fb010e0944dea157ff898040007cd69124d498bec26c7701138d3'
+IDENTITY_ADDITIONS=frozenset({'scripts/pr122_customer_identity.py',
+    'tests/test_pr122_customer_identity.py',
+    'docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md'})
+IDENTITY_BASE_PATHS_SHA256='88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a'
 
 def need(ok,msg):
     if not ok:raise RuntimeError('HOLD:'+msg)
@@ -68,10 +72,15 @@ def owner():need(os.geteuid()==0 and os.uname().nodename==HOST and os.environ.ge
 def unpack(raw):
     need(len(raw)<=10000000,'TAR_SIZE');out={}
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-        members=t.getmembers();need(1<len(members)<=100,'TAR_COUNT')
+        members=t.getmembers();need(1<len(members)<=103,'TAR_COUNT')
         for m in members:
             need(m.isfile() and m.name.startswith('customer-center/') and '..' not in Path(m.name).parts and m.name not in out and m.size<=8000000,'TAR_PATH_TYPE')
             out[m.name]=t.extractfile(m).read()
+        paths={name.removeprefix('customer-center/') for name in out}
+        if len(members)>100 or paths & IDENTITY_ADDITIONS:
+            need(len(members)==103 and IDENTITY_ADDITIONS <= paths and 'CUSTOMER_MANIFEST.json' in paths,'IDENTITY_CANDIDATE_SHAPE')
+            baseline=paths-IDENTITY_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
+            need(len(baseline)==99 and sha(canonical(sorted(baseline)))==IDENTITY_BASE_PATHS_SHA256,'IDENTITY_CANDIDATE_BASE_PATHS')
     raw_manifest=out.pop('customer-center/CUSTOMER_MANIFEST.json');manifest=json.loads(raw_manifest)
     files={x['path']:out.get('customer-center/'+x['path']) for x in manifest['files']}
     need(len(files)==len(manifest['files']) and len(files)==len(out),'MANIFEST_SET')

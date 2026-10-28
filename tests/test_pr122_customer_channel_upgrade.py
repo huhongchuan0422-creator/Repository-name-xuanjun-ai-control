@@ -98,6 +98,49 @@ REAL_GATE=u.gate
 
 
 # Unprivileged source/pin checks; no host execution or artifact verification.
+class Current103ShapeTests(unittest.TestCase):
+    def exact_archive(self,count=103,substitute=False):
+        additions=sorted(u.IDENTITY_ADDITIONS)
+        baseline=['baseline-%03d.py'%i for i in range(99)]
+        names=baseline+additions+['CUSTOMER_MANIFEST.json']
+        if count<103:names=names[:count]
+        if substitute and names:names[0]='unapproved.py'
+        files={name:('# '+name+'\n').encode() for name in names if name!='CUSTOMER_MANIFEST.json'}
+        manifest=u.canonical({'source_commit':'b'*40,'source_tree':'c'*40,'files':[{'path':p,'size':len(body),'sha256':u.sha(body)} for p,body in files.items()]})
+        raw=io.BytesIO()
+        with tarfile.open(fileobj=raw,mode='w:gz') as t:
+            for p,body in {**files,'CUSTOMER_MANIFEST.json':manifest}.items():
+                item=tarfile.TarInfo('customer-center/'+p);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        return raw.getvalue(),baseline
+
+    def test_exact_103_shape_is_accepted_with_exact_baseline_pin(self):
+        raw,baseline=self.exact_archive()
+        with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))):
+            files,manifest,msha=u.unpack(raw)
+        self.assertEqual(len(files),103)
+        self.assertEqual(manifest['source_commit'],'b'*40)
+        self.assertEqual(msha,u.sha(u.canonical(manifest)))
+
+    def test_101_102_and_104_member_shapes_are_rejected(self):
+        raw,baseline=self.exact_archive(101)
+        with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))),self.assertRaises(RuntimeError):u.unpack(raw)
+        raw,baseline=self.exact_archive(102)
+        with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))),self.assertRaises(RuntimeError):u.unpack(raw)
+        raw,baseline=self.exact_archive()
+        with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as source:
+            bodies={m.name:source.extractfile(m).read() for m in source.getmembers()}
+        bodies['customer-center/extra.py']=b'extra\n'
+        out=io.BytesIO()
+        with tarfile.open(fileobj=out,mode='w:gz') as t:
+            for name,body in bodies.items():
+                item=tarfile.TarInfo(name);item.size=len(body);t.addfile(item,io.BytesIO(body))
+        with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))),self.assertRaises(RuntimeError):u.unpack(out.getvalue())
+
+    def test_103_baseline_substitution_is_rejected(self):
+        raw,baseline=self.exact_archive(substitute=True)
+        with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))),self.assertRaisesRegex(RuntimeError,'IDENTITY_CANDIDATE_BASE_PATHS'):u.unpack(raw)
+
+
 class FrozenPinTests(unittest.TestCase):
     def test_exact_audited_zip_pin(self):
         self.assertEqual(u.FROZEN_ZIP, 'a662b76d6c3fb010e0944dea157ff898040007cd69124d498bec26c7701138d3')

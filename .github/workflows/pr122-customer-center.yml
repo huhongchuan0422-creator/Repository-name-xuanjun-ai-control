@@ -279,10 +279,16 @@ jobs:
           import urllib.request
           from pathlib import Path
           from scripts.pr122_customer_channel_binding import bind
-          from scripts.pr122_customer_core import canonical
+          from scripts.pr122_customer_channel_upgrade import unpack as upgrade_unpack
+          from scripts.pr122_customer_core import canonical,digest
           url='https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/7e5d42f5a5331dc261074ddd780413d03de9c591/scripts/pr122_domestic_customer_channel.py'
           with urllib.request.urlopen(url,timeout=20) as response:original=response.read(100001)
-          code,binding=bind(original,Path('/tmp/pr122-customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes(),'/tmp/pr122-customer/wheels')
+          archive_raw=Path('/tmp/pr122-customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
+          upgrade_files,upgrade_manifest,upgrade_manifest_sha=upgrade_unpack(archive_raw)
+          assert len(upgrade_files)==103 and len(upgrade_manifest['files'])==102
+          assert upgrade_manifest['source_commit']==os.environ['GITHUB_SHA']
+          assert upgrade_manifest_sha==digest(Path('/tmp/pr122-customer/CUSTOMER_MANIFEST.json').read_bytes())
+          code,binding=bind(original,archive_raw,'/tmp/pr122-customer/wheels')
           out=Path('/tmp/pr122-customer/rebind-candidate');out.mkdir()
           (out/'channel.py').write_bytes(code);(out/'REBIND_BINDING.json').write_bytes(canonical(binding))
           print(canonical(binding).decode())
