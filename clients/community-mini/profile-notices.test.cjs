@@ -37,3 +37,10 @@ test('profile notices reject malformed records without exposing another payload'
  await page.loadNotices(null,page._authEpoch,page._loginAttempt,false);
  assert.equal(page.data.notices.length,0);assert.match(page.data.noticeStatus,/通知列表返回未确认/);
 });
+test('profile notice detail keeps a closed reactive read-state template',()=>{
+ const wxml=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
+ assert(wxml.includes('<view wx:if="{{noticeDetailOpen&&selectedNotice}}">'));
+ assert(wxml.includes("<text>通知详情 · {{selectedNotice.read?'已读':'未读'}}</text>"));
+ assert(wxml.includes('wx:if="{{!selectedNotice.read}}"'));
+ assert(wxml.includes('bindtap="markNoticeRead"'));
+});

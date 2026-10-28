@@ -20,7 +20,7 @@
     </view>
     <view wx:if="{{noticeDetailOpen&&selectedNotice}}">
       <button size="mini" bindtap="backNoticeList" disabled="{{noticePending}}">返回通知列表</button>
-      <text>通知详情 · {{selectedNotice.read?'已读':'未读'}</text><text>{{selectedNotice.message}}</text>
+      <text>通知详情 · {{selectedNotice.read?'已读':'未读'}}</text><text>{{selectedNotice.message}}</text>
       <button wx:if="{{!selectedNotice.read}}" data-id="{{selectedNotice.id}}" bindtap="markNoticeRead" loading="{{noticePending}}" disabled="{{noticePending}}">标记已读</button>
     </view>
   </view>
