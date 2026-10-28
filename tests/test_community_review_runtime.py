@@ -30,19 +30,23 @@ class IntegratedReview(unittest.TestCase):
    if target.count() and target.is_visible():return target
    if attempt==max_steps:break
    before_cursor=page.evaluate('window.reviewPage.data.fieldCursor')
-   before=page.locator('#native [data-path]:visible').first.get_attribute('data-path') if page.locator('#native [data-path]:visible').count() else None
+   before=page.locator('#native input[data-path]:visible, #native textarea[data-path]:visible').first.get_attribute('data-path') if page.locator('#native input[data-path]:visible, #native textarea[data-path]:visible').count() else None
    next_field=page.get_by_role('button',name='下一项资料',exact=True)
    expect(next_field).to_be_visible()
    next_field.click()
    after_cursor=page.evaluate('window.reviewPage.data.fieldCursor')
    self.assertNotEqual(after_cursor,before_cursor,f'{label}: field cursor did not advance')
-   visible=page.locator('#native [data-path]:visible')
+   visible=page.locator('#native input[data-path]:visible, #native textarea[data-path]:visible')
    after=visible.first.get_attribute('data-path') if visible.count() else None
    self.assertNotEqual(after,before,f'{label}: visible field did not advance')
   raise AssertionError(f'{label}: target field not visible after {max_steps} bounded advances')
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
   page=self.page();errors=[];requests=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:requests.append(r.url))
-  self.ready(page);page.locator('#apply').click();expect(page.locator('#native')).to_contain_text('选择原申请继续办理')
+  self.ready(page);page.locator('#apply').click();page.wait_for_function('window.reviewPage?.data.ready === true')
+  self.assertEqual(page.evaluate('window.reviewPage.data.applications.length'),0)
+  self.assertIsNone(page.evaluate('window.reviewPage.data.application'))
+  expect(page.get_by_role('button',name='保存同一份申请草稿',exact=True)).to_be_enabled()
+  expect(page.locator('#native [data-path="subject_info.identity_info.id_doc_type"] select')).to_be_enabled()
   page.locator('input[data-key="store_name"]').fill('同版本测试门店')
   page.locator('input[data-key="address"]').fill('隔离演示地址')
   merchant_name=self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','stage0 merchant_name')
@@ -66,15 +70,17 @@ class IntegratedReview(unittest.TestCase):
  def test_native_home_store_navigation_uses_registered_pages(self):
   page=self.page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   self.ready(page)
-  page.get_by_role('button',name='查看门店介绍 ›',exact=True).click()
+  page.get_by_role('button',name='查看当前门店介绍 ›',exact=True).click()
   expect(page).to_have_url(__import__('re').compile(r'view=store-detail&scene=shop1$'))
-  expect(page.locator('#native')).to_contain_text('门店资料来源待接入')
+  self.assertEqual(page.evaluate('window.reviewPage.data.viewMode'),'store-detail')
+  self.assertEqual(page.evaluate('window.reviewPage.scene'),'shop1')
+  expect(page.locator('#native')).to_contain_text('不代表资质、排名或开通支付')
   page.get_by_role('button',name='返回推荐店铺',exact=True).click()
-  expect(page.locator('#native')).to_contain_text('平台推荐')
+  expect(page.locator('#native')).to_contain_text('推荐目录尚未开放')
   page.locator('#native [data-section="orders"]').click()
   expect(page.locator('#native')).to_contain_text('订单')
   page.locator('#native [data-section="home"]').click()
-  expect(page.locator('#native')).to_contain_text('查看门店介绍')
+  expect(page.locator('#native')).to_contain_text('查看当前门店介绍')
   self.assertEqual(errors,[])
  def test_actual_web_license_inline_saves_and_uploads_same_application(self):
   page=self.page();page.add_init_script("""window.addEventListener('load',async()=>{
