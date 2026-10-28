@@ -1,7 +1,7 @@
 """Offline fixed-product admission matrices. No provider/host/upload I/O.
 Metadata records are synthetic fixtures; optional exact artifact bytes are real inputs.
 """
-import copy, hashlib, importlib.util, io, json, os, pathlib, shutil, subprocess, tempfile, time, unittest
+import copy, hashlib, importlib.util, io, json, os, pathlib, shutil, subprocess, tempfile, time, unittest, zipfile
 from unittest.mock import patch
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -82,6 +82,15 @@ class Contracts(unittest.TestCase):
                     p.evidence(*records,self.env)
             records=copy.deepcopy(self.records);records[index][key]*=2;records[index]['total_count']=2
             with self.assertRaises(ValueError):p.evidence(*records,self.env)
+    def test_safe_failure_reason_never_exports_arbitrary_error_text(self):
+        from urllib.error import HTTPError
+        self.assertEqual(p.safe_failure_reason(ValueError('FIXED_ARTIFACT_MEMBERS_REQUIRED')),
+                         'FIXED_ARTIFACT_MEMBERS_REQUIRED')
+        self.assertEqual(p.safe_failure_reason(HTTPError('https://secret.invalid/?token=SECRET',403,
+                         'private body',{},None)), 'HTTP_STATUS_403')
+        for exc in (ValueError('SECRET_TOKEN_ABC'), RuntimeError('FIXED_ARTIFACT_MEMBERS_REQUIRED'),
+                    OSError('credential/private/path'), ValueError('FIXED_ARTIFACT_MEMBERS_REQUIRED\nSECRET')):
+            self.assertEqual(p.safe_failure_reason(exc),'UNCLASSIFIED_SAFE_FAILURE')
     def test_changed_source_archive_and_duplicate_json_rejected(self):
         with self.assertRaisesRegex(ValueError,'FIXED_ARTIFACT_BYTES_SHA_REQUIRED'):p.archive_source(b'not the pinned archive')
         with self.assertRaisesRegex(ValueError,'FIXED_PRODUCT_SOURCE_SHA_REQUIRED'):p.source_files(b'not the pinned source')
@@ -231,6 +240,21 @@ class ExactArtifact(unittest.TestCase):
         destination,context=p.paths(self.env)
         self.env['COMMUNITY_PREVIEW_PRODUCT_CONTEXT']=str(context)
         return destination,context
+    def test_actual_pinned_outer_archive_members_and_source(self):
+        path=os.environ.get('COMMUNITY_FIXED_PRODUCT_TEST_ARCHIVE','')
+        if not path:self.skipTest('EXACT_PRODUCT_OUTER_ARCHIVE_FIXTURE_NOT_PROVIDED')
+        self.assertEqual(p.archive_source(pathlib.Path(path).read_bytes()),self.raw)
+    def test_outer_artifact_rejects_missing_extra_and_duplicate_members(self):
+        expected=['community-tests.log','stage5-tests.log','community-stage-source.zip']
+        for names in (expected[:1]+expected[2:],expected+['extra.txt'],expected+['stage5-tests.log']):
+            stream=io.BytesIO()
+            with zipfile.ZipFile(stream,'w') as z:
+                for name in names:z.writestr(name,self.raw if name.endswith('.zip') else b'offline fixture')
+            raw=stream.getvalue()
+            # Isolate membership validation; production SHA and size pins stay unchanged.
+            with patch.object(p,'ARTIFACT_SIZE',len(raw)),patch.object(p,'ARTIFACT_SHA256',hashlib.sha256(raw).hexdigest()):
+                with self.subTest(names=names),self.assertRaisesRegex(ValueError,'FIXED_ARTIFACT_MEMBERS_REQUIRED'):
+                    p.archive_source(raw)
     def test_actual_frozen_source_set_and_appid(self):
         files=p.source_files(self.raw)
         self.assertEqual(len(files),463)

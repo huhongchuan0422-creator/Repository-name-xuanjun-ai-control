@@ -140,8 +140,8 @@ def archive_source(raw):
     require(len(raw) == ARTIFACT_SIZE and hashlib.sha256(raw).hexdigest() == ARTIFACT_SHA256,
             'FIXED_ARTIFACT_BYTES_SHA_REQUIRED')
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
-        require(len(z.infolist()) == 2
-                and set(z.namelist()) == {'community-tests.log', 'community-stage-source.zip'},
+        require(len(z.infolist()) == 3
+                and set(z.namelist()) == {'community-tests.log', 'stage5-tests.log', 'community-stage-source.zip'},
                 'FIXED_ARTIFACT_MEMBERS_REQUIRED')
         source = z.read('community-stage-source.zip')
     source_files(source)
@@ -314,9 +314,23 @@ def main():
               strict_json(read_regular(root / 'fixed-product-receipt.json', 16384)), env)
         print('FIXED_06053_PRODUCT_STAGED_NO_UPLOAD')
 
+def safe_failure_reason(exc):
+    # Publish only fixed non-sensitive diagnoses, never URLs, token values or traces.
+    allowed = frozenset(('FIXED_ARTIFACT_MEMBERS_REQUIRED', 'FIXED_ARTIFACT_BYTES_SHA_REQUIRED',
+        'FIXED_PRODUCT_SOURCE_SHA_REQUIRED', 'FIXED_PRODUCT_MANIFEST_SHA_REQUIRED',
+        'FIXED_PRODUCT_PUSH_EVIDENCE_REQUIRED', 'FIXED_PRODUCT_TEST_REQUIRED',
+        'FIXED_UNEXPIRED_ARTIFACT_BINDING_REQUIRED', 'GITHUB_ARTIFACT_STORAGE_REQUIRED',
+        'FIXED_ARTIFACT_REDIRECT_REQUIRED', 'EXACT_FIXED_PRODUCT_CONTROL_CONTEXT_REQUIRED'))
+    if type(exc) is ValueError and str(exc) in allowed:
+        return str(exc)
+    from urllib.error import HTTPError
+    if isinstance(exc, HTTPError) and type(exc.code) is int and 400 <= exc.code <= 599:
+        return 'HTTP_STATUS_' + str(exc.code)
+    return 'UNCLASSIFIED_SAFE_FAILURE'
+
 if __name__ == '__main__':
     try:
         main()
-    except Exception:
-        raise SystemExit('FIXED_PRODUCT_PREVIEW_ADMISSION_FAILED')
+    except Exception as exc:
+        raise SystemExit('FIXED_PRODUCT_PREVIEW_ADMISSION_FAILED: ' + safe_failure_reason(exc))
 
