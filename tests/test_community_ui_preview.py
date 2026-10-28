@@ -14,7 +14,9 @@ class SourceBoundary(unittest.TestCase):
         photo=native.split('线下实际经营场景照片',1)[1].split('小程序服务截图',1)[0]
         self.assertNotIn('OCR未接通',photo)
         self.assertIn('场景照片无需OCR',photo)
-        self.assertIn('识别：未接通',native)
+        self.assertNotIn('bindtap="recognizeDocument"',photo)
+        self.assertIn('OCR按需调用且默认关闭',native)
+        self.assertIn('识别：按需调用；上传本身不自动生成识别结果或自动回填',native)
 
     def test_generated_inputs_and_scoped_fields(self):
         data=build()
