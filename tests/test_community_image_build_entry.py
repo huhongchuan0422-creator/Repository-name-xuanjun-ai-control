@@ -135,3 +135,28 @@ class HostedImageEntry(unittest.TestCase):
         names=set(self.ns['validate'].__code__.co_consts)
         for token in ('EXACT_SUCCESSFUL_PUSH_EVIDENCE_REQUIRED','ONE_SOURCE_ARTIFACT_REQUIRED','UNEXPIRED_EXACT_SOURCE_ARTIFACT_REQUIRED'):
             self.assertIn(token,names)
+
+    def test_original_ocr_download_id_keeps_named_directory_and_exact_validator_path(self):
+        import shlex
+        download=self.workflow.split('      - name: Read original successful PR139 offline OCR artifact (no rebuild)\n',1)[1].split('      - name:',1)[0]
+        self.assertIn('uses: actions/download-artifact@v4',download)
+        self.assertIn("artifact-ids: '12553737114'",download)
+        self.assertIn("run-id: '40076963020'",download)
+        self.assertIn('path: original-ocr-evidence',download)
+        self.assertNotIn('merge-multiple: true',download)
+        step=self.workflow.split('      - name: Verify fixed original OCR bundle and preserve community vendor pins\n',1)[1].split('      - name:',1)[0]
+        command=shlex.split(step.split('        run: |\n',1)[1].strip())
+        # download-artifact with artifact-ids and the default merge=false keeps
+        # the exact original artifact name, even when there is only one match.
+        name='xuanjun-ocr-linux-x86_64-cp311-cb28f605291cde6dc48a2d6431166211059dc595'
+        expected=Path('original-ocr-evidence')/name/'xuanjun-ocr-linux-x86_64-cp311.tar.gz'
+        self.assertEqual(command,['python','community-image-context/scripts/community_ocr_image_inputs.py',str(expected),'community-image-context/ocr-runtime'])
+
+    def test_missing_original_ocr_bundle_rejects_before_destination_write(self):
+        import tempfile
+        from scripts.community_ocr_image_inputs import prepare
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);destination=root/'ocr-runtime'
+            with self.assertRaisesRegex(ValueError,'ORIGINAL_OCR_BUNDLE_REQUIRED'):
+                prepare(root/'original-ocr-evidence/xuanjun-ocr-linux-x86_64-cp311.tar.gz',destination)
+            self.assertFalse(destination.exists())
