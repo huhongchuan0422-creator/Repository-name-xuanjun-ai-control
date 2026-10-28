@@ -273,7 +273,7 @@ jobs:
           import json,os,subprocess,pathlib
           pathlib.Path('/tmp/pr122-customer/CI_BINDING.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'ISOLATED_FIXTURE_ONLY','host_mutations':0,'production_acceptance_14':'NOT_RUN','independent_review':'PENDING','production_release':'HOLD'},indent=2))
           PY
-      - name: Build exact fixed-channel rebind candidate no root execution
+      - name: Build exact 103-member fixed-channel rebind candidate and upgrade parse no root execution
         run: |
           python - <<'PYCODE'
           import urllib.request

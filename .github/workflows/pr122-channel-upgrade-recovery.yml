@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Root-owned disposable filesystem crash matrix no production paths
+      - name: Root-owned disposable upgrade plus exact 103-member shape regressions no production paths
         shell: bash
         run: |
           set -euo pipefail
