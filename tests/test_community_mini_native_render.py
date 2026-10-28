@@ -32,6 +32,12 @@ class NativeSourceRender(unittest.TestCase):
                         expect(page.locator('#material-'+group).get_by_text('登录后读取材料清单',exact=True)).to_be_visible()
                     expect(page.get_by_text('正在读取材料清单',exact=False)).to_have_count(0)
                     self.assertFalse(page.evaluate('window.__nativeEvidence.state.pending'))
+                # Native picker child labels and selection must show the same Page state.
+                # HTML select does not apply a value attribute after options are inserted.
+                for picker in page.locator('select[value]').all():
+                    expect(picker).to_have_value('' if picker.get_attribute('aria-label').strip().startswith('请选择') else picker.get_attribute('value'))
+                for raw_code in ('BANK_ACCOUNT_TYPE_CORPORATE','BANK_ACCOUNT_TYPE_PERSONAL','NOT_VERIFIED','NOT_APPROVED','operator_identity','ubo_1_front'):
+                    expect(page.get_by_text(raw_code,exact=False)).to_have_count(0)
                 self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'))
                 spacing=page.locator('.page:visible').first.evaluate('(element)=>({left:parseFloat(getComputedStyle(element).paddingLeft),bottom:parseFloat(getComputedStyle(element).paddingBottom)})')
                 self.assertGreaterEqual(spacing['left'],10,'native .page padding must survive DOM projection')
@@ -41,6 +47,8 @@ class NativeSourceRender(unittest.TestCase):
                 evidence=page.evaluate('window.__nativeEvidence')
                 records.append(dict(name=name,viewport_sha256=hashlib.sha256(viewport.read_bytes()).hexdigest(),viewport=dict(width=390,height=844),sha256=hashlib.sha256(file.read_bytes()).hexdigest(),route=evidence['route'],state=evidence['state'],fixture=True))
             page.goto(html.as_uri());expect(page.get_by_text('发现身边好店',exact=True)).to_be_visible()
+            from scripts.community_merchant_onboarding import MATERIALS
+            self.assertEqual({x['id']:x['title'] for x in page.evaluate('window.__nativeCatalog')},MATERIALS)
             snapshot('01-home-public')
             click('openMerchantJoin');snapshot('02-admission-public')
             click('connectApplicant');expect(page.locator('[data-handler="selectDocumentType"]').first).to_be_enabled();snapshot('03-admission-ready')
@@ -63,7 +71,7 @@ class NativeSourceRender(unittest.TestCase):
                     self.assertEqual(page.locator('#material-store .upload-slot').count(),3);snapshot('21-both-scene-photographs')
                 self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.application'),application);snapshot(title)
             # Synthetic submit is strictly visual/handler evidence. Real material and submit guards run in HTTP tests.
-            click('returnMaterial','[data-group="legal"]');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),0);snapshot('22-return-legal-group')
+            click('returnMaterial','[data-group="legal"]');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),0);self.assertGreaterEqual(page.locator('#material-legal').evaluate('(e)=>e.getBoundingClientRect().top'),-2);self.assertLess(page.locator('#material-legal').evaluate('(e)=>e.getBoundingClientRect().top'),100);snapshot('22-return-legal-group')
             for _ in range(3):click('next')
             click('submit');self.assertEqual(page.evaluate('window.__nativeEvidence.state.platformState'),'SUBMITTED');snapshot('09-admission-submitted-fixture')
             click('navigateSection','[data-section="orders"]');expect(page.get_by_text('我的订单',exact=True)).to_be_visible();snapshot('10-orders-no-store')

@@ -1,5 +1,6 @@
 'use strict';
 const definitions=require('./merchant-fields.json');
+const choiceText={LEGAL:'法人 / 经营者本人',SUPER:'授权经办人',BANK_ACCOUNT_TYPE_CORPORATE:'对公银行账户',BANK_ACCOUNT_TYPE_PERSONAL:'经营者个人银行账户'};
 const docs=['IDENTIFICATION_TYPE_IDCARD','IDENTIFICATION_TYPE_OVERSEA_PASSPORT','IDENTIFICATION_TYPE_HONGKONG_PASSPORT','IDENTIFICATION_TYPE_MACAO_PASSPORT','IDENTIFICATION_TYPE_TAIWAN_PASSPORT','IDENTIFICATION_TYPE_FOREIGN_RESIDENT','IDENTIFICATION_TYPE_HONGKONG_MACAO_RESIDENT','IDENTIFICATION_TYPE_TAIWAN_RESIDENT'];
 function get(o,path){return path.split('.').reduce((v,k)=>v&&v[k],o);}
 function put(o,path,value){const keys=path.split('.');if(keys.some(k=>['__proto__','constructor','prototype'].includes(k)))throw Error('INVALID_FORM_PATH');let p=o;for(let i=0;i<keys.length-1;i++){const k=keys[i];if(!p[k])p[k]=/^\d+$/.test(keys[i+1])?[]:{};p=p[k];}p[keys[keys.length-1]]=value;}
@@ -15,7 +16,7 @@ function platformFields(profile){const scenes=get(profile,'business_info.sales_i
 const docLabels=['中国大陆居民身份证','境外护照','香港来往内地通行证','澳门来往内地通行证','台湾居民来往大陆通行证','外国人永久居留身份证','港澳居民居住证','台湾居民居住证'];
 function materialGroups(profile,options,materials,stage){
  const out=[],pick=(ids)=>ids.map(id=>materials.find(m=>m.id===id)||{id,title:({'business_license':'营业执照照片','identity_front':'身份证人像面 / 证件正面','identity_back':'身份证国徽面 / 证件背面','operator_identity':'经办人证件正面','operator_identity_back':'经办人证件背面','storefront_photo':'门头照','interior_photo':'店内环境照','cashier_photo':'收银台照（选填补充）','mini_program_screenshot':'小程序服务页面截图','industry_permit':'行业资质材料'})[id]||id,uploaded:false,connected:false}).map(m=>({...m,connected:m.connected!==false}));
- const add=(id,title,fields,ids=[],extra={})=>{const g={id,title,fields,materials:pick(ids),...extra};out.push(g);return g;};
+ const add=(id,title,fields,ids=[],extra={})=>{fields=fields.map(f=>({...f,choiceLabels:f.choices?f.choices.map(v=>choiceText[v]||v):null,choiceLabel:choiceText[f.value]||f.value||'请选择',choiceIndex:f.choices?Math.max(0,f.choices.indexOf(f.value)):0}));const g={id,title,fields,materials:pick(ids),...extra};out.push(g);return g;};
  const fields=rows(profile,options,0).concat(rows(profile,options,1),rows(profile,options,2));
  const prefix=p=>fields.filter(f=>f.path.startsWith(p));
  const doc=(id,title,path,ids,fs,ocrKind='')=>{const value=get(profile,path)||(id==='legal'?options.doc:docs[0]);const g=add(id,title,fs,ids.filter(k=>value!==docs[1]||!k.endsWith('_back')),{docPath:path,docLabels,docValue:Math.max(0,docs.indexOf(value)),docLabel:docLabels[docs.indexOf(value)]||docLabels[0],ocrKind:ocrKind&&value===docs[0]?ocrKind:''});return g;};
