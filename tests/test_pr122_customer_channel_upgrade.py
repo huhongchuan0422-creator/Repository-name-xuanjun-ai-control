@@ -140,6 +140,17 @@ class Current103ShapeTests(unittest.TestCase):
         with patch.object(u,'IDENTITY_BASE_PATHS_SHA256',u.sha(u.canonical(sorted(baseline)))),self.assertRaisesRegex(RuntimeError,'IDENTITY_CANDIDATE_BASE_PATHS'):u.unpack(raw)
 
 
+
+    def test_exact_host_integration_125_archive_unpack(self):
+        import tempfile
+        from scripts.pr122_customer_package import build
+        with tempfile.TemporaryDirectory(prefix='upgrade-host-shape-') as folder:
+            build(folder,'a'*40,'b'*40)
+            raw=(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
+        files,manifest,_=u.unpack(raw)
+        self.assertEqual(len(files),125)
+        self.assertEqual(len(manifest['files']),124)
+
 class FrozenPinTests(unittest.TestCase):
     def test_exact_audited_zip_pin(self):
         self.assertEqual(u.FROZEN_ZIP, 'a662b76d6c3fb010e0944dea157ff898040007cd69124d498bec26c7701138d3')

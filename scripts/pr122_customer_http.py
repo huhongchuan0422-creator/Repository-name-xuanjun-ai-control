@@ -39,11 +39,12 @@ class CustomerUnixServer(socketserver.UnixStreamServer):
     request_queue_size=128
 
 class App:
-    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted,deployment_profile=FULL,identity_boundary=None):
+    def __init__(self,factory,providers,origin,assets,*,source_identity=reject_untrusted,deployment_profile=FULL,identity_boundary=None,ecosystem=None,twin=None):
         if origin!='https://wenwenwenyiyiyi.work':raise ValueError('PINNED_ORIGIN_REQUIRED')
         self.deployment_profile=profile({'deployment_profile':deployment_profile})
         self.factory=factory;self.providers=providers;self.origin=origin;self.assets=Path(assets);self.source_identity=source_identity
         self.identity_boundary=identity_boundary
+        self.ecosystem=ecosystem;self.twin=twin
     def handler(self):
         app=self
         class Handler(BaseHTTPRequestHandler):
@@ -82,6 +83,20 @@ class App:
                         allowed=(self.command=='POST' and path in auth_paths) or (
                             self.command in ('GET','HEAD') and path==PREFIX+'api/me')
                         if not allowed:raise Denied('LOGIN_ONLY_AUTH_SCOPE')
+                    # Optional FULL-only same-origin extensions. LOGIN_ONLY allowlist above
+                    # rejects these before any asset read, DB/project access, or source callback.
+                    extension_assets={
+                        PREFIX+'ecosystem/':('ecosystem','index.html'),PREFIX+'ecosystem/bootstrap.mjs':('ecosystem','bootstrap.mjs'),
+                        PREFIX+'ecosystem/api.mjs':('ecosystem','api.mjs'),PREFIX+'ecosystem/ecosystem-view.mjs':('ecosystem','ecosystem-view.mjs'),PREFIX+'ecosystem/style.css':('ecosystem','style.css'),
+                        PREFIX+'twin/':('twin','index.html'),PREFIX+'twin/bootstrap.mjs':('twin','bootstrap.mjs'),PREFIX+'twin/style.css':('twin','style.css')}
+                    if path in extension_assets:
+                        if self.command not in ('GET','HEAD'):return self.reply(405,{'error':'METHOD_NOT_ALLOWED'})
+                        kind,name=extension_assets[path];enabled=app.ecosystem if kind=='ecosystem' else app.twin
+                        if enabled is None:return self.reply(404,{'error':'NOT_FOUND'})
+                        center=app.factory();uid=center.session(self.token())
+                        if not any(p.get('role') in ('OWNER','EDITOR','VIEWER','REVIEWER') for p in center.projects(uid)):raise Denied('PROJECT_MEMBERSHIP_REQUIRED')
+                        raw=(app.assets/kind/name).read_bytes();ctype='text/html; charset=utf-8' if name=='index.html' else 'text/css; charset=utf-8' if name.endswith('.css') else 'application/javascript; charset=utf-8'
+                        return self.reply(200,raw,ctype)
                     if not path.startswith((PREFIX+'api/',PREFIX+'preview/')) and path not in (PREFIX+'webhooks/telegram',PREFIX+'webhooks/feishu'):return self.reply(404,{'error':'NOT_FOUND'})
                     body={};raw=b''
                     service_identity=path==PREFIX+'api/authorization/consume'
@@ -141,6 +156,12 @@ class App:
                         center.logout(self.token())
                         return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
+                    if operation.startswith('ecosystem/'):
+                        if app.ecosystem is None:return self.reply(404,{'error':'NOT_FOUND'})
+                        status,value=app.ecosystem.handle(center,uid,self.command,operation,body);return self.reply(status,value)
+                    if operation.startswith('twin/'):
+                        if app.twin is None:return self.reply(404,{'error':'NOT_FOUND'})
+                        status,value=app.twin.handle(center,uid,self.command,operation,body);return self.reply(status,value)
                     if operation=='authorization':
                         if self.command!='POST':return self.reply(405,{'error':'POST_REQUIRED'})
                         if app.identity_boundary is None:raise Denied('IDENTITY_CALLER_TRUST')
@@ -237,7 +258,7 @@ class App:
             def do_PATCH(self):self.execute()
         return Handler
 
-def serve(factory,providers,assets,*,deployment_profile=FULL,identity_boundary=None):
+def serve(factory,providers,assets,*,deployment_profile=FULL,identity_boundary=None,ecosystem=None,twin=None):
     # Single-process bounded service serializes permission revocation and outbound
     # work; each request gets a fresh SQLite connection. application limits authenticated writes and credential attempts.
     import grp,os,socketserver
@@ -245,7 +266,7 @@ def serve(factory,providers,assets,*,deployment_profile=FULL,identity_boundary=N
     # Private service-owned directory plus pinned Nginx group prevents another
     # local application impersonating a crashed loopback backend.
     if path.exists() or path.is_symlink():raise RuntimeError('SOCKET_EXISTS_INSPECT_FIRST')
-    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid),deployment_profile=deployment_profile,identity_boundary=identity_boundary).handler())
+    server=CustomerUnixServer(str(path),App(factory,providers,'https://wenwenwenyiyiyi.work',assets,source_identity=TrustedNginxSource(__import__('pwd').getpwnam('nginx').pw_uid),deployment_profile=deployment_profile,identity_boundary=identity_boundary,ecosystem=ecosystem,twin=twin).handler())
     os.chown(path,-1,grp.getgrnam('nginx').gr_gid);os.chmod(path,0o660)
     try:server.serve_forever()
     finally:server.server_close();path.unlink(missing_ok=True)

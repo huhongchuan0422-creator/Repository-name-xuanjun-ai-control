@@ -14,6 +14,8 @@ def build(output,commit,tree):
     if len(commit)!=40 or any(c not in '0123456789abcdef' for c in commit):raise ValueError('EXACT_COMMIT')
     paths={p.relative_to(ROOT).as_posix() for p in (ROOT/'scripts').glob('pr122_customer_*.py')}
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'deploy/pr122-customer-center').rglob('*') if p.is_file())
+    if (ROOT/'clients/saas-console').is_dir():paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'clients/saas-console').rglob('*') if p.is_file())
+    paths.update({'scripts/saas_pending_packages.py','scripts/saas_ecosystem_adapter.py','scripts/saas_ecosystem_http.py','scripts/saas_module_package_gate.py','scripts/community_saas_modules.py','scripts/community_saas_offer_catalog.py','scripts/community_saas_schema_guard.py','scripts/pr122_customer_twin.py'})
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'tests').glob('test_pr122_customer_*.py'))
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'tests').glob('pr122_customer_*') if p.is_file())
     paths.add('docs/development/PR122_CUSTOMER_CENTER_CHANGE_CONTROL_20261016.md')

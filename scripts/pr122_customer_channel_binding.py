@@ -17,14 +17,22 @@ IDENTITY_ADDITIONS=frozenset({'scripts/pr122_customer_identity.py',
     'tests/test_pr122_customer_identity.py',
     'docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md'})
 IDENTITY_BASE_PATHS_SHA256='88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a'
+HOST_INTEGRATION_ADDITIONS=frozenset(["clients/saas-console/build_ecosystem_assets.py","clients/saas-console/package.json","clients/saas-console/src/api.js","clients/saas-console/src/ecosystem-bootstrap.mjs","clients/saas-console/src/ecosystem-view.mjs","deploy/pr122-customer-center/ui/ecosystem/api.mjs","deploy/pr122-customer-center/ui/ecosystem/bootstrap.mjs","deploy/pr122-customer-center/ui/ecosystem/ecosystem-view.mjs","deploy/pr122-customer-center/ui/ecosystem/index.html","deploy/pr122-customer-center/ui/ecosystem/style.css","deploy/pr122-customer-center/ui/twin/bootstrap.mjs","deploy/pr122-customer-center/ui/twin/index.html","deploy/pr122-customer-center/ui/twin/style.css","scripts/community_saas_modules.py","scripts/community_saas_offer_catalog.py","scripts/community_saas_schema_guard.py","scripts/pr122_customer_twin.py","scripts/saas_ecosystem_adapter.py","scripts/saas_ecosystem_http.py","scripts/saas_module_package_gate.py","scripts/saas_pending_packages.py","tests/test_pr122_customer_extension_hosts.py"])
+HOST_INTEGRATION_BASE_PATHS_SHA256='36fad3b6e5fbcc286f56ba61c5d86d979565aaadf550b41c61f4c4c63073f88c'
 
 def validate_member_shape(ms):
-    if not 1<len(ms)<=103 or len({m.name for m in ms})!=len(ms) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
+    if not 1<len(ms)<=125 or len({m.name for m in ms})!=len(ms) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
     paths={m.name[len('customer-center/'):] for m in ms}
-    if paths & IDENTITY_ADDITIONS or len(ms)>100:
-        if len(ms)!=103 or not IDENTITY_ADDITIONS <= paths or 'CUSTOMER_MANIFEST.json' not in paths:raise Denied('IDENTITY_CANDIDATE_SHAPE')
+    if len(ms)<=100 and not (paths & IDENTITY_ADDITIONS) and not (paths & HOST_INTEGRATION_ADDITIONS):return
+    if len(ms)==103 and IDENTITY_ADDITIONS <= paths and not (paths & HOST_INTEGRATION_ADDITIONS):
         baseline=paths-IDENTITY_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
         if len(baseline)!=99 or digest(canonical(sorted(baseline)))!=IDENTITY_BASE_PATHS_SHA256:raise Denied('IDENTITY_CANDIDATE_BASE_PATHS')
+        return
+    if len(ms)==125 and HOST_INTEGRATION_ADDITIONS <= paths and 'CUSTOMER_MANIFEST.json' in paths:
+        baseline=paths-HOST_INTEGRATION_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
+        if len(baseline)!=102 or digest(canonical(sorted(baseline)))!=HOST_INTEGRATION_BASE_PATHS_SHA256:raise Denied('HOST_INTEGRATION_BASE_PATHS')
+        return
+    raise Denied('CANDIDATE_EXACT_SHAPE')
 
 def bind(original,archive,wheel_folder=None):
     if digest(original)!=ORIGINAL_SHA:raise Denied('EXACT_ORIGINAL_CHANNEL_REQUIRED')

@@ -152,7 +152,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_bind_tokens.BindTokenTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_change_submit_idempotency_full.ChangeSubmitIdempotencyFullTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests tests.test_pr122_customer_runtime.RuntimeTests tests.test_pr122_customer_channel_binding.BindingTests tests.test_pr122_customer_channel_upgrade.UpgradeTests tests.test_pr122_customer_channel_upgrade.FrozenPinTests tests.test_pr122_customer_publication_worker.PublicationTests tests.test_pr122_customer_small_edit.SmallEditTests tests.test_pr122_customer_edit_jobs.EditJobTests tests.test_pr122_customer_edit_jobs.EditJobHTTPTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
+          sudo -n "$(command -v python)" -B -m unittest tests.test_pr122_customer_center.CustomerTests tests.test_pr122_customer_bind_tokens.BindTokenTests tests.test_pr122_customer_http.HttpTests tests.test_pr122_customer_providers.ProviderTests tests.test_pr122_customer_release.ReleaseTests tests.test_pr122_customer_revision tests.test_pr122_customer_changes.ChangeTests tests.test_pr122_customer_changes.ChangeHTTPTests tests.test_pr122_change_submit_idempotency_full.ChangeSubmitIdempotencyFullTests tests.test_pr122_customer_preview.PreviewTests tests.test_pr122_customer_preview.PreviewHTTPTests tests.test_pr122_customer_runtime.RuntimeTests tests.test_pr122_customer_channel_binding.BindingTests tests.test_pr122_customer_channel_upgrade.UpgradeTests tests.test_pr122_customer_channel_upgrade.FrozenPinTests tests.test_pr122_customer_publication_worker.PublicationTests tests.test_pr122_customer_small_edit.SmallEditTests tests.test_pr122_customer_edit_jobs.EditJobTests tests.test_pr122_customer_edit_jobs.EditJobHTTPTests tests.test_pr122_customer_extension_hosts.HostTests -v 2>&1 | tee /tmp/pr122-customer/CUSTOMER_TESTS.log
           python -m py_compile scripts/pr122_customer_*.py
           python - <<'PY'
           import json,re
@@ -273,7 +273,7 @@ jobs:
           import json,os,subprocess,pathlib
           pathlib.Path('/tmp/pr122-customer/CI_BINDING.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),'run_id':os.environ['GITHUB_RUN_ID'],'scope':'ISOLATED_FIXTURE_ONLY','host_mutations':0,'production_acceptance_14':'NOT_RUN','independent_review':'PENDING','production_release':'HOLD'},indent=2))
           PY
-      - name: Build exact 103-member fixed-channel rebind candidate and upgrade parse no root execution
+      - name: Build exact 125-member host-integrated fixed-channel rebind candidate and upgrade parse no root execution
         run: |
           python - <<'PYCODE'
           import json,os,urllib.request
@@ -285,7 +285,7 @@ jobs:
           with urllib.request.urlopen(url,timeout=20) as response:original=response.read(100001)
           archive_raw=Path('/tmp/pr122-customer/PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
           upgrade_files,upgrade_manifest,upgrade_manifest_sha=upgrade_unpack(archive_raw)
-          assert len(upgrade_files)==103 and len(upgrade_manifest['files'])==102
+          assert len(upgrade_files)==125 and len(upgrade_manifest['files'])==124
           assert upgrade_manifest['source_commit']==os.environ['GITHUB_SHA']
           package_receipt=json.loads(Path('/tmp/pr122-customer/CUSTOMER_PACKAGE_RECEIPT.json').read_bytes())
           assert upgrade_manifest_sha==package_receipt['manifest_sha256']

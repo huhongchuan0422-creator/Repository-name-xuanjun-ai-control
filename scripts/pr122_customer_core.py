@@ -414,6 +414,7 @@ class Center:
             o=self.db.execute('SELECT o.*,v.item,v.payload version_payload FROM objects o JOIN versions v ON v.id=o.version WHERE o.id=? AND o.project=?',(identifier(oid),pid)).fetchone()
             if not o: raise Denied('OBJECT_PERMISSION_REQUIRED')
             q,role=self.requirement(uid,pid,o['item'])
+            if role not in ('OWNER','EDITOR','VIEWER','REVIEWER'):raise Denied('PROJECT_ROLE_NOT_ALLOWED')
             if json.loads(self.decrypt(o['version_payload'],o['version'])).get('category')=='INTERNAL' and role!='REVIEWER':raise Denied('HISTORICAL_INTERNAL_ONLY')
             if o['scan']!='CLEAN': raise Denied('QUARANTINED')
             raw=self.decrypt(private_path(self.objects/oid).read_bytes(),'object:'+pid+':'+oid)

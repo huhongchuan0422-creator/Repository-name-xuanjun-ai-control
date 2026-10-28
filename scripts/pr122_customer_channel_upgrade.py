@@ -32,6 +32,8 @@ IDENTITY_ADDITIONS=frozenset({'scripts/pr122_customer_identity.py',
     'tests/test_pr122_customer_identity.py',
     'docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md'})
 IDENTITY_BASE_PATHS_SHA256='88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a'
+HOST_INTEGRATION_ADDITIONS=frozenset(["clients/saas-console/build_ecosystem_assets.py","clients/saas-console/package.json","clients/saas-console/src/api.js","clients/saas-console/src/ecosystem-bootstrap.mjs","clients/saas-console/src/ecosystem-view.mjs","deploy/pr122-customer-center/ui/ecosystem/api.mjs","deploy/pr122-customer-center/ui/ecosystem/bootstrap.mjs","deploy/pr122-customer-center/ui/ecosystem/ecosystem-view.mjs","deploy/pr122-customer-center/ui/ecosystem/index.html","deploy/pr122-customer-center/ui/ecosystem/style.css","deploy/pr122-customer-center/ui/twin/bootstrap.mjs","deploy/pr122-customer-center/ui/twin/index.html","deploy/pr122-customer-center/ui/twin/style.css","scripts/community_saas_modules.py","scripts/community_saas_offer_catalog.py","scripts/community_saas_schema_guard.py","scripts/pr122_customer_twin.py","scripts/saas_ecosystem_adapter.py","scripts/saas_ecosystem_http.py","scripts/saas_module_package_gate.py","scripts/saas_pending_packages.py","tests/test_pr122_customer_extension_hosts.py"])
+HOST_INTEGRATION_BASE_PATHS_SHA256='36fad3b6e5fbcc286f56ba61c5d86d979565aaadf550b41c61f4c4c63073f88c'
 
 def need(ok,msg):
     if not ok:raise RuntimeError('HOLD:'+msg)
@@ -72,15 +74,19 @@ def owner():need(os.geteuid()==0 and os.uname().nodename==HOST and os.environ.ge
 def unpack(raw):
     need(len(raw)<=10000000,'TAR_SIZE');out={}
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-        members=t.getmembers();need(1<len(members)<=103,'TAR_COUNT')
+        members=t.getmembers();need(1<len(members)<=125,'TAR_COUNT')
         for m in members:
             need(m.isfile() and m.name.startswith('customer-center/') and '..' not in Path(m.name).parts and m.name not in out and m.size<=8000000,'TAR_PATH_TYPE')
             out[m.name]=t.extractfile(m).read()
         paths={name.removeprefix('customer-center/') for name in out}
-        if len(members)>100 or paths & IDENTITY_ADDITIONS:
-            need(len(members)==103 and IDENTITY_ADDITIONS <= paths and 'CUSTOMER_MANIFEST.json' in paths,'IDENTITY_CANDIDATE_SHAPE')
+        if len(members)<=100 and not (paths & IDENTITY_ADDITIONS) and not (paths & HOST_INTEGRATION_ADDITIONS):pass
+        elif len(members)==103 and IDENTITY_ADDITIONS <= paths and not (paths & HOST_INTEGRATION_ADDITIONS):
             baseline=paths-IDENTITY_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
             need(len(baseline)==99 and sha(canonical(sorted(baseline)))==IDENTITY_BASE_PATHS_SHA256,'IDENTITY_CANDIDATE_BASE_PATHS')
+        elif len(members)==125 and HOST_INTEGRATION_ADDITIONS <= paths and 'CUSTOMER_MANIFEST.json' in paths:
+            baseline=paths-HOST_INTEGRATION_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
+            need(len(baseline)==102 and sha(canonical(sorted(baseline)))==HOST_INTEGRATION_BASE_PATHS_SHA256,'HOST_INTEGRATION_BASE_PATHS')
+        else:need(False,'CANDIDATE_EXACT_SHAPE')
     raw_manifest=out.pop('customer-center/CUSTOMER_MANIFEST.json');manifest=json.loads(raw_manifest)
     files={x['path']:out.get('customer-center/'+x['path']) for x in manifest['files']}
     need(len(files)==len(manifest['files']) and len(files)==len(out),'MANIFEST_SET')

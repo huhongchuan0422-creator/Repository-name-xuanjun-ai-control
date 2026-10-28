@@ -7,9 +7,11 @@ class BindingTests(unittest.TestCase):
         import tempfile,tarfile
         from pathlib import Path
         from scripts.pr122_customer_package import build
+        from scripts.pr122_customer_channel_binding import HOST_INTEGRATION_ADDITIONS
         with tempfile.TemporaryDirectory(prefix='identity-shape-synthetic-') as folder:
             build(folder,'a'*40,'b'*40)
-            with tarfile.open(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz') as archive:return archive.getmembers()
+            with tarfile.open(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz') as archive:
+                return [m for m in archive.getmembers() if m.name.removeprefix('customer-center/') not in HOST_INTEGRATION_ADDITIONS]
     def test_exact_identity_103_and_legacy_envelope(self):
         import tarfile
         from scripts.pr122_customer_channel_binding import validate_member_shape
@@ -46,3 +48,15 @@ class BindingTests(unittest.TestCase):
         import hashlib
         original=b'x=1\n'
         with patch('scripts.pr122_customer_channel_binding.ORIGINAL_SHA',hashlib.sha256(original).hexdigest()),self.assertRaises(Exception):bind(original,b'bad')
+
+    def test_exact_host_integration_125_shape_and_neighbors_rejected(self):
+        import tempfile,tarfile
+        from pathlib import Path
+        from scripts.pr122_customer_package import build
+        from scripts.pr122_customer_channel_binding import validate_member_shape
+        with tempfile.TemporaryDirectory(prefix='host-integration-shape-') as folder:
+            build(folder,'a'*40,'b'*40)
+            with tarfile.open(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz') as archive:members=archive.getmembers()
+        self.assertEqual(len(members),125);validate_member_shape(members)
+        for changed in (members[:-1],members+[tarfile.TarInfo('customer-center/extra')]):
+            with self.assertRaises(Denied):validate_member_shape(changed)
