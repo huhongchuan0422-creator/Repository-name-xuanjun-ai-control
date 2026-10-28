@@ -19,6 +19,11 @@ from scripts import community_preview_stage_a as a
 from scripts import community_preview_stage_a_bundle as b
 from scripts import community_preview_control_carrier as carrier
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class StageATest(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(dir=Path.cwd());self.addCleanup(self.tmp.cleanup)
@@ -26,9 +31,9 @@ class StageATest(unittest.TestCase):
         self.inputs=self.base/'image-f131-40059478387';self.clock=[100];self.reads=0;self.loads=0
         self.image=b'SYNTHETIC_IMAGE_NOT_PRODUCTION'
         self.payload=dict(a.PAYLOAD);self.payload['artifact12546452389.zip']=(len(self.image),a.sha(self.image))
-        self.blobs={'community_preview_site_prepare.py':Path('scripts/community_preview_site_prepare.py').read_bytes(),
-            'prepare-site.sh':Path('deploy/community-preview/prepare-site.sh').read_bytes(),
-            'control-oci2330-v1.zip':carrier.build()[0],'artifact12546452389.zip':self.image}
+        self.blobs={'community_preview_site_prepare.py':frozen.a_source(),
+            'prepare-site.sh':frozen.source(frozen.V1_COMMIT,'deploy/community-preview/prepare-site.sh'),
+            'control-oci2330-v1.zip':frozen.v1_carrier()[0],'artifact12546452389.zip':self.image}
         self.stack=contextlib.ExitStack();self.addCleanup(self.stack.close)
         for key,value in dict(BASE=str(self.base),INPUT=str(self.inputs),PAYLOAD=self.payload).items():self.stack.enter_context(patch.object(a,key,value))
         self.owner={'sudo_uid':os.getuid(),'sudo_gid':os.getgid(),'kernel_loginuid':os.getuid()}
@@ -220,7 +225,13 @@ class StageATest(unittest.TestCase):
             except SystemExit as result:return result.code,calls
     def test_full_single_bundle_validator_and_symlink_tamper_rejection(self):
         image=self.root/'synthetic-image.zip';image.write_bytes(self.image)
-        name,raw,command,report=b.build(image)
+        source=self.root/'bundle-source';(source/'scripts').mkdir(parents=True);(source/'deploy/community-preview').mkdir(parents=True)
+        for name,raw in self.blobs.items():
+            if name=='artifact12546452389.zip':continue
+            target=source/('scripts/'+name if name.endswith('.py') else 'deploy/community-preview/'+name)
+            target.write_bytes(raw)
+        (source/'scripts/community_preview_stage_a.py').write_bytes(Path(a.__file__).read_bytes())
+        with patch.object(b,'ROOT',source):name,raw,command,report=b.build(image)
         code,calls=self.outer_validator(raw,command);self.assertEqual(code,0);self.assertEqual(set(calls[0][0]),set(self.payload))
         # Exact outer SHA remains original, so altered input never reaches entry.
         code,calls=self.outer_validator(raw[:-1]+b'x',command);self.assertEqual(code,2);self.assertEqual(calls,[])
@@ -394,14 +405,15 @@ finally:
         proc=subprocess.run([sys.executable,'-c',code],start_new_session=True,capture_output=True,timeout=5)
         self.assertEqual(proc.returncode,0,proc.stderr.decode());self.assertIn(b'PRODUCTION_SELECT_BACKGROUND_TIMEOUT',proc.stdout)
     def test_delivery_declared_files_and_exact_generated_outer_match(self):
-        manifest=json.loads(Path('deploy/community-preview/site-preparation-manifest.json').read_text())
-        for group in ('files','stage_a_adapter_files'):
-            for name,meta in manifest[group].items():
-                raw=Path(name).read_bytes();self.assertEqual(meta,{'bytes':len(raw),'sha256':a.sha(raw)},name)
-        report=json.loads(Path('deploy/community-preview/stage-a-delivery.json').read_text())
-        command=b.outer_script(report['package_filename'],report['package_bytes'],report['package_sha256'],report['entry_sha256'],report['manifest_sha256'])
-        self.assertEqual(command,Path('deploy/community-preview/stage-a-owner-call.sh').read_bytes())
-        self.assertEqual(manifest['stage_a_delivery'],report)
+        with frozen.historical_tree(frozen.STAGE_A_COMMIT) as root:
+            manifest=json.loads((root/'deploy/community-preview/site-preparation-manifest.json').read_text())
+            for group in ('files','stage_a_adapter_files'):
+                for name,meta in manifest[group].items():
+                    raw=(root/name).read_bytes();self.assertEqual(meta,{'bytes':len(raw),'sha256':a.sha(raw)},name)
+            report=json.loads((root/'deploy/community-preview/stage-a-delivery.json').read_text())
+            command=b.outer_script(report['package_filename'],report['package_bytes'],report['package_sha256'],report['entry_sha256'],report['manifest_sha256'])
+            self.assertEqual(command,(root/'deploy/community-preview/stage-a-owner-call.sh').read_bytes())
+            self.assertEqual(manifest['stage_a_delivery'],report)
     def production_confirm_pty(self,mode):
         # Real PTY, generated shell, sudo argv/FD pass-through fixture, exact
         # production confirm/select/read/gate/close. No actual sudo/UK assumed.

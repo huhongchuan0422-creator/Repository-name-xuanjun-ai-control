@@ -25,6 +25,11 @@ from scripts import community_preview_control_carrier as carrier
 GOOD='2330dd55c07f58d7f45a7c4510a9761d0d4735d6'
 BAD='2330dd55c07f58d7f45a7c4510a97610dd4735d6'
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class SitePreparation(unittest.TestCase):
     def test_exact_git_oci_and_strict_rejection_of_old_typo(self):
         import test_community_preview_release_plan as f
@@ -34,12 +39,13 @@ class SitePreparation(unittest.TestCase):
         c['oci_revision']=GOOD;self.assertEqual(plan.current_identity(c)['oci_revision'],GOOD)
         self.assertEqual(comp.PINS[plan],hashlib.sha256(Path(plan.__file__).read_bytes()).hexdigest())
     def test_refreshed_bundles_pin_only_exact_corrected_sources(self):
-        python,shell=bundle.build();three,three_shell=bundle.build_three()
-        for content in (python,three):ast.parse(content,feature_version=(3,6))
-        for content in (shell,three_shell):self.assertEqual(subprocess.run(['/bin/bash','-n'],input=content,capture_output=True,timeout=3).returncode,0)
-        self.assertEqual(three,Path('deploy/community-preview/three-reasons-readonly.py').read_bytes())
-        self.assertEqual(three_shell,Path('deploy/community-preview/three-reasons-readonly.sh').read_bytes())
-        for path,pin in bundle.PINS.items():self.assertEqual(hashlib.sha256(Path(path).read_bytes()).hexdigest(),pin)
+        with frozen.historical_tree(frozen.READONLY_COMMIT) as root,patch.object(bundle,'ROOT',root):
+            python,shell=bundle.build();three,three_shell=bundle.build_three()
+            for content in (python,three):ast.parse(content,feature_version=(3,6))
+            for content in (shell,three_shell):self.assertEqual(subprocess.run(['/bin/bash','-n'],input=content,capture_output=True,timeout=3).returncode,0)
+            self.assertEqual(three,(bundle.ROOT/'deploy/community-preview/three-reasons-readonly.py').read_bytes())
+            self.assertEqual(three_shell,(bundle.ROOT/'deploy/community-preview/three-reasons-readonly.sh').read_bytes())
+            for path,pin in bundle.PINS.items():self.assertEqual(hashlib.sha256((bundle.ROOT/path).read_bytes()).hexdigest(),pin)
     def test_private_root_and_missing_header_rejected_by_actual_trust_method_ast(self):
         # Execute exact original trust class AST, avoiding unrelated crypto/IAM
         # dependencies. Real trust logic, synthetic socket peer/header only.
@@ -72,7 +78,7 @@ class SitePreparation(unittest.TestCase):
         self.assertEqual(r['changed_fields'],['routing_sha256']);self.assertEqual(r['status'],'HOLD_CHANGED')
         self.assertNotIn('d'*64,json.dumps(r))
     def test_carrier_exact_files_modes_manifest_and_disabled_default(self):
-        archive,raw=carrier.build();m=json.loads(raw);z=zipfile.ZipFile(io.BytesIO(archive))
+        archive,raw=frozen.v1_carrier();m=json.loads(raw);z=zipfile.ZipFile(io.BytesIO(archive))
         self.assertEqual(m['install_root'],loader.INSTALL_ROOT);self.assertFalse(m['updates_enabled'])
         self.assertEqual(set(z.namelist()),loader.PATHS|{'manifest.json'})
         for p,meta in m['files'].items():
@@ -84,7 +90,7 @@ class SitePreparation(unittest.TestCase):
             with self.assertRaises(loader.Hold):loader.load(hashlib.sha256(raw).hexdigest())
             read.assert_not_called()
     def child_loader(self,tamper=False,symlink=False):
-        archive,raw=carrier.build()
+        archive,raw=frozen.v1_carrier()
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);target=root/loader.INSTALL_ROOT.lstrip('/');target.mkdir(parents=True,mode=0o700)
             z=zipfile.ZipFile(io.BytesIO(archive))

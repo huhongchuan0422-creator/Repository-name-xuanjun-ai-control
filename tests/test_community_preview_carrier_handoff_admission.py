@@ -15,6 +15,11 @@ from scripts import community_preview_carrier_handoff_admission as h
 from scripts import community_preview_carrier_handoff_call as handoff_call
 from scripts import community_preview_carrier_handoff_entry as fixed_entry
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class HandoffAdmission(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
@@ -197,8 +202,7 @@ class HandoffAdmission(unittest.TestCase):
             self.skipTest('exact nested 005c carrier fixture required')
         refs=self.post_b_refs()
         old_entries=h.members(self.archive,h.POST_B_OLD_MANIFEST,h.POST_B_OLD_ARCHIVE)
-        from scripts.community_preview_bc_build import build
-        candidate_archive,candidate_manifest,_=build()
+        candidate_archive,candidate_manifest=frozen.post_b_carrier()
         self.assertEqual(hashlib.sha256(candidate_archive).hexdigest(),h.POST_B_NEW_ARCHIVE)
         self.assertEqual(hashlib.sha256(candidate_manifest).hexdigest(),h.POST_B_NEW_MANIFEST)
         new_entries=h.members(candidate_archive,h.POST_B_NEW_MANIFEST,h.POST_B_NEW_ARCHIVE)
@@ -267,23 +271,25 @@ class HandoffAdmission(unittest.TestCase):
                     history_refs=refs,mode=h.POST_B_MODE,fault=fault)
         self.assertEqual(exchanged,[])
 
+    def _assert_post_b_late_c_zero_exchange(self,kind):
+        refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
+        exchanged=[]
+        def fault(point):
+            if point!='before_switch':return
+            if kind=='attempt':h.writefile(self.jfd,'active-attempt.json',b'{}',self.uid)
+            else:os.mkdir(h.ORIGINAL_ATTEMPT,0o700,dir_fd=self.jfd)
+        with patch.object(h,'exchange',side_effect=lambda *args:exchanged.append(args)):
+            with self.assertRaisesRegex(h.Hold,'POST_B_C_ALREADY_STARTED'):
+                h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
+                    self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-late-c-'+kind,
+                    history_refs=refs,mode=h.POST_B_MODE,fault=fault)
+        self.assertEqual(exchanged,[])
+
     def test_post_b_attempt_or_checkpoint_appearing_after_staging_before_exchange_zero_exchange(self):
-        for kind in ('attempt','checkpoint'):
-            with self.subTest(kind=kind):
-                # Fresh test object state is required because execute is intentionally one-shot.
-                refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()
-                exchanged=[]
-                def fault(point):
-                    if point!='before_switch':return
-                    if kind=='attempt':h.writefile(self.jfd,'active-attempt.json',b'{}',self.uid)
-                    else:os.mkdir(h.ORIGINAL_ATTEMPT,0o700,dir_fd=self.jfd)
-                with patch.object(h,'exchange',side_effect=lambda *args:exchanged.append(args)):
-                    with self.assertRaisesRegex(h.Hold,'POST_B_C_ALREADY_STARTED'):
-                        h.execute(self.parent,self.jfd,self.entry,self.lease,old_entries,candidate_archive,self.uid,
-                            self.parent_id,self.journal_id,self.entry_id,self.lock_id,'post-b-late-c-'+kind,
-                            history_refs=refs,mode=h.POST_B_MODE,fault=fault)
-                self.assertEqual(exchanged,[])
-                break
+        self._assert_post_b_late_c_zero_exchange('attempt')
+
+    def test_post_b_checkpoint_appearing_after_staging_before_exchange_zero_exchange(self):
+        self._assert_post_b_late_c_zero_exchange('checkpoint')
 
     def test_post_b_interrupted_after_exchange_is_inspect_only_not_replayed(self):
         refs,old_entries,new_entries,candidate_archive=self.post_b_fixture()

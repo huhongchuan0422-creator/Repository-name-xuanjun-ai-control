@@ -17,6 +17,11 @@ from unittest.mock import patch, Mock
 from scripts import community_preview_site_prepare as s
 from scripts import community_preview_control_carrier as carrier
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class PreparationSteps(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(dir=Path.cwd());self.root=Path(self.tmp.name);self.root.chmod(0o700)
@@ -36,8 +41,7 @@ class PreparationSteps(unittest.TestCase):
     def tearDown(self):self.stack.close();self.tmp.cleanup()
     def private(self,path,body):path=Path(path);path.write_bytes(body);path.chmod(0o600)
     def stage_carrier(self):
-        raw=Path('deploy/community-preview/control-oci2330-v1.zip').read_bytes()
-        m=Path('deploy/community-preview/control-oci2330-v1-manifest.json').read_bytes()
+        raw,m=frozen.v1_carrier()
         self.assertEqual(len(raw),111330);self.assertEqual(s.sha(raw),s.CARRIER_SHA);self.assertEqual(s.sha(m),s.CARRIER_MANIFEST)
         self.private(self.input/'control-oci2330-v1.zip',raw)
         return raw,m

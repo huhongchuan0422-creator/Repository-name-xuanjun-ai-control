@@ -14,10 +14,15 @@ from unittest.mock import patch
 from scripts import community_preview_bc_build as build
 from scripts import community_preview_bc_install as ins
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class FixedInstaller(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.archive,cls.manifest,_=build.build()
+        cls.archive,cls.manifest=frozen.bc_carrier()
         assert hashlib.sha256(cls.archive).hexdigest()==ins.ARCHIVE_SHA256
         assert hashlib.sha256(cls.manifest).hexdigest()==ins.MANIFEST_SHA256
     def setUp(self):

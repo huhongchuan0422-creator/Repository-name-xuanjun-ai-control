@@ -27,6 +27,23 @@ def condition(expression,values):
     return bool(eval(' '.join(translated),{'__builtins__':{},'contains':lambda value,part:part in (value or '')}))
 
 
+def exact_readonly_permissions(workflow):
+    # Scan mapping-key tokens as well as line keys: YAML flow/quoted overrides
+    # must not evade the exact top-level two-scope allowlist.
+    token_pattern=r'''(?<![\w-])(?:permissions|"(?:[^"\\]|\\[\s\S])*"|'(?:[^']|'')*')\s*:'''
+    blocks=[]
+    for match in re.finditer(token_pattern,workflow):
+        token=match.group().rsplit(':',1)[0].strip()
+        try:key=ast.literal_eval(token) if token.startswith('"') else token[1:-1].replace("''", "'") if token.startswith("'") else token
+        except (SyntaxError,ValueError):raise AssertionError('UNSUPPORTED_QUOTED_WORKFLOW_KEY')
+        if key=='permissions':blocks.append(match)
+    if len(blocks)!=1 or blocks[0].group()!='permissions:' or (blocks[0].start() and workflow[blocks[0].start()-1]!='\n'):
+        raise AssertionError('ONE_TOP_LEVEL_PERMISSION_BLOCK_REQUIRED')
+    block=workflow[blocks[0].start():].split('\njobs:',1)[0]
+    if block!='permissions:\n  contents: read\n  actions: read':
+        raise AssertionError('EXACT_CONTENTS_ACTIONS_READ_ONLY_REQUIRED')
+
+
 class HostedImageEntry(unittest.TestCase):
     def setUp(self):
         self.workflow=PATH.read_text()
@@ -64,8 +81,24 @@ class HostedImageEntry(unittest.TestCase):
         for name in ('backend_image_enabled','preview_enabled'):
             body=re.split(r'\n {6}[a-z_]+:',inputs.split('      '+name+':\n',1)[1],maxsplit=1)[0]
             self.assertIn('type: boolean',body);self.assertIn('default: false',body)
-        self.assertIn('permissions:\n  contents: read\njobs:',self.workflow)
+        exact_readonly_permissions(self.workflow)
         self.assertNotIn('actions: write',self.workflow)
+    def test_permissions_reject_write_extra_scope_and_any_job_override(self):
+        for changed in (
+            self.workflow.replace('  actions: read','  actions: write',1),
+            self.workflow.replace('  contents: read','  contents: write',1),
+            self.workflow.replace('  actions: read','  actions: read\n  id-token: write',1),
+            self.workflow.replace('  actions: read','  actions: read\n  packages: read',1),
+            self.workflow.replace('  test:\n','  test:\n    permissions: {}\n',1),
+            self.workflow.replace('  test:\n','  test:\n    "permissions": {contents: write}\n',1),
+            self.workflow.replace('permissions:\n','"permissions":\n',1),
+            self.workflow+'\n  inline_override: {permissions: {contents: write}, runs-on: ubuntu-latest, steps: [{run: "true"}]}\n',
+            self.workflow+'\n  inline_override: {'+r'"\u0070ermissions": {contents: write}, runs-on: ubuntu-latest}'+'\n',
+
+        ):
+            with self.subTest(changed=changed[:70]),self.assertRaises(AssertionError):
+                exact_readonly_permissions(changed)
+
     def test_image_job_requires_original_branch_exact_sha_explicit_true_and_test_gate(self):
         self.assertTrue(self.enabled('community-backend-image'))
         for change in ({'github.ref':'refs/heads/main'},{'inputs.backend_image_source_sha':'b'*40},

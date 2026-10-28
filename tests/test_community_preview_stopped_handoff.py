@@ -21,9 +21,12 @@ import test_community_preview_upgrade as old
 
 A_SOURCE_COMMIT='1d639347f404f952998b3b414a95e48f66571c3c'
 def frozen_a_source():
-    path=os.environ.get('COMMUNITY_TEST_A_ENTRY_FILE')
-    if path:return Path(path).read_bytes()
-    return subprocess.check_output(['git','show',A_SOURCE_COMMIT+':scripts/community_preview_site_prepare.py'])
+    return frozen.a_source()
+
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
 
 class WholeEntry(unittest.TestCase):
     tty_actual=False
@@ -228,7 +231,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -288,7 +291,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -445,7 +448,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -475,7 +478,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -503,7 +506,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -529,7 +532,7 @@ class WholeEntry(unittest.TestCase):
                 deadline_reads[0]+=1
                 return 0 if deadline_reads[0]==1 else 121
             return real_monotonic()
-        with patch.object(h.time,'monotonic',side_effect=monotonic),patch.object(h.time,'sleep',return_value=None):
+        with patch.object(h.time,'monotonic',new=monotonic),patch.object(h.time,'sleep',return_value=None):
             with self.assertRaisesRegex(u.Hold,'C_RESUME_APPROVAL_NOT_RECEIVED'):
                 q.resume_c_before_confirmation()
         candidate=self._register_c_resume_approval_from_persisted_plan(q)
@@ -1747,11 +1750,8 @@ s.BASE=str(base);s.ENTRY=str(base/'site-prepare-v1.py');s.PERMIT=str(base/'site-
 h.B_APPROVAL=str(base/'bc-b-approval.json');h.C_APPROVAL=str(base/'bc-c-approval.json');h.PROOF=str(base/'backup-2330-to-f131-v1/stopped-handoff-v1.json')
 u.JOURNAL_PARENT=str(journal);u.OWNER_UID=uid;c.REFERENCE_UID=uid
 clock=[1000];c.root_host=lambda:None;c.now=lambda:clock[0];s.time.time=lambda:clock[0];s.space=lambda *a,**k:None;h.operator=lambda:(uid,gid);h.acknowledge=lambda *a:None
-a_path=os.environ.get('COMMUNITY_TEST_A_ENTRY_FILE')
-if a_path:A=Path(a_path).read_bytes()
-else:
- import subprocess
- A=subprocess.check_output(['git','show','1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py'],cwd=repo)
+A=Path(sys.argv[3]).read_bytes()
+assert __import__('hashlib').sha256(A).hexdigest()=='48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55'
 Path(s.ENTRY).write_bytes(A);Path(s.ENTRY).chmod(0o600)
 freeze=dict(format=1,host=p.HOST,old_id=s.OLD_ID,old_image=s.OLD_IMAGE,roots=[s.DATA+'/data',s.DATA+'/config'],issued_at=1000,expires_at=1600,all_writers_frozen=True,owner_review_reference_sha256='e'*64)
 Path(s.FREEZE).write_bytes(s.canonical(freeze));Path(s.FREEZE).chmod(0o600)
@@ -1777,7 +1777,8 @@ assert not Path(s.PERMIT).exists()
 assert Path(s.BACKUP,'private-manifest.json').exists() and Path(s.BACKUP,'clone-results.json').exists()
 session.close();print('REAL_LOADER_B_OK')
 """
-        proc=subprocess.run([sys.executable,'-I','-B','-S','-c',worker,str(Path.cwd()),str(bundle)],capture_output=True,text=True)
+        a_entry=self.root/'verified-original-a.py';a_entry.write_bytes(frozen.a_source())
+        proc=subprocess.run([sys.executable,'-I','-B','-S','-c',worker,str(Path.cwd()),str(bundle),str(a_entry)],capture_output=True,text=True)
         self.assertEqual(proc.returncode,0,proc.stderr+proc.stdout);self.assertIn('REAL_LOADER_B_OK',proc.stdout)
 
     def test_v1_builder_refuses_changed_sources_instead_of_overwriting_a(self):

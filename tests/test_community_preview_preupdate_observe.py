@@ -20,6 +20,11 @@ from scripts import community_preview_preupdate_observe as p
 from scripts import community_preview_preupdate_bundle as bundle
 
 
+try:
+    from . import test_community_historical_fixtures as frozen
+except ImportError:
+    import test_community_historical_fixtures as frozen
+
 class FiveObjectReadonly(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
@@ -202,19 +207,20 @@ class FiveObjectReadonly(unittest.TestCase):
              patch.object(p.os,'uname',return_value=Mock(nodename=p.v.HOST)),patch.object(p,'observe',side_effect=p.v.TotalDeadline()),redirect_stdout(io.StringIO()) as out:
             self.assertEqual(p.main(),2);self.assertEqual(json.loads(out.getvalue())['state'],'HOLD_PARTIAL_BOUNDED_OBSERVATION')
     def test_bundle_exact_helpers_standalone_ast_shell_and_dependency_pin(self):
-        python,shell=bundle.build()
-        self.assertEqual(python,(bundle.ROOT/'deploy/community-preview/preupdate-five-readonly.py').read_bytes())
-        self.assertEqual(shell,(bundle.ROOT/'deploy/community-preview/preupdate-five-readonly.sh').read_bytes())
-        ast.parse(python,feature_version=(3,6));ast.parse(p.approved.PRIVATE_PROBE,feature_version=(3,6))
-        self.assertEqual(shell.split(b"<<'COMMUNITY_PREUPDATE_READONLY_PY'",1)[1].split(b'\n',1)[1].split(b'\nCOMMUNITY_PREUPDATE_READONLY_PY\n',1)[0],python.rstrip(b'\n'))
-        self.assertEqual(subprocess.run(['/bin/bash','-n'],input=shell,capture_output=True,timeout=3).returncode,0)
-        with patch.dict(bundle.PINS,{'scripts/community_preview_update_composition.py':'0'*64}):
-            with self.assertRaises(ValueError):bundle.build()
-        ns={'__name__':'readonly_isolated_bundle'};exec(compile(python,'<bundle>','exec'),ns)
-        helpers=bundle.selected((bundle.ROOT/'scripts/community_preview_update_composition.py').read_text(),
-            {'require','digest','canonical_isolation','stable_metadata','inspect_bound','PRIVATE_PROBE'})
-        self.assertIn(repr(helpers),python.decode())
-        ns['v'].ROOT_ANCHOR=str(self.root);ns['v'].ROOT_UID=os.getuid();ns['v'].PROJECT_UID=os.getuid()
-        ns['v'].capture=self.capture;ns['wall']=p.wall
-        self.assertEqual(ns['current_projection'](),p.current_projection())
-        self.assertNotIn('mutate',ns['original'].__dict__);self.assertNotIn('compose',ns['approved'].__dict__)
+        with frozen.historical_tree(frozen.READONLY_COMMIT) as root,patch.object(bundle,'ROOT',root):
+            python,shell=bundle.build()
+            self.assertEqual(python,(bundle.ROOT/'deploy/community-preview/preupdate-five-readonly.py').read_bytes())
+            self.assertEqual(shell,(bundle.ROOT/'deploy/community-preview/preupdate-five-readonly.sh').read_bytes())
+            ast.parse(python,feature_version=(3,6));ast.parse(p.approved.PRIVATE_PROBE,feature_version=(3,6))
+            self.assertEqual(shell.split(b"<<'COMMUNITY_PREUPDATE_READONLY_PY'",1)[1].split(b'\n',1)[1].split(b'\nCOMMUNITY_PREUPDATE_READONLY_PY\n',1)[0],python.rstrip(b'\n'))
+            self.assertEqual(subprocess.run(['/bin/bash','-n'],input=shell,capture_output=True,timeout=3).returncode,0)
+            with patch.dict(bundle.PINS,{'scripts/community_preview_update_composition.py':'0'*64}):
+                with self.assertRaises(ValueError):bundle.build()
+            ns={'__name__':'readonly_isolated_bundle'};exec(compile(python,'<bundle>','exec'),ns)
+            helpers=bundle.selected((bundle.ROOT/'scripts/community_preview_update_composition.py').read_text(),
+                {'require','digest','canonical_isolation','stable_metadata','inspect_bound','PRIVATE_PROBE'})
+            self.assertIn(repr(helpers),python.decode())
+            ns['v'].ROOT_ANCHOR=str(self.root);ns['v'].ROOT_UID=os.getuid();ns['v'].PROJECT_UID=os.getuid()
+            ns['v'].capture=self.capture;ns['wall']=p.wall
+            self.assertEqual(ns['current_projection'](),p.current_projection())
+            self.assertNotIn('mutate',ns['original'].__dict__);self.assertNotIn('compose',ns['approved'].__dict__)

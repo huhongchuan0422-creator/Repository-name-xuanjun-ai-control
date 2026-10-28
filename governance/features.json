@@ -106,7 +106,8 @@
           "tests/test_community_preview_stage_a.py",
           "tests/test_community_preview_stopped_handoff.py",
           "tests/test_community_preview_bc_install.py",
-          "tests/test_community_preview_fixed_product.py"
+          "tests/test_community_preview_fixed_product.py",
+          "tests/test_community_historical_fixtures.py"
         ]
       },
       "reuse": [
@@ -282,7 +283,9 @@
         "docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md",
         "scripts/community_preview_fixed_product.py",
         "tests/test_community_preview_fixed_product.py",
-        "docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md"
+        "tests/test_community_historical_fixtures.py",
+        "docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md",
+        "docs/development/COMMUNITY_GATE_HISTORICAL_INPUTS_20261028.md"
       ]
     },
     {
