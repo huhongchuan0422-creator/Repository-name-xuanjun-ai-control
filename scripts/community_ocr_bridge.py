@@ -1,7 +1,8 @@
 """Community source callbacks for pinned OCR 90aca1cf; no network or new grant.
 
-Production permission admission remains closed until an existing ocr:use
-mapping is independently evidenced. Test admission is not production authority.
+Legacy scene permission admission remains closed. The separately protected
+applicant opt-in admits only the verified mini account's own application, not
+a merchant tenant or project grant. Test admission is not production authority.
 """
 from scripts.community_mini_merchant import MiniMerchant
 
@@ -30,29 +31,39 @@ def on_owner(method):
 
 
 class CommunityOcrBridge:
-    def __init__(self, merchant, scene, principal_type, owner_call):
-        if type(merchant) is not MiniMerchant or scene not in merchant.identity.scenes:
+    def __init__(self, merchant, scene, principal_type, owner_call, *, applicant_mode=False):
+        if type(applicant_mode) is not bool or type(merchant) is not MiniMerchant or (scene!='' if applicant_mode else scene not in merchant.identity.scenes):
             raise PermissionError('ORIGINAL_OCR_SOURCE_REQUIRED')
         from pydantic import PrivateAttr
         class BoundPrincipal(principal_type):
             _community_token: str = PrivateAttr()
         self.merchant, self.scene, self.principal_type = merchant, scene, BoundPrincipal
+        self.applicant_mode=applicant_mode
         import threading
         self.owner_call = owner_call
         self.owner_thread = threading.get_ident()
 
     @on_owner
     def authenticate(self, token):
-        uid, project, csrf, principal = self.merchant.context(token, self.scene)
-        origin = self.merchant._ocr_origin(self.scene, project, principal)
-        p = self.principal_type(subject=uid, tenant_id=origin['scope']['tenant_id'], permissions=set())
+        if self.applicant_mode:
+            uid,_=self.merchant.identity.applicant_context(token)
+            # Account-local OCR partition, not a merchant tenant or project grant.
+            p=self.principal_type(subject=uid,tenant_id='community-applicant:'+uid,permissions={'ocr:use'})
+        else:
+            uid, project, csrf, principal = self.merchant.context(token, self.scene)
+            origin = self.merchant._ocr_origin(self.scene, project, principal)
+            p = self.principal_type(subject=uid, tenant_id=origin['scope']['tenant_id'], permissions=set())
         p._community_token = token
-        # No evidenced existing ocr:use mapping: the actual OCR HTTP gate rejects.
+        # Legacy scene mode has no permission mapping; explicit applicant mode is owner-only.
         return p
 
     def _context(self, p):
         if type(p) is not self.principal_type:
             raise PermissionError('OCR_ORIGINAL_SESSION_REQUIRED')
+        if self.applicant_mode:
+            uid,_=self.merchant.identity.applicant_context(p._community_token)
+            if p.subject!=uid or p.tenant_id!='community-applicant:'+uid:raise PermissionError('OCR_PRINCIPAL_CHANGED')
+            return uid,None
         uid, project, csrf, principal = self.merchant.context(p._community_token, self.scene)
         origin = self.merchant._ocr_origin(self.scene, project, principal)
         if p.subject != uid or p.tenant_id != origin['scope']['tenant_id']:
@@ -64,7 +75,7 @@ class CommunityOcrBridge:
         try:
             uid, origin = self._context(p)
             _, meta, data = self.merchant.onboarding._load(application, uid)
-            return meta.get('ocr_origin') == origin
+            return data['status'] in ('DRAFT','CORRECTION_REQUIRED') if self.applicant_mode else meta.get('ocr_origin') == origin
         except (PermissionError, ValueError, KeyError):
             return False
 
@@ -74,7 +85,7 @@ class CommunityOcrBridge:
         if document_type not in KINDS:
             raise PermissionError('OCR_DOCUMENT_NOT_SUPPORTED')
         reader = self.merchant.ocr_shared_source if self.merchant.onboarding.wechat_applyment is not None else self.merchant.ocr_source
-        source = reader(p._community_token, self.scene, application, KINDS[document_type])
+        source = reader(p._community_token, self.scene, application, KINDS[document_type],applicant=self.applicant_mode)
         if source['subject'] != p.subject or source['tenant_id'] != p.tenant_id:
             raise PermissionError('OCR_PRINCIPAL_CHANGED')
         source['application_revision'] = application_revision(source['application_revision'])
@@ -149,7 +160,7 @@ class CommunityOcrBridge:
                          if key in ('company_name','registered_address') and value.strip()}
             if not confirmed:
                 return {'written':False,'revision':int(revision)}
-            uid,_,csrf,_ = self.merchant.context(p._community_token,self.scene)
+            uid,_,csrf,_ = self.merchant._ocr_context(p._community_token,self.scene,self.applicant_mode)
             def check(application_version,provider_version):
                 # Original Center transaction is already held by the primitive.
                 # Never call the independent-transaction shared reader here.
@@ -158,7 +169,7 @@ class CommunityOcrBridge:
                 import json
                 if json.dumps(current,sort_keys=True) != json.dumps(job,sort_keys=True):
                     raise PermissionError('OCR_CONFIRMATION_SNAPSHOT_CHANGED')
-                now = self.merchant.ocr_source(p._community_token,self.scene,job['onboarding_application_id'],KINDS[job['document_type']])
+                now = self.merchant.ocr_source(p._community_token,self.scene,job['onboarding_application_id'],KINDS[job['document_type']],applicant=self.applicant_mode)
                 if (now['subject'] != p.subject or now['tenant_id'] != p.tenant_id
                         or now['document_type'] != job['document_type']
                         or now['attachment_id'] != job['attachment_id'] or now['document_sha256'] != job['document_sha256']
@@ -194,8 +205,8 @@ class CommunityOcrBridge:
         return {'written': True, 'revision': result['revision']}
 
 
-def compose(merchant, scene, ocr_api, store, owner_call, infer=None):
-    """Explicit host composition; default admission still denies ocr:use.
+def compose(merchant, scene, ocr_api, store, owner_call, infer=None, *, applicant_mode=False):
+    """Explicit host composition; default scene admission still denies ocr:use.
 
     Caller provides the pinned, unmodified OCR module and encrypted store. No
     importing a second engine tree from request data, no engine source writes.
@@ -210,7 +221,7 @@ def compose(merchant, scene, ocr_api, store, owner_call, infer=None):
             raise PermissionError('OCR_PINNED_DEPENDENCY_REQUIRED')
     if type(store) is not ocr_api.SecureSQLiteJobStore:
         raise PermissionError('OCR_ENCRYPTED_STORE_REQUIRED')
-    bridge = CommunityOcrBridge(merchant, scene, ocr_api.Principal, owner_call)
+    bridge = CommunityOcrBridge(merchant, scene, ocr_api.Principal, owner_call,applicant_mode=applicant_mode)
     bridge.store = store
     options = dict(authenticate=bridge.authenticate, store=store,
         authorize_application=bridge.authorize_application, authorize_attachment=bridge.authorize_attachment)

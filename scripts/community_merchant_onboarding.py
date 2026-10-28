@@ -32,6 +32,32 @@ def checked_scenes(value):
     return list(value)
 
 
+def checked_declarations(value,entity):
+    # UI conditions only, in the existing encrypted application metadata.
+    # These are not extra WeChat fields, account grants or business scope.
+    if (type(value) is not dict or set(value)!={'scene','ubos'}
+            or type(value['scene']) is not str or value['scene'] not in ('unknown','store','mini','both')
+            or not (value['ubos']=='unknown' or type(value['ubos']) is int and 0<=value['ubos']<=4
+                    or entity=='SOLE_PROPRIETOR' and value['ubos']=='not_applicable')):
+        raise ValueError('INVALID_APPLICATION_DECLARATIONS')
+    if entity=='ENTERPRISE' and value['ubos']=='not_applicable':raise ValueError('INVALID_APPLICATION_DECLARATIONS')
+    return dict(value)
+
+
+def require_confirmed_declarations(meta,profile=None):
+    value=meta.get('declarations')
+    if value is None:return  # Historical callers retain their original validation.
+    value=checked_declarations(value,meta['entity_type'])
+    if value['scene']=='unknown' or meta['entity_type']=='ENTERPRISE' and value['ubos']=='unknown':
+        raise ValueError('APPLICATION_CONDITIONS_NOT_CONFIRMED')
+    expected={'store':[STORE_SCENE],'mini':[MINI_SCENE],'both':[MINI_SCENE,STORE_SCENE]}[value['scene']]
+    actual=profile_scenes(profile) if profile is not None else meta.get('sales_scenes_type')
+    if actual is None or set(actual)!=set(expected):raise ValueError('APPLICATION_SCENE_DECLARATION_MISMATCH')
+    if profile is not None and meta['entity_type']=='ENTERPRISE':
+        ubos=profile.get('subject_info',{}).get('ubo_info_list',[])
+        if type(ubos) is not list or len(ubos)!=value['ubos']:raise ValueError('APPLICATION_UBO_DECLARATION_MISMATCH')
+
+
 def profile_scenes(profile):
     value=profile
     for key in ('business_info','sales_info'):
@@ -43,7 +69,11 @@ def profile_scenes(profile):
 
 
 def shared_application_fields(profile,fields):
-    """Platform names/contacts reuse this application's provider draft only."""
+    """Project platform fields from this same application's WeChat profile.
+
+    Old drafts without a sales selection retain their original stored fields;
+    no default store/project is inferred and no second applicant form is added.
+    """
     result=dict(fields)
     for key,path in {'legal_name':('subject_info','business_license_info','merchant_name'),
                      'contact':('contact_info','mobile_phone')}.items():
@@ -54,6 +84,19 @@ def shared_application_fields(profile,fields):
             if type(value) is not str:raise ValueError('INVALID_SHARED_APPLICATION_FIELD')
             if value:safe_text(value,512)
             if key=='contact' and len(value)>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
+            result[key]=value
+    scenes=profile_scenes(profile)
+    if scenes is not None:
+        store='SALES_SCENES_STORE' in scenes
+        sources={'store_name':('business_info','sales_info','biz_store_info','biz_store_name') if store else ('business_info','merchant_shortname'),
+                 'address':('business_info','sales_info','biz_store_info','biz_store_address') if store else ('subject_info','business_license_info','license_address')}
+        for key,path in sources.items():
+            value=profile
+            for part in path:value=value.get(part) if type(value) is dict else None
+            if value is None:value=''
+            if type(value) is not str:raise ValueError('INVALID_SHARED_APPLICATION_FIELD')
+            if value:safe_text(value,512)
+            if key=='store_name' and len(value)>120:raise ValueError('MERCHANT_PROFILE_FIELD_LIMIT')
             result[key]=value
     return result
 
@@ -94,7 +137,7 @@ class MerchantOnboarding:
                 'formats':['application/pdf','image/png','image/jpeg'],'max_file_bytes':5_000_000,
                 'industry_permit_required_for':['FOOD'],'operator_materials_when_delegated':True,
                 'sales_scenes':[MINI_SCENE,STORE_SCENE],
-                'default_sales_scenes':[MINI_SCENE],
+                'default_sales_scenes':[], 'sales_scene_confirmation_required':True,
                 'optional_materials':['settlement_proof','operator_authorization','cashier_photo'],
                 'scope':'同一申请资料按微信主体与经营场景复用，平台仅核原项目门店归属',
                 'payment_enabled':False}
@@ -159,7 +202,7 @@ class MerchantOnboarding:
         wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
         if wechat_record is not None:data['fields']=shared_application_fields(wechat_record.get('profile',{}),data['fields'])
         return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
-            delegated=meta['delegated'],sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
+            delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
@@ -188,7 +231,7 @@ class MerchantOnboarding:
                  'download':{'application','kind'}}
         listing=type(op) is str and op in ('mine','review_list')
         if (type(op) is not str or op not in schemas or
-                (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type'}) if op=='save' else set(params)!=schemas[op]))):
+                (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         if op=='open_workbench':
@@ -268,6 +311,13 @@ class MerchantOnboarding:
                 if type(identity_type) is not str or identity_type not in DOCS:raise ValueError('INVALID_IDENTITY_TYPE')
                 meta['identity_type']=identity_type
                 if 'sales_scenes_type' in params:meta['sales_scenes_type']=checked_scenes(params['sales_scenes_type'])
+                if 'declarations' in params:
+                    declaration=checked_declarations(params['declarations'],params['entity_type'])
+                    if declaration['scene']=='unknown':meta.pop('sales_scenes_type',None)
+                    else:
+                        expected={'store':[STORE_SCENE],'mini':[MINI_SCENE],'both':[MINI_SCENE,STORE_SCENE]}[declaration['scene']]
+                        if set(meta.get('sales_scenes_type',[]))!=set(expected):raise ValueError('APPLICATION_SCENE_DECLARATION_MISMATCH')
+                    meta['declarations']=declaration
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
@@ -333,6 +383,7 @@ class MerchantOnboarding:
                 workflow._append(c.db,owner,application,revision,uid,'REVIEW_MATERIAL',{'kind':kind,'decision':decision,'note_sha256':hashlib.sha256(note.encode()).hexdigest()})
                 self._meta(application,owner,meta)
             else:
+                if op=='submit':require_confirmed_declarations(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
                 action='SUBMIT' if op=='submit' else 'WITHDRAW' if op=='withdraw' else params['action']
                 if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
                 if action in ('SUBMIT','APPROVE'):self._check_materials(application,meta)
@@ -345,8 +396,16 @@ class MerchantOnboarding:
                             raise ValueError('MATERIAL_REVIEW_REQUIRED:'+kind)
                 note='' if op in ('submit','withdraw') else safe_text(params['note'],80)
                 encoded_note=self._encode({'note':note},'onboarding-note:'+application) if note else ''
+                required_fields=workflow._FIELDS
+                if action=='SUBMIT' and self.wechat_applyment is not None:
+                    record=self.wechat_applyment._read(application)
+                    if record is not None and profile_scenes(record.get('profile',{}))==['SALES_SCENES_MINI_PROGRAM']:
+                        # Authoritative same-application draft only, never a body flag.
+                        # License address is optional in WeChat's mini-only contract;
+                        # names/contact/materials and the full provider validation remain.
+                        required_fields=tuple(k for k in workflow._FIELDS if k!='address')
                 revision=workflow.transition(c.db,owner,application,uid,'MERCHANT' if op in ('submit','withdraw') else 'REVIEWER',action,params['revision'],encoded_note,
-                    decode=lambda value:self._decode(value,'onboarding-fields:'+application),manage_transaction=False)
+                    decode=lambda value:self._decode(value,'onboarding-fields:'+application),manage_transaction=False,required_fields=required_fields)
                 if action=='REOPEN':
                     # Reopening a rejection authorizes correction, not approval.
                     # New material decisions are required; immutable history stays.

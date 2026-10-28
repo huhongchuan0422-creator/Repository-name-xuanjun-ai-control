@@ -110,6 +110,7 @@ class PlatformHost:
         self.application = None
         self.center_lock = None
         self.ocr = None
+        self.ocr_lock = None
 
     @classmethod
     def open(cls, plan_path, keys_path, wechat_path):
@@ -170,7 +171,7 @@ class PlatformHost:
             owner.close()
             raise
 
-    def configure_ocr(self, scene, api, store):
+    def configure_ocr(self, scene, api, store, *, applicant_mode=False):
         """Explicit protected Python opt-in; plan/env/HTTP cannot enable OCR.
 
         Uses existing Center and admitted encrypted store; no key generation,
@@ -195,9 +196,53 @@ class PlatformHost:
                for info in (_file(path) for path in original)):
             raise PermissionError('OCR_SEPARATE_STORE_REQUIRED')
         merchant=MiniMerchant(app.identity,app.onboarding,app.operations)
-        self.ocr=HostOcr(merchant,scene,api,store)
+        self.ocr=HostOcr(merchant,scene,api,store,applicant_mode=applicant_mode)
         app.gateway.ocr=self.ocr
         return self.ocr
+
+    def configure_applicant_ocr(self,key_reference,store_reference):
+        """Explicit original-install opt-in using pre-existing protected inputs.
+
+        Does not create keys/files, initialize a missing DB, infer secret paths,
+        borrow Center keys, or add project roles. Never called by HTTP or env.
+        """
+        if self.application is None or self.application.server is not None or self.ocr is not None:
+            raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        _require_nonroot()
+        key_path=Path(key_reference);db_path=Path(store_reference)
+        for path in (key_path,db_path):
+            if not path.is_absolute() or str(path)!=str(path.absolute()) or '..' in path.parts:
+                raise ValueError('EXACT_ABSOLUTE_OCR_REFERENCE_REQUIRED')
+            _directory(str(path.parent));_file(path)
+        db_info=_file(db_path)
+        originals=[Path(self.plan['center_root'])/'center.sqlite']
+        originals += [Path(self.plan['runtime_directory'])/(name+'.sqlite') for name in NAMES]
+        originals += [key_path]
+        if any((db_info.st_dev,db_info.st_ino)==(i.st_dev,i.st_ino) for i in (_file(p) for p in originals)):
+            raise PermissionError('OCR_SEPARATE_STORE_REQUIRED')
+        material=load_protected(str(key_path))
+        if type(material) is not dict or set(material)!={'ocr_encryption_key'} or type(material['ocr_encryption_key']) is not str:
+            raise ValueError('EXISTING_OCR_KEY_REFERENCE_REQUIRED')
+        from services.ocr_engine import api,ocr_core
+        ocr_core._verified_model_paths()  # Original immutable model hashes; no download.
+        import json
+        pins=json.loads(Path(__file__).with_name('community_ocr_dependency.json').read_text())
+        for name,digest in pins['files'].items():
+            if hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest()!=digest:
+                raise PermissionError('OCR_PINNED_DEPENDENCY_REQUIRED')
+        lock=os.open(str(db_path),os.O_RDWR|os.O_NOFOLLOW)
+        try:
+            if (os.fstat(lock).st_dev,os.fstat(lock).st_ino)!=(db_info.st_dev,db_info.st_ino):
+                raise PermissionError('OCR_STORE_CHANGED')
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            # _file above requires this exact DB already exists. Constructor
+            # may maintain original tables; this is activation, NOT a probe.
+            store=api.SecureSQLiteJobStore(str(db_path),material['ocr_encryption_key'].encode('ascii'))
+            result=self.configure_ocr('',api,store,applicant_mode=True)
+            self.ocr_lock=lock
+            return result
+        except BaseException:
+            os.close(lock);raise
 
     def serve(self):
         if self.application is None:
@@ -213,10 +258,15 @@ class PlatformHost:
     def close(self):
         first = None
         if self.ocr is not None:
-            try:self.ocr.close()
+            try:
+                self.ocr.close()
+                # Keep the independent DB lock until its last worker has exited.
+                self.ocr.worker.shutdown(wait=True,cancel_futures=True)
             except BaseException as error:first=error
             if self.application is not None:self.application.gateway.ocr=None
             self.ocr=None
+        if self.ocr_lock is not None:
+            os.close(self.ocr_lock);self.ocr_lock=None
         for target, operation in ((self.application,'close'), (self.center,'db'), (self.persistence,'close')):
             if target is None:
                 continue
@@ -247,12 +297,18 @@ def main(argv=None):
     parser.add_argument('--plan',required=True)
     parser.add_argument('--center-keys',required=True)
     parser.add_argument('--wechat-secret',required=True)
+    parser.add_argument('--applicant-ocr-key-reference')
+    parser.add_argument('--applicant-ocr-store-reference')
     args = parser.parse_args(argv)
+    if bool(args.applicant_ocr_key_reference)!=bool(args.applicant_ocr_store_reference):
+        parser.error('Both existing applicant OCR references are required')
     def stop(signum,frame):
         raise KeyboardInterrupt()
     previous = signal.signal(signal.SIGTERM,stop)
     try:
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
+            if args.applicant_ocr_key_reference:
+                host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference)
             host.serve()
     except KeyboardInterrupt:
         return 0

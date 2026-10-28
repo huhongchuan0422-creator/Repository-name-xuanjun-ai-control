@@ -528,6 +528,8 @@ class WechatApplyment:
                 result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':
+                from scripts.community_merchant_onboarding import require_confirmed_declarations
+                require_confirmed_declarations(meta,(record or {}).get('profile'))
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
                 self._validate(record['profile'],meta['entity_type'])
                 if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')

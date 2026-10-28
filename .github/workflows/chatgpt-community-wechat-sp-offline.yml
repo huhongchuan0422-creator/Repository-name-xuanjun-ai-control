@@ -901,6 +901,16 @@ jobs:
                   assert hashlib.sha256(archive.read(name)).hexdigest()==digest
               archive.extractall(root)
           VERIFY
+      - name: Read original successful PR139 offline OCR artifact (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12553737114'
+          run-id: '40076963020'
+          github-token: ${{ github.token }}
+          path: original-ocr-evidence
+      - name: Verify fixed original OCR bundle and preserve community vendor pins
+        run: |
+          python community-image-context/scripts/community_ocr_image_inputs.py original-ocr-evidence/xuanjun-ocr-linux-x86_64-cp311.tar.gz community-image-context/ocr-runtime
       - name: Download only existing hash-pinned CPython 3.11 vendor wheels
         run: |
           python -m pip download --only-binary=:all: --dest community-image-context/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
@@ -920,6 +930,7 @@ jobs:
           docker build --network=none --target release --build-arg SOURCE_SHA="$GITHUB_SHA" -t "community-preview:$GITHUB_SHA" -f community-image-context/deploy/community-preview/Dockerfile community-image-context
           docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 "community-preview:$GITHUB_SHA" --help
           docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$GITHUB_SHA" -B -c 'import os,sys,cryptography,cffi,pycparser; assert os.geteuid()==10001; assert os.getegid()==1008; assert sys.version_info[:2]==(3,11); assert (cryptography.__version__,cffi.__version__,pycparser.__version__)==("46.0.3","2.0.0","2.23"); print("NONROOT_READONLY_IMAGE_IMPORT=PASS")'
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$GITHUB_SHA" -B -m scripts.community_ocr_smoke
           docker image inspect --format '{{.Id}}' "community-preview:$GITHUB_SHA" > community-image-id.txt
           docker image save "community-preview:$GITHUB_SHA" | gzip -n > community-backend-image.tar.gz
           sha256sum community-backend-image.tar.gz > community-backend-image.sha256

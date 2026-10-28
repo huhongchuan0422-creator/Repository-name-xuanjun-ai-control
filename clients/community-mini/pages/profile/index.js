@@ -1,6 +1,8 @@
 const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
+  showProfile(){if(typeof wx.pageScrollTo==='function')wx.pageScrollTo({selector:'#account-details',duration:180});},
+  showNotices(){if(this.data.authenticated&&this.data.loaded){if(typeof wx.pageScrollTo==='function')wx.pageScrollTo({selector:'#account-notices',duration:180});}else{this.setData({status:'选择门店并验证本人身份后读取通知；未读取其他门店或他人的记录'});this.showProfile();}},
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},

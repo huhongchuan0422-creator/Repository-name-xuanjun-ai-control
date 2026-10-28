@@ -44,23 +44,13 @@ class MiniMerchant:
             # Missing store context is allowed ONLY for this owner's application.
             # A supplied invalid/revoked scene never falls back to this branch.
             _,csrf=self.identity.applicant_context(token)
+            if op=='ocr':return self._dispatch_ocr(token,scene,p)
             if (op!='onboarding' or set(p)!={'operation','params'}
                     or type(p['operation']) is not str or p['operation'] not in APPLICANT):
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
             return self.onboarding.dispatch(token,csrf,p,source_origin=None)
         uid,pid,csrf,principal=self.context(token,scene)
-        if op=='ocr':
-            from scripts.community_ocr_host import HostOcr, OcrPublicError
-            if type(self.ocr) is not HostOcr or self.ocr.merchant.identity is not self.identity or self.ocr.merchant.onboarding is not self.onboarding:
-                raise OcrPublicError('OCR_UNAVAILABLE')
-            try:return self.ocr.dispatch(token,scene,p)
-            except PermissionError as error:
-                from scripts.community_ocr_host import OcrPublicError
-                code=str(error)
-                if any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
-                elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
-                else:public='OCR_UNAVAILABLE'
-                raise OcrPublicError(public) from None
+        if op=='ocr':return self._dispatch_ocr(token,scene,p)
         if op=='collection_code':
             if set(p)!={'workspace'} or type(p['workspace']) is not str:raise ValueError('EXACT_COLLECTION_WORKSPACE_REQUIRED')
             from scripts.community_collection_code import CollectionCodes
@@ -92,10 +82,29 @@ class MiniMerchant:
             return self.operations.dispatch(token,csrf,p)
         raise PermissionError('MINI_MERCHANT_OPERATION_DENIED')
 
+    def _dispatch_ocr(self,token,scene,p):
+        from scripts.community_ocr_host import HostOcr, OcrPublicError
+        if type(self.ocr) is not HostOcr or self.ocr.merchant.identity is not self.identity or self.ocr.merchant.onboarding is not self.onboarding:
+            raise OcrPublicError('OCR_UNAVAILABLE')
+        try:return self.ocr.dispatch(token,scene,p)
+        except PermissionError as error:
+            from scripts.community_ocr_host import OcrPublicError
+            code=str(error)
+            if any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
+            elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
+            else:public='OCR_UNAVAILABLE'
+            raise OcrPublicError(public) from None
+
     def _ocr_origin(self,scene,project,principal):
         return {'project':project,'scene':scene,'scope':dict(self.identity.runtime.bindings[principal])}
 
-    def ocr_shared_source(self,token,scene,application,kind):
+    def _ocr_context(self,token,scene,applicant):
+        if applicant is not True:return self.context(token,scene)
+        if scene!='':raise PermissionError('OCR_APPLICANT_SCOPE_REQUIRED')
+        uid,csrf=self.identity.applicant_context(token)
+        return uid,None,csrf,None
+
+    def ocr_shared_source(self,token,scene,application,kind,*,applicant=False):
         """Host-only source preparation, NOT an OCR resolver/API contract.
 
         Both original draft versions and current attachment bytes are observed
@@ -111,7 +120,7 @@ class MiniMerchant:
             raise PermissionError('ORIGINAL_SHARED_DRAFT_REQUIRED')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         with c.tx():
-            uid,_,_,_=self.context(token,scene)
+            uid,_,_,_=self._ocr_context(token,scene,applicant)
             owner,_,platform=self.onboarding._load(application,uid)
             def row():
                 return c.db.execute("SELECT user_id,active,payload FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=?",
@@ -127,7 +136,7 @@ class MiniMerchant:
             if (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
                     or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
                 raise PermissionError('SHARED_DRAFT_EDIT_STATE_DENIED')
-            source=self.ocr_source(token,scene,application,kind)
+            source=self.ocr_source(token,scene,application,kind,**({'applicant':True} if applicant else {}))
             # _read decrypts private metadata. Bind its result to the exact row
             # read before decryption; never substitute the latest provider version.
             current=row()
@@ -138,7 +147,7 @@ class MiniMerchant:
                 raise PermissionError('OCR_SHARED_SOURCE_CHANGED')
             # Original source performs final session/origin/object/expiry checks.
             # This second read also catches mutations during provider decryption.
-            final=self.ocr_source(token,scene,application,kind)
+            final=self.ocr_source(token,scene,application,kind,**({'applicant':True} if applicant else {}))
             _,_,latest_platform=self.onboarding._load(application,uid)
             current=row()
             if (final!=source or latest_platform!=platform or (tuple(initial) if initial is not None else None)
@@ -146,7 +155,7 @@ class MiniMerchant:
                 raise PermissionError('OCR_SHARED_SOURCE_CHANGED')
             return dict(source,wechat_version=version)
 
-    def ocr_source(self,token,scene,application,kind):
+    def ocr_source(self,token,scene,application,kind,*,applicant=False):
         """Protected Python-only preparation; no OCR/network call or HTTP exposure.
 
         Original mini identity + current applicant ownership + immutable origin
@@ -155,10 +164,10 @@ class MiniMerchant:
         """
         import hashlib
         from scripts.pr122_customer_core import private_path
-        uid,pid,csrf,principal=self.context(token,scene)
-        origin=self._ocr_origin(scene,pid,principal)
+        uid,pid,csrf,principal=self._ocr_context(token,scene,applicant)
+        origin=None if applicant is True else self._ocr_origin(scene,pid,principal)
         owner,meta,data=self.onboarding._load(application,uid)
-        if meta.get('ocr_origin')!=origin:
+        if applicant is not True and meta.get('ocr_origin')!=origin:
             raise PermissionError('OCR_APPLICATION_ORIGIN_UNVERIFIED')
         hints={'business_license':'business_license','identity_front':'id_front'}
         if kind not in hints or (kind=='identity_front' and meta.get('identity_type')!='IDENTIFICATION_TYPE_IDCARD'):
@@ -179,9 +188,9 @@ class MiniMerchant:
         if row['mime'] not in ('image/png','image/jpeg'):
             raise PermissionError('OCR_IMAGE_REQUIRED')
         # Do not return bytes after a session/scope/application replacement.
-        current=self.context(token,scene)
+        current=self._ocr_context(token,scene,applicant)
         _,latest,version=self.onboarding._load(application,uid)
-        if (current!=(uid,pid,csrf,principal) or self._ocr_origin(scene,pid,principal)!=origin
+        if (current!=(uid,pid,csrf,principal) or (applicant is not True and self._ocr_origin(scene,pid,principal)!=origin)
                 or latest!=meta or version['revision']!=data['revision']):
             raise PermissionError('OCR_SOURCE_CHANGED')
         # Re-read the authoritative object after decrypt and all identity/draft
@@ -199,8 +208,8 @@ class MiniMerchant:
         # Clock can advance while decrypting/authorizing; use time at release.
         if material['expires_at'] is not None and material['expires_at']<=c.now():
             raise PermissionError('OCR_ATTACHMENT_EXPIRED')
-        return {'subject':owner,'tenant_id':origin['scope']['tenant_id'],
-                'project':pid,'scene':scene,'scope':origin['scope'],
+        return {'subject':owner,'tenant_id':'community-applicant:'+uid if applicant is True else origin['scope']['tenant_id'],
+                'project':pid,'scene':scene,'scope':None if applicant is True else origin['scope'],
                 'onboarding_application_id':application,'application_revision':data['revision'],
                 'attachment_id':material['object_id'],'document_sha256':row['sha'],
                 'document_type':hints[kind],'mime':row['mime'],'data':raw}

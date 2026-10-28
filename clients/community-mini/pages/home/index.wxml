@@ -1,27 +1,9 @@
-<view class="page" style="padding-bottom:180rpx;box-sizing:border-box;"><view class="xj-nav"><button class="nav-item {{activeSection==='home'?'is-active':''}}" data-section="home" bindtap="navigateSection"><view class="nav-icon icon-home"></view><text>首页</text></button><button class="nav-item {{activeSection==='recommendations'?'is-active':''}}" data-section="recommendations" bindtap="navigateSection"><view class="nav-icon icon-recommendations"></view><text>推荐</text></button><button class="nav-item {{activeSection==='orders'?'is-active':''}}" data-section="orders" bindtap="navigateSection"><view class="nav-icon icon-orders"></view><text>订单</text></button><button class="nav-item {{activeSection==='profile'?'is-active':''}}" data-section="profile" bindtap="navigateSection"><view class="nav-icon icon-profile"></view><text>我的</text></button></view>
-  <view class="brand">玄钧AI新 <text class="badge">开发预览</text></view>
-  <view class="hero">
-    <text class="eyebrow">COMMUNITY SERVICE</text>
-    <text class="title">发现身边好店</text>
-    <text class="subtitle">连接身边服务，让每一次到店更简单</text>
-  </view>
-  <view class="card hero-card"><text class="section-title">把你的好店带到这里</text><text class="description">从本人入驻申请开始，保存资料、查看审核进度；无需先拥有门店账号。</text><button class="primary" bindtap="openMerchantJoin">商家入驻 · 开始办理 ›</button><button class="secondary" bindtap="openMerchant">已有商家，进入工作台 ›</button></view>
-  <view class="card"><text class="section-title">身边的门店服务</text><text class="hint">{{needsScene?'尚未选择门店，扫码后查看对应服务。':'已带入门店入口，仍按本人权限读取服务。'}}</text><button class="service-link" bindtap="scanStore">扫码进入门店 ›</button><button wx:if="{{!needsScene}}" class="service-link" bindtap="openStorefront">查看当前门店介绍 ›</button><button class="service-link" bindtap="openRecommendations">浏览推荐与门店入口 ›</button></view>
-  <view class="card">
-    <text class="section-title">我的服务</text>
-    <button class="service-link" bindtap="openProfile" disabled="{{pending}}"><text>个人资料</text><text class="muted">管理昵称与联系方式 ›</text></button>
-    <button class="service-link" bindtap="openCheckout" disabled="{{pending}}"><text>门店与订单</text><text class="muted">浏览服务与查看订单 ›</text></button>
-    <text wx:if="{{!authenticated}}" class="hint">可先进入页面；读取个人资料和订单时再按门店权限核验</text>
-  </view>
-  <view class="card status-card" aria-live="polite">
-    <view class="status-heading"><view class="status-dot {{authenticated?'is-ready':''}}"></view><text>{{pending?'正在连接':(authenticated?'已登录':'暂未登录')}}</text></view>
-    <text class="description">{{status}}</text>
-    <button class="primary" wx:if="{{!authenticated}}" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'微信登录 / 注册'}}</button>
-  </view>
-  <button wx:if="{{authenticated}}" class="secondary" bindtap="logout" disabled="{{pending}}">退出登录</button>
-  <view class="card" wx:if="{{needsScene}}"><text class="section-title">还没有选择门店？</text><button class="secondary" bindtap="scanStore">扫码进入门店</button><text class="hint">请在微信中扫描商家提供的门店二维码，或从原门店服务链接进入。也可先进入商家入驻，不必先拥有门店。</text></view>
-  <view class="card"><text class="section-title">更多门店服务</text><text class="hint">社区归属、推荐关系及原有服务，选定门店后按原权限使用。</text><button data-section="services" bindtap="navigateSection">社区与推荐 · 更多服务 ›</button></view>
-<button class="secondary" bindtap="openPrivacy">隐私保护指引</button>
-  <text class="hint" aria-live="polite">{{privacyStatus}}</text>
-  <text class="footer">开发预览 · 支付尚未开放</text>
-</view>
+<view class="page consumer-page" style="padding-bottom:180rpx;box-sizing:border-box;"><view class="xj-nav"><button class="nav-item {{activeSection==='home'?'is-active':''}}" data-section="home" bindtap="navigateSection"><view class="nav-icon icon-home"></view><text>首页</text></button><button class="nav-item {{activeSection==='recommendations'?'is-active':''}}" data-section="recommendations" bindtap="navigateSection"><view class="nav-icon icon-recommendations"></view><text>推荐</text></button><button class="nav-item {{activeSection==='orders'?'is-active':''}}" data-section="orders" bindtap="navigateSection"><view class="nav-icon icon-orders"></view><text>订单</text></button><button class="nav-item {{activeSection==='profile'?'is-active':''}}" data-section="profile" bindtap="navigateSection"><view class="nav-icon icon-profile"></view><text>我的</text></button></view>
+<view class="service-top">社区服务</view>
+<view class="hero"><text class="eyebrow">社区商家</text><text class="title">发现身边好店</text><text class="subtitle">浏览商家介绍与社区服务信息</text></view>
+<view class="card discovery-card"><text class="badge">商家展示</text><text class="section-title">{{needsScene?'发现身边的门店':'当前门店服务'}}</text><text class="description">{{needsScene?'扫描门店入口后查看真实商家介绍；尚未关联任何门店。':'已带入原门店入口，商家信息以原服务端核验为准。'}}</text><button wx:if="{{needsScene}}" class="text-link" bindtap="scanStore">扫码查看门店介绍 ›</button><button wx:else class="text-link" bindtap="openStorefront">查看当前门店介绍 ›</button></view>
+<text class="section-title">附近商家</text><view class="card store-row" wx:if="{{!needsScene}}"><view class="store-avatar">店</view><view class="store-copy"><text class="section-title">当前选择的门店</text><text class="hint">按原入口查看商家介绍，不代表资质已审核</text><button class="text-link" bindtap="openStorefront">查看商家介绍 ›</button></view></view><view class="card empty-state" wx:else><text>暂无可展示的附近商家</text><text class="hint">附近商家目录尚未接通，不展示虚构门店、定位或排名。</text><button class="text-link" bindtap="openRecommendations">浏览推荐与门店入口 ›</button></view>
+<view class="card"><text class="section-title">商家中心</text><button class="service-link highlighted-link" bindtap="openMerchantJoin">商家入驻 · 开始办理 / 查看进度 ›</button><button class="service-link" bindtap="openMerchant">已有商家，进入工作台 ›</button><text class="hint">本人微信账号即可开始入驻，无需先有门店。</text></view>
+<view class="card"><text class="section-title">我的服务</text><button class="service-link" bindtap="openProfile">个人资料 ›</button><button class="service-link" bindtap="openCheckout">门店与订单 ›</button><button class="service-link" data-section="services" bindtap="navigateSection">社区与推荐 · 更多服务 ›</button></view>
+<view class="card status-card"><text class="description" aria-live="polite">{{status}}</text><button wx:if="{{!authenticated}}" class="primary" bindtap="retryLogin" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在登录':'微信登录 / 注册'}}</button><button wx:else class="text-link" bindtap="logout" disabled="{{pending}}">退出登录</button></view>
+<button class="text-link" bindtap="openPrivacy">隐私保护指引</button><text class="hint" aria-live="polite">{{privacyStatus}}</text><text class="hint">商家入驻、微信认证与支付资格分别核验。支付尚未开放。</text></view>

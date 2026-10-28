@@ -25,7 +25,9 @@ def load_pinned():
     tmp = tempfile.TemporaryDirectory()
     root = Path(tmp.name)
     for name, digest in lock['files'].items():
-        raw = subprocess.check_output(['git','show',lock['source_sha']+':services/ocr_engine/'+name])
+        # Same hash-pinned original bytes may come from the approved offline artifact.
+        original = __import__('os').environ.get('COMMUNITY_TEST_PINNED_OCR_DIR')
+        raw = (Path(original)/name).read_bytes() if original else subprocess.check_output(['git','show',lock['source_sha']+':services/ocr_engine/'+name])
         if hashlib.sha256(raw).hexdigest() != digest:
             raise AssertionError('PINNED_OCR_HASH_MISMATCH')
         (root/name).write_bytes(raw)

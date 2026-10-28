@@ -48,16 +48,19 @@ class OwnerCalls:
 
 
 class HostOcr:
-    def __init__(self, merchant, scene, api, store):
+    def __init__(self, merchant, scene, api, store, *, applicant_mode=False):
         from scripts.community_ocr_bridge import compose
-        self.owner=OwnerCalls();self.merchant=merchant;self.scene=scene
-        self.bridge,self.app=compose(merchant,scene,api,store,self.owner)
+        self.owner=OwnerCalls();self.merchant=merchant;self.scene=scene;self.applicant_mode=applicant_mode
+        self.bridge,self.app=compose(merchant,scene,api,store,self.owner,applicant_mode=applicant_mode)
         self.worker=concurrent.futures.ThreadPoolExecutor(max_workers=1,thread_name_prefix='community-ocr')
         self.busy=False
     def dispatch(self, token, scene, params):
         self.owner.check()
         if self.busy:raise PermissionError('OCR_REQUEST_PENDING')
-        if scene!=self.scene:raise PermissionError('OCR_SCENE_MISMATCH')
+        if self.applicant_mode:
+            # Supplied store contexts must still be valid; never downgrade a bad one.
+            if scene:self.merchant.context(token,scene)
+        elif scene!=self.scene:raise PermissionError('OCR_SCENE_MISMATCH')
         if type(params) is not dict or type(params.get('action')) is not str:
             raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         action=params['action'];base={'action','application'}

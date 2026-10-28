@@ -11,12 +11,19 @@ class SourceBoundary(unittest.TestCase):
         self.assertIn("x.id==='admission-business_info-'?'':",stage)
         self.assertIn('识别未接通',stage)
         native=(ROOT/'clients/community-mini/pages/merchant-join/index.wxml').read_text()
-        photo=native.split('线下实际经营场景照片',1)[1].split('小程序服务截图',1)[0]
-        self.assertNotIn('OCR未接通',photo)
-        self.assertIn('场景照片无需OCR',photo)
-        self.assertNotIn('bindtap="recognizeDocument"',photo)
-        self.assertIn('OCR按需调用且默认关闭',native)
-        self.assertIn('识别：按需调用；上传本身不自动生成识别结果或自动回填',native)
+        import subprocess
+        groups=json.loads(subprocess.check_output(['node','-e',"const f=require('./clients/community-mini/merchant-form');console.log(JSON.stringify(f.materialGroups({}, {entity:'ENTERPRISE',contact:'LEGAL',doc:f.docs[0],scene:'both',ubos:'unknown'},[],1)))"],cwd=ROOT,text=True))
+        photo=next(g for g in groups if g['id']=='store')
+        self.assertEqual([m['id'] for m in photo['materials']],['storefront_photo','interior_photo','cashier_photo'])
+        self.assertTrue(photo['photos']);self.assertNotIn('ocrKind',photo)
+        self.assertIn('三类照片不做OCR',photo['note'])
+        self.assertIn('wx:if="{{group.ocrKind&&application}}"',native)
+        self.assertIn('识别本组已上传证照',native)
+        self.assertIn('人工核对',native)
+        host=(ROOT/'scripts/community_platform_host.py').read_text()
+        self.assertIn('if args.applicant_ocr_key_reference:',host)
+        self.assertIn('EXISTING_OCR_KEY_REFERENCE_REQUIRED',host)
+        self.assertIn('尚未请求识别。识别结果需人工核对，不自动覆盖已填写资料。',native)
 
     def test_generated_inputs_and_scoped_fields(self):
         data=build()

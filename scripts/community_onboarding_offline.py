@@ -62,8 +62,9 @@ def save_draft(db, tenant, application, actor, fields, expected_revision=0, *, e
             db.execute("INSERT INTO onboarding VALUES(?,?,?,'DRAFT',?,NULL)",(tenant,application,revision,payload))
         _append(db,tenant,application,revision,actor,"SAVE_DRAFT",data)
     return revision
-def transition(db,tenant,application,actor,role,action,expected_revision,note="", *, decode=None,manage_transaction=True):
+def transition(db,tenant,application,actor,role,action,expected_revision,note="", *, decode=None,manage_transaction=True,required_fields=_FIELDS):
     tenant,actor=_actor(tenant,actor); application=_str(application,"APPLICATION")
+    if type(required_fields) is not tuple or required_fields not in (_FIELDS,tuple(k for k in _FIELDS if k!="address")):raise ValueError("INVALID_REQUIRED_FIELDS")
     if type(expected_revision) is not int or expected_revision<1:raise ValueError("REVISION")
     matrix={"WITHDRAW":({"DRAFT","CORRECTION_REQUIRED"},"WITHDRAWN","MERCHANT"),
             "SUBMIT":({"DRAFT"},"SUBMITTED","MERCHANT"),
@@ -80,7 +81,7 @@ def transition(db,tenant,application,actor,role,action,expected_revision,note=""
         rev,state,payload,_=_current(db,tenant,application)
         if rev!=expected_revision:raise ValueError("REVISION_CONFLICT")
         if state not in allowed:raise ValueError("STATE_FORBIDDEN")
-        if action=="SUBMIT" and any(not v for v in (decode(payload) if decode is not None else json.loads(payload)).values()):raise ValueError("MISSING_REQUIRED")
+        if action=="SUBMIT" and any(not (decode(payload) if decode is not None else json.loads(payload)).get(k) for k in required_fields):raise ValueError("MISSING_REQUIRED")
         newrev=rev+1
         db.execute("UPDATE onboarding SET revision=?,status=?,reviewer_note=? WHERE tenant=? AND application=?",
                    (newrev,target,note,tenant,application))
