@@ -49,7 +49,8 @@
         "criteria": [
           "单模块和批量报价的独立版本",
           "双币价格、成本UNKNOWN及供应商费用隔离",
-          "Owner审批、历史合同价格与租户隔离"
+          "Owner审批、历史合同价格与租户隔离",
+          "原小程序预览控制SHA与冻结f131产品SHA分离，固定源制品/同版新鲜健康/AppID/base与原Runner凭据边界均须通过；离线测试不等于已上传或真机通过"
         ],
         "tests": [
           "tests/test_stage5_saas_offer_catalog.py",
@@ -104,7 +105,8 @@
           "clients/community-mini/ocr-host-ui.test.cjs",
           "tests/test_community_preview_stage_a.py",
           "tests/test_community_preview_stopped_handoff.py",
-          "tests/test_community_preview_bc_install.py"
+          "tests/test_community_preview_bc_install.py",
+          "tests/test_community_preview_fixed_product.py"
         ]
       },
       "reuse": [
@@ -277,7 +279,10 @@
         "deploy/community-preview/install-stopped-v1.sh",
         "tests/test_community_preview_stopped_handoff.py",
         "tests/test_community_preview_bc_install.py",
-        "docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md"
+        "docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md",
+        "scripts/community_preview_fixed_product.py",
+        "tests/test_community_preview_fixed_product.py",
+        "docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md"
       ]
     },
     {

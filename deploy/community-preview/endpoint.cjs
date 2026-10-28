@@ -40,6 +40,30 @@ function verifySource(root,expected){
     keys.some(k=>typeof expected[k]!=='string'||actual[k]!==expected[k]))throw Error('PREPARED_SOURCE_CHANGED');
  return actual;
 }
+
+// Fixed-product mode is admitted by the same original Python control contract.
+// No global GITHUB_SHA rewrite and no upload credential is passed to the child.
+function sourceIdentity(){
+ const env=process.env,mode=env.COMMUNITY_FIXED_PRODUCT_PREVIEW??'false';
+ if(!['true','false'].includes(mode))throw Error('EXACT_PRODUCT_MODE_REQUIRED');
+ if(mode==='false'){
+  if(env.COMMUNITY_PREVIEW_PRODUCT_CONTEXT)throw Error('UNEXPECTED_PRODUCT_CONTEXT');
+  return {product_source_sha:env.GITHUB_SHA||null,control_source_sha:env.GITHUB_SHA||null,source_root:null,fixed_product:false};
+ }
+ const keys=['PATH','GITHUB_SHA','GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT',
+  'PREVIEW_CONTROL_SHA','PREVIEW_SOURCE_SHA','PREVIEW_TARGET','PREVIEW_EVIDENCE_RUN_ID','PREVIEW_ENABLED',
+  'IMAGE_BUILD_ENABLED','RUNNER_TEMP','COMMUNITY_FIXED_PRODUCT_PREVIEW','COMMUNITY_PREVIEW_PRODUCT_CONTEXT'];
+ const childEnv=Object.fromEntries(keys.filter(k=>env[k]!==undefined).map(k=>[k,env[k]]));
+ let identity;
+ try{identity=JSON.parse(require('node:child_process').execFileSync('/usr/bin/python3',
+  ['-I','-B',path.resolve(__dirname,'../../scripts/community_preview_fixed_product.py'),'identity'],
+  {env:childEnv,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['ignore','pipe','pipe']}));}
+ catch(_){throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');}
+ if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||
+    identity.product_source_sha!=='f13155ed63a3137d41766ee587d9b4b96a81477f')throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
+ return identity;
+}
+
 function endpoint(profile=process.env.COMMUNITY_PREVIEW_PROFILE??'legacy'){
  if(typeof profile!=='string'||!Object.hasOwn(profiles,profile))throw Error('EXACT_PREVIEW_PROFILE_REQUIRED');
  const baseUrl=profiles[profile];
@@ -48,7 +72,8 @@ function endpoint(profile=process.env.COMMUNITY_PREVIEW_PROFILE??'legacy'){
  const origin=new URL(baseUrl).origin;
  return {profile,baseUrl,origin,health_url:baseUrl+'/community/health'};
 }
-function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000)){
+function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),controlSha=null){
+ if(controlSha!==null&&report?.control_source_sha!==controlSha)throw Error('MATCHING_CONTROL_READINESS_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||
@@ -60,4 +85,4 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000)){
     !Number.isSafeInteger(report.observed_at)||report.observed_at>now+30||now-report.observed_at>600)
   throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
 }
-module.exports={endpoint,verifyReadiness,sourceManifest,verifySource};
+module.exports={endpoint,verifyReadiness,sourceManifest,verifySource,sourceIdentity};

@@ -8,7 +8,7 @@ from pathlib import Path
 
 def build(root):
     root = Path(root)
-    patterns = ('docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
+    patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
                 'tests/test_community_*.mjs', 'tests/community_*.cjs',
                 'tests/test_stage5_*.py', 'demos/community-local-e2e/*',
                 'demos/community-stage/*', 'demos/community-stage/ui-preview/*', 'demos/community-payment/*',
@@ -50,7 +50,7 @@ def build(root):
         if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
             raise ValueError('PACKAGE_SYMLINK_DENIED')
         files[path.relative_to(root).as_posix()] = path.read_bytes()
-    required = {'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
+    required = {'docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'scripts/community_preview_fixed_product.py', 'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
                 'scripts/community_preview_readiness.py',
                 'scripts/community_mini_host_config.py',
                 'scripts/community_platform_host.py',

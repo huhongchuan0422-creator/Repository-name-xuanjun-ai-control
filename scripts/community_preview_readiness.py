@@ -4,7 +4,7 @@ This proves connectivity only, not real login, merchant admission or acceptance.
 """
 import json, os, re, time
 from pathlib import Path
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 ORIGIN='https://community-preview.wenwenwenyiyiyi.work'
 URL=ORIGIN+'/community/health'
@@ -26,13 +26,15 @@ def target_for(profile):
     return dict(profile=profile, baseUrl=base, origin=origin,
                 health_url=base+'/community/health')
 
-def check(open_url=None, profile=None):
-    opener=open_url or build_opener(NoRedirect()).open
+def check(open_url=None, profile=None, product_identity=None):
+    opener=open_url or build_opener(ProxyHandler({}), NoRedirect()).open
     report=dict(origin=ORIGIN,status='BACKEND_NOT_READY',login_verified=False,
                 customer_acceptance=False,payment_enabled=False)
     try:
         target=target_for(profile if profile is not None else os.environ.get('COMMUNITY_PREVIEW_PROFILE','legacy'))
-        head=os.environ.get('GITHUB_SHA')
+        head=(product_identity['product_source_sha'] if product_identity else os.environ.get('GITHUB_SHA'))
+        if product_identity and product_identity['fixed_product']:
+            report['control_source_sha']=product_identity['control_source_sha']
         report.update(target,frontend_source_sha=head,compatibility='UNVERIFIED')
         if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
@@ -65,7 +67,12 @@ if __name__=='__main__':
     import argparse
     from pathlib import Path
     parser=argparse.ArgumentParser();parser.add_argument('--output',required=True)
-    args=parser.parse_args();report=check()
+    args=parser.parse_args()
+    # -I keeps imports isolated; load only our checked-out adjacent control helper.
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name('community_preview_fixed_product.py'))
+    helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
+    report=check(product_identity=helper.identity(os.environ))
     output=Path(args.output);output.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
     output.write_text(json.dumps(report,sort_keys=True)+'\n');output.chmod(0o600)
     print('PREVIEW_BACKEND_STATUS='+report['status'])

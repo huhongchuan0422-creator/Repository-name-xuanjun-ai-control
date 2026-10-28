@@ -38,7 +38,7 @@ on:
         type: boolean
         default: false
       preview_source_sha:
-        description: 'Exact selected branch HEAD (40 lowercase hex); required for preview'
+        description: 'Exact current control branch HEAD; preview product is fixed to reviewed f131'
         type: string
         default: ''
       preview_target:
@@ -47,7 +47,7 @@ on:
         options: [uk-path-candidate]
         default: uk-path-candidate
       preview_evidence_run_id:
-        description: 'Successful push Hosted evidence run for the exact selected SHA'
+        description: 'Fixed f131 successful push evidence: 40058542631'
         type: string
         default: ''
 permissions:
@@ -103,7 +103,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Reuse exact successful push Hosted evidence before preview
-        if: github.event_name == 'workflow_dispatch' && (inputs.preview_enabled || inputs.backend_image_enabled)
+        if: github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled && !inputs.preview_enabled
         env:
           PREVIEW_SOURCE_SHA: ${{ inputs.preview_source_sha }}
           PREVIEW_TARGET: ${{ inputs.preview_target }}
@@ -187,6 +187,36 @@ jobs:
               except Exception:
                   raise SystemExit('HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW')
           EVIDENCE
+      - name: Admit fixed f131 product using original exact push evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        env:
+          PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
+          PREVIEW_SOURCE_SHA: f13155ed63a3137d41766ee587d9b4b96a81477f
+          PREVIEW_TARGET: ${{ inputs.preview_target }}
+          PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+          PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+          IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -I -B scripts/community_preview_fixed_product.py admit
+      - name: Fixed product preview control affected scope (offline only)
+        if: (github.event_name == 'workflow_dispatch' && inputs.preview_enabled) || contains(github.event.head_commit.message, '[fixed-product-preview-scope]')
+        env:
+          COMMUNITY_FIXED_PRODUCT_TEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'fixed-product-source.zip' || '' }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.:tests python -B -m unittest test_community_preview_fixed_product test_preview_endpoint_contract -v 2>&1 | tee community-tests.log
+          node --test tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Preserve fixed verified product input for original domestic preview
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-fixed-f131-preview-input
+          path: |
+            fixed-product-source.zip
+            fixed-product-receipt.json
+          if-no-files-found: error
+          retention-days: 1
       - name: Preview entry evidence affected scope (offline only)
         if: contains(github.event.head_commit.message, '[preview-entry-scope]')
         run: |
@@ -425,13 +455,13 @@ jobs:
           fi
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Install exact browser test runner
-        if:  "!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')))"
+        if:  "!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]')"
         run: |
           git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
           python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32
           python -m playwright install --with-deps chromium
       - name: Complete Phase1 and Phase2 source regression
-        if:  "!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]')))"
+        if:  "!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]')"
         run: |
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
@@ -1030,7 +1060,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '40058542631' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1055,12 +1085,19 @@ jobs:
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '40058542631' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
     env:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
+      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
+      PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
+      PREVIEW_SOURCE_SHA: f13155ed63a3137d41766ee587d9b4b96a81477f
+      PREVIEW_TARGET: ${{ inputs.preview_target }}
+      PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+      PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+      IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
     steps:
       - name: Verify existing domestic upload runner before loading credentials
         shell: bash
@@ -1098,7 +1135,8 @@ jobs:
           assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
           assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
           assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
-          assert {'deploy/community-preview/prepare-mini.cjs',
+          assert {'scripts/community_preview_fixed_product.py',
+                  'deploy/community-preview/prepare-mini.cjs',
                   'deploy/community-preview/endpoint.cjs',
                   'deploy/community-preview/endpoint-profiles.json',
                   'scripts/community_preview_readiness.py',
@@ -1132,6 +1170,20 @@ jobs:
           sha256sum -c sdk.sha256
           mkdir -p "$RUNNER_TEMP/community-mini-ci"
           tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
+      - name: Receive verified fixed product input from this control run
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        uses: actions/download-artifact@v4
+        with:
+          name: community-fixed-f131-preview-input
+          path: ${{ runner.temp }}/community-mini-fixed-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Bind fixed product tree separately from current control source
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B scripts/community_preview_fixed_product.py stage
+          printf 'COMMUNITY_PREVIEW_PRODUCT_CONTEXT=%s/community-mini-product-context-%s-%s.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
       - name: Require live backend health before loading upload credentials
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         run: /usr/bin/python3 -I -B scripts/community_preview_readiness.py --output "$RUNNER_TEMP/community-mini-preview/backend-readiness.json"

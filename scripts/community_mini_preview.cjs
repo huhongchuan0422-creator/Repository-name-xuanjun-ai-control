@@ -10,6 +10,7 @@ async function main(){
   try{fs.lstatSync(path.join(destination,name));throw Error('PREVIEW_OUTPUT_ALREADY_USED');}
   catch(e){if(e.code!=='ENOENT')throw e;}
  }
+ const identity=require('../deploy/community-preview/endpoint.cjs').sourceIdentity();
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
  const appSource=fs.readFileSync(path.join(projectPath,'app.js'),'utf8');
@@ -24,22 +25,23 @@ async function main(){
      prepared.connected_app_sha256!==crypto.createHash('sha256').update(appSource).digest('hex')||
      prepared.appid!==config.appid||prepared.scene!==null||prepared.entry_page!=='pages/home/index'||
      prepared.search_query!==''||prepared.entry_mode!=='EXISTING_SCENELESS_GUIDANCE'||
-     prepared.frontend_source_sha!==process.env.GITHUB_SHA||prepared.commerce!==true||prepared.payments!==false||
+     prepared.frontend_source_sha!==identity.product_source_sha||prepared.control_source_sha!==identity.control_source_sha||prepared.commerce!==true||prepared.payments!==false||
      !appSource.includes("baseUrl: '"+target.baseUrl+"'")||
      !appSource.includes("payments: false")||!appSource.includes("commerce: true"))
    throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
   const proof=process.env.COMMUNITY_PREVIEW_READINESS_RECEIPT;
   if(!proof)throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
   readiness=JSON.parse(fs.readFileSync(proof,'utf8'));
-  verifyReadiness(readiness,target,process.env.GITHUB_SHA);
+  verifyReadiness(readiness,target,identity.product_source_sha,Math.floor(Date.now()/1000),identity.fixed_product?identity.control_source_sha:null);
   verifySource(projectPath,prepared.prepared_files);
+  if(identity.fixed_product)verifySource(projectPath,identity.prepared_files);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
- const receipt={head:process.env.GITHUB_SHA||null,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
+ const receipt={head:identity.product_source_sha,control_source_sha:identity.control_source_sha,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
    public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
    backend_origin:target?target.origin:null,backend_base_url:target?target.baseUrl:null,
    entry_page:'pages/home/index',scene:null,search_query:'',entry_mode:'EXISTING_SCENELESS_GUIDANCE',
-   frontend_source_sha:process.env.GITHUB_SHA||null,
+   frontend_source_sha:identity.product_source_sha,
    backend_source_sha:readiness?readiness.backend_source_sha:null,
    compatibility:'EXACT_SOURCE_MATCH',source_hashes:{},status:'NOT_RUN'};
  function source(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){

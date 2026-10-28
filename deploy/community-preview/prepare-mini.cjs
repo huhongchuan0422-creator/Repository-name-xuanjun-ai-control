@@ -1,9 +1,11 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const ROOT=path.resolve(__dirname,'../..');
-const SOURCE=path.join(ROOT,'clients/community-mini');
+const {sourceIdentity}=require('./endpoint.cjs');
+const identity=sourceIdentity();
+const SOURCE=path.join(identity.source_root||ROOT,'clients/community-mini');
 const OUT=process.env.COMMUNITY_CONNECTED_MINI_OUTPUT;
-const {endpoint,sourceManifest}=require('./endpoint.cjs');
+const {endpoint,sourceManifest,verifySource}=require('./endpoint.cjs');
 const target=endpoint();
 const HOST=target.baseUrl;
 if(!OUT)throw Error('OUTPUT_DIRECTORY_REQUIRED');
@@ -35,7 +37,7 @@ const updated=original.replace(needle,replacement);
 const receipt={
  status:'CONNECTED_PREVIEW_SOURCE_PREPARED_NOT_UPLOADED',
  ...target,commerce:true,payments:false,scene:null,entry_page:'pages/home/index',search_query:'',
- entry_mode:'EXISTING_SCENELESS_GUIDANCE',frontend_source_sha:process.env.GITHUB_SHA||null,
+ entry_mode:'EXISTING_SCENELESS_GUIDANCE',frontend_source_sha:identity.product_source_sha,control_source_sha:identity.control_source_sha,
  appid:config.appid,
  source_app_sha256:crypto.createHash('sha256').update(original).digest('hex'),
  connected_app_sha256:crypto.createHash('sha256').update(updated).digest('hex'),
@@ -46,9 +48,10 @@ const receipt={
 // OUT is published only after all preparation succeeds. The parent must already exist.
 const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(OUT)),'.connected-mini-'));
 try{
- fs.cpSync(SOURCE,temp,{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});
+ for(const name of fs.readdirSync(SOURCE))fs.cpSync(path.join(SOURCE,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});
  fs.writeFileSync(path.join(temp,'app.js'),updated);
  receipt.prepared_files=sourceManifest(temp);
+ if(identity.fixed_product)verifySource(temp,identity.prepared_files);
  fs.writeFileSync(path.join(temp,'CONNECTED_PREVIEW_RECEIPT.json'),JSON.stringify(receipt,null,2)+'\n');
  if(!absent(OUT))throw Error('OUTPUT_MUST_NOT_EXIST');
  fs.renameSync(temp,OUT);

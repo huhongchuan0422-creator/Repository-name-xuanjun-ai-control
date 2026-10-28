@@ -184,7 +184,7 @@ class EndpointContract(unittest.TestCase):
         def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message=''):
             contexts.append(dict(expected=expected,github=dict(event_name=event,sha=HEAD,ref=ref,
                 event=dict(head_commit=dict(message=message))),inputs=dict(preview_enabled=enabled,
-                preview_source_sha=sha,preview_target=target)))
+                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='40058542631')))
         case(False);case(False,enabled=True,sha='b'*40)
         case(False,enabled=True,target='legacy');case(False,enabled=True,ref='refs/heads/main')
         case(True,enabled=True);case(False,event='push')
@@ -276,7 +276,8 @@ class HostedEvidence(unittest.TestCase):
         self.assertIn('needs: [test, mini-sdk]',preview)
         self.assertIn('contents: read',self.workflow)
         self.assertNotIn('actions: write',self.workflow)
-        self.assertNotIn('actions: read',self.workflow)
+        # Already present on the current control baseline; needed for fixed artifact read.
+        self.assertIn('actions: read',self.workflow)
     def test_exact_ocr_host_step_success_is_admitted_and_matches_actual_step(self):
         name='Original host OCR lifecycle and Mini feedback affected scope'
         self.assertIn('      - name: '+name+'\n',self.workflow)
