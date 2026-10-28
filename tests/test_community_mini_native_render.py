@@ -28,7 +28,8 @@ class NativeSourceRender(unittest.TestCase):
             def snapshot(name):
                 self.assertEqual(errors,[])
                 if name in ('02-admission-public','17-login-error'):
-                    expect(page.get_by_text('登录后读取材料清单',exact=False)).to_be_visible()
+                    for group in ('license','legal'):
+                        expect(page.locator('#material-'+group).get_by_text('登录后读取材料清单',exact=True)).to_be_visible()
                     expect(page.get_by_text('正在读取材料清单',exact=False)).to_have_count(0)
                     self.assertFalse(page.evaluate('window.__nativeEvidence.state.pending'))
                 self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'))

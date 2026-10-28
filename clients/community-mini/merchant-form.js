@@ -36,7 +36,8 @@ function materialGroups(profile,options,materials,stage){
   if(options.scene!=='mini')add('store','实体门店资料',prefix('business_info.sales_info.biz_store_info.'),['storefront_photo','interior_photo','cashier_photo'],{photos:true,note:'门头和店内环境在确认实体经营后必传；收银台补充选填。本版各框1张，可替换。三类照片不做OCR、不自动回填；只显示上传、关联与审核状态。'});
   if(!['mini','both'].includes(options.scene))add('business','经营联系资料',fields.filter(f=>['business_info.merchant_shortname','business_info.service_phone'].includes(f.path)));
  }
- if(stage===2){add('qualification','结算规则与行业',prefix('settlement_info.'),materials.some(m=>m.id==='industry_permit'&&m.required)?['industry_permit']:[],{note:'只在原行业规则要求时提供资质；不新增默认必传材料。'});add('bank','结算账户',prefix('bank_account_info.'),[],{note:'沿用微信原账户类型与户名规则；其他银行联行号或支行全称至少一项，不新增银行卡照片。'});}
+ if(stage===2){add('industry','行业资质材料适用情况',[],[],{condition:'category',conditionLabels:['按原行业规则核对','原行业要求提供经营许可'],conditionValue:options.category==='FOOD'?1:0,conditionLabel:'行业资质 · '+(options.category==='FOOD'?'原行业要求提供经营许可':'按原行业规则核对'),note:'按实际适用的原行业要求提供资质，不新增微信结算字段或通用必传证照；结算规则仍以原审核核验为准。'});add('qualification','结算规则与行业',prefix('settlement_info.'),options.category==='FOOD'||materials.some(m=>m.id==='industry_permit'&&m.required)?['industry_permit']:[],{note:'只在原行业规则要求时提供资质；不新增默认必传材料。'});add('bank','结算账户',prefix('bank_account_info.'),[],{note:'沿用微信原账户类型与户名规则；其他银行联行号或支行全称至少一项，不新增银行卡照片。'});}
+ if(stage===2){const kinds=['settlement_proof',...(options.contact==='SUPER'?['operator_authorization']:[])];const optional=materials.filter(m=>kinds.includes(m.id));if(optional.length)add('optional','原申请选填补充材料',[],optional.map(m=>m.id),{optional:true,note:'可展开原申请历史选填入口。不要求新增银行卡照片，不默认必传，不改变微信审核要求；仅按原审核补件需要使用。'});}
  return out;
 }
 module.exports={get,put,rows,platformFields,docs,materialGroups};
