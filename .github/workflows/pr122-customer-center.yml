@@ -276,7 +276,7 @@ jobs:
       - name: Build exact 103-member fixed-channel rebind candidate and upgrade parse no root execution
         run: |
           python - <<'PYCODE'
-          import urllib.request
+          import os,urllib.request
           from pathlib import Path
           from scripts.pr122_customer_channel_binding import bind
           from scripts.pr122_customer_channel_upgrade import unpack as upgrade_unpack
