@@ -27,6 +27,10 @@ class NativeSourceRender(unittest.TestCase):
                 page.wait_for_timeout(80)
             def snapshot(name):
                 self.assertEqual(errors,[])
+                if name in ('02-admission-public','17-login-error'):
+                    expect(page.get_by_text('登录后读取材料清单',exact=False)).to_be_visible()
+                    expect(page.get_by_text('正在读取材料清单',exact=False)).to_have_count(0)
+                    self.assertFalse(page.evaluate('window.__nativeEvidence.state.pending'))
                 self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'))
                 spacing=page.locator('.page:visible').first.evaluate('(element)=>({left:parseFloat(getComputedStyle(element).paddingLeft),bottom:parseFloat(getComputedStyle(element).paddingBottom)})')
                 self.assertGreaterEqual(spacing['left'],10,'native .page padding must survive DOM projection')
