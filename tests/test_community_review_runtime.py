@@ -72,6 +72,7 @@ class IntegratedReview(unittest.TestCase):
   self.ready(page)
   page.get_by_role('button',name='查看当前门店介绍 ›',exact=True).click()
   expect(page).to_have_url(__import__('re').compile(r'view=store-detail&scene=shop1$'))
+  page.wait_for_function("window.reviewPage?.data.viewMode === 'store-detail' && window.reviewPage?.scene === 'shop1'")
   self.assertEqual(page.evaluate('window.reviewPage.data.viewMode'),'store-detail')
   self.assertEqual(page.evaluate('window.reviewPage.scene'),'shop1')
   expect(page.locator('#native')).to_contain_text('不代表资质、排名或开通支付')
