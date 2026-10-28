@@ -102,10 +102,9 @@ class Current103ShapeTests(unittest.TestCase):
     def exact_archive(self,count=103,substitute=False):
         additions=sorted(u.IDENTITY_ADDITIONS)
         baseline=['baseline-%03d.py'%i for i in range(99)]
-        names=baseline+additions+['CUSTOMER_MANIFEST.json']
-        if count<103:names=names[:count]
+        names=(baseline+additions)[:max(0,count-1)]
         if substitute and names:names[0]='unapproved.py'
-        files={name:('# '+name+'\n').encode() for name in names if name!='CUSTOMER_MANIFEST.json'}
+        files={name:('# '+name+'\n').encode() for name in names}
         manifest=u.canonical({'source_commit':'b'*40,'source_tree':'c'*40,'files':[{'path':p,'size':len(body),'sha256':u.sha(body)} for p,body in files.items()]})
         raw=io.BytesIO()
         with tarfile.open(fileobj=raw,mode='w:gz') as t:
