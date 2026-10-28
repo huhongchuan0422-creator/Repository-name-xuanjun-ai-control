@@ -36,11 +36,19 @@ class MiniMerchant:
             raise PermissionError('MERCHANT_SCENE_GRANT_REQUIRED')
         return g,csrf
     def dispatch(self,token,scene,body):
-        uid,pid,csrf,principal=self.context(token,scene)
         if (type(body) is not dict or set(body)!={'operation','params'}
                 or type(body['operation']) is not str or type(body['params']) is not dict):
             raise ValueError('INVALID_MINI_MERCHANT_REQUEST')
         op,p=body['operation'],body['params']
+        if scene == '':
+            # Missing store context is allowed ONLY for this owner's application.
+            # A supplied invalid/revoked scene never falls back to this branch.
+            _,csrf=self.identity.applicant_context(token)
+            if (op!='onboarding' or set(p)!={'operation','params'}
+                    or type(p['operation']) is not str or p['operation'] not in APPLICANT):
+                raise PermissionError('APPLICANT_OPERATION_REQUIRED')
+            return self.onboarding.dispatch(token,csrf,p,source_origin=None)
+        uid,pid,csrf,principal=self.context(token,scene)
         if op=='ocr':
             from scripts.community_ocr_host import HostOcr, OcrPublicError
             if type(self.ocr) is not HostOcr or self.ocr.merchant.identity is not self.identity or self.ocr.merchant.onboarding is not self.onboarding:

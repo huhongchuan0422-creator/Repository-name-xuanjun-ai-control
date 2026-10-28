@@ -89,6 +89,28 @@ class CenterIdentity(IdentityPort):
         if self.center.session(token,csrf)!=uid:raise PermissionError('MINI_SESSION_CHANGED')
         return uid,pid,csrf,principal
 
+    def applicant_context(self,token):
+        """Authenticate the existing mini applicant, without selecting a store or grant."""
+        self._time(self.center.now())
+        c=self.center;uid=c.session(token)
+        rows=c.db.execute("SELECT project,payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND active=1",
+                          (c.idx('wechat-session:'+token),uid)).fetchall()
+        if not rows:raise PermissionError('MINI_SESSION_BINDING_REQUIRED')
+        identities=set()
+        for row in rows:
+            meta=json.loads(c.decrypt(row['payload'],'wechat-mini-session'))
+            subject=meta.get('subject_idx');csrf=meta.get('merchant_csrf')
+            if type(subject) is not str or not subject or type(csrf) is not str or not csrf:
+                raise PermissionError('MINI_RELOGIN_REQUIRED')
+            if c.db.execute("SELECT 1 FROM links WHERE channel='WECHAT_MINI' AND subject_idx=? AND user_id=? AND project=? AND active=1",
+                            (subject,uid,row['project'])).fetchone() is None:
+                raise PermissionError('PROVIDER_LINK_REVOKED')
+            identities.add((subject,csrf))
+        if len(identities)!=1:raise PermissionError('MINI_SESSION_CHANGED')
+        _,csrf=next(iter(identities))
+        if c.session(token,csrf)!=uid:raise PermissionError('MINI_SESSION_CHANGED')
+        return uid,csrf
+
     def configure_registration(self,scenes):
         """Protected host opt-in, never a login/body-supplied tenant or role."""
         if hasattr(self,'registration'):

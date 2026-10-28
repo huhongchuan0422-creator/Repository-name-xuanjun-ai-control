@@ -1,13 +1,15 @@
 const {parseScene,createSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
-  data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
+  scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
+  goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
+  data:{status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店');}},
-  onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.clearPrivate('缺少门店场景，无法读取本人资料');return;}this.loginAndLoad();},
+  onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.clearPrivate('登录后可办理本人商家入驻。选择门店后再读取该门店下的个人资料。');this.setData({needsScene:true});return;}this.setData({needsScene:false});this.loginAndLoad();},
   onUnload(){this._dead=true;this._noticeRequest=null;if(this.session)this.session.clear();},
   async loginAndLoad(){
     if(this.data.pending)return;
-    if(!this.scene){this.customerSessionRevoked('缺少门店场景，无法读取本人资料');return;}
+    if(this.sceneInvalid){this.setData({status:'门店入口无效，请返回首页或重新扫描有效门店码'});return;}
     const attempt=this._loginAttempt=(this._loginAttempt||0)+1;const epoch=auth.current();this._authEpoch=epoch;
     this.setData({pending:true,status:'正在登录',authenticated:false,loaded:false});
     try{
@@ -17,7 +19,8 @@ Page({
       await this.session.login();
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){if(this.session)this.session.clear();return;}
       this.setData({authenticated:true});
-      await this.loadProfile(epoch,attempt);
+      if(this.scene)await this.loadProfile(epoch,attempt);
+      else this.setData({status:'微信身份已验证，可办理本人商家入驻；未读取任何门店资料'});
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{if(this.session)this.session.clear();this.session=null;this.clearPrivate(customerError(e));}}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
@@ -59,9 +62,9 @@ Page({
     finally{if(this.noticeCurrent(request)){this._noticeRequest=null;this.setData({noticePending:false});}}
   },
   retryLogin(){return this.loginAndLoad();},
-  openJoin(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant-join/index?scene='+encodeURIComponent(s)});},
-  openMerchant(){const s=this.scene||getApp().globalData.scene;if(s)wx.navigateTo({url:'/pages/merchant/index?scene='+encodeURIComponent(s)});},
-navigateSection(e){if(this._sceneStale){this.setData({status:'授权场景已切换，请从对应门店重新进入'});return;}const section=e.currentTarget.dataset.section;const scene=this.scene||getApp().globalData.scene;if(!scene){this.setData({status:'缺少门店场景，无法切换页面'});return;}getApp().globalData.scene=scene;const urls={home:'/pages/home/index',recommendations:'/pages/checkout/index?view=recommendations',orders:'/pages/checkout/index?view=orders',profile:'/pages/profile/index'};const url=urls[section];if(url)wx.navigateTo({url:url+(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene)});},
+  openJoin(){return auth.navigate(this,'join',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
+  openMerchant(){return auth.navigate(this,'merchant',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
+  navigateSection(e){return auth.navigate(this,e.currentTarget.dataset.section,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   openOrders(){this.navigateSection({currentTarget:{dataset:{section:'orders'}}});},
   input(e){const f=e.currentTarget.dataset.field;if(f==='nickname'||f==='contact')this.setData({[f]:e.detail.value});},
   async save(){

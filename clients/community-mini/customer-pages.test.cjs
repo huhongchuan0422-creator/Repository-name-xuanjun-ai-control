@@ -23,7 +23,8 @@ function environment(baseUrl='https://fixture.invalid'){
         user_id:'user1',project_customer_id:'customer1',nickname:o.data.params.nickname,contact:o.data.params.contact,version:1}}});
       o.fail({errMsg:'unexpected'});
     },
-    navigateTo(o){nav.push(o.url);}
+    navigateTo(o){nav.push(o.url);if(o.success)o.success();if(o.complete)o.complete();},
+    redirectTo(o){nav.push(o.url);if(o.success)o.success();if(o.complete)o.complete();}
   };
   return {calls,nav,pages,config,wx};
 }
@@ -43,7 +44,7 @@ function loadPage(path,{baseUrl='https://fixture.invalid',env=null}={}){
 test('native bottom navigation is fixed, safe-area aware, and reserves content space',()=>{
  for(const page of ['home','checkout','profile','merchant','merchant-join']){
   const wxml=fs.readFileSync(__dirname+'/pages/'+page+'/index.wxml','utf8');
-  assert.match(wxml,/position:fixed/);assert.match(wxml,/safe-area-inset-bottom/);
+  const css=fs.readFileSync(__dirname+'/app.wxss','utf8');assert.match(wxml,/class="xj-nav"/);assert.match(css,/position:fixed/);assert.match(css,/safe-area-inset-bottom/);
   assert.match(wxml,/padding-bottom:180rpx/);
  }
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
@@ -57,7 +58,8 @@ test('app routes customer home/profile while preserving checkout route and check
   const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
   const script=fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8');
   assert.match(checkout,/bindtap="openCustomerHome"/);
-  assert.ok(script.includes("const url=section==='home'?'/pages/home/index':'/pages/profile/index';"));
+  assert.match(script,/auth.navigate\(this,e.currentTarget.dataset.section/);
+  assert.match(fs.readFileSync(__dirname+'/customer-auth.js','utf8'),/home:'\/pages\/home\/index'/);
   assert.match(fs.readFileSync(__dirname+'/app.js','utf8'),/baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false/);
 });
 
@@ -124,18 +126,18 @@ test('access denial during update clears private state and requires explicit rel
 });
 
 
-test('missing scene cold start and retry stay not-ready without false authentication',async()=>{
-  const h=loadPage('pages/home/index.js');
-  h.page.onLoad({});
-  assert.equal(h.page.data.authenticated,false);
-  assert.match(h.page.data.status,/缺少门店场景/);
-  const before=h.calls.length;
+test('missing scene permits explicit identity login and public navigation, never private data',async()=>{
+  const h=loadPage('pages/home/index.js');h.page.onLoad({});
+  assert.equal(h.page.data.authenticated,false);assert.equal(h.calls.length,0);
+  assert.match(h.page.data.status,/未选择门店/);
   await h.page.retryLogin();
-  assert.equal(h.page.data.authenticated,false);
-  assert.match(h.page.data.status,/缺少门店场景/);
-  assert.equal(h.calls.length,before);
-  h.page.openProfile();
-  assert.equal(h.nav.length,0);
+  assert.equal(h.page.data.authenticated,true);
+  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
+  assert.equal(h.config.scene,undefined);h.page.openProfile();
+  assert.deepEqual(h.nav,['/pages/profile/index']);
+  const p=loadPage('pages/profile/index.js');p.page.onLoad({});await p.page.loginAndLoad();
+  assert.equal(p.page.data.authenticated,true);assert.equal(p.page.data.loaded,false);
+  assert.equal(p.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
 });
 
 test('logout from profile revokes retained home and checkout page sessions and private state',async()=>{
@@ -323,12 +325,13 @@ test('consumer store page excludes internal delivery forms and preserves communi
 });
 
 
-test('ordinary home launch offers guidance without login, sample store or retry loop',()=>{
+test('ordinary home exposes public entry and keeps initial login explicit',()=>{
  const h=loadPage('pages/home/index.js');h.page.onLoad({});
  assert.equal(h.page.data.needsScene,true);assert.equal(h.calls.length,0);
  assert.equal(h.config.scene,undefined);assert.equal(h.page.scene,null);
  const wxml=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
- assert.match(wxml,/!authenticated&&!needsScene/);assert.match(wxml,/尚未选择门店/);
+ assert.match(wxml,/wx:if="{{!authenticated}}"/);assert.match(wxml,/商家入驻 · 开始办理/);
+ assert.doesNotMatch(wxml,/示例门店 A/);
  assert.match(wxml,/wx:if="{{!needsScene}}"/);
 });
 test('valid home scene retains original login and invalid explicit scene never inherits a store',async()=>{
@@ -348,3 +351,28 @@ test('privacy entry invokes only platform contract and handles absent, failed an
  h.page.openPrivacy();h.page.onUnload();options.fail();assert.equal(h.page.data.privacyStatus,'');
  assert.equal(h.page.data.authenticated,false);
 });
+
+// Regression for the Owner's actual scene-less official preview, not a fixture store.
+test('all four public tabs navigate without a scene and repeated navigation has bounded stack',()=>{
+ for(const source of ['home','profile','checkout']){
+  const h=loadPage('pages/'+source+'/index.js');h.page.onLoad({});
+  for(let i=0;i<3;i++)for(const section of ['home','recommendations','orders','profile'])h.page.navigateSection({currentTarget:{dataset:{section}}});
+  assert.equal(h.nav.length,12);assert.ok(h.nav.every(url=>!url.includes('scene=')));
+  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
+ }
+});
+test('public navigation errors surface and caller can retry, arbitrary scan never selects a store',()=>{
+ const h=loadPage('pages/home/index.js');h.page.onLoad({});
+ h.wx.redirectTo=o=>o.fail({errMsg:'private transport detail'});h.page.openProfile();
+ assert.match(h.page.data.status,/页面暂时无法打开/);assert.equal(h.page._navigationPending,false);
+ h.wx.scanCode=o=>o.success({result:'https://evil.invalid',path:'pages/other/index?scene=shop1'});h.page.scanStore();
+ assert.equal(h.config.scene,undefined);assert.match(h.page.data.status,/有效门店码/);
+});
+
+test('recommendations and orders admission buttons navigate without a scene; back helper is exported',async()=>{for(const view of ['recommendations','orders']){const f=loadPage('pages/checkout/index.js');await f.page.onLoad({view});f.page.openMerchantJoin();assert.equal(f.nav.at(-1),'/pages/merchant-join/index');f.page.openMerchant();assert.equal(f.nav.at(-1),'/pages/merchant/index');f.page.goBack();assert.equal(f.nav.at(-1),'/pages/home/index');assert.equal(f.calls.some(c=>c.url&&c.url.endsWith('/mini/api')),false);}assert.equal(typeof authModule.back,'function');});
+
+test('original more-services entry is reachable but never reads private data without a scene',async()=>{const f=loadPage('pages/home/index.js');await f.page.onLoad({});f.page.navigateSection({currentTarget:{dataset:{section:'services'}}});assert.equal(f.nav.at(-1),'/pages/checkout/index?view=services');const c=loadPage('pages/checkout/index.js');await c.page.onLoad({view:'services'});assert.equal(c.page.data.viewMode,'services');assert.equal(c.page.data.sessionReady,false);assert.equal(c.calls.length,0);const wxml=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(wxml,/viewMode==='services' && !needsScene && sessionReady/);assert.match(wxml,/绑定推荐人/);assert.match(wxml,/我的社区关系/);});
+
+test('visible order list preserves original next-page action rather than stranding it in more services',()=>{const text=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8').split("viewMode==='orders'")[1].split("viewMode==='services'")[0];assert.match(text,/wx:if="{{ordersMore}}" bindtap="loadOrders" data-more="true"/);});
+
+test('stale current home safely re-enters the new scene instead of same-route short circuit',()=>{const nav=[],page={route:'pages/home/index',scene:'old',_sceneStale:true,data:{activeSection:'home'},setData(p){Object.assign(this.data,p);}};authModule.navigate(page,'home',{redirectTo:o=>nav.push(o.url)},{globalData:{scene:'new'}});assert.deepEqual(nav,['/pages/home/index?scene=new']);assert.equal(page.scene,'old');});

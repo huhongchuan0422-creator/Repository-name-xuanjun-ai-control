@@ -86,7 +86,9 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     },
     async merchant(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
-      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||
+      const applicantOnly=scene===''&&operation==='onboarding'&&params&&
+        ['catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link'].includes(params.operation);
+      if((!applicantOnly&&(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)))||
          !['workspaces','onboarding','read','write','collection_code','ocr'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
       const version=generation;
       const reply=await request('/mini/merchant',{operation,params},token,scene);

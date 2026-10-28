@@ -37,6 +37,11 @@ on:
         description: 'Explicitly run existing development preview upload (default off)'
         type: boolean
         default: false
+      mini_operation:
+        description: 'Explicit official development operation; upload creates a development version, never review/release'
+        type: choice
+        options: [preview, upload]
+        default: preview
       preview_source_sha:
         description: 'Exact current control branch HEAD; preview product is fixed to reviewed 06053'
         type: string
@@ -472,7 +477,7 @@ jobs:
           set -o pipefail
           python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
           python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
-          node --test clients/community-mini/*.test.cjs scripts/community_mini_key.test.cjs
+          node --test clients/community-mini/*.test.cjs scripts/community_mini_key.test.cjs tests/community_mini_development_operation.test.cjs
           node --test demos/community-local-e2e/*.test.mjs
           node --test demos/community-payment/demo.test.mjs
           node --test demos/community-admin/admin.test.mjs
@@ -1198,11 +1203,12 @@ jobs:
         env:
           COMMUNITY_CONNECTED_MINI_OUTPUT: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
         run: '"$COMMUNITY_NODE_BINARY" deploy/community-preview/prepare-mini.cjs'
-      - name: Preview development code using existing upload secret
+      - name: Run selected official preview or development upload using existing secret
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         env:
           WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          COMMUNITY_MINI_OPERATION: ${{ github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
           COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
           COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
           COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
@@ -1212,6 +1218,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: community-mini-development-preview
+          name: community-mini-development-${{ github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
           path: ${{ runner.temp }}/community-mini-preview/
           retention-days: 7

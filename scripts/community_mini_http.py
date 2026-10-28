@@ -212,7 +212,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token') or self.headers.get_all('Authorization',[]):
                         raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
                     mini_merchant=MiniMerchant(gateway.identity,onboarding,operations,getattr(gateway,'collection_codes',None),getattr(gateway,'ocr',None))
-                    mini_merchant.context(self.headers.get('X-Community-Session',''),self.headers.get('X-Community-Scene',''))
+                    scene=self.headers.get('X-Community-Scene','')
+                    if scene == '':gateway.identity.applicant_context(self.headers.get('X-Community-Session',''))
+                    else:mini_merchant.context(self.headers.get('X-Community-Session',''),scene)
                     limit=7_000_000
                 if self.path=='/mini/project-materials':
                     from scripts.community_project_materials import MAX_UPLOAD_BODY

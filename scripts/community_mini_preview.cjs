@@ -1,8 +1,10 @@
 'use strict';
-// Development preview only: no release, payment or server deployment API.
+// Explicit preview OR development-version upload. Never review/release/payment/deployment.
 const {normalizeUploadKey}=require('./community_mini_key.cjs');
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');
 async function main(){
+ const operation=process.env.COMMUNITY_MINI_OPERATION||'preview';
+ if(!['preview','upload'].includes(operation))throw Error('EXACT_DEVELOPMENT_OPERATION_REQUIRED');
  const destination=process.env.COMMUNITY_PREVIEW_OUTPUT;
  if(!destination)throw Error('OUTPUT_DIRECTORY_REQUIRED');
  fs.mkdirSync(destination,{recursive:true,mode:0o700});
@@ -11,6 +13,9 @@ async function main(){
   catch(e){if(e.code!=='ENOENT')throw e;}
  }
  const identity=require('../deploy/community-preview/endpoint.cjs').sourceIdentity();
+ if(operation==='upload'&&(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||!identity.fixed_product))throw Error('EXPLICIT_FIXED_PRODUCT_UPLOAD_REQUIRED');
+ const version='ui-'+identity.product_source_sha.slice(0,12);
+ const description='Community development product '+identity.product_source_sha.slice(0,12)+' control '+identity.control_source_sha.slice(0,12);
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
  const appSource=fs.readFileSync(path.join(projectPath,'app.js'),'utf8');
@@ -37,7 +42,8 @@ async function main(){
   if(identity.fixed_product)verifySource(projectPath,identity.prepared_files);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
- const receipt={head:identity.product_source_sha,control_source_sha:identity.control_source_sha,appid,operation:'DEVELOPMENT_PREVIEW_ONLY',
+ const receipt={head:identity.product_source_sha,control_source_sha:identity.control_source_sha,appid,operation:operation==='upload'?'DEVELOPMENT_UPLOAD_ONLY':'DEVELOPMENT_PREVIEW_ONLY',
+   developer_version:operation==='upload'?version:null,description,
    public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
    backend_origin:target?target.origin:null,backend_base_url:target?target.baseUrl:null,
    entry_page:'pages/home/index',scene:null,search_query:'',entry_mode:'EXISTING_SCENELESS_GUIDANCE',
@@ -63,15 +69,20 @@ async function main(){
   process.stdout.write=process.stderr.write=()=>true;
   const project=new ci.Project({appid,type:'miniProgram',projectPath,privateKey:key,
     ignores:['**/*.test.cjs','node_modules/**/*']});
-  await ci.preview({project,desc:'Community phase integration '+String(receipt.head).slice(0,12),
-    setting:{es6:true,es7:true,minify:true},robot:1,threads:1,
-    qrcodeFormat:'image',qrcodeOutputDest:path.join(destination,'preview.png'),
-    pagePath:'pages/home/index',searchQuery:'',onProgressUpdate:()=>{}});
-  if(!fs.existsSync(path.join(destination,'preview.png')))throw Error('PREVIEW_QR_MISSING');
-  receipt.status='DEVELOPMENT_PREVIEW_UPLOADED';
+  if(operation==='upload'){
+   await ci.upload({project,version,desc:description,setting:{es6:true,es7:true,minify:true},robot:1,threads:1,onProgressUpdate:()=>{}});
+   receipt.status='DEVELOPMENT_VERSION_UPLOADED';
+  }else{
+   await ci.preview({project,desc:description,
+     setting:{es6:true,es7:true,minify:true},robot:1,threads:1,
+     qrcodeFormat:'image',qrcodeOutputDest:path.join(destination,'preview.png'),
+     pagePath:'pages/home/index',searchQuery:'',onProgressUpdate:()=>{}});
+   if(!fs.existsSync(path.join(destination,'preview.png')))throw Error('PREVIEW_QR_MISSING');
+   receipt.status='DEVELOPMENT_PREVIEW_UPLOADED';
+  }
  }catch(e){
   const message=String(e&&(e.errMsg||e.message)||'');
-  receipt.status=/ip|whitelist|白名单/i.test(message)?'UPLOAD_IP_NOT_ALLOWED':'PREVIEW_FAILED_OR_UNKNOWN';
+  receipt.status=operation==='upload'?'DEVELOPMENT_UPLOAD_FAILED_OR_UNKNOWN':'PREVIEW_FAILED_OR_UNKNOWN';
   const code=e&&(e.errCode||e.code);if(Number.isSafeInteger(code))receipt.provider_error_code=code;
   process.exitCode=3;
  }finally{
@@ -80,4 +91,5 @@ async function main(){
  }
  log('MINI_PREVIEW_STATUS='+receipt.status);
 }
-main().catch(()=>{console.error('MINI_PREVIEW_STATUS=LOCAL_PREVIEW_SETUP_FAILED');process.exitCode=4;});
+if(require.main===module)main().catch(()=>{console.error('MINI_PREVIEW_STATUS=LOCAL_PREVIEW_SETUP_FAILED');process.exitCode=4;});
+module.exports={main};

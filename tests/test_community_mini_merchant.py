@@ -371,3 +371,105 @@ class OcrSourceReadRace(unittest.TestCase):
         self.assertEqual(result['document_type'],'id_front')
         self.assertEqual(result['document_sha256'],hashlib.sha256(result['data']).hexdigest())
         self.assertEqual(result['mime'],'image/png')
+
+
+class ApplicantWithoutStore(unittest.TestCase):
+    setUp=SameMiniMerchant.setUp
+    tearDown=SameMiniMerchant.tearDown
+    def applicant(self,op,params=None,token=None,scene=''):
+        return self.service.dispatch(token or self.token,scene,dict(operation='onboarding',params=dict(operation=op,params=params or {})))
+    def create(self):
+        return self.applicant('save',dict(application=None,revision=0,entity_type='ENTERPRISE',category='GENERAL',delegated=False,sales_scenes_type=['SALES_SCENES_MINI_PROGRAM'],fields=dict(legal_name='Applicant',store_name='New Store',address='Address',contact='13800000000')))
+    def test_existing_verified_applicant_saves_same_draft_without_store_or_new_role(self):
+        before=dict(self.operations.grants);app=self.create();owner,meta,_=self.onboarding._load(app['application'],self.fx.uid1)
+        self.assertEqual(owner,self.fx.uid1);self.assertNotIn('ocr_origin',meta);self.assertEqual(self.operations.grants,before)
+        self.assertEqual(self.applicant('mine')['applications'][0]['application'],app['application'])
+        self.assertEqual(self.applicant('read',dict(application=app['application']))['status'],'DRAFT')
+    def test_unknown_nonempty_scene_and_every_store_operation_still_denied(self):
+        for scene in ('../bad','unknown',None):
+            with self.subTest(scene=scene),self.assertRaises(PermissionError):self.applicant('mine',scene=scene)
+        for op in ('workspaces','read','write','collection_code','ocr'):
+            with self.subTest(op=op),self.assertRaises(PermissionError):self.service.dispatch(self.token,'',dict(operation=op,params={}))
+        for op in ('review','review_list','open_workbench','wechat_execute','wechat_query'):
+            with self.subTest(op=op),self.assertRaises(PermissionError):self.applicant(op)
+    def test_no_web_session_and_live_provider_link_csrf_epoch_guards(self):
+        with self.assertRaises(PermissionError):self.applicant('mine',token=self.fx.web1)
+        c=self.fx.center;row=c.db.execute("SELECT subject_idx,project,payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=?",(c.idx('wechat-session:'+self.token),)).fetchone()
+        import json
+        from scripts.pr122_customer_core import canonical
+        meta=json.loads(c.decrypt(row['payload'],'wechat-mini-session'));meta.pop('merchant_csrf')
+        c.db.execute("UPDATE links SET payload=? WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=?",(c.encrypt(canonical(meta),'wechat-mini-session'),row['subject_idx']))
+        with self.assertRaisesRegex(PermissionError,'RELOGIN'):self.applicant('mine')
+        c.db.execute("UPDATE links SET payload=? WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=?",(row['payload'],row['subject_idx']))
+        c.db.execute("UPDATE links SET active=0 WHERE channel='WECHAT_MINI' AND user_id=?",(self.fx.uid1,))
+        with self.assertRaisesRegex(PermissionError,'REVOKED'):self.applicant('mine')
+        c.db.execute("UPDATE links SET active=1 WHERE channel='WECHAT_MINI' AND user_id=?",(self.fx.uid1,));c.db.execute('UPDATE accounts SET epoch=epoch+1 WHERE id=?',(self.fx.uid1,))
+        with self.assertRaises(PermissionError):self.applicant('mine')
+    def test_cross_owner_read_save_upload_and_wechat_read_still_rejected(self):
+        from scripts.community_wechat_applyment import WechatApplyment
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        self.onboarding.wechat_applyment=WechatApplyment(self.onboarding,PartnerOrderReader.__new__(PartnerOrderReader))
+        app=self.create();other=self.fx.token('another-login','openid2')
+        cases=[('read',dict(application=app['application'])),('wechat_read',dict(application=app['application'])),
+          ('save',dict(application=app['application'],revision=app['revision'],entity_type='ENTERPRISE',category='GENERAL',delegated=False,fields=app['fields'])),
+          ('upload',dict(application=app['application'],revision=app['revision'],kind='business_license',content_base64='iVBORw0KGgpmaXh0dXJl',expires_at=None))]
+        for op,params in cases:
+            with self.subTest(op=op),self.assertRaises(PermissionError):self.applicant(op,params,token=other)
+        self.assertEqual(self.applicant('mine',token=other)['applications'],[])
+    def test_original_http_authenticates_before_body_and_supports_scene_less_owner(self):
+        from scripts.community_mini_http import serve
+        import urllib.request,json
+        from concurrent.futures import ThreadPoolExecutor
+        server=serve(self.fx.gateway,onboarding=self.onboarding,operations=self.operations)
+        body=json.dumps(dict(operation='onboarding',params=dict(operation='mine',params={}))).encode()
+        req=urllib.request.Request('http://127.0.0.1:'+str(server.server_port)+'/mini/merchant',data=body,headers={'Content-Type':'application/json','X-Community-Session':self.token})
+        def call():
+            with urllib.request.urlopen(req,timeout=5) as response:return json.load(response)
+        try:
+            with ThreadPoolExecutor(1) as pool:
+                future=pool.submit(call);server.handle_request();self.assertEqual(future.result()['result']['applications'],[])
+        finally:server.server_close()
+
+    def test_real_http_native_first_registration_upload_before_fields_submit_and_read(self):
+        from scripts.pr122_customer_core import canonical
+        from scripts.community_wechat_applyment import WechatApplyment
+        from scripts.community_wechat_sp_readonly import PartnerOrderReader
+        from scripts.community_mini_http import serve
+        from pathlib import Path
+        import subprocess,os,json,time
+        c=self.fx.center
+        realm=dict(kind='COMMUNITY_PLATFORM_REALM',title='Synthetic platform',requirements=[],source='OWNER_APPROVED_FIRST_INSTALL',authority_ref='test_realm')
+        c.db.execute("UPDATE projects SET authority_ref='test_realm',payload=? WHERE id='project1'",(c.encrypt(canonical(realm),'project:project1'),))
+        self.fx.identity.configure_registration(['shop1'])
+        self.fx.provider.exchange.return_value=dict(appid=self.fx.identity.appid,openid='new_applicant_without_store')
+        c.scanner=lambda raw:True  # isolated scanner substitute, not production/OCR acceptance
+        self.onboarding.wechat_applyment=WechatApplyment(self.onboarding,PartnerOrderReader.__new__(PartnerOrderReader))
+        server=serve(self.fx.gateway,onboarding=self.onboarding,operations=self.operations);server.timeout=.1
+        import tempfile
+        with tempfile.TemporaryFile(mode='w+') as log:
+            child=subprocess.Popen(['node','tests/community_mini_merchant_http.cjs'],cwd=Path(__file__).resolve().parents[1],env=dict(os.environ,COMMUNITY_TEST_ORIGIN='http://127.0.0.1:'+str(server.server_port),COMMUNITY_TEST_SCENELESS='true'),stdout=log,stderr=log)
+            try:
+                deadline=time.monotonic()+25
+                while child.poll() is None and time.monotonic()<deadline:server.handle_request()
+                if child.poll() is None:child.kill();child.wait();self.fail('NATIVE_APPLICANT_HTTP_TIMEOUT')
+                log.seek(0);output=log.read();self.assertEqual(child.returncode,0,output);result=json.loads(output)
+                row=c.db.execute("SELECT user_id FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=?",(result['application'],)).fetchone();uid=row[0]
+                self.assertNotIn(uid,(self.fx.uid1,self.fx.uid2));self.assertEqual(c.db.execute('SELECT count(*) FROM members WHERE user_id=?',(uid,)).fetchone()[0],0)
+                _,meta,app=self.onboarding._load(result['application'],uid);self.assertEqual(app['status'],'SUBMITTED');self.assertNotIn('ocr_origin',meta)
+                self.assertFalse(any(g['user_id']==uid for g in self.operations.grants.values()))
+                self.assertTrue(result['upload_before_fields']);self.assertTrue(result['four_steps']);self.assertIsNone(result['scene'])
+            finally:
+                if child.poll() is None:child.kill();child.wait()
+                server.server_close()
+
+    def test_no_scene_session_expiry_logout_maintenance_and_origin_guards(self):
+        c=self.fx.center;app=self.create()
+        with self.assertRaisesRegex(PermissionError,'ORIGIN_UNVERIFIED'):
+            self.service.ocr_source(self.token,'shop1',app['application'],'business_license')
+        c.db.execute("UPDATE settings SET v='1' WHERE k='maintenance'")
+        with self.assertRaises(PermissionError):self.applicant('mine')
+        c.db.execute("UPDATE settings SET v='0' WHERE k='maintenance'")
+        c.logout(self.token)
+        with self.assertRaises(PermissionError):self.applicant('mine')
+        self.token=self.fx.token('expiry-case');self.fx.stage.now+=3601
+        with self.assertRaises(PermissionError):self.applicant('mine')
