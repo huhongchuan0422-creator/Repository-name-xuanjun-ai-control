@@ -60,7 +60,7 @@ function sourceIdentity(){
   {env:childEnv,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['ignore','pipe','pipe']}));}
  catch(_){throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');}
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||
-    identity.product_source_sha!=='f13155ed63a3137d41766ee587d9b4b96a81477f')throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
+    identity.product_source_sha!=='06053b6a16a8e6efcd324dffe06612b9384aaaf1')throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
 

@@ -1,4 +1,4 @@
-"""Fixed f131 product admission for the ORIGINAL preview workflow, never deployment.
+"""Fixed 06053 product admission for the ORIGINAL preview workflow, never deployment.
 GITHUB_SHA remains the control revision. No arbitrary artifact/ref/product is accepted.
 """
 import argparse, datetime, hashlib, io, json, os, re, stat, tempfile, time, zipfile
@@ -9,14 +9,14 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
 WORKFLOW = '.github/workflows/chatgpt-community-wechat-sp-offline.yml'
-PRODUCT_SHA = 'f13155ed63a3137d41766ee587d9b4b96a81477f'
-PRODUCT_RUN = 40058542631
-PRODUCT_JOB = 120766815688
-ARTIFACT_ID = 12546258346
-ARTIFACT_SIZE = 992283
-ARTIFACT_SHA256 = '21c15e3bb8ff1bb2b54ba3f7d950eea5b96cc62df98d94ee2155d4fff146b0ec'
-SOURCE_SHA256 = '125ec8633e173d582d5ca5cd3dccc21d2d97104723fb61a136911c48e12d47d1'
-MANIFEST_SHA256 = '5dc52185ab0b7cb9eecaea59da6e57de20dcad051547361530bf6ee75405f9e8'
+PRODUCT_SHA = '06053b6a16a8e6efcd324dffe06612b9384aaaf1'
+PRODUCT_RUN = 40637408406
+PRODUCT_JOB = 122647451378
+ARTIFACT_ID = 12794951121
+ARTIFACT_SIZE = 1256398
+ARTIFACT_SHA256 = '531817377750379a64707980ced46f34e216b544b34a7a16af9d1b8eab6aec32'
+SOURCE_SHA256 = '0d1f00d130f7649a508c7a955df4539454ef9ec48862c6a61649640cf54fd288'
+MANIFEST_SHA256 = '99b88e868257357920e2036d530cc72037638a57fc71fbd0a8d83e7f55c939f4'
 APPID = 'wx1d5f8873eaea5392'
 PROFILE = 'uk-path-candidate'
 BASE_URL = 'https://uk.wenwenwenyiyiyi.work/community-preview'
@@ -74,7 +74,7 @@ def evidence(run, jobs, artifacts, env, now=None):
     require(len(selected) == 1 and selected[0].get('id') == PRODUCT_JOB
             and selected[0].get('status') == 'completed'
             and selected[0].get('conclusion') == 'success'
-            and any(s.get('name') == 'Preview entry evidence affected scope (offline only)'
+            and any(s.get('name') == 'Complete Phase1 and Phase2 source regression'
                     and s.get('status') == 'completed' and s.get('conclusion') == 'success'
                     for s in selected[0].get('steps', [])), 'FIXED_PRODUCT_TEST_REQUIRED')
     selected = [a for a in artifacts['artifacts']
@@ -92,7 +92,7 @@ def evidence(run, jobs, artifacts, env, now=None):
             and binding.get('repository_id') == 1413132159
             and binding.get('head_repository_id') == 1413132159,
             'FIXED_UNEXPIRED_ARTIFACT_BINDING_REQUIRED')
-    return dict(status='FIXED_F131_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
+    return dict(status='FIXED_06053_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
                 product_source_sha=PRODUCT_SHA, product_run_id=PRODUCT_RUN,
                 product_test_job_id=PRODUCT_JOB, artifact_id=ARTIFACT_ID,
                 artifact_sha256=ARTIFACT_SHA256, source_zip_sha256=SOURCE_SHA256,
@@ -215,7 +215,7 @@ def paths(env):
 
 def verify_receipt(receipt, env):
     control = context(env)
-    require(receipt.get('status') == 'FIXED_F131_PRODUCT_EVIDENCE_VERIFIED'
+    require(receipt.get('status') == 'FIXED_06053_PRODUCT_EVIDENCE_VERIFIED'
             and receipt.get('control_source_sha') == control
             and receipt.get('product_source_sha') == PRODUCT_SHA
             and receipt.get('product_run_id') == PRODUCT_RUN
@@ -307,12 +307,12 @@ def main():
         source = archive_source(download_archive(env.get('GITHUB_TOKEN', '')))
         write_new('fixed-product-source.zip', source)
         write_new('fixed-product-receipt.json', (json.dumps(receipt, sort_keys=True) + '\n').encode())
-        print('FIXED_F131_PRODUCT_SOURCE_VERIFIED_NO_UPLOAD')
+        print('FIXED_06053_PRODUCT_SOURCE_VERIFIED_NO_UPLOAD')
     else:
         root = Path(env['RUNNER_TEMP']) / ('community-mini-fixed-input-' + env['GITHUB_RUN_ID'] + '-' + env['GITHUB_RUN_ATTEMPT'])
         stage(read_regular(root / 'fixed-product-source.zip', MAX_BYTES),
               strict_json(read_regular(root / 'fixed-product-receipt.json', 16384)), env)
-        print('FIXED_F131_PRODUCT_STAGED_NO_UPLOAD')
+        print('FIXED_06053_PRODUCT_STAGED_NO_UPLOAD')
 
 if __name__ == '__main__':
     try:

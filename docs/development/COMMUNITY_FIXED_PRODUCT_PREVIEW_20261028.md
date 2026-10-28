@@ -55,3 +55,15 @@ Current local results: 48 Python tests +6 original Node endpoint tests, all pass
 
 This record is an execution contract/candidate, not platform execution or independent review approval.
 
+
+
+## Active 06053 successor after actual same-version backend update (2026-10-28)
+
+The f131 section above is immutable historical evidence, not the active dispatch binding.
+
+- Actual product P: `06053b6a16a8e6efcd324dffe06612b9384aaaf1`; push Run40637408406 / test122647451378, exact successful step `Complete Phase1 and Phase2 source regression` (not the skipped old preview-entry step).
+- Fixed source Artifact12794951121, 1256398 bytes, outer SHA256 `531817377750379a64707980ced46f34e216b544b34a7a16af9d1b8eab6aec32`; source ZIP `0d1f00d130f7649a508c7a955df4539454ef9ec48862c6a61649640cf54fd288`; full manifest `99b88e868257357920e2036d530cc72037638a57fc71fbd0a8d83e7f55c939f4`,462 files plus manifest. Same AppID/profile/base and exact27-file connected projection.
+- Root reported actual site COMMITTED sequence7 at10:43:04Z, container349b22901e368ced0ffc535693e8d2a8a7b65a5426feca81c8bfe3d54c921a6a, image28278f76538a3331ddbf4ead409d45a71b0a0e158b313bab31ee1fa0a4f4e26a. Root's real browser health at10:44:57Z was READY / IMAGE_BUILD_STAMP / product06053 / production_acceptance=false, observed_at1793184297. This record is source-author received field evidence, not an independent site witness.
+- Active manual inputs: preview_enabled=true, preview_source_sha=actual current C Git commit, preview_target=uk-path-candidate, preview_evidence_run_id=40637408406, backend_image_enabled=false; no image rebuild. No manufactured C SHA or old skipped run is accepted.
+- Preserve exact current-control branch guard, read-only actions+contents permissions, original domestic Runner, unchanged AppID/credential references, full artifact/manifest/path/expiry/health checks. The workflow must freshly verify backendproduct06053 again before credential/provider use.
+- Publication is normal source CI only. Official development preview is a separate single original operation; no ci.upload/formal release/payment. Real QR+provider receipt are still required; no preview success is claimed by this source change.
