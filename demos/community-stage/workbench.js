@@ -64,7 +64,8 @@
   if(typeof MutationObserver==='function')new MutationObserver(syncFinanceAccount).observe(root,{childList:true,subtree:true});
  }
  // FINANCE_FOCUSED_LAYOUT_BEGIN
- let financeTools=null,financeReturn=null,financeMoved=[];
+ let financeTools=null,financeReturn=null,financeSplitGroups=null,financeMoved=[];
+ function syncFinanceReturn(){if(!financeReturn)return;financeReturn.textContent=!$('financialObservation').hidden&&!$('financialObservationDetail').hidden?'‹ 返回原列表':'‹ 返回工作台';}
  function syncFinanceLayout(focused){
   // Existing nodes are moved, not copied: session, grants and handlers stay intact.
   if(typeof document.createComment!=='function')return;
@@ -72,9 +73,13 @@
   if(!financeTools){
    financeTools=document.createElement('details');financeTools.className='finance-page-tools';
    const summary=document.createElement('summary');summary.textContent='账户、工作区、页面导航与范围说明';financeTools.append(summary);main.append(financeTools);
-   financeReturn=document.createElement('button');financeReturn.type='button';financeReturn.className='finance-page-return';financeReturn.textContent='‹ 返回工作台';financeReturn.onclick=()=>selectFinancialMode('WORKBENCH');main.insertBefore(financeReturn,header);
+   financeReturn=document.createElement('button');financeReturn.type='button';financeReturn.className='finance-page-return';financeReturn.textContent='‹ 返回工作台';financeReturn.onclick=()=>{if(!$('financialObservation').hidden&&!$('financialObservationDetail').hidden)$('financialObservationBack').click();else selectFinancialMode('WORKBENCH');};main.insertBefore(financeReturn,header);
+   financeSplitGroups=document.createElement('nav');financeSplitGroups.className='finance-split-groups';financeSplitGroups.setAttribute('aria-label','分账记录分组');
+   for(const [mode,label] of [['SPLIT','分账请求'],['RETURN','分账回退']]){const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.mode=mode;button.onclick=()=>selectFinancialMode(mode);financeSplitGroups.append(button);}
+   main.insertBefore(financeSplitGroups,$('providerActions'));
   }
-  financeReturn.hidden=!focused;financeTools.hidden=!focused;
+  financeReturn.hidden=!focused;financeTools.hidden=!focused;syncFinanceReturn();
+  financeSplitGroups.hidden=!focused||!['SPLIT','RETURN'].includes(financialMode);for(const button of financeSplitGroups.children)button.setAttribute('aria-pressed',String(button.dataset.mode===financialMode));
   if(focused&&!financeMoved.length){
    const globalNav=document.querySelector('body > nav');
    const nodes=[globalNav,financeAccount,$('financeNavigation'),...Array.from(header.children).filter(node=>node!==$('workbenchTitle')),$('providerActions').querySelector(':scope > p'),$('financialObservationScope')].filter(Boolean);
@@ -92,7 +97,7 @@
   $('workbenchMain').className=focused?'finance-focused':'';$('workbenchOriginalSections').hidden=focused;
   $('providerActions').hidden=!allowed;$('billSection').hidden=focused||!(config?.providerWorkspace||config?.merchantBillWorkspace);
   $('financeSectionTitle').hidden=focused;$('financialObservationTitle').hidden=focused;
-  $('workbenchTitle').textContent=focused?(financialMode==='RECONCILIATION'?'对账管理':financialTitle[financialMode]):'商家工作台';
+  $('workbenchTitle').textContent=focused?financialListTitle(financialMode):'商家工作台';
   for(const id of ['financeRefund','financeSplit','financeReturn','financeReconciliation'])$(id).hidden=!allowed;
   $('financialKindLabel').hidden=focused;$('financialRecords').hidden=focused&&financialMode==='RECONCILIATION';
   $('readReconciliation').hidden=focused&&financialMode!=='RECONCILIATION';
@@ -106,7 +111,8 @@
   $('financialReadControls').open=false;$('originalFinancialActions').open=false;renderFinancialMode();
  }
  for(const [id,mode]of [['financeHome','WORKBENCH'],['financeRefund','REFUND'],['financeSplit','SPLIT'],['financeReturn','RETURN'],['financeReconciliation','RECONCILIATION']])$(id).onclick=()=>selectFinancialMode(mode);
- function syncFinancialTitle(){if(financialMode!=='WORKBENCH'&&config?.providerWorkspace)$('workbenchTitle').textContent=$('financialObservationTitle').textContent||(financialMode==='RECONCILIATION'?'对账管理':financialTitle[financialMode]);}
+ function financialListTitle(kind){return kind==='RECONCILIATION'?'对账管理':['SPLIT','RETURN'].includes(kind)?'分账管理':financialTitle[kind];}
+ function syncFinancialTitle(){if(financialMode!=='WORKBENCH'&&config?.providerWorkspace)$('workbenchTitle').textContent=!$('financialObservation').hidden&&!$('financialObservationDetail').hidden?$('financialObservationTitle').textContent:financialListTitle(financialMode);syncFinanceReturn();}
  function clearObservation(){
   observationRevision++;
   $('financialObservation').hidden=true;$('financialObservationList').replaceChildren();$('financialObservationDetail').replaceChildren();
@@ -114,12 +120,13 @@
  }
  const observedText=value=>value===undefined||value===null?'原记录未返回':String(value);
  const minorText=(amount,currency)=>Number.isSafeInteger(amount)?String(amount)+' 最小货币单位'+(typeof currency==='string'&&currency?' · '+currency:'（原记录未返回币种）'):'摘要未提供金额，不以订单金额代替';
+ const financialStateText=(value,detail)=>{const labels={SUBMITTED_RESULT_UNKNOWN:'已提交，结果待核实',UNKNOWN_QUERY_EXISTING_ONLY:'结果未知，仅查询原记录',EXCEPTION:'存在待核实异常',NOT_OBSERVED:'尚未观察',PENDING:'待处理'};return Object.prototype.hasOwnProperty.call(labels,value)?labels[value]+(detail?'（'+value+'）':''):value===undefined||value===null?'原记录未返回':'原始状态：'+String(value);};
  function observationFields(kind,r,detail){
-  const fields=kind==='RECONCILIATION'?[['订单引用',r.reference],['观察状态',r.status],['本地订单状态',r.local_order_state],['服务商状态',r.provider_state]]:
-   [['分组',financialTitle[kind]],['请求编号',r.request_id],['关联订单',r.reference],['请求状态',!detail&&r.status==='SUBMITTED_RESULT_UNKNOWN'?'已提交，结果待核实':r.status]];
+  const fields=kind==='RECONCILIATION'?[['订单引用',r.reference],['观察状态',financialStateText(r.status,detail)],['本地订单状态',financialStateText(r.local_order_state,detail)],['服务商状态',financialStateText(r.provider_state,detail)]]:
+   [['分组',financialTitle[kind]],['请求编号',r.request_id],['关联订单',r.reference],[kind==='REFUND'?'退款请求状态':'请求状态',financialStateText(r.status,detail)]];
   if(detail){
    if(kind==='RECONCILIATION')fields.push(['原订单金额',minorText(r.original_amount_minor,r.currency)],['已确认本地退款',minorText(r.confirmed_local_refunds_minor,r.currency)],['异常条目',Array.isArray(r.anomalies)?r.anomalies.length?r.anomalies.join('；'):'原观察未报告异常':'原记录未返回'],['范围',r.coverage==='ORDER_OBSERVATIONS_ONLY'?'仅订单观察，不是全量日账单':r.coverage],['日账单核对',r.daily_bill_reconciled===true?'原记录标记已核对':r.daily_bill_reconciled===false?'未完成':'原记录未返回'],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status]);
-   else{if(kind==='RETURN')fields.push(['接收方编号',r.receiver_id]);fields.push(['服务商响应',r.provider_response_verified===true?'响应已验证；不等于到账或财务核销':r.provider_response_verified===false?'未验证':'原记录未返回'],['金额信息',minorText(r.amount_minor,r.currency)],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status],['自动重试','此观察界面不提供资金重试操作']);}
+   else{if(kind==='RETURN')fields.push(['接收方编号',r.receiver_id]);fields.push([kind==='RETURN'?'回退结果':'服务商响应',r.provider_response_verified===true?'响应已验证；不等于到账或财务核销':r.provider_response_verified===false?'未验证':'原记录未返回'],[kind==='RETURN'?'回退金额':'金额信息',minorText(r.amount_minor,r.currency)],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status],['自动重试','此观察界面不提供资金重试操作']);if(kind==='RETURN')fields.push(['业务边界','分账回退不等同消费者退款']);}
   }
   return fields;
  }

@@ -24,7 +24,8 @@ from scripts.community_center_operations import CenterOperations
 from scripts.community_merchant_store import open_store
 
 def reviewer_reload(page):
-    if page.locator('#detail').is_visible():page.get_by_role('button',name='返回入驻审核列表',exact=True).click()
+    if page.locator('#detail').is_visible():page.locator('#reviewTopBack').click()
+    if not page.locator('#reviewListFilters').evaluate('e=>e.open'):page.locator('#reviewListFilters > summary').click()
     page.locator('#reloadQueue').click()
 
 def reviewer_open(page):
@@ -34,10 +35,21 @@ def reviewer_open(page):
     def shot(label):
         if capture:
             os.makedirs('community-admin-browser-evidence',exist_ok=True);page.evaluate('window.scrollTo(0,0)');page.screenshot(path='community-admin-browser-evidence/'+prefix+'-'+label+'-1440.png',full_page=True)
-    expect(page.locator('#applications .admission-record-card').first).to_be_visible();shot('30-list')
+    expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#reviewTopBack')).to_have_attribute('href','/community-preview/community/portal');expect(page.locator('#reviewTopBack')).to_have_text('‹ 返回工作台');shot('30-list')
     page.locator('#applications button').first.click();expect(page.locator('#detail > .admission-record-card')).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核 · 详情');shot('60-detail')
-    page.get_by_role('button',name='返回入驻审核列表',exact=True).click();expect(page.locator('#applications .admission-record-card').first).to_be_visible();shot('30-return')
-    page.locator('#applications button').first.click();page.locator('#reviewOriginalControls > summary').click();expect(page.locator('#reviewOriginalControls')).to_have_attribute('open','');shot('61-controls');reviewer_open.captured=True
+    page.locator('#reviewTopBack').click();expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核');shot('30-return')
+    page.locator('#applications button').first.click();page.locator('#reviewOriginalControls > summary').click();expect(page.locator('#reviewOriginalControls')).to_have_attribute('open','');expect(page.locator('#title')).to_have_text('商家入驻审核 · 审核操作');expect(page.locator('#detail > .admission-record-card')).to_be_hidden();expect(page.locator('.admission-operation-context')).to_be_visible();expect(page.locator('#reviewDecisionGroup')).to_have_attribute('open','');expect(page.locator('#reviewListFilters')).to_be_hidden();shot('61-controls')
+    if capture:
+        viewport=page.viewport_size
+        try:
+            page.set_viewport_size({'width':390,'height':844});page.evaluate('window.scrollTo(0,0)')
+            expect(page.locator('#title')).to_have_text('商家入驻审核 · 审核操作')
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            page.screenshot(path='community-admin-browser-evidence/'+prefix+'-61-controls-390.png',full_page=True)
+        finally:page.set_viewport_size(viewport)
+    # Original material-review assertions below still exercise visible original nodes.
+    if not page.locator('#reviewMaterialsGroup').evaluate('e=>e.open'):page.locator('#reviewMaterialsGroup > summary').click()
+    reviewer_open.captured=True
 
 class OnboardingBrowserJourney(unittest.TestCase):
     def test_apply_upload_correction_resubmit_per_material_review_approve(self):

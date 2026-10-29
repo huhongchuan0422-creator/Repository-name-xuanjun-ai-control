@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess,unittest
 ROOT=Path(__file__).resolve().parents[1]
 class FinanceUIContract(unittest.TestCase):
+ def test_original_ui_restore(self):subprocess.run(['node',str(ROOT/'tests/community_original_ui_restore.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
  def run_node(self,name,source,html):
   subprocess.run(['node',str(ROOT/'tests'/name),str(ROOT/'demos/community-stage'/source),str(ROOT/'demos/community-stage'/html),'/merchant/review'],check=True,timeout=30)
  def test_financial_selection(self):self.run_node('community_finance_selection_dom.cjs','workbench.js','workbench.html')

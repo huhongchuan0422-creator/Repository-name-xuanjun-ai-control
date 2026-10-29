@@ -8,7 +8,7 @@ const code=readFileSync(new URL('../demos/community-stage/communities.js',import
 const merchant=(workspace,status='ACTIVE',version=0)=>({workspace,name:workspace,store_status:'ACTIVE',lifecycle:{status,version,reason:'fixture'}});
 const result=(records,cursor=null)=>({records,has_more:cursor!==null,next_cursor:cursor});
 function setup(responses,reportHook=true){
- const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
+ const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(...x){this.children.push(...x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
  const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[],memberEvents=[],receiverEvents=[];
@@ -109,7 +109,7 @@ test('manually changing selected reference prevents old mutation receipt replaci
 
 test('profile mine detail update reread use original APIs and latest version',async()=>{
  const f=setup([{result:result([community('co_one','DRAFT',1)])},{result:community('co_one','DRAFT',7)},{result:community('co_one','DRAFT',8)},{result:community('co_one','DRAFT',8)}]);
- await f.click('mine');await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
+ await f.click('mine');await f.elements.records.children.find(x=>x.className==='community-record-open').onclick();
  f.elements.name.value='Revised';f.elements.description.value='Original API';f.elements.contact.value='Contact';
  await f.elements.profile.onsubmit({preventDefault(){}});await f.click('read');
  assert.deepEqual(f.calls.map(c=>c.body.operation),['mine','status','update','status']);
@@ -133,7 +133,7 @@ test('profile denied reread clears private detail and blocks stale update',async
  });
  test('denied detail removes private list rows and cursor',async()=>{
  const f=setup([{result:result([community('co_one','DRAFT')],'a'.repeat(64))},{error:'COMMUNITY_PRIVATE'}]);
- await f.click('mine');await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
+ await f.click('mine');await f.elements.records.children.find(x=>x.className==='community-record-open').onclick();
  assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.result.textContent,'');
  });
 

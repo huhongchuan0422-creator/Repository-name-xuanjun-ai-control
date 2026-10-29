@@ -21,3 +21,6 @@ main.finance-focused{padding-top:24px}.finance-focused header{padding:0;margin:0
 .finance-page-tools>summary{cursor:pointer;color:#246d4f;font-weight:600}.finance-page-tools>nav{margin:12px 0;display:flex;gap:12px;flex-wrap:wrap}.finance-page-tools a{color:#246d4f}.finance-page-tools>.finance-account{margin:12px 0}
 .finance-page-tools #financialObservationScope{font-size:14px}.finance-page-tools #financeNavigation{margin:12px 0}
 @media(max-width:480px){main.finance-focused{padding-top:18px}.finance-page-tools{padding:12px}.finance-page-return{margin-bottom:14px}}
+
+/* Original split-management groups; presentation only, existing actions retain authority checks. */
+.finance-split-groups{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.finance-split-groups button{margin:0;padding:7px 14px;background:#edf4f0;color:#246d4f;border:1px solid #d5e3dc}.finance-split-groups button[aria-pressed=true]{background:#246d4f;color:white}.finance-split-groups[hidden]{display:none}

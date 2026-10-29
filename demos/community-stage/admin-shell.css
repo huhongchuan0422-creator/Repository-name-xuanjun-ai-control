@@ -116,3 +116,32 @@ main.compact-finance-selected > h1{margin-top:0}
 .admin-navigation-disclosure>summary{display:none;cursor:pointer;font-weight:600;color:#246d4f}
 @media(max-width:900px){.admin-navigation-disclosure>summary{display:list-item}.community-admin .admin-sidebar{padding:14px 18px}.admin-navigation-disclosure[open]>summary{margin-bottom:14px}}
 @media(max-width:520px){.community-admin .admin-home-hero{padding:22px 18px;margin-bottom:28px}.community-admin .admin-home-hero h2{font-size:27px}.community-admin .admin-home{padding:20px 14px}}
+
+/* Final confirmed-page restoration: retained controls, single primary record surface. */
+.community-admin main h1{font-size:24px;margin:14px 0 18px}
+.community-admin .admin-back{display:block;background:transparent;border:0;color:var(--green);padding:0;margin:0 0 14px;font-size:14px}
+.community-admin .restored-specific-status>#message[data-generic-complete=true]{display:none}
+.community-admin #message[data-outcome=unconfirmed]{background:#fff3d6;color:#664b14;border-left:3px solid #a97618}
+.community-admin .restored-canvas,.community-admin .community-promotion-panel,.community-admin .community-members-panel{border:0;background:transparent;padding:0;box-shadow:none}
+.community-admin .restored-query,.community-admin .restored-secondary{margin:24px 0 12px;border-top:1px solid var(--line);padding:14px 0;background:transparent}
+.community-admin .restored-query>summary,.community-admin .restored-secondary>summary{color:var(--green);margin-bottom:12px;cursor:pointer}
+.community-admin .profile-hint,.community-admin .platform-review-panel>p,.community-admin .platform-merchant-panel>p{background:#fff4d9;border-radius:12px;padding:12px 16px;font-size:14px;color:#75541d}
+.community-admin .community-profile-detail>h3,.community-admin .community-promotion-detail>h3,.community-admin .community-member-detail>h3{font-size:18px;margin:0 0 20px}
+.community-admin .community-promotion-detail dl,.community-admin .community-member-detail dl{margin:0}
+.community-admin .community-promotion-detail dt,.community-admin .community-member-detail dt{font-size:13px;color:#6c8076;margin:20px 0 4px}
+.community-admin .community-promotion-detail dd,.community-admin .community-member-detail dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.community-admin button.restored-primary-return,.community-admin button.community-record-open{display:block;width:100%;text-align:left;background:var(--green);color:white;border:0;padding:15px 18px;margin:22px 0;border-radius:9px;font-weight:600}
+.community-admin button.restored-primary-return[hidden]{display:none}
+.community-admin .platform-review-editor label,.community-admin .platform-merchant-editor label,.community-admin #customerProfile label,.community-admin .open-actions>label,.community-admin .receiver-query-controls label,.community-admin .platform-orders-panel>details label{display:grid;gap:7px;margin:18px 0;color:var(--ink)}
+.community-admin .platform-review-editor input,.community-admin .platform-review-editor textarea,.community-admin .platform-review-editor select,.community-admin .platform-merchant-editor input,.community-admin .platform-merchant-editor textarea,.community-admin .platform-merchant-editor select,.community-admin #customerProfile input,.community-admin .open-actions input,.community-admin .open-actions select,.community-admin .platform-orders-panel>details select{box-sizing:border-box;width:100%;max-width:100%;padding:12px;border:1px solid #b8ccbf;border-radius:8px;background:white;color:var(--ink);font:inherit}
+.community-admin .platform-review-editor>button,.community-admin .platform-merchant-editor>button,.community-admin #customerProfile button,.community-admin .open-actions>button{background:var(--green);color:white}
+.community-admin .restored-editing>.community-record-card,.community-admin .restored-editing>.open-detail-action,.community-admin .restored-editing>.community-profile-detail,.community-admin .restored-editing>.promotion-records,.community-admin .restored-editing>.community-promotion-detail,.community-admin .restored-editing>.community-receiver-detail,.community-admin .restored-editing>.community-receiver-detail+button{display:none}
+.community-admin .restored-editing>.open-actions{background:white;border:1px solid var(--line);border-radius:16px;padding:22px;margin:18px 0}
+.community-admin .restored-editing>.open-actions>summary{font-size:18px;color:var(--ink)}
+.community-admin .restored-profile-editing .community-profile-detail>h3{display:none}
+.community-admin .restored-workspace-return{width:100%;text-align:left;margin-top:16px}
+
+.community-admin .restored-editing>.receiver-records{display:none}
+
+.community-admin .restored-operation-editing>.operation-query-action{display:none}
+.community-admin .restored-operation-editing>details{background:white;border:1px solid var(--line);border-radius:16px;padding:22px}

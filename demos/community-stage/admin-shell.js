@@ -36,7 +36,7 @@
   new MutationObserver(syncAccount).observe(accountRoot,{childList:true,subtree:true});syncAccount();
  }
  const detail=document.createElement('div');detail.className='community-profile-detail';detail.hidden=true;
- const detailTitle=document.createElement('h3');detailTitle.textContent='社区资料详情';detail.append(detailTitle);
+ const detailTitle=document.createElement('h3');detailTitle.textContent='记录详情';detail.append(detailTitle);
  const fields=document.createElement('dl');detail.append(fields);
  const edit=document.createElement('button');edit.type='button';edit.textContent='编辑资料';
  const reread=document.createElement('button');reread.type='button';reread.textContent='回读当前记录';
@@ -77,7 +77,7 @@
  const openCardTitle=document.createElement('h3');openCardTitle.textContent='记录列表 · 当前范围';openCard.append(openCardTitle);
  const openSummary=document.createElement('dl');openCard.append(openSummary);
  const openDetails=document.createElement('div');openDetails.className='community-profile-detail';openDetails.hidden=true;
- const openTitle=document.createElement('h3');openTitle.textContent='社区详情';openDetails.append(openTitle);
+ const openTitle=document.createElement('h3');openTitle.textContent='记录详情';openDetails.append(openTitle);
  const openFields=document.createElement('dl');openDetails.append(openFields);
  const showOpen=document.createElement('button');showOpen.type='button';showOpen.className='open-detail-action';showOpen.textContent='查看社区详情';showOpen.hidden=true;
  const backOpen=document.createElement('button');backOpen.type='button';backOpen.textContent='返回社区记录';
@@ -95,7 +95,7 @@
  openActions.append(document.getElementById('kind').closest('label'),relationButtons);
  openPanel.append(openQuery,openHint,openCard,showOpen,openDetails,openActions);
  let openRecord=null,openMembers=false;
- function clearOpen(message){openRecord=null;openMembers=false;openCard.hidden=true;showOpen.hidden=true;openDetails.hidden=true;openSummary.replaceChildren();openFields.replaceChildren();openHint.textContent=message;}
+ function clearOpen(message){openActions.open=false;openRecord=null;openMembers=false;openCard.hidden=true;showOpen.hidden=true;openDetails.hidden=true;openSummary.replaceChildren();openFields.replaceChildren();openHint.textContent=message;}
  function openPair(target,label,value){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;target.append(dt,dd);}
  // CURRENT_SUBJECT_RELATION_BEGIN
  function currentSubjectRelation(record){
@@ -175,9 +175,9 @@
   if(!r.records.length){const empty=document.createElement('p');empty.textContent='当前页没有记录；不代表其他页或未接通。';reportRows.append(empty);}
   for(const item of r.records){const row=document.createElement('article');row.className='community-record-card';const fields=document.createElement('dl');
    const keys=earnings?[['原订单','reference'],['分账请求','request_id'],['接收方','receiver_id'],['规则编号','rule_id'],['规则版本','rule_version'],['已核实分账','received_minor'],['已核实回退','returned_minor'],['净额','net_minor'],['渠道状态','provider_state'],['接收方状态','receiver_state'],['财务核销','finance_status']]:[['原订单','reference'],['商家','merchant_id'],['门店','store_id'],['订单金额','amount_minor'],['订单状态','order_state'],['渠道付款已核实','provider_payment_verified']];
-   const fieldValue=key=>key.endsWith('_minor')?money(item[key],r.currency):key==='finance_status'&&item[key]==='UNCONFIRMED'?'未确认':key==='provider_payment_verified'?item[key]===true?'是（不代表财务核销）':item[key]===false?'否':'未返回':reportValue(item[key]);
+   const fieldValue=key=>key.endsWith('_minor')?money(item[key],r.currency):key==='finance_status'&&item[key]==='UNCONFIRMED'?'未确认':['provider_state','receiver_state','order_state'].includes(key)&&({FINISHED:'已完成',SUCCESS:'成功',PENDING:'待处理',PROCESSING:'处理中'})[item[key]]?({FINISHED:'已完成',SUCCESS:'成功',PENDING:'待处理',PROCESSING:'处理中'})[item[key]]+'（'+item[key]+'；到账与核销另核）':key==='provider_payment_verified'?item[key]===true?'是（不代表财务核销）':item[key]===false?'否':'未返回':reportValue(item[key]);
    if(refunds){const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';row.append(title);for(const pair of [['关联记录',reportValue(item.reference)],['订单退款状态',item.order_state==='SUCCESS'?'支付成功，仍可能存在部分退款':item.order_state==='REFUNDED'?'订单已退款':reportValue(item.order_state)],['退款详情',item.refund_observation_status==='NO_RECORDED_VERIFIED_REFUND'?'未记录已签验退款事件，不等于未退款':(item.refund_observations||[]).map(o=>reportValue(o.out_refund_no)+' · '+money(o.refund_minor,o.currency)).join('；')||'原观察记录未返回']])openPair(fields,...pair);}else if(earnings){const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';row.append(title);for(const pair of [['分账关联',reportValue(item.request_id)+' · '+reportValue(item.receiver_id)],['已分账 / 已回退 / 净额',money(item.received_minor,r.currency)+' / '+money(item.returned_minor,r.currency)+' / '+money(item.net_minor,r.currency)],['汇总范围',r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'原范围未确认']])openPair(fields,...pair);}else for(const [label,key]of keys)openPair(fields,label,fieldValue(key));row.append(fields);reportRows.append(row);
-   if(earnings||refunds){const open=document.createElement('button');open.type='button';open.className='snapshot-detail-action';open.textContent=refunds?'查看退款观察详情':'查看分账记录详情';open.onclick=()=>{if(revision!==reportViewRevision||reportRecord!==record)return;snapshotMode='detail';snapshotDetail.replaceChildren();const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl'),back=document.createElement('button');card.className='community-record-card';h.textContent='记录详情';card.append(h,dl);for(const [label,key]of keys)openPair(dl,label,fieldValue(key));if(refunds){openPair(dl,'退款观测',item.refund_observation_status==='NO_RECORDED_VERIFIED_REFUND'?'未记录已签验退款事件，不等于未退款':'以下为原签验后存储观察，不是本轮重新验签或财务核销');for(const observation of item.refund_observations||[]){openPair(dl,'退款单号',reportValue(observation.out_refund_no));openPair(dl,'本笔退款',money(observation.refund_minor,observation.currency));openPair(dl,'原观察时间',reportValue(observation.observed_at));openPair(dl,'本笔财务核销',observation.finance_status==='UNCONFIRMED'?'未确认':reportValue(observation.finance_status));}openPair(dl,'财务核销',item.finance_status==='UNCONFIRMED'?'未确认':reportValue(item.finance_status));openPair(dl,'可用操作','仅查看，不执行退款或分账');}openPair(dl,'汇总范围',r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'原范围未确认');back.type='button';back.className='snapshot-detail-action';back.textContent=refunds?'返回退款观察列表':'返回分账快照列表';back.onclick=()=>{if(revision===reportViewRevision&&reportRecord===record)snapshotList();};snapshotDetail.append(card,back);snapshotDetail.hidden=false;reportRows.hidden=true;reportBack.hidden=true;syncSnapshotTitle();};reportRows.append(open);}
+   if(earnings||refunds){const open=document.createElement('button');open.type='button';open.className='snapshot-detail-action';open.textContent=refunds?'查看退款观察详情':'查看分账记录详情';open.onclick=()=>{if(revision!==reportViewRevision||reportRecord!==record)return;snapshotMode='detail';snapshotDetail.replaceChildren();const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl'),back=document.createElement('button');card.className='community-record-card';h.textContent='记录详情';card.append(h,dl);for(const [label,key]of keys)openPair(dl,label,fieldValue(key));if(refunds){openPair(dl,'退款观测',item.refund_observation_status==='NO_RECORDED_VERIFIED_REFUND'?'未记录已签验退款事件，不等于未退款':'以下为原签验后存储观察，不是本轮重新验签或财务核销');for(const observation of item.refund_observations||[]){openPair(dl,'退款单号',reportValue(observation.out_refund_no));openPair(dl,'本笔退款',money(observation.refund_minor,observation.currency));openPair(dl,'原观察时间',Number.isInteger(observation.observed_at)?new Date(observation.observed_at*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})+' 北京时间':'原记录未返回有效时间');openPair(dl,'本笔财务核销',observation.finance_status==='UNCONFIRMED'?'未确认':reportValue(observation.finance_status));}openPair(dl,'财务核销',item.finance_status==='UNCONFIRMED'?'未确认':reportValue(item.finance_status));openPair(dl,'可用操作','仅查看，不执行退款或分账');}openPair(dl,'汇总范围',r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'原范围未确认');back.type='button';back.className='snapshot-detail-action';back.textContent=refunds?'返回退款观察列表':'返回分账快照列表';back.onclick=()=>{if(revision===reportViewRevision&&reportRecord===record)snapshotList();};snapshotDetail.append(card,back);snapshotDetail.hidden=false;reportRows.hidden=true;reportBack.hidden=true;syncSnapshotTitle();};reportRows.append(open);}
   }
   if(!earnings&&!refunds){reportCard.hidden=false;reportShow.hidden=false;reportDetail.hidden=true;if(activeIndex===reportIndex&&pageTitle)pageTitle.textContent=reportPanel.querySelector('h2').textContent;}else if(snapshotMode!=='overview')snapshotList();
  };
@@ -198,7 +198,7 @@
  const promotionRows=document.createElement('div');promotionRows.className='promotion-records';
  const promotionDetail=document.createElement('div');promotionDetail.className='community-promotion-detail';promotionDetail.hidden=true;
  const promotionFields=document.createElement('dl'),promotionBack=document.createElement('button');promotionBack.type='button';promotionBack.textContent='返回推广记录';
- promotionDetail.append(promotionFields,promotionBack);
+ const promotionDetailHeading=document.createElement('h3');promotionDetailHeading.textContent='记录详情';promotionDetail.append(promotionDetailHeading,promotionFields,promotionBack);
  const promotionActions=document.createElement('details');promotionActions.className='open-actions';
  const promotionSummary=document.createElement('summary');promotionSummary.textContent='创建推广及更新状态';promotionActions.append(promotionSummary);
  for(const key of ['promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion','promotionState'])promotionActions.append(document.getElementById(key).closest('label'));
@@ -207,8 +207,8 @@
  promotionPanel.append(promotionQuery,promotionHint,promotionRows,promotionDetail,promotionActions);
  const expiry=value=>Number.isInteger(value)?new Date(value*1000).toISOString().replace('T',' ').replace('.000Z',' UTC'):'当前权限未返回有效时间';
  const promotionValue=(record,key)=>record[key]===undefined?'当前权限未返回该字段':key==='expires_at'?expiry(record[key]):key==='status'?({ACTIVE:'有效',PAUSED:'已暂停'}[record[key]]||String(record[key])):String(record[key]);
- function clearPromotion(message){promotionRows.replaceChildren();promotionFields.replaceChildren();promotionRows.hidden=false;promotionDetail.hidden=true;promotionHint.textContent=message;}
- function promotionDetails(record){promotionFields.replaceChildren();for(const [label,key]of [['推广码','id'],['原小程序门店场景','scene'],['推广标题','title'],['到期时间','expires_at'],['状态','status'],['当前版本','version'],['新成员','new_members'],['已认证去重参与','authenticated_redemptions']])openPair(promotionFields,label,promotionValue(record,key));promotionRows.hidden=true;promotionDetail.hidden=false;}
+ function clearPromotion(message){promotionActions.open=false;promotionRows.replaceChildren();promotionFields.replaceChildren();promotionRows.hidden=false;promotionDetail.hidden=true;promotionHint.textContent=message;}
+ function promotionDetails(record){promotionFields.replaceChildren();for(const [label,key]of [['原小程序门店场景','scene'],['推广标题','title'],['到期时间','expires_at'],['推广码','id'],['当前版本','version'],['状态','status'],['新成员','new_members'],['已认证去重参与','authenticated_redemptions']])openPair(promotionFields,label,promotionValue(record,key));promotionRows.hidden=true;promotionDetail.hidden=false;}
  window.communityPromotionView=({type,record})=>{
   if(type==='identity-reset')promotionReference.value='';
   if(type==='saved'){clearPromotion('服务端已确认本次操作；请查询原推广记录核对最新状态。');promotionDetails(record);return;}
@@ -232,7 +232,7 @@
  const memberHint=document.createElement('p');memberHint.className='profile-hint';
  const memberRows=document.createElement('div');memberRows.className='member-records';
  const memberDetail=document.createElement('div');memberDetail.className='community-member-detail';memberDetail.hidden=true;
- const memberFields=document.createElement('dl'),memberBack=document.createElement('button'),memberRefresh=document.createElement('button');memberBack.type='button';memberBack.textContent='返回成员列表';memberRefresh.type='button';memberRefresh.textContent='重新查询当前社区';memberDetail.append(memberFields,memberBack,memberRefresh);
+ const memberFields=document.createElement('dl'),memberBack=document.createElement('button'),memberRefresh=document.createElement('button');memberBack.type='button';memberBack.textContent='返回成员列表';memberRefresh.type='button';memberRefresh.textContent='重新查询当前社区';const memberDetailHeading=document.createElement('h3');memberDetailHeading.textContent='记录详情';memberDetail.append(memberDetailHeading,memberFields,memberBack,memberRefresh);
  memberPanel.append(memberQuery,memberHint,memberRows,memberDetail);
  function memberName(item){
   if(item.merchant_name_status==='MATCHED'&&typeof item.merchant_name==='string'&&item.merchant_name)return item.merchant_name;
@@ -261,7 +261,7 @@
  const receiverPanel=document.getElementById('receiverRelations'),receiverIndex=panels.indexOf(receiverPanel);
  receiverPanel.classList.add('community-receiver-panel');
  const receiverHint=document.createElement('p');receiverHint.className='profile-hint';
- const receiverRows=document.createElement('div'),receiverDetail=document.createElement('article');receiverDetail.className='community-receiver-detail';receiverDetail.hidden=true;
+ const receiverRows=document.createElement('div'),receiverDetail=document.createElement('article');receiverRows.className='receiver-records';receiverDetail.className='community-receiver-detail';receiverDetail.hidden=true;
  const receiverFields=document.createElement('dl'),receiverBack=document.createElement('button');receiverBack.type='button';receiverBack.className='platform-order-button';receiverBack.textContent='返回接收关系列表';receiverBack.hidden=true;const receiverDetailTitle=document.createElement('h3');receiverDetailTitle.textContent='记录详情';receiverDetail.append(receiverDetailTitle,receiverFields);
  const receiverActions=document.createElement('details');receiverActions.className='open-actions';const receiverSummary=document.createElement('summary');receiverSummary.textContent='原接收关系配置操作';receiverActions.append(receiverSummary);
  const receiverQueryControls=document.createElement('details'),receiverQuerySummary=document.createElement('summary');receiverQueryControls.className='receiver-query-controls open-actions';receiverQueryControls.open=true;receiverQuerySummary.textContent='查询接收关系';receiverQueryControls.append(receiverQuerySummary);
@@ -274,7 +274,8 @@
  function syncReceiverTitle(){if(activeIndex===receiverIndex&&pageTitle)pageTitle.textContent=receiverPanel.querySelector('h2').textContent+(receiverDetail.hidden?'':' · 详情');}
  function clearReceiverUi(message){receiverRows.replaceChildren();receiverFields.replaceChildren();receiverDetail.hidden=true;receiverBack.hidden=true;receiverRows.hidden=false;receiverHint.textContent=message;syncReceiverTitle();}
  window.communityReceiverView=({type,record})=>{
-  if(type==='detail'||type==='saved'){clearReceiverUi(type==='saved'?'保存已获服务端确认，建议回读当前关系版本。':'已回读所选接收关系；并非资金到账凭证。');for(const pair of receiverPairs(record))openPair(receiverFields,...pair);receiverDetail.hidden=false;receiverBack.hidden=false;receiverRows.hidden=true;syncReceiverTitle();return;}
+  if(type==='identity-reset'||type==='error')receiverActions.open=false;
+  if(type==='detail'||type==='saved'){receiverActions.open=false;clearReceiverUi(type==='saved'?'保存已获服务端确认，建议回读当前关系版本。':'已回读所选接收关系；并非资金到账凭证。');for(const pair of receiverPairs(record))openPair(receiverFields,...pair);receiverDetail.hidden=false;receiverBack.hidden=false;receiverRows.hidden=true;syncReceiverTitle();return;}
   if(type!=='listed'){if(type==='error'||type==='reset')receiverQueryControls.open=true;clearReceiverUi(type==='error'?'读取或保存未确认，旧详情已清除，请核对权限并回读。':type==='loading'?'正在请求原授权关系，尚未确认':'尚未读取原接收关系');return;}
   receiverQueryControls.open=false;clearReceiverUi('已读取当前扫描页 '+record.result.records.length+' 条；不是全部关系汇总。');
   if(!record.result.records.length){const p=document.createElement('p');p.textContent=record.result.has_more?'本扫描页没有可显示关系，仍有下一页。':'本页没有可显示关系；不自动推定可用初始版本。';receiverRows.append(p);}
@@ -326,12 +327,12 @@
  const reviewState=s=>({DRAFT:'草稿',PENDING:'待审核',APPROVED:'已通过',CORRECTION:'待补充资料',REJECTED:'已驳回',PAUSED:'已暂停'}[s]||String(s));
  function reviewFields(r,detail){const fields=[['社区状态',reviewState(r.state)],['审核决定',['APPROVED','CORRECTION','REJECTED','PAUSED'].includes(r.state)?reviewState(r.state):'尚未形成审核决定'],['审核意见',r.opinion||'原记录暂无审核意见']];if(detail)fields.push(['社区编号',r.id],['社区名称',r.name],['社区介绍',r.description],['联系人及联系方式',r.contact],['当前版本',r.version]);return fields;}
  function reviewCard(title,record,detail){const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');card.className='community-record-card';h.textContent=title;card.append(h,dl);for(const [label,value]of reviewFields(record,detail)){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value===undefined||value===null?'原权限未返回':String(value);dl.append(dt,dd);}return card;}
- function syncReviewTitle(){if(activeIndex!==reviewIndex)return;reviewPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=reviewMode==='detail'?'平台审核 · 详情':reviewMode==='edit'?'平台审核 · 原操作/审核界面':'平台审核';}
+ function syncReviewTitle(){if(activeIndex!==reviewIndex)return;reviewPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=reviewMode==='detail'?'平台审核 · 详情':reviewMode==='edit'?'平台审核 · 审核界面':'平台审核';}
  function clearReview(message){reviewRevision++;reviewSnapshot=null;reviewRecord=null;reviewReadCurrent=null;reviewMode='list';reviewRows.replaceChildren();reviewDetail.replaceChildren();reviewEditor.hidden=true;reviewRows.hidden=false;reviewDetail.hidden=true;for(const b of [reviewBack,reviewEdit,reviewRead,reviewMore])b.hidden=true;reviewHint.textContent=message;syncReviewTitle();}
  function showReviewList(){reviewRevision++;const revision=reviewRevision;reviewMode='list';reviewRows.replaceChildren();reviewRows.hidden=false;reviewDetail.hidden=true;reviewEditor.hidden=true;reviewBack.hidden=true;reviewEdit.hidden=true;reviewRead.hidden=true;reviewMore.hidden=!reviewSnapshot?.result.has_more;reviewHint.textContent='当前原筛选页的查询快照；详情读取最新版本，审核结果以服务端回执和回读为准。';if(reviewSnapshot){for(const r of reviewSnapshot.result.records){const open=document.createElement('button');open.textContent='查看审核详情';open.type='button';open.className='platform-review-button';open.onclick=()=>{if(revision!==reviewRevision)return;return reviewSnapshot.select(r);};reviewRows.append(reviewCard('记录列表 · 当前范围',r,false),open);}if(!reviewSnapshot.result.records.length)reviewRows.textContent=reviewSnapshot.result.has_more?'当前扫描页暂无记录，仍可读取下一页。':'当前筛选暂无社区记录。';}syncReviewTitle();}
  reviewMore.onclick=()=>document.getElementById('more').onclick();
  reviewBack.onclick=()=>{if(reviewSnapshot)showReviewList();else clearReview('请重新查询原筛选列表。');};
- reviewEdit.onclick=()=>{if(!reviewRecord)return;reviewMode='edit';reviewDetail.hidden=false;reviewEditor.hidden=false;reviewEdit.hidden=true;reviewHint.textContent='仅提交所选社区当前版本；必须是原同租户独立审核人。结果未知先回读，不自动重复审核。';syncReviewTitle();};
+ reviewEdit.onclick=()=>{if(!reviewRecord)return;reviewMode='edit';reviewDetail.hidden=true;reviewEditor.hidden=false;reviewEdit.hidden=true;reviewHint.textContent='仅提交所选社区当前版本；必须是原同租户独立审核人。结果未知先回读，不自动重复审核。';syncReviewTitle();};
  reviewRead.onclick=()=>{if(reviewReadCurrent)return reviewReadCurrent();};
  window.communityPlatformReviewView=({type,record})=>{
   if(type==='reset'||type==='error'||type==='loading'){clearReview(type==='error'?'读取或审核未确认；已清除旧资料和成功展示，请回读或重新查询。':type==='loading'?'正在读取原权限社区目录…':'请按原状态查询社区目录。');return;}
@@ -344,7 +345,7 @@
 
  // PLATFORM_OPERATIONS_CARDS_BEGIN: original non-order views; orders stay in original31.
  const operationRows=document.createElement('div'),operationDetail=document.createElement('div'),operationHint=document.createElement('p'),operationBack=document.createElement('button'),operationQuery=document.createElement('button');
- operationRows.className='platform-operation-rows';operationDetail.className='platform-operation-detail';operationBack.textContent='返回运营查询列表';operationQuery.textContent='打开原运营查询条件';for(const b of [operationBack,operationQuery]){b.type='button';b.className='platform-order-button';}platformPanel.append(operationHint,operationRows,operationDetail,operationBack,operationQuery);
+ operationRows.className='platform-operation-rows';operationDetail.className='platform-operation-detail';operationBack.textContent='返回运营查询列表';operationQuery.textContent='打开原运营查询条件';operationQuery.className='operation-query-action';for(const b of [operationBack,operationQuery]){b.type='button';b.className='platform-order-button';}platformPanel.append(operationHint,operationRows,operationDetail,operationBack,operationQuery);
  let operationRevision=0,operationSnapshot=null,operationMode='list';
  const operationNames={platform_overview:'经营总览',platform_customers:'项目客户',platform_audit:'项目审计'};
  const operationText=v=>v===undefined||v===null?'原记录未返回':String(v),operationBool=v=>v===true?'是':v===false?'否':'原记录未返回';
@@ -353,7 +354,7 @@
  if(op==='platform_customers'){const fields=[['查看数据','原项目客户'],['账户编号',r.user_id],['昵称',r.nickname||'未填写昵称'],['项目角色',r.project_role],['会员关系有效',operationBool(r.membership_active)]];if(detail)fields.push(['账户验证',operationBool(r.verified)],['项目客户编号',r.project_customer_id],['社区归属',r.community_id||'未记录社区归属'],['原关联订单数量',r.owned_order_count]);return fields;}
  const fields=[['查看数据','原项目审计'],['审计序号',r.id],['事件',r.event],['关联对象',r.object_id]];if(detail)fields.push(['操作账户',r.actor],['原始时间戳',r.at],['前序摘要',r.parent],['当前摘要',r.sha],['范围','仅本项目过滤记录，不代表全局完整链已验证']);return fields;}
  function operationCard(title,fields){const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');card.className='community-record-card';h.textContent=title;card.append(h,dl);for(const [k,v]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=operationText(v);dl.append(dt,dd);}return card;}
- function syncOperationsTitle(){const active=document.getElementById('platformView').value!=='platform_orders';for(const e of [operationRows,operationHint,operationQuery])e.hidden=!active||operationMode!=='list'&&e===operationRows;operationDetail.hidden=!active||operationMode!=='detail';operationBack.hidden=!active||operationMode==='list';if(active)platformResult.hidden=true;if(activeIndex===panels.indexOf(platformPanel)&&active){platformPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=operationMode==='detail'?'平台运营查询 · 详情':operationMode==='edit'?'平台运营查询 · 原查询条件':'平台运营查询';}}
+ function syncOperationsTitle(){const active=document.getElementById('platformView').value!=='platform_orders';for(const e of [operationRows,operationHint,operationQuery])e.hidden=!active||operationMode!=='list'&&e===operationRows;operationDetail.hidden=!active||operationMode!=='detail';operationBack.hidden=!active||operationMode==='list';if(active)platformResult.hidden=true;if(activeIndex===panels.indexOf(platformPanel)&&active){platformPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=operationMode==='detail'?'平台运营查询 · 详情':operationMode==='edit'?'平台运营查询 · 查询条件':'平台运营查询';}}
  function clearOperations(){operationRevision++;operationSnapshot=null;operationMode='list';operationRows.replaceChildren();operationDetail.replaceChildren();operationHint.textContent='请打开原查询条件，读取当前角色可访问的运营数据。';syncOperationsTitle();}
  function operationsList(){operationRevision++;const revision=operationRevision,s=operationSnapshot;operationMode='list';operationRows.replaceChildren();operationDetail.replaceChildren();if(!s){syncOperationsTitle();return;}const records=s.operation==='platform_overview'?[s.record]:s.record.records;if(!Array.isArray(records)){clearOperations();operationHint.textContent='返回结构未确认，请重新查询；不显示为空结果。';return;}operationHint.textContent=s.record.coverage_complete===false?'部分原商家映射不可用，仅可访问门店小计；未核销。':s.operation==='platform_customers'?'仅当前原项目成员，不查询全局账户。':s.operation==='platform_audit'?'仅本项目原审计记录；不代表全局完整链验证。':'当前原准入门店范围；签验支付与财务核销分别记录，不能认作到账。';
  for(const r of records){const b=document.createElement('button');b.type='button';b.className='platform-order-button';b.textContent='查看运营记录详情';b.onclick=()=>{if(revision!==operationRevision||!s.current())return;operationMode='detail';operationDetail.replaceChildren(operationCard('记录详情',operationFields(s.operation,r,true)));syncOperationsTitle();};operationRows.append(operationCard('记录列表 · 当前范围',operationFields(s.operation,r,false)),b);}if(!records.length)operationRows.textContent=s.record.has_more?'当前扫描页暂无记录，仍可查询下一页。':'当前查询范围暂无记录。';platformResult.hidden=true;syncOperationsTitle();}
@@ -370,11 +371,11 @@
  let merchantViewRevision=0,merchantSnapshot=null,merchantItem=null,merchantSavedBase=null,merchantMode='list';
  const merchantState=v=>({ACTIVE:'正常',PAUSED:'暂停新交易',DISABLED:'停用新交易'}[v]||operationText(v));
  function merchantFields(item,detail){const life=item.lifecycle||{};const fields=[['原商家工作区',item.workspace],['当前版本',life.version],['平台状态',merchantState(life.status)]];if(detail)fields.push(['原因',life.reason||'原记录暂无原因'],['门店名称',item.name===undefined?'当前回执未含门店名称，请回读':item.name||'原门店未设置名称'],['门店状态',item.store_status],['状态边界','平台生命周期不是微信进件或签约状态；原已有订单查询与恢复功能保留']);return fields;}
- function syncMerchantTitle(){if(activeIndex!==merchantIndex)return;merchantPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=merchantMode==='detail'?'平台商家管理 · 详情':merchantMode==='edit'?'平台商家管理 · 原操作':'平台商家管理';}
+ function syncMerchantTitle(){if(activeIndex!==merchantIndex)return;merchantPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=merchantMode==='detail'?'平台商家管理 · 详情':merchantMode==='edit'?'平台商家管理 · 编辑':'平台商家管理';}
  function clearMerchantView(message){merchantViewRevision++;merchantSnapshot=null;merchantItem=null;merchantSavedBase=null;merchantMode='list';merchantRows.replaceChildren();merchantDetail.replaceChildren();merchantRows.hidden=false;merchantDetail.hidden=true;merchantEditor.hidden=true;merchantBack.hidden=true;merchantEdit.hidden=true;merchantRead.hidden=!document.getElementById('platformMerchantWorkspace').value;merchantHint.textContent=message;syncMerchantTitle();}
  function showMerchantList(){merchantViewRevision++;const revision=merchantViewRevision,s=merchantSnapshot;merchantMode='list';merchantRows.replaceChildren();merchantRows.hidden=false;merchantDetail.hidden=true;merchantEditor.hidden=true;merchantBack.hidden=true;merchantEdit.hidden=true;merchantRead.hidden=true;if(!s){syncMerchantTitle();return;}merchantHint.textContent=s.result.coverage_complete===false?'部分原映射不可用；只显示当前可访问商家，不代表全部商家。':'当前原准入商家查询快照；变更前按原分页边界回读版本。';for(const item of s.result.records){const b=document.createElement('button');b.type='button';b.className='platform-order-button';b.textContent='查看商家详情';b.onclick=()=>{if(revision!==merchantViewRevision)return;s.select(item);};merchantRows.append(operationCard('记录列表 · 当前范围',merchantFields(item,false)),b);}if(!s.result.records.length)merchantRows.textContent=s.result.has_more?'当前扫描页无可见商家，仍有下一页。':'当前范围暂无可见商家。';for(const missing of s.result.unavailable_mappings||[]){const note=document.createElement('p');note.textContent=operationText(missing.workspace)+'：原映射不可用，未读取其门店及订单。';merchantRows.append(note);}syncMerchantTitle();}
  function showMerchantDetail(){merchantMode='detail';merchantRows.hidden=true;merchantDetail.replaceChildren(operationCard('记录详情',merchantFields(merchantItem,true)));merchantDetail.hidden=false;merchantEditor.hidden=true;merchantBack.hidden=false;merchantEdit.hidden=false;merchantRead.hidden=false;syncMerchantTitle();}
- merchantBack.onclick=()=>showMerchantList();merchantEdit.onclick=()=>{if(!merchantItem)return;merchantMode='edit';merchantEditor.hidden=false;merchantEdit.hidden=true;merchantHint.textContent='仅原平台OWNER可修改；精确当前版本CAS，结果未知先回读，不自动重复变更。';syncMerchantTitle();};merchantRead.onclick=()=>window.communityReadMerchant();
+ merchantBack.onclick=()=>showMerchantList();merchantEdit.onclick=()=>{if(!merchantItem)return;merchantMode='edit';merchantDetail.hidden=true;merchantEditor.hidden=false;merchantEdit.hidden=true;merchantHint.textContent='仅原平台OWNER可修改；精确当前版本CAS，结果未知先回读，不自动重复变更。';syncMerchantTitle();};merchantRead.onclick=()=>window.communityReadMerchant();
  window.communityPlatformMerchantView=({type,record})=>{if(type==='reset'||type==='error'){clearMerchantView(record?.message||'结果未确认或权限拒绝，已清旧资料；先回读所选商家或重新查询。');return;}if(type==='loading'||type==='saving'){merchantViewRevision++;merchantSavedBase=type==='saving'?merchantItem:null;merchantItem=null;merchantMode='list';syncMerchantTitle();merchantDetail.replaceChildren();merchantDetail.hidden=true;merchantEditor.hidden=true;merchantBack.hidden=true;merchantEdit.hidden=true;merchantRead.hidden=true;merchantHint.textContent=type==='saving'?'正在提交原商家状态，请等待真实回执。':'正在查询原商家记录；旧列表仅供只读，不可据此修改。';return;}if(type==='temporary'){merchantHint.textContent='暂时无法读取；保留上一页只读记录及重试游标，必须重新查询成功后才能选择。';return;}if(type==='listed'){merchantSnapshot=record;showMerchantList();return;}if(type==='detail'){merchantViewRevision++;merchantItem=record.item;showMerchantDetail();return;}if(type==='saved'){merchantViewRevision++;merchantItem={...(merchantSavedBase||{}),workspace:record.workspace,lifecycle:record.lifecycle};showMerchantDetail();merchantHint.textContent='原状态变更已有回执；请回读当前原分页记录核对，未改变微信签约状态。';}};
  clearMerchantView('请查询原准入商家记录。');
  // PLATFORM_MERCHANT_CARDS_END
@@ -388,7 +389,7 @@
  // CUSTOMER_PROFILE_CARDS_BEGIN: original current-user profile and referral actions only.
  const customerForm=document.getElementById('customerProfile'),customerPanel=customerForm.closest('section'),customerIndex=panels.indexOf(customerPanel);customerPanel.classList.add('customer-profile-panel');
  const customerRows=document.createElement('div'),customerDetail=document.createElement('div'),customerHint=document.createElement('p'),customerBack=document.createElement('button'),customerEdit=document.createElement('button'),customerControls=document.createElement('details'),customerSummary=document.createElement('summary'),customerReferral=document.createElement('div');
- customerRows.className='customer-profile-rows';customerDetail.className='customer-profile-detail';customerReferral.className='customer-referral-result';customerBack.textContent='返回个人资料列表';customerEdit.textContent='编辑个人资料';customerSummary.textContent='原推荐关系与通知操作';customerControls.append(customerSummary);for(const id of ['referralCode','referralInput','bindReferrer','notices']){const e=document.getElementById(id);customerControls.append(id==='referralInput'?e.closest('label'):e);}customerControls.append(customerReferral);for(const b of [customerBack,customerEdit]){b.type='button';b.className='customer-profile-button';}customerPanel.append(customerHint,customerRows,customerDetail,customerBack,customerEdit,customerForm,customerControls);document.getElementById('customerResult').hidden=true;
+ customerRows.className='customer-profile-rows';customerDetail.className='customer-profile-detail';customerReferral.className='customer-referral-result';customerBack.textContent='返回个人资料列表';customerEdit.textContent='编辑个人资料';customerControls.className='customer-retained-controls';customerSummary.textContent='原推荐关系与通知操作';customerControls.append(customerSummary);for(const id of ['referralCode','referralInput','bindReferrer','notices']){const e=document.getElementById(id);customerControls.append(id==='referralInput'?e.closest('label'):e);}customerControls.append(customerReferral);for(const b of [customerBack,customerEdit]){b.type='button';b.className='customer-profile-button';}customerPanel.append(customerHint,customerRows,customerDetail,customerBack,customerEdit,customerForm,customerControls);document.getElementById('customerResult').hidden=true;
  let customerSnapshot=null,customerMode='list',customerViewRevision=0;
  function syncCustomerTitle(){if(activeIndex!==customerIndex)return;customerPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=customerMode==='detail'?'个人资料与推荐关系 · 详情':customerMode==='edit'?'个人资料与推荐关系 · 编辑':'个人资料与推荐关系';}
  function customerCard(record,title){const article=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');article.className='community-record-card';h.textContent=title;article.append(h,dl);for(const [label,key]of [['昵称','nickname'],['联系方式','contact']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=record[key]||'原资料未填写';dl.append(dt,dd);}return article;}
@@ -403,18 +404,18 @@
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
   if(activeIndex===profileIndex&&index!==profileIndex)emptyProfile('切换功能后请重新查询社区资料。');
-  if(index!==reportIndex)snapshotMode='overview';activeIndex=index;syncPlatformBrand(index);
+  if(index!==reportIndex)snapshotMode='overview';if(index!==receiverIndex)receiverActions.open=false;activeIndex=index;syncPlatformBrand(index);
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.hidden=false;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();syncCustomerTitle();syncSnapshotTitle();syncReceiverTitle();
-  const compactFinance=index===receiverIndex||index===panels.indexOf(platformPanel);main.classList.toggle('compact-finance-selected',compactFinance);if(pageTitle&&compactFinance)main.insertBefore(back,pageTitle);else main.insertBefore(back,home);
+  const compactFinance=index===receiverIndex||index===panels.indexOf(platformPanel);main.classList.toggle('compact-finance-selected',compactFinance);if(pageTitle)main.insertBefore(back,pageTitle);else main.insertBefore(back,home);
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
   main.classList.toggle('open-selected',index===openIndex);main.classList.toggle('report-selected',index===reportIndex);if(index===reportIndex)reportReference.value=document.getElementById('reference').value;
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(index===memberIndex)memberPanel.append(result);else if(index===reviewIndex)reviewPanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.insertBefore(result,profileQuery);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(index===memberIndex)memberPanel.append(result);else if(index===reviewIndex)reviewPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
@@ -436,7 +437,7 @@
  let homeContext=null,homeRevision=0;
  const platformHome=()=>!!homeContext&&['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(homeContext.role);
  const communityHome=()=>!!homeContext&&['CUSTOMER','COMMUNITY_ADMIN','MERCHANT_ADMIN'].includes(homeContext.role);
- function syncHomeTitle(){if(activeIndex!==null)return;const title=platformHome()?'平台管理':communityHome()?'社区运营总览':'工作台';heading.textContent=title;heading.hidden=!!pageTitle;homeHeroTitle.textContent=title;if(pageTitle){pageTitle.textContent=title;pageTitle.hidden=!!homeContext;}if(platformBrandText)platformBrandText.textContent=platformHome()?'社区服务 · 平台':platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=platformHome()?'平台管理工作台':platformBrandSubtitleOriginal;}
+ function syncHomeTitle(){if(activeIndex!==null)return;const title=platformHome()?'平台管理':communityHome()?'社区运营总览':'工作台';heading.textContent=title;heading.hidden=!!pageTitle;homeHeroTitle.textContent=title;if(pageTitle){pageTitle.textContent=title;pageTitle.hidden=true;}if(platformBrandText)platformBrandText.textContent=platformHome()?'社区服务 · 平台':platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=platformHome()?'平台管理工作台':platformBrandSubtitleOriginal;}
  function openPlatformHomeView(operation){select(panels.indexOf(platformPanel));const field=document.getElementById('platformView');field.value=operation;field.onchange();syncOrderPageTitle();syncOperationsTitle();orderQuery.open=true;document.getElementById('readPlatformView').click();}
  function renderHome(){
   const revision=++homeRevision;cards.replaceChildren();cards.className='admin-home-groups';homeHeroActions.replaceChildren();homeEyebrow.textContent=platformHome()?'平台控制台':communityHome()?'社区工作台':'原账户工作台';
@@ -488,5 +489,49 @@
  renderHome();
  // ROLE_HOME_END
 
- back.addEventListener('click',()=>select(null));select(null);
+ // ORIGINAL_UI_RESTORATION_BEGIN: presentation only; original handlers remain authoritative.
+ const retainedQuery=(panel,node,label)=>{const d=document.createElement('details'),summary=document.createElement('summary');d.className='restored-query';d.open=true;summary.textContent=label;d.append(summary,node);panel.append(d);return d;};
+ const profileQuery=retainedQuery(profilePanel,actions,'查询与登记社区');
+ const openQueryDisclosure=retainedQuery(openPanel,openQuery,'社区查询');
+ const promotionQueryDisclosure=retainedQuery(promotionPanel,promotionQuery,'推广查询');
+ const memberQueryDisclosure=retainedQuery(memberPanel,memberQuery,'商家成员查询');
+ const customerQuery=retainedQuery(customerPanel,document.getElementById('readProfile'),'个人资料查询');
+ const receiverWorkspaceOriginal=document.getElementById('receiverWorkspace').closest('label');
+ const receiverEditReturn=document.createElement('button');receiverEditReturn.type='button';receiverEditReturn.textContent='返回接收关系列表';receiverEditReturn.className='restored-primary-return';receiverEditReturn.onclick=()=>{receiverActions.open=false;receiverBack.click();};receiverActions.append(receiverEditReturn);
+ operationQuery.classList.add('operation-query-action');reportPanel.append(reportControls);platformPanel.append(orderQuery);customerPanel.insertBefore(customerForm,customerBack);receiverPanel.insertBefore(receiverActions,receiverQueryControls);
+ // Move original actions outside the data cards, never clone listeners or permission state.
+ const profileSecondary=document.createElement('details'),profileSecondaryTitle=document.createElement('summary');profileSecondary.className='restored-secondary';profileSecondaryTitle.textContent='编辑与回读';profileSecondary.append(profileSecondaryTitle,edit,reread);profilePanel.append(toList,profileSecondary);
+ openPanel.append(backOpen,refreshOpen);promotionPanel.append(promotionBack);memberPanel.append(memberBack,memberRefresh);
+ for(const button of [toList,backOpen,promotionBack,memberBack])button.classList.add('restored-primary-return');
+ const workspaceReturn=document.createElement('button');workspaceReturn.type='button';workspaceReturn.className='restored-workspace-return';workspaceReturn.textContent='返回工作台';workspaceReturn.onclick=()=>select(null);nav.append(workspaceReturn);
+ const safeText=(node,text)=>{if(node&&node.textContent!==text)node.textContent=text;};
+ const safeHidden=(node,value)=>{if(node&&node.hidden!==value)node.hidden=value;};
+ let contextualReturn=null;
+ function syncRestoredPresentation(){
+  contextualReturn=null;main.classList.toggle('restored-specific-status',[profileIndex,openIndex,promotionIndex,memberIndex,reviewIndex,merchantIndex,receiverIndex,panels.indexOf(platformPanel)].includes(activeIndex));if(activeIndex===null)return;
+  let title=pageTitle?.textContent;
+  const profileEditing=!profileForm.hidden,profileDetailed=!detail.hidden;
+  if(activeIndex===profileIndex){title='社区资料'+(profileEditing?' · 编辑':profileDetailed?' · 详情':'');if(profileDetailed)contextualReturn=toList;}
+  else if(activeIndex===openIndex){title='打开社区'+(openActions.open?' · 关系操作':!openDetails.hidden?' · 详情':'');if(openActions.open)contextualReturn={click:()=>{openActions.open=false;backOpen.click();}};else if(!openDetails.hidden)contextualReturn=backOpen;}
+  else if(activeIndex===promotionIndex){title='社区推广'+(promotionActions.open?' · 编辑':!promotionDetail.hidden?' · 详情':'');if(promotionActions.open)contextualReturn={click:()=>{promotionActions.open=false;promotionBack.click();}};else if(!promotionDetail.hidden)contextualReturn=promotionBack;}
+  else if(activeIndex===memberIndex){title='社区商家成员'+(!memberDetail.hidden?' · 详情':'');if(!memberDetail.hidden)contextualReturn=memberBack;}
+  else if(activeIndex===customerIndex&&customerMode!=='list')contextualReturn=customerBack;
+  else if(activeIndex===reviewIndex&&reviewMode!=='list')contextualReturn=reviewBack;
+  else if(activeIndex===merchantIndex&&merchantMode!=='list')contextualReturn=merchantBack;
+  else if(activeIndex===receiverIndex){const editing=receiverActions.open;const destination=editing?receiverActions:receiverQuery;if(receiverWorkspaceOriginal.parentNode!==destination)destination.insertBefore(receiverWorkspaceOriginal,editing?document.getElementById('receiverId').closest('label'):document.getElementById('listReceiverRelations'));title=receiverPanel.querySelector('h2').textContent+(editing?' · 编辑':!receiverDetail.hidden?' · 详情':'');if(editing)contextualReturn={click:()=>{receiverActions.open=false;receiverBack.click();}};else if(!receiverDetail.hidden)contextualReturn=receiverBack;}
+  else if(activeIndex===panels.indexOf(platformPanel)){if(document.getElementById('platformView').value==='platform_orders'){if(!orderDetail.hidden)contextualReturn=orderBack;}else if(operationMode!=='list')contextualReturn=operationBack;}
+  else if(activeIndex===reportIndex&&snapshotMode==='detail')contextualReturn=snapshotDetail.querySelector('.snapshot-detail-action');
+  safeText(pageTitle,title);safeText(back,contextualReturn?'‹ 返回原列表':'‹ 返回工作台');
+  safeHidden(toList,!profileDetailed);safeHidden(profileSecondary,!profileDetailed||profileEditing);
+  safeHidden(backOpen,openDetails.hidden);safeHidden(refreshOpen,openDetails.hidden);
+  safeHidden(promotionBack,promotionDetail.hidden&&!promotionActions.open);safeHidden(memberBack,memberDetail.hidden);safeHidden(memberRefresh,memberDetail.hidden);
+  openPanel.classList.toggle('restored-editing',openActions.open);promotionPanel.classList.toggle('restored-editing',promotionActions.open);receiverPanel.classList.toggle('restored-editing',receiverActions.open);
+  profilePanel.classList.toggle('restored-profile-editing',profileEditing);platformPanel.classList.toggle('restored-operation-editing',operationMode==='edit'&&document.getElementById('platformView').value!=='platform_orders');
+  for(const [panel,query]of [[profilePanel,profileQuery],[openPanel,openQueryDisclosure],[promotionPanel,promotionQueryDisclosure],[memberPanel,memberQueryDisclosure],[customerPanel,customerQuery]])panel.classList.add('restored-canvas');
+ }
+ // This observes only rendered state, not identity/authorization. It never sends requests.
+ const presentationObserver=new MutationObserver(syncRestoredPresentation);presentationObserver.observe(main,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden','open']});
+ back.addEventListener('click',()=>{syncRestoredPresentation();if(contextualReturn)contextualReturn.click();else select(null);});select(null);syncRestoredPresentation();
+ // ORIGINAL_UI_RESTORATION_END
+
 })();
