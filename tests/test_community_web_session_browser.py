@@ -49,6 +49,16 @@ class SessionBrowser(unittest.TestCase):
             host.center.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',
                 (PROMOTIONS,promotion_code,fx.fx.uid1,'project1',
                  host.center.encrypt(canonical(promotion_record),'community-promotion:'+promotion_code)))
+            # Page22 uses the same admitted fixture merchant, not a mocked API.
+            from scripts.community_center_communities import MEMBERS
+            relation_key=host.application.communities.key('tenant1','MERCHANT:'+fx.fx.uid1)
+            relation=dict(community_id=promotion_community,tenant='tenant1',user_id=fx.fx.uid1,kind='MERCHANT',updated_at=host.center.now())
+            host.center.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',
+                (MEMBERS,relation_key,fx.fx.uid1,'project1',host.center.encrypt(canonical(relation),'community-relation:'+relation_key)))
+            merchant_db=host.persistence.runtime.demo.merchant_db
+            merchant_db.execute("INSERT OR REPLACE INTO merchant_profiles VALUES(?,?,?,?,?,?,?,1)",
+                ('tenant1','merchant1','store1','原商家表合成门店','仅 Hosted 测试','不得输出的商家联系方式','ACTIVE'))
+            merchant_db.commit()
             server.timeout=.1;received=[]
             def browser_flow():
                 def forward(route):
@@ -225,6 +235,33 @@ class SessionBrowser(unittest.TestCase):
                         expect(page.locator('#more')).to_be_hidden()
                         expect(promotion_panel).not_to_contain_text('原场景推广测试')
                         shot('21-denied-cleared-1440')
+                        # Pages22/49 query the actual original members permission path.
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区商家成员',exact=True).click()
+                        page.locator('#memberCommunityReference').fill(promotion_community)
+                        with directory('members'):page.locator('#queryMerchantMembers').click()
+                        member_panel=page.locator('.community-members-panel')
+                        member_card=member_panel.locator('.community-record-card')
+                        expect(member_card).to_have_count(1)
+                        expect(member_card.locator('dt')).to_have_text(['成员名称','成员类型','所属范围','列表说明'])
+                        expect(member_card).to_contain_text('原商家表合成门店')
+                        expect(member_panel).not_to_contain_text('不得输出的商家联系方式')
+                        shot('22-list-1440')
+                        member_panel.get_by_role('button',name='查看商家成员详情',exact=True).click()
+                        member_detail=member_panel.locator('.community-member-detail')
+                        expect(member_detail).to_be_visible();expect(member_detail).to_contain_text('原商家表合成门店')
+                        expect(member_detail).to_contain_text('未核验，不能从成员关系推断')
+                        shot('49-detail-1440')
+                        member_panel.get_by_role('button',name='返回成员列表',exact=True).click()
+                        expect(member_card).to_be_visible();shot('22-return-1440')
+                        member_panel.get_by_role('button',name='查看商家成员详情',exact=True).click()
+                        with directory('members'):member_panel.get_by_role('button',name='重新查询当前社区',exact=True).click()
+                        expect(member_card).to_contain_text('原商家表合成门店');shot('22-readback-1440')
+                        page.locator('#memberCommunityReference').fill(foreign_id)
+                        with directory('members',403):page.locator('#queryMerchantMembers').click()
+                        expect(member_panel.locator('.member-records')).to_be_empty()
+                        expect(member_detail).to_be_hidden();expect(page.locator('#more')).to_be_hidden()
+                        expect(member_panel).not_to_contain_text('原商家表合成门店')
+                        shot('22-denied-cleared-1440')
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
@@ -249,7 +286,7 @@ class SessionBrowser(unittest.TestCase):
                             finally:conn.close()
                         self.assertEqual(errors,[])
                         (evidence/'receipt.json').write_text(json.dumps(dict(source=os.environ.get('GITHUB_SHA','LOCAL'),
-                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19','20','21'],screenshots=shots,
+                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19','20','21','22','49'],screenshots=shots,
                             production=False,customer_accepted=False),ensure_ascii=False,indent=2)+'\n')
                     except Exception:
                         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)

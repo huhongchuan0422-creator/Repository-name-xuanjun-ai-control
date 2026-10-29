@@ -60,3 +60,8 @@
 .promotion-selected section:has(>#result){background:transparent;border:0;padding:0;margin:0}.promotion-selected section:has(>#result)>h2{display:none}
 .community-promotion-panel .community-record-card{margin:16px 0}.community-promotion-detail{padding:20px;border:1px solid var(--line);border-radius:14px;background:white}.community-promotion-detail dd{overflow-wrap:anywhere}
 .community-admin .community-promotion-panel .open-detail-action{display:block;width:100%;background:var(--green);color:white;text-align:left;margin:18px 0}.community-promotion-panel .open-query{flex-wrap:wrap}
+
+/* Pages22/49 share confirmed record-card hierarchy without exposing raw member JSON. */
+.members-selected #records,.members-selected #result,.members-selected .community-members-panel>h2{display:none}.members-selected section:has(>#result){background:transparent;border:0;padding:0;margin:0}.members-selected section:has(>#result)>h2{display:none}
+.community-members-panel .community-record-card{margin:16px 0}.community-member-detail{padding:20px;border:1px solid var(--line);border-radius:14px;background:white}.community-member-detail dd{overflow-wrap:anywhere}.community-members-panel .open-query{flex-wrap:wrap}
+.community-admin .community-members-panel .open-detail-action{display:block;width:100%;background:var(--green);color:white;text-align:left;margin:18px 0}

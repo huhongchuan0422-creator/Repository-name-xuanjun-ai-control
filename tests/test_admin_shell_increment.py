@@ -7,7 +7,13 @@ class Increment(unittest.TestCase):
   from pathlib import Path
   with zipfile.ZipFile('/tmp/miniapp-c19-readonly/community-stage-source.zip') as z:
    for name in ['communities.html','web-session.js','workbench.css','workbench.js','onboarding.js']:
-    self.assertEqual(z.read('demos/community-stage/'+name),Path('demos/community-stage/'+name).read_bytes())
+    actual=Path('demos/community-stage/'+name).read_bytes()
+    if name=='communities.html':
+     increment='<section id="communityMerchantMembers"><h2>社区商家成员</h2><label>社区编号<input id="memberCommunityReference"></label><button id="queryMerchantMembers">查询商家成员</button><p>读取当前授权社区的原商家资料与已有渠道查询状态；成员关系不代表收款或分账已验收。</p></section>'.encode()
+     self.assertEqual(actual.count(increment),1)
+     for added in ['communityMerchantMembers','memberCommunityReference','queryMerchantMembers']:self.assertEqual(actual.count(('id="'+added+'"').encode()),1)
+     actual=actual.replace(increment,b'',1)
+    self.assertEqual(z.read('demos/community-stage/'+name),actual)
    original=z.read('demos/community-stage/communities.html').decode()
    rendered=asset('/community/portal')[0].decode()
    for id in re.findall(r'id="([^"]+)"',original): self.assertEqual(rendered.count('id="'+id+'"'),1)
@@ -26,7 +32,7 @@ class Increment(unittest.TestCase):
      else: route.fulfill(status=404,body='Not found')
     page.route('https://community-ui.test/**',respond)
     page.goto('https://community-ui.test'+PREFIX+'/community/portal');page.wait_for_load_state('networkidle')
-    self.assertEqual(page.locator('.admin-card').count(),9)
+    self.assertEqual(page.locator('.admin-card').count(),10)
     self.assertFalse(page.locator('#profile').is_visible())
     page.screenshot(path='../community-home-1440.png',full_page=True)
     page.get_by_role('navigation',name='社区功能').get_by_role('button',name='社区资料',exact=True).click()

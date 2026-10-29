@@ -11,9 +11,9 @@ function setup(responses,reportHook=true){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
- const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[];
+ const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[],memberEvents=[];
  const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
- const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityPromotionView:value=>promotionEvents.push(value),communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityMerchantMembersView:value=>memberEvents.push(value),communityPromotionView:value=>promotionEvents.push(value),communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -25,7 +25,7 @@ function setup(responses,reportHook=true){
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
  const click=id=>elements[id].onclick();
- return {elements,calls,pending,configure,click,openEvents,reportEvents,promotionEvents,sectionChanged:context.window.communitySectionChanged};
+ return {elements,calls,pending,configure,click,openEvents,reportEvents,promotionEvents,memberEvents,sectionChanged:context.window.communitySectionChanged};
 }
 
 const community=(id,state='APPROVED',version=1)=>({id,name:id,state,version,description:'fixture',contact:'private'});
@@ -238,4 +238,23 @@ test('page21 create receipt permits later explicit creation and late state resul
 
 test('page21 authoritative pre-write rejection permits corrected retry without UNKNOWN reset',async()=>{
  const f=setup([{error:'APPROVED_COMMUNITY_REQUIRED'},{result:promotion()}]);f.elements.reference.value='co_one';f.elements.promotionScene.value='shop1';f.elements.promotionTitle.value='实际标题';f.elements.promotionExpiry.value='2026-11-01T12:00';await f.click('createPromotion');await f.click('createPromotion');assert.equal(f.calls.length,2);assert.equal(f.promotionEvents.at(-1).type,'saved');
+});
+
+const member=(kind='MERCHANT',community_id='co_one')=>({community_id,tenant:'tenant1',user_id:'member1',kind,updated_at:1793000000});
+test('page22 uses same members API and preserves sparse scan cursor while filtering merchant relation only',async()=>{
+ const f=setup([{result:result([member('CUSTOMER')],'a'.repeat(64))},{result:result([member(),member('MERCHANT','co_other')])}]);f.elements.reference.value='co_one';await f.click('queryMerchantMembers');
+ assert.equal(f.calls[0].body.operation,'members');assert.deepEqual(f.calls[0].body.params,{community_id:'co_one',after_id:''});assert.equal(f.memberEvents.at(-1).record.result.records.length,0);assert.equal(f.elements.more.hidden,false);
+ await f.click('more');assert.deepEqual(f.calls[1].body.params,{community_id:'co_one',after_id:'a'.repeat(64)});assert.deepEqual(f.memberEvents.at(-1).record.result.records,[member()]);assert.equal(f.elements.records.children.length,0);
+});
+test('page22 denial clears prior rows cursor and selected detail receipt',async()=>{
+ const f=setup([{result:result([member()],'a'.repeat(64))},{error:'COMMUNITY_MEMBERS_PRIVATE'}]);f.elements.reference.value='co_one';await f.click('queryMerchantMembers');const old=f.memberEvents.at(-1).record;await f.click('queryMerchantMembers');assert.equal(old.select(),false);assert.equal(f.memberEvents.at(-1).type,'error');assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);
+});
+test('page22 stale members cannot render across community identity or navigation change',async()=>{
+ for(const change of ['reference','identity','navigation']){const f=setup([{result:result([member()]),delay:true}]);f.elements.reference.value='co_one';const pending=f.click('queryMerchantMembers');if(change==='reference')f.elements.reference.value='co_other';if(change==='identity')f.configure({csrf:'new',workspace:'new'});if(change==='navigation')f.sectionChanged();f.pending.shift()();await pending;assert.equal(f.memberEvents.some(x=>x.type==='listed'),false);assert.equal(f.elements.more.hidden,true);}
+});
+test('page19 members remain unfiltered and page22 retained selection is invalidated by page19 query',async()=>{
+ const f=setup([{result:result([member()])},{result:result([member('CUSTOMER'),member()])}]);f.elements.reference.value='co_one';await f.click('queryMerchantMembers');const old=f.memberEvents.at(-1).record;await f.click('members');assert.equal(old.select(),false);assert.equal(f.elements.records.children.length,2);assert.equal(f.openEvents.at(-1).type,'members');assert.equal(f.memberEvents.at(-1).type,'reset');
+});
+test('page22 visible community input uses original scope and identity reset clears it',async()=>{
+ const f=setup([{result:result([member('MERCHANT','co_other')])}]);f.elements.memberCommunityReference.value='co_other';f.elements.memberCommunityReference.oninput();await f.click('queryMerchantMembers');assert.equal(f.calls[0].body.params.community_id,'co_other');f.configure({csrf:'new',workspace:'new'});assert.equal(f.elements.memberCommunityReference.value,'');assert.equal(f.memberEvents.at(-1).type,'identity-reset');
 });

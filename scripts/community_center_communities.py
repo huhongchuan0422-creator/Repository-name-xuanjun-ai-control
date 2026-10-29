@@ -210,7 +210,8 @@ class CenterCommunities:
                     rows = c.db.execute('SELECT subject_idx,payload FROM links WHERE channel=? AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51',
                         (MEMBERS, g['project'], after)).fetchall()
                     relations = [json.loads(c.decrypt(r[1], 'community-relation:' + r[0])) for r in rows[:50]]
-                    result = dict(records=[r for r in relations if r['tenant'] == g['tenant'] and r['community_id'] == record['id']],
+                    from scripts.community_member_merchant_projection import project_member
+                    result = dict(records=[project_member(self,g,record,r) for r in relations if r['tenant'] == g['tenant'] and r['community_id'] == record['id']],
                         has_more=len(rows) > 50, next_cursor=rows[49][0] if len(rows) > 50 else None)
                 else:
                     raise ValueError('UNKNOWN_COMMUNITY_OPERATION')

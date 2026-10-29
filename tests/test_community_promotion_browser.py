@@ -88,6 +88,11 @@ class CommunityPromotionBrowserJourney(unittest.TestCase):
                     self.assertEqual((record['authenticated_redemptions'],record['new_members']),(1,1))
                     self.assertEqual(record['metrics'],'DISTINCT_AUTHENTICATED_REDEMPTIONS_ONLY')
 
+                    # Listing invalidates the former selection; select this actual
+                    # returned record before the original versioned state action.
+                    admin.locator('#records article').filter(has_text=code).get_by_role('button',name='选择推广记录').click()
+                    expect(admin.locator('#promotionCode')).to_have_value(code)
+                    expect(admin.locator('#promotionVersion')).to_have_value('1')
                     admin.locator('#promotionState').select_option('PAUSED')
                     admin.locator('#savePromotionState').click()
                     expect(admin.locator('#promotionVersion')).to_have_value('2')

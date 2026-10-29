@@ -191,6 +191,38 @@
  promotionBack.addEventListener('click',()=>{promotionDetail.hidden=true;promotionRows.hidden=false;});
  clearPromotion('尚未查询原推广记录');
 
+ // Pages22/49: scoped original merchant-name projection; membership never implies payment admission.
+ const memberPanel=document.getElementById('communityMerchantMembers'),memberIndex=panels.indexOf(memberPanel);
+ memberPanel.classList.add('community-members-panel');
+ const memberQuery=document.createElement('div');memberQuery.className='open-query';memberQuery.append(document.getElementById('memberCommunityReference').closest('label'),document.getElementById('queryMerchantMembers'));
+ const memberHint=document.createElement('p');memberHint.className='profile-hint';
+ const memberRows=document.createElement('div');memberRows.className='member-records';
+ const memberDetail=document.createElement('div');memberDetail.className='community-member-detail';memberDetail.hidden=true;
+ const memberFields=document.createElement('dl'),memberBack=document.createElement('button'),memberRefresh=document.createElement('button');memberBack.type='button';memberBack.textContent='返回成员列表';memberRefresh.type='button';memberRefresh.textContent='重新查询当前社区';memberDetail.append(memberFields,memberBack,memberRefresh);
+ memberPanel.append(memberQuery,memberHint,memberRows,memberDetail);
+ function memberName(item){
+  if(item.merchant_name_status==='MATCHED'&&typeof item.merchant_name==='string'&&item.merchant_name)return item.merchant_name;
+  if(item.merchant_name_status==='MULTIPLE'&&Array.isArray(item.merchant_names))return '多个原门店：'+item.merchant_names.filter(v=>typeof v==='string').join('、');
+  return ({NO_PROFILE:'原商家资料尚未建立',NO_ADMITTED_MAPPING:'尚无同项目已准入商家映射',MAPPING_UNAVAILABLE:'原商家映射当前不可用'}[item.merchant_name_status]||'接口未返回商家名称');
+ }
+ function memberWechat(item){
+  if(item.wechat_status_source!=='SIGNED_PROVIDER_QUERY')return item.wechat_status_source==='MULTIPLE_MERCHANT_WORKSPACES'?'多个商家工作区，签约状态需分别核验':'未核验，不能从成员关系推断';
+  const states={APPLYMENT_STATE_EDITTING:'待完善资料',APPLYMENT_STATE_AUDITING:'微信审核中',APPLYMENT_STATE_REJECTED:'微信已驳回',APPLYMENT_STATE_TO_BE_CONFIRMED:'待确认',APPLYMENT_STATE_TO_BE_SIGNED:'待签约',APPLYMENT_STATE_SIGNING:'签约中',APPLYMENT_STATE_FINISHED:'微信进件签约已完成',APPLYMENT_STATE_CANCELED:'已取消'};
+  return states[item.wechat_status]?states[item.wechat_status]+'（原签验查询记录；收款及分账另行验收）':'未核验的渠道状态';
+ }
+ function clearMembers(message){memberRows.replaceChildren();memberFields.replaceChildren();memberRows.hidden=false;memberDetail.hidden=true;memberHint.textContent=message;}
+ window.communityMerchantMembersView=({type,record})=>{
+  if(type==='identity-reset')document.getElementById('memberCommunityReference').value='';
+  if(type!=='listed'){clearMembers(type==='loading'?'正在查询原成员关系':type==='error'?'读取失败或无权查看，旧成员记录已清除':'尚未查询原成员关系');return;}
+  clearMembers('当前页 '+record.result.records.length+' 条商家成员关系；不是全部成员统计。');
+  if(!record.result.records.length){const empty=document.createElement('p');empty.textContent=record.result.has_more?'本扫描页没有商家成员，仍有下一页可查询。':'本页没有商家成员；不补造商家资料。';memberRows.append(empty);}
+  for(const item of record.result.records){const card=document.createElement('article');card.className='community-record-card';const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';const fields=document.createElement('dl');
+   for(const pair of [['成员名称',memberName(item)],['成员类型','商家成员'],['所属范围','当前授权社区 '+record.community_id],['列表说明','点击下方按钮查看本次已读关系详情。']])openPair(fields,...pair);card.append(title,fields);
+   const show=document.createElement('button');show.type='button';show.className='open-detail-action';show.textContent='查看商家成员详情';show.addEventListener('click',()=>{if(!record.select())return;memberFields.replaceChildren();for(const pair of [['成员名称',memberName(item)],['成员编号',item.user_id],['成员类型','商家成员'],['所属范围','当前授权社区 '+record.community_id],['关系更新时间',Number.isInteger(item.updated_at)?new Date(item.updated_at*1000).toISOString().replace('T',' ').replace('.000Z',' UTC'):'接口未返回有效时间'],['微信进件与签约',memberWechat(item)],['渠道记录观测时间',item.wechat_status_source==='SIGNED_PROVIDER_QUERY'&&Number.isInteger(item.wechat_observed_at)?new Date(item.wechat_observed_at*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false})+' 北京时间':'尚无签验观测']])openPair(memberFields,...pair);memberRows.hidden=true;memberDetail.hidden=false;});memberRows.append(card,show);
+  }
+ };
+ memberBack.addEventListener('click',()=>{memberDetail.hidden=true;memberRows.hidden=false;});memberRefresh.addEventListener('click',()=>document.getElementById('queryMerchantMembers').click());clearMembers('尚未查询原成员关系');
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -198,10 +230,11 @@
   activeIndex=index;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   main.classList.toggle('profile-selected',index===profileIndex);
+  main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
   main.classList.toggle('open-selected',index===openIndex);main.classList.toggle('report-selected',index===reportIndex);if(index===reportIndex)reportReference.value=document.getElementById('reference').value;
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(index===memberIndex)memberPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
