@@ -87,7 +87,7 @@ test('profile read and update reuse commerce profile APIs without fabricated fie
   h.page.input({currentTarget:{dataset:{field:'nickname'}},detail:{value:'Alice'}});
   h.page.input({currentTarget:{dataset:{field:'contact'}},detail:{value:'alice@example.org'}});
   await h.page.save();
-  const business=h.calls.filter(x=>x.data&&x.data.operation);
+  const business=h.calls.filter(x=>x.data&&typeof x.data.operation==='string'&&x.data.operation.startsWith('commerce.'));
   assert.deepEqual(business.map(x=>x.data.operation),['commerce.profile_read','commerce.notices','commerce.profile_update']);
   assert.deepEqual(JSON.parse(JSON.stringify(business[1].data.params)),{after_id:''});
   assert.equal(JSON.stringify(business[2].data.params),JSON.stringify({nickname:'Alice',contact:'alice@example.org',expected_version:0}));
@@ -330,7 +330,7 @@ test('ordinary home exposes public entry and keeps initial login explicit',()=>{
  assert.equal(h.page.data.needsScene,true);assert.equal(h.calls.length,0);
  assert.equal(h.config.scene,undefined);assert.equal(h.page.scene,null);
  const wxml=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
- assert.match(wxml,/wx:if="{{!authenticated}}"/);assert.match(wxml,/商家入驻 · 开始办理/);
+ assert.match(wxml,/wx:if="{{!authenticated}}"/);assert.doesNotMatch(wxml,/bindtap="openMerchantJoin"/);assert.match(fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8'),/bindtap="openMerchantEntry"/);
  assert.doesNotMatch(wxml,/示例门店 A/);
  assert.match(wxml,/wx:if="{{!needsScene}}"/);
 });
