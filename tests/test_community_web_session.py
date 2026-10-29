@@ -3,6 +3,7 @@ import unittest
 from email.message import Message
 import test_community_mini_center_identity as fixture
 from scripts.community_web_session import WebSession,token,COOKIE
+from scripts.community_center_communities import CenterCommunities
 
 class OriginalWebSession(unittest.TestCase):
     def setUp(self):
@@ -37,5 +38,26 @@ class OriginalWebSession(unittest.TestCase):
             with self.assertRaises((PermissionError,ValueError)):self.service.dispatch('/community/session/login',Message(),body,'127.0.0.1')
         _,_,headers=self.login()
         with self.assertRaises(ValueError):self.service.dispatch('/community/session/grant',headers,{},'127.0.0.1')
+
+    def setup_community(self):
+        grants={name:dict(user_id=self.fx.uid1,project='project1',tenant='tenant1',role=role) for name,role in [('community','COMMUNITY_ADMIN'),('platform','PLATFORM_OWNER'),('review','PLATFORM_REVIEWER'),('customer','CUSTOMER'),('merchant','MERCHANT_ADMIN')]}
+        grants['foreign']=dict(user_id=self.fx.uid2,project='project1',tenant='tenant1',role='PLATFORM_OWNER')
+        communities=CenterCommunities(self.fx.center,grants)
+        self.service=WebSession(self.fx.center,communities=communities)
+        return communities
+    def test_check_projects_exact_server_roles_and_preserves_original_fields(self):
+        self.setup_community();_,_,headers=self.login()
+        result,_=self.service.dispatch('/community/session/check',headers,{},'127.0.0.1')
+        self.assertEqual(set(result),{'user_id','workspaces','reviewer'})
+        self.assertFalse(result['reviewer'])
+        self.assertEqual(result['workspaces'],[dict(kind='COMMUNITY',workspace=n,role=r) for n,r in [('community','COMMUNITY_ADMIN'),('platform','PLATFORM_OWNER'),('review','PLATFORM_REVIEWER'),('customer','CUSTOMER'),('merchant','MERCHANT_ADMIN')]])
+    def test_role_is_rechecked_and_unknown_does_not_become_platform(self):
+        communities=self.setup_community();_,_,headers=self.login()
+        communities.grants['platform']['role']='INVALID'
+        communities.grants['review']['tenant']='foreign'
+        result,_=self.service.dispatch('/community/session/check',headers,{},'127.0.0.1')
+        self.assertNotIn('platform',[w['workspace'] for w in result['workspaces']])
+        self.assertNotIn('review',[w['workspace'] for w in result['workspaces']])
+        with self.assertRaises(ValueError):self.service.dispatch('/community/session/check',headers,{'role':'PLATFORM_OWNER'},'127.0.0.1')
 
 if __name__=='__main__':unittest.main()

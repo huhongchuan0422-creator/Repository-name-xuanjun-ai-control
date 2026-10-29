@@ -15,7 +15,7 @@
  const memberView=(type,record)=>{if(typeof window.communityMerchantMembersView==='function')window.communityMerchantMembersView({type,record});};
  const promotionView=(type,record)=>{if(typeof window.communityPromotionView==='function')window.communityPromotionView({type,record});};
  const reportView=(type,record)=>{if(typeof window.communityReportView==='function')window.communityReportView({type,record});};
- const isReport=operation=>['community_orders','community_earnings'].includes(operation);
+ const isReport=operation=>['community_orders','community_earnings','community_refunds'].includes(operation);
  const merchantView=(type,record)=>{if(typeof window.communityPlatformMerchantView==='function')window.communityPlatformMerchantView({type,record});};
  let reviewSelection=null;
  const reviewView=(type,record)=>{if(typeof window.communityPlatformReviewView==='function')window.communityPlatformReviewView({type,record});};
@@ -50,6 +50,7 @@
  $('review').onclick=()=>action(t=>communityResult(t,'review',{community_id:id(),expected_version:version(),decision:$('decision').value,opinion:$('opinion').value}));
  $('more').onclick=()=>action(t=>page&&list(t,page.operation,page.params,page.merchantOnly));
  async function customerRequest(t,operation,params){const generation=directoryGeneration;clearCustomer('loading');try{const r=await call(operation,params,t);if(t!==epoch||generation!==directoryGeneration)return;if(operation==='profile_read'||operation==='profile_update'){profileVersion=r.version;$('nickname').value=r.nickname;$('customerContact').value=r.contact;customerView(operation==='profile_read'?'listed':'saved',r);}else customerView(operation==='referral_code'?'code':'bound',r);$('customerResult').textContent=JSON.stringify(r,null,2);}catch(error){if(t===epoch&&generation===directoryGeneration)clearCustomer(error.serverRejected?'error':'unknown');throw error;}}
+ window.communityReadRefunds=()=>action(t=>list(t,'community_refunds',{community_id:id(),after_id:''}));
  $('readProfile').onclick=()=>action(t=>customerRequest(t,'profile_read',{}));
  $('customerProfile').onsubmit=e=>{e.preventDefault();return action(t=>{if(profileVersion===null)throw Error('先读取当前资料');return customerRequest(t,'profile_update',{nickname:$('nickname').value,contact:$('customerContact').value,expected_version:profileVersion});});};
  $('referralCode').onclick=()=>action(t=>customerRequest(t,'referral_code',{}));

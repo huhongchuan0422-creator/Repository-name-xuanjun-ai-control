@@ -26,3 +26,11 @@ class FinanceUIContract(unittest.TestCase):
  def test_customer_profile_runtime(self):subprocess.run(['node',str(ROOT/'tests/community_test_profile_runtime.cjs'),str(ROOT/'demos/community-stage/communities.js')],check=True,timeout=30)
 
  def test_customer_profile_shell(self):subprocess.run(['node',str(ROOT/'tests/community_test_customer_shell.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_admission_review_queue(self):self.run_node('community_admission_queue_dom.cjs','onboarding.js','onboarding.html')
+
+ def test_admission_review_layout(self):subprocess.run(['node',str(ROOT/'tests/community_admission_layout_dom.cjs'),str(ROOT/'demos/community-stage/onboarding.js')],check=True,timeout=30)
+
+ def test_community_split_snapshot(self):subprocess.run(['node',str(ROOT/'tests/community_snapshot_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_community_refund_observation(self):subprocess.run(['node',str(ROOT/'tests/community_refund_observation_dom.cjs'),str(ROOT/'demos/community-stage/communities.js'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)

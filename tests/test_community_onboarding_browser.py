@@ -23,6 +23,22 @@ from scripts.community_mini_http import serve
 from scripts.community_center_operations import CenterOperations
 from scripts.community_merchant_store import open_store
 
+def reviewer_reload(page):
+    if page.locator('#detail').is_visible():page.get_by_role('button',name='返回入驻审核列表',exact=True).click()
+    page.locator('#reloadQueue').click()
+
+def reviewer_open(page):
+    # Actual existing HTTP fixture, original review controls reached through their visible disclosure.
+    capture=not getattr(reviewer_open,'captured',False)
+    prefix='admission-reopen' if os.environ.get('COMMUNITY_REOPEN_BROWSER_CHILD')=='1' else 'admission'
+    def shot(label):
+        if capture:
+            os.makedirs('community-admin-browser-evidence',exist_ok=True);page.evaluate('window.scrollTo(0,0)');page.screenshot(path='community-admin-browser-evidence/'+prefix+'-'+label+'-1440.png',full_page=True)
+    expect(page.locator('#applications .admission-record-card').first).to_be_visible();shot('30-list')
+    page.locator('#applications button').first.click();expect(page.locator('#detail > .admission-record-card')).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核 · 详情');shot('60-detail')
+    page.get_by_role('button',name='返回入驻审核列表',exact=True).click();expect(page.locator('#applications .admission-record-card').first).to_be_visible();shot('30-return')
+    page.locator('#applications button').first.click();page.locator('#reviewOriginalControls > summary').click();expect(page.locator('#reviewOriginalControls')).to_have_attribute('open','');shot('61-controls');reviewer_open.captured=True
+
 class OnboardingBrowserJourney(unittest.TestCase):
     def test_apply_upload_correction_resubmit_per_material_review_approve(self):
         self.journey(False)
@@ -115,7 +131,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
 
                     phase('REVIEWER_OPEN')
                     open_page(admin,'/merchant/review',fx.reviewer['csrf'])
-                    admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')
+                    reviewer_open(admin);expect(admin.locator('#applicationState')).to_have_text('待审核')
                     self.assertEqual(application(admin),original_id)
                     reject_before=revision(admin)
                     admin.locator('#note').fill('资料整体不符合当前入驻要求，请补充后重新提交')
@@ -151,7 +167,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     resubmitted_revision=revision(page);self.assertGreater(resubmitted_revision,changed_revision)
                     self.assertEqual(application(page),original_id)
 
-                    admin.locator('#reloadQueue').click();admin.locator('#applications button').first.click()
+                    reviewer_reload(admin);reviewer_open(admin)
                     expect(admin.locator('#applicationState')).to_have_text('待审核');self.assertEqual(application(admin),original_id)
                     before_unreviewed=revision(admin)
                     admin.locator('#note').fill('不得跳过逐份复审')
@@ -221,8 +237,8 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     phase('UNREVIEWED_APPROVE_REJECTED')
                     expect(admin.locator('#status')).to_contain_text('资料、状态或版本不符合要求')
                     expect(admin.locator('[data-action=APPROVE]')).to_be_enabled()
-                    admin.locator('#reloadQueue').click()
-                    admin.locator('#applications button').first.click()
+                    reviewer_reload(admin)
+                    reviewer_open(admin)
                     expect(admin.locator('#applicationState')).to_have_text('待审核')
                     self.assertEqual(application(admin),original_id)
                     self.assertEqual(revision(admin),before_unreviewed)
@@ -321,7 +337,7 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     for kind in [row.get_attribute('data-kind') for row in page.locator('#materials .material, #licenseUpload .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:upload(kind)
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
                     open_page(admin,'/merchant/review',fx.reviewer['csrf'])
-                    admin.locator('#applications button').first.click();expect(admin.locator('#applicationState')).to_have_text('待审核')
+                    reviewer_open(admin);expect(admin.locator('#applicationState')).to_have_text('待审核')
                     admin.locator('#note').fill('请更新小程序经营页面截图')
                     admin.locator('[data-kind=mini_program_screenshot]').get_by_role('button',name='资料需补充',exact=True).click()
                     expect(admin.locator('[data-kind=mini_program_screenshot] p')).to_contain_text('需要补件')
@@ -330,8 +346,8 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(page.locator('#reviewNote')).to_contain_text('请更新小程序经营页面截图')
                     upload('mini_program_screenshot',b'%PDF-updated synthetic mini program')
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
-                    admin.locator('#reloadQueue').click();expect(admin.locator('#applications button').first).to_contain_text('待审核')
-                    admin.locator('#applications button').first.click();admin.locator('#note').fill('本份资料核对通过')
+                    reviewer_reload(admin);expect(admin.locator('#applications button').first).to_contain_text('待审核')
+                    reviewer_open(admin);admin.locator('#note').fill('本份资料核对通过')
                     for kind in [row.get_attribute('data-kind') for row in admin.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:
                         row=admin.locator('[data-kind="'+kind+'"]');row.get_by_role('button',name='资料通过',exact=True).click()
                         expect(row.locator('p')).to_contain_text('资料审核通过')

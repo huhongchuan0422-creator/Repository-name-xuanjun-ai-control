@@ -105,13 +105,14 @@
 
 
  // Page20: only original order/verified split observations; never a payment action.
+ // COMMUNITY_SNAPSHOT_BEGIN
  const reportPanel=document.getElementById('communityEarnings').closest('section'),reportIndex=panels.indexOf(reportPanel);
  reportPanel.classList.add('community-report-panel');
  const reportQuery=document.createElement('div');reportQuery.className='open-query';
  const reportLabel=document.createElement('label');reportLabel.textContent='社区编号';
  const reportReference=document.createElement('input');reportReference.id='reportReference';reportLabel.append(reportReference);
  reportReference.addEventListener('input',()=>{document.getElementById('reference').value=reportReference.value;document.getElementById('reference').oninput();});
- reportQuery.append(reportLabel,document.getElementById('communityOrders'),document.getElementById('communityEarnings'));
+ reportQuery.append(reportLabel,document.getElementById('communityOrders'),document.getElementById('communityEarnings'));const readRefundObservations=document.createElement('button');readRefundObservations.type='button';readRefundObservations.textContent='查询原订单退款观察';readRefundObservations.onclick=()=>window.communityReadRefunds();reportQuery.append(readRefundObservations);
  const reportHint=document.createElement('p');reportHint.className='profile-hint';
  const reportCard=document.createElement('article');reportCard.className='community-record-card';
  const reportTitle=document.createElement('h3');reportTitle.textContent='记录列表 · 当前范围';
@@ -127,30 +128,38 @@
  reportConfig.append(document.getElementById('bindReceiver'));
  const oldConfigTitle=reportPanel.querySelector('h3');if(oldConfigTitle)oldConfigTitle.hidden=true;
  reportPanel.append(reportQuery,reportHint,reportCard,reportShow,reportDetail,reportConfig);
- let reportRecord=null;
+ let reportRecord=null,reportViewRevision=0,snapshotMode='overview',snapshotKind='split';
+ const snapshotDetail=document.createElement('div');snapshotDetail.className='community-snapshot-detail';snapshotDetail.hidden=true;reportDetail.append(snapshotDetail);
+ function syncSnapshotTitle(){if(activeIndex===reportIndex&&snapshotMode!=='overview'&&pageTitle)pageTitle.textContent=(snapshotKind==='refund'?'退款观察':'分账快照')+(snapshotMode==='detail'?' · 详情':'');}
+ function snapshotList(){snapshotMode='list';reportCard.hidden=true;reportShow.hidden=true;reportDetail.hidden=false;reportRows.hidden=false;snapshotDetail.hidden=true;snapshotDetail.replaceChildren();reportBack.hidden=false;syncSnapshotTitle();}
+
  const money=(value,currency)=>Number.isSafeInteger(value)&&currency==='CNY'?(value<0?'-':'')+'¥'+Math.floor(Math.abs(value)/100)+'.'+String(Math.abs(value)%100).padStart(2,'0')+' CNY':'当前权限未返回有效金额';
  const reportValue=value=>value===undefined?'当前权限未返回该字段':String(value);
- function clearReport(message){reportRecord=null;reportHint.textContent=message;reportCard.hidden=false;reportShow.hidden=false;reportShow.disabled=true;reportDetail.hidden=true;reportRows.replaceChildren();reportSummary.replaceChildren();
-  for(const pair of [['社区收益观察','分账与回退分别查看；未确认不表示已到账'],['分账快照','查询当前社区范围的原记录'],['退款观察','只读原订单退款及分账回退观察'],['查询状态',message]])openPair(reportSummary,...pair);
+ function clearReport(message){reportViewRevision++;snapshotDetail.replaceChildren();snapshotDetail.hidden=true;reportRows.hidden=false;reportBack.hidden=false;reportRecord=null;reportHint.textContent=message;reportCard.hidden=false;reportShow.hidden=false;reportShow.disabled=true;reportDetail.hidden=true;reportRows.replaceChildren();reportSummary.replaceChildren();
+  for(const pair of [['社区收益观察','分账与回退分别查看；未确认不表示已到账'],['分账快照','查询当前社区范围的原记录'],['退款观察','只读原订单退款及分账回退观察'],['查询状态',message]])openPair(reportSummary,...pair);if(snapshotMode!=='overview')snapshotList();
  }
  window.communityReportView=({type,record})=>{
   if(type==='identity-reset')reportReference.value='';
   if(type==='binding'){clearReport('接收关系已保存，版本 '+reportValue(record.version)+'；仅适用于新分账规则版本，不执行资金操作。');return;}
   if(type!=='listed'){clearReport(type==='loading'?'正在读取，尚未确认':type==='error'?'读取失败或无权查看，旧记录已清除':'尚未查询，不填充真实结果');return;}
   clearReport('已读取当前页 '+record.result.records.length+' 条记录；不代表全部记录或到账。');reportRecord=record;
-  const r=record.result,earnings=record.operation==='community_earnings';reportSummary.replaceChildren();
+  const r=record.result,earnings=record.operation==='community_earnings',refunds=record.operation==='community_refunds',revision=reportViewRevision;if(refunds){snapshotKind='refund';snapshotMode='list';}else if(earnings)snapshotKind='split';else snapshotMode='overview';reportSummary.replaceChildren();
   for(const pair of [['社区收益观察','当前页已核实金额 '+money(r.page_gross_minor,r.currency)+'；净额 '+money(r.page_net_minor,r.currency)],['分账快照',earnings?'当前社区的原分账规则版本与接收方观察':'当前社区归属订单；未读取分账快照'],['退款观察','当前页已核实退款/回退 '+money(r.page_returns_minor,r.currency)],['查询状态',(r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'汇总范围未确认')+' · '+(r.finance_status==='UNCONFIRMED'?'财务核销未确认':'财务状态：'+reportValue(r.finance_status))]])openPair(reportSummary,...pair);
-  reportShow.textContent=earnings?'查看分账快照':'查看归属订单';reportShow.disabled=false;
-  const heading=document.createElement('h3');heading.textContent=earnings?'当前页分账快照与回退观察':'当前页归属订单';reportRows.append(heading);
+  reportShow.textContent=refunds?'查看退款观察':earnings?'查看分账快照':'查看归属订单';reportShow.disabled=false;
+  const heading=document.createElement('h3');heading.textContent=earnings?'当前页分账快照与回退观察':refunds?'当前页原订单退款观察':'当前页归属订单';heading.hidden=earnings||refunds;reportRows.append(heading);
   if(!r.records.length){const empty=document.createElement('p');empty.textContent='当前页没有记录；不代表其他页或未接通。';reportRows.append(empty);}
   for(const item of r.records){const row=document.createElement('article');row.className='community-record-card';const fields=document.createElement('dl');
    const keys=earnings?[['原订单','reference'],['分账请求','request_id'],['接收方','receiver_id'],['规则编号','rule_id'],['规则版本','rule_version'],['已核实分账','received_minor'],['已核实回退','returned_minor'],['净额','net_minor'],['渠道状态','provider_state'],['接收方状态','receiver_state'],['财务核销','finance_status']]:[['原订单','reference'],['商家','merchant_id'],['门店','store_id'],['订单金额','amount_minor'],['订单状态','order_state'],['渠道付款已核实','provider_payment_verified']];
-   for(const [label,key]of keys)openPair(fields,label,key.endsWith('_minor')?money(item[key],r.currency):key==='finance_status'&&item[key]==='UNCONFIRMED'?'未确认':key==='provider_payment_verified'?item[key]===true?'是（不代表财务核销）':item[key]===false?'否':'未返回':reportValue(item[key]));row.append(fields);reportRows.append(row);
+   const fieldValue=key=>key.endsWith('_minor')?money(item[key],r.currency):key==='finance_status'&&item[key]==='UNCONFIRMED'?'未确认':key==='provider_payment_verified'?item[key]===true?'是（不代表财务核销）':item[key]===false?'否':'未返回':reportValue(item[key]);
+   if(refunds){const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';row.append(title);for(const pair of [['关联记录',reportValue(item.reference)],['订单退款状态',item.order_state==='SUCCESS'?'支付成功，仍可能存在部分退款':item.order_state==='REFUNDED'?'订单已退款':reportValue(item.order_state)],['退款详情',item.refund_observation_status==='NO_RECORDED_VERIFIED_REFUND'?'未记录已签验退款事件，不等于未退款':(item.refund_observations||[]).map(o=>reportValue(o.out_refund_no)+' · '+money(o.refund_minor,o.currency)).join('；')||'原观察记录未返回']])openPair(fields,...pair);}else if(earnings){const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';row.append(title);for(const pair of [['分账关联',reportValue(item.request_id)+' · '+reportValue(item.receiver_id)],['已分账 / 已回退 / 净额',money(item.received_minor,r.currency)+' / '+money(item.returned_minor,r.currency)+' / '+money(item.net_minor,r.currency)],['汇总范围',r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'原范围未确认']])openPair(fields,...pair);}else for(const [label,key]of keys)openPair(fields,label,fieldValue(key));row.append(fields);reportRows.append(row);
+   if(earnings||refunds){const open=document.createElement('button');open.type='button';open.className='snapshot-detail-action';open.textContent=refunds?'查看退款观察详情':'查看分账记录详情';open.onclick=()=>{if(revision!==reportViewRevision||reportRecord!==record)return;snapshotMode='detail';snapshotDetail.replaceChildren();const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl'),back=document.createElement('button');card.className='community-record-card';h.textContent='记录详情';card.append(h,dl);for(const [label,key]of keys)openPair(dl,label,fieldValue(key));if(refunds){openPair(dl,'退款观测',item.refund_observation_status==='NO_RECORDED_VERIFIED_REFUND'?'未记录已签验退款事件，不等于未退款':'以下为原签验后存储观察，不是本轮重新验签或财务核销');for(const observation of item.refund_observations||[]){openPair(dl,'退款单号',reportValue(observation.out_refund_no));openPair(dl,'本笔退款',money(observation.refund_minor,observation.currency));openPair(dl,'原观察时间',reportValue(observation.observed_at));openPair(dl,'财务核销',observation.finance_status==='UNCONFIRMED'?'未确认':reportValue(observation.finance_status));}openPair(dl,'财务核销',item.finance_status==='UNCONFIRMED'?'未确认':reportValue(item.finance_status));openPair(dl,'可用操作','仅查看，不执行退款或分账');}openPair(dl,'汇总范围',r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'原范围未确认');back.type='button';back.className='snapshot-detail-action';back.textContent=refunds?'返回退款观察列表':'返回分账快照列表';back.onclick=()=>{if(revision===reportViewRevision&&reportRecord===record)snapshotList();};snapshotDetail.append(card,back);snapshotDetail.hidden=false;reportRows.hidden=true;reportBack.hidden=true;syncSnapshotTitle();};reportRows.append(open);}
   }
+  if(!earnings&&!refunds){reportCard.hidden=false;reportShow.hidden=false;reportDetail.hidden=true;if(activeIndex===reportIndex&&pageTitle)pageTitle.textContent=reportPanel.querySelector('h2').textContent;}else if(snapshotMode!=='overview')snapshotList();
  };
- reportShow.addEventListener('click',()=>{if(!reportRecord)return;reportCard.hidden=true;reportShow.hidden=true;reportDetail.hidden=false;});
- reportBack.addEventListener('click',()=>{if(!reportRecord)return;reportDetail.hidden=true;reportCard.hidden=false;reportShow.hidden=false;});
+ reportShow.addEventListener('click',()=>{if(!reportRecord)return;if(['community_earnings','community_refunds'].includes(reportRecord.operation)){snapshotKind=reportRecord.operation==='community_refunds'?'refund':'split';snapshotList();return;}reportCard.hidden=true;reportShow.hidden=true;reportDetail.hidden=false;});
+ reportBack.addEventListener('click',()=>{snapshotMode='overview';snapshotDetail.hidden=true;reportRows.hidden=false;reportDetail.hidden=true;reportCard.hidden=false;reportShow.hidden=false;if(activeIndex===reportIndex&&pageTitle)pageTitle.textContent=reportPanel.querySelector('h2').textContent;});
  clearReport('尚未查询，不填充真实结果');
+ // COMMUNITY_SNAPSHOT_END
 
  // Page21: field cards use original scoped promotion responses, never link views as members.
  const promotionPanel=document.getElementById('listPromotions').closest('section'),promotionIndex=panels.indexOf(promotionPanel);
@@ -367,10 +376,10 @@
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
   if(activeIndex===profileIndex&&index!==profileIndex)emptyProfile('切换功能后请重新查询社区资料。');
-  activeIndex=index;syncPlatformBrand(index);
+  if(index!==reportIndex)snapshotMode='overview';activeIndex=index;syncPlatformBrand(index);
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
-  syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();syncCustomerTitle();
+  syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();syncCustomerTitle();syncSnapshotTitle();
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
@@ -391,5 +400,6 @@
   const card=document.createElement('button');card.type='button';card.className='admin-card';
   const strong=document.createElement('strong');strong.textContent=title;const description=document.createElement('span');description.textContent='打开原业务模块 · 按当前角色权限';card.append(strong,description);card.addEventListener('click',()=>select(index));cards.append(card);
  });
+ const snapshotNav=document.createElement('button');snapshotNav.type='button';snapshotNav.textContent='分账快照';snapshotNav.addEventListener('click',()=>{const changed=activeIndex===reportIndex&&snapshotKind!=='split';select(reportIndex);if(changed&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();snapshotKind='split';if(reportRecord?.operation!=='community_earnings')clearReport('请查询当前社区的原分账快照。');snapshotList();});nav.append(snapshotNav);const refundNav=document.createElement('button');refundNav.type='button';refundNav.textContent='退款观察';refundNav.addEventListener('click',()=>{const changed=activeIndex===reportIndex&&snapshotKind!=='refund';select(reportIndex);if(changed&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();snapshotKind='refund';if(reportRecord?.operation!=='community_refunds')clearReport('请查询当前社区的原订单退款观察。');snapshotList();});nav.append(refundNav);
  back.addEventListener('click',()=>select(null));select(null);
 })();

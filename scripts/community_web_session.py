@@ -62,9 +62,11 @@ class WebSession:
                     workspaces.append({'kind':'MERCHANT','workspace':name})
             if self.communities is not None:
                 for name in self.communities.grants:
-                    try:self.communities.authorize(session,values[0],name)
+                    try:grant=self.communities.authorize(session,values[0],name)
                     except PermissionError:continue
-                    workspaces.append({'kind':'COMMUNITY','workspace':name})
+                    role=grant.get('role')
+                    if role not in ('CUSTOMER','COMMUNITY_ADMIN','MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER'):continue
+                    workspaces.append({'kind':'COMMUNITY','workspace':name,'role':role})
             reviewer=False
             if self.onboarding is not None:
                 try:self.onboarding._reviewer(uid);reviewer=True

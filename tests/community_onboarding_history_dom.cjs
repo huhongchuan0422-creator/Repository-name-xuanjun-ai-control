@@ -39,7 +39,7 @@ const context={document,window:{},location:{pathname:process.argv[4]||'/merchant
 }};
 vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context);
 const flush=async()=>{for(let i=0;i<80;i++)await Promise.resolve();};
-const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){nodes.applications.children[0].click();await flush();}};
+const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();}};
 const text=node=>walk(node).map(n=>n.textContent).join('\n');
 (async()=>{
  await flush();await reload();assert(nodes.applicationVersion.textContent.includes('app1'));assert(nodes.applicationVersion.textContent.includes('51'));

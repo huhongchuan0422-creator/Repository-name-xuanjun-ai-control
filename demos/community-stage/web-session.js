@@ -19,6 +19,7 @@
   select.disabled=active!==null||!csrf||!workspaces.length;
  };
  const configure=value=>{
+  if(window.communityHomeContext)window.communityHomeContext(value);
   if(window.configureCommunityWorkbench)window.configureCommunityWorkbench(value);
   if(window.configureCommunityPortal)window.configureCommunityPortal(value);
   if(window.configureCommunityOnboarding)window.configureCommunityOnboarding(value);
@@ -36,10 +37,16 @@
   if(!response.ok)throw Error(response.status===403?'登录已失效或没有权限，请重新登录。':'请求未确认，请检查状态后再操作。');
   return result.result;
  }
+ // Role is navigation metadata from this session check, never a grant.
+ const communityRoles=new Set(['CUSTOMER','COMMUNITY_ADMIN','MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER']);
+ function selectedContext(){
+  if(!csrf)return null;
+  const selected=workspaces.find(w=>w.workspace===select.value);
+  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null}:{})};
+ }
  function choose(){
   if(active!==null)return;
-  const workspace=select.value;
-  configure(csrf?{csrf,...(workspaces.some(w=>w.workspace===workspace)?{workspace}:{})}:null);
+  configure(selectedContext());
  }
  async function check(t){
   const result=await call('check',{},t,csrf);if(!current(t))return;
@@ -47,8 +54,7 @@
   select.replaceChildren();for(const w of workspaces){const option=document.createElement('option');option.value=w.workspace;option.textContent=w.workspace;select.append(option);}
   const review=location.pathname.endsWith('/merchant/review');
   message.textContent=review?(result.reviewer?'已登录原平台审核账户。':'已登录；当前账户没有平台审核权限。'):(workspaces.length?'已登录，请选择已授权工作区。':'已登录；当前账户没有此角色的工作区。');
-  const workspace=select.value;
-  configure({csrf,...(workspace?{workspace}:{})});
+  configure(selectedContext());
  }
  async function mutation(action,body){
   // This guard also rejects synthetic submit/click events on disabled buttons.

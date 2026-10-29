@@ -33,7 +33,7 @@ const flush=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
 const control=path=>walk(nodes.wechatFields).find(e=>e.dataset.path===path);
 const edit=(path,value)=>{const e=control(path);e.value=value;e.listeners.input?.();};
 const rows=()=>nodes.materials.children.map(e=>e.dataset.kind);
-const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'test'});await flush();if(context.location.pathname==='/merchant/review'){nodes.applications.children[0].click();await flush();}};
+const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'test'});await flush();if(context.location.pathname==='/merchant/review'){walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();}};
 const read=async()=>{nodes.wechatRead.click();await flush();};
 const save=async()=>{nodes.wechatProfile.onsubmit({preventDefault(){}});await flush();};
 const scene=key=>walk(nodes.wechatFields).find(e=>e.dataset.scene===key);

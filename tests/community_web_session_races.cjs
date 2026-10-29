@@ -4,7 +4,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync(process.argv[2],'utf8');
 const flush=async()=>{for(let i=0;i<120;i++)await Promise.resolve();};
-function harness(initial=''){
+function harness(initial='',community=false){
  class Element{
   constructor(){this.value='';this.textContent='';this.disabled=false;this.children=[];this.events={};}
   addEventListener(name,fn){this.events[name]=fn;}
@@ -15,11 +15,11 @@ function harness(initial=''){
  form.querySelector=selector=>selector==='[name=password]'?password:null;
  form.reset=()=>{email.value='';password.value='';};
  const root={querySelector:selector=>({'form':form,'[role=status]':message,'select':select,'[data-logout]':logout}[selector]),querySelectorAll:()=>[login,logout]};
- const data=new Map(initial?[['community-original-csrf',initial]]:[]),requests=[],configured=[],messages=[];let channel;
+ const data=new Map(initial?[['community-original-csrf',initial]]:[]),requests=[],configured=[],homeContexts=[],messages=[];let channel;
  const locks={tail:Promise.resolve(),request(name,fn){assert.equal(name,'community-original-session');const p=this.tail.then(fn);this.tail=p.catch(()=>{});return p;}};
- const context={document:{getElementById:()=>root,createElement:()=>new Element()},location:{pathname:'/community-preview/merchant/workbench'},
+ const context={document:{getElementById:()=>root,createElement:()=>new Element()},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
   sessionStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
-  window:{configureCommunityWorkbench:value=>{configured.push(value?{...value}:null);form.reset();}},navigator:{locks},
+  window:{communityHomeContext:value=>homeContexts.push(value?{...value}:null),configureCommunityWorkbench:value=>{configured.push(value?{...value}:null);form.reset();}},navigator:{locks},
   BroadcastChannel:class{constructor(name){assert.equal(name,'community-original-session');channel=this;}postMessage(value){messages.push(value);}},
   FormData:class{constructor(){this.data={email:email.value,password:password.value};}get(k){return this.data[k];}},
   fetch:(url,options)=>new Promise((resolve,reject)=>{requests.push({action:url.split('/').at(-1),options,
@@ -27,7 +27,7 @@ function harness(initial=''){
  vm.runInNewContext(source,context);
  const submit=address=>{email.value=address;password.value='SyntheticPassword!';form.events.submit({preventDefault(){}});};
  const completeLogin=async(csrf,workspace)=>{const request=requests.filter(r=>r.action==='login').at(-1);request.reply({csrf,user_id:workspace});await flush();requests.filter(r=>r.action==='check').at(-1).reply({workspaces:[{kind:'MERCHANT',workspace}],reviewer:false});await flush();};
- return{requests,configured,messages,form,email,password,login,logout,select,message,data,submit,completeLogin,
+ return{requests,configured,homeContexts,messages,form,email,password,login,logout,select,message,data,submit,completeLogin,
  notify:()=>channel.onmessage({data:'changed'}),csrf:()=>data.get('community-original-csrf')};
 }
 (async()=>{
@@ -69,6 +69,22 @@ function harness(initial=''){
   assert.equal(h.select.children.length,0);assert.equal(h.configured.at(-1),null);
   assert.equal(h.login.disabled,false);assert(h.message.textContent.includes('未自动重试'));
   assert.deepEqual(h.messages,['changed']);
+ }
+ {
+  const h=harness('old-csrf',true);await flush();
+  h.requests[0].reply({workspaces:[{kind:'COMMUNITY',workspace:'platform',role:'PLATFORM_OWNER'},{kind:'COMMUNITY',workspace:'community',role:'COMMUNITY_ADMIN'},{kind:'COMMUNITY',workspace:'legacy'},{kind:'COMMUNITY',workspace:'invalid',role:'OWNER'}],reviewer:true});await flush();
+  assert.equal(h.configured.at(-1).role,'PLATFORM_OWNER');assert.deepEqual(h.homeContexts,h.configured);
+  for(const [workspace,role]of [['community','COMMUNITY_ADMIN'],['legacy',null],['invalid',null],['invented',null]]){h.select.value=workspace;h.select.events.change();assert.equal(h.configured.at(-1).role,role);}
+  h.select.value='platform';h.select.events.change();assert.equal(h.configured.at(-1).role,'PLATFORM_OWNER');
+  h.notify();assert.equal(h.configured.at(-1),null);assert.deepEqual(h.homeContexts,h.configured);
+ }
+ {
+  const h=harness('old-csrf',true);await flush();const stale=h.requests[0];h.notify();
+  stale.reply({workspaces:[{kind:'COMMUNITY',workspace:'platform',role:'PLATFORM_OWNER'}],reviewer:true});await flush();assert.equal(h.configured.at(-1),null);
+ }
+ {
+  const h=harness('old-csrf',true);await flush();h.requests[0].reply({workspaces:[{kind:'COMMUNITY',workspace:'platform',role:'PLATFORM_REVIEWER'}],reviewer:false});await flush();
+  h.logout.events.click();await flush();assert.equal(h.configured.at(-1),null);h.requests.at(-1).reply({logged_out:true});await flush();assert.equal(h.configured.at(-1),null);
  }
  console.log('original web session race regression: race/state schedules PASS');
 })().catch(error=>{console.error(error);process.exitCode=1;});

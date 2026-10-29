@@ -29,6 +29,37 @@ def receiver_communities(center,scope,project,receiver_ids):
     return result
 
 
+def refund_observations(db,identity,reference,original):
+    """Narrow read of existing verified refund projections; never provider I/O."""
+    def invalid():raise ValueError('COMMUNITY_REFUND_OBSERVATION_INTEGRITY_CONFLICT')
+    try:validate_scope(identity)
+    except ValueError:invalid()
+    if not valid_id(reference) or original.get('currency')!='CNY' or type(original.get('amount_minor')) is not int or not 0<original['amount_minor']<=9007199254740991:invalid()
+    t,m,s=(identity[k] for k in ('tenant_id','merchant_id','store_id'))
+    records=[];total=0;seen=set()
+    rows=db.execute('SELECT event_id,from_state,to_state,evidence_source FROM order_events WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference=? ORDER BY rowid',(t,m,s,reference))
+    for event_id,before,after,raw in rows:
+        try:value=json.loads(raw)
+        except (ValueError,TypeError):invalid()
+        if type(value) is not dict:invalid()
+        if value.get('source')!='WECHAT_SIGNED_REFUND_RESULT':continue
+        number=value.get('out_refund_no');amount=value.get('refund_minor');at=value.get('observed_at');digest=value.get('body_sha256')
+        if (not valid_id(number) or number in seen or type(amount) is not int or not 0<amount<=9007199254740991
+                or type(at) is not int or not 0<=at<=9007199254740991
+                or type(digest) is not str or not re.fullmatch('[0-9a-f]{64}',digest)
+                or original['state'] not in ('SUCCESS','REFUNDED') or before not in ('SUCCESS','REFUNDED') or after not in ('SUCCESS','REFUNDED')
+                or type(original.get('provider_transaction_id')) is not str or not original['provider_transaction_id']
+                or value.get('transaction_id')!=original['provider_transaction_id']):invalid()
+        expected='wr_'+hashlib.sha256(canonical([identity,reference,number])).hexdigest()[:48]
+        if event_id!=expected:invalid()
+        seen.add(number);total+=amount
+        if total>original['amount_minor']:invalid()
+        records.append(dict(reference=reference,out_refund_no=number,refund_minor=amount,currency=original['currency'],observed_at=at,
+            evidence_source='WECHAT_SIGNED_REFUND_RESULT',observation_status='RECORDED_SIGNED_SUCCESS',finance_status='UNCONFIRMED'))
+    if records and provider_evidence(db,identity,reference) is None:invalid()
+    return records
+
+
 class CommunityReports:
     def __init__(self,communities,commerce,actions):
         if communities.center is not commerce.center or actions is not None and actions.center is not communities.center:raise ValueError('SAME_ORIGINAL_COMMUNITY_SERVICES_REQUIRED')
@@ -161,7 +192,7 @@ class CommunityReports:
             totals_scope='CURRENT_PAGE_ONLY',funds_operation_executed=False)
 
     def dispatch(self,session,csrf,body):
-        fields={'community_orders':{'community_id','after_id'},'community_earnings':{'community_id','after_id'},
+        fields={'community_orders':{'community_id','after_id'},'community_refunds':{'community_id','after_id'},'community_earnings':{'community_id','after_id'},
             'community_receiver_bind':{'community_id','provider_workspace','receiver_id','expected_version'},
             'community_receiver_list':{'community_id','provider_workspace','after_id'},
             'community_receiver_read':{'community_id','provider_workspace','receiver_id'}}
@@ -193,11 +224,11 @@ class CommunityReports:
             return dict(result,applies_to='NEW_RULE_VERSIONS_ONLY',funds_operation_executed=False)
         after=p['after_id']
         if type(after) is not str or after and not re.fullmatch('[0-9a-f]{64}',after):raise ValueError('INVALID_COMMUNITY_REPORT_CURSOR')
-        channel='COMMUNITY_COMMERCE_V1' if op=='community_orders' else 'COMMUNITY_PROVIDER_ACTION'
+        channel='COMMUNITY_COMMERCE_V1' if op in ('community_orders','community_refunds') else 'COMMUNITY_PROVIDER_ACTION'
         rows=c.db.execute('SELECT subject_idx,payload FROM links WHERE channel=? AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51',(channel,g['project'],after)).fetchall()
         records=[];gross=returned=0
         for key,payload in rows[:50]:
-            value=json.loads(c.decrypt(payload,('community-commerce:' if op=='community_orders' else 'provider-action:')+key))
+            value=json.loads(c.decrypt(payload,('community-commerce:' if op in ('community_orders','community_refunds') else 'provider-action:')+key))
             if type(value) is not dict:
                 if op=='community_earnings':earnings_conflict()
                 raise ValueError('COMMUNITY_ORDER_INTEGRITY_CONFLICT')
@@ -207,12 +238,15 @@ class CommunityReports:
                 try:validate_scope(identity)
                 except ValueError:earnings_conflict()
             if type(identity) is not dict or identity.get('tenant_id')!=g['tenant']:continue
-            if op=='community_orders':
+            if op in ('community_orders','community_refunds'):
                 if value.get('community_id')!=community['id'] or type(value.get('lines')) is not list:continue
                 try:original=state(self.commerce.runtime.demo.db,identity,value['reference'])
                 except ValueError:continue
                 verified=provider_evidence(self.commerce.runtime.demo.db,identity,value['reference']) is not None
                 records.append(dict(reference=value['reference'],merchant_id=identity['merchant_id'],store_id=identity['store_id'],amount_minor=original['amount_minor'],currency='CNY',order_state=original['state'],provider_payment_verified=verified and original['state'] in ('SUCCESS','REFUNDED')))
+                if op=='community_refunds':
+                    observations=refund_observations(self.commerce.runtime.demo.db,identity,value['reference'],original)
+                    records[-1].update(refund_observations=observations,refund_observation_status='RECORDED_SIGNED_REFUND_OBSERVATIONS' if observations else 'NO_RECORDED_VERIFIED_REFUND',finance_status='UNCONFIRMED',funds_operation_executed=False)
                 if verified and original['state'] in ('SUCCESS','REFUNDED'):
                     gross+=original['amount_minor']
                     # The community and finance views must reject the same

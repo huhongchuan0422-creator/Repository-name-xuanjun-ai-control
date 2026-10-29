@@ -2,7 +2,7 @@
 (() => {
   const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review';
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过',WITHDRAWN:'已撤回'};
-  let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null;
+  let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null,reviewQueueRevision=0,reviewLayout=null;
   let historyGeneration=0,historyCursor=null,historyRequest=null;
   let noticeGeneration=0,noticeCursor=null,noticeRequest=null,noticeRecords=new Map();
   const wechatControls=new Map(),sceneControls=new Map();
@@ -30,9 +30,9 @@
   function clearWechat(){materialContext++;wechatRecord=null;setScenes();for(const e of wechatControls.values())e.value='';$('wechatState').textContent='';$('wechatOpinion').value='';}
   // The existing customer host passes its current CSRF value after login. No
   // second login form, password store or reusable browser token is introduced.
-  window.configureCommunityOnboarding=context=>{generation++;busy=false;csrf=typeof context?.csrf==='string'?context.csrf:'';
+  window.configureCommunityOnboarding=context=>{generation++;reviewQueueRevision++;busy=false;csrf=typeof context?.csrf==='string'?context.csrf:'';
     clearWechat();resetHistory();resetNotices();current=null;cursor=null;$('withdrawConfirmed').checked=false;withdrawalControls();$('detail').hidden=true;$('openingActions').hidden=true;$('moreApplications').hidden=true;
-    for(const id of ['mine','applications','summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
+    preserveReviewVersion();for(const id of ['mine','applications','summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
     $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';$('applicationVersion').textContent='';
     for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';setForm(null);$('statusFilter').value='ALL';
     message('正在读取当前账号的入驻信息…');return load();};
@@ -71,7 +71,7 @@
     if(current?.application!==app?.application)clearWechat();current=app;$('withdrawConfirmed').checked=false;withdrawalControls();$('detail').hidden=!app;refreshLicense();if(!app)return;
     $('applicationVersion').textContent='申请编号 '+app.application+' · 版本 '+app.revision;
     $('applicationTitle').textContent=app.fields.store_name||'入驻申请';$('applicationState').textContent=states[app.status]||app.status;
-    $('summary').replaceChildren();for(const [label,value] of [['主体名称',app.fields.legal_name],['门店名称',app.fields.store_name],['经营地址',app.fields.address],['联系人',app.fields.contact]]){
+    preserveReviewVersion();$('summary').replaceChildren();for(const [label,value] of [['主体名称',app.fields.legal_name],['门店名称',app.fields.store_name],['经营地址',app.fields.address],['联系人',app.fields.contact]]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('summary').append(dt,dd);}
     $('reviewNote').textContent=app.reviewer_note?'审核说明：'+app.reviewer_note:'';
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
@@ -86,7 +86,7 @@
     $('openingActions').hidden=!reviewMode||app.status!=='APPROVED'||app.opening_state==='OPENED'||!app.opening_workspaces?.length;
     $('openingWorkspace').replaceChildren();for(const workspace of app.opening_workspaces||[]){const option=document.createElement('option');option.value=workspace;option.textContent=workspace;$('openingWorkspace').append(option);}
     refreshConditions();
-    if(!reviewMode)setForm(app);
+    if(!reviewMode)setForm(app);else syncReviewLayout(app);
   }
   function resetHistory(){
     historyGeneration++;historyCursor=null;historyRequest=null;
@@ -234,21 +234,25 @@
   // A refused/unknown read must not leave the previous applicant actionable.
   function clearReviewSelection(){
     clearWechat();resetHistory();resetNotices();current=null;
-    for(const id of ['summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
+    preserveReviewVersion();for(const id of ['summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
     for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';
     $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';$('applicationVersion').textContent='';
     $('detail').hidden=true;$('reviewActions').hidden=true;$('openingActions').hidden=true;
-    $('withdrawConfirmed').checked=false;withdrawalControls();
+    $('withdrawConfirmed').checked=false;withdrawalControls();syncReviewLayout(null);
   }
+  function reviewListCard(app){const card=document.createElement('article'),title=document.createElement('h3'),dl=document.createElement('dl');card.className='admission-record-card';title.textContent='记录列表 · 当前范围';card.append(title,dl);for(const [label,value]of [['申请摘要',(app.fields.store_name||'未填写门店名称')+' · '+(states[app.status]||app.status)],['主体资料',(app.fields.legal_name||'原摘要未返回主体名称')+' · '+(app.entity_type==='ENTERPRISE'?'企业':app.entity_type==='SOLE_PROPRIETOR'?'个体工商户':app.entity_type||'原摘要未返回主体类型')],['办理人资料',app.delegated===true?'授权经办人，材料须按原申请核对':app.delegated===false?'法人办理，材料须按原申请核对':'原摘要未返回办理方式']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;dl.append(dt,dd);}return card;}
   async function readListedApplication(application){
-    if(reviewMode)clearReviewSelection();
-    render(await request(reviewMode?'review_read':'read',{application}));
+    const revision=reviewQueueRevision,filter=$('statusFilter').value;if(reviewMode)clearReviewSelection();
+    const result=await request(reviewMode?'review_read':'read',{application});if(reviewMode&&(revision!==reviewQueueRevision||filter!==$('statusFilter').value))return;render(result);
   }
-  async function list(append=false){const result=await request(reviewMode?'review_list':'mine',{status:$('statusFilter').value,...(append&&cursor?{cursor}:{})}),target=$(reviewMode?'applications':'mine');if(!append)target.replaceChildren();
-    for(const app of result.applications)target.append(button((app.fields.store_name||'未命名申请')+' · '+(states[app.status]||app.status),async()=>{await readListedApplication(app.application);}));
-    cursor=result.next_cursor||null;$('moreApplications').hidden=!cursor;
-    if(!reviewMode&&!append){render(result.applications[0]||null);}
-    message(result.applications.length?'已读取最新入驻状态。':reviewMode?'暂无入驻申请。':'尚无申请，请填写经营信息并保存草稿。');}
+  async function list(append=false){const target=$(reviewMode?'applications':'mine'),identity=generation,filter=$('statusFilter').value;if(reviewMode&&!append){reviewQueueRevision++;clearReviewSelection();target.replaceChildren();cursor=null;$('moreApplications').hidden=true;}const revision=reviewQueueRevision;
+    try{const result=await request(reviewMode?'review_list':'mine',{status:filter,...(append&&cursor?{cursor}:{})});if(reviewMode&&(identity!==generation||revision!==reviewQueueRevision||filter!==$('statusFilter').value))return;if(!append)target.replaceChildren();
+      for(const app of result.applications){const open=button((app.fields.store_name||'未命名申请')+' · '+(states[app.status]||app.status),async()=>{if(reviewMode&&(identity!==generation||revision!==reviewQueueRevision||filter!==$('statusFilter').value))return;await readListedApplication(app.application);});if(reviewMode){open.textContent='查看入驻申请详情 · '+(states[app.status]||app.status);open.className='admission-review-button';target.append(reviewListCard(app));}target.append(open);}
+      cursor=result.next_cursor||null;$('moreApplications').hidden=!cursor;
+      if(!reviewMode&&!append)render(result.applications[0]||null);
+      message(result.applications.length?'已读取最新入驻状态。':reviewMode?'暂无入驻申请。':'尚无申请，请填写经营信息并保存草稿。');
+    }catch(error){if(reviewMode&&identity===generation&&revision===reviewQueueRevision){reviewQueueRevision++;target.replaceChildren();cursor=null;$('moreApplications').hidden=true;clearReviewSelection();}throw error;}}
+
   async function load(){return run(async()=>{catalog=await request('catalog');await list();});}
   $('profile').addEventListener('submit',event=>{event.preventDefault();run(async()=>{const licenseDraft=[...wechatControls].filter(([path])=>path.startsWith('subject_info.business_license_info.')).map(([path,input])=>[path,input.value]);render(await request('save',{application:current?.application||null,revision:current?.revision||0,
     sales_scenes_type:selectedScenes(),identity_type:$('identity_type').value,fields:draftFields(),entity_type:$('entity_type').value,category:$('category').value,delegated:$('delegated').checked}));for(const [path,value]of licenseDraft)wechatControls.get(path).value=value;message('申请草稿已保存，请按清单上传资料；未保存的执照字段请点击保存执照资料草稿。');});});
@@ -270,7 +274,7 @@
     render(await request('review',{application:current.application,revision:current.revision,action:b.dataset.action,note:$('note').value.trim()}));message('审核处理已保存。');})));
   $('reloadQueue').addEventListener('click',()=>run(list));$('queue').hidden=!reviewMode;$('applicant').hidden=reviewMode;$('title').textContent=reviewMode?'商家入驻审核':'申请商家入驻';
   $('reloadMine').addEventListener('click',()=>run(list));
-  $('statusFilter').addEventListener('change',()=>run(list));$('moreApplications').addEventListener('click',()=>run(()=>list(true)));
+  $('statusFilter').addEventListener('change',()=>{if(reviewMode){reviewQueueRevision++;$('applications').replaceChildren();cursor=null;$('moreApplications').hidden=true;clearReviewSelection();}return run(list);});$('moreApplications').addEventListener('click',()=>run(()=>list(true)));
   $('openWorkbench').addEventListener('click',()=>run(async()=>{render(await request('open_workbench',{application:current.application,revision:current.revision,workspace:$('openingWorkspace').value}));message('工作台开通状态已更新。');}));
   const definitions=[
     ['contact_info.contact_type','管理员类型：LEGAL 法人 / SUPER 经办人'],['contact_info.contact_id_doc_type','经办人证件类型（官方枚举）'],['contact_info.contact_id_number','经办人证件号码'],['contact_info.contact_period_begin','经办人证件有效期开始'],['contact_info.contact_period_end','经办人证件有效期结束或长期'],['contact_info.contact_name','超级管理员姓名'],['contact_info.mobile_phone','超级管理员手机'],['contact_info.contact_email','超级管理员邮箱'],
@@ -334,6 +338,15 @@
   for(const [id,decision]of [['wechatApprove','INTERNAL_APPROVED'],['wechatCorrect','CORRECTION']])$(id).onclick=()=>run(async()=>showWechat(await request('wechat_review',{application:current.application,expected_version:wechatVersion(),decision,opinion:$('wechatOpinion').value})));
   $('wechatExecute').onclick=()=>run(async()=>showWechat(await request('wechat_execute',{application:current.application,expected_version:wechatVersion()})));
   $('wechatQuery').onclick=()=>run(async()=>showWechat(await request('wechat_query',{application:current.application})));
+  // ADMISSION_REVIEW_LAYOUT_BEGIN: review route only, original controls moved not duplicated.
+  function preserveReviewVersion(){if(reviewLayout){const node=$('applicationVersion');if(node)reviewLayout.card.append(node);}}
+  function syncReviewLayout(app){if(!reviewMode||!reviewLayout)return;$('queue').hidden=!!app;$('moreApplications').hidden=!!app||!cursor;$('title').textContent=app?'商家入驻审核 · 详情':'商家入驻审核';if(!app){reviewLayout.controls.open=false;return;}const versionNode=$('applicationVersion');$('summary').replaceChildren();const extra=[['申请编号 / 版本',versionNode],['商家与联系资料',[(app.fields.store_name||'原门店未填写'),(app.fields.legal_name||'原主体未填写'),(app.fields.address||'原地址未填写'),(app.fields.contact||'原联系方式未填写')].join('；')],['门店范围','仅当前原申请；可开通工作区：'+((app.opening_workspaces||[]).join('、')||'原响应未提供可开通工作区')],['条件与材料',(app.entity_type==='ENTERPRISE'?'企业':app.entity_type==='SOLE_PROPRIETOR'?'个体工商户':app.entity_type)+'；'+(app.delegated===true?'授权经办人':app.delegated===false?'法人本人':'原记录未返回办理方式')+'；'+((app.required_materials||[]).map(k=>catalog.materials.find(m=>m.id===k)?.title||k).join('、')||'原条件未要求材料')],['平台审核',(states[app.status]||app.status)+(app.reviewer_note?'；'+app.reviewer_note:'')],['微信进件 / 签约','未在本摘要核验，与平台审核分别显示；请使用下方原微信状态查询。']];for(const [label,value]of extra){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;if(value===versionNode)dd.append(versionNode);else dd.textContent=value===undefined?'原记录未返回':String(value);$('summary').append(dt,dd);}}
+
+  function setupReviewLayout(){if(!reviewMode||!document.body)return;document.body.classList.add('admission-review');const header=document.querySelector('header > span');if(header)header.textContent='社区服务 · 平台';const intro=document.querySelector('.intro');if(intro){for(const node of intro.children)if(node!==$('title'))node.hidden=true;}const queueHeading=$('queue').querySelector('h2');if(queueHeading)queueHeading.hidden=true;
+    const card=document.createElement('article'),h=document.createElement('h3'),controls=document.createElement('details'),summary=document.createElement('summary'),back=button('返回入驻审核列表',async()=>{$('detail').hidden=true;$('queue').hidden=false;$('moreApplications').hidden=!cursor;$('title').textContent='商家入驻审核';});card.className='admission-record-card';h.textContent='记录详情';card.append(h);controls.id='reviewOriginalControls';summary.textContent='原审核材料、补件、开通及微信操作';controls.append(summary);back.className='admission-review-button';for(const node of [...$('detail').children]){if(node.contains($('applicationTitle'))||['applicationVersion','summary','reviewNote'].includes(node.id))card.append(node);else controls.append(node);}controls.append($('wechatApplication'));$('detail').append(card,back,controls);reviewLayout={controls,card,back};syncReviewLayout(null);
+  }
+  setupReviewLayout();
+  // ADMISSION_REVIEW_LAYOUT_END
   refreshLicense();
   load();
 })();

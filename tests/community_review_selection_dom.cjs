@@ -40,20 +40,20 @@ const context={document,window:{},location:{pathname:process.argv[4]||'/merchant
 }};
 vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context);
 const flush=async()=>{for(let i=0;i<80;i++)await Promise.resolve();};
-const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){nodes.applications.children[0].click();await flush();}};
+const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();}};
 const text=node=>walk(node).map(n=>n.textContent).join('\n');
 (async()=>{
  await flush();await reload();assert.equal(nodes.detail.hidden,false);
  nodes.note.value='old private reason';nodes.wechatState.textContent='old private provider';
- denyRead=true;nodes.applications.children[0].click();await flush();
+ denyRead=true;walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();
  assert.equal(nodes.detail.hidden,true);assert.equal(nodes.summary.children.length,0);assert.equal(nodes.materials.children.length,0);
  assert.equal(nodes.applicationVersion.textContent,'');assert.equal(nodes.wechatState.textContent,'');assert.equal(nodes.note.value,'');assert.equal(nodes.reviewActions.hidden,true);assert.equal(nodes.openingActions.hidden,true);
  // Failure leaves no selected application from which a new financial/review action can proceed.
  assert(!calls.some(c=>['review','wechat_execute','open_workbench'].includes(c.operation)));
- denyRead=false;nodes.applications.children[0].click();await flush();assert.equal(nodes.detail.hidden,false);assert(nodes.applicationVersion.textContent.includes('app1'));
- holdRead=true;nodes.applications.children[0].click();await flush();assert.equal(nodes.detail.hidden,true);const old=readDeferred.shift();
+ denyRead=false;walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();assert.equal(nodes.detail.hidden,false);assert(nodes.applicationVersion.textContent.includes('app1'));
+ holdRead=true;walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();assert.equal(nodes.detail.hidden,true);const old=readDeferred.shift();
  app=makeApp('app2');await context.window.configureCommunityOnboarding({csrf:'new-original-csrf'});await flush();
  old(reply(makeApp('app1')));await flush();assert.equal(nodes.detail.hidden,true);assert.equal(nodes.summary.children.length,0);
- holdRead=false;nodes.applications.children[0].click();await flush();assert(nodes.applicationVersion.textContent.includes('app2'));
+ holdRead=false;walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();assert(nodes.applicationVersion.textContent.includes('app2'));
  console.log('SCOPED_MOCK_DOM_PASS reviewer denied clear, request-start clear, stale identity, successful reread; no business submission');
 })().catch(e=>{console.error(e);process.exitCode=1;});

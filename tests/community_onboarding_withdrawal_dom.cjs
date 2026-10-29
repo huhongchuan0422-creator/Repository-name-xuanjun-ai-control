@@ -38,7 +38,7 @@ const context={document,window:{},location:{pathname:process.argv[4]||'/merchant
 }};
 vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context);
 const flush=async()=>{for(let n=0;n<100;n++)await Promise.resolve();};
-const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){nodes.applications.children[0].click();await flush();}};
+const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'current-original-csrf'});await flush();if(context.location.pathname==='/merchant/review'){walk(nodes.applications).find(n=>n.tagName==='button').click();await flush();}};
 const withdrawals=()=>calls.filter(c=>c.operation==='withdraw');
 (async()=>{
  await flush();await reload();
