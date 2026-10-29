@@ -5,11 +5,12 @@ on:
     paths:
       - '.github/workflows/chatgpt-community-package-metadata-c19.yml'
       - 'delivery/community-package-metadata-c19/package-metadata.json'
+      - 'delivery/community-package-metadata-c19/COMMUNITY_211_ORIGINAL_INSTALL.py'
 permissions:
   contents: read
 jobs:
   deliver-fixed-metadata:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-c9d1ab]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,32 @@ jobs:
         with:
           name: reviewed-community-211a9-package-metadata
           path: delivery/community-package-metadata-c19/package-metadata.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
+
+  deliver-fixed-installer:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-installer-c9d1ab]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify original reviewed installer bytes only; never execute payload
+        run: |
+          python - <<'PYVERIFY'
+          import hashlib,pathlib
+          raw=pathlib.Path('delivery/community-package-metadata-c19/COMMUNITY_211_ORIGINAL_INSTALL.py').read_bytes()
+          assert len(raw)==437353
+          assert hashlib.sha256(raw).hexdigest()=='c9d1ab1cff4c066690cbd327ae4596bc1cebfb8e25a33abfa28c7c2acc06d5f9'
+          print('FIXED_INSTALLER_BYTES_MATCH; NOT_EXECUTED; NOT_INSTALLED')
+          PYVERIFY
+      - name: Publish exact single installer member
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-211a9-installer-c9d1ab
+          path: delivery/community-package-metadata-c19/COMMUNITY_211_ORIGINAL_INSTALL.py
           compression-level: 0
           if-no-files-found: error
           retention-days: 3
