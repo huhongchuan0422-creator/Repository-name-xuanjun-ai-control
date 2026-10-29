@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 import test_community_platform_host as fixture
 from scripts.pr122_customer_core import canonical
+from scripts.community_order_store import create_order
 
 SCOPE=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1')
 
@@ -37,6 +38,7 @@ def configure_fixture(fx):
 
 def seed_observations(host,uid):
     c=host.center
+    create_order(host.persistence.runtime.demo.db,SCOPE,'synthetic_platform_order',101)
     directory=host.application.communities
     directory.write(directory.grants['platform'],dict(id=COMMUNITY,tenant='tenant1',owner=uid,name='合成接收关系社区',description='仅Hosted隔离测试',contact='合成联系人',state='APPROVED',version=1,opinion='',updated_at=c.now()))
     web=c.login('one@example.org','FixturePassword123!')
@@ -69,6 +71,8 @@ class FinanceFixtureContract(unittest.TestCase):
                 self.assertEqual(call('reconciliation_read',dict(reference='synthetic_order'))['finance_status'],'UNCONFIRMED')
                 read=host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='community_receiver_list',params=dict(community_id=COMMUNITY,provider_workspace='finance',after_id='')))
                 self.assertEqual(read['records'][0]['version'],1);self.assertFalse(read['funds_operation_executed'])
+                orders=host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='platform_orders',params=dict(after_id=0,status='ALL')))
+                self.assertEqual(orders['records'][0]['reference'],'synthetic_platform_order');self.assertEqual(orders['records'][0]['amount_minor'],101);self.assertIsNone(orders['records'][0]['payment_evidence'])
                 with self.assertRaises(PermissionError):call('financial_records',dict(kind='REFUND',after_id=''),workspace='not_admitted')
 
 class FinanceCardsBrowser(unittest.TestCase):
@@ -103,15 +107,15 @@ class FinanceCardsBrowser(unittest.TestCase):
                             # Existing session CSRF; explicit synthetic admitted finance workspace, no new auth.
                             page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
                             def shot(name):
-                                page.locator('#financialObservation').scroll_into_view_if_needed();page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
+                                page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
                             for kind,prefix in [('REFUND','finance-32'),('SPLIT','finance-33')]:
-                                page.locator('#financialKind').select_option(kind)
+                                page.locator('#financeRefund' if kind=='REFUND' else '#financeSplit').click();expect(page.locator('#financeBrand')).to_have_text('社区服务 · 平台');expect(page.locator('.finance-account[open]')).to_have_count(0);expect(page.locator('#community-session [name=email]')).to_have_count(1);expect(page.locator('#community-session [data-logout]')).to_have_count(1);page.locator('#financialReadControls summary').click()
                                 with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==200):page.locator('#financialRecords').click()
-                                expect(page.locator('#financialObservationList')).to_contain_text('req_'+kind.lower());shot(prefix+'-list-1440')
+                                expect(page.locator('#financialObservationList')).to_contain_text('req_'+kind.lower());page.locator('#financialReadControls summary').click();expect(page.locator('#workbenchOriginalSections')).to_be_hidden();shot(prefix+'-list-1440')
                                 page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('摘要未提供金额');shot(prefix+'-detail-1440')
                                 page.locator('#financialObservationBack').click();expect(page.locator('#financialKind')).to_have_value(kind);expect(page.locator('#financialObservationList')).to_be_visible();shot(prefix+'-return-1440')
-                            page.locator('#financialKind').select_option('RETURN');page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');shot('finance-33-return-empty-1440')
-                            page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');shot('finance-34-list-1440')
+                            page.locator('#financeReturn').click();page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');page.locator('#financialReadControls summary').click();shot('finance-33-return-empty-1440')
+                            page.locator('#financeReconciliation').click();page.locator('#financialReadControls summary').click();page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');page.locator('#financialReadControls summary').click();shot('finance-34-list-1440')
                             page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('不是全量日账单');shot('finance-34-detail-1440')
                             # Original page27 reads the same real fixture receiver binding; no second system.
                             page.goto(fx.plan['https_origin']+'/community-preview/community/portal')
@@ -121,7 +125,7 @@ class FinanceCardsBrowser(unittest.TestCase):
                             panel27=page.locator('#receiverRelations');panel27.locator('#receiverCommunityReference').fill(COMMUNITY);panel27.locator('#receiverWorkspace').fill('finance');panel27.locator('#listReceiverRelations').click()
                             expect(panel27.locator('.community-record-card')).to_contain_text('community')
                             def receiver_shot(name):
-                                panel27.scroll_into_view_if_needed();page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
+                                page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
                             receiver_shot('finance-27-list-1440')
                             panel27.get_by_role('button',name='查看接收关系详情',exact=True).click();expect(panel27.locator('.community-receiver-detail')).to_contain_text('finance');receiver_shot('finance-54-detail-1440')
                             panel27.get_by_role('button',name='返回接收关系列表',exact=True).click();expect(panel27.locator('.community-record-card')).to_be_visible();receiver_shot('finance-27-return-1440')
@@ -129,14 +133,21 @@ class FinanceCardsBrowser(unittest.TestCase):
                             panel27.locator('#receiverWorkspace').fill('not_admitted')
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):panel27.locator('#listReceiverRelations').click()
                             expect(panel27.locator('.community-receiver-detail')).to_be_hidden();expect(panel27.locator('#receiverVersion')).to_have_value('');receiver_shot('finance-27-denied-1440')
+                            # Original platform_orders authority, not provider-actions or mocked responses.
+                            page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='平台运营查询',exact=True).click()
+                            orderPanel=page.locator('.platform-orders-panel');orderPanel.locator('summary').click();orderPanel.locator('#platformView').select_option('platform_orders');orderPanel.locator('#platformOrderStatus').select_option('ALL');orderPanel.locator('#readPlatformView').click()
+                            expect(orderPanel.locator('.platform-order-rows')).to_contain_text('synthetic_platform_order');orderPanel.locator('summary').click();expect(page.locator('main h1')).to_have_text('支付证据')
+                            receiver_shot('finance-31-list-1440')
+                            orderPanel.get_by_role('button',name='查看支付证据详情',exact=True).click();expect(orderPanel.locator('.platform-order-detail')).to_contain_text('不据此断言未支付');expect(page.locator('main h1')).to_have_text('支付证据详情');receiver_shot('finance-62-detail-1440')
+                            orderPanel.get_by_role('button',name='返回原列表',exact=True).click();expect(orderPanel.locator('.platform-order-rows')).to_be_visible();expect(page.locator('main h1')).to_have_text('支付证据');receiver_shot('finance-31-return-1440')
                             # Real finance grant revoked on host owner thread, retaining the same browser identity.
                             page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench');expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
                             page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
-                            page.locator('#financialKind').select_option('REFUND');page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('req_refund')
+                            page.locator('#financeRefund').click();page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('req_refund')
                             revoke_finance.set()
                             if not revoked_finance.wait(5):raise AssertionError('fixture grant revocation not acknowledged')
                             with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==403):page.locator('#financialRecords').click()
-                            expect(page.locator('#financialObservation')).to_be_hidden();expect(page.locator('#financialObservationDetail')).to_be_empty();expect(page.locator('#providerActionResult')).to_be_empty();page.screenshot(path=str(evidence/'finance-denied-1440.png'),full_page=True);shots.append('finance-denied-1440.png')
+                            expect(page.locator('#financialObservation')).to_be_hidden();expect(page.locator('#financialObservationDetail')).to_be_empty();expect(page.locator('#providerActionResult')).to_be_empty();page.locator('#financialReadControls summary').click();page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/'finance-denied-1440.png'),full_page=True);shots.append('finance-denied-1440.png')
                             self.assertEqual(errors,[])
                             self.assertTrue(all(r['operation'] in ('financial_records','reconciliation_read') for r in received if r['operation']))
                             (evidence/'finance-receipt.json').write_text(json.dumps(dict(scope='SYNTHETIC_ORIGINAL_HOST_HTTP_NOT_CUSTOMER_ACCEPTANCE',shots=shots,received=received,browser_assertions_passed=True),ensure_ascii=False,indent=2)+'\n')

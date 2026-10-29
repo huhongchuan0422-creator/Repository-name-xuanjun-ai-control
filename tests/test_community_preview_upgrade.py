@@ -51,7 +51,8 @@ class UpgradeBoundary(unittest.TestCase):
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():
             raw=(legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else
-                 legacy_onboarding_asset('community_preview_2330_communities.html') if path=='/community/portal' else asset(path)[0])
+                 legacy_onboarding_asset('community_preview_2330_communities.html') if path=='/community/portal' else
+                 legacy_onboarding_asset('community_preview_2330_workbench.html') if path=='/merchant/workbench' else asset(path)[0])
             self.assertEqual(digest,hashlib.sha256(raw).hexdigest(),path)
         self.assertEqual(u.SOURCE,'2330dd55c07f58d7f45a7c4510a9761d0d4735d6')
     def test_only_existing_bounded_container_and_mounts_are_admitted(self):

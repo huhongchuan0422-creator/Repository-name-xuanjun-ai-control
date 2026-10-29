@@ -8,7 +8,7 @@ class Increment(unittest.TestCase):
   with zipfile.ZipFile('/tmp/miniapp-c19-readonly/community-stage-source.zip') as z:
    for name in ['communities.html','web-session.js','workbench.css','workbench.js','onboarding.js']:
     actual=Path('demos/community-stage/'+name).read_bytes()
-    reviewed_business_deltas={'workbench.js': 'a0a1f8320194e4a620beac521615abf0bf1634668783c744eb727e0265f78844', 'workbench.css': 'b48aa879972dd7f8bcaa931ce6ad010b5d7ff0b32cb7121c2aaefb881c9a7b9f', 'onboarding.js': '2ceef5d812bb452ac18005a8249a61d01aabfd8843bfff0729624e75da9a3dd0'}
+    reviewed_business_deltas={'workbench.js': '6f8a17025510c4b0a8956cf7098247d13a24873cc59b433fcea8b44a02d8ee15', 'workbench.css': 'da483c7cfe0f7b81b98f2c99d6b34995a20d6be75a4df08cf44f383e2ed231ec', 'onboarding.js': '2ceef5d812bb452ac18005a8249a61d01aabfd8843bfff0729624e75da9a3dd0'}
     if name in reviewed_business_deltas:
      self.assertEqual(hashlib.sha256(actual).hexdigest(),reviewed_business_deltas[name]);continue
     if name=='communities.html':

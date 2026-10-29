@@ -10,3 +10,7 @@ class FinanceUIContract(unittest.TestCase):
  def test_reviewer_selection(self):self.run_node('community_review_selection_dom.cjs','onboarding.js','onboarding.html')
 
  def test_platform_selection(self):subprocess.run(['node',str(ROOT/'tests/community_platform_selection_dom.mjs')],check=True,timeout=30)
+
+ def test_platform_order_cards(self):subprocess.run(['node',str(ROOT/'tests/community_platform_orders_dom.cjs'),str(ROOT/'demos/community-stage/communities.js'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_finance_navigation(self):self.run_node('community_finance_navigation_dom.cjs','workbench.js','workbench.html')

@@ -247,6 +247,37 @@
  receiverBack.addEventListener('click',()=>window.communityReceiverReturn());
  clearReceiverUi('尚未读取原接收关系');
 
+ // PLATFORM_ORDER_CARDS_BEGIN: original platform_orders only, no provider actions.
+ const platformResult=document.getElementById('platformViewResult'),platformPanel=platformResult.closest('section');
+ platformPanel.classList.add('platform-orders-panel');
+ const orderQuery=document.createElement('details'),orderSummary=document.createElement('summary');orderSummary.textContent='原平台运营查询与筛选';orderQuery.append(orderSummary);
+ for(const id of ['platformView','platformOrderStatus'])orderQuery.append(document.getElementById(id).closest('label'));
+ orderQuery.append(document.getElementById('readPlatformView'));
+ const orderTitle=document.createElement('h3'),orderHint=document.createElement('p'),orderRows=document.createElement('div'),orderDetail=document.createElement('div'),orderBack=document.createElement('button');
+ orderTitle.textContent='支付证据';orderRows.className='platform-order-rows';orderDetail.className='platform-order-detail';orderBack.textContent='返回原列表';orderBack.type='button';orderBack.className='platform-order-button';
+ platformPanel.append(orderQuery,orderTitle,orderHint,orderRows,orderDetail,orderBack,document.getElementById('morePlatformView'),platformResult);
+ let orderViewRevision=0;
+ function syncOrderPageTitle(){platformPanel.querySelector('h2').hidden=document.getElementById('platformView').value==='platform_orders';orderTitle.hidden=true;if(!pageTitle||activeIndex!==panels.indexOf(platformPanel))return;pageTitle.textContent=document.getElementById('platformView').value==='platform_orders'?orderTitle.textContent:platformPanel.querySelector('h2').textContent;}
+ function clearOrderView(message){orderViewRevision++;orderRows.replaceChildren();orderDetail.replaceChildren();orderRows.hidden=false;orderDetail.hidden=true;orderBack.hidden=true;orderTitle.textContent='支付证据';orderHint.textContent=message;platformResult.hidden=false;syncOrderPageTitle();}
+ const orderValue=v=>v===undefined||v===null?'原记录未返回':String(v);
+ function orderFields(r,detail){const scope=r.scope||{};const money=Number.isSafeInteger(r.amount_minor)&&typeof r.currency==='string'&&r.currency?r.amount_minor+' 最小货币单位 · '+r.currency:'金额或币种未完整返回，不填0或猜币种';const fields=[['订单编号',r.reference],['门店范围',[scope.tenant_id,scope.merchant_id,scope.store_id].map(orderValue).join(' / ')],['金额与币种',money]];
+  if(detail)fields.push(['订单状态',r.order_state],['支付核验',r.payment_evidence?'已存证据来源：'+r.payment_evidence:'当前未返回已验证支付证据；不据此断言未支付'],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status]);return fields;}
+ function orderCard(title,fields){const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');card.className='platform-order-card';h.textContent=title;card.append(h);for(const [label,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=orderValue(value);dl.append(dt,dd);}card.append(dl);return card;}
+ window.communityPlatformOrdersView=({type,record,current})=>{
+  clearOrderView('尚未读取支付证据；打开原查询选择订单观察。');
+  const orders=type==='listed'||document.getElementById('platformView').value==='platform_orders';orderTitle.hidden=true;orderHint.hidden=!orders;orderRows.hidden=!orders;
+  if(type!=='listed')return;
+  const revision=orderViewRevision;platformResult.hidden=true;
+  orderHint.textContent=record.coverage_complete===false?'部分原商家权限或映射不可用：'+orderValue(record.unavailable_mapping_count)+' 项；这里只显示可访问门店小计，不代表完整范围。':'当前原授权门店订单；不是到账或财务核销结论。';
+  if(!Array.isArray(record.records)){clearOrderView('本次记录格式未确认，请重新读取；不会把错误显示为空列表。');return;}
+  if(!record.records.length){orderRows.textContent=record.has_more?'当前扫描页没有可显示订单，仍有下一页。':'当前筛选没有可显示订单。';return;}
+  for(const r of record.records){const card=orderCard('记录列表 · 当前范围',orderFields(r,false)),show=document.createElement('button');show.type='button';show.className='platform-order-button';show.textContent='查看支付证据详情';
+   show.onclick=()=>{if(revision!==orderViewRevision||!current())return;orderRows.hidden=true;orderDetail.replaceChildren(orderCard('记录详情',orderFields(r,true)));orderDetail.hidden=false;orderBack.hidden=false;orderTitle.textContent='支付证据详情';syncOrderPageTitle();};orderRows.append(card,show);}
+  orderBack.onclick=()=>{if(revision!==orderViewRevision||!current())return;orderDetail.replaceChildren();orderDetail.hidden=true;orderRows.hidden=false;orderBack.hidden=true;orderTitle.textContent='支付证据';syncOrderPageTitle();};
+ };
+ clearOrderView('尚未读取支付证据；打开原查询选择订单观察。');
+ // PLATFORM_ORDER_CARDS_END
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -254,6 +285,7 @@
   activeIndex=index;
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
+  syncOrderPageTitle();
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;

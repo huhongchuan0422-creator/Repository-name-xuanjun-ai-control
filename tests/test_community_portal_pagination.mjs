@@ -70,9 +70,10 @@ test('identity reset clears private rows and fields and late old response cannot
 
 test('repeated pending clicks do not fetch twice; failed next page retains retry cursor',async()=>{
  const f=setup([{result:result([merchant('a')],'a')},{error:'TEMPORARY_UNAVAILABLE',delay:true},{result:result([merchant('b')])}]);
- await f.click('platformMerchants');const request=f.click('moreMerchants');assert.equal(f.elements.moreMerchants.disabled,true);
+ await f.click('platformMerchants');const oldSelect=f.elements.merchantRecords.children[0].children[0].onclick;oldSelect();const request=f.click('moreMerchants');assert.equal(f.elements.moreMerchants.disabled,true);
  await f.click('moreMerchants');await f.click('platformMerchants');assert.equal(f.calls.length,2);
  f.pending.shift()();await request;assert.equal(f.elements.message.textContent,'TEMPORARY_UNAVAILABLE');assert.equal(f.elements.moreMerchants.disabled,false);assert.equal(f.elements.moreMerchants.hidden,false);
+ assert.match(f.elements.merchantRecords.children[0].textContent,/a/);for(const id of ['platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason'])assert.equal(f.elements[id].value,'');oldSelect();assert.equal(f.elements.platformMerchantWorkspace.value,'');
  await f.click('moreMerchants');assert.deepEqual(f.calls[2].body.params,{after_workspace:'a'});assert.match(f.elements.merchantRecords.children[0].textContent,/b/);
 });
 

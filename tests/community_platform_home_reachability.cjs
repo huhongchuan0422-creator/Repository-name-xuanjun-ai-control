@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(process.argv[2],'utf8'),sources=fs.readFileSync(process.argv[3],'utf8');
+const context={window:{}};vm.runInNewContext(sources,context);
+const home=source.slice(source.indexOf('function platformHome(){'),source.indexOf('function optionsPanel('));
+const pageLine=source.split('\n').find(line=>line.includes('const pagesFor=role=>'));
+const applicable=source.slice(source.indexOf('function applicable('),source.indexOf('function contactFieldsPage('));
+const esc=source.split('\n').find(line=>line.startsWith('const e='));
+vm.runInNewContext(`const data=window.COMMUNITY_UI_PREVIEW,state={options:{entity:'ENTERPRISE',doc:'IDENTIFICATION_TYPE_IDCARD'}};${esc}\nconst href=(role,id='home',mode='list')=>'#/'+role+'/'+id+(id==='home'?'':'/'+mode);const link=(label,url,cls='button')=>'<a class="'+cls+'" href="'+url+'">'+e(label)+'</a>';\n${applicable}\n${pageLine}\n${home}\nwindow.renderPlatformHome=platformHome;window.platformIDs=()=>pagesFor('platform').map(p=>p.id);`,context);
+const rendered=context.window.renderPlatformHome(),ids=context.window.platformIDs();
+for(const id of ids)assert(rendered.includes('href="#/platform/'+id+'/list"'),'original generated module unreachable: '+id);
+for(const id of ['platform-orders','platform-admission','platform-3-0-0','platform-6-0-0','platform-5-0-0','platform-4-1-0'])assert(rendered.includes('href="#/platform/'+id+'/list"'),'old link removed: '+id);
+context.window.COMMUNITY_UI_PREVIEW.pages.push({id:'future-original-module',role:'platform',title:'<script>unsafe</script>'});
+const future=context.window.renderPlatformHome();assert(future.includes('#/platform/future-original-module/list'));assert(future.includes('&lt;script&gt;unsafe&lt;/script&gt;'));assert(!future.includes('<script>unsafe'));
+console.log('SCOPED_NODE_PASS actual platformHome + actual pagesFor + generated sources: '+ids.length+' IDs reachable, old links retained, future source and escaped title');
