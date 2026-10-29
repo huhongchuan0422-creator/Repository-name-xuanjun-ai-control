@@ -33,6 +33,22 @@ class SessionBrowser(unittest.TestCase):
                 dict(id=foreign_id,tenant='tenant1',owner=fx.fx.uid2,name='他人测试社区',
                      description='隔离测试资料',contact='不得显示的测试联系人',state='DRAFT',
                      version=1,opinion='',updated_at=host.center.now()))
+            # Page21 synthetic approved record and promotion, confined to this
+            # disposable host. Subsequent list/state requests use real HTTP/roles.
+            promotion_community='co_'+'a'*32
+            promotion_code='cp_'+'b'*32
+            host.application.communities.write(fx.plan['community_grants']['community'],
+                dict(id=promotion_community,tenant='tenant1',owner=fx.fx.uid1,name='推广隔离测试社区',
+                     description='仅页面21测试',contact='合成联系人',state='APPROVED',
+                     version=1,opinion='',updated_at=host.center.now()))
+            from scripts.community_consumer_communities import PROMOTIONS
+            from scripts.pr122_customer_core import canonical
+            promotion_record=dict(id=promotion_code,community_id=promotion_community,tenant='tenant1',
+                scene='shop1',title='原场景推广测试',expires_at=host.center.now()+86400,
+                status='ACTIVE',version=1,created_at=host.center.now())
+            host.center.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',
+                (PROMOTIONS,promotion_code,fx.fx.uid1,'project1',
+                 host.center.encrypt(canonical(promotion_record),'community-promotion:'+promotion_code)))
             server.timeout=.1;received=[]
             def browser_flow():
                 def forward(route):
@@ -83,7 +99,7 @@ class SessionBrowser(unittest.TestCase):
                         with directory('register'):page.locator('#profile button').click()
                         expect(page.locator('.community-profile-panel .community-profile-detail')).to_be_visible()
                         with directory('mine'):page.locator('#mine').click()
-                        card=page.locator('.community-profile-panel .community-record-card')
+                        card=page.locator('.community-profile-panel .community-record-card').filter(has_text='逐页验收测试社区')
                         expect(card).to_have_count(1)
                         expect(card.locator('dt')).to_have_text(['社区名称','社区介绍','联系人及联系方式','状态'])
                         expect(card.locator('dd')).to_have_text(['逐页验收测试社区','仅 Hosted 隔离合成数据，不代表生产记录。','测试联系人 · 00000000000','草稿'])
@@ -176,6 +192,39 @@ class SessionBrowser(unittest.TestCase):
                         expect(report_panel).to_contain_text('读取失败或无权查看，旧记录已清除')
                         expect(report_card).not_to_contain_text('¥0.00')
                         shot('20-denied-cleared-1440')
+                        # Page21 original response fields, detail/return and update.
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区推广',exact=True).click()
+                        promotion_panel=page.locator('.community-promotion-panel')
+                        page.locator('#promotionReference').fill(promotion_community)
+                        expect(page.locator('#createPromotion')).to_be_hidden()
+                        with directory('promotions'):page.locator('#listPromotions').click()
+                        promotion_card=promotion_panel.locator('.community-record-card')
+                        expect(promotion_card).to_have_count(1)
+                        expect(promotion_card.locator('dt')).to_have_text(['原小程序门店场景','推广标题','到期时间','列表说明'])
+                        expect(promotion_card).to_contain_text('shop1');expect(promotion_card).to_contain_text('原场景推广测试')
+                        shot('21-list-1440')
+                        promotion_panel.get_by_role('button',name='查看推广详情',exact=True).click()
+                        expect(promotion_panel.locator('.community-promotion-detail')).to_contain_text(promotion_code)
+                        shot('21-detail-1440')
+                        promotion_panel.get_by_role('button',name='返回推广记录',exact=True).click()
+                        expect(promotion_card).to_be_visible();shot('21-return-1440')
+                        promotion_panel.locator('.open-actions > summary').click()
+                        page.locator('#promotionState').select_option('PAUSED')
+                        with directory('promotion_state'):page.locator('#savePromotionState').click()
+                        expect(promotion_panel.locator('.community-promotion-detail')).to_contain_text('已暂停')
+                        with directory('promotions'):page.locator('#listPromotions').click()
+                        promotion_panel.get_by_role('button',name='查看推广详情',exact=True).click()
+                        expect(page.locator('#promotionVersion')).to_have_value('2')
+                        expect(promotion_panel.locator('.community-promotion-detail')).to_contain_text('已暂停')
+                        shot('21-state-readback-1440')
+                        page.locator('#promotionReference').fill(foreign_id)
+                        with directory('promotions',403):page.locator('#listPromotions').click()
+                        expect(promotion_panel.locator('.promotion-records')).to_be_empty()
+                        expect(promotion_panel.locator('.community-promotion-detail')).to_be_hidden()
+                        expect(page.locator('#promotionCode')).to_have_value('')
+                        expect(page.locator('#more')).to_be_hidden()
+                        expect(promotion_panel).not_to_contain_text('原场景推广测试')
+                        shot('21-denied-cleared-1440')
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
@@ -200,7 +249,7 @@ class SessionBrowser(unittest.TestCase):
                             finally:conn.close()
                         self.assertEqual(errors,[])
                         (evidence/'receipt.json').write_text(json.dumps(dict(source=os.environ.get('GITHUB_SHA','LOCAL'),
-                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19','20'],screenshots=shots,
+                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19','20','21'],screenshots=shots,
                             production=False,customer_accepted=False),ensure_ascii=False,indent=2)+'\n')
                     except Exception:
                         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)

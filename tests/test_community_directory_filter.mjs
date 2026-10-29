@@ -11,9 +11,9 @@ function setup(responses,reportHook=true){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
- const calls=[],pending=[],openEvents=[],reportEvents=[];
+ const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[];
  const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
- const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityPromotionView:value=>promotionEvents.push(value),communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -25,7 +25,7 @@ function setup(responses,reportHook=true){
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
  const click=id=>elements[id].onclick();
- return {elements,calls,pending,configure,click,openEvents,reportEvents,sectionChanged:context.window.communitySectionChanged};
+ return {elements,calls,pending,configure,click,openEvents,reportEvents,promotionEvents,sectionChanged:context.window.communitySectionChanged};
 }
 
 const community=(id,state='APPROVED',version=1)=>({id,name:id,state,version,description:'fixture',contact:'private'});
@@ -203,3 +203,39 @@ test('profile denied reread clears private detail and blocks stale update',async
  const f=setup([{result:result([{reference:'original_order',amount_minor:101,order_state:'PENDING'}])}],false);f.elements.reference.value='co_one';await f.click('communityOrders');
  assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*101分/);
  });
+
+const promotion=(id='cp_one')=>({id,community_id:'co_one',scene:'shop1',title:'实际标题',expires_at:1794000000,status:'ACTIVE',version:1,new_members:2,authenticated_redemptions:3,metrics:'DISTINCT_AUTHENTICATED_REDEMPTIONS_ONLY'});
+test('page21 uses real promotion result and sparse-page cursor without raw duplicated list',async()=>{
+ const record=promotion();const f=setup([{result:result([record],'cp_cursor')},{result:result([])}]);f.elements.reference.value='co_one';await f.click('listPromotions');
+ const e=f.promotionEvents.find(x=>x.type==='listed');assert.deepEqual(e.record.result.records,[record]);assert.equal(f.elements.records.children.length,0);assert.equal(e.record.select(record),true);assert.equal(f.elements.promotionCode.value,record.id);
+ await f.click('more');assert.deepEqual(f.calls[1].body.params,{community_id:'co_one',after_id:'cp_cursor'});assert.equal(e.record.select(record),false);assert.equal(f.elements.promotionCode.value,'');
+});
+test('page21 denial clears old rows cursor selection and emits error not empty success',async()=>{
+ const f=setup([{result:result([promotion()],'cp_cursor')},{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';await f.click('listPromotions');f.promotionEvents.at(-1).record.select(promotion());await f.click('listPromotions');
+ assert.equal(f.promotionEvents.at(-1).type,'error');assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.promotionCode.value,'');assert.equal(f.elements.records.children.length,0);
+});
+test('page21 late list response binds identity reference and navigation',async()=>{
+ for(const change of ['reference','event','identity','navigation']){
+  const f=setup([{result:result([promotion()],'cp_cursor'),delay:true}]);f.elements.reference.value='co_one';const pending=f.click('listPromotions');
+  if(change==='reference')f.elements.reference.value='co_other';if(change==='event'){f.elements.reference.value='co_other';f.elements.reference.oninput();}if(change==='identity')f.configure({csrf:'next',workspace:'next'});if(change==='navigation')f.sectionChanged();f.pending.shift()();await pending;
+  assert.equal(f.promotionEvents.some(x=>x.type==='listed'),false);assert.equal(f.elements.more.hidden,true);
+ }
+});
+test('page21 switching to other query invalidates retained promotion selection',async()=>{
+ const f=setup([{result:result([promotion()])},{result:result([community('co_one')])}]);f.elements.reference.value='co_one';await f.click('listPromotions');const old=f.promotionEvents.at(-1).record;await f.click('mine');assert.equal(old.select(promotion()),false);
+});
+test('page21 UNKNOWN create never repeats same intent across navigation or identity reset',async()=>{
+ const f=setup([{error:'UNKNOWN'},{result:result([promotion()])}]);
+ const fill=()=>{f.elements.reference.value='co_one';f.elements.promotionScene.value='shop1';f.elements.promotionTitle.value='实际标题';f.elements.promotionExpiry.value='2026-11-01T12:00';};
+ fill();await f.click('createPromotion');f.sectionChanged();await f.click('createPromotion');assert.equal(f.calls.length,1);assert.match(f.elements.message.textContent,/未确认/);
+ f.configure({csrf:'next',workspace:'platform'});fill();await f.click('createPromotion');assert.equal(f.calls.length,1);await f.click('listPromotions');assert.equal(f.calls.length,2);await f.click('createPromotion');assert.equal(f.calls.length,2);
+});
+test('page21 create receipt permits later explicit creation and late state result cannot restore another community',async()=>{
+ const f=setup([{result:promotion()},{result:promotion('cp_two')},{result:{...promotion(),version:2},delay:true}]);f.elements.reference.value='co_one';f.elements.promotionScene.value='shop1';f.elements.promotionTitle.value='实际标题';f.elements.promotionExpiry.value='2026-11-01T12:00';
+ await f.click('createPromotion');await f.click('createPromotion');assert.equal(f.calls.length,2);assert.equal(f.elements.promotionCode.value,'cp_two');
+ const pending=f.click('savePromotionState');f.elements.reference.value='co_other';f.elements.reference.oninput();f.pending.shift()();await pending;assert.equal(f.elements.promotionCode.value,'');assert.equal(f.elements.promotionVersion.value,'');assert.equal(f.promotionEvents.at(-1).type,'reset');
+});
+
+test('page21 authoritative pre-write rejection permits corrected retry without UNKNOWN reset',async()=>{
+ const f=setup([{error:'APPROVED_COMMUNITY_REQUIRED'},{result:promotion()}]);f.elements.reference.value='co_one';f.elements.promotionScene.value='shop1';f.elements.promotionTitle.value='实际标题';f.elements.promotionExpiry.value='2026-11-01T12:00';await f.click('createPromotion');await f.click('createPromotion');assert.equal(f.calls.length,2);assert.equal(f.promotionEvents.at(-1).type,'saved');
+});

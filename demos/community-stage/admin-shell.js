@@ -152,6 +152,45 @@
  reportBack.addEventListener('click',()=>{if(!reportRecord)return;reportDetail.hidden=true;reportCard.hidden=false;reportShow.hidden=false;});
  clearReport('尚未查询，不填充真实结果');
 
+ // Page21: field cards use original scoped promotion responses, never link views as members.
+ const promotionPanel=document.getElementById('listPromotions').closest('section'),promotionIndex=panels.indexOf(promotionPanel);
+ promotionPanel.classList.add('community-promotion-panel');
+ const promotionQuery=document.createElement('div');promotionQuery.className='open-query';
+ const promotionLabel=document.createElement('label');promotionLabel.textContent='社区编号';
+ const promotionReference=document.createElement('input');promotionReference.id='promotionReference';promotionLabel.append(promotionReference);
+ promotionReference.addEventListener('input',()=>{document.getElementById('reference').value=promotionReference.value;document.getElementById('reference').oninput();});
+ promotionQuery.append(promotionLabel,document.getElementById('listPromotions'));
+ const promotionHint=document.createElement('p');promotionHint.className='profile-hint';
+ const promotionRows=document.createElement('div');promotionRows.className='promotion-records';
+ const promotionDetail=document.createElement('div');promotionDetail.className='community-promotion-detail';promotionDetail.hidden=true;
+ const promotionFields=document.createElement('dl'),promotionBack=document.createElement('button');promotionBack.type='button';promotionBack.textContent='返回推广记录';
+ promotionDetail.append(promotionFields,promotionBack);
+ const promotionActions=document.createElement('details');promotionActions.className='open-actions';
+ const promotionSummary=document.createElement('summary');promotionSummary.textContent='创建推广及更新状态';promotionActions.append(promotionSummary);
+ for(const key of ['promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion','promotionState'])promotionActions.append(document.getElementById(key).closest('label'));
+ promotionActions.append(document.getElementById('createPromotion'),document.getElementById('savePromotionState'));
+ const promotionNote=document.createElement('p');promotionNote.className='profile-hint';promotionNote.textContent='使用原已通过社区及门店场景；到期时间沿用原90天上限。创建结果未确认时先查询对账，不重复提交同一意图。只统计已登录确认的去重记录，不把浏览计为新成员。';promotionActions.append(promotionNote);
+ promotionPanel.append(promotionQuery,promotionHint,promotionRows,promotionDetail,promotionActions);
+ const expiry=value=>Number.isInteger(value)?new Date(value*1000).toISOString().replace('T',' ').replace('.000Z',' UTC'):'当前权限未返回有效时间';
+ const promotionValue=(record,key)=>record[key]===undefined?'当前权限未返回该字段':key==='expires_at'?expiry(record[key]):key==='status'?({ACTIVE:'有效',PAUSED:'已暂停'}[record[key]]||String(record[key])):String(record[key]);
+ function clearPromotion(message){promotionRows.replaceChildren();promotionFields.replaceChildren();promotionRows.hidden=false;promotionDetail.hidden=true;promotionHint.textContent=message;}
+ function promotionDetails(record){promotionFields.replaceChildren();for(const [label,key]of [['推广码','id'],['原小程序门店场景','scene'],['推广标题','title'],['到期时间','expires_at'],['状态','status'],['当前版本','version'],['新成员','new_members'],['已认证去重参与','authenticated_redemptions']])openPair(promotionFields,label,promotionValue(record,key));promotionRows.hidden=true;promotionDetail.hidden=false;}
+ window.communityPromotionView=({type,record})=>{
+  if(type==='identity-reset')promotionReference.value='';
+  if(type==='saved'){clearPromotion('服务端已确认本次操作；请查询原推广记录核对最新状态。');promotionDetails(record);return;}
+  if(type!=='listed'){clearPromotion(type==='loading'?'正在读取或提交，尚未确认':type==='error'?'结果未确认或无权查看，旧记录已清除；请查询原记录对账。':'尚未查询原推广记录');return;}
+  clearPromotion('已读取当前页 '+record.result.records.length+' 条推广记录；统计为已认证去重参与，不是浏览量。');
+  if(!record.result.records.length){const empty=document.createElement('p');empty.textContent='当前页没有推广记录；其他页及未读取范围不作推断。';promotionRows.append(empty);}
+  for(const item of record.result.records){
+   const card=document.createElement('article');card.className='community-record-card';const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';const fields=document.createElement('dl');
+   for(const [label,key]of [['原小程序门店场景','scene'],['推广标题','title'],['到期时间','expires_at']])openPair(fields,label,promotionValue(item,key));
+   openPair(fields,'列表说明','点击下方按钮查看完整资料；状态以回读结果为准。');card.append(title,fields);
+   const show=document.createElement('button');show.type='button';show.className='open-detail-action';show.textContent='查看推广详情';show.addEventListener('click',()=>{if(record.select(item))promotionDetails(item);});promotionRows.append(card,show);
+  }
+ };
+ promotionBack.addEventListener('click',()=>{promotionDetail.hidden=true;promotionRows.hidden=false;});
+ clearPromotion('尚未查询原推广记录');
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -159,9 +198,10 @@
   activeIndex=index;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   main.classList.toggle('profile-selected',index===profileIndex);
+  main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
   main.classList.toggle('open-selected',index===openIndex);main.classList.toggle('report-selected',index===reportIndex);if(index===reportIndex)reportReference.value=document.getElementById('reference').value;
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
