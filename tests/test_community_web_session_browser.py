@@ -42,7 +42,7 @@ class SessionBrowser(unittest.TestCase):
                     headers={k:v for k,v in request.all_headers().items() if k.lower() not in ('host','content-length')};headers['Host']='uk.wenwenwenyiyiyi.work';headers['X-Xuanjun-Client-IP']='127.0.0.1'
                     headers.pop('content-length',None)
                     try:
-                        conn.request(request.method,path,body=request.post_data,headers=headers)
+                        conn.request(request.method,path,body=request.post_data_buffer,headers=headers)
                         response=conn.getresponse();body=response.read();received.append((path,response.status))
                         route.fulfill(status=response.status,headers=dict(response.getheaders()),body=body)
                     finally:conn.close()
