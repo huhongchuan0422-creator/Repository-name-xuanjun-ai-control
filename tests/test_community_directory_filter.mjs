@@ -7,7 +7,7 @@ const html=readFileSync(new URL('../demos/community-stage/communities.html',impo
 const code=readFileSync(new URL('../demos/community-stage/communities.js',import.meta.url),'utf8');
 const merchant=(workspace,status='ACTIVE',version=0)=>({workspace,name:workspace,store_status:'ACTIVE',lifecycle:{status,version,reason:'fixture'}});
 const result=(records,cursor=null)=>({records,has_more:cursor!==null,next_cursor:cursor});
-function setup(responses){
+function setup(responses,reportHook=true){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
@@ -20,6 +20,7 @@ function setup(responses){
   if(fixture.delay)return new Promise(resolve=>pending.push(()=>resolve(reply())));
   return reply();
  }});
+ if(!reportHook)delete context.window.communityReportView;
  vm.runInContext(code,context);
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
@@ -196,4 +197,9 @@ test('profile denied reread clears private detail and blocks stale update',async
  test('page20 bind failure clears old successful receipt and identity reset signals visible filter clear',async()=>{
  const f=setup([{result:{version:7}},{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'binding');await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'error');assert.equal(f.elements.result.textContent,'');
  f.configure({csrf:'next',workspace:'next'});assert.equal(f.reportEvents.at(-1).type,'identity-reset');
+ });
+
+ test('original standalone portal without admin shell retains real order record rows',async()=>{
+ const f=setup([{result:result([{reference:'original_order',amount_minor:101,order_state:'PENDING'}])}],false);f.elements.reference.value='co_one';await f.click('communityOrders');
+ assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*101分/);
  });
