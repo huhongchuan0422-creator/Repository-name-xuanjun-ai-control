@@ -12,7 +12,8 @@ function setup(responses){
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
  const calls=[],pending=[];
- const context=vm.createContext({document:{getElementById:id=>elements[id],createElement:element},window:{},fetch:async(url,options)=>{
+ const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -37,7 +38,7 @@ test('all original statuses use exact API filter and preserve sparse-page cursor
 test('opening a listed community reads current revision before original review',async()=>{
  const f=setup([{result:result([community('co_one','APPROVED',1)])},{result:community('co_one','APPROVED',8)},{result:community('co_one','PAUSED',9)}]);
  f.elements.directoryStatus.value='APPROVED';await f.click('listDirectory');
- await f.elements.records.children[0].children[0].onclick();
+ await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
  f.elements.decision.value='PAUSED';f.elements.opinion.value='Pause reason';await f.click('review');
  assert.deepEqual(f.calls.map(c=>c.body.operation),['list','status','review']);
  assert.deepEqual(f.calls[2].body.params,{community_id:'co_one',expected_version:8,decision:'PAUSED',opinion:'Pause reason'});
@@ -46,7 +47,7 @@ test('opening a listed community reads current revision before original review',
 test('filter change discards page selection and late success or error',async()=>{
  for(const delayed of [{result:result([community('late')],'b'.repeat(64)),delay:true},{error:'OLD_ERROR',delay:true}]){
   const f=setup([{result:result([community('old')],'a'.repeat(64))},delayed,{result:result([community('new','PAUSED')])}]);
-  await f.click('pending');const oldSelect=f.elements.records.children[0].children[0].onclick;
+  await f.click('pending');const oldSelect=f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick;
   const pending=f.click('more');f.elements.directoryStatus.value='PAUSED';f.elements.directoryStatus.onchange();
   assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.reference.value,'');
   f.pending.shift()();await pending;assert.equal(f.elements.records.children.length,0);assert.doesNotMatch(f.elements.message.textContent,/OLD_ERROR|操作完成/);
@@ -55,7 +56,7 @@ test('filter change discards page selection and late success or error',async()=>
 });
 test('late selected detail cannot restore cleared revision; identity reset clears filter',async()=>{
  const f=setup([{result:result([community('old')])},{result:community('old','APPROVED',8),delay:true},{result:result([])}]);
- await f.click('pending');const pending=f.elements.records.children[0].children[0].onclick();
+ await f.click('pending');const pending=f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
  f.elements.directoryStatus.value='PAUSED';f.elements.directoryStatus.onchange();f.pending.shift()();await pending;
  assert.equal(f.elements.reference.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询当前社区版本/);
  f.configure({csrf:'next',workspace:'next'});assert.equal(f.elements.directoryStatus.value,'ALL');await f.click('pending');
@@ -104,3 +105,33 @@ test('manually changing selected reference prevents old mutation receipt replaci
  f.elements.reference.value='other';f.pending.shift()();await pending;
  assert.equal(f.elements.reference.value,'other');const count=f.calls.length;await f.click('submit');assert.equal(f.calls.length,count);
 });
+
+test('profile mine detail update reread use original APIs and latest version',async()=>{
+ const f=setup([{result:result([community('co_one','DRAFT',1)])},{result:community('co_one','DRAFT',7)},{result:community('co_one','DRAFT',8)},{result:community('co_one','DRAFT',8)}]);
+ await f.click('mine');await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
+ f.elements.name.value='Revised';f.elements.description.value='Original API';f.elements.contact.value='Contact';
+ await f.elements.profile.onsubmit({preventDefault(){}});await f.click('read');
+ assert.deepEqual(f.calls.map(c=>c.body.operation),['mine','status','update','status']);
+ assert.equal(f.calls[2].body.params.expected_version,7);
+ assert.equal(f.calls[2].body.params.name,'Revised');
+ assert.equal(f.elements.reference.value,'co_one');
+});
+test('profile denied reread clears private detail and blocks stale update',async()=>{
+ const f=setup([{result:community('co_one','DRAFT',7)},{error:'COMMUNITY_PRIVATE'}]);
+ f.elements.reference.value='co_one';await f.click('read');await f.click('read');
+ assert.equal(f.elements.result.textContent,'');assert.equal(f.elements.contact.value,'');
+ await f.elements.profile.onsubmit({preventDefault(){}});assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先回读/);
+});
+
+ test('register UNKNOWN persists a guard and cannot POST again after mine or identity reset',async()=>{
+ const f=setup([{error:'UNKNOWN'},{result:result([])}]);
+ f.elements.name.value='New';f.elements.contact.value='Contact';await f.elements.profile.onsubmit({preventDefault(){}});
+ await f.elements.profile.onsubmit({preventDefault(){}});await f.click('mine');f.configure({csrf:'next',workspace:'platform'});
+ await f.elements.profile.onsubmit({preventDefault(){}});
+ assert.deepEqual(f.calls.map(c=>c.body.operation),['register','mine']);assert.match(f.elements.message.textContent,/对账/);
+ });
+ test('denied detail removes private list rows and cursor',async()=>{
+ const f=setup([{result:result([community('co_one','DRAFT')],'a'.repeat(64))},{error:'COMMUNITY_PRIVATE'}]);
+ await f.click('mine');await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
+ assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.result.textContent,'');
+ });
