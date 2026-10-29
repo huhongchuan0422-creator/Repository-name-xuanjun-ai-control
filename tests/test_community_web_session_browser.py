@@ -10,6 +10,7 @@ import os
 import socket
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from playwright.sync_api import sync_playwright,expect
 import test_community_platform_host as fixture
@@ -25,6 +26,12 @@ class SessionBrowser(unittest.TestCase):
         with fx.open() as host:
             host.center.db.execute("UPDATE members SET role='REVIEWER' WHERE user_id=?",(fx.fx.uid2,))
             server=host.application.listen_proxy(fx.plan['socket_path'],fx.plan['https_origin'],fx.plan['nginx_uid'],fx.plan['nginx_gid'])
+            # Synthetic private record belonging to the other existing fixture account.
+            foreign_id='co_'+'f'*32
+            host.application.communities.write(fx.plan['community_grants']['community'],
+                dict(id=foreign_id,tenant='tenant1',owner=fx.fx.uid2,name='他人测试社区',
+                     description='隔离测试资料',contact='不得显示的测试联系人',state='DRAFT',
+                     version=1,opinion='',updated_at=host.center.now()))
             server.timeout=.1;received=[]
             def browser_flow():
                 def forward(route):
@@ -41,7 +48,7 @@ class SessionBrowser(unittest.TestCase):
                 with sync_playwright() as p:
                     browser=p.chromium.launch(headless=True)
                     try:
-                        page=browser.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+                        page=browser.new_page(viewport={'width':1440,'height':1000});errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
                         page.route(fx.plan['https_origin']+'/**',forward)
                         def login(address):
                             panel=page.locator('#community-session');panel.locator('[name=email]').fill(address)
@@ -55,7 +62,51 @@ class SessionBrowser(unittest.TestCase):
                         expect(page.locator('#community-session select')).to_have_value('community')
                         page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
                         expect(page.locator('#mine')).to_be_visible()
-                        with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):page.locator('#mine').click()
+                        evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
+                        shots=[]
+                        def shot(name):
+                            page.screenshot(path=str(evidence/(name+'.png')),full_page=True)
+                            shots.append(name+'.png')
+                        def directory(op,status=200):
+                            return page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==status and r.request.post_data_json.get('operation')==op)
+                        page.get_by_role('button',name='登记新社区',exact=True).click()
+                        page.locator('#name').fill('逐页验收测试社区')
+                        page.locator('#description').fill('仅 Hosted 隔离合成数据，不代表生产记录。')
+                        page.locator('#contact').fill('测试联系人 · 00000000000')
+                        with directory('register'):page.locator('#profile button').click()
+                        expect(page.locator('.community-profile-detail')).to_be_visible()
+                        with directory('mine'):page.locator('#mine').click()
+                        card=page.locator('.community-record-card')
+                        expect(card).to_have_count(1)
+                        expect(card.locator('dt')).to_have_text(['社区名称','社区介绍','联系人及联系方式','状态'])
+                        expect(card.locator('dd')).to_have_text(['逐页验收测试社区','仅 Hosted 隔离合成数据，不代表生产记录。','测试联系人 · 00000000000','DRAFT'])
+                        shot('18-list-1440')
+                        with directory('status'):card.get_by_role('button',name='查看详情',exact=True).click()
+                        expect(page.locator('.community-profile-detail')).to_be_visible()
+                        expect(page.locator('#profile')).to_be_hidden()
+                        shot('18-detail-1440')
+                        page.get_by_role('button',name='返回记录列表',exact=True).click()
+                        expect(card).to_be_visible();shot('18-return-1440')
+                        with directory('status'):card.get_by_role('button',name='查看详情',exact=True).click()
+                        page.get_by_role('button',name='编辑资料',exact=True).click()
+                        expect(page.locator('#profile')).to_be_visible();shot('18-edit-1440')
+                        page.locator('#description').fill('已编辑的 Hosted 隔离测试介绍')
+                        with directory('update'):page.locator('#profile button').click()
+                        with directory('status'):page.get_by_role('button',name='回读当前记录',exact=True).click()
+                        expect(page.locator('.community-profile-detail dl')).to_contain_text('已编辑的 Hosted 隔离测试介绍')
+                        shot('18-readback-1440')
+                        with directory('mine'):page.locator('#mine').click()
+                        expect(card).to_contain_text('测试联系人 · 00000000000')
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='打开社区',exact=True).click()
+                        page.locator('#reference').fill(foreign_id)
+                        with directory('status',403):page.locator('#read').click()
+                        expect(page.locator('#records')).to_be_empty()
+                        expect(page.locator('#contact')).to_have_value('')
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
+                        expect(page.locator('.community-profile-detail')).to_be_hidden()
+                        expect(page.locator('main')).not_to_contain_text('测试联系人 · 00000000000')
+                        expect(page.locator('main')).not_to_contain_text('不得显示的测试联系人')
+                        shot('18-denied-cleared-1440')
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
@@ -78,6 +129,9 @@ class SessionBrowser(unittest.TestCase):
                                 response=conn.getresponse();response.read();self.assertEqual(response.status,403)
                             finally:conn.close()
                         self.assertEqual(errors,[])
+                        (evidence/'receipt.json').write_text(json.dumps(dict(source=os.environ.get('GITHUB_SHA','LOCAL'),
+                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',screenshots=shots,
+                            production=False,customer_accepted=False),ensure_ascii=False,indent=2)+'\n')
                     finally:browser.close()
             # Root cannot be an admitted production peer. Only this synthetic
             # local transport substitutes source verification; Hosted uses the

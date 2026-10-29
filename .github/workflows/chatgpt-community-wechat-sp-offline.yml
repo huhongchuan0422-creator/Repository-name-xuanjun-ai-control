@@ -640,6 +640,7 @@ jobs:
             stage5-tests.log
             preview-hosted-evidence.json
             community-stage-source.zip
+            community-admin-browser-evidence/
           retention-days: 14
       - name: Preserve complete UK read-only candidate for root review
         if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
