@@ -114,7 +114,7 @@ class SessionBrowser(unittest.TestCase):
                         @contextmanager
                         def directory(op,status=200):
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.request.post_data_json.get('operation')==op) as event:
-                                yield
+                                yield event
                             response=event.value
                             self.assertEqual(response.status,status,{'operation':op,'status':response.status,'body':response.json()})
                         page.get_by_role('button',name='登记新社区',exact=True).click()
@@ -178,8 +178,11 @@ class SessionBrowser(unittest.TestCase):
                         page.locator('.community-open-panel .open-actions > summary').click()
                         for original in ('kind','join','leave','members'):expect(page.locator('#'+original)).to_be_visible()
                         shot('46-original-relation-controls-1440')
-                        with directory('members'):page.locator('#members').click()
-                        expect(page.locator('#records')).to_be_visible();shot('46-members-read-1440')
+                        with directory('members') as member_response:page.locator('#members').click()
+                        self.assertEqual(member_response.value.json()['result']['records'],[])
+                        expect(page.locator('#records')).to_be_empty()
+                        expect(page.locator('.community-open-panel #result')).to_be_visible()
+                        expect(page.locator('.community-open-panel .profile-hint').filter(has_text='当前页暂无成员。')).to_be_visible();shot('46-members-read-1440')
                         page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
                         with directory('mine'):page.locator('#mine').click()
                         expect(card).to_be_visible()

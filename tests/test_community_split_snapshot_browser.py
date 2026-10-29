@@ -99,7 +99,9 @@ class SplitSnapshotBrowser(unittest.TestCase):
                             page=browser.new_page(viewport=dict(width=1440,height=1000));errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.route(fx.plan['https_origin']+'/**',forward)
                             page.goto(fx.plan['https_origin']+'/community-preview/community/portal')
                             session=page.locator('#community-session');session.locator('[name=email]').fill('one@example.org');session.locator('[name=password]').fill('FixturePassword123!');session.get_by_role('button',name='登录',exact=True).click();expect(session.locator('[role=status]')).to_contain_text('已登录')
-                            session.locator('select').select_option('platform')
+                            account=page.locator('.admin-account')
+                            if account.get_attribute('open') is None:account.locator('summary').click()
+                            session.get_by_role('combobox',name='已授权工作区',exact=True).select_option('platform')
                             def shot(name):
                                 page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
                             expect(page.locator('main h1')).to_have_text('平台管理')

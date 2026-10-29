@@ -97,3 +97,8 @@
 .community-admin .admin-home .admin-card{display:block;box-sizing:border-box;text-decoration:none;color:var(--ink);background:white;border:1px solid var(--line);width:100%;font:inherit;cursor:pointer}
 .community-admin .admin-home .admin-card:hover,.community-admin .admin-home .admin-card:focus-visible{background:#edf5ef;border-color:#246d4f}
 @media(max-width:520px){.community-admin .admin-home{padding:20px 14px}.community-admin .admin-home-group{padding:16px}.community-admin .admin-home .admin-card{min-height:96px;padding:18px}}
+
+/* Original financial page hierarchy: one read-state hint, cards, retained query controls. */
+main.compact-finance-selected > #message[data-generic-complete="true"]{display:none}
+main.compact-finance-selected .admin-back{margin:0 0 20px}
+main.compact-finance-selected > h1{margin-top:0}

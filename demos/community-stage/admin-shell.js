@@ -17,6 +17,7 @@
  const profileIndex=panels.indexOf(profilePanel);
  profilePanel.classList.add('community-profile-panel');
  const pageTitle=main.querySelector('h1');
+ const originalMessage=document.getElementById('message');if(originalMessage){const syncReadMessage=()=>{originalMessage.dataset.genericComplete=['操作完成','记录查询完成'].includes(originalMessage.textContent)?'true':'false';};new MutationObserver(syncReadMessage).observe(originalMessage,{childList:true,characterData:true,subtree:true});syncReadMessage();}
  const account=document.querySelector('.admin-account'),accountRoot=document.getElementById('community-session');
  let accountReady=false;
  if(account&&accountRoot){
@@ -98,6 +99,7 @@
  window.communityOpenView=({type,record})=>{
   if(type==='reset'||type==='error'||type==='loading'){clearOpen(type==='error'?'资料未确认或当前无权查看，请重新查询。':type==='loading'?'正在查询社区资料…':'身份或工作区已变化，请重新查询。');if(activeIndex===openIndex&&result)result.hidden=true;return;}
   if(type==='members'){clearOpen('成员查询使用原权限；以下仅为当前页记录。');openMembers=true;if(activeIndex===openIndex&&result)result.hidden=false;return;}
+  if(type==='members-listed'){if(openMembers&&activeIndex===openIndex)openHint.textContent=record.count?'已读取当前页 '+record.count+' 位成员。':record.has_more?'当前扫描页暂无可见成员，可读取下一页。':'当前页暂无成员。';return;}
   if(type==='relation'){clearOpen(record.active?'本次加入已获服务端确认；请回读社区资料。':'本次退出已获服务端确认；请回读社区资料。');if(activeIndex===openIndex&&result)result.hidden=true;return;}
   if(type!=='status')return;
   clearOpen('资料已读取，可查看详情；'+currentSubjectRelation(record)+'。');openRecord=record;
@@ -251,17 +253,18 @@
  const receiverRows=document.createElement('div'),receiverDetail=document.createElement('div');receiverDetail.className='community-receiver-detail';receiverDetail.hidden=true;
  const receiverFields=document.createElement('dl'),receiverBack=document.createElement('button');receiverBack.type='button';receiverBack.className='platform-order-button';receiverBack.textContent='返回接收关系列表';receiverDetail.append(receiverFields,receiverBack);
  const receiverActions=document.createElement('details');receiverActions.className='open-actions';const receiverSummary=document.createElement('summary');receiverSummary.textContent='原接收关系配置操作';receiverActions.append(receiverSummary);
+ const receiverQueryControls=document.createElement('details'),receiverQuerySummary=document.createElement('summary');receiverQueryControls.className='receiver-query-controls open-actions';receiverQueryControls.open=true;receiverQuerySummary.textContent='查询接收关系';receiverQueryControls.append(receiverQuerySummary);
  const receiverQuery=document.createElement('div');receiverQuery.className='open-query';receiverQuery.append(document.getElementById('receiverCommunityReference').closest('label'),document.getElementById('receiverWorkspace').closest('label'),document.getElementById('listReceiverRelations'));
  receiverActions.append(document.getElementById('receiverId').closest('label'),document.getElementById('receiverVersion').closest('label'),document.getElementById('readReceiverRelation'),document.getElementById('bindReceiver'));
  const receiverNotice=document.createElement('p');receiverNotice.textContent='仅原平台所有者及已授权财务范围可操作；只影响新分账规则版本，不执行资金操作。未知结果先回读关系版本，不重复提交。';receiverActions.append(receiverNotice);
- reportConfig.hidden=true;receiverPanel.append(receiverQuery,receiverHint,receiverRows,document.getElementById('moreReceiverRelations'),receiverDetail,receiverActions);
+ receiverQueryControls.append(receiverQuery);reportConfig.hidden=true;receiverPanel.append(receiverHint,receiverRows,document.getElementById('moreReceiverRelations'),receiverDetail,receiverQueryControls,receiverActions);
  const workspaceText=r=>r.provider_workspace_status==='LEGACY_NOT_RECORDED'?'历史记录未保存工作区，不作推断':typeof r.provider_workspace==='string'?r.provider_workspace:'未返回';
  const receiverPairs=r=>[['已授权财务工作区（记录）',workspaceText(r)],['本次已验证查询工作区',r.requested_provider_workspace||'保存回执；请回读核实'],['已准入接收方编号',r.receiver_id],['关系当前版本',r.version],['适用范围','仅新分账规则版本；未执行资金操作']];
  function clearReceiverUi(message){receiverRows.replaceChildren();receiverFields.replaceChildren();receiverDetail.hidden=true;receiverRows.hidden=false;receiverHint.textContent=message;}
  window.communityReceiverView=({type,record})=>{
   if(type==='detail'||type==='saved'){clearReceiverUi(type==='saved'?'保存已获服务端确认，建议回读当前关系版本。':'已回读所选接收关系；并非资金到账凭证。');for(const pair of receiverPairs(record))openPair(receiverFields,...pair);receiverDetail.hidden=false;receiverRows.hidden=true;return;}
-  if(type!=='listed'){clearReceiverUi(type==='error'?'读取或保存未确认，旧详情已清除，请核对权限并回读。':type==='loading'?'正在请求原授权关系，尚未确认':'尚未读取原接收关系');return;}
-  clearReceiverUi('已读取当前扫描页 '+record.result.records.length+' 条；不是全部关系汇总。');
+  if(type!=='listed'){if(type==='error'||type==='reset')receiverQueryControls.open=true;clearReceiverUi(type==='error'?'读取或保存未确认，旧详情已清除，请核对权限并回读。':type==='loading'?'正在请求原授权关系，尚未确认':'尚未读取原接收关系');return;}
+  receiverQueryControls.open=false;clearReceiverUi('已读取当前扫描页 '+record.result.records.length+' 条；不是全部关系汇总。');
   if(!record.result.records.length){const p=document.createElement('p');p.textContent=record.result.has_more?'本扫描页没有可显示关系，仍有下一页。':'本页没有可显示关系；不自动推定可用初始版本。';receiverRows.append(p);}
   for(const item of record.result.records){const card=document.createElement('article');card.className='community-record-card';const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';const fields=document.createElement('dl');for(const pair of receiverPairs(item))openPair(fields,...pair);card.append(title,fields);const show=document.createElement('button');show.type='button';show.className='open-detail-action';show.textContent='查看接收关系详情';show.addEventListener('click',()=>record.select(item));receiverRows.append(card,show);}
  };
@@ -276,7 +279,7 @@
  orderQuery.append(document.getElementById('readPlatformView'));
  const orderTitle=document.createElement('h3'),orderHint=document.createElement('p'),orderRows=document.createElement('div'),orderDetail=document.createElement('div'),orderBack=document.createElement('button');
  orderTitle.textContent='支付证据';orderRows.className='platform-order-rows';orderDetail.className='platform-order-detail';orderBack.textContent='返回原列表';orderBack.type='button';orderBack.className='platform-order-button';
- platformPanel.append(orderQuery,orderTitle,orderHint,orderRows,orderDetail,orderBack,document.getElementById('morePlatformView'),platformResult);
+ platformPanel.append(orderTitle,orderHint,orderRows,orderDetail,orderBack,document.getElementById('morePlatformView'),platformResult,orderQuery);
  let orderViewRevision=0;
  function syncOrderPageTitle(){platformPanel.querySelector('h2').hidden=document.getElementById('platformView').value==='platform_orders';orderTitle.hidden=true;if(!pageTitle||activeIndex!==panels.indexOf(platformPanel))return;pageTitle.textContent=document.getElementById('platformView').value==='platform_orders'?orderTitle.textContent:platformPanel.querySelector('h2').textContent;}
  function clearOrderView(message){orderViewRevision++;orderRows.replaceChildren();orderDetail.replaceChildren();orderRows.hidden=false;orderDetail.hidden=true;orderBack.hidden=true;orderTitle.textContent='支付证据';orderHint.textContent=message;platformResult.hidden=false;syncOrderPageTitle();}
@@ -392,6 +395,7 @@
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();syncCustomerTitle();syncSnapshotTitle();
+  const compactFinance=index===receiverIndex||index===panels.indexOf(platformPanel);main.classList.toggle('compact-finance-selected',compactFinance);if(pageTitle&&compactFinance)main.insertBefore(back,pageTitle);else main.insertBefore(back,home);
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;

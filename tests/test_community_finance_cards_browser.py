@@ -161,13 +161,19 @@ class FinanceCardsBrowser(unittest.TestCase):
                             financeSelector.select_option('finance');expect(page.locator('#providerActions')).to_be_visible()
                             def shot(name):
                                 page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
+                            def select_finance(button_id):
+                                tools=page.locator('.finance-page-tools')
+                                if tools.count() and tools.is_visible() and tools.get_attribute('open') is None:tools.locator(':scope > summary').click()
+                                page.locator('#'+button_id).click()
+                                expect(page.locator('.finance-page-tools[open]')).to_have_count(0)
+                                expect(page.locator('.finance-page-return')).to_be_visible()
                             for kind,prefix in [('REFUND','finance-32'),('SPLIT','finance-33')]:
-                                page.locator('#financeRefund' if kind=='REFUND' else '#financeSplit').click();expect(page.locator('#financeBrand')).to_have_text('社区服务 · 平台');expect(page.locator('.finance-account[open]')).to_have_count(0);expect(page.locator('#community-session [name=email]')).to_have_count(1);expect(page.locator('#community-session [data-logout]')).to_have_count(1);page.locator('#financialReadControls summary').click()
+                                select_finance('financeRefund' if kind=='REFUND' else 'financeSplit');expect(page.locator('#financeBrand')).to_have_text('社区服务 · 平台');expect(page.locator('.finance-account[open]')).to_have_count(0);expect(page.locator('#community-session [name=email]')).to_have_count(1);expect(page.locator('#community-session [data-logout]')).to_have_count(1);page.locator('#financialReadControls summary').click()
                                 with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==200):page.locator('#financialRecords').click()
                                 expect(page.locator('#financialObservationList')).to_contain_text('req_'+kind.lower());page.locator('#financialReadControls summary').click();expect(page.locator('#workbenchOriginalSections')).to_be_hidden();shot(prefix+'-list-1440')
                                 page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('摘要未提供金额');shot(prefix+'-detail-1440')
                                 page.locator('#financialObservationBack').click();expect(page.locator('#financialKind')).to_have_value(kind);expect(page.locator('#financialObservationList')).to_be_visible();shot(prefix+'-return-1440')
-                            page.locator('#financeReturn').click();page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');page.locator('#financialReadControls summary').click();shot('finance-33-return-empty-1440')
+                            select_finance('financeReturn');page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');page.locator('#financialReadControls summary').click();shot('finance-33-return-empty-1440')
                             seed_return.set()
                             if not return_seeded.wait(5):raise AssertionError('synthetic return fixture seed not acknowledged')
                             page.locator('#financialReadControls summary').click()
@@ -176,7 +182,7 @@ class FinanceCardsBrowser(unittest.TestCase):
                             page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click()
                             expect(page.locator('#workbenchTitle')).to_have_text('分账回退详情');expect(page.locator('#financialObservationDetail')).to_contain_text('community');expect(page.locator('#financialObservationDetail')).to_contain_text('7 最小货币单位（原记录未返回币种）');expect(page.locator('#financialObservationDetail')).to_contain_text('UNKNOWN_QUERY_EXISTING_ONLY');expect(page.locator('#financialObservationDetail')).to_contain_text('未验证');expect(page.locator('#financialObservationDetail')).to_contain_text('未确认');shot('finance-65-return-detail-1440')
                             page.locator('#financialObservationBack').click();expect(page.locator('#financialObservationList')).to_contain_text('req_return');expect(page.locator('#financialKind')).to_have_value('RETURN');shot('finance-65-return-back-1440')
-                            page.locator('#financeReconciliation').click();page.locator('#financialReadControls summary').click();page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');page.locator('#financialReadControls summary').click();shot('finance-34-list-1440')
+                            select_finance('financeReconciliation');page.locator('#financialReadControls summary').click();page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');page.locator('#financialReadControls summary').click();shot('finance-34-list-1440')
                             page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('不是全量日账单');shot('finance-34-detail-1440')
                             # Original page27 reads the same real fixture receiver binding; no second system.
                             page.goto(fx.plan['https_origin']+'/community-preview/community/portal')
@@ -190,8 +196,8 @@ class FinanceCardsBrowser(unittest.TestCase):
                             receiver_shot('finance-27-list-1440')
                             panel27.get_by_role('button',name='查看接收关系详情',exact=True).click();expect(panel27.locator('.community-receiver-detail')).to_contain_text('finance');receiver_shot('finance-54-detail-1440')
                             panel27.get_by_role('button',name='返回接收关系列表',exact=True).click();expect(panel27.locator('.community-record-card')).to_be_visible();receiver_shot('finance-27-return-1440')
-                            panel27.locator('summary').click();panel27.locator('#receiverId').fill('community');panel27.locator('#readReceiverRelation').click();expect(panel27.locator('#receiverVersion')).to_have_value('1');receiver_shot('finance-55-readback-1440')
-                            panel27.locator('#receiverWorkspace').fill('not_admitted')
+                            panel27.locator('.open-actions:not(.receiver-query-controls) > summary').click();panel27.locator('#receiverId').fill('community');panel27.locator('#readReceiverRelation').click();expect(panel27.locator('#receiverVersion')).to_have_value('1');receiver_shot('finance-55-readback-1440')
+                            panel27.locator('.receiver-query-controls > summary').click();panel27.locator('#receiverWorkspace').fill('not_admitted')
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):panel27.locator('#listReceiverRelations').click()
                             expect(panel27.locator('.community-receiver-detail')).to_be_hidden();expect(panel27.locator('#receiverVersion')).to_have_value('');receiver_shot('finance-27-denied-1440')
                             # Original26/52/53: independent synthetic reviewer, exact original CAS and status reread.
@@ -234,7 +240,7 @@ class FinanceCardsBrowser(unittest.TestCase):
                             # Real finance grant revoked on host owner thread, retaining the same browser identity.
                             page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench');expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
                             page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
-                            page.locator('#financeRefund').click();page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('req_refund')
+                            select_finance('financeRefund');page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('req_refund')
                             revoke_finance.set()
                             if not revoked_finance.wait(5):raise AssertionError('fixture grant revocation not acknowledged')
                             with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==403):page.locator('#financialRecords').click()

@@ -63,6 +63,29 @@
   financeAccount=document.createElement('details');financeAccount.className='finance-account';financeAccountSummary=document.createElement('summary');financeAccountSummary.textContent='原账户与工作区';financeAccount.append(financeAccountSummary);root.parentNode.insertBefore(financeAccount,root);financeAccount.append(root);financeAccountRoot=root;
   if(typeof MutationObserver==='function')new MutationObserver(syncFinanceAccount).observe(root,{childList:true,subtree:true});
  }
+ // FINANCE_FOCUSED_LAYOUT_BEGIN
+ let financeTools=null,financeReturn=null,financeMoved=[];
+ function syncFinanceLayout(focused){
+  // Existing nodes are moved, not copied: session, grants and handlers stay intact.
+  if(typeof document.createComment!=='function')return;
+  const main=$('workbenchMain'),header=$('workbenchTitle').parentNode;
+  if(!financeTools){
+   financeTools=document.createElement('details');financeTools.className='finance-page-tools';
+   const summary=document.createElement('summary');summary.textContent='账户、工作区、页面导航与范围说明';financeTools.append(summary);main.append(financeTools);
+   financeReturn=document.createElement('button');financeReturn.type='button';financeReturn.className='finance-page-return';financeReturn.textContent='‹ 返回工作台';financeReturn.onclick=()=>selectFinancialMode('WORKBENCH');main.insertBefore(financeReturn,header);
+  }
+  financeReturn.hidden=!focused;financeTools.hidden=!focused;
+  if(focused&&!financeMoved.length){
+   const globalNav=document.querySelector('body > nav');
+   const nodes=[globalNav,financeAccount,$('financeNavigation'),...Array.from(header.children).filter(node=>node!==$('workbenchTitle')),$('providerActions').querySelector(':scope > p'),$('financialObservationScope')].filter(Boolean);
+   for(const node of nodes){const marker=document.createComment('original finance presentation position');node.parentNode.insertBefore(marker,node);financeMoved.push({node,marker});financeTools.append(node);}
+   financeTools.open=false;
+  }else if(!focused&&financeMoved.length){
+   for(const {node,marker}of financeMoved){marker.parentNode.insertBefore(node,marker);marker.remove();}financeMoved=[];financeTools.open=false;
+  }
+  if(focused)financeTools.open=false;
+ }
+ // FINANCE_FOCUSED_LAYOUT_END
  function renderFinancialMode(){
   const allowed=!!config?.providerWorkspace,focused=allowed&&financialMode!=='WORKBENCH';
   $('financeBrand').hidden=!focused;ensureFinanceAccount();syncFinanceAccount();
@@ -74,6 +97,7 @@
   $('financialKindLabel').hidden=focused;$('financialRecords').hidden=focused&&financialMode==='RECONCILIATION';
   $('readReconciliation').hidden=focused&&financialMode!=='RECONCILIATION';
   $('financialMore').hidden=focused&&financialMode==='RECONCILIATION'||!financialPage;
+  syncFinanceLayout(focused);
  }
  function selectFinancialMode(mode){
   if(busy||!config||(mode!=='WORKBENCH'&&!config.providerWorkspace))return;
