@@ -51,11 +51,11 @@
  $('more').onclick=()=>action(t=>page&&list(t,page.operation,page.params,page.merchantOnly),page&&isReport(page.operation)?'记录查询完成':'操作完成');
  async function customerRequest(t,operation,params){const generation=directoryGeneration;clearCustomer('loading');try{const r=await call(operation,params,t);if(t!==epoch||generation!==directoryGeneration)return;if(operation==='profile_read'||operation==='profile_update'){profileVersion=r.version;$('nickname').value=r.nickname;$('customerContact').value=r.contact;customerView(operation==='profile_read'?'listed':'saved',r);}else customerView(operation==='referral_code'?'code':'bound',r);$('customerResult').textContent=JSON.stringify(r,null,2);}catch(error){if(t===epoch&&generation===directoryGeneration)clearCustomer(error.serverRejected?'error':'unknown');throw error;}}
  window.communityReadRefunds=()=>action(t=>list(t,'community_refunds',{community_id:id(),after_id:''}),'记录查询完成');
- $('readProfile').onclick=()=>action(t=>customerRequest(t,'profile_read',{}));
- $('customerProfile').onsubmit=e=>{e.preventDefault();return action(t=>{if(profileVersion===null)throw Error('先读取当前资料');return customerRequest(t,'profile_update',{nickname:$('nickname').value,contact:$('customerContact').value,expected_version:profileVersion});});};
- $('referralCode').onclick=()=>action(t=>customerRequest(t,'referral_code',{}));
- $('bindReferrer').onclick=()=>action(t=>customerRequest(t,'referral_bind',{code:$('referralInput').value}));
- $('notices').onclick=()=>{customerView('notices');return action(t=>list(t,'notices',{after_id:''}));};
+ $('readProfile').onclick=()=>action(t=>customerRequest(t,'profile_read',{}),'资料读取完成');
+ $('customerProfile').onsubmit=e=>{e.preventDefault();return action(t=>{if(profileVersion===null)throw Error('先读取当前资料');return customerRequest(t,'profile_update',{nickname:$('nickname').value,contact:$('customerContact').value,expected_version:profileVersion});},'资料保存回执已收到');};
+ $('referralCode').onclick=()=>action(t=>customerRequest(t,'referral_code',{}),'推荐码已读取');
+ $('bindReferrer').onclick=()=>action(t=>customerRequest(t,'referral_bind',{code:$('referralInput').value}),'推荐关系绑定回执已收到');
+ $('notices').onclick=()=>{customerView('notices');return action(t=>list(t,'notices',{after_id:''}),'通知读取完成');};
  $('communityOrders').onclick=()=>action(t=>list(t,'community_orders',{community_id:id(),after_id:''}),'记录查询完成');
  $('communityEarnings').onclick=()=>action(t=>list(t,'community_earnings',{community_id:id(),after_id:''}),'记录查询完成');
  $('bindReceiver').onclick=()=>action(async t=>{const generation=directoryGeneration,selectedReference=$('reference').value;reportView('loading');$('result').textContent='';try{const r=await call('community_receiver_bind',{community_id:id(),provider_workspace:$('receiverWorkspace').value,receiver_id:$('receiverId').value,expected_version:Number($('receiverVersion').value)},t);if(t===epoch&&generation===directoryGeneration&&selectedReference===$('reference').value){$('receiverVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);reportView('binding',r);}}catch(error){if(t===epoch&&generation===directoryGeneration&&selectedReference===$('reference').value)reportView('error');throw error;}});

@@ -257,6 +257,7 @@ class SessionBrowser(unittest.TestCase):
                         try:
                             page.set_viewport_size({'width':390,'height':844});expect(page.locator('main h1')).to_have_text('社区推广 · 编辑');expect(page.locator('#savePromotionState')).to_be_visible()
                             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                            self.assertTrue(page.evaluate("(()=>{const p=document.querySelector('.community-promotion-panel'),a=p.querySelector('details.open-actions'),b=Array.from(p.querySelectorAll('button')).find(x=>x.textContent==='返回推广记录');return !!a&&!!b&&!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)})()"))
                             shot('48-promotion-edit-390')
                         finally:page.set_viewport_size(viewport)
                         page.locator('#promotionState').select_option('PAUSED')

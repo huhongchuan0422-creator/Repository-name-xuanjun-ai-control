@@ -145,3 +145,6 @@ main.compact-finance-selected > h1{margin-top:0}
 
 .community-admin .restored-operation-editing>.operation-query-action{display:none}
 .community-admin .restored-operation-editing>details{background:white;border:1px solid var(--line);border-radius:16px;padding:22px}
+
+/* Original secondary reread actions stay reachable, without competing with the primary return. */
+button.restored-secondary-action{background:transparent!important;color:#226b50!important;border:1px solid #cddfd7!important;width:auto!important;min-width:0;padding:10px 14px!important;font-weight:400!important;}
