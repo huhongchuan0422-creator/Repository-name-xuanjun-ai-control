@@ -22,3 +22,7 @@ class FinanceUIContract(unittest.TestCase):
  def test_platform_operations_merchants(self):subprocess.run(['node',str(ROOT/'tests/community_platform_operations_merchants_dom.cjs'),str(ROOT/'demos/community-stage/communities.js'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
 
  def test_platform_brand(self):subprocess.run(['node',str(ROOT/'tests/community_platform_brand_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_customer_profile_runtime(self):subprocess.run(['node',str(ROOT/'tests/community_test_profile_runtime.cjs'),str(ROOT/'demos/community-stage/communities.js')],check=True,timeout=30)
+
+ def test_customer_profile_shell(self):subprocess.run(['node',str(ROOT/'tests/community_test_customer_shell.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)

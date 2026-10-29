@@ -80,3 +80,5 @@
 /* Original platform page canvases; keep the record cards as the single white surface. */
 .community-admin .platform-review-panel,.community-admin .platform-orders-panel,.community-admin .platform-merchant-panel,.community-admin .community-receiver-panel{background:transparent;border:0;padding:0;box-shadow:none}
 .community-admin .community-receiver-panel .open-detail-action{background:#246d4f;color:#fff}
+
+.community-admin .customer-profile-panel{background:transparent;border:0;padding:0;box-shadow:none}.community-admin button.customer-profile-button{display:block;width:100%;margin:16px 0;background:#246d4f;color:#fff;text-align:left}.customer-profile-panel #customerProfile{background:#fff;border:1px solid #d9e5df;border-radius:16px;padding:20px}.customer-profile-panel details{margin-top:24px}.customer-profile-panel #readProfile{margin-bottom:16px}

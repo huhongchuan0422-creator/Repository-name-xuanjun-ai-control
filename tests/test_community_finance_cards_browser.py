@@ -86,6 +86,12 @@ class FinanceFixtureContract(unittest.TestCase):
                 merchants=review_call('platform_merchants',dict(after_workspace=''));target=next(v for v in merchants['records'] if v['workspace']=='merchant');self.assertEqual(target['lifecycle']['version'],0)
                 changed=review_call('platform_merchant_state',dict(merchant_workspace='merchant',status='ACTIVE',expected_version=0,reason='合成原状态版本测试'));self.assertEqual(changed['version'],1)
                 with self.assertRaises(PermissionError):host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform_readonly',operation='platform_merchant_state',params=dict(merchant_workspace='merchant',status='PAUSED',expected_version=1,reason='只读审核员不得修改')))
+                profile=review_call('profile_read',{});self.assertEqual(profile['version'],0)
+                saved=review_call('profile_update',dict(nickname='合成个人昵称',contact='合成联系方式',expected_version=0));self.assertEqual(saved['version'],1)
+                self.assertEqual(review_call('profile_read',{})['contact'],'合成联系方式')
+                with self.assertRaises(ValueError):review_call('profile_update',dict(nickname='不得覆盖',contact='',expected_version=0))
+                code=review_call('referral_code',{})['code'];self.assertEqual(len(code),32)
+                with self.assertRaises(PermissionError):review_call('referral_bind',dict(code=code)) # original self-referral denial
                 with self.assertRaises(PermissionError):call('financial_records',dict(kind='REFUND',after_id=''),workspace='not_admitted')
 
 class FinanceCardsBrowser(unittest.TestCase):
@@ -174,6 +180,15 @@ class FinanceCardsBrowser(unittest.TestCase):
                             merchantPanel.get_by_role('button',name='打开原商家状态操作',exact=True).click();merchantPanel.locator('#platformMerchantState').select_option('ACTIVE');merchantPanel.locator('#platformMerchantReason').fill('合成原状态版本测试');receiver_shot('finance-59-edit-1440')
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):merchantPanel.locator('#saveMerchantState').click()
                             merchantPanel.get_by_role('button',name='回读所选商家当前版本',exact=True).click();expect(merchantPanel.locator('#platformMerchantVersion')).to_have_value('1');expect(merchantPanel.locator('.platform-merchant-detail')).to_contain_text('合成原状态版本测试');receiver_shot('finance-59-readback-1440');merchantPanel.get_by_role('button',name='返回商家列表',exact=True).click();expect(merchantPanel.locator('.platform-merchant-rows')).to_be_visible()
+                            # Original17/41/42: current user's existing profile store and version CAS, synthetic only.
+                            page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='个人资料与推荐关系',exact=True).click();customerPanel=page.locator('.customer-profile-panel');expect(page.locator('.admin-brand')).to_contain_text('社区服务 · 社区');customerPanel.locator('#readProfile').click();expect(customerPanel.locator('.customer-profile-rows')).to_contain_text('原资料未填写')
+                            customerPanel.get_by_role('button',name='查看个人资料详情',exact=True).click();customerPanel.get_by_role('button',name='编辑个人资料',exact=True).click();customerPanel.locator('#nickname').fill('合成个人昵称');customerPanel.locator('#customerContact').fill('合成联系方式');expect(page.locator('main h1')).to_have_text('个人资料与推荐关系 · 编辑');receiver_shot('finance-42-profile-edit-1440')
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):customerPanel.get_by_role('button',name='保存个人资料',exact=True).click()
+                            expect(customerPanel.locator('.customer-profile-detail')).to_contain_text('合成联系方式');receiver_shot('finance-41-profile-detail-1440');customerPanel.get_by_role('button',name='返回个人资料列表',exact=True).click();expect(customerPanel.locator('.customer-profile-rows')).to_contain_text('合成个人昵称');receiver_shot('finance-17-profile-list-1440');customerPanel.locator('#readProfile').click();expect(customerPanel.locator('.customer-profile-rows')).to_contain_text('合成联系方式')
+                            customerPanel.locator('summary').click();customerPanel.locator('#referralCode').click();expect(customerPanel.locator('.customer-referral-result')).to_contain_text('我的推荐码');expect(customerPanel.locator('.customer-profile-rows')).to_be_empty()
+                            page.evaluate("configureCommunityPortal({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'not_admitted'})")
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):customerPanel.locator('#readProfile').click()
+                            expect(customerPanel.locator('#nickname')).to_have_value('');expect(customerPanel.locator('#customerContact')).to_have_value('');expect(customerPanel.locator('.customer-profile-detail')).to_be_empty();expect(customerPanel.locator('.customer-referral-result')).to_be_empty();receiver_shot('finance-17-profile-denied-1440')
                             # Real finance grant revoked on host owner thread, retaining the same browser identity.
                             page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench');expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
                             page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")

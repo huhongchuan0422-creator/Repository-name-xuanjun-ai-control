@@ -349,6 +349,20 @@
  function syncPlatformBrand(index){const selected=[reviewIndex,panels.indexOf(platformPanel),merchantIndex,receiverIndex].includes(index);if(platformBrandText)platformBrandText.textContent=selected?'社区服务 · 平台':platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=selected?'平台管理工作台':platformBrandSubtitleOriginal;}
  // PLATFORM_BRAND_SCOPE_END
 
+ // CUSTOMER_PROFILE_CARDS_BEGIN: original current-user profile and referral actions only.
+ const customerForm=document.getElementById('customerProfile'),customerPanel=customerForm.closest('section'),customerIndex=panels.indexOf(customerPanel);customerPanel.classList.add('customer-profile-panel');
+ const customerRows=document.createElement('div'),customerDetail=document.createElement('div'),customerHint=document.createElement('p'),customerBack=document.createElement('button'),customerEdit=document.createElement('button'),customerControls=document.createElement('details'),customerSummary=document.createElement('summary'),customerReferral=document.createElement('div');
+ customerRows.className='customer-profile-rows';customerDetail.className='customer-profile-detail';customerReferral.className='customer-referral-result';customerBack.textContent='返回个人资料列表';customerEdit.textContent='编辑个人资料';customerSummary.textContent='原推荐关系与通知操作';customerControls.append(customerSummary);for(const id of ['referralCode','referralInput','bindReferrer','notices']){const e=document.getElementById(id);customerControls.append(id==='referralInput'?e.closest('label'):e);}customerControls.append(customerReferral);for(const b of [customerBack,customerEdit]){b.type='button';b.className='customer-profile-button';}customerPanel.append(customerHint,customerRows,customerDetail,customerBack,customerEdit,customerForm,customerControls);document.getElementById('customerResult').hidden=true;
+ let customerSnapshot=null,customerMode='list',customerViewRevision=0;
+ function syncCustomerTitle(){if(activeIndex!==customerIndex)return;customerPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=customerMode==='detail'?'个人资料与推荐关系 · 详情':customerMode==='edit'?'个人资料与推荐关系 · 编辑':'个人资料与推荐关系';}
+ function customerCard(record,title){const article=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');article.className='community-record-card';h.textContent=title;article.append(h,dl);for(const [label,key]of [['昵称','nickname'],['联系方式','contact']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=record[key]||'原资料未填写';dl.append(dt,dd);}return article;}
+ function showCustomerDetail(){if(!customerSnapshot)return;customerMode='detail';customerRows.hidden=true;customerDetail.replaceChildren(customerCard(customerSnapshot,'记录详情'));const scope=document.createElement('details'),summary=document.createElement('summary'),dl=document.createElement('dl');summary.textContent='原资料归属与推荐关系';scope.append(summary,dl);for(const [label,key]of [['原账户','user_id'],['原租户','tenant_id'],['原项目客户','project_customer_id'],['当前资料版本','version'],['原推荐人账户','referrer_user_id']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=customerSnapshot[key]===null&&key==='referrer_user_id'?'原记录暂无推荐人':customerSnapshot[key]===undefined?'原响应未返回':String(customerSnapshot[key]);dl.append(dt,dd);}customerDetail.append(scope);customerDetail.hidden=false;customerBack.hidden=false;customerEdit.hidden=false;customerForm.hidden=true;syncCustomerTitle();}
+ function showCustomerList(){const revision=++customerViewRevision;customerMode='list';customerRows.replaceChildren();customerRows.hidden=false;customerDetail.replaceChildren();customerDetail.hidden=true;customerBack.hidden=true;customerEdit.hidden=true;customerForm.hidden=true;if(customerSnapshot){const open=document.createElement('button');open.type='button';open.textContent='查看个人资料详情';open.className='customer-profile-button';open.onclick=()=>{if(revision===customerViewRevision)showCustomerDetail();};customerRows.append(customerCard(customerSnapshot,'记录列表 · 当前范围'),open);}syncCustomerTitle();}
+ customerBack.onclick=()=>showCustomerList();customerEdit.onclick=()=>{if(!customerSnapshot)return;customerMode='edit';customerRows.hidden=true;customerDetail.hidden=true;customerForm.hidden=false;customerEdit.hidden=true;customerBack.hidden=false;syncCustomerTitle();};
+ window.communityCustomerView=({type,record})=>{if(type==='notices'){if(result)result.hidden=false;return;}if(activeIndex===customerIndex&&result)result.hidden=true;customerViewRevision++;customerReferral.replaceChildren();if(type==='listed'||type==='saved'){customerSnapshot=record;showCustomerList();customerHint.textContent=type==='saved'?'原资料保存已有回执；可重新读取核对当前版本。':'已读取当前账户的原资料。';if(type==='saved')showCustomerDetail();return;}customerSnapshot=null;showCustomerList();customerHint.textContent=({reset:'请读取我的资料。',loading:'正在读取或提交原资料，请等待回执。',error:'读取或提交被拒绝，已清除旧资料，请重新读取。',unknown:'本次结果未确认，已清除旧版本；资料可回读对账，推荐绑定不能据此认定成功。',code:'已取得原推荐码；不会自动绑定推荐关系。',bound:'原推荐绑定已有回执；仅该回执所示关系。'}[type]||'结果未确认');if(type==='code'||type==='bound'){const dt=document.createElement('p');dt.textContent=type==='code'?'我的推荐码：'+String(record.code):'原推荐人账户：'+String(record.referrer_user_id);customerReferral.append(dt);customerControls.open=true;}};
+ window.communityCustomerView({type:'reset'});
+ // CUSTOMER_PROFILE_CARDS_END
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -356,7 +370,7 @@
   activeIndex=index;syncPlatformBrand(index);
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
-  syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();
+  syncOrderPageTitle();syncOperationsTitle();syncReviewTitle();syncMerchantTitle();syncCustomerTitle();
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
@@ -366,7 +380,7 @@
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
-  if(result)result.hidden=index===merchantIndex||index===panels.indexOf(platformPanel)||index===reviewIndex||index===receiverIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
+  if(result)result.hidden=index===customerIndex||index===merchantIndex||index===panels.indexOf(platformPanel)||index===reviewIndex||index===receiverIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
   buttons.forEach((button,i)=>{if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   if(index!==null){const title=panels[index].querySelector('h2');title.tabIndex=-1;title.focus();}
  }
