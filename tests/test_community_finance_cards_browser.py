@@ -21,6 +21,7 @@ from scripts.community_order_store import create_order
 SCOPE=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1')
 
 COMMUNITY='co_'+'c'*32
+REVIEW_COMMUNITY='co_'+'d'*32
 
 def configure_fixture(fx):
     fx.plan['community_grants']={'platform':dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='PLATFORM_OWNER')}
@@ -36,11 +37,12 @@ def configure_fixture(fx):
     fx.plan['nginx_uid']=os.geteuid() or 65534
     fx.write('host.json',fx.plan)
 
-def seed_observations(host,uid):
+def seed_observations(host,uid,independent_owner):
     c=host.center
     create_order(host.persistence.runtime.demo.db,SCOPE,'synthetic_platform_order',101)
     directory=host.application.communities
     directory.write(directory.grants['platform'],dict(id=COMMUNITY,tenant='tenant1',owner=uid,name='合成接收关系社区',description='仅Hosted隔离测试',contact='合成联系人',state='APPROVED',version=1,opinion='',updated_at=c.now()))
+    directory.write(directory.grants['platform'],dict(id=REVIEW_COMMUNITY,tenant='tenant1',owner=independent_owner,name='合成独立审核社区',description='仅Hosted隔离审核',contact='合成审核联系人',state='PENDING',version=1,opinion='',updated_at=c.now()))
     web=c.login('one@example.org','FixturePassword123!')
     directory.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='community_receiver_bind',params=dict(community_id=COMMUNITY,provider_workspace='finance',receiver_id='community',expected_version=0)))
     # Unknown immutable observation envelopes, not fabricated signed success.
@@ -62,7 +64,7 @@ class FinanceFixtureContract(unittest.TestCase):
         fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.doCleanups);configure_fixture(fx)
         with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_NETWORK')):
             with fx.open() as host:
-                seed_observations(host,fx.fx.uid1);web=host.center.login('one@example.org','FixturePassword123!')
+                seed_observations(host,fx.fx.uid1,fx.fx.uid2);web=host.center.login('one@example.org','FixturePassword123!')
                 def call(op,p,workspace='finance'):
                     return host.application.provider_actions.dispatch(web['token'],web['csrf'],dict(workspace=workspace,operation=op,params=p))
                 for kind in ('REFUND','SPLIT'):
@@ -73,6 +75,11 @@ class FinanceFixtureContract(unittest.TestCase):
                 self.assertEqual(read['records'][0]['version'],1);self.assertFalse(read['funds_operation_executed'])
                 orders=host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='platform_orders',params=dict(after_id=0,status='ALL')))
                 self.assertEqual(orders['records'][0]['reference'],'synthetic_platform_order');self.assertEqual(orders['records'][0]['amount_minor'],101);self.assertIsNone(orders['records'][0]['payment_evidence'])
+                def review_call(op,params):return host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation=op,params=params))
+                before=review_call('status',dict(community_id=REVIEW_COMMUNITY));self.assertEqual(before['state'],'PENDING')
+                reviewed=review_call('review',dict(community_id=REVIEW_COMMUNITY,expected_version=before['version'],decision='APPROVED',opinion='合成独立审核'))
+                self.assertEqual(reviewed['version'],2);self.assertEqual(review_call('status',dict(community_id=REVIEW_COMMUNITY))['state'],'APPROVED')
+                with self.assertRaises(PermissionError):review_call('review',dict(community_id=COMMUNITY,expected_version=1,decision='PAUSED',opinion='self review must fail'))
                 with self.assertRaises(PermissionError):call('financial_records',dict(kind='REFUND',after_id=''),workspace='not_admitted')
 
 class FinanceCardsBrowser(unittest.TestCase):
@@ -83,7 +90,7 @@ class FinanceCardsBrowser(unittest.TestCase):
         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
         with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_NETWORK')):
             with fx.open() as host:
-                seed_observations(host,fx.fx.uid1)
+                seed_observations(host,fx.fx.uid1,fx.fx.uid2)
                 server=host.application.listen_proxy(fx.plan['socket_path'],fx.plan['https_origin'],fx.plan['nginx_uid'],fx.plan['nginx_gid']);server.timeout=.1
                 received=[];shots=[];revoke_finance=threading.Event();revoked_finance=threading.Event()
                 def flow():
@@ -133,6 +140,15 @@ class FinanceCardsBrowser(unittest.TestCase):
                             panel27.locator('#receiverWorkspace').fill('not_admitted')
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):panel27.locator('#listReceiverRelations').click()
                             expect(panel27.locator('.community-receiver-detail')).to_be_hidden();expect(panel27.locator('#receiverVersion')).to_have_value('');receiver_shot('finance-27-denied-1440')
+                            # Original26/52/53: independent synthetic reviewer, exact original CAS and status reread.
+                            page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='平台审核',exact=True).click()
+                            reviewPanel=page.locator('.platform-review-panel');reviewPanel.locator('summary').click();reviewPanel.locator('#directoryStatus').select_option('PENDING');reviewPanel.locator('#listDirectory').click()
+                            expect(reviewPanel.locator('.platform-review-rows')).to_contain_text('尚未形成审核决定');reviewPanel.locator('summary').click();expect(page.locator('main h1')).to_have_text('平台审核');receiver_shot('finance-26-list-1440')
+                            reviewPanel.get_by_role('button',name='查看审核详情',exact=True).click();expect(reviewPanel.locator('.platform-review-detail')).to_contain_text('合成审核联系人');expect(page.locator('main h1')).to_have_text('平台审核 · 详情');receiver_shot('finance-52-detail-1440')
+                            reviewPanel.get_by_role('button',name='打开原审核界面',exact=True).click();reviewPanel.locator('#decision').select_option('APPROVED');reviewPanel.locator('#opinion').fill('合成独立审核');receiver_shot('finance-53-edit-1440')
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):reviewPanel.locator('#review').click()
+                            expect(reviewPanel.locator('.platform-review-detail')).to_contain_text('已通过');reviewPanel.get_by_role('button',name='回读当前社区版本',exact=True).click();expect(reviewPanel.locator('.platform-review-detail')).to_contain_text('合成独立审核');receiver_shot('finance-53-readback-1440')
+                            reviewPanel.get_by_role('button',name='返回审核列表',exact=True).click();expect(reviewPanel.locator('.platform-review-rows')).to_be_visible();expect(reviewPanel.locator('#directoryStatus')).to_have_value('PENDING');receiver_shot('finance-26-return-1440')
                             # Original platform_orders authority, not provider-actions or mocked responses.
                             page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='平台运营查询',exact=True).click()
                             orderPanel=page.locator('.platform-orders-panel');orderPanel.locator('summary').click();orderPanel.locator('#platformView').select_option('platform_orders');orderPanel.locator('#platformOrderStatus').select_option('ALL');orderPanel.locator('#readPlatformView').click()

@@ -1,0 +1,28 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+class Node{constructor(tag='div'){this.tagName=tag;this.children=[];this.value='';this.textContent='';this.hidden=false;}append(...v){this.children.push(...v);}replaceChildren(...v){this.children=v;this.textContent='';}closest(){return panel;}querySelector(){return heading;}addEventListener(e,f){this['on'+e]=f;}set innerHTML(_){throw Error('UNSAFE_HTML');}classList={add(){}};}
+const nodes={},panel=new Node('section'),heading=new Node('h2'),get=id=>nodes[id]??=new Node(),document={getElementById:get,createElement:t=>new Node(t)};heading.textContent='平台审核';
+const pageTitle=new Node('h1'),storage=new Map(),calls=[],context={panels:[panel],activeIndex:0,pageTitle,window:{},document,location:{hostname:'test',hash:''},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,opts)=>new Promise((resolve,reject)=>calls.push({url,body:JSON.parse(opts.body),resolve,reject}))};
+vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context);const shell=fs.readFileSync(process.argv[3],'utf8'),begin=shell.indexOf(' // PLATFORM_COMMUNITY_REVIEW_BEGIN'),end=shell.indexOf(' // PLATFORM_COMMUNITY_REVIEW_END');assert(begin>=0&&end>begin);vm.runInNewContext(shell.slice(begin,end),context);
+const flush=async()=>{for(let i=0;i<50;i++)await Promise.resolve();},reply=r=>({ok:true,json:async()=>({result:r})});
+const walk=e=>[e,...e.children.flatMap(walk)],text=e=>walk(e).map(n=>n.textContent).join('|');
+async function start(fn){const n=calls.length;fn();await flush();assert.equal(calls.length,n+1);return calls.at(-1);}
+const record=(state='PENDING',version=3)=>({id:'co_one',name:'<img src=x>',state,version,description:'原介绍',contact:'private-contact',opinion:''});
+(async()=>{
+ context.window.configureCommunityPortal({csrf:'original',workspace:'platform'});get('directoryStatus').value='PENDING';
+ let q=await start(()=>get('listDirectory').onclick());q.resolve(reply({records:[record()],has_more:true,next_cursor:'a'.repeat(64)}));await flush();
+ const rows=panel.children.find(n=>n.className==='platform-review-rows'),detail=panel.children.find(n=>n.className==='platform-review-detail'),editor=panel.children.find(n=>n.className==='platform-review-editor'),button=name=>panel.children.find(n=>n.textContent===name);
+ assert(text(rows).includes('尚未形成审核决定'));assert.equal(pageTitle.textContent,'平台审核');const open=rows.children[1].onclick;
+ q=await start(open);assert.equal(q.body.operation,'status');q.resolve(reply(record('PENDING',8)));await flush();assert(text(detail).includes('private-contact'));assert(text(detail).includes('<img src=x>'));assert.equal(pageTitle.textContent,'平台审核 · 详情');
+ const count=calls.length;button('打开原审核界面').onclick();assert.equal(calls.length,count);assert.equal(editor.hidden,false);assert.equal(pageTitle.textContent,'平台审核 · 原操作/审核界面');get('decision').value='APPROVED';get('opinion').value='independent-review';
+ q=await start(()=>get('review').onclick());assert.deepEqual(JSON.parse(JSON.stringify(q.body.params)),{community_id:'co_one',expected_version:8,decision:'APPROVED',opinion:'independent-review'});q.resolve(reply({...record('APPROVED',9),opinion:'independent-review'}));await flush();assert(text(detail).includes('已通过'));assert(text(detail).includes('independent-review'));assert.equal(editor.hidden,true);
+ q=await start(()=>button('回读当前社区版本').onclick());assert.equal(q.body.operation,'status');q.resolve(reply(record('APPROVED',9)));await flush();button('返回审核列表').onclick();assert.equal(get('directoryStatus').value,'PENDING');assert.equal(rows.hidden,false);assert.equal(button('下一页审核记录').hidden,false);
+ q=await start(()=>rows.children[1].onclick());q.resolve(reply(record('APPROVED',9)));await flush();get('decision').value='PAUSED';q=await start(()=>get('review').onclick());q.resolve({ok:false,json:async()=>({error:'ACCESS_DENIED'})});await flush();assert.equal(rows.children.length,0);assert.equal(detail.children.length,0);assert.equal(get('contact').value,'');assert.equal(get('result').textContent,'');assert.equal(get('opinion').value,'');const deniedCount=calls.length;get('review').onclick();await flush();assert.equal(calls.length,deniedCount);open();await flush();assert.equal(calls.length,deniedCount);
+ q=await start(()=>get('listDirectory').onclick());q.resolve(reply({records:[],has_more:false,next_cursor:null}));await flush();assert(text(rows).includes('暂无社区'));assert.equal(button('下一页审核记录').hidden,true);
+ // A transport-unknown review clears the previous record and never repeats the mutation.
+ q=await start(()=>context.window.communityReadReview('co_one'));q.resolve(reply(record('PENDING',12)));await flush();get('decision').value='APPROVED';q=await start(()=>get('review').onclick());q.reject(Error('UNKNOWN_NETWORK'));await flush();assert.equal(detail.children.length,0);assert.equal(get('result').textContent,'');const unknownCount=calls.length;get('review').onclick();await flush();assert.equal(calls.length,unknownCount);
+ // Late status under different page generation cannot repopulate private detail or page title.
+ q=await start(()=>context.window.communityReadReview('co_one'));context.window.communitySectionChanged();context.activeIndex=null;pageTitle.textContent='其他功能';q.resolve(reply(record()));await flush();assert.equal(detail.children.length,0);assert.equal(pageTitle.textContent,'其他功能');
+ assert(calls.every(c=>['list','status','review'].includes(c.body.operation)));
+ console.log('SCOPED_MOCK_PASS actual list/status/review CAS, cards/detail/editor/readback/return, denial clears/no auto retry, stale page/title, empty/XSS text');
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -17,7 +17,7 @@
   return data.result;
  };
  const action=async(fn,context=null)=>{if(busy||!config)return;busy=true;const ticket=epoch,task={context};activeAction=task;for(const b of document.querySelectorAll('button'))b.disabled=true;
-  try{await fn(ticket);if(ticket===epoch&&activeAction===task)status('操作完成');}catch(e){if(ticket===epoch&&activeAction===task)status(e.message);}finally{if(ticket===epoch&&activeAction===task){activeAction=null;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=false;}}};
+  try{await fn(ticket);if(ticket===epoch&&activeAction===task)status(context==='financial-read'?'记录查询完成':'操作完成');}catch(e){if(ticket===epoch&&activeAction===task)status(e.message);}finally{if(ticket===epoch&&activeAction===task){activeAction=null;busy=false;for(const b of document.querySelectorAll('button'))b.disabled=false;}}};
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',()=>action(fn));return b;};
  const article=(id,text)=>{const a=document.createElement('article');a.textContent=text;$(id).append(a);return a;};
  const pageParams=after=>({limit:50,after_id:after,status:$('orderStatus').value});
@@ -92,7 +92,7 @@
  const minorText=(amount,currency)=>Number.isSafeInteger(amount)?String(amount)+' 最小货币单位'+(typeof currency==='string'&&currency?' · '+currency:'（原记录未返回币种）'):'摘要未提供金额，不以订单金额代替';
  function observationFields(kind,r,detail){
   const fields=kind==='RECONCILIATION'?[['订单引用',r.reference],['观察状态',r.status],['本地订单状态',r.local_order_state],['服务商状态',r.provider_state]]:
-   [['分组',financialTitle[kind]],['请求编号',r.request_id],['关联订单',r.reference],['请求状态',r.status]];
+   [['分组',financialTitle[kind]],['请求编号',r.request_id],['关联订单',r.reference],['请求状态',!detail&&r.status==='SUBMITTED_RESULT_UNKNOWN'?'已提交，结果待核实':r.status]];
   if(detail){
    if(kind==='RECONCILIATION')fields.push(['原订单金额',minorText(r.original_amount_minor,r.currency)],['已确认本地退款',minorText(r.confirmed_local_refunds_minor,r.currency)],['异常条目',Array.isArray(r.anomalies)?r.anomalies.length?r.anomalies.join('；'):'原观察未报告异常':'原记录未返回'],['范围',r.coverage==='ORDER_OBSERVATIONS_ONLY'?'仅订单观察，不是全量日账单':r.coverage],['日账单核对',r.daily_bill_reconciled===true?'原记录标记已核对':r.daily_bill_reconciled===false?'未完成':'原记录未返回'],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status]);
    else{if(kind==='RETURN')fields.push(['接收方编号',r.receiver_id]);fields.push(['服务商响应',r.provider_response_verified===true?'响应已验证；不等于到账或财务核销':r.provider_response_verified===false?'未验证':'原记录未返回'],['金额信息',minorText(r.amount_minor,r.currency)],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status],['自动重试','此观察界面不提供资金重试操作']);}
@@ -201,10 +201,10 @@
   showObservations(kind,r.records,r);financialPage=r.has_more?{kind,after_id:r.next_cursor}:null;
   if(financialPage)financialPages.set(kind,financialPage);$('financialMore').hidden=!financialPage;
  }
- $('financialRecords').onclick=()=>action(t=>fundsPage(t,$('financialKind').value));
- $('financialMore').onclick=()=>action(t=>financialPage&&financialPage.kind===$('financialKind').value&&fundsPage(t,financialPage.kind,financialPage.after_id));
+ $('financialRecords').onclick=()=>action(t=>fundsPage(t,$('financialKind').value),'financial-read');
+ $('financialMore').onclick=()=>action(t=>financialPage&&financialPage.kind===$('financialKind').value&&fundsPage(t,financialPage.kind,financialPage.after_id),'financial-read');
  $('reconcileOrder').onclick=()=>action(t=>providerAction(t,'reconcile_order',{reference:$('providerOrder').value}));
- $('readReconciliation').onclick=()=>action(t=>providerAction(t,'reconciliation_read',{reference:$('providerOrder').value}));
+ $('readReconciliation').onclick=()=>action(t=>providerAction(t,'reconciliation_read',{reference:$('providerOrder').value}),'financial-read');
  $('listStores').onclick=()=>action(async t=>{const r=await call('stores',{},t);if(t!==epoch)return;$('storeList').replaceChildren();for(const store of r.stores){const a=document.createElement('article');a.textContent=(store.profile?.name||'尚未创建资料')+' · '+store.workspace;const b=document.createElement('button');b.textContent='编辑资料';b.onclick=()=>{if(busy)return;$('storeWorkspace').value=store.workspace;$('storeName').value=store.profile?.name||'';$('storeDescription').value=store.profile?.description||'';$('storeContact').value=store.profile?.contact||'';$('storeState').value=store.profile?.status||'PAUSED';$('storeVersion').value=store.profile?.version||'';};a.append(b);$('storeList').append(a);}});
  $('storeForm').onsubmit=e=>{e.preventDefault();action(async t=>{const r=await call('store_save',{store_workspace:$('storeWorkspace').value,record:{name:$('storeName').value,description:$('storeDescription').value,contact:$('storeContact').value,status:$('storeState').value},expected_version:$('storeVersion').value?Number($('storeVersion').value):null},t);if(t===epoch){$('storeVersion').value=r.version;$('storeResult').textContent=JSON.stringify(r,null,2);}});};
  function clearOrderLines(){$('orderLines').replaceChildren();$('completionRevision').value='';$('completionNote').value='';}

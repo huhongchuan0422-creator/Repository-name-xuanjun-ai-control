@@ -277,3 +277,9 @@ test('receiver stale read refuses changed workspace and cleared detail',async()=
  const pending=f.click('readReceiverRelation');f.elements.receiverWorkspace.value='new';f.elements.receiverWorkspace.oninput();f.pending.shift()();await pending;
  assert(!f.receiverEvents.some(x=>x.type==='detail'));assert.equal(f.elements.receiverVersion.value,'');assert(f.elements.moreReceiverRelations.hidden);
 });
+
+test('review refusal clears previous private status and cannot replay old CAS',async()=>{
+ const f=setup([{result:community('co_one','PENDING',8)},{error:'ACCESS_DENIED'}]);
+ f.elements.reference.value='co_one';await f.click('read');assert.match(f.elements.result.textContent,/private/);f.elements.decision.value='APPROVED';await f.click('review');
+ assert.equal(f.elements.result.textContent,'');assert.equal(f.elements.contact.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询当前社区版本/);
+});

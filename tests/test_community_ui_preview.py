@@ -343,7 +343,8 @@ class ClickThrough(unittest.TestCase):
             for i in range(unready.count()):
                 expect(unready.nth(i).locator('.not-ready')).to_have_text('未就绪')
             ready=page.locator('.platform-dashboard .dashboard-card:not(.is-unready) b')
-            self.assertEqual({ready.nth(i).inner_text() for i in range(ready.count())},{'订单管理','商家入驻审核','平台审核','平台商家管理','用户管理','社区管理','社区分账接收关系','平台运营查询','权限配置','通知与日志'})
+            self.assertEqual({ready.nth(i).inner_text() for i in range(ready.count())},{'订单管理','商家入驻审核','平台审核','平台商家管理','用户管理','社区管理','社区分账接收关系','平台运营查询','权限配置','通知与日志','平台配置社区分账接收关系'})
+            expect(page.locator('.platform-dashboard a[href="#/platform/platform-9-0-0/list"]')).to_be_visible()
             for title in ('用户管理','社区管理','商家入驻审核','平台审核','权限配置','通知与日志'):
                 expect(page.locator('.platform-dashboard .dashboard-card:not(.is-unready)').filter(has_text=title).first).to_be_visible()
             page.screenshot(path=str(self.out/'role-platform-phone.png'),full_page=True)

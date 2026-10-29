@@ -278,6 +278,34 @@
  clearOrderView('尚未读取支付证据；打开原查询选择订单观察。');
  // PLATFORM_ORDER_CARDS_END
 
+ // PLATFORM_COMMUNITY_REVIEW_BEGIN: original list/status/review only.
+ const reviewPanel=document.getElementById('review').closest('section'),reviewIndex=panels.indexOf(reviewPanel);
+ reviewPanel.classList.add('platform-review-panel');
+ const reviewQuery=document.createElement('details'),reviewSummary=document.createElement('summary');reviewSummary.textContent='原社区筛选与查询';reviewQuery.append(reviewSummary,document.getElementById('pending'),document.getElementById('directoryStatus').closest('label'),document.getElementById('listDirectory'));
+ const reviewHint=document.createElement('p'),reviewRows=document.createElement('div'),reviewDetail=document.createElement('div'),reviewEditor=document.createElement('div'),reviewBack=document.createElement('button'),reviewEdit=document.createElement('button'),reviewRead=document.createElement('button'),reviewMore=document.createElement('button');
+ reviewRows.className='platform-review-rows';reviewDetail.className='platform-review-detail';reviewEditor.className='platform-review-editor';reviewBack.textContent='返回审核列表';reviewEdit.textContent='打开原审核界面';reviewRead.textContent='回读当前社区版本';reviewMore.textContent='下一页审核记录';for(const b of [reviewBack,reviewEdit,reviewRead,reviewMore]){b.type='button';b.className='platform-review-button';}
+ reviewEditor.append(document.getElementById('decision').closest('label'),document.getElementById('opinion').closest('label'),document.getElementById('review'));
+ reviewPanel.append(reviewHint,reviewRows,reviewDetail,reviewEditor,reviewBack,reviewEdit,reviewRead,reviewMore,reviewQuery);
+ let reviewSnapshot=null,reviewRecord=null,reviewReadCurrent=null,reviewRevision=0,reviewMode='list';
+ const reviewState=s=>({DRAFT:'草稿',PENDING:'待审核',APPROVED:'已通过',CORRECTION:'待补充资料',REJECTED:'已驳回',PAUSED:'已暂停'}[s]||String(s));
+ function reviewFields(r,detail){const fields=[['社区状态',reviewState(r.state)],['审核决定',['APPROVED','CORRECTION','REJECTED','PAUSED'].includes(r.state)?reviewState(r.state):'尚未形成审核决定'],['审核意见',r.opinion||'原记录暂无审核意见']];if(detail)fields.push(['社区编号',r.id],['社区名称',r.name],['社区介绍',r.description],['联系人及联系方式',r.contact],['当前版本',r.version]);return fields;}
+ function reviewCard(title,record,detail){const card=document.createElement('article'),h=document.createElement('h3'),dl=document.createElement('dl');card.className='community-record-card';h.textContent=title;card.append(h,dl);for(const [label,value]of reviewFields(record,detail)){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value===undefined||value===null?'原权限未返回':String(value);dl.append(dt,dd);}return card;}
+ function syncReviewTitle(){if(activeIndex!==reviewIndex)return;reviewPanel.querySelector('h2').hidden=true;if(pageTitle)pageTitle.textContent=reviewMode==='detail'?'平台审核 · 详情':reviewMode==='edit'?'平台审核 · 原操作/审核界面':'平台审核';}
+ function clearReview(message){reviewRevision++;reviewSnapshot=null;reviewRecord=null;reviewReadCurrent=null;reviewMode='list';reviewRows.replaceChildren();reviewDetail.replaceChildren();reviewEditor.hidden=true;reviewRows.hidden=false;reviewDetail.hidden=true;for(const b of [reviewBack,reviewEdit,reviewRead,reviewMore])b.hidden=true;reviewHint.textContent=message;syncReviewTitle();}
+ function showReviewList(){reviewRevision++;const revision=reviewRevision;reviewMode='list';reviewRows.replaceChildren();reviewRows.hidden=false;reviewDetail.hidden=true;reviewEditor.hidden=true;reviewBack.hidden=true;reviewEdit.hidden=true;reviewRead.hidden=true;reviewMore.hidden=!reviewSnapshot?.result.has_more;reviewHint.textContent='当前原筛选页的查询快照；详情读取最新版本，审核结果以服务端回执和回读为准。';if(reviewSnapshot){for(const r of reviewSnapshot.result.records){const open=document.createElement('button');open.textContent='查看审核详情';open.type='button';open.className='platform-review-button';open.onclick=()=>{if(revision!==reviewRevision)return;return reviewSnapshot.select(r);};reviewRows.append(reviewCard('记录列表 · 当前范围',r,false),open);}if(!reviewSnapshot.result.records.length)reviewRows.textContent=reviewSnapshot.result.has_more?'当前扫描页暂无记录，仍可读取下一页。':'当前筛选暂无社区记录。';}syncReviewTitle();}
+ reviewMore.onclick=()=>document.getElementById('more').onclick();
+ reviewBack.onclick=()=>{if(reviewSnapshot)showReviewList();else clearReview('请重新查询原筛选列表。');};
+ reviewEdit.onclick=()=>{if(!reviewRecord)return;reviewMode='edit';reviewDetail.hidden=false;reviewEditor.hidden=false;reviewEdit.hidden=true;reviewHint.textContent='仅提交所选社区当前版本；必须是原同租户独立审核人。结果未知先回读，不自动重复审核。';syncReviewTitle();};
+ reviewRead.onclick=()=>{if(reviewReadCurrent)return reviewReadCurrent();};
+ window.communityPlatformReviewView=({type,record})=>{
+  if(type==='reset'||type==='error'||type==='loading'){clearReview(type==='error'?'读取或审核未确认；已清除旧资料和成功展示，请回读或重新查询。':type==='loading'?'正在读取原权限社区目录…':'请按原状态查询社区目录。');return;}
+  if(type==='loading-detail'){reviewRevision++;reviewRecord=null;reviewReadCurrent=null;reviewRows.hidden=true;reviewDetail.replaceChildren();reviewDetail.hidden=true;reviewEditor.hidden=true;reviewEdit.hidden=true;reviewRead.hidden=true;reviewBack.hidden=true;reviewMore.hidden=true;reviewHint.textContent='正在读取或提交原社区记录，请等待真实回执。';return;}
+  if(type==='listed'){reviewSnapshot=record;reviewRecord=null;showReviewList();return;}
+  if(type==='detail'){reviewRevision++;reviewRecord=record.record;document.getElementById('opinion').value=reviewRecord.opinion||'';reviewReadCurrent=record.read;reviewMode='detail';reviewRows.hidden=true;reviewDetail.replaceChildren(reviewCard('记录详情',reviewRecord,true));reviewDetail.hidden=false;reviewEditor.hidden=true;reviewBack.hidden=false;reviewEdit.hidden=false;reviewRead.hidden=false;reviewMore.hidden=true;reviewHint.textContent='已读取服务端当前版本；待审核/草稿不代表已通过。编辑和提交沿原独立审核权限。';syncReviewTitle();}
+ };
+ clearReview('请按原状态查询社区目录。');
+ // PLATFORM_COMMUNITY_REVIEW_END
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -285,17 +313,17 @@
   activeIndex=index;
   main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
-  syncOrderPageTitle();
+  syncOrderPageTitle();syncReviewTitle();
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
   main.classList.toggle('promotion-selected',index===promotionIndex);if(index===promotionIndex)promotionReference.value=document.getElementById('reference').value;
   main.classList.toggle('open-selected',index===openIndex);main.classList.toggle('report-selected',index===reportIndex);if(index===reportIndex)reportReference.value=document.getElementById('reference').value;
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(index===memberIndex)memberPanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(index===promotionIndex)promotionPanel.append(result);else if(index===memberIndex)memberPanel.append(result);else if(index===reviewIndex)reviewPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
-  if(result)result.hidden=index===receiverIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
+  if(result)result.hidden=index===panels.indexOf(platformPanel)||index===reviewIndex||index===receiverIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
   buttons.forEach((button,i)=>{if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   if(index!==null){const title=panels[index].querySelector('h2');title.tabIndex=-1;title.focus();}
  }
