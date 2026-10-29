@@ -66,6 +66,7 @@ class SessionBrowser(unittest.TestCase):
                         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
                         shots=[]
                         def shot(name):
+                            page.evaluate('window.scrollTo(0,0)')
                             page.screenshot(path=str(evidence/(name+'.png')),full_page=True)
                             shots.append(name+'.png')
                         @contextmanager
@@ -85,7 +86,7 @@ class SessionBrowser(unittest.TestCase):
                         card=page.locator('.community-record-card')
                         expect(card).to_have_count(1)
                         expect(card.locator('dt')).to_have_text(['社区名称','社区介绍','联系人及联系方式','状态'])
-                        expect(card.locator('dd')).to_have_text(['逐页验收测试社区','仅 Hosted 隔离合成数据，不代表生产记录。','测试联系人 · 00000000000','DRAFT'])
+                        expect(card.locator('dd')).to_have_text(['逐页验收测试社区','仅 Hosted 隔离合成数据，不代表生产记录。','测试联系人 · 00000000000','草稿'])
                         shot('18-list-1440')
                         with directory('status'):card.get_by_role('button',name='查看详情',exact=True).click()
                         expect(page.locator('.community-profile-detail')).to_be_visible()
@@ -116,6 +117,7 @@ class SessionBrowser(unittest.TestCase):
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
+                        page.locator('.admin-account summary').click()
                         page.locator('[data-logout]').click();expect(page.locator('#community-session [role=status]')).to_have_text('已退出登录。')
                         page.goto(base+'/merchant/review')
                         with page.expect_response(lambda r:r.url.endswith('/merchant/onboarding') and r.request.post_data_json.get('operation')=='review_list' and r.status==200):

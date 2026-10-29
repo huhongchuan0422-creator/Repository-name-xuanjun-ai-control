@@ -13,3 +13,18 @@
 @media(max-width:520px){.community-admin .admin-cards{grid-template-columns:1fr}.community-admin .admin-brand span{display:none}.community-admin h1{font-size:25px}}
 
 .community-admin .community-record-card{border:1px solid var(--line);border-radius:16px;padding:20px;margin:18px 0;background:white}.community-admin .community-record-card h3{margin:0 0 16px}.community-admin .community-record-card dt,.community-admin .community-profile-detail dt{color:#6c8076;font-size:13px;margin-top:16px}.community-admin .community-record-card dd,.community-admin .community-profile-detail dd{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}.community-admin .community-record-card button{display:block;width:100%;margin:20px 0 0;background:var(--green);color:white;text-align:left}
+
+/* Page 18: keep original handlers/data DOM, present one field card rather than nested debug panels. */
+.community-admin .profile-selected>.community-profile-panel{padding:0;border:0;background:transparent;margin-top:22px}
+.community-admin .community-profile-panel>h2{display:none}
+.community-admin .profile-actions{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.community-admin .profile-hint{color:#6c8076;font-size:14px;margin:12px 0 18px}
+.community-admin .community-profile-panel>section{border:0;padding:0;margin:18px 0;background:transparent}
+.community-admin .community-profile-panel>section>h2,.community-admin .community-profile-panel #result{display:none}
+.community-admin .community-record-card{padding:20px 24px;margin:0 0 20px}
+.community-admin .community-profile-detail{border:1px solid var(--line);border-radius:16px;padding:24px;background:white}
+.community-admin .community-profile-detail h3{margin-top:0}
+.community-admin .community-profile-detail dl{margin-bottom:24px}
+.community-admin #profile label{display:grid;gap:7px;margin:18px 0;color:var(--ink)}
+.community-admin #profile input,.community-admin #profile textarea{box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:12px;border:1px solid #b8ccbf;border-radius:8px;font:inherit}
+.community-admin #profile button,.community-admin .community-profile-detail>#submit{background:var(--green);color:white}

@@ -15,6 +15,14 @@
  const profileForm=document.getElementById('profile');
  const profilePanel=profileForm.closest('section');
  const profileIndex=panels.indexOf(profilePanel);
+ profilePanel.classList.add('community-profile-panel');
+ const pageTitle=main.querySelector('h1');
+ const account=document.querySelector('.admin-account'),accountRoot=document.getElementById('community-session');
+ let accountReady=false;
+ if(account&&accountRoot){
+  const syncAccount=()=>{const ready=accountRoot.querySelector('select').options.length>0;if(ready&&!accountReady)account.open=false;else if(!ready&&accountReady)account.open=true;accountReady=ready;};
+  new MutationObserver(syncAccount).observe(accountRoot,{childList:true,subtree:true});syncAccount();
+ }
  const detail=document.createElement('div');detail.className='community-profile-detail';detail.hidden=true;
  const detailTitle=document.createElement('h3');detailTitle.textContent='社区资料详情';detail.append(detailTitle);
  const fields=document.createElement('dl');detail.append(fields);
@@ -22,34 +30,37 @@
  const reread=document.createElement('button');reread.type='button';reread.textContent='回读当前记录';
  const toList=document.createElement('button');toList.type='button';toList.textContent='返回记录列表';
  const create=document.createElement('button');create.type='button';create.textContent='登记新社区';
- const hint=document.createElement('p');hint.className='profile-hint';hint.textContent='尚未读取；点击“我的社区”查询原记录。';
  const submit=document.getElementById('submit'),mine=document.getElementById('mine');
- profilePanel.append(hint,create,detail);detail.append(edit,reread,toList,profileForm,submit);
+ const actions=document.createElement('div');actions.className='profile-actions';actions.append(mine,create);
+ const hint=document.createElement('p');hint.className='profile-hint';hint.textContent='尚未读取；点击“我的社区”查询原记录。';
+ profilePanel.append(actions,hint,detail);detail.append(edit,reread,toList,profileForm,submit);
  profileForm.hidden=true;submit.hidden=true;
  let profileRecord=null,activeIndex=null;
- function emptyProfile(message){profileRecord=null;detail.hidden=true;profileForm.hidden=true;submit.hidden=true;fields.replaceChildren();hint.textContent=message;}
+ function emptyProfile(message){fields.hidden=false;profileRecord=null;detail.hidden=true;profileForm.hidden=true;submit.hidden=true;fields.replaceChildren();hint.textContent=message;}
  window.communityProfileView=({type,record})=>{
   if(type==='reset'){emptyProfile('身份或工作区已变化，请重新查询。');return;}
   if(type==='error'){emptyProfile('本次操作未确认或权限已变化；请回读原记录，不要重复提交。');return;}
   if(type==='list'){detail.hidden=true;profileForm.hidden=true;submit.hidden=true;if(result)result.hidden=false;hint.textContent='查询原社区记录中…';return;}
   if(type==='listed'){hint.textContent=record.count?'已读取当前页 '+record.count+' 条原记录。':'当前页没有记录。';return;}
   if(type!=='detail'||activeIndex!==profileIndex)return;
-  profileRecord=record;fields.replaceChildren();
+  profileRecord=record;fields.hidden=false;fields.replaceChildren();
   for(const [label,key] of [['社区名称','name'],['社区介绍','description'],['联系人及联系方式','contact'],['状态','state'],['当前版本','version']]){
-   const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=label;value.textContent=record[key]===undefined?'当前权限未返回该字段':String(record[key]);fields.append(term,value);
+   const term=document.createElement('dt'),value=document.createElement('dd');term.textContent=label;value.textContent=record[key]===undefined?'当前权限未返回该字段':key==='state'?({DRAFT:'草稿',PENDING:'待审核',CORRECTION:'待补充资料',REJECTED:'已驳回',APPROVED:'已通过',PAUSED:'已暂停'}[record[key]]||String(record[key])):String(record[key]);fields.append(term,value);
   }
   detail.hidden=false;profileForm.hidden=true;submit.hidden=true;
   edit.disabled=!['DRAFT','CORRECTION','REJECTED'].includes(record.state);
-  hint.textContent='已读取原记录；可编辑状态仍由服务端校验所有者权限。';
+  hint.textContent=edit.disabled?'当前状态仅可查看资料。':'资料已读取，可查看或编辑。';
   if(result)result.hidden=true;
  };
- edit.addEventListener('click',()=>{if(!profileRecord||edit.disabled)return;profileForm.hidden=false;submit.hidden=false;});
+ edit.addEventListener('click',()=>{if(!profileRecord||edit.disabled)return;fields.hidden=true;profileForm.hidden=false;submit.hidden=false;});
  reread.addEventListener('click',()=>{if(profileRecord)document.getElementById('read').click();});
  toList.addEventListener('click',()=>{detail.hidden=true;profileForm.hidden=true;submit.hidden=true;if(result)result.hidden=false;hint.textContent='已返回原列表；需要最新数据时点击“我的社区”。';});
- create.addEventListener('click',()=>{document.getElementById('directoryStatus').onchange();profileRecord=null;fields.replaceChildren();detail.hidden=false;profileForm.hidden=false;submit.hidden=true;edit.disabled=true;hint.textContent='登记新社区；保存仍使用原 register 接口及服务端权限。';});
+ create.addEventListener('click',()=>{document.getElementById('directoryStatus').onchange();profileRecord=null;fields.hidden=true;fields.replaceChildren();detail.hidden=false;profileForm.hidden=false;submit.hidden=true;edit.disabled=true;hint.textContent='填写社区资料后保存草稿，核对无误再提交审核。';});
 
  function select(index){
   activeIndex=index;
+  if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
+  main.classList.toggle('profile-selected',index===profileIndex);
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
   if(index===profileIndex)profilePanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
