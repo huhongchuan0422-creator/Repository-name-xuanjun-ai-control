@@ -11,9 +11,9 @@ function setup(responses,reportHook=true){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
- const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[],memberEvents=[];
+ const calls=[],pending=[],openEvents=[],reportEvents=[],promotionEvents=[],memberEvents=[],receiverEvents=[];
  const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
- const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityMerchantMembersView:value=>memberEvents.push(value),communityPromotionView:value=>promotionEvents.push(value),communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityReceiverView:value=>receiverEvents.push(value),communityMerchantMembersView:value=>memberEvents.push(value),communityPromotionView:value=>promotionEvents.push(value),communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -25,7 +25,7 @@ function setup(responses,reportHook=true){
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
  const click=id=>elements[id].onclick();
- return {elements,calls,pending,configure,click,openEvents,reportEvents,promotionEvents,memberEvents,sectionChanged:context.window.communitySectionChanged};
+ return {elements,calls,pending,configure,click,openEvents,reportEvents,promotionEvents,memberEvents,receiverEvents,receiverReturn:context.window.communityReceiverReturn,sectionChanged:context.window.communitySectionChanged};
 }
 
 const community=(id,state='APPROVED',version=1)=>({id,name:id,state,version,description:'fixture',contact:'private'});
@@ -191,11 +191,11 @@ test('profile denied reread clears private detail and blocks stale update',async
  });
 
  test('page20 receiver bind late success does not describe a different selected community',async()=>{
- const f=setup([{result:{version:7},delay:true}]);f.elements.reference.value='co_old';const pending=f.click('bindReceiver');f.elements.reference.value='co_new';f.elements.reference.oninput();f.pending.shift()();await pending;
+ const f=setup([{result:{version:7},delay:true}]);f.elements.reference.value='co_old';f.elements.receiverVersion.value='0';const pending=f.click('bindReceiver');f.elements.reference.value='co_new';f.elements.reference.oninput();f.pending.shift()();await pending;
  assert.notEqual(f.elements.receiverVersion.value,7);assert.equal(f.reportEvents.some(x=>x.type==='binding'),false);assert.equal(f.elements.result.textContent,'');
  });
  test('page20 bind failure clears old successful receipt and identity reset signals visible filter clear',async()=>{
- const f=setup([{result:{version:7}},{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'binding');await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'error');assert.equal(f.elements.result.textContent,'');
+ const f=setup([{result:{version:7}},{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';f.elements.receiverVersion.value='0';await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'binding');await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'error');assert.equal(f.elements.result.textContent,'');
  f.configure({csrf:'next',workspace:'next'});assert.equal(f.reportEvents.at(-1).type,'identity-reset');
  });
 
@@ -257,4 +257,23 @@ test('page19 members remain unfiltered and page22 retained selection is invalida
 });
 test('page22 visible community input uses original scope and identity reset clears it',async()=>{
  const f=setup([{result:result([member('MERCHANT','co_other')])}]);f.elements.memberCommunityReference.value='co_other';f.elements.memberCommunityReference.oninput();await f.click('queryMerchantMembers');assert.equal(f.calls[0].body.params.community_id,'co_other');f.configure({csrf:'new',workspace:'new'});assert.equal(f.elements.memberCommunityReference.value,'');assert.equal(f.memberEvents.at(-1).type,'identity-reset');
+});
+
+test('receiver sparse list real detail and return retain original scan; never bind on read',async()=>{
+ const row={community_id:'co_one',receiver_id:'comm',version:3};
+ const f=setup([{result:result([], 'a'.repeat(64))},{result:result([row])},{result:row},{result:result([row])}]);
+ f.elements.reference.value='co_one';f.elements.receiverWorkspace.value='finance';
+ await f.click('listReceiverRelations');await f.click('moreReceiverRelations');await f.receiverEvents.at(-1).record.select(row);
+ assert.equal(f.receiverEvents.at(-1).type,'detail');assert.equal(f.elements.receiverVersion.value,3);
+ await f.receiverReturn();assert.equal(f.calls[3].body.params.after_id,'a'.repeat(64));assert(!f.calls.some(x=>x.body.operation.endsWith('_bind')));
+});
+test('receiver unknown clears version; empty value never silently becomes first bind zero',async()=>{
+ const f=setup([{error:'UNKNOWN'},{result:{version:3}}]);f.elements.reference.value='co_one';f.elements.receiverWorkspace.value='finance';f.elements.receiverId.value='comm';f.elements.receiverVersion.value='2';
+ await f.click('bindReceiver');await f.click('bindReceiver');assert.equal(f.calls.length,1);assert.equal(f.elements.receiverVersion.value,'');
+ await f.click('readReceiverRelation');assert.equal(f.elements.receiverVersion.value,3);
+});
+test('receiver stale read refuses changed workspace and cleared detail',async()=>{
+ const f=setup([{result:{receiver_id:'old',version:3},delay:true}]);f.elements.reference.value='co_one';f.elements.receiverWorkspace.value='finance';f.elements.receiverId.value='old';
+ const pending=f.click('readReceiverRelation');f.elements.receiverWorkspace.value='new';f.elements.receiverWorkspace.oninput();f.pending.shift()();await pending;
+ assert(!f.receiverEvents.some(x=>x.type==='detail'));assert.equal(f.elements.receiverVersion.value,'');assert(f.elements.moreReceiverRelations.hidden);
 });

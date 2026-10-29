@@ -119,9 +119,52 @@ class CommunityReports:
                 receiver_state=receiver['result'],finance_status='UNCONFIRMED'))
         return records
 
+    def _receiver_projection(self,value,key,g,community,finance,policy,requested_workspace):
+        # Never infer a historical workspace from matching scope or a current grant.
+        if type(value) is not dict:raise ValueError('RECEIVER_BINDING_INTEGRITY_CONFLICT')
+        if value.get('scope')!=finance['scope'] or value.get('community_id')!=community['id']:return None
+        rid=value.get('receiver_id')
+        if type(rid) is not str or rid not in policy['receivers']:return None
+        expected=hashlib.sha256(canonical([finance['scope'],rid])).hexdigest()
+        if key!=expected or type(value.get('version')) is not int or value['version']<1 or type(value.get('at')) is not int:
+            raise ValueError('RECEIVER_BINDING_INTEGRITY_CONFLICT')
+        stored=value.get('provider_workspace')
+        if stored is not None and (type(stored) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,64}',stored)):
+            raise ValueError('RECEIVER_BINDING_INTEGRITY_CONFLICT')
+        return dict(community_id=community['id'],receiver_id=rid,scope=dict(finance['scope']),version=value['version'],at=value['at'],
+            provider_workspace=stored,provider_workspace_status='RECORDED' if stored is not None else 'LEGACY_NOT_RECORDED',
+            requested_provider_workspace=requested_workspace,applies_to='NEW_RULE_VERSIONS_ONLY',funds_operation_executed=False)
+
+    def _read_receivers(self,session,csrf,g,community,op,p):
+        if g['role']!='PLATFORM_OWNER' or self.actions is None:raise PermissionError('PLATFORM_RECEIVER_READ_AUTHORITY_REQUIRED')
+        c=self.center;c.project(g['user_id'],g['project'],('OWNER',))
+        finance,policy=self.actions._authorize(session,csrf,p['provider_workspace'])
+        if finance['project']!=g['project'] or finance['tenant']!=g['tenant']:raise PermissionError('SAME_PROJECT_ADMITTED_RECEIVER_REQUIRED')
+        if op=='community_receiver_read':
+            rid=p['receiver_id']
+            if type(rid) is not str or rid not in policy['receivers']:raise PermissionError('SAME_PROJECT_ADMITTED_RECEIVER_REQUIRED')
+            key=hashlib.sha256(canonical([finance['scope'],rid])).hexdigest()
+            rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_RECEIVER_BINDING' AND project=? AND subject_idx=? AND active=1",(g['project'],key)).fetchall()
+        else:
+            after=p['after_id']
+            if type(after) is not str or after and not re.fullmatch('[0-9a-f]{64}',after):raise ValueError('INVALID_RECEIVER_BINDING_CURSOR')
+            rows=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_RECEIVER_BINDING' AND project=? AND active=1 AND subject_idx>? ORDER BY subject_idx LIMIT 51",(g['project'],after)).fetchall()
+        records=[]
+        for key,raw in rows[:50]:
+            value=json.loads(c.decrypt(raw,'community-receiver:'+key))
+            projected=self._receiver_projection(value,key,g,community,finance,policy,p['provider_workspace'])
+            if projected is not None:records.append(projected)
+        if op=='community_receiver_read':
+            if len(records)!=1:raise ValueError('RECEIVER_BINDING_NOT_FOUND')
+            return records[0]
+        return dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None,
+            totals_scope='CURRENT_PAGE_ONLY',funds_operation_executed=False)
+
     def dispatch(self,session,csrf,body):
         fields={'community_orders':{'community_id','after_id'},'community_earnings':{'community_id','after_id'},
-            'community_receiver_bind':{'community_id','provider_workspace','receiver_id','expected_version'}}
+            'community_receiver_bind':{'community_id','provider_workspace','receiver_id','expected_version'},
+            'community_receiver_list':{'community_id','provider_workspace','after_id'},
+            'community_receiver_read':{'community_id','provider_workspace','receiver_id'}}
         op,p=body['operation'],body['params']
         if type(op) is not str or op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_COMMUNITY_REPORT_FIELDS')
         g=self.communities.authorize(session,csrf,body['workspace']);c=self.center
@@ -129,6 +172,8 @@ class CommunityReports:
         platform=g['role'] in ('PLATFORM_OWNER','PLATFORM_REVIEWER')
         if not platform and not (g['role']=='COMMUNITY_ADMIN' and community['owner']==g['user_id']):raise PermissionError('COMMUNITY_REPORT_OWNER_REQUIRED')
         with c.tx():c.limit('community-report:'+g['user_id'],60,60)
+        if op in ('community_receiver_list','community_receiver_read'):
+            return self._read_receivers(session,csrf,g,community,op,p)
         if op=='community_receiver_bind':
             if g['role']!='PLATFORM_OWNER' or self.actions is None or community['state']!='APPROVED':raise PermissionError('APPROVED_COMMUNITY_AND_PLATFORM_AUTHORITY_REQUIRED')
             c.project(g['user_id'],g['project'],('OWNER',))
@@ -139,7 +184,7 @@ class CommunityReports:
                 prior=receiver_communities(c,scope,g['project'],[p['receiver_id']]).get(p['receiver_id'])
                 revision=prior['version'] if prior else 0
                 if type(p['expected_version']) is not int or p['expected_version']!=revision:raise ValueError('RECEIVER_BINDING_VERSION_CONFLICT')
-                result=dict(community_id=community['id'],receiver_id=p['receiver_id'],scope=scope,version=revision+1,approved_by=g['user_id'],at=c.now())
+                result=dict(community_id=community['id'],receiver_id=p['receiver_id'],provider_workspace=p['provider_workspace'],scope=scope,version=revision+1,approved_by=g['user_id'],at=c.now())
                 payload=c.encrypt(canonical(result),'community-receiver:'+key)
                 c.db.execute("INSERT INTO links VALUES('COMMUNITY_RECEIVER_BINDING',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(key,g['user_id'],g['project'],payload))
                 history=hashlib.sha256(canonical(result)).hexdigest()

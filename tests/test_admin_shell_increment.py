@@ -1,4 +1,4 @@
-import unittest,zipfile,re
+import unittest,zipfile,re,hashlib
 from scripts.community_web_entries import asset,PREFIX
 from playwright.sync_api import sync_playwright
 
@@ -8,11 +8,17 @@ class Increment(unittest.TestCase):
   with zipfile.ZipFile('/tmp/miniapp-c19-readonly/community-stage-source.zip') as z:
    for name in ['communities.html','web-session.js','workbench.css','workbench.js','onboarding.js']:
     actual=Path('demos/community-stage/'+name).read_bytes()
+    reviewed_business_deltas={'workbench.js': 'a0a1f8320194e4a620beac521615abf0bf1634668783c744eb727e0265f78844', 'workbench.css': 'b48aa879972dd7f8bcaa931ce6ad010b5d7ff0b32cb7121c2aaefb881c9a7b9f', 'onboarding.js': '2ceef5d812bb452ac18005a8249a61d01aabfd8843bfff0729624e75da9a3dd0'}
+    if name in reviewed_business_deltas:
+     self.assertEqual(hashlib.sha256(actual).hexdigest(),reviewed_business_deltas[name]);continue
     if name=='communities.html':
      increment='<section id="communityMerchantMembers"><h2>社区商家成员</h2><label>社区编号<input id="memberCommunityReference"></label><button id="queryMerchantMembers">查询商家成员</button><p>读取当前授权社区的原商家资料与已有渠道查询状态；成员关系不代表收款或分账已验收。</p></section>'.encode()
      self.assertEqual(actual.count(increment),1)
      for added in ['communityMerchantMembers','memberCommunityReference','queryMerchantMembers']:self.assertEqual(actual.count(('id="'+added+'"').encode()),1)
      actual=actual.replace(increment,b'',1)
+     receiver_increment=b'<section id="receiverRelations"><h2>\xe5\xb9\xb3\xe5\x8f\xb0\xe9\x85\x8d\xe7\xbd\xae\xe7\xa4\xbe\xe5\x8c\xba\xe5\x88\x86\xe8\xb4\xa6\xe6\x8e\xa5\xe6\x94\xb6\xe5\x85\xb3\xe7\xb3\xbb</h2><label>\xe7\xa4\xbe\xe5\x8c\xba\xe7\xbc\x96\xe5\x8f\xb7<input id="receiverCommunityReference"></label><button id="listReceiverRelations">\xe6\x9f\xa5\xe8\xaf\xa2\xe6\x8e\xa5\xe6\x94\xb6\xe5\x85\xb3\xe7\xb3\xbb</button><button id="readReceiverRelation">\xe5\x9b\x9e\xe8\xaf\xbb\xe6\x89\x80\xe9\x80\x89\xe6\x8e\xa5\xe6\x94\xb6\xe5\x85\xb3\xe7\xb3\xbb</button><button id="moreReceiverRelations" hidden>\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa1\xb5\xe6\x8e\xa5\xe6\x94\xb6\xe5\x85\xb3\xe7\xb3\xbb</button></section>'
+     self.assertEqual(actual.count(receiver_increment),1)
+     actual=actual.replace(receiver_increment,b'',1)
     self.assertEqual(z.read('demos/community-stage/'+name),actual)
    original=z.read('demos/community-stage/communities.html').decode()
    rendered=asset('/community/portal')[0].decode()
@@ -32,7 +38,7 @@ class Increment(unittest.TestCase):
      else: route.fulfill(status=404,body='Not found')
     page.route('https://community-ui.test/**',respond)
     page.goto('https://community-ui.test'+PREFIX+'/community/portal');page.wait_for_load_state('networkidle')
-    self.assertEqual(page.locator('.admin-card').count(),10)
+    self.assertEqual(page.locator('.admin-card').count(),11)
     self.assertFalse(page.locator('#profile').is_visible())
     page.screenshot(path='../community-home-1440.png',full_page=True)
     page.get_by_role('navigation',name='社区功能').get_by_role('button',name='社区资料',exact=True).click()

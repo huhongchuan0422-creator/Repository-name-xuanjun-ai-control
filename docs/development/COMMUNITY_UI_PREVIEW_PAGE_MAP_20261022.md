@@ -18,12 +18,10 @@
 |商家小程序|广告管理与审核|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|广告事件报表|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|模拟对账|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|微信退款与分账处理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|退款申请|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|分账回退|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|分账规则|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|分账申请|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|真实资金记录与对账|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|财务记录 · 提交微信退款|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|财务记录 · 提交分账回退|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|财务记录 · 保存不可变规则版本|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|财务记录 · 提交微信分账|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|微信官方账单|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |社区管理|个人资料与推荐关系|`#/community/community-0-0-0/list` → `detail` → `edit` → 演示保存返回列表|communities.html|
 |社区管理|社区资料|`#/community/community-1-0-0/list` → `detail` → `edit` → 演示保存返回列表|communities.html|
@@ -34,6 +32,8 @@
 |平台管理|平台运营查询|`#/platform/platform-5-0-0/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|communities.html|
 |平台管理|平台商家管理|`#/platform/platform-6-0-0/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|communities.html|
 |社区管理|社区推广|`#/community/community-7-0-0/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|communities.html|
+|社区管理|社区商家成员|`#/community/community-8-0-0/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|communities.html|
+|平台管理|平台配置社区分账接收关系|`#/platform/platform-9-0-0/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|communities.html|
 |商家小程序|订单与收款记录|`#/merchant/merchant-native-orders/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|clients/community-mini/pages/merchant/index.wxml|
 |商家小程序|收款统计|`#/merchant/merchant-native-summary/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|clients/community-mini/pages/merchant/index.wxml|
 |商家小程序|门店资料|`#/merchant/merchant-native-profile/list` → `detail` → `edit` → 演示保存返回列表|clients/community-mini/pages/merchant/index.wxml|

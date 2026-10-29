@@ -1,0 +1,152 @@
+"""Synthetic financial observations through original non-root Unix/HTTPS host.
+
+No provider network, payment, refund, split, reconciliation execution, or API
+response fabrication. Screenshots prove only isolated browser rendering.
+"""
+import concurrent.futures
+import hashlib
+import http.client
+import json
+import os
+import socket
+import time
+import threading
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import test_community_platform_host as fixture
+from scripts.pr122_customer_core import canonical
+
+SCOPE=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1')
+
+COMMUNITY='co_'+'c'*32
+
+def configure_fixture(fx):
+    fx.plan['community_grants']={'platform':dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='PLATFORM_OWNER')}
+    fx.plan['principals']['finance']=dict(tenant_id='tenant1',role='PLATFORM_OWNER')
+    fx.plan['bindings']['finance']=dict(SCOPE)
+    fx.plan['operations']['finance']=dict(user_id=fx.fx.uid1,project='project1',project_roles=['OWNER'],principal='finance')
+    policy=dict(version=1,applyment_submission_enabled=False,
+        provider_bindings=[dict(scope=SCOPE,policy=dict(sp_appid=fx.wechat['appid'],sub_mchid='1900000001',sub_appid=None,
+            refund_notify_url=fx.plan['https_origin']+'/wechat/refund/notify',profit_sharing=True,max_total_bps=1000,
+            receivers={'community':dict(type='MERCHANT_ID',account='1900000002',name='Synthetic receiver',label='Synthetic receiver')},enabled_operations=['REFUND','SPLIT','RETURN']))],
+        payment_admissions={},notifications=None,merchant_bill_grants={})
+    fx.plan['commerce_provider_config']=str(fx.write('finance-commerce.json',policy))
+    fx.plan['nginx_uid']=os.geteuid() or 65534
+    fx.write('host.json',fx.plan)
+
+def seed_observations(host,uid):
+    c=host.center
+    directory=host.application.communities
+    directory.write(directory.grants['platform'],dict(id=COMMUNITY,tenant='tenant1',owner=uid,name='合成接收关系社区',description='仅Hosted隔离测试',contact='合成联系人',state='APPROVED',version=1,opinion='',updated_at=c.now()))
+    web=c.login('one@example.org','FixturePassword123!')
+    directory.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='community_receiver_bind',params=dict(community_id=COMMUNITY,provider_workspace='finance',receiver_id='community',expected_version=0)))
+    # Unknown immutable observation envelopes, not fabricated signed success.
+    for kind in ('REFUND','SPLIT'):
+        ref='synthetic_'+kind.lower();key=hashlib.sha256(('finance-card-'+kind).encode()).hexdigest()
+        value=dict(scope=SCOPE,scope_hash=hashlib.sha256(canonical(SCOPE)).hexdigest(),kind=kind,
+            reference=ref,request_id='req_'+kind.lower(),provider_reference='synthetic_provider_'+kind.lower())
+        c.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',('COMMUNITY_PROVIDER_ACTION',key,uid,'project1',c.encrypt(canonical(value),'provider-action:'+key)))
+    # No RETURN seed: its empty state is intentional, not a fake zero-valued refund.
+    value=dict(reference='synthetic_order',scope=SCOPE,original_amount_minor=101,currency='CNY',
+        provider_state='NOT_OBSERVED',local_order_state='PENDING',confirmed_local_refunds_minor=0,
+        anomalies=['SYNTHETIC_UNVERIFIED_OBSERVATION'],observed_at=c.now(),status='EXCEPTION',
+        coverage='ORDER_OBSERVATIONS_ONLY',daily_bill_reconciled=False,finance_status='UNCONFIRMED',funds_retry_authorized=False)
+    key=hashlib.sha256(canonical([SCOPE,value['reference']])).hexdigest()
+    c.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',('COMMUNITY_ORDER_RECONCILIATION',key,uid,'project1',c.encrypt(canonical(value),'community-order-reconciliation:'+key)))
+
+class FinanceFixtureContract(unittest.TestCase):
+    def test_original_dispatch_without_socket_or_provider(self):
+        fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.doCleanups);configure_fixture(fx)
+        with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_NETWORK')):
+            with fx.open() as host:
+                seed_observations(host,fx.fx.uid1);web=host.center.login('one@example.org','FixturePassword123!')
+                def call(op,p,workspace='finance'):
+                    return host.application.provider_actions.dispatch(web['token'],web['csrf'],dict(workspace=workspace,operation=op,params=p))
+                for kind in ('REFUND','SPLIT'):
+                    r=call('financial_records',dict(kind=kind,after_id=''));self.assertEqual(len(r['records']),1);self.assertFalse(r['records'][0]['provider_response_verified']);self.assertFalse(r['records'][0]['automatic_retry_allowed'])
+                self.assertEqual(call('financial_records',dict(kind='RETURN',after_id=''))['records'],[])
+                self.assertEqual(call('reconciliation_read',dict(reference='synthetic_order'))['finance_status'],'UNCONFIRMED')
+                read=host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='community_receiver_list',params=dict(community_id=COMMUNITY,provider_workspace='finance',after_id='')))
+                self.assertEqual(read['records'][0]['version'],1);self.assertFalse(read['funds_operation_executed'])
+                with self.assertRaises(PermissionError):call('financial_records',dict(kind='REFUND',after_id=''),workspace='not_admitted')
+
+class FinanceCardsBrowser(unittest.TestCase):
+    @unittest.skipIf(os.geteuid()==0,'Original non-root Unix peer/browser chain runs on Hosted only')
+    def test_finance_record_cards_real_http(self):
+        from playwright.sync_api import sync_playwright,expect
+        fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.doCleanups);configure_fixture(fx)
+        evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
+        with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_NETWORK')):
+            with fx.open() as host:
+                seed_observations(host,fx.fx.uid1)
+                server=host.application.listen_proxy(fx.plan['socket_path'],fx.plan['https_origin'],fx.plan['nginx_uid'],fx.plan['nginx_gid']);server.timeout=.1
+                received=[];shots=[];revoke_finance=threading.Event();revoked_finance=threading.Event()
+                def flow():
+                    def forward(route):
+                        req=route.request;path=req.url.removeprefix(fx.plan['https_origin']+'/community-preview')
+                        conn=http.client.HTTPConnection('unused',timeout=5);conn.sock=socket.socket(socket.AF_UNIX);conn.sock.settimeout(5);conn.sock.connect(fx.plan['socket_path'])
+                        headers={k:v for k,v in req.all_headers().items() if k.lower() not in ('host','content-length')};headers['Host']='uk.wenwenwenyiyiyi.work';headers['X-Xuanjun-Client-IP']='127.0.0.1'
+                        try:
+                            conn.request(req.method,path,body=req.post_data_buffer,headers=headers);response=conn.getresponse();body=response.read()
+                            operation=json.loads(req.post_data).get('operation') if path=='/community/provider-actions' else None
+                            received.append(dict(path=path,status=response.status,operation=operation))
+                            route.fulfill(status=response.status,headers=dict(response.getheaders()),body=body)
+                        finally:conn.close()
+                    with sync_playwright() as p:
+                        browser=p.chromium.launch(headless=True)
+                        try:
+                            page=browser.new_page(viewport=dict(width=1440,height=1000));errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+                            page.route(fx.plan['https_origin']+'/**',forward)
+                            page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench')
+                            panel=page.locator('#community-session');panel.locator('[name=email]').fill('one@example.org');panel.locator('[name=password]').fill('FixturePassword123!');panel.get_by_role('button',name='登录',exact=True).click();expect(panel.locator('[role=status]')).to_contain_text('已登录')
+                            # Existing session CSRF; explicit synthetic admitted finance workspace, no new auth.
+                            page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
+                            def shot(name):
+                                page.locator('#financialObservation').scroll_into_view_if_needed();page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
+                            for kind,prefix in [('REFUND','finance-32'),('SPLIT','finance-33')]:
+                                page.locator('#financialKind').select_option(kind)
+                                with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==200):page.locator('#financialRecords').click()
+                                expect(page.locator('#financialObservationList')).to_contain_text('req_'+kind.lower());shot(prefix+'-list-1440')
+                                page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('摘要未提供金额');shot(prefix+'-detail-1440')
+                                page.locator('#financialObservationBack').click();expect(page.locator('#financialKind')).to_have_value(kind);expect(page.locator('#financialObservationList')).to_be_visible();shot(prefix+'-return-1440')
+                            page.locator('#financialKind').select_option('RETURN');page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');shot('finance-33-return-empty-1440')
+                            page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');shot('finance-34-list-1440')
+                            page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('不是全量日账单');shot('finance-34-detail-1440')
+                            # Original page27 reads the same real fixture receiver binding; no second system.
+                            page.goto(fx.plan['https_origin']+'/community-preview/community/portal')
+                            expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
+                            page.evaluate("configureCommunityPortal({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'platform'})")
+                            page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='平台配置社区分账接收关系',exact=True).click()
+                            panel27=page.locator('#receiverRelations');panel27.locator('#receiverCommunityReference').fill(COMMUNITY);panel27.locator('#receiverWorkspace').fill('finance');panel27.locator('#listReceiverRelations').click()
+                            expect(panel27.locator('.community-record-card')).to_contain_text('community')
+                            def receiver_shot(name):
+                                panel27.scroll_into_view_if_needed();page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
+                            receiver_shot('finance-27-list-1440')
+                            panel27.get_by_role('button',name='查看接收关系详情',exact=True).click();expect(panel27.locator('.community-receiver-detail')).to_contain_text('finance');receiver_shot('finance-54-detail-1440')
+                            panel27.get_by_role('button',name='返回接收关系列表',exact=True).click();expect(panel27.locator('.community-record-card')).to_be_visible();receiver_shot('finance-27-return-1440')
+                            panel27.locator('summary').click();panel27.locator('#receiverId').fill('community');panel27.locator('#readReceiverRelation').click();expect(panel27.locator('#receiverVersion')).to_have_value('1');receiver_shot('finance-55-readback-1440')
+                            panel27.locator('#receiverWorkspace').fill('not_admitted')
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):panel27.locator('#listReceiverRelations').click()
+                            expect(panel27.locator('.community-receiver-detail')).to_be_hidden();expect(panel27.locator('#receiverVersion')).to_have_value('');receiver_shot('finance-27-denied-1440')
+                            # Real finance grant revoked on host owner thread, retaining the same browser identity.
+                            page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench');expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
+                            page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
+                            page.locator('#financialKind').select_option('REFUND');page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('req_refund')
+                            revoke_finance.set()
+                            if not revoked_finance.wait(5):raise AssertionError('fixture grant revocation not acknowledged')
+                            with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==403):page.locator('#financialRecords').click()
+                            expect(page.locator('#financialObservation')).to_be_hidden();expect(page.locator('#financialObservationDetail')).to_be_empty();expect(page.locator('#providerActionResult')).to_be_empty();page.screenshot(path=str(evidence/'finance-denied-1440.png'),full_page=True);shots.append('finance-denied-1440.png')
+                            self.assertEqual(errors,[])
+                            self.assertTrue(all(r['operation'] in ('financial_records','reconciliation_read') for r in received if r['operation']))
+                            (evidence/'finance-receipt.json').write_text(json.dumps(dict(scope='SYNTHETIC_ORIGINAL_HOST_HTTP_NOT_CUSTOMER_ACCEPTANCE',shots=shots,received=received,browser_assertions_passed=True),ensure_ascii=False,indent=2)+'\n')
+                        finally:browser.close()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future=pool.submit(flow);deadline=time.monotonic()+90
+                    while not future.done() and time.monotonic()<deadline:
+                        if revoke_finance.is_set() and not revoked_finance.is_set():
+                            host.application.provider_actions.operations.grants.pop('finance');revoked_finance.set()
+                        server.handle_request()
+                    future.result(timeout=2)
+
+if __name__=='__main__':unittest.main()

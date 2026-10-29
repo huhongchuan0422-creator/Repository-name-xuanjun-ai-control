@@ -3,3 +3,6 @@ body{font:16px/1.6 system-ui,sans-serif;margin:0;background:#f3f5f8;color:#18243
 article,p{overflow-wrap:anywhere}
 
 input[type=checkbox]{width:auto;max-width:none}
+
+/* Confirmed finance record-card hierarchy; original operations remain available. */
+.financial-observation{color:#243f35;background:#f3f7f5;padding:24px;border-radius:14px;margin:20px 0}.financial-observation h3{font-size:24px;margin:0 0 16px}.financial-observation>p{color:#647c73;font-size:14px}.financial-record-card{background:white;border:1px solid #d9e3dd;border-radius:16px;padding:20px;margin:18px 0 22px}.financial-record-card h4{font-size:18px;margin:0 0 18px}.financial-record-card dl{margin:0}.financial-record-card dt{font-size:13px;color:#6d8379;margin:22px 0 4px}.financial-record-card dd{margin:0;color:#243f35;overflow-wrap:anywhere}.financial-wide{display:block;width:100%;margin:0 0 22px;background:#246d4f;color:white;border:0;text-align:left;padding:15px 18px;border-radius:9px;font-weight:600}#originalFinancialActions{margin-top:22px;border-top:1px solid #d9e3dd;padding-top:14px}#originalFinancialActions summary{cursor:pointer;color:#246d4f;font-weight:600}@media(max-width:480px){.financial-observation{padding:14px}.financial-record-card{padding:16px}}

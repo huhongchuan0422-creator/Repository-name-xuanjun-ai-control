@@ -1,12 +1,12 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,orderCursor=null,orderAfter='',reportCursor=null,reportWindow=null,adCursor=null,itemCursor=null;
- let financialPage=null,refundPage=null,refundSelection=0,detailSelection=0,staffPage=null,activeAction=null;
- const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult','billResult','refundApplications','orderLines','staffRecords'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;clearStaffSelection();staffPage=null;$('moreStaff').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;itemCursor=null;$('moreItems').hidden=true;financialPage=null;$('financialMore').hidden=true;billPage=null;billAuditPage=null;refundPage=null;clearRefundSelection();clearOrderLines();$('refundApplicationDecision').value='APPROVED';detailSelection++;$('moreRefundApplications').hidden=true;$('moreBill').hidden=true;$('moreBillAudit').hidden=true;};
+ let financialPage=null,financialPages=new Map(),providerSelection=0,refundPage=null,refundSelection=0,detailSelection=0,staffPage=null,activeAction=null;
+ const clear=()=>{for(const id of ['orders','items','ads','report','summary','finance','orderDetail','refundResult','splitResult','providerReceivers','providerActionResult','priceResult','refundApplicationResult','staffResult','storeList','storeResult','billResult','refundApplications','orderLines','staffRecords'])$(id).replaceChildren();for(const f of document.querySelectorAll('form'))f.reset();$('providerOrder').value='';$('providerRequest').value='';$('providerActions').hidden=true;clearStaffSelection();staffPage=null;$('moreStaff').hidden=true;profileVersion=null;orderCursor=null;orderAfter='';reportCursor=null;reportWindow=null;$('moreOrders').hidden=true;$('moreReport').hidden=true;$('moreAds').hidden=true;adCursor=null;itemCursor=null;$('moreItems').hidden=true;financialPage=null;financialPages.clear();providerSelection++;$('financialMore').hidden=true;billPage=null;billAuditPage=null;refundPage=null;clearRefundSelection();clearOrderLines();$('refundApplicationDecision').value='APPROVED';detailSelection++;$('moreRefundApplications').hidden=true;$('moreBill').hidden=true;$('moreBillAudit').hidden=true;};
  const status=message=>{$('notice').textContent=message;};
  window.configureCommunityWorkbench=value=>{
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null,merchantBillWorkspace:typeof value.merchantBillWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.merchantBillWorkspace)?value.merchantBillWorkspace:null}:null;
-  clear();$('providerActions').hidden=!config?.providerWorkspace;$('billSection').hidden=!(config?.providerWorkspace||config?.merchantBillWorkspace);$('billScope').value=config?.providerWorkspace?'STORE':'MERCHANT';busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
+  clear();clearObservation();$('providerActions').hidden=!config?.providerWorkspace;$('billSection').hidden=!(config?.providerWorkspace||config?.merchantBillWorkspace);$('billScope').value=config?.providerWorkspace?'STORE':'MERCHANT';busy=false;for(const b of document.querySelectorAll('button'))b.disabled=!config;status(config?'工作台已连接当前客户中心身份':'请从客户中心登录并打开授权工作台');
  };
  const call=async(op,params,ticket)=>{
   const auth=config;if(!auth)throw Error('请从客户中心打开工作台');
@@ -47,9 +47,58 @@
  $('refundForm').onsubmit=e=>{e.preventDefault();action(async t=>{const reference=$('detailReference').value;if(!/^[A-Za-z0-9_-]{1,64}$/.test(reference))throw Error('先输入订单编号');const r=await call('refund_record',{reference,event_id:$('refundEvent').value,amount_minor:Number($('refundAmount').value)},t);if(reference!==$('detailReference').value)return;await detail(t);if(t===epoch&&reference===$('detailReference').value)$('refundResult').textContent='退款预审已记录，未执行微信退款。'+JSON.stringify(r);});};
  $('splitForm').onsubmit=e=>{e.preventDefault();action(async t=>{const shares=Object.create(null);const lines=$('splitShares').value.trim().split(/\n/);if(lines.length>20)throw Error('接收方过多');for(const line of lines){const parts=line.split(',').map(s=>s.trim());if(parts.length!==2||!parts[0]||Object.hasOwn(shares,parts[0])||!/^\d+$/.test(parts[1]))throw Error('接收方格式错误或重复');shares[parts[0]]=Number(parts[1]);}const reference=$('detailReference').value;const r=await call('split_preview',{reference,shares_bps:shares},t);if(t!==epoch||reference!==$('detailReference').value)return;$('splitResult').replaceChildren();article('splitResult','可分配金额（分）：'+r.allocatable_minor+'；退款预审（分）：'+r.refund_preview_minor);for(const [name,amount] of Object.entries(r.allocations_minor))article('splitResult',name+'：'+amount+' 分');});};
  $('reconcile').onclick=()=>action(async t=>{const r=await call('reconciliation',{},t);if(t===epoch)$('finance').textContent=JSON.stringify(r,null,2);});
- async function providerAction(t,operation,params,current=()=>true){if(t!==epoch||!current())throw Error('当前选择已变化');const context=config;if(!context?.providerWorkspace)throw Error('当前账号未配置财务处理工作台');const response=await fetch('/community/provider-actions',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace:context.providerWorkspace,operation,params})});if(t!==epoch||!current())throw Error('当前选择已变化');const data=await response.json();if(t!==epoch||!current())throw Error('当前选择已变化');if(!response.ok)throw Error('请求未确认，请保留原申请编号并查询，不要重复提交');if(!operation.startsWith('bill_'))$('providerActionResult').textContent=JSON.stringify(data.result,null,2);return data.result;}
+ let observationRevision=0;
+ const financialTitle={REFUND:'退款观察',SPLIT:'分账请求',RETURN:'分账回退',RECONCILIATION:'对账记录与异常'};
+ function clearObservation(){
+  observationRevision++;
+  $('financialObservation').hidden=true;$('financialObservationList').replaceChildren();$('financialObservationDetail').replaceChildren();
+  $('financialObservationTitle').textContent='';$('financialObservationScope').textContent='';$('financialObservationDetail').hidden=true;$('financialObservationBack').hidden=true;$('financialObservationList').hidden=false;$('providerActionResult').hidden=false;
+ }
+ const observedText=value=>value===undefined||value===null?'原记录未返回':String(value);
+ const minorText=(amount,currency)=>Number.isSafeInteger(amount)?String(amount)+' 最小货币单位'+(typeof currency==='string'&&currency?' · '+currency:'（原记录未返回币种）'):'摘要未提供金额，不以订单金额代替';
+ function observationFields(kind,r,detail){
+  const fields=kind==='RECONCILIATION'?[['订单引用',r.reference],['观察状态',r.status],['本地订单状态',r.local_order_state],['服务商状态',r.provider_state]]:
+   [['分组',financialTitle[kind]],['请求编号',r.request_id],['关联订单',r.reference],['请求状态',r.status]];
+  if(detail){
+   if(kind==='RECONCILIATION')fields.push(['原订单金额',minorText(r.original_amount_minor,r.currency)],['已确认本地退款',minorText(r.confirmed_local_refunds_minor,r.currency)],['异常条目',Array.isArray(r.anomalies)?r.anomalies.length?r.anomalies.join('；'):'原观察未报告异常':'原记录未返回'],['范围',r.coverage==='ORDER_OBSERVATIONS_ONLY'?'仅订单观察，不是全量日账单':r.coverage],['日账单核对',r.daily_bill_reconciled===true?'原记录标记已核对':r.daily_bill_reconciled===false?'未完成':'原记录未返回'],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status]);
+   else{if(kind==='RETURN')fields.push(['接收方编号',r.receiver_id]);fields.push(['服务商响应',r.provider_response_verified===true?'响应已验证；不等于到账或财务核销':r.provider_response_verified===false?'未验证':'原记录未返回'],['金额信息',minorText(r.amount_minor,r.currency)],['财务核销',r.finance_status==='UNCONFIRMED'?'未确认':r.finance_status],['自动重试','此观察界面不提供资金重试操作']);}
+  }
+  return fields;
+ }
+ function observationCard(title,fields){const card=document.createElement('article');card.className='financial-record-card';const heading=document.createElement('h4');heading.textContent=title;card.append(heading);const dl=document.createElement('dl');for(const [label,value]of fields){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=observedText(value);dl.append(dt,dd);}card.append(dl);return card;}
+ function showObservations(kind,records,result){
+  clearObservation();const ticket=epoch,selection=providerSelection,view=observationRevision;
+  $('financialObservation').hidden=false;$('providerActionResult').hidden=true;$('financialObservationTitle').textContent=financialTitle[kind];
+  $('financialObservationScope').textContent=kind==='RECONCILIATION'?'原订单既有观察快照；不是日账单、到账或财务核销结论。':'当前权限本页记录；财务核销未确认。分账回退与消费者退款分别显示。';
+  if(!records.length){$('financialObservationList').textContent=result.has_more?'当前页没有可见记录，仍有下一页可读取。':'当前范围没有可见记录。';return;}
+  for(const r of records){const card=observationCard('记录列表 · 当前范围',observationFields(kind,r,false)),open=document.createElement('button');open.className='financial-wide';open.textContent='查看详情';open.onclick=()=>{if(busy||ticket!==epoch||selection!==providerSelection||view!==observationRevision)return;$('financialObservationList').hidden=true;$('financialObservationDetail').replaceChildren(observationCard('记录详情',observationFields(kind,r,true)));$('financialObservationDetail').hidden=false;$('financialObservationTitle').textContent=financialTitle[kind]+'详情';$('financialObservationBack').hidden=false;};$('financialObservationList').append(card,open);}
+  $('financialObservationBack').onclick=()=>{if(ticket!==epoch||selection!==providerSelection||view!==observationRevision)return;$('financialObservationDetail').replaceChildren();$('financialObservationDetail').hidden=true;$('financialObservationList').hidden=false;$('financialObservationBack').hidden=true;$('financialObservationTitle').textContent=financialTitle[kind];};
+ }
+ function clearProviderResult(){ $('providerActionResult').replaceChildren();clearObservation(); }
+ function clearFinancialPages(){financialPage=null;financialPages.clear();$('financialMore').hidden=true;}
+ let providerSelectionKey='';
+ function providerChanged(){
+  const key=JSON.stringify([$ ('providerOrder').value,$('providerRequest').value,$('financialKind').value]);
+  if(key===providerSelectionKey)return;providerSelectionKey=key;providerSelection++;clearProviderResult();
+  financialPage=financialPages.get($('financialKind').value)||null;$('financialMore').hidden=!financialPage;
+  // Do not unlock an in-flight funds action or create a new request identifier.
+ }
+ for(const id of ['providerOrder','providerRequest','financialKind']){$(id).oninput=providerChanged;$(id).onchange=providerChanged;}
+ async function providerAction(t,operation,params,current=()=>true){
+  providerChanged();const selection=providerSelection,valid=()=>t===epoch&&selection===providerSelection&&current();
+  if(!valid())throw Error('当前选择已变化');clearProviderResult();
+  const context=config;if(!context?.providerWorkspace)throw Error('当前账号未配置财务处理工作台');
+  try{
+   const response=await fetch('/community/provider-actions',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':context.csrf},body:JSON.stringify({workspace:context.providerWorkspace,operation,params})});
+   if(!valid())throw Error('当前选择已变化');
+   if(!response.ok)throw Error('请求未确认，请保留原申请编号并查询，不要重复提交');
+   const data=await response.json();if(!valid())throw Error('当前选择已变化');
+   if(!data||!Object.prototype.hasOwnProperty.call(data,'result'))throw Error('响应未确认，请按原编号查询，不要重复提交');
+   if(!operation.startsWith('bill_'))$('providerActionResult').textContent=JSON.stringify(data.result,null,2);if(operation==='reconciliation_read'&&data.result&&typeof data.result==='object')showObservations('RECONCILIATION',[data.result],data.result);return data.result;
+  }catch(error){if(valid()){clearProviderResult();clearFinancialPages();}throw Error(valid()?'请求未确认，请保留原申请编号并查询，不要重复提交':'当前选择已变化');}
+ }
  const providerReference=()=>({reference:$('providerOrder').value,request_id:$('providerRequest').value});
- $('newProviderRequest').onclick=()=>{if(busy)return;$('providerRequest').value='pa_'+crypto.randomUUID().replaceAll('-','');$('providerActionResult').replaceChildren();};
+ $('newProviderRequest').onclick=()=>{if(busy)return;$('providerRequest').value='pa_'+crypto.randomUUID().replaceAll('-','');providerChanged();};
  $('providerRefundForm').onsubmit=e=>{e.preventDefault();action(t=>providerAction(t,'refund',{...providerReference(),amount_minor:Number($('providerRefundAmount').value),reason:$('providerRefundReason').value}));};
  $('queryProviderRefund').onclick=()=>action(t=>providerAction(t,'query_refund',providerReference()));$('statusProviderRefund').onclick=()=>action(t=>providerAction(t,'status_refund',providerReference()));
  $('loadReceivers').onclick=()=>action(async t=>{const r=await providerAction(t,'receivers',{});if(t!==epoch)return;$('providerReceivers').replaceChildren();for(const receiver of r.receivers){const label=document.createElement('label');label.textContent=receiver.label+' · '+receiver.id+'（分）';const input=document.createElement('input');input.type='number';input.min='0';input.step='1';input.value='0';input.dataset.receiver=receiver.id;label.append(input);$('providerReceivers').append(label);}});
@@ -110,9 +159,16 @@
   $('staffResult').textContent='权限变更已记录，请重新读取门店员工确认当前状态。\n'+JSON.stringify(r,null,2);
  }
  $('staffRemove').onclick=()=>action(t=>staffMutation(t,'staff_remove',{workspace:$('staffWorkspace').value}));
- async function fundsPage(t,kind,after_id=''){const r=await providerAction(t,'financial_records',{kind,after_id});if(t!==epoch)return;financialPage=r.has_more?{kind,after_id:r.next_cursor}:null;$('financialMore').hidden=!financialPage;}
+ async function fundsPage(t,kind,after_id=''){
+  providerChanged();const selection=providerSelection,current=()=>selection===providerSelection&&kind===$('financialKind').value;
+  financialPages.delete(kind);financialPage=null;$('financialMore').hidden=true;
+  const r=await providerAction(t,'financial_records',{kind,after_id},current);if(t!==epoch||!current())return;
+  if(!r||!Array.isArray(r.records)||typeof r.has_more!=='boolean'||r.has_more&&(typeof r.next_cursor!=='string'||!r.next_cursor||r.next_cursor===after_id)){clearProviderResult();clearFinancialPages();throw Error('财务列表响应未确认，请重新读取');}
+  showObservations(kind,r.records,r);financialPage=r.has_more?{kind,after_id:r.next_cursor}:null;
+  if(financialPage)financialPages.set(kind,financialPage);$('financialMore').hidden=!financialPage;
+ }
  $('financialRecords').onclick=()=>action(t=>fundsPage(t,$('financialKind').value));
- $('financialMore').onclick=()=>action(t=>financialPage&&fundsPage(t,financialPage.kind,financialPage.after_id));
+ $('financialMore').onclick=()=>action(t=>financialPage&&financialPage.kind===$('financialKind').value&&fundsPage(t,financialPage.kind,financialPage.after_id));
  $('reconcileOrder').onclick=()=>action(t=>providerAction(t,'reconcile_order',{reference:$('providerOrder').value}));
  $('readReconciliation').onclick=()=>action(t=>providerAction(t,'reconciliation_read',{reference:$('providerOrder').value}));
  $('listStores').onclick=()=>action(async t=>{const r=await call('stores',{},t);if(t!==epoch)return;$('storeList').replaceChildren();for(const store of r.stores){const a=document.createElement('article');a.textContent=(store.profile?.name||'尚未创建资料')+' · '+store.workspace;const b=document.createElement('button');b.textContent='编辑资料';b.onclick=()=>{if(busy)return;$('storeWorkspace').value=store.workspace;$('storeName').value=store.profile?.name||'';$('storeDescription').value=store.profile?.description||'';$('storeContact').value=store.profile?.contact||'';$('storeState').value=store.profile?.status||'PAUSED';$('storeVersion').value=store.profile?.version||'';};a.append(b);$('storeList').append(a);}});

@@ -95,7 +95,7 @@ class CenterCommunities:
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
             from scripts.community_platform_merchants import PlatformMerchants
             return PlatformMerchants(self).dispatch(session,csrf,body)
-        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('community_orders','community_earnings','community_receiver_bind'):
+        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('community_orders','community_earnings','community_receiver_bind','community_receiver_list','community_receiver_read'):
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
             from scripts.community_reports import CommunityReports
             return CommunityReports(self,self.commerce,self.provider_actions).dispatch(session,csrf,body)

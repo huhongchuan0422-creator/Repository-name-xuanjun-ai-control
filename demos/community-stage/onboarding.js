@@ -230,8 +230,22 @@
       (!reviewMode&&kind==='business_license'?$('licenseUpload'):$('materials')).append(row);
     }
   }
+  // Discard only browser-held reviewer detail before reading another application.
+  // A refused/unknown read must not leave the previous applicant actionable.
+  function clearReviewSelection(){
+    clearWechat();resetHistory();resetNotices();current=null;
+    for(const id of ['summary','materials','reviewNote','opening','openingWorkspace'])$(id).replaceChildren();
+    for(const id of ['legal_name','store_name','address','contact','note'])$(id).value='';
+    $('applicationTitle').textContent='入驻申请';$('applicationState').textContent='';$('applicationVersion').textContent='';
+    $('detail').hidden=true;$('reviewActions').hidden=true;$('openingActions').hidden=true;
+    $('withdrawConfirmed').checked=false;withdrawalControls();
+  }
+  async function readListedApplication(application){
+    if(reviewMode)clearReviewSelection();
+    render(await request(reviewMode?'review_read':'read',{application}));
+  }
   async function list(append=false){const result=await request(reviewMode?'review_list':'mine',{status:$('statusFilter').value,...(append&&cursor?{cursor}:{})}),target=$(reviewMode?'applications':'mine');if(!append)target.replaceChildren();
-    for(const app of result.applications)target.append(button((app.fields.store_name||'未命名申请')+' · '+(states[app.status]||app.status),async()=>{render(await request(reviewMode?'review_read':'read',{application:app.application}));}));
+    for(const app of result.applications)target.append(button((app.fields.store_name||'未命名申请')+' · '+(states[app.status]||app.status),async()=>{await readListedApplication(app.application);}));
     cursor=result.next_cursor||null;$('moreApplications').hidden=!cursor;
     if(!reviewMode&&!append){render(result.applications[0]||null);}
     message(result.applications.length?'已读取最新入驻状态。':reviewMode?'暂无入驻申请。':'尚无申请，请填写经营信息并保存草稿。');}

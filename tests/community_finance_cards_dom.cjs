@@ -1,0 +1,47 @@
+'use strict';
+// Actual workbench source and HTML, with deterministic synthetic HTTP timing.
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+class Element{
+ constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
+ append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this.textContent='';}
+ addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
+ reset(){}set innerHTML(_){throw Error('unsafe DOM');}
+}
+const html=fs.readFileSync(process.argv[3],'utf8');
+const nodes=Object.fromEntries([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
+const walk=node=>[node,...node.children.flatMap(walk)];
+const document={getElementById:id=>{assert(nodes[id],id);return nodes[id];},createElement:tag=>new Element(tag),querySelectorAll:tag=>Object.values(nodes).flatMap(walk).filter(node=>node.tagName===tag)};
+const requests=[];
+const context={window:{},document,fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,body:JSON.parse(options.body),resolve,reject}))};
+vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context);
+const configure=context.window.configureCommunityWorkbench,flush=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
+const response=(result,ok=true)=>({ok,status:ok?200:403,json:async()=>({result})});
+const result=label=>({label,local_inventory:{counts:{split_records:1},complete_reconciliation_available:false},finance_status:'UNCONFIRMED',has_more:true,next_offset:50,next_cursor:'audit-'+label});
+function select(id,value,event='input'){nodes[id].value=value;assert.equal(typeof nodes[id]['on'+event],'function');nodes[id]['on'+event]();}
+function reset(){configure({csrf:'csrf-original',workspace:'merchant',providerWorkspace:'finance'});select('billKind','SPLIT');select('billDate','2026-10-16');}
+async function start(button){const before=requests.length;nodes[button].click();await flush();assert.equal(requests.length,before+1,button+' sends exactly once');return requests.at(-1);}
+async function finish(request,label,ok=true){request.resolve(response(result(label),ok));await flush();}
+function assertEmpty(){assert.equal(nodes.billResult.textContent,'');assert(nodes.moreBill.hidden);assert(nodes.moreBillAudit.hidden);}
+(async()=>{
+ configure({csrf:'original',workspace:'merchant',providerWorkspace:'finance'});nodes.providerOrder.value='order1';nodes.providerRequest.value='request1';nodes.financialKind.value='REFUND';
+ let q=await start('financialRecords');q.resolve(response({records:[{request_id:'ref1',reference:'order1',status:'SUBMITTED_RESULT_UNKNOWN',provider_response_verified:false,finance_status:'UNCONFIRMED'}],has_more:true,next_cursor:'a'.repeat(64)}));await flush();
+ assert.equal(nodes.financialObservation.hidden,false);assert.equal(nodes.financialObservationTitle.textContent,'退款观察');assert.equal(nodes.providerActionResult.hidden,true);
+ const texts=node=>walk(node).map(n=>n.textContent).join('|');
+ assert(texts(nodes.financialObservationList).includes('ref1'));const n=requests.length,open=nodes.financialObservationList.children[1];open.click();assert.equal(requests.length,n);assert.equal(nodes.financialObservationDetail.hidden,false);assert(texts(nodes.financialObservationDetail).includes('摘要未提供金额'));assert(!texts(nodes.financialObservationDetail).includes('CNY'));
+ nodes.financialObservationBack.click();assert.equal(nodes.financialObservationList.hidden,false);assert.equal(nodes.financialKind.value,'REFUND');assert.equal(nodes.financialMore.hidden,false);
+ // Retained callbacks from the same group must not restore a removed snapshot after refresh/403.
+ const oldBack=nodes.financialObservationBack.onclick;
+ q=await start('financialRecords');q.resolve(response({records:[{request_id:'fresh-ref',reference:'order1',status:'NEW'}],has_more:false,next_cursor:null}));await flush();
+ open.onclick();assert.equal(nodes.financialObservationDetail.hidden,true);assert(texts(nodes.financialObservationList).includes('fresh-ref'));
+ nodes.financialObservationList.children[1].click();assert.equal(nodes.financialObservationDetail.hidden,false);oldBack();assert.equal(nodes.financialObservationDetail.hidden,false);
+ const currentOpen=nodes.financialObservationList.children[1].onclick,currentBack=nodes.financialObservationBack.onclick;
+ q=await start('financialRecords');q.resolve(response(null,false));await flush();currentOpen();currentBack();assert.equal(nodes.financialObservation.hidden,true);assert.equal(nodes.financialObservationDetail.children.length,0);
+ select('financialKind','RETURN','change');open.click();assert.equal(nodes.financialObservation.hidden,true);
+ q=await start('financialRecords');q.resolve(response({records:[{request_id:'return1',reference:'order1',receiver_id:'receiver1',amount_minor:17,status:'UNKNOWN_QUERY_EXISTING_ONLY',finance_status:'UNCONFIRMED'}],has_more:false,next_cursor:null}));await flush();nodes.financialObservationList.children[1].click();assert(texts(nodes.financialObservationDetail).includes('17 最小货币单位（原记录未返回币种）'));assert(!texts(nodes.financialObservationDetail).includes('CNY'));assert(texts(nodes.financialObservationDetail).includes('receiver1'));
+ q=await start('readReconciliation');q.resolve(response({reference:'order1',status:'EXCEPTION',provider_state:'REFUND',local_order_state:'SUCCESS',original_amount_minor:101,currency:'CNY',confirmed_local_refunds_minor:0,anomalies:['<img src=x onerror=bad()>'],coverage:'ORDER_OBSERVATIONS_ONLY',daily_bill_reconciled:false,finance_status:'UNCONFIRMED'}));await flush();nodes.financialObservationList.children[1].click();assert(texts(nodes.financialObservationDetail).includes('<img src=x'));assert(texts(nodes.financialObservationDetail).includes('101 最小货币单位 · CNY'));assert(texts(nodes.financialObservationDetail).includes('仅订单观察，不是全量日账单'));
+ q=await start('readReconciliation');q.resolve(response(null,false));await flush();assert.equal(nodes.financialObservation.hidden,true);assert.equal(nodes.financialObservationDetail.children.length,0);
+ assert(requests.every(r=>['financial_records','reconciliation_read'].includes(r.body.operation)));
+ for(const id of ['providerRefundForm','providerSplitForm','splitReturnForm','reconcileOrder','newProviderRequest'])assert(html.includes('id="'+id+'"'));
+ assert(html.includes('<details id="originalFinancialActions">'));assert(!html.includes('<details id="originalFinancialActions" open'));
+ console.log('SCOPED_MOCK_DOM_PASS finance fields/cards/detail/back/cursor/plain text/denial; only existing readonly operations');
+})().catch(e=>{console.error(e);process.exitCode=1;});

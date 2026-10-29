@@ -223,11 +223,36 @@
  };
  memberBack.addEventListener('click',()=>{memberDetail.hidden=true;memberRows.hidden=false;});memberRefresh.addEventListener('click',()=>document.getElementById('queryMerchantMembers').click());clearMembers('尚未查询原成员关系');
 
+ // Insert before select() in the original admin shell. Reuse original controls, not copies.
+ const receiverPanel=document.getElementById('receiverRelations'),receiverIndex=panels.indexOf(receiverPanel);
+ receiverPanel.classList.add('community-receiver-panel');
+ const receiverHint=document.createElement('p');receiverHint.className='profile-hint';
+ const receiverRows=document.createElement('div'),receiverDetail=document.createElement('div');receiverDetail.className='community-receiver-detail';receiverDetail.hidden=true;
+ const receiverFields=document.createElement('dl'),receiverBack=document.createElement('button');receiverBack.type='button';receiverBack.textContent='返回接收关系列表';receiverDetail.append(receiverFields,receiverBack);
+ const receiverActions=document.createElement('details');receiverActions.className='open-actions';const receiverSummary=document.createElement('summary');receiverSummary.textContent='原接收关系配置操作';receiverActions.append(receiverSummary);
+ const receiverQuery=document.createElement('div');receiverQuery.className='open-query';receiverQuery.append(document.getElementById('receiverCommunityReference').closest('label'),document.getElementById('receiverWorkspace').closest('label'),document.getElementById('listReceiverRelations'));
+ receiverActions.append(document.getElementById('receiverId').closest('label'),document.getElementById('receiverVersion').closest('label'),document.getElementById('readReceiverRelation'),document.getElementById('bindReceiver'));
+ const receiverNotice=document.createElement('p');receiverNotice.textContent='仅原平台所有者及已授权财务范围可操作；只影响新分账规则版本，不执行资金操作。未知结果先回读关系版本，不重复提交。';receiverActions.append(receiverNotice);
+ reportConfig.hidden=true;receiverPanel.append(receiverQuery,receiverHint,receiverRows,document.getElementById('moreReceiverRelations'),receiverDetail,receiverActions);
+ const workspaceText=r=>r.provider_workspace_status==='LEGACY_NOT_RECORDED'?'历史记录未保存工作区，不作推断':typeof r.provider_workspace==='string'?r.provider_workspace:'未返回';
+ const receiverPairs=r=>[['已授权财务工作区（记录）',workspaceText(r)],['本次已验证查询工作区',r.requested_provider_workspace||'保存回执；请回读核实'],['已准入接收方编号',r.receiver_id],['关系当前版本',r.version],['适用范围','仅新分账规则版本；未执行资金操作']];
+ function clearReceiverUi(message){receiverRows.replaceChildren();receiverFields.replaceChildren();receiverDetail.hidden=true;receiverRows.hidden=false;receiverHint.textContent=message;}
+ window.communityReceiverView=({type,record})=>{
+  if(type==='detail'||type==='saved'){clearReceiverUi(type==='saved'?'保存已获服务端确认，建议回读当前关系版本。':'已回读所选接收关系；并非资金到账凭证。');for(const pair of receiverPairs(record))openPair(receiverFields,...pair);receiverDetail.hidden=false;receiverRows.hidden=true;return;}
+  if(type!=='listed'){clearReceiverUi(type==='error'?'读取或保存未确认，旧详情已清除，请核对权限并回读。':type==='loading'?'正在请求原授权关系，尚未确认':'尚未读取原接收关系');return;}
+  clearReceiverUi('已读取当前扫描页 '+record.result.records.length+' 条；不是全部关系汇总。');
+  if(!record.result.records.length){const p=document.createElement('p');p.textContent=record.result.has_more?'本扫描页没有可显示关系，仍有下一页。':'本页没有可显示关系；不自动推定可用初始版本。';receiverRows.append(p);}
+  for(const item of record.result.records){const card=document.createElement('article');card.className='community-record-card';const title=document.createElement('h3');title.textContent='记录列表 · 当前范围';const fields=document.createElement('dl');for(const pair of receiverPairs(item))openPair(fields,...pair);card.append(title,fields);const show=document.createElement('button');show.type='button';show.className='open-detail-action';show.textContent='查看接收关系详情';show.addEventListener('click',()=>record.select(item));receiverRows.append(card,show);}
+ };
+ receiverBack.addEventListener('click',()=>window.communityReceiverReturn());
+ clearReceiverUi('尚未读取原接收关系');
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
   if(activeIndex===profileIndex&&index!==profileIndex)emptyProfile('切换功能后请重新查询社区资料。');
   activeIndex=index;
+  main.classList.toggle('receiver-selected',index===receiverIndex);if(index===receiverIndex)document.getElementById('receiverCommunityReference').value=document.getElementById('reference').value;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   main.classList.toggle('profile-selected',index===profileIndex);
   main.classList.toggle('members-selected',index===memberIndex);if(index===memberIndex)document.getElementById('memberCommunityReference').value=document.getElementById('reference').value;
@@ -238,7 +263,7 @@
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
-  if(result)result.hidden=index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
+  if(result)result.hidden=index===receiverIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
   buttons.forEach((button,i)=>{if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   if(index!==null){const title=panels[index].querySelector('h2');title.tabIndex=-1;title.focus();}
  }
