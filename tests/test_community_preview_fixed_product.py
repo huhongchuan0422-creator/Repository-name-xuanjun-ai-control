@@ -39,9 +39,9 @@ class Contracts(unittest.TestCase):
     def test_control_product_separate_and_fixed_literals(self):
         r=p.evidence(*self.records,self.env)
         self.assertEqual(r['control_source_sha'],CONTROL)
-        self.assertEqual(r['product_source_sha'],'06053b6a16a8e6efcd324dffe06612b9384aaaf1')
+        self.assertEqual(r['product_source_sha'],'211a9f4a1425c4b2667c13052b8590c0af3b3ac1')
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
-        self.assertEqual(r['artifact_id'],12794951121)
+        self.assertEqual(r['artifact_id'],12897330655)
         self.assertFalse(r['upload_performed'])
     def test_context_rejects_wrong_branch_control_product_mode_run_and_target(self):
         for key,value in [('GITHUB_EVENT_NAME','push'),('GITHUB_REPOSITORY','other/repo'),
@@ -143,7 +143,7 @@ class Contracts(unittest.TestCase):
         w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         preview=w.split('  mini-preview:\n',1)[1]
         self.assertIn("inputs.preview_source_sha == github.sha",preview)
-        self.assertIn("inputs.preview_evidence_run_id == '40637408406'",preview)
+        self.assertIn("inputs.preview_evidence_run_id == '40871297771'",preview)
         self.assertIn("github.ref == 'refs/heads/"+p.BRANCH+"'",preview)
         self.assertIn('runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]',preview)
         self.assertIn('test "$(hostname -s)" = iZvt5t8tlrm8oiZ',preview)
@@ -189,7 +189,7 @@ class Contracts(unittest.TestCase):
                 return Response()
         with patch.object(p,'build_opener',return_value=Opener()):
             self.assertEqual(p.download_archive('SYNTHETIC_TOKEN'),b'fixture bytes')
-        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12794951121/zip')
+        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12897330655/zip')
         self.assertEqual(requests[0].get_header('Authorization'),'Bearer SYNTHETIC_TOKEN')
         self.assertIsNone(requests[1].get_header('Authorization'))
     def test_download_rejects_untrusted_redirect_and_missing_token(self):
@@ -215,7 +215,7 @@ class Contracts(unittest.TestCase):
     def test_node_identity_child_does_not_receive_credentials(self):
         script="""const cp=require('node:child_process');let called=false;
 cp.execFileSync=(bin,args,opts)=>{called=true;if('WECHAT_MINIPROGRAM_PRIVATE_KEY' in opts.env||'GITHUB_TOKEN' in opts.env)throw Error('credential leaked');
-return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'06053b6a16a8e6efcd324dffe06612b9384aaaf1',source_root:'/fixture'});};
+return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'211a9f4a1425c4b2667c13052b8590c0af3b3ac1',source_root:'/fixture'});};
 const p=require(process.argv[1]);p.sourceIdentity();if(!called)throw Error('identity admission missing');"""
         env=dict(self.env,WECHAT_MINIPROGRAM_PRIVATE_KEY='SYNTHETIC_CANARY_NOT_A_KEY',GITHUB_TOKEN='SYNTHETIC_CANARY_NOT_A_TOKEN')
         r=subprocess.run(['node','-e',script,str(ROOT/'deploy/community-preview/endpoint.cjs')],
@@ -245,7 +245,7 @@ class ExactArtifact(unittest.TestCase):
         if not path:self.skipTest('EXACT_PRODUCT_OUTER_ARCHIVE_FIXTURE_NOT_PROVIDED')
         self.assertEqual(p.archive_source(pathlib.Path(path).read_bytes()),self.raw)
     def test_outer_artifact_rejects_missing_extra_and_duplicate_members(self):
-        expected=['community-tests.log','stage5-tests.log','community-stage-source.zip']
+        expected=list(p.ARTIFACT_MEMBERS)
         for names in (expected[:1]+expected[2:],expected+['extra.txt'],expected+['stage5-tests.log']):
             stream=io.BytesIO()
             with zipfile.ZipFile(stream,'w') as z:
@@ -255,9 +255,26 @@ class ExactArtifact(unittest.TestCase):
             with patch.object(p,'ARTIFACT_SIZE',len(raw)),patch.object(p,'ARTIFACT_SHA256',hashlib.sha256(raw).hexdigest()):
                 with self.subTest(names=names),self.assertRaisesRegex(ValueError,'FIXED_ARTIFACT_MEMBERS_REQUIRED'):
                     p.archive_source(raw)
+    def test_outer_members_content_tamper_even_with_mocked_outer_pin_rejected(self):
+        path=os.environ.get('COMMUNITY_FIXED_PRODUCT_TEST_ARCHIVE','')
+        if not path:self.skipTest('EXACT_PRODUCT_OUTER_ARCHIVE_FIXTURE_NOT_PROVIDED')
+        original=pathlib.Path(path).read_bytes()
+        for mode in ('bytes','size'):
+            stream=io.BytesIO()
+            with zipfile.ZipFile(io.BytesIO(original)) as source,zipfile.ZipFile(stream,'w') as target:
+                for name in source.namelist():
+                    data=source.read(name)
+                    if name=='stage5-tests.log':
+                        data=(bytes([data[0]^1])+data[1:]) if mode=='bytes' else data+b'changed'
+                    target.writestr(name,data)
+            raw=stream.getvalue()
+            with patch.object(p,'ARTIFACT_SIZE',len(raw)),patch.object(p,'ARTIFACT_SHA256',hashlib.sha256(raw).hexdigest()):
+                with self.subTest(mode=mode),self.assertRaisesRegex(ValueError,'FIXED_ARTIFACT_MEMBER_BYTES_SHA_REQUIRED'):
+                    p.archive_source(raw)
+
     def test_actual_frozen_source_set_and_appid(self):
         files=p.source_files(self.raw)
-        self.assertEqual(len(files),463)
+        self.assertEqual(len(files),505)
         self.assertEqual(json.loads(files['clients/community-mini/project.config.json'])['appid'],p.APPID)
     def test_exact_stage_identity_and_duplicate_stage_denial(self):
         destination,context=self.stage()
@@ -316,7 +333,7 @@ class ExactArtifact(unittest.TestCase):
         r=subprocess.run(['node',str(ROOT/'scripts/community_mini_preview.cjs')],env=env,capture_output=True,text=True,timeout=20)
         self.assertEqual(r.returncode,4)
         self.assertFalse((self.root/'preview-mutated/receipt.json').exists())
-        # Self-reported manifest edits cannot turn changed code into pinned 06053.
+        # Self-reported manifest edits cannot turn changed code into pinned 211a9.
         prepared['prepared_files']['session.js']=hashlib.sha256((out/'session.js').read_bytes()).hexdigest()
         (out/'CONNECTED_PREVIEW_RECEIPT.json').write_text(json.dumps(prepared))
         env['COMMUNITY_PREVIEW_OUTPUT']=str(self.root/'preview-forged-manifest')
@@ -324,5 +341,21 @@ class ExactArtifact(unittest.TestCase):
         self.assertEqual(r.returncode,4)
         self.assertFalse((self.root/'preview-forged-manifest/receipt.json').exists())
 
-if __name__=='__main__':unittest.main()
 
+
+# Frozen old-contract regression only. Original files remain byte-identical inert
+# fixtures; materialization is TEST_ONLY in a fresh TEMP, never a product selector.
+import atexit
+_history_temp=tempfile.TemporaryDirectory(prefix='preview-06053-history-test-')
+atexit.register(_history_temp.cleanup)
+_history_root=pathlib.Path(_history_temp.name)
+for _fixture in (ROOT/'tests/fixtures/preview_06053_history').rglob('*.txt'):
+    _relative=_fixture.relative_to(ROOT/'tests/fixtures/preview_06053_history')
+    _destination=_history_root/str(_relative)[:-4]
+    _destination.parent.mkdir(parents=True,exist_ok=True)
+    _destination.write_bytes(_fixture.read_bytes())
+_history_spec=importlib.util.spec_from_file_location('original_preview_06053_contract',_history_root/'tests/test_community_preview_fixed_product.py')
+_history=importlib.util.module_from_spec(_history_spec);_history_spec.loader.exec_module(_history)
+Original06053Contracts=_history.Contracts
+
+if __name__=='__main__':unittest.main()

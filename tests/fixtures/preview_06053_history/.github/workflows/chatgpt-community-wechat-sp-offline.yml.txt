@@ -1,0 +1,1239 @@
+name: Community WeChat SP Offline Gate
+# Existing preview channel; manual upload stays opt-in and exact-head/target bound.
+on:
+  push:
+    branches:
+      - feature/chatgpt-community-wechat-sp-offline-20261017
+    paths:
+      - 'scripts/community_*.py'
+      - 'scripts/community_*.cjs'
+      - 'tests/test_community_*.py'
+      - 'clients/community-mini/**'
+      - 'demos/community-stage/**'
+      - scripts/community_wechat_sp_offline_guard.py
+      - scripts/community_wechat_sp_mock_checkout_view.py
+      - scripts/community_wechat_sp_split_projection.py
+      - tests/test_community_wechat_sp_offline_guard.py
+      - tests/test_community_wechat_sp_mock_checkout_view.py
+      - tests/test_community_wechat_sp_split_projection.py
+      - deploy/community-preview/install-stopped-v1.sh
+      - governance/features.json
+      - .github/workflows/chatgpt-community-wechat-sp-offline.yml
+  workflow_dispatch:
+    inputs:
+      backend_image_enabled:
+        description: 'Build existing Hosted backend image only (default off; no preview or deployment)'
+        type: boolean
+        default: false
+      backend_image_source_sha:
+        description: 'Exact original branch HEAD for Hosted image build (40 lowercase hex)'
+        type: string
+        default: ''
+      backend_image_evidence_run_id:
+        description: 'Successful original push evidence for this exact image source SHA'
+        type: string
+        default: ''
+      preview_enabled:
+        description: 'Explicitly run existing development preview upload (default off)'
+        type: boolean
+        default: false
+      mini_operation:
+        description: 'Explicit official development operation; upload creates a development version, never review/release'
+        type: choice
+        options: [preview, upload]
+        default: preview
+      preview_source_sha:
+        description: 'Exact current control branch HEAD; preview product is fixed to reviewed 06053'
+        type: string
+        default: ''
+      preview_target:
+        description: 'Existing fixed preview target'
+        type: choice
+        options: [uk-path-candidate]
+        default: uk-path-candidate
+      preview_evidence_run_id:
+        description: 'Fixed 06053 successful push evidence: 40637408406'
+        type: string
+        default: ''
+permissions:
+  contents: read
+  actions: read
+jobs:
+  test:
+    # Do not skip the job on commit text; select after checkout.
+    outputs:
+      source_sha256: ${{ steps.source_package.outputs.sha256 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Classify pushed changes
+        id: scope
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] && [[ "$BEFORE" != "0000000000000000000000000000000000000000" ]] || exit 1
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin "$BEFORE"
+          test "$(git rev-parse "$BEFORE^{commit}")" = "$BEFORE"
+          git diff --name-only -z --no-renames "$BEFORE" "$GITHUB_SHA" > "$RUNNER_TEMP/push-files.nul"
+          python3 - <<'CHECK'
+          import os
+          from pathlib import Path
+          b=(Path(os.environ['RUNNER_TEMP'])/'push-files.nul').read_bytes()
+          if not b or not b.endswith(b'\0'):raise SystemExit('PUSH_DELTA_UNKNOWN')
+          rows=b[:-1].split(b'\0')
+          if len(rows)>10000 or any(not x or b'\n' in x or b'\r' in x for x in rows):raise SystemExit('PUSH_DELTA_UNKNOWN')
+          allowed={b'scripts/community_preview_stopped_handoff.py',b'scripts/community_preview_update_checkpoint.py',b'scripts/community_preview_bc_build.py',b'scripts/community_preview_prepared_resume_delivery.py',b'tests/test_community_preview_stopped_handoff.py',b'tests/test_community_preview_prepared_resume_delivery.py',b'deploy/community-preview/issue76-prepared-resume-r18.sh',b'.github/workflows/chatgpt-community-wechat-sp-offline.yml',b'docs/development/community-progress/README.md',b'docs/development/community-progress/status.json',b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md'}
+          handoff={b'scripts/community_preview_carrier_handoff_admission.py',
+                   b'scripts/community_preview_carrier_handoff_call.py',
+                   b'scripts/community_preview_carrier_handoff_entry.py',
+                   b'tests/test_community_preview_carrier_handoff_admission.py',
+                   b'tests/test_community_preview_carrier_handoff_call.py',
+                   b'tests/test_community_preview_carrier_handoff_entry.py',
+                   b'docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md',
+                   b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
+          handoff_sources={x for x in handoff if x.startswith((b'scripts/',b'tests/'))}
+          capture_test=b'tests/test_community_web_session_browser.py'
+          capture_paths={capture_test,b'.github/workflows/chatgpt-community-wechat-sp-offline.yml'}
+          capture_only=capture_test in rows and set(rows)<=capture_paths
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('capture_only='+str(capture_only).lower()+'\n')
+              f.write('resume_only='+str(set(rows)<=allowed).lower()+'\n')
+              f.write('handoff_only='+str(set(rows)<=handoff).lower()+'\n')
+              f.write('handoff_touched='+str(bool(set(rows)&handoff_sources)).lower()+'\n')
+          CHECK
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Reuse exact successful push Hosted evidence before preview
+        if: github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled && !inputs.preview_enabled
+        env:
+          PREVIEW_SOURCE_SHA: ${{ inputs.preview_source_sha }}
+          PREVIEW_TARGET: ${{ inputs.preview_target }}
+          PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+          IMAGE_SOURCE_SHA: ${{ inputs.backend_image_source_sha }}
+          IMAGE_EVIDENCE_RUN_ID: ${{ inputs.backend_image_evidence_run_id }}
+          IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
+          PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+        run: |
+          python - <<'EVIDENCE'
+          import datetime,json,os,re,time
+          from urllib.request import HTTPRedirectHandler,ProxyHandler,Request,build_opener
+          REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          BRANCH='feature/chatgpt-community-wechat-sp-offline-20261017'
+          WORKFLOW='.github/workflows/chatgpt-community-wechat-sp-offline.yml'
+          def validate(run,jobs,artifacts,head,evidence_id,current_id,now):
+              if (not re.fullmatch('[0-9a-f]{40}',head or '') or evidence_id==current_id
+                      or run.get('id')!=evidence_id or run.get('head_sha')!=head
+                      or run.get('head_branch')!=BRANCH or run.get('path')!=WORKFLOW
+                      or run.get('event')!='push' or run.get('status')!='completed' or run.get('conclusion')!='success'
+                      or run.get('repository',{}).get('full_name')!=REPO
+                      or run.get('head_repository',{}).get('full_name')!=REPO):
+                  raise ValueError('EXACT_SUCCESSFUL_PUSH_EVIDENCE_REQUIRED')
+              if jobs.get('total_count',101)>100 or artifacts.get('total_count',101)>100:
+                  raise ValueError('BOUNDED_EVIDENCE_REQUIRED')
+              accepted={'Complete Phase1 and Phase2 source regression',
+                        'Preview version and entry affected scope (no provider or host I/O)',
+                        'Preview entry evidence affected scope (offline only)',
+                        'UK read-only inspection candidate affected scope (no site execution)',
+                        'Original host OCR lifecycle and Mini feedback affected scope'}
+              tests=[j for j in jobs.get('jobs',[]) if j.get('name')=='test' and j.get('conclusion')=='success'
+                     and j.get('status')=='completed' and any(s.get('name') in accepted
+                     and s.get('conclusion')=='success' and s.get('status')=='completed' for s in j.get('steps',[]))]
+              if len(tests)!=1:raise ValueError('SUCCESSFUL_TEST_GATE_REQUIRED')
+              found=[]
+              for a in artifacts.get('artifacts',[]):
+                  if a.get('name')!='community-phase-integration-evidence':continue
+                  binding=a.get('workflow_run',{})
+                  expires=datetime.datetime.strptime(a.get('expires_at',''),'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()
+                  if (a.get('expired') is not False or expires<=now or not 0<a.get('size_in_bytes',0)<=20000000
+                          or not re.fullmatch('sha256:[0-9a-f]{64}',a.get('digest',''))
+                          or binding.get('id')!=evidence_id or binding.get('head_sha')!=head
+                          or binding.get('head_branch')!=BRANCH
+                          or binding.get('repository_id')!=1413132159 or binding.get('head_repository_id')!=1413132159):
+                      raise ValueError('UNEXPIRED_EXACT_SOURCE_ARTIFACT_REQUIRED')
+                  found.append({'id':a['id'],'digest':a['digest'],'expires_at':a['expires_at']})
+              if len(found)!=1:raise ValueError('ONE_SOURCE_ARTIFACT_REQUIRED')
+              return dict(status='EXACT_SHA_HOSTED_TEST_EVIDENCE_REUSED',head_sha=head,
+                          run_id=evidence_id,test_job_id=tests[0]['id'],artifact=found[0],
+                          artifact_bytes_reverified=False,source_package='REBUILD_FROM_CURRENT_EXACT_CHECKOUT')
+          def validate_context(env):
+              image=env.get('IMAGE_BUILD_ENABLED','false');preview=env.get('PREVIEW_ENABLED','false')
+              if image not in ('true','false') or preview not in ('true','false') or (image=='true')==(preview=='true'):
+                  raise ValueError('ONE_EXPLICIT_HOSTED_OR_PREVIEW_MODE_REQUIRED')
+              head=env.get('GITHUB_SHA','')
+              text=env.get('IMAGE_EVIDENCE_RUN_ID','') if image=='true' else env.get('PREVIEW_EVIDENCE_RUN_ID','')
+              source=env.get('IMAGE_SOURCE_SHA','') if image=='true' else env.get('PREVIEW_SOURCE_SHA','')
+              if (env.get('GITHUB_REPOSITORY')!=REPO or env.get('GITHUB_REF')!='refs/heads/'+BRANCH
+                      or not re.fullmatch('[0-9a-f]{40}',head) or source!=head
+                      or (image!='true' and env.get('PREVIEW_TARGET')!='uk-path-candidate')
+                      or not re.fullmatch('[1-9][0-9]{0,19}',text)):
+                  raise ValueError('EXACT_PREVIEW_CONTEXT_REQUIRED')
+              return head,text
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          def read(path):
+              url='https://api.github.com/repos/'+REPO+path
+              with build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,headers={'Accept':'application/vnd.github+json','User-Agent':'community-preview-evidence'}),timeout=10) as response:
+                  if response.status!=200 or response.geturl()!=url:raise ValueError('EXACT_GITHUB_RESPONSE_REQUIRED')
+                  raw=response.read(1048577)
+                  if len(raw)>1048576:raise ValueError('EVIDENCE_SIZE_LIMIT')
+                  return json.loads(raw)
+          if __name__=='__main__':
+              try:
+                  head,text=validate_context(os.environ)
+                  evidence_id=int(text);prefix='/actions/runs/'+text
+                  receipt=validate(read(prefix),read(prefix+'/jobs?per_page=100'),read(prefix+'/artifacts?per_page=100'),
+                                   head,evidence_id,int(os.environ['GITHUB_RUN_ID']),time.time())
+                  with open('preview-hosted-evidence.json','x') as out:json.dump(receipt,out,sort_keys=True)
+                  print('EXACT_SHA_HOSTED_TEST_EVIDENCE_REUSED')
+              except Exception:
+                  raise SystemExit('HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW')
+          EVIDENCE
+      - name: Admit fixed 06053 product using original exact push evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        env:
+          PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
+          PREVIEW_SOURCE_SHA: 06053b6a16a8e6efcd324dffe06612b9384aaaf1
+          PREVIEW_TARGET: ${{ inputs.preview_target }}
+          PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+          PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+          IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -I -B scripts/community_preview_fixed_product.py admit
+      - name: Fixed product preview control affected scope (offline only)
+        if: (github.event_name == 'workflow_dispatch' && inputs.preview_enabled) || contains(github.event.head_commit.message, '[fixed-product-preview-scope]')
+        env:
+          COMMUNITY_FIXED_PRODUCT_TEST_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'fixed-product-source.zip' || '' }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.:tests python -B -m unittest test_community_preview_fixed_product test_preview_endpoint_contract -v 2>&1 | tee community-tests.log
+          node --test tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Preserve fixed verified product input for original domestic preview
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-fixed-06053-preview-input
+          path: |
+            fixed-product-source.zip
+            fixed-product-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Preview entry evidence affected scope (offline only)
+        if: contains(github.event.head_commit.message, '[preview-entry-scope]')
+        run: |
+          set -o pipefail
+          if [ "${{ contains(github.event.head_commit.message, '[image-build-entry-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_image_build_entry test_preview_endpoint_contract.HostedEvidence -v 2>&1 | tee community-tests.log
+          else
+            PYTHONPATH=tests python -B -m unittest test_preview_endpoint_contract.HostedEvidence -v 2>&1 | tee community-tests.log
+          fi
+      - name: Shared license draft dual-CAS host-only affected scope
+        if: contains(github.event.head_commit.message, '[shared-license-cas-scope]')
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          if [ "${{ contains(github.event.head_commit.message, '[shared-source-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_shared_source -v 2>&1 | tee -a community-tests.log
+          else
+            PYTHONPATH=.:tests python -B -m unittest test_community_shared_license_cas test_community_mini_merchant.SharedProfileAndSigning -v 2>&1 | tee -a community-tests.log
+          fi
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Original host OCR lifecycle and Mini feedback affected scope
+        if: contains(github.event.head_commit.message, '[community-ocr-host-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
+          python -m pip install fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 cryptography==50.0.2 playwright==1.55.0
+          if [ "${{ contains(github.event.head_commit.message, '[shared-ocr-composition-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_shared_composition test_community_ocr_bridge.OcrComposition test_community_ocr_host test_community_ui_preview.SourceBoundary -v 2>&1 | tee community-tests.log
+            node --test clients/community-mini/ocr-host-ui.test.cjs 2>&1 | tee -a community-tests.log
+          else
+            PYTHONPATH=.:tests python -B -m unittest test_community_ocr_host test_community_ui_preview.SourceBoundary test_community_platform_host.FormalHost.test_serve_uses_exact_proxy_arguments_and_always_closes test_community_platform_host.FormalHost.test_host_lock_cleanup_on_failed_composition_allows_explicit_reopen -v 2>&1 | tee community-tests.log
+            node --test clients/community-mini/ocr-host-ui.test.cjs clients/community-mini/session.test.cjs clients/community-mini/merchant-pages.test.cjs 2>&1 | tee -a community-tests.log
+          fi
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Community OCR source HTTP encrypted-store composition (synthetic only)
+        if: contains(github.event.head_commit.message, '[community-ocr-scope]')
+        run: |
+          set -o pipefail
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
+          python -m pip install fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 cryptography==50.0.2
+          PYTHONPATH=.:tests python -B -m unittest test_community_ocr_bridge.OcrComposition test_community_mini_merchant.OcrSourceBoundary test_community_merchant_onboarding -v 2>&1 | tee community-tests.log
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Issue76 exact source AST and syntax preflight
+        if: steps.scope.outputs.handoff_touched == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py scripts/community_preview_carrier_handoff_entry.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_entry.py 2>&1 | tee community-parse.log
+          sha256sum scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py | tee -a community-parse.log
+          python -B - <<'PY' 2>&1 | tee -a community-parse.log
+          import ast
+          from pathlib import Path
+          for name in ('scripts/community_preview_carrier_handoff_admission.py',
+                       'scripts/community_preview_carrier_handoff_call.py',
+                       'scripts/community_preview_carrier_handoff_entry.py',
+                       'tests/test_community_preview_carrier_handoff_admission.py',
+                       'tests/test_community_preview_carrier_handoff_call.py',
+                       'tests/test_community_preview_carrier_handoff_entry.py'):
+              raw=Path(name).read_bytes()
+              ast.parse(raw.decode('utf-8'),filename=name)
+              print('AST_PARSE_PASS',name,'bytes='+str(len(raw)))
+          PY
+      - name: Retrieve and verify immutable nested 1d and 005c carrier fixtures
+        if: steps.scope.outputs.handoff_touched == 'true' || (steps.scope.outputs.resume_only == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')) || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-stage-a-scope]') || contains(github.event.head_commit.message, '[preview-post-receipt-scope]') || contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') || (!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          : > community-tests.log
+          python3 - <<'FIXTURE' 2>&1 | tee -a community-tests.log
+          import hashlib,io,json,os,urllib.request,urllib.error,zipfile
+          from pathlib import Path
+          from scripts.community_preview_carrier_handoff_admission import github_artifact_opener
+          repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+          specs=[
+            ('old',12572781194,'a9b034ce85734cf26f4b18058f6840f6434aac0c31322b0664fda7e78eb68956',
+             '5107d2f762d018d067c22ca034e41e0e5ee9b8e529cfdfc0a3dbb80a2cc6f4a4',
+             'e09b7ab9432350cafac0c07e76966d1197056eee02d802c0a2b3be7460c1ac1a'),
+            ('new',12586026477,'f529ca439a9decc95efa4cf4f93391e0ba93719565ad952629d752ef7640ca34',
+             '2418f4421262f509cd84c1c8465c918ea8bbd0c2ee1101d5f692176225bcd7ff',
+             'd1d3c92b4059c7e449ed38045be9c1a5bb52ce1795365f01b41d7bd0028019fd')]
+          root=Path(os.environ['RUNNER_TEMP'])/'issue76-carrier-fixtures';root.mkdir(mode=0o700)
+          token=os.environ['GH_TOKEN']
+          prefix='deploy/community-preview/stopped-handoff-v1-delivery/'
+          for label,aid,outer_sha,archive_sha,manifest_sha in specs:
+              url='https://api.github.com/repos/'+repo+'/actions/artifacts/'+str(aid)+'/zip'
+              req=urllib.request.Request(url,headers={'Authorization':'Bearer '+token,
+                  'Accept':'application/vnd.github+json','User-Agent':'issue76-fixture-verifier'})
+              try:
+                  with github_artifact_opener().open(req,timeout=30) as response:
+                      body=response.read(2*1024*1024+1)
+              except urllib.error.HTTPError as error:
+                  raise SystemExit('ARTIFACT_DOWNLOAD_HTTP_'+str(error.code))
+              except Exception as error:
+                  raise SystemExit('ARTIFACT_DOWNLOAD_FAILED_'+type(error).__name__)
+              if len(body)>2*1024*1024 or hashlib.sha256(body).hexdigest()!=outer_sha:
+                  raise SystemExit(label+'_OUTER_ARTIFACT_SHA_MISMATCH')
+              with zipfile.ZipFile(io.BytesIO(body)) as outer:
+                  names=outer.namelist()
+                  ap=prefix+'control-stopped-v1.zip';mp=prefix+'manifest.json'
+                  if names.count(ap)!=1 or names.count(mp)!=1:raise SystemExit(label+'_FIXTURE_MEMBER_SET')
+                  archive=outer.read(ap);manifest=outer.read(mp)
+              if hashlib.sha256(archive).hexdigest()!=archive_sha or hashlib.sha256(manifest).hexdigest()!=manifest_sha:
+                  raise SystemExit(label+'_INNER_SHA_MISMATCH')
+              with zipfile.ZipFile(io.BytesIO(archive)) as nested:
+                  if 'manifest.json' not in nested.namelist() or nested.read('manifest.json')!=manifest:
+                      raise SystemExit(label+'_INNER_MANIFEST_MISMATCH')
+              apath=root/(label+'-control-stopped-v1.zip');mpath=root/(label+'-manifest.json')
+              apath.write_bytes(archive);mpath.write_bytes(manifest)
+              with open(os.environ['GITHUB_ENV'],'a') as env:
+                  env.write('HANDOFF_'+label.upper()+'_ARCHIVE='+str(apath)+'\n')
+                  env.write('HANDOFF_'+label.upper()+'_MANIFEST='+str(mpath)+'\n')
+              print(label.upper()+'_OUTER_SHA='+outer_sha+' INNER_ARCHIVE_SHA='+archive_sha+' MANIFEST_SHA='+manifest_sha)
+          FIXTURE
+      - name: Verify original historical inputs for source tests
+        if: steps.scope.outputs.handoff_touched == 'true' || (steps.scope.outputs.resume_only == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')) || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-stage-a-scope]') || contains(github.event.head_commit.message, '[preview-post-receipt-scope]') || contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') || (!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]'))
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 1d639347f404f952998b3b414a95e48f66571c3c 3b6be4aa1ff06d088fe26f44f08b9a505c5b5513 4a0d8e2f48077b0254966e0e54947e910c56596f 2853904258ca036a4abcdc2c829278634c45370b a93c4853b7bbb2a249d49b309c27b98c4082055d
+          python3 -B tests/test_community_historical_fixtures.py --verify-inputs
+      - name: Issue76 exact historical container inventory tests
+        if: steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]')
+        run: |
+          set -euo pipefail
+          python -B -m py_compile scripts/community_preview_update_composition.py tests/test_community_preview_stopped_handoff.py 2>&1 | tee historical-container-tests.log
+          PYTHONPATH=.:tests python -B -m unittest test_community_preview_stopped_handoff.ExactHistoricalInitializeInventoryTests test_community_preview_stopped_handoff.CBoundaryReasonClassification -v 2>&1 | tee -a historical-container-tests.log
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p=Path('historical-container-tests.log')
+          print('HISTORICAL_CONTAINER_TEST_LOG_BYTES='+str(p.stat().st_size))
+          print('HISTORICAL_CONTAINER_TEST_LOG_SHA256='+hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+      - name: Issue76 carrier handoff isolated candidate tests
+        if: steps.scope.outputs.handoff_only == 'true' && steps.scope.outputs.handoff_touched == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c 2>&1 | tee -a community-tests.log
+          git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum 2>&1 | tee -a community-tests.log | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
+          python -B -m py_compile scripts/community_preview_carrier_handoff_admission.py scripts/community_preview_carrier_handoff_call.py scripts/community_preview_carrier_handoff_entry.py tests/test_community_preview_carrier_handoff_admission.py tests/test_community_preview_carrier_handoff_call.py tests/test_community_preview_carrier_handoff_entry.py 2>&1 | tee -a community-tests.log
+          PYTHONPATH=. python -B -m unittest tests.test_community_preview_carrier_handoff_admission tests.test_community_preview_carrier_handoff_call tests.test_community_preview_carrier_handoff_entry -v 2>&1 | tee -a community-tests.log
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: UK read-only inspection candidate affected scope (no site execution)
+        if: (steps.scope.outputs.resume_only == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')) || contains(github.event.head_commit.message, '[preview-inspection-scope]') || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-site-steps-scope]') || contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]')
+        run: |
+          set -euo pipefail
+          if [ "${{ (steps.scope.outputs.resume_only == 'true' && !contains(github.event.head_commit.message, '[preview-historical-container-scope]')) || contains(github.event.head_commit.message, '[preview-b-resume-scope]') }}" = true ]; then
+            git fetch --no-tags origin 1d639347f404f952998b3b414a95e48f66571c3c
+            git show 1d639347f404f952998b3b414a95e48f66571c3c:scripts/community_preview_site_prepare.py | sha256sum | grep -Fx '48357b6ff333d4cf727b203140d7b427ec8eeb84ea3d07c00a8a443f5430ed55  -'
+            PYTHONPATH=. python -B scripts/community_preview_bc_build.py
+            cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
+            python -B -m py_compile scripts/community_preview_stopped_handoff.py scripts/community_preview_update_checkpoint.py scripts/community_preview_update_composition.py scripts/community_preview_bc_build.py scripts/community_preview_prepared_resume_delivery.py tests/test_community_preview_stopped_handoff.py tests/test_community_preview_prepared_resume_delivery.py
+            sh -n deploy/community-preview/issue76-prepared-resume-r18.sh
+            PYTHONPATH=.:tests python -B -m unittest \
+              tests.test_community_preview_prepared_resume_delivery \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_accepts_distinct_historical_and_new_carrier_sha \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_permit_appearing_after_admission_is_hold \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_prior_permit_changed_between_reads_rejected \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_reacquires_lock_preserves_old_evidence_and_finishes_b \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_requires_new_lock_and_rejects_concurrent_executor \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_rejects_duplicate_record_and_crash_preserves_it \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_rejects_old_identity_or_new_authority_mismatch \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_rejects_any_snapshot_clone_proof_or_c_journal_state \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_preserves_old_stage_permit_and_uses_new_excl_path \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_old_expired_approval_is_never_reused \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_c_plan_must_bind_new_real_plan \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_rejects_incomplete_or_inconsistent_prior_stage_permit \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_continuously_rechecks_old_reference_and_absence \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_probe_name_conflict_or_unknown_holds_before_first_write \
+              test_community_preview_stopped_handoff.WholeEntry.test_partial_resume_known_failure_reopens_new_lock_session_and_recovers_bound_resume_evidence \
+              test_community_preview_stopped_handoff.WholeEntry.test_builder_exposes_resume_wrapper_without_changing_default_acceptance \
+              test_community_preview_stopped_handoff.WholeEntry.test_actual_b_classes_same_lease_to_c_success_no_old_stop_start \
+              test_community_preview_stopped_handoff.WholeEntry.test_default_off_and_no_forged_b_done \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_tty_mismatch_then_same_plan_resume_once \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_prints_full_plan_and_waits_for_distinct_fresh_approval \
+              test_community_preview_stopped_handoff.WholeEntry.test_real_c_resume_known_failure_reopens_and_recovers_with_new_approval \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_wrong_plan_or_expired_approval_holds_zero_mutation \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_observed_at_drift_reuses_persisted_approved_plan \
+              test_community_preview_stopped_handoff.WholeEntry.test_expired_plan_and_approval_create_one_preserved_successor \
+              test_community_preview_stopped_handoff.WholeEntry.test_expired_successor_keeps_historical_carrier_and_binds_current_manifest \
+              test_community_preview_stopped_handoff.WholeEntry.test_expired_successor_rejects_execution_trace_and_stable_drift \
+              test_community_preview_stopped_handoff.WholeEntry.test_successor_predecessor_replacement_or_second_expiry_holds \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_missing_b_evidence_or_c_sideeffect_holds \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_duplicate_call_after_commit_is_rejected \
+              test_community_preview_stopped_handoff.WholeEntry.test_known_failure_recovery_uses_new_c_resume_approval_provenance \
+              test_community_preview_stopped_handoff.WholeEntry.test_successor_dynamic_approval_survives_tty_known_failure_reopen_recovery \
+              test_community_preview_stopped_handoff.WholeEntry.test_recovery_rejects_unbound_dynamic_approval_path_before_consume \
+              test_community_preview_stopped_handoff.WholeEntry.test_independent_correction_reissue_real_pty_execute_and_recovery \
+              test_community_preview_stopped_handoff.WholeEntry.test_prepared_reopen_cli_dispatches_only_exact_reopen_mode \
+              test_community_preview_stopped_handoff.WholeEntry.test_update_prepared_reopen_requires_exact_sequence_one_then_uses_stopped_path \
+              test_community_preview_stopped_handoff.WholeEntry.test_persisted_prepared_reopens_same_attempt_with_separate_exact_authority \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_cli_dispatches_exact_mode_without_b_or_recover \
+              test_community_preview_stopped_handoff.WholeEntry.test_c_preconfirmation_c_approval_revoked_during_tty_wait_holds_before_proof \
+              test_community_preview_stopped_handoff.WholeEntry.test_real_pty_production_ack_prompt_then_input_eof_timeout \
+              test_community_preview_stopped_handoff.ExactHistoricalInitializeInventoryTests \
+              tests.test_community_preview_carrier_handoff_admission \
+              tests.test_community_preview_carrier_handoff_call \
+              tests.test_community_preview_carrier_handoff_entry \
+              -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') }}" = true ]; then
+            PYTHONPATH=. python -B scripts/community_preview_bc_build.py
+            python -B -m py_compile scripts/community_preview_bc_loader.py scripts/community_preview_stopped_handoff.py scripts/community_preview_bc_build.py scripts/community_preview_bc_install.py
+            sh -n deploy/community-preview/install-stopped-v1.sh
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_bc_install test_community_preview_stopped_handoff test_community_preview_release_plan test_community_preview_update_checkpoint test_community_preview_update_composition -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-stage-a-scope]') }}" = true ]; then
+            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_stage_a -v 2>&1 | tee community-tests.log
+            bash -n deploy/community-preview/stage-a-owner-call.sh
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-site-steps-scope]') }}" = true ]; then
+            # Reuse the already frozen A carrier. This scope validates the V2
+            # site-preparation source only; rebuilding frozen v1 is intentionally denied.
+            PYTHONPATH=.:tests python -B -m unittest \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_python36_compat_uses_verified_proc_fd_path \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_enumeration_error_is_bounded_hold \
+              test_community_preview_preparation_steps.PreparationSteps.test_bounded_names_rejects_proc_fd_identity_mismatch \
+              test_community_preview_preparation_steps.PreparationSteps.test_tree_denies_links_specials_public_files_and_budget \
+              test_community_preview_preparation_steps.PreparationSteps.test_snapshot_full_private_dataset_readback_and_no_live_changes \
+              test_community_preview_preparation_steps.PreparationSteps.test_clones_real_copies_synthetic_semantics_no_active_restore \
+              -v 2>&1 | tee community-tests.log
+            bash -n deploy/community-preview/prepare-site.sh
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-https-acceptance-scope]') }}" = true ]; then
+            python -B scripts/community_preview_preupdate_bundle.py
+            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_https_acceptance test_community_preview_update_composition -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-post-receipt-scope]') }}" = true ]; then
+            python -B scripts/community_preview_preupdate_bundle.py
+            PYTHONPATH=. python -B scripts/community_preview_control_carrier.py
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_site_prepare test_community_preview_release_plan -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_preupdate_observe -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-update-composition-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_update_composition -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-update-checkpoint-scope]') }}" = true ]; then
+            PYTHONPATH=.:tests python -B -m unittest test_community_preview_update_checkpoint test_community_preview_release_plan -v 2>&1 | tee community-tests.log
+          elif [ "${{ contains(github.event.head_commit.message, '[preview-release-plan-scope]') }}" = true ]; then
+            PYTHONPATH=. python -B -m unittest discover -s tests -p 'test_community_preview_release_plan.py' -v 2>&1 | tee community-tests.log
+          else
+            python -B -m unittest discover -s tests -p 'test_community_preview_version_inspect.py' -v 2>&1 | tee community-tests.log
+            bash -n deploy/community-preview/inspect-version-readonly.sh
+          fi
+          python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Install exact browser test runner
+        if:  "!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]')"
+        run: |
+          git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
+          python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32
+          python -m playwright install --with-deps chromium
+      - name: Complete Phase1 and Phase2 source regression
+        if: "(!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]')) && !(steps.scope.outputs.capture_only == 'true' && contains(github.event.head_commit.message, '[web-session-browser-scope]'))"
+        run: |
+          set -o pipefail
+          python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
+          python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
+          node --test clients/community-mini/*.test.cjs scripts/community_mini_key.test.cjs tests/community_mini_development_operation.test.cjs
+          node --test demos/community-local-e2e/*.test.mjs
+          node --test demos/community-payment/demo.test.mjs
+          node --test demos/community-admin/admin.test.mjs
+      - name: Preview version and entry affected scope (no provider or host I/O)
+        if: contains(github.event.head_commit.message, '[preview-version-scope]')
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_preview_readiness.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_health_dependencies.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_preview_endpoint_contract.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'preview_preparation_test.py' -v 2>&1 | tee -a community-tests.log
+          node --test tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
+      - name: Preview endpoint affected scope (unchanged 1821 results reused)
+        if: contains(github.event.head_commit.message, '[preview-endpoint-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_preview_endpoint_contract.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'preview_preparation_test.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_preview_readiness.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_preview_candidate.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+          node --test clients/community-mini/session.test.cjs clients/community-mini/customer-pages.test.cjs tests/preview_endpoint_contract.test.cjs 2>&1 | tee -a community-tests.log
+      - name: Protected existing host composition affected scope
+        if: contains(github.event.head_commit.message, '[host-config-scope]')
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_mini_config_file.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_host_config.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_application.py' -v 2>&1 | tee -a community-tests.log
+      - name: Community fixed action candidate affected scope
+        if: contains(github.event.head_commit.message, '[community-connection-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -B -m unittest discover -s tests -p 'test_community_connection_collect.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Original persistent runtime affected scope
+        if: contains(github.event.head_commit.message, '[persistent-runtime-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_persistent_runtime.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Verify exact original browser proxy routes with real Nginx
+        if: contains(github.event.head_commit.message, '[platform-host-scope]')
+        run: |
+          set -o pipefail
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y nginx
+          python -B -m unittest discover -s tests -p 'test_community_web_entries_nginx.py' -v 2>&1 | tee -a community-tests.log
+      - name: Formal original platform host affected scope
+        if: contains(github.event.head_commit.message, '[platform-host-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_platform_host.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_proxy.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_entries.py' -v 2>&1 | tee -a community-tests.log
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          python -B -m unittest discover -s tests -p 'test_community_web_entries_browser.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_browser.py' -v 2>&1 | tee -a community-tests.log
+          node --test clients/community-mini/customer-pages.test.cjs clients/community-mini/checkout-community.test.cjs clients/community-mini/project-lifecycle.test.cjs 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Native WeChat consumer registration affected scope
+        if: contains(github.event.head_commit.message, '[wechat-registration-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_wechat_registration.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_first_install.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_center_operations.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_center_identity.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_customer_profile_native.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_mini_application.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_platform_host.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Formal host source ZIP closure affected scope
+        if: contains(github.event.head_commit.message, '[formal-package-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee community-tests.log
+      - name: Original web session browser affected scope
+        if: contains(github.event.head_commit.message, '[web-session-browser-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install playwright==1.55.0 cryptography==50.0.2
+          python -m playwright install --with-deps chromium
+          python -B -m unittest discover -s tests -p 'test_community_web_session_browser.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Original session race and cookie coherence affected scope
+        if: contains(github.event.head_commit.message, '[web-session-race-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install playwright==1.55.0 cryptography==50.0.2
+          python -m playwright install --with-deps chromium
+          node tests/community_web_session_races.cjs demos/community-stage/web-session.js 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_browser.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_entries_browser.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Fixed community-only upgrade state machine affected scope
+        if: contains(github.event.head_commit.message, '[preview-upgrade-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install cryptography==50.0.2
+          python -B -m unittest discover -s tests -p 'test_community_preview_upgrade.py' -v 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Original session same-context tabs and lifecycle affected scope
+        if: contains(github.event.head_commit.message, '[web-session-tabs-scope]')
+        env:
+          NODE_OPTIONS: --test-reporter=tap
+        run: |
+          set -o pipefail
+          python -m pip install playwright==1.55.0 cryptography==50.0.2
+          python -m playwright install --with-deps chromium
+          node tests/community_web_session_races.cjs demos/community-stage/web-session.js 2>&1 | tee community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_coordination.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_tabs.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_web_session_browser.py' -v 2>&1 | tee -a community-tests.log
+          python -B -m unittest discover -s tests -p 'test_community_stage_package.py' -v 2>&1 | tee -a community-tests.log
+      - name: Build deterministic offline source package
+        id: source_package
+        run: |
+          python scripts/community_stage_package.py --output community-stage-source.zip
+          python - <<'DIGEST'
+          import hashlib,os
+          from pathlib import Path
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('sha256='+hashlib.sha256(Path('community-stage-source.zip').read_bytes()).hexdigest()+'\n')
+          DIGEST
+      - name: Save exact-source test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: |
+            community-tests.log
+            stage5-tests.log
+            preview-hosted-evidence.json
+            community-stage-source.zip
+            community-admin-browser-evidence/
+          retention-days: 14
+      - name: Preserve complete UK read-only candidate for root review
+        if: contains(github.event.head_commit.message, '[preview-inspection-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-readonly-version-candidate
+          path: |
+            scripts/community_preview_version_inspect.py
+            deploy/community-preview/inspect-version-readonly.sh
+            deploy/community-preview/readonly-version-manifest.json
+            tests/test_community_preview_version_inspect.py
+            docs/development/COMMUNITY_PREVIEW_VERSION_READONLY_REVIEW_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve five-object readonly candidate for root review
+        if: contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-preupdate-five-readonly-candidate
+          path: |
+            scripts/community_preview_preupdate_observe.py
+            scripts/community_preview_preupdate_bundle.py
+            deploy/community-preview/preupdate-five-readonly.py
+            deploy/community-preview/preupdate-five-readonly.sh
+            deploy/community-preview/preupdate-five-readonly-manifest.json
+            tests/test_community_preview_preupdate_observe.py
+            docs/development/COMMUNITY_PREUPDATE_FIVE_READONLY_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve post-receipt correction reasons and proposed root carrier
+        if: contains(github.event.head_commit.message, '[preview-post-receipt-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-post-receipt-preparation
+          path: |
+            scripts/community_preview_three_diagnostics.py
+            scripts/community_preview_root_loader.py
+            scripts/community_preview_control_carrier.py
+            deploy/community-preview/three-reasons-readonly.py
+            deploy/community-preview/three-reasons-readonly.sh
+            deploy/community-preview/control-oci2330-v1.zip
+            deploy/community-preview/control-oci2330-v1-manifest.json
+            deploy/community-preview/current-source-correction.json
+            deploy/community-preview/post-receipt-preparation-manifest.json
+            tests/test_community_preview_site_prepare.py
+            docs/development/COMMUNITY_POST_RECEIPT_PREPARATION_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve exact HTTPS acceptance contract for root review
+        if: contains(github.event.head_commit.message, '[preview-https-acceptance-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-https-acceptance-contract
+          path: |
+            scripts/community_preview_update_composition.py
+            tests/test_community_preview_https_acceptance.py
+            tests/test_community_preview_update_composition.py
+            deploy/community-preview/control-oci2330-v1.zip
+            deploy/community-preview/control-oci2330-v1-manifest.json
+            deploy/community-preview/https-acceptance-contract.json
+            docs/development/COMMUNITY_HTTPS_ACCEPTANCE_CONTRACT_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve original site preparation stages for root review
+        if: contains(github.event.head_commit.message, '[preview-site-steps-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-site-preparation-stages
+          path: |
+            scripts/community_preview_site_prepare.py
+            deploy/community-preview/prepare-site.sh
+            deploy/community-preview/site-preparation-manifest.json
+            deploy/community-preview/control-oci2330-v1.zip
+            deploy/community-preview/control-oci2330-v1-manifest.json
+            tests/test_community_preview_preparation_steps.py
+            docs/development/COMMUNITY_SITE_PREPARATION_STEPS_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve complete stage A input and invocation review
+        if: contains(github.event.head_commit.message, '[preview-stage-a-scope]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-uk-stage-a-complete-review
+          path: |
+            scripts/community_preview_stage_a.py
+            scripts/community_preview_stage_a_bundle.py
+            tests/test_community_preview_stage_a.py
+            deploy/community-preview/stage-a-owner-call.sh
+            deploy/community-preview/stage-a-delivery.json
+            docs/development/COMMUNITY_STAGE_A_COMPLETE_20261024.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve Issue76 carrier handoff isolated test evidence
+        if: always() && steps.scope.outputs.handoff_touched == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-carrier-handoff-isolated-evidence
+          path: |
+            community-parse.log
+            community-tests.log
+            scripts/community_preview_carrier_handoff_admission.py
+            scripts/community_preview_carrier_handoff_call.py
+            scripts/community_preview_carrier_handoff_entry.py
+            tests/test_community_preview_carrier_handoff_admission.py
+            tests/test_community_preview_carrier_handoff_call.py
+            tests/test_community_preview_carrier_handoff_entry.py
+            docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build stopped-handoff source for historical inventory candidate
+        if: contains(github.event.head_commit.message, '[preview-historical-container-scope]')
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python -B scripts/community_preview_bc_build.py
+          cat deploy/community-preview/stopped-handoff-v1-delivery/delivery.json
+      - name: Build exact post-B C-resume delivery index
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
+        run: |
+          set -euo pipefail
+          python - <<'INDEX'
+          import hashlib,json,os,shutil,subprocess
+          from pathlib import Path
+          source=Path('deploy/community-preview/stopped-handoff-v1-delivery')
+          dest=Path('post-b-c-resume-delivery')
+          dest.mkdir(mode=0o700)
+          report=json.loads((source/'delivery.json').read_text())
+          head=os.environ['GITHUB_SHA']
+          assert report['candidate_commit']==head, 'CANDIDATE_COMMIT_MISMATCH'
+          # Do not ship owner-bc or resume-b-partial wrappers in this post-B
+          # candidate; only the C continuation wrapper is applicable.
+          names=('control-stopped-v1.zip','manifest.json',
+                 'resume-c-before-confirmation.sh','delivery.json')
+          for name in names:shutil.copyfile(source/name,dest/name)
+          shutil.copyfile(source/'control-stopped-v1.zip',dest/'control-stopped-v1-post-b-candidate.zip')
+          shipped_sources=(
+              'scripts/community_preview_carrier_handoff_admission.py',
+              'scripts/community_preview_carrier_handoff_call.py',
+              'scripts/community_preview_carrier_handoff_entry.py',
+              'tests/test_community_preview_carrier_handoff_admission.py',
+              'tests/test_community_preview_carrier_handoff_entry.py')
+          for name in shipped_sources:
+              target=dest/Path(name).name
+              shutil.copyfile(name,target)
+          required=[
+            dest/'control-stopped-v1.zip',dest/'manifest.json',
+            dest/'resume-c-before-confirmation.sh',dest/'delivery.json',
+            dest/'control-stopped-v1-post-b-candidate.zip',
+            dest/'community_preview_carrier_handoff_admission.py',
+            dest/'community_preview_carrier_handoff_call.py',
+            dest/'community_preview_carrier_handoff_entry.py',
+            dest/'test_community_preview_carrier_handoff_admission.py',
+            dest/'test_community_preview_carrier_handoff_entry.py',
+            Path('scripts/community_preview_stopped_handoff.py'),
+            Path('scripts/community_preview_update_composition.py'),
+            Path('scripts/community_preview_update_checkpoint.py'),
+            Path('scripts/community_preview_release_plan.py'),
+            Path('scripts/community_preview_bc_build.py'),
+            Path('tests/test_community_preview_stopped_handoff.py'),
+            Path('scripts/community_preview_prepared_resume_delivery.py'),
+            Path('tests/test_community_preview_prepared_resume_delivery.py'),
+            Path('deploy/community-preview/issue76-prepared-resume-r18.sh'),
+            Path('docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md')]
+          files={}
+          for path in required:
+              raw=path.read_bytes()
+              files[str(path)]=dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
+          index=dict(format=1,purpose='POST_B_C_RESUME_SOURCE_CANDIDATE_NOT_INSTALLED',
+              commit=head,tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+              carrier_archive_sha256=hashlib.sha256((dest/'control-stopped-v1.zip').read_bytes()).hexdigest(),
+              carrier_manifest_sha256=hashlib.sha256((dest/'manifest.json').read_bytes()).hexdigest(),
+              install_authorized=False,site_executed=False,bc_executed=False,files=files)
+          index_path=dest/'post-b-c-resume-delivery-index.json'
+          index_path.write_text(json.dumps(index,sort_keys=True,indent=2)+'\n')
+          indexed=set(index['files'])
+          shipped={str(p) for p in dest.iterdir() if p.name!='post-b-c-resume-delivery-index.json'}
+          indexed_shipped={name for name in indexed if name.startswith(str(dest)+'/')}
+          assert indexed_shipped==shipped, 'DELIVERY_INDEX_SHIPPED_SET_MISMATCH'
+          for name,meta in index['files'].items():
+              raw=Path(name).read_bytes()
+              assert len(raw)==meta['bytes'] and hashlib.sha256(raw).hexdigest()==meta['sha256'], 'DELIVERY_INDEX_BYTE_MISMATCH:'+name
+          for name in shipped:
+              assert name in index['files'], 'SHIPPED_OBJECT_NOT_INDEXED:'+name
+          print(json.dumps(index,sort_keys=True))
+          INDEX
+      - name: Preserve exact post-B C-resume source candidate
+        if: success() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-post-b-c-resume-source
+          path: |
+            post-b-c-resume-delivery/
+            scripts/community_preview_stopped_handoff.py
+            scripts/community_preview_update_composition.py
+            scripts/community_preview_update_checkpoint.py
+            scripts/community_preview_release_plan.py
+            scripts/community_preview_bc_build.py
+            scripts/community_preview_prepared_resume_delivery.py
+            tests/test_community_preview_stopped_handoff.py
+            tests/test_community_preview_prepared_resume_delivery.py
+            deploy/community-preview/issue76-prepared-resume-r18.sh
+            docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve stopped handoff proposal evidence (no site execution)
+        if: always() && (steps.scope.outputs.resume_only == 'true' || contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') || contains(github.event.head_commit.message, '[preview-b-resume-scope]') || contains(github.event.head_commit.message, '[preview-historical-container-scope]'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-stopped-handoff-v1
+          path: |
+            deploy/community-preview/stopped-handoff-v1-delivery/
+            scripts/community_preview_stopped_handoff.py
+            scripts/community_preview_bc_loader.py
+            scripts/community_preview_bc_build.py
+            scripts/community_preview_bc_install.py
+            deploy/community-preview/install-stopped-v1.sh
+            tests/test_community_preview_stopped_handoff.py
+            tests/test_community_preview_bc_install.py
+            docs/development/COMMUNITY_STOPPED_HANDOFF_V1.md
+          if-no-files-found: error
+          retention-days: 14
+
+  community-backend-image:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]')) || (github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled == true && inputs.preview_enabled != true && inputs.backend_image_source_sha == github.sha && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: source-evidence
+      - name: Verify actual same-run ZIP and prepare empty build context
+        env:
+          EXPECTED_SOURCE_ZIP_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        run: |
+          python - <<'VERIFY'
+          import hashlib,json,os,stat,zipfile
+          from pathlib import Path,PurePosixPath
+          package=Path('source-evidence/community-stage-source.zip')
+          assert 0<package.stat().st_size<=30000000
+          assert hashlib.sha256(package.read_bytes()).hexdigest()==os.environ['EXPECTED_SOURCE_ZIP_SHA256']
+          root=Path('community-image-context');root.mkdir(mode=0o700)
+          with zipfile.ZipFile(package) as archive:
+              members=archive.infolist();assert len(members)<=2000
+              assert len({m.filename for m in members})==len(members)
+              assert sum(m.file_size for m in members)<=30000000
+              for m in members:
+                  p=PurePosixPath(m.filename)
+                  assert str(p)==m.filename and not p.is_absolute() and '..' not in p.parts
+                  assert not m.is_dir() and stat.S_ISREG(m.external_attr>>16) and m.file_size<=2000000
+              manifest=json.loads(archive.read('MANIFEST.json'))
+              assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+              assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+              for name,digest in manifest['files'].items():
+                  assert hashlib.sha256(archive.read(name)).hexdigest()==digest
+              archive.extractall(root)
+          VERIFY
+      - name: Read original successful PR139 offline OCR artifact (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12553737114'
+          run-id: '40076963020'
+          github-token: ${{ github.token }}
+          path: original-ocr-evidence
+      - name: Verify fixed original OCR bundle and preserve community vendor pins
+        run: |
+          python community-image-context/scripts/community_ocr_image_inputs.py original-ocr-evidence/xuanjun-ocr-linux-x86_64-cp311-cb28f605291cde6dc48a2d6431166211059dc595/xuanjun-ocr-linux-x86_64-cp311.tar.gz community-image-context/ocr-runtime
+      - name: Download only existing hash-pinned CPython 3.11 vendor wheels
+        run: |
+          python -m pip download --only-binary=:all: --dest community-image-context/wheels cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
+          cd community-image-context
+          python - <<'VERIFY'
+          import hashlib,runpy
+          from pathlib import Path
+          p=Path('scripts/pr122_customer_runtime.py')
+          assert hashlib.sha256(p.read_bytes()).hexdigest()=='3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959'
+          runpy.run_path(str(p))['wheel_files'](Path('wheels'))
+          print('ORIGINAL_VENDOR_WHEEL_HASHES=PASS')
+          VERIFY
+      - name: Build independent image and run original host compatibility in image
+        run: |
+          set -euo pipefail
+          docker build --network=none --target verify --build-arg SOURCE_SHA="$GITHUB_SHA" -f community-image-context/deploy/community-preview/Dockerfile community-image-context 2>&1 | tee community-image-tests.log
+          docker build --network=none --target release --build-arg SOURCE_SHA="$GITHUB_SHA" -t "community-preview:$GITHUB_SHA" -f community-image-context/deploy/community-preview/Dockerfile community-image-context
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 "community-preview:$GITHUB_SHA" --help
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$GITHUB_SHA" -B -c 'import os,sys,cryptography,cffi,pycparser; assert os.geteuid()==10001; assert os.getegid()==1008; assert sys.version_info[:2]==(3,11); assert (cryptography.__version__,cffi.__version__,pycparser.__version__)==("46.0.3","2.0.0","2.23"); print("NONROOT_READONLY_IMAGE_IMPORT=PASS")'
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$GITHUB_SHA" -B -m scripts.community_ocr_smoke
+          docker image inspect --format '{{.Id}}' "community-preview:$GITHUB_SHA" > community-image-id.txt
+          docker image save "community-preview:$GITHUB_SHA" | gzip -n > community-backend-image.tar.gz
+          sha256sum community-backend-image.tar.gz > community-backend-image.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: community-backend-image-candidate
+          path: |
+            community-image-tests.log
+            community-image-id.txt
+            community-backend-image.tar.gz
+            community-backend-image.sha256
+          retention-days: 3
+
+  mini-python-runtime:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-runtime]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Prepare the existing pinned customer runtime wheels without secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip download --only-binary=:all: --dest "$RUNNER_TEMP/community-mini-wheels" cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
+          python - <<'VERIFY'
+          import hashlib,os,runpy
+          from pathlib import Path
+          source=Path('scripts/pr122_customer_runtime.py').read_bytes()
+          assert hashlib.sha256(source).hexdigest()=='3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959'
+          runtime=runpy.run_path('scripts/pr122_customer_runtime.py')
+          runtime['wheel_files'](Path(os.environ['RUNNER_TEMP'])/'community-mini-wheels')
+          print('PINNED_EXISTING_RUNTIME_WHEELS=PASS')
+          VERIFY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-python-wheels
+          path: ${{ runner.temp }}/community-mini-wheels/
+          retention-days: 1
+
+  mini-runtime:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-runtime]')
+    needs: [test, mini-python-runtime]
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 6
+    steps:
+      - name: Verify existing non-root domestic test runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -u)" = 1002
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: ${{ runner.temp }}/community-mini-source-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify exact CI source digest and every manifest file without git checkout
+        env:
+          COMMUNITY_EXPECTED_SOURCE_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'SOURCE'
+          import hashlib,io,json,os,re,stat,zipfile
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          suffix=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          raw=(temp/('community-mini-source-input-'+suffix)/'community-stage-source.zip').read_bytes()
+          expected=os.environ['COMMUNITY_EXPECTED_SOURCE_SHA256']
+          assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
+          archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
+          assert len(items)<2000 and len(items)==len({i.filename for i in items})
+          assert sum(i.file_size for i in items)<10000000
+          manifest=json.loads(archive.read('MANIFEST.json'))
+          assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+          assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
+          assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          assert {'deploy/community-preview/prepare-mini.cjs',
+                  'deploy/community-preview/endpoint.cjs',
+                  'deploy/community-preview/endpoint-profiles.json',
+                  'scripts/community_preview_readiness.py',
+                  'clients/community-mini/session.js',
+                  'clients/community-mini/pages/home/index.wxml'}.issubset(manifest['files'])
+          files={}
+          for item in items:
+              path=Path(item.filename)
+              assert not path.is_absolute() and '..' not in path.parts and chr(92) not in item.filename
+              assert stat.S_ISREG(item.external_attr >> 16)
+              data=archive.read(item)
+              if item.filename!='MANIFEST.json':assert hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]
+              files[item.filename]=data
+          root=temp/('community-mini-source-'+suffix);root.mkdir(mode=0o700)
+          for name,data in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+              with path.open('xb') as out:out.write(data)
+              path.chmod(0o600)
+          print('EXACT_CI_SOURCE_MANIFEST=PASS; FILES='+str(len(manifest['files'])))
+          SOURCE
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-mini-python-wheels
+          path: ${{ runner.temp }}/community-mini-wheels
+      - name: Reuse original temporary runtime builder and run community integration
+        working-directory: ${{ runner.temp }}/community-mini-source-${{ github.run_id }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'VERIFY'
+          import hashlib
+          from pathlib import Path
+          assert hashlib.sha256(Path('scripts/pr122_customer_runtime.py').read_bytes()).hexdigest()=='3a483ed81eb595309665c3d2b5746e56a50016fb246617000eb326dc5ff2b959'
+          VERIFY
+          COMMUNITY_RUNTIME="$RUNNER_TEMP/community-mini-runtime-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          /usr/bin/python3 -I -B scripts/pr122_customer_runtime.py --wheels "$RUNNER_TEMP/community-mini-wheels" --output "$COMMUNITY_RUNTIME"
+          "$COMMUNITY_RUNTIME/venv/bin/python" -I -B - <<'CHECK'
+          import json,os,sys,unittest
+          from pathlib import Path
+          sys.path[:0]=[str(Path.cwd()),str(Path.cwd()/'tests')]
+          patterns=['test_community_mini*.py','test_community_center_operations.py', 'test_community_center_saas.py','test_community_merchant_onboarding.py','test_community_merchant_opening.py','test_community_onboarding_pagination.py','test_community_saas_provider_evidence.py','test_community_saas_reconciliation.py',
+                    'test_community_provider_notification_http.py','test_community_stage_recovery.py',
+                    'test_community_stage_roles.py', 'test_community_ad_report.py', 'test_community_workbench.py',
+                    'test_community_wechat_sp_verification.py','test_community_wechat_sp_readonly.py', 'test_community_wechat_sp_prepay.py']
+          suite=unittest.TestSuite()
+          for pattern in patterns:suite.addTests(unittest.defaultTestLoader.discover('tests',pattern=pattern))
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          report={'head':os.environ['GITHUB_SHA'],'host':os.uname().nodename,'uid':os.geteuid(),
+                  'tests':result.testsRun,'failures':len(result.failures),'errors':len(result.errors),
+                  'skipped':len(result.skipped),'production_install':'NOT_EXECUTED',
+                  'root_called':False,'provider_network':'SYNTHETIC_FIXTURES','money_operations':False,
+                  'status':'PASS' if result.wasSuccessful() and not result.skipped else 'FAIL'}
+          out=Path(os.environ['RUNNER_TEMP'])/('community-mini-runtime-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'])
+          (out/'COMMUNITY_HOST_TEST_REPORT.json').write_text(json.dumps(report,sort_keys=True))
+          print(json.dumps(report,sort_keys=True))
+          if report['status']!='PASS':raise SystemExit(1)
+          CHECK
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: community-mini-domestic-runtime
+          path: |
+            ${{ runner.temp }}/community-mini-runtime-${{ github.run_id }}-${{ github.run_attempt }}/RUNTIME_REPORT.json
+            ${{ runner.temp }}/community-mini-runtime-${{ github.run_id }}-${{ github.run_attempt }}/COMMUNITY_HOST_TEST_REPORT.json
+          if-no-files-found: error
+          retention-days: 7
+
+  mini-sdk:
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '40637408406' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Prepare official preview SDK without application credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund miniprogram-ci@2.1.31
+          mkdir "$RUNNER_TEMP/community-mini-sdk-bundle"
+          tar -czf "$RUNNER_TEMP/community-mini-sdk-bundle/sdk.tar.gz" -C "$RUNNER_TEMP/community-mini-ci" node_modules
+          cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          sha256sum sdk.tar.gz > sdk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/
+          retention-days: 1
+
+  # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
+  mini-preview:
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '40637408406' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    needs: [test, mini-sdk]
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 12
+    env:
+      COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
+      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
+      PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
+      PREVIEW_SOURCE_SHA: 06053b6a16a8e6efcd324dffe06612b9384aaaf1
+      PREVIEW_TARGET: ${{ inputs.preview_target }}
+      PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
+      PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
+      IMAGE_BUILD_ENABLED: ${{ inputs.backend_image_enabled }}
+    steps:
+      - name: Verify existing domestic upload runner before loading credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" -ne 0
+          node_bin="$(dirname "$(dirname "$RUNNER_TEMP")")/externals/node20/bin/node"
+          test -x "$node_bin"
+          "$node_bin" --version
+          printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: ${{ runner.temp }}/community-mini-source-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify exact Hosted source package and unpack without git checkout
+        env:
+          COMMUNITY_EXPECTED_SOURCE_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'SOURCE'
+          import hashlib,io,json,os,re,stat,zipfile
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          suffix=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          raw=(temp/('community-mini-source-input-'+suffix)/'community-stage-source.zip').read_bytes()
+          expected=os.environ['COMMUNITY_EXPECTED_SOURCE_SHA256']
+          assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
+          archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
+          assert len(items)<2000 and len(items)==len({i.filename for i in items})
+          assert sum(i.file_size for i in items)<10000000
+          manifest=json.loads(archive.read('MANIFEST.json'))
+          assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+          assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
+          assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          assert {'scripts/community_preview_fixed_product.py',
+                  'deploy/community-preview/prepare-mini.cjs',
+                  'deploy/community-preview/endpoint.cjs',
+                  'deploy/community-preview/endpoint-profiles.json',
+                  'scripts/community_preview_readiness.py',
+                  'clients/community-mini/session.js',
+                  'clients/community-mini/pages/home/index.wxml'}.issubset(manifest['files'])
+          files={}
+          for item in items:
+              path=Path(item.filename)
+              assert not path.is_absolute() and '..' not in path.parts and chr(92) not in item.filename
+              assert stat.S_ISREG(item.external_attr >> 16)
+              data=archive.read(item)
+              if item.filename!='MANIFEST.json':
+                  assert hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]
+              files[item.filename]=data
+          root=temp/('community-mini-preview-source-'+suffix);root.mkdir(mode=0o700)
+          for name,data in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+              with path.open('xb') as out:out.write(data)
+              path.chmod(0o600)
+          print('EXACT_PREVIEW_SOURCE_MANIFEST=PASS; FILES='+str(len(manifest['files'])))
+          SOURCE
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-mini-sdk-runtime
+          path: ${{ runner.temp }}/community-mini-sdk-bundle
+      - name: Verify and unpack credential-free SDK into task temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          sha256sum -c sdk.sha256
+          mkdir -p "$RUNNER_TEMP/community-mini-ci"
+          tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
+      - name: Receive verified fixed product input from this control run
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        uses: actions/download-artifact@v4
+        with:
+          name: community-fixed-06053-preview-input
+          path: ${{ runner.temp }}/community-mini-fixed-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Bind fixed product tree separately from current control source
+        if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B scripts/community_preview_fixed_product.py stage
+          printf 'COMMUNITY_PREVIEW_PRODUCT_CONTEXT=%s/community-mini-product-context-%s-%s.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Require live backend health before loading upload credentials
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        run: /usr/bin/python3 -I -B scripts/community_preview_readiness.py --output "$RUNNER_TEMP/community-mini-preview/backend-readiness.json"
+      - name: Prepare connected development mini source
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        env:
+          COMMUNITY_CONNECTED_MINI_OUTPUT: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
+        run: '"$COMMUNITY_NODE_BINARY" deploy/community-preview/prepare-mini.cjs'
+      - name: Run selected official preview or development upload using existing secret
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        env:
+          WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
+          WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          COMMUNITY_MINI_OPERATION: ${{ github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
+          COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
+          COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
+          COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
+          COMMUNITY_PREVIEW_READINESS_RECEIPT: ${{ runner.temp }}/community-mini-preview/backend-readiness.json
+        run: '"$COMMUNITY_NODE_BINARY" scripts/community_mini_preview.cjs'
+      - name: Preserve sanitized preview receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-development-${{ github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
+          path: ${{ runner.temp }}/community-mini-preview/
+          retention-days: 7

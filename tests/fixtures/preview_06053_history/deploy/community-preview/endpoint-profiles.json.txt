@@ -1,0 +1,4 @@
+{
+  "legacy": "https://community-preview.wenwenwenyiyiyi.work",
+  "uk-path-candidate": "https://uk.wenwenwenyiyiyi.work/community-preview"
+}
