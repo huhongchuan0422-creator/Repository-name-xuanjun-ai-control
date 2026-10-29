@@ -11,13 +11,16 @@ from scripts.community_order_store import state
 
 
 class MiniPayments:
-    def __init__(self,identity,prepay,merchants=None):
+    def __init__(self,identity,prepay,merchants=None,*,deferred_merchant_mode=False):
         if type(identity) is not CenterIdentity or type(prepay) is not PartnerPrepay or identity.center is not prepay.center:
             raise ValueError('SAME_ORIGINAL_CENTER_REQUIRED')
         self.identity,self.prepay=identity,prepay
+        if type(deferred_merchant_mode) is not bool or deferred_merchant_mode and merchants!={}:
+            raise ValueError('EXPLICIT_EMPTY_DEFERRED_MERCHANT_MODE_REQUIRED')
+        self.merchant_mode=merchants is not None
         self.merchants={}
         if merchants is not None:
-            if type(merchants) is not dict or not merchants or prepay.bindings:raise ValueError('ONE_PROTECTED_PAYMENT_BINDING_MODE_REQUIRED')
+            if type(merchants) is not dict or not merchants and not deferred_merchant_mode or prepay.bindings:raise ValueError('ONE_PROTECTED_PAYMENT_BINDING_MODE_REQUIRED')
             for scene,record in merchants.items():
                 if type(scene) is not str or scene not in identity.scenes or type(record) is not dict or set(record)!={'sp_appid','sub_mchid','description','notify_url','profit_sharing'}:
                     raise ValueError('INVALID_PROTECTED_MERCHANT_PAYMENT_BINDING')
@@ -26,6 +29,13 @@ class MiniPayments:
                 PartnerPrepay(identity.center,prepay.reader,{'validation':dict(record,user_id='validation',project='validation',out_trade_no='validation',amount_minor=1,sp_openid='validation')})
                 binding=identity.scenes[scene]
                 self.merchants[scene]=dict(record= dict(record),project=binding['project'],scope=dict(identity.runtime.bindings[binding['principal']]))
+    def _refresh_merchant(self,scene):
+        refresh=getattr(self,'merchant_refresh',None)
+        if refresh is not None:
+            try:refresh(scene)
+            except BaseException:
+                self.merchants.pop(scene,None)
+                raise
     def _authorize(self,token,scene,reference):
         i=self.identity;c=i.center
         i.authorize_order_read(token,scene,reference,c.now())
@@ -40,7 +50,8 @@ class MiniPayments:
         meta=c.db.execute("SELECT payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,uid,pid)).fetchone()
         if meta is None:raise PermissionError('CURRENT_WECHAT_PAYER_REQUIRED')
         session=json.loads(c.decrypt(meta[0],'wechat-mini-session'))
-        if self.merchants:
+        if self.merchant_mode:
+            self._refresh_merchant(scene)
             from scripts.pr122_customer_core import canonical
             merchant=self.merchants.get(scene)
             if merchant is None or merchant['project']!=pid or merchant['scope']!=scope:

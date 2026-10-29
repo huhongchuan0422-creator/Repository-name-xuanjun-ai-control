@@ -50,3 +50,7 @@
 
 /* Page20 uses original query cursor; raw debug payload is not customer presentation. */
 .report-selected #records,.report-selected #result{display:none}.community-report-panel>h3[hidden]{display:none}.community-report-panel>.community-record-card{margin:16px 0}.community-report-panel>button{width:100%;margin-bottom:16px}.community-report-detail .community-record-card{margin:14px 0}.community-report-detail dl{margin:0}.community-report-detail dd{overflow-wrap:anywhere}.community-report-panel .open-query{flex-wrap:wrap}
+
+/* Confirmed page20 hierarchy; retain original pagination without empty debug panel. */
+.report-selected .community-report-panel>h2{display:none}.report-selected section:has(>#result){background:transparent;border:0;padding:0;margin:0}.report-selected section:has(>#result)>h2{display:none}
+.community-admin .community-report-panel .open-detail-action{display:block;width:100%;background:var(--green);color:white;text-align:left;margin:18px 0}.community-admin .community-report-panel .open-detail-action[hidden]{display:none}

@@ -36,6 +36,7 @@ class CollectionCodes:
         if g['role']!='MERCHANT_ADMIN':raise PermissionError('MERCHANT_ADMIN_REQUIRED')
         self.merchant.operations.dispatch(token,csrf,dict(workspace=workspace,operation='community.summary',params={}))
         payments=self.gateway.payments
+        payments._refresh_merchant(scene)
         binding=payments.merchants.get(scene)
         if binding is None:raise PermissionError('PAYMENT_SCENE_NOT_ADMITTED')
         if payments.activation_guard(scene)!=binding['record']:raise PermissionError('PAYMENT_ACTIVATION_CHANGED')

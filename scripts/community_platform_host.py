@@ -21,7 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
-OPTIONAL_FIELDS = {'registration_scenes','community_grants','provider_reader_config'}
+OPTIONAL_FIELDS = {'registration_scenes','community_grants','provider_reader_config','commerce_provider_config'}
 
 
 def _require_nonroot():
@@ -53,11 +53,14 @@ def _configuration(plan, key_material, wechat):
         raise ValueError('EXACT_WECHAT_SECRET_INPUT_REQUIRED')
     from scripts.community_mini_login import WechatCodeClient
     WechatCodeClient(wechat['appid'], wechat['app_secret'])  # Validate; no provider IO.
-    if 'provider_reader_config' in plan:
-        ref = plan['provider_reader_config']
+    for reference in ('provider_reader_config','commerce_provider_config'):
+        if reference not in plan:continue
+        ref = plan[reference]
         if (type(ref) is not str or not Path(ref).is_absolute()
                 or str(Path(ref)) != ref or '..' in Path(ref).parts):
             raise ValueError('PROTECTED_PROVIDER_READER_CONFIG_REF_REQUIRED')
+    if 'commerce_provider_config' in plan and (not plan['reviewers'] or 'provider_reader_config' not in plan):
+        raise PermissionError('ORIGINAL_ONBOARDING_READER_REQUIRED_FOR_COMMERCE')
     if plan['reviewers'] and 'provider_reader_config' not in plan:
         raise PermissionError('PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING')
     if type(plan['principals']) is not dict or not plan['principals'] or type(plan['bindings']) is not dict or set(plan['bindings']) != set(plan['principals']):
@@ -102,6 +105,59 @@ def _open_provider_reader(protected_path, clock):
         config['public_key_id'],config['public_key_pem'].encode('ascii'),clock)
 
 
+def _commerce_policy(protected_path):
+    """Read existing protected opt-in only; no secret creation or provider IO.
+
+    JSON arrays represent existing tuple scope keys without changing the original
+    provider policy validator. Actual grants/product admissions stay explicit.
+    """
+    value=load_protected(protected_path)
+    fields={'version','applyment_submission_enabled','provider_bindings',
+            'payment_admissions','notifications','merchant_bill_grants'}
+    if (type(value) is not dict or set(value)!=fields or type(value['version']) is not int
+            or value['version']!=1 or type(value['applyment_submission_enabled']) is not bool
+            or type(value['provider_bindings']) is not list
+            or type(value['payment_admissions']) is not dict
+            or type(value['merchant_bill_grants']) is not dict):
+        raise ValueError('EXACT_PROTECTED_COMMERCE_POLICY_REQUIRED')
+    bindings={}
+    for item in value['provider_bindings']:
+        if (type(item) is not dict or set(item)!={'scope','policy'}
+                or type(item['scope']) is not dict
+                or set(item['scope'])!={'tenant_id','merchant_id','store_id'}
+                or any(type(v) is not str for v in item['scope'].values())
+                or type(item['policy']) is not dict):
+            raise ValueError('EXACT_PROVIDER_SCOPE_POLICY_REQUIRED')
+        key=tuple(item['scope'][n] for n in ('tenant_id','merchant_id','store_id'))
+        if key in bindings:raise ValueError('DUPLICATE_PROVIDER_SCOPE_POLICY')
+        bindings[key]=item['policy']
+    notification=value['notifications'];key=None
+    if notification is not None:
+        if (type(notification) is not dict or set(notification)!={'api_v3_key_base64','path'}
+                or type(notification['api_v3_key_base64']) is not str
+                or type(notification['path']) is not str):
+            raise ValueError('EXACT_PROTECTED_NOTIFICATION_POLICY_REQUIRED')
+        try:key=base64.b64decode(notification['api_v3_key_base64'],validate=True)
+        except (ValueError,TypeError):raise ValueError('INVALID_PROTECTED_API_V3_KEY') from None
+        if len(key)!=32:raise ValueError('INVALID_PROTECTED_API_V3_KEY')
+        if not value['payment_admissions']:raise ValueError('PAYMENT_ADMISSIONS_REQUIRED_FOR_NOTIFICATIONS')
+    if value['merchant_bill_grants'] and not bindings:
+        raise ValueError('PROVIDER_BINDINGS_REQUIRED_FOR_BILLS')
+    return value,bindings,key
+
+
+def _wire_commerce(application,reader,policy):
+    """Original capabilities, called before listen; all IO remains in original APIs."""
+    value,bindings,key=policy
+    if bindings:application.configure_provider_actions(reader,bindings)
+    if value['payment_admissions']:
+        application.configure_dynamic_payments_from_applyments(reader,value['payment_admissions'])
+    if value['notifications'] is not None:
+        application.configure_payment_notifications(key,value['notifications']['path'])
+    if value['merchant_bill_grants']:
+        application.configure_merchant_bills(value['merchant_bill_grants'])
+
+
 class PlatformHost:
     """Own Center and PersistentRuntime; MiniApplication borrows both."""
     def __init__(self):
@@ -121,6 +177,7 @@ class PlatformHost:
         key_material = load_protected(keys_path)
         wechat = load_protected(wechat_path)
         keys, principals, bindings, operations = _configuration(plan, key_material, wechat)
+        commerce_policy = _commerce_policy(plan['commerce_provider_config']) if 'commerce_provider_config' in plan else None
         config = load_protected(plan['application_config'])
         if type(config) is not dict or config.get('appid') != wechat['appid'] or config.get('https_origin') != plan['https_origin']:
             raise PermissionError('SAME_PROTECTED_APPID_AND_ORIGIN_REQUIRED')
@@ -160,11 +217,12 @@ class PlatformHost:
             if plan['reviewers']:
                 owner.application.configure_onboarding(plan['reviewers'])
                 reader = _open_provider_reader(plan['provider_reader_config'], owner.center.now)
-                owner.application.configure_wechat_applyment(reader,submission_enabled=False)
+                owner.application.configure_wechat_applyment(reader,submission_enabled=commerce_policy[0]['applyment_submission_enabled'] if commerce_policy else False)
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
             if plan.get('community_grants'):
                 owner.application.configure_communities(plan['community_grants'])
             owner.application.configure_commerce()
+            if commerce_policy is not None:_wire_commerce(owner.application,reader,commerce_policy)
             owner.plan = plan
             return owner
         except BaseException:

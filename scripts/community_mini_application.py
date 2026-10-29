@@ -147,6 +147,36 @@ class MiniApplication:
         self.configure_collection_codes()
         return payments
 
+    def configure_dynamic_payments_from_applyments(self,reader,admissions):
+        """Protected startup policy; same-thread per-use verified scene projection.
+
+        No new HTTP authority, provider request or payment. The payments object
+        remains stable for notification handlers even when a merchant signs later.
+        """
+        if self.server is not None or getattr(self.gateway,'payments',None) is not None:
+            raise ValueError('PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING')
+        if self.onboarding is None or self.onboarding.wechat_applyment is None or self.onboarding.wechat_applyment.reader is not reader:
+            raise ValueError('ORIGINAL_WECHAT_APPLYMENT_REQUIRED')
+        from scripts.community_wechat_payment_activation import _admission,project_wechat_scene
+        from scripts.pr122_customer_core import canonical
+        import json
+        if type(admissions) is not dict or not admissions or not set(admissions).issubset(self.identity.scenes):
+            raise PermissionError('REGISTERED_PAYMENT_PRODUCT_ADMISSIONS_REQUIRED')
+        fixed=json.loads(canonical(admissions))
+        for product in fixed.values():_admission(product)
+        payments=self.configure_payments(reader,merchants={},deferred_merchant_mode=True)
+        def refresh(scene):
+            if scene not in fixed:raise PermissionError('PAYMENT_PRODUCT_ADMISSION_REQUIRED')
+            projected=project_wechat_scene(self.identity,self.onboarding,reader,scene,fixed[scene])
+            from scripts.community_mini_payments import MiniPayments
+            from scripts.community_wechat_sp_prepay import PartnerPrepay
+            checked=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{}),merchants={scene:projected['merchant']})
+            payments.merchants[scene]=checked.merchants[scene]
+        payments.merchant_refresh=refresh
+        payments.activation_guard=lambda scene:project_wechat_scene(self.identity,self.onboarding,reader,scene,fixed[scene])['merchant']
+        self.configure_collection_codes()
+        return payments
+
     def configure_collection_codes(self):
         if self.server is not None or getattr(self.gateway,'collection_codes',None) is not None:
             raise ValueError('COLLECTION_CODE_ALREADY_CONFIGURED_OR_LISTENING')
@@ -154,13 +184,13 @@ class MiniApplication:
         self.gateway.collection_codes=CollectionCodes(self.gateway,self.onboarding,self.operations)
         return self.gateway.collection_codes
 
-    def configure_payments(self,reader,bindings=None,*,merchants=None):
+    def configure_payments(self,reader,bindings=None,*,merchants=None,deferred_merchant_mode=False):
         """Protected opt-in; original customer orders and verified payer required."""
         if self.server is not None or getattr(self.gateway,'payments',None) is not None:
             raise ValueError('PAYMENTS_ALREADY_CONFIGURED_OR_LISTENING')
         from scripts.community_wechat_sp_prepay import PartnerPrepay
         from scripts.community_mini_payments import MiniPayments
-        self.gateway.payments=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{} if bindings is None else bindings),merchants=merchants)
+        self.gateway.payments=MiniPayments(self.identity,PartnerPrepay(self.center,reader,{} if bindings is None else bindings),merchants=merchants,deferred_merchant_mode=deferred_merchant_mode)
         self.gateway.payments.rule_actions=self.provider_actions
         self.gateway.payments.commerce=self.commerce
         return self.gateway.payments

@@ -141,6 +141,36 @@ class WechatPaymentActivation(unittest.TestCase):
     with self.assertRaises(PermissionError):
      client.dispatch(token,{'scene':self.scene,'operation':'prepare','reference':'composed_order'})
     self.reader._fetch.assert_not_called()
+ def test_deferred_same_object_activation_after_signed_finished_and_revocation(self):
+  from scripts.community_mini_application import MiniApplication
+  from scripts.community_payment_notifications import PaymentNotifications
+  token=self.fx.fx.fx.token('deferred_code');self.fx.fx.fx.checkout(token,'deferred_order')
+  self.seed('APPLYMENT_STATE_AUDITING')
+  app=object.__new__(MiniApplication)
+  app.server=None;app.identity=self.identity;app.center=self.center
+  app.onboarding=self.fx.fx.service;app.operations=self.fx.operations
+  app.provider_actions=None;app.commerce=None
+  app.gateway=MiniGateway(self.identity.runtime,self.identity, __import__('scripts.community_mini_login',fromlist=['WechatCodeClient']).WechatCodeClient(self.identity.appid,'a'*32))
+  app.notifications=None
+  client=app.configure_dynamic_payments_from_applyments(self.reader,self.admissions)
+  self.assertTrue(client.merchant_mode);self.assertEqual(client.merchants,{})
+  notify=app.configure_payment_notifications(b'k'*32)
+  self.reader._fetch=Mock(side_effect=AssertionError('NO_PROVIDER_IO'))
+  with self.assertRaises(PermissionError):client._authorize(token,self.scene,'deferred_order')
+  self.assertEqual(client.merchants,{})
+  self.seed('APPLYMENT_STATE_FINISHED','1234567891')
+  binding=client._authorize(token,self.scene,'deferred_order')
+  self.assertEqual(binding['sub_mchid'],'1234567891');self.assertIs(notify.payments,client)
+  with self.assertRaises(PermissionError):client._refresh_merchant('not_admitted')
+  self.center.db.execute("UPDATE links SET active=0 WHERE channel='COMMUNITY_MERCHANT_OPENING'")
+  with self.assertRaises(PermissionError):client._authorize(token,self.scene,'deferred_order')
+  self.assertNotIn(self.scene,client.merchants);self.reader._fetch.assert_not_called()
+ def test_empty_merchants_require_explicit_deferred_mode(self):
+  prepay=PartnerPrepay(self.center,self.reader,{})
+  with self.assertRaises(ValueError):MiniPayments(self.identity,prepay,merchants={})
+  client=MiniPayments(self.identity,prepay,merchants={},deferred_merchant_mode=True)
+  self.assertTrue(client.merchant_mode)
+
  def test_reopen_is_idempotent_and_client_never_supplies_submerchant(self):
   first=self.project()
   self.fx.fx.fx.reopen()

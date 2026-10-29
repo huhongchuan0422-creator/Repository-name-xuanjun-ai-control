@@ -116,7 +116,7 @@
  const reportCard=document.createElement('article');reportCard.className='community-record-card';
  const reportTitle=document.createElement('h3');reportTitle.textContent='记录列表 · 当前范围';
  const reportSummary=document.createElement('dl');reportCard.append(reportTitle,reportSummary);
- const reportShow=document.createElement('button');reportShow.type='button';reportShow.textContent='查看分账快照';reportShow.disabled=true;
+ const reportShow=document.createElement('button');reportShow.type='button';reportShow.className='open-detail-action';reportShow.textContent='查看分账快照';reportShow.disabled=true;
  const reportDetail=document.createElement('div');reportDetail.className='community-report-detail';reportDetail.hidden=true;
  const reportRows=document.createElement('div');reportRows.className='report-rows';
  const reportBack=document.createElement('button');reportBack.type='button';reportBack.textContent='返回观察记录';

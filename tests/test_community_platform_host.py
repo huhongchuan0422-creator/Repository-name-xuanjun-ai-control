@@ -80,6 +80,34 @@ class FormalHost(unittest.TestCase):
         ctx=patch('scripts.community_platform_host._require_nonroot') if os.geteuid()==0 else contextlib.nullcontext()
         with ctx:
             return PlatformHost.open(str(self.plan_path),str(self.keys_path),str(self.wechat_path))
+    def test_protected_commerce_policy_wires_real_reader_and_provider_actions(self):
+        policy=dict(version=1,applyment_submission_enabled=True,
+            provider_bindings=[dict(scope=dict(tenant_id='tenant1',merchant_id='merchant1',store_id='store1'),
+                policy=dict(sp_appid=self.wechat['appid'],sub_mchid='1900000001',sub_appid=None,
+                    refund_notify_url='https://uk.wenwenwenyiyiyi.work/wechat/refund/notify',
+                    profit_sharing=False,max_total_bps=0,receivers={},enabled_operations=['REFUND']))],
+            payment_admissions={},notifications=None,merchant_bill_grants={})
+        self.plan['commerce_provider_config']=str(self.write('commerce.json',policy))
+        self.write('host.json',self.plan)
+        # Real composition and existing policy validators, but never provider IO.
+        with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_IO')):
+            with self.open() as host:
+                app=host.application
+                self.assertTrue(app.onboarding.wechat_applyment.enabled)
+                self.assertIs(app.provider_actions.reader,app.onboarding.wechat_applyment.reader)
+                self.assertIs(app.provider_actions.operations,app.operations)
+                self.assertIs(app.provider_actions.commerce,app.commerce)
+                self.assertEqual(app.provider_actions.bindings[('tenant1','merchant1','store1')]['enabled_operations'],['REFUND'])
+                self.assertIsNone(getattr(app.gateway,'payments',None))
+                self.assertIsNone(app.notifications)
+    def test_commerce_policy_never_creates_missing_onboarding_or_reader(self):
+        for field in ('reviewers','provider_reader_config'):
+            plan=copy.deepcopy(self.plan);plan['commerce_provider_config']=str(self.root/'commerce.json')
+            if field=='reviewers':plan[field]={}
+            else:del plan[field]
+            with self.assertRaisesRegex(PermissionError,'ONBOARDING_READER'):
+                _configuration(plan,self.key_material,self.wechat)
+
     def test_original_identity_real_stores_commerce_and_no_payment_or_demo_secrets(self):
         with self.open() as host:
             app=host.application
