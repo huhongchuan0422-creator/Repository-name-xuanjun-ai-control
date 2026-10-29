@@ -67,7 +67,7 @@ class ReviewRuntime:
                     if not self._local():return self.answer(403,{'error':'LOOPBACK_REVIEW_ONLY'})
                     parsed=urllib.parse.urlsplit(self.path)
                     if parsed.path=='/review/sources':
-                        names={'app.wxss','session.js','client.js','payment.js','customer-auth.js','merchant-form.js','merchant-fields.json'}
+                        names={'app.wxss','session.js','client.js','payment.js','customer-auth.js','merchant-form.js','merchant-fields.json','merchant-submit.js','merchant-official-fields.js','merchant-official-areas.json','merchant-official-industries.json','merchant-platform-reference.json'}
                         names.update(p.relative_to(ROOT/'clients/community-mini').as_posix() for p in (ROOT/'clients/community-mini/pages').glob('*/index.*') if p.suffix in ('.js','.wxml','.wxss'))
                         return self.answer(200,{'sources':{n:(ROOT/'clients/community-mini'/n).read_text() for n in sorted(names)},'isolated':True})
                     assets={'/':('review-runtime.html','text/html; charset=utf-8'),'/review/native.js':('review-native.js','application/javascript; charset=utf-8')}

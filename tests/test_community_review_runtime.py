@@ -26,6 +26,12 @@ class IntegratedReview(unittest.TestCase):
   page.goto(self.url);page.locator('body[data-review-ready="true"]').wait_for();expect(page.locator('#native')).to_contain_text('客户身份已验证')
  def visible_field(self,page,selector,label,max_steps=24):
   target=page.locator(selector)
+  if not target.count() or not target.is_visible():
+   path=__import__('re').search(r'data-path="([^"]+)"',selector)
+   if not path:raise AssertionError('FIELD_PATH_REQUIRED:'+label)
+   group=page.evaluate('(path)=>window.reviewPage.data.materialGroups.find(g=>g.fields.some(f=>f.path===path))?.id',path.group(1))
+   if not group:raise AssertionError('VISIBLE_MATERIAL_GROUP_REQUIRED:'+label)
+   page.locator('#native button.edit-group[data-group="'+group+'"]').click()
   expect(target).to_be_visible()
   return target
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
@@ -42,14 +48,14 @@ class IntegratedReview(unittest.TestCase):
   page.locator('#native [data-key="ubos"] select').select_option('1')
   page.get_by_role('button',name='保存草稿并继续下一项',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 1')
   page.locator('#native [data-key="scene"] select').select_option('2')
-  page.locator('input[data-path="business_info.merchant_shortname"]').fill('同版本测试门店')
+  self.visible_field(page,'input[data-path="business_info.merchant_shortname"]','stage1 merchant_shortname').fill('同版本测试门店')
   page.get_by_role('button',name='保存草稿并继续下一项',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 2')
   application=page.evaluate('window.reviewPage.data.application.application')
   page.get_by_role('button',name='‹ 上一阶段',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 1')
   page.get_by_role('button',name='‹ 上一阶段',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 0')
   mobile_after_back=self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','stage2 back to stage0 mobile_phone')
   expect(mobile_after_back).to_have_value('13800000000')
-  page.reload();page.get_by_role('button',name='同版本测试门店 · 草稿未提交',exact=True).click();expect(page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')).to_have_value('同版本测试主体')
+  page.reload();page.get_by_role('button',name='同版本测试门店 · 草稿未提交',exact=True).click();expect(self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','reload original merchant_name')).to_have_value('同版本测试主体')
   self.assertEqual(page.evaluate('window.reviewPage.data.application.application'),application)
   self.assertEqual(page.evaluate('window.reviewPage.data.application.status'),'DRAFT')
   page.screenshot(path=str(self.out/'native-same-application.png'),full_page=True)
@@ -123,8 +129,8 @@ class IntegratedReview(unittest.TestCase):
   page.evaluate("location.hash='/pages/merchant/index?scene=shop1'")
   expect(page.locator('#native')).to_contain_text('当前账号尚无已开通商家权限')
   page.locator('#identity').select_option('merchant');expect(page.locator('#native')).to_contain_text('请选择日常服务')
-  page.get_by_role('button',name='日常订单与收款记录',exact=True).click();expect(page.locator('#native')).to_contain_text('暂无记录')
-  page.get_by_role('button',name='返回工作台',exact=True).click();page.get_by_role('button',name='取得正式商家收款码',exact=True).click();expect(page.locator('#native')).to_contain_text('暂未取得可用的正式收款码')
+  page.locator('#native button[data-view="orders"]').click();expect(page.locator('#native')).to_contain_text('暂无记录')
+  page.get_by_role('button',name='‹ 返回工作台',exact=True).click();page.locator('#native button.service-link').filter(has_text='商家收款码').click();page.get_by_role('button',name='取得正式商家收款码',exact=True).click();expect(page.locator('#native')).to_contain_text('暂未取得可用的正式收款码')
   self.assertEqual(page.locator('#native img').count(),0)
  def test_existing_merchant_catalog_is_not_deleted_and_native_reads_its_edit(self):
   page=self.page();self.ready(page);page.locator('#identity').select_option('merchant');expect(page.locator('#native')).to_contain_text('请选择日常服务')
@@ -136,7 +142,7 @@ class IntegratedReview(unittest.TestCase):
   page.evaluate("location.hash='/pages/merchant/index?scene=shop1'")
   # A management iframe is an auxiliary original backend, not a replacement mini.
   page.locator('#identity').select_option('consumer');page.locator('#identity').select_option('merchant')
-  expect(page.locator('#native')).to_contain_text('请选择日常服务');page.get_by_role('button',name='门店与商品资料',exact=True).click();expect(page.locator('#native')).to_contain_text('同版本手机可见商品')
+  expect(page.locator('#native')).to_contain_text('请选择日常服务');page.locator('#native button[data-view="settings"]').click();expect(page.locator('#native')).to_contain_text('同版本手机可见商品')
 
  def test_runner_accepts_no_production_root_and_rejects_cross_origin(self):
   self.assertTrue(self.receipt['isolated']);self.assertFalse(self.receipt['payments']);self.assertTrue(self.receipt['temporary_data'])
