@@ -28,3 +28,10 @@
 .community-admin #profile label{display:grid;gap:7px;margin:18px 0;color:var(--ink)}
 .community-admin #profile input,.community-admin #profile textarea{box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:12px;border:1px solid #b8ccbf;border-radius:8px;font:inherit}
 .community-admin #profile button,.community-admin .community-profile-detail>#submit{background:var(--green);color:white}
+
+/* Page19: real status result card, never fabricated membership. */
+.community-admin .open-selected>.community-open-panel{padding:0;border:0;background:transparent}
+.community-admin .community-open-panel>h2{display:none}
+.community-admin .community-open-panel .open-detail-action{display:block;width:100%;background:var(--green);color:white;text-align:left;margin:18px 0}
+.community-admin .community-open-panel .open-detail-action[hidden]{display:none}
+.community-admin .community-open-panel>section{border:0;padding:0;background:transparent}

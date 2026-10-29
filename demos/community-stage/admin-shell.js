@@ -57,16 +57,57 @@
  toList.addEventListener('click',()=>{detail.hidden=true;profileForm.hidden=true;submit.hidden=true;if(result)result.hidden=false;hint.textContent='已返回原列表；需要最新数据时点击“我的社区”。';});
  create.addEventListener('click',()=>{document.getElementById('directoryStatus').onchange();profileRecord=null;fields.hidden=true;fields.replaceChildren();detail.hidden=false;profileForm.hidden=false;submit.hidden=true;edit.disabled=true;hint.textContent='填写社区资料后保存草稿，核对无误再提交审核。';});
 
+ // Page 19 uses only original status/membership responses. A selected kind is not proof of membership.
+ const openPanel=document.getElementById('reference').closest('section'),openIndex=panels.indexOf(openPanel);
+ openPanel.classList.add('community-open-panel');
+ const openHint=document.createElement('p');openHint.className='profile-hint';openHint.textContent='输入社区编号查询，只有原服务端允许的资料才会显示。';
+ const openCard=document.createElement('article');openCard.className='community-record-card';openCard.hidden=true;
+ const openCardTitle=document.createElement('h3');openCardTitle.textContent='记录列表 · 当前范围';openCard.append(openCardTitle);
+ const openSummary=document.createElement('dl');openCard.append(openSummary);
+ const openDetails=document.createElement('div');openDetails.className='community-profile-detail';openDetails.hidden=true;
+ const openTitle=document.createElement('h3');openTitle.textContent='社区详情';openDetails.append(openTitle);
+ const openFields=document.createElement('dl');openDetails.append(openFields);
+ const showOpen=document.createElement('button');showOpen.type='button';showOpen.className='open-detail-action';showOpen.textContent='查看社区详情';showOpen.hidden=true;
+ const backOpen=document.createElement('button');backOpen.type='button';backOpen.textContent='返回社区记录';
+ const refreshOpen=document.createElement('button');refreshOpen.type='button';refreshOpen.textContent='回读社区资料';
+ openDetails.append(backOpen,refreshOpen);openPanel.append(openHint,openCard,showOpen,openDetails);
+ const kindNote=document.createElement('p');kindNote.className='profile-hint';kindNote.textContent='关系类型为本次加入或退出的操作选择，不代表已确认的当前关系。';
+ document.getElementById('kind').closest('label').append(kindNote);
+ let openRecord=null,openMembers=false;
+ function clearOpen(message){openRecord=null;openMembers=false;openCard.hidden=true;showOpen.hidden=true;openDetails.hidden=true;openSummary.replaceChildren();openFields.replaceChildren();openHint.textContent=message;}
+ function openPair(target,label,value){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;target.append(dt,dd);}
+ window.communityOpenView=({type,record})=>{
+  if(type==='reset'||type==='error'||type==='loading'){clearOpen(type==='error'?'资料未确认或当前无权查看，请重新查询。':type==='loading'?'正在查询社区资料…':'身份或工作区已变化，请重新查询。');if(activeIndex===openIndex&&result)result.hidden=true;return;}
+  if(type==='members'){clearOpen('成员查询使用原权限；以下仅为当前页记录。');openMembers=true;if(activeIndex===openIndex&&result)result.hidden=false;return;}
+  if(type==='relation'){clearOpen(record.active?'本次加入已获服务端确认；请回读社区资料。':'本次退出已获服务端确认；请回读社区资料。');if(activeIndex===openIndex&&result)result.hidden=true;return;}
+  if(type!=='status')return;
+  clearOpen('资料已读取；当前关系未由服务端返回，不从操作选择推断。');openRecord=record;
+  openPair(openSummary,'社区编号',record.id);openPair(openSummary,'关系类型','当前关系未由服务端返回');
+  for(const [label,key] of [['社区编号','id'],['社区名称','name'],['社区介绍','description'],['状态','state'],['当前版本','version'],['联系人及联系方式','contact']]){
+   if(record[key]===undefined)continue;
+   const value=key==='state'?({DRAFT:'草稿',PENDING:'待审核',CORRECTION:'待补充资料',REJECTED:'已驳回',APPROVED:'已通过',PAUSED:'已暂停'}[record[key]]||String(record[key])):String(record[key]);openPair(openFields,label,value);
+  }
+  openCard.hidden=false;showOpen.hidden=false;if(activeIndex===openIndex&&result)result.hidden=true;
+ };
+ document.getElementById('reference').addEventListener('input',()=>{clearOpen('社区编号已改变，请查询所选社区。');if(activeIndex===openIndex&&result)result.hidden=true;});
+ showOpen.addEventListener('click',()=>{if(!openRecord)return;openCard.hidden=true;showOpen.hidden=true;openDetails.hidden=false;});
+ backOpen.addEventListener('click',()=>{if(!openRecord)return;openDetails.hidden=true;openCard.hidden=false;showOpen.hidden=false;});
+ refreshOpen.addEventListener('click',()=>document.getElementById('read').click());
+
  function select(index){
+  if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
+  if(index!==openIndex){openMembers=false;clearOpen('输入社区编号查询，只有原服务端允许的资料才会显示。');}
+  if(activeIndex===profileIndex&&index!==profileIndex)emptyProfile('切换功能后请重新查询社区资料。');
   activeIndex=index;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   main.classList.toggle('profile-selected',index===profileIndex);
+  main.classList.toggle('open-selected',index===openIndex);
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
-  if(result)result.hidden=index===null||(index===profileIndex&&!detail.hidden);
+  if(result)result.hidden=index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
   buttons.forEach((button,i)=>{if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   if(index!==null){const title=panels[index].querySelector('h2');title.tabIndex=-1;title.focus();}
  }

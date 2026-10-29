@@ -11,9 +11,9 @@ function setup(responses){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
- const calls=[],pending=[];
+ const calls=[],pending=[],openEvents=[];
  const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
- const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{},fetch:async(url,options)=>{
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityOpenView:value=>openEvents.push(value)},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -24,7 +24,7 @@ function setup(responses){
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
  const click=id=>elements[id].onclick();
- return {elements,calls,pending,configure,click};
+ return {elements,calls,pending,configure,click,openEvents,sectionChanged:context.window.communitySectionChanged};
 }
 
 const community=(id,state='APPROVED',version=1)=>({id,name:id,state,version,description:'fixture',contact:'private'});
@@ -134,4 +134,36 @@ test('profile denied reread clears private detail and blocks stale update',async
  const f=setup([{result:result([community('co_one','DRAFT')],'a'.repeat(64))},{error:'COMMUNITY_PRIVATE'}]);
  await f.click('mine');await f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
  assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.result.textContent,'');
+ });
+
+ test('open community emits only actual status and clears denied or reset views',async()=>{
+ const f=setup([{result:community('co_one','DRAFT',1)},{error:'COMMUNITY_PRIVATE'}]);
+ f.elements.reference.value='co_one';await f.click('read');
+ const actual=f.openEvents.find(x=>x.type==='status');assert.equal(actual.record.id,'co_one');assert.equal(actual.record.kind,undefined);
+ await f.click('read');assert.equal(f.openEvents.at(-1).type,'error');assert.equal(f.elements.records.children.length,0);
+ f.configure({csrf:'next',workspace:'other'});assert.equal(f.openEvents.at(-1).type,'reset');
+ });
+ test('open community late result cannot be displayed after filter or identity change',async()=>{
+ const f=setup([{result:community('co_old'),delay:true}]);f.elements.reference.value='co_old';const pending=f.click('read');
+ f.elements.directoryStatus.onchange();f.pending.shift()();await pending;
+ assert.equal(f.openEvents.filter(x=>x.type==='status').length,0);assert.equal(f.elements.result.textContent,'');
+ });
+
+ test('members denial cannot expose prior mine rows or retain pagination',async()=>{
+ const f=setup([{result:result([community('co_private')],'a'.repeat(64))},{error:'ACCESS_DENIED'}]);
+ await f.click('mine');f.elements.reference.value='co_private';await f.click('members');
+ assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.result.textContent,'');
+ });
+ test('members late response is discarded when selected reference changes',async()=>{
+ for(const inputEvent of [false,true]){
+  const f=setup([{result:result([{user_id:'old-member',kind:'CUSTOMER'}]),delay:true}]);
+  f.elements.reference.value='co_old';const pending=f.click('members');f.elements.reference.value='co_new';if(inputEvent)f.elements.reference.oninput();
+  f.pending.shift()();await pending;assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);
+ }
+ });
+
+ test('section navigation invalidates late shared member results and cursor',async()=>{
+ const f=setup([{result:result([{user_id:'old-member',kind:'CUSTOMER'}],'b'.repeat(64)),delay:true}]);
+ f.elements.reference.value='co_old';const pending=f.click('members');f.sectionChanged();f.pending.shift()();await pending;
+ assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.doesNotMatch(f.elements.message.textContent,/操作完成/);
  });
