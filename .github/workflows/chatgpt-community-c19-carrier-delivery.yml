@@ -1,0 +1,48 @@
+name: Fixed reviewed community c19 carrier delivery
+on:
+  push:
+    branches: [feature/chatgpt-community-wechat-sp-offline-20261017]
+    paths:
+      - '.github/workflows/chatgpt-community-c19-carrier-delivery.yml'
+      - 'delivery/community-c19-fixed/**'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  deliver-fixed-carrier:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Download original immutable image artifact ZIP bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12832817699 > source-artifact.json
+          python - <<'PY'
+          import json
+          x=json.load(open('source-artifact.json'))
+          assert x['id']==12832817699 and not x['expired']
+          assert x['workflow_run']['id']==40727179362
+          assert x['workflow_run']['head_sha']=='c19db7f5bb7f24023f95913a3a68ff1d4aa4a17f'
+          assert x['size_in_bytes']==532397655
+          assert x['digest']=='sha256:6b441ee1af9bdc3283eec7dd05d4961058c261379ae6254e97e10728d1a56e11'
+          PY
+          gh api repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/12832817699/zip > original-image-artifact.zip
+      - name: Assemble and verify exact approved carrier without executing payload
+        run: python -B delivery/community-c19-fixed/assemble.py original-image-artifact.zip out
+      - name: Publish complete byte-identical carrier
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-c19-complete-carrier
+          path: |
+            out/COMMUNITY_STAGE_A_06053_TO_C19DB7_81a7c88af819.zip
+            out/receipt.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
