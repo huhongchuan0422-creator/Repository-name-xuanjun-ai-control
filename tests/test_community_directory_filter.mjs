@@ -11,9 +11,9 @@ function setup(responses){
  const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
- const calls=[],pending=[],openEvents=[];
+ const calls=[],pending=[],openEvents=[],reportEvents=[];
  const stored=new Map();const localStorage={getItem:key=>stored.get(key)||null,setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)};
- const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityOpenView:value=>openEvents.push(value)},fetch:async(url,options)=>{
+ const context=vm.createContext({localStorage,document:{getElementById:id=>elements[id],createElement:element},window:{communityOpenView:value=>openEvents.push(value),communityReportView:value=>reportEvents.push(value)},fetch:async(url,options)=>{
   calls.push({url,options,body:JSON.parse(options.body)});
   const fixture=responses.shift();assert.ok(fixture,'Unexpected fixture request');
   const reply=()=>({ok:!fixture.error,json:async()=>fixture.error?{error:fixture.error}:{result:fixture.result}});
@@ -24,7 +24,7 @@ function setup(responses){
  const configure=context.window.configureCommunityPortal;
  configure({csrf:'token',workspace:'platform'});
  const click=id=>elements[id].onclick();
- return {elements,calls,pending,configure,click,openEvents,sectionChanged:context.window.communitySectionChanged};
+ return {elements,calls,pending,configure,click,openEvents,reportEvents,sectionChanged:context.window.communitySectionChanged};
 }
 
 const community=(id,state='APPROVED',version=1)=>({id,name:id,state,version,description:'fixture',contact:'private'});
@@ -166,4 +166,34 @@ test('profile denied reread clears private detail and blocks stale update',async
  const f=setup([{result:result([{user_id:'old-member',kind:'CUSTOMER'}],'b'.repeat(64)),delay:true}]);
  f.elements.reference.value='co_old';const pending=f.click('members');f.sectionChanged();f.pending.shift()();await pending;
  assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.doesNotMatch(f.elements.message.textContent,/操作完成/);
+ });
+
+ test('page20 report refresh denial must clear previous private rows and cursor',async()=>{
+ const f=setup([{result:result([{reference:'private-order',net_minor:123}], 'a'.repeat(64))},{error:'ACCESS_DENIED'}]);
+ f.elements.reference.value='co_one';await f.click('communityEarnings');await f.click('communityEarnings');
+ assert.equal(f.elements.records.children.length,0);assert.equal(f.elements.more.hidden,true);assert.equal(f.elements.result.textContent,'');
+ });
+ test('page20 delayed result must bind the selected community even without input event',async()=>{
+ const f=setup([{result:result([{reference:'old-private-order'}]),delay:true}]);
+ f.elements.reference.value='co_old';const pending=f.click('communityOrders');f.elements.reference.value='co_new';
+ f.pending.shift()();await pending;assert.equal(f.elements.records.children.length,0);
+ });
+
+ test('page20 preserves actual page amounts, finance state and same query cursor',async()=>{
+ const first={...result([{reference:'order_a',net_minor:123}],'a'.repeat(64)),currency:'CNY',page_gross_minor:150,page_returns_minor:27,page_net_minor:123,totals_scope:'CURRENT_PAGE_ONLY',finance_status:'UNCONFIRMED'};
+ const f=setup([{result:first},{result:{...first,records:[],has_more:false,next_cursor:null}}]);f.elements.reference.value='co_one';await f.click('communityEarnings');
+ const e=f.reportEvents.find(x=>x.type==='listed');assert.equal(e.record.community_id,'co_one');assert.deepEqual(e.record.result,first);
+ await f.click('more');assert.deepEqual(f.calls[1].body.params,{community_id:'co_one',after_id:'a'.repeat(64)});assert.equal(f.elements.more.hidden,true);
+ });
+ test('page20 permission failure is error rather than fake empty or zero success',async()=>{
+ const f=setup([{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';await f.click('communityOrders');assert.equal(f.reportEvents.at(-1).type,'error');assert.equal(f.reportEvents.some(x=>x.type==='listed'),false);
+ });
+
+ test('page20 receiver bind late success does not describe a different selected community',async()=>{
+ const f=setup([{result:{version:7},delay:true}]);f.elements.reference.value='co_old';const pending=f.click('bindReceiver');f.elements.reference.value='co_new';f.elements.reference.oninput();f.pending.shift()();await pending;
+ assert.notEqual(f.elements.receiverVersion.value,7);assert.equal(f.reportEvents.some(x=>x.type==='binding'),false);assert.equal(f.elements.result.textContent,'');
+ });
+ test('page20 bind failure clears old successful receipt and identity reset signals visible filter clear',async()=>{
+ const f=setup([{result:{version:7}},{error:'ACCESS_DENIED'}]);f.elements.reference.value='co_one';await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'binding');await f.click('bindReceiver');assert.equal(f.reportEvents.at(-1).type,'error');assert.equal(f.elements.result.textContent,'');
+ f.configure({csrf:'next',workspace:'next'});assert.equal(f.reportEvents.at(-1).type,'identity-reset');
  });

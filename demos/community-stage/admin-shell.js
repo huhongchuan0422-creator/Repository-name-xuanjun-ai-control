@@ -103,6 +103,55 @@
  backOpen.addEventListener('click',()=>{if(!openRecord)return;openDetails.hidden=true;openCard.hidden=false;showOpen.hidden=false;});
  refreshOpen.addEventListener('click',()=>document.getElementById('read').click());
 
+
+ // Page20: only original order/verified split observations; never a payment action.
+ const reportPanel=document.getElementById('communityEarnings').closest('section'),reportIndex=panels.indexOf(reportPanel);
+ reportPanel.classList.add('community-report-panel');
+ const reportQuery=document.createElement('div');reportQuery.className='open-query';
+ const reportLabel=document.createElement('label');reportLabel.textContent='社区编号';
+ const reportReference=document.createElement('input');reportReference.id='reportReference';reportLabel.append(reportReference);
+ reportReference.addEventListener('input',()=>{document.getElementById('reference').value=reportReference.value;document.getElementById('reference').oninput();});
+ reportQuery.append(reportLabel,document.getElementById('communityOrders'),document.getElementById('communityEarnings'));
+ const reportHint=document.createElement('p');reportHint.className='profile-hint';
+ const reportCard=document.createElement('article');reportCard.className='community-record-card';
+ const reportTitle=document.createElement('h3');reportTitle.textContent='记录列表 · 当前范围';
+ const reportSummary=document.createElement('dl');reportCard.append(reportTitle,reportSummary);
+ const reportShow=document.createElement('button');reportShow.type='button';reportShow.textContent='查看分账快照';reportShow.disabled=true;
+ const reportDetail=document.createElement('div');reportDetail.className='community-report-detail';reportDetail.hidden=true;
+ const reportRows=document.createElement('div');reportRows.className='report-rows';
+ const reportBack=document.createElement('button');reportBack.type='button';reportBack.textContent='返回观察记录';
+ reportDetail.append(reportRows,reportBack);
+ const reportConfig=document.createElement('details');reportConfig.className='open-actions';
+ const configTitle=document.createElement('summary');configTitle.textContent='平台配置社区分账接收关系';reportConfig.append(configTitle);
+ for(const key of ['receiverWorkspace','receiverId','receiverVersion'])reportConfig.append(document.getElementById(key).closest('label'));
+ reportConfig.append(document.getElementById('bindReceiver'));
+ const oldConfigTitle=reportPanel.querySelector('h3');if(oldConfigTitle)oldConfigTitle.hidden=true;
+ reportPanel.append(reportQuery,reportHint,reportCard,reportShow,reportDetail,reportConfig);
+ let reportRecord=null;
+ const money=(value,currency)=>Number.isSafeInteger(value)&&currency==='CNY'?(value<0?'-':'')+'¥'+Math.floor(Math.abs(value)/100)+'.'+String(Math.abs(value)%100).padStart(2,'0')+' CNY':'当前权限未返回有效金额';
+ const reportValue=value=>value===undefined?'当前权限未返回该字段':String(value);
+ function clearReport(message){reportRecord=null;reportHint.textContent=message;reportCard.hidden=false;reportShow.hidden=false;reportShow.disabled=true;reportDetail.hidden=true;reportRows.replaceChildren();reportSummary.replaceChildren();
+  for(const pair of [['社区收益观察','分账与回退分别查看；未确认不表示已到账'],['分账快照','查询当前社区范围的原记录'],['退款观察','只读原订单退款及分账回退观察'],['查询状态',message]])openPair(reportSummary,...pair);
+ }
+ window.communityReportView=({type,record})=>{
+  if(type==='identity-reset')reportReference.value='';
+  if(type==='binding'){clearReport('接收关系已保存，版本 '+reportValue(record.version)+'；仅适用于新分账规则版本，不执行资金操作。');return;}
+  if(type!=='listed'){clearReport(type==='loading'?'正在读取，尚未确认':type==='error'?'读取失败或无权查看，旧记录已清除':'尚未查询，不填充真实结果');return;}
+  clearReport('已读取当前页 '+record.result.records.length+' 条记录；不代表全部记录或到账。');reportRecord=record;
+  const r=record.result,earnings=record.operation==='community_earnings';reportSummary.replaceChildren();
+  for(const pair of [['社区收益观察','当前页已核实金额 '+money(r.page_gross_minor,r.currency)+'；净额 '+money(r.page_net_minor,r.currency)],['分账快照',earnings?'当前社区的原分账规则版本与接收方观察':'当前社区归属订单；未读取分账快照'],['退款观察','当前页已核实退款/回退 '+money(r.page_returns_minor,r.currency)],['查询状态',(r.totals_scope==='CURRENT_PAGE_ONLY'?'仅当前页':'汇总范围未确认')+' · '+(r.finance_status==='UNCONFIRMED'?'财务核销未确认':'财务状态：'+reportValue(r.finance_status))]])openPair(reportSummary,...pair);
+  reportShow.textContent=earnings?'查看分账快照':'查看归属订单';reportShow.disabled=false;
+  const heading=document.createElement('h3');heading.textContent=earnings?'当前页分账快照与回退观察':'当前页归属订单';reportRows.append(heading);
+  if(!r.records.length){const empty=document.createElement('p');empty.textContent='当前页没有记录；不代表其他页或未接通。';reportRows.append(empty);}
+  for(const item of r.records){const row=document.createElement('article');row.className='community-record-card';const fields=document.createElement('dl');
+   const keys=earnings?[['原订单','reference'],['分账请求','request_id'],['接收方','receiver_id'],['规则编号','rule_id'],['规则版本','rule_version'],['已核实分账','received_minor'],['已核实回退','returned_minor'],['净额','net_minor'],['渠道状态','provider_state'],['接收方状态','receiver_state'],['财务核销','finance_status']]:[['原订单','reference'],['商家','merchant_id'],['门店','store_id'],['订单金额','amount_minor'],['订单状态','order_state'],['渠道付款已核实','provider_payment_verified']];
+   for(const [label,key]of keys)openPair(fields,label,key.endsWith('_minor')?money(item[key],r.currency):key==='finance_status'&&item[key]==='UNCONFIRMED'?'未确认':key==='provider_payment_verified'?item[key]===true?'是（不代表财务核销）':item[key]===false?'否':'未返回':reportValue(item[key]));row.append(fields);reportRows.append(row);
+  }
+ };
+ reportShow.addEventListener('click',()=>{if(!reportRecord)return;reportCard.hidden=true;reportShow.hidden=true;reportDetail.hidden=false;});
+ reportBack.addEventListener('click',()=>{if(!reportRecord)return;reportDetail.hidden=true;reportCard.hidden=false;reportShow.hidden=false;});
+ clearReport('尚未查询，不填充真实结果');
+
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
   if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
@@ -110,9 +159,9 @@
   activeIndex=index;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;
   main.classList.toggle('profile-selected',index===profileIndex);
-  main.classList.toggle('open-selected',index===openIndex);
+  main.classList.toggle('open-selected',index===openIndex);main.classList.toggle('report-selected',index===reportIndex);if(index===reportIndex)reportReference.value=document.getElementById('reference').value;
   // Move, never clone, the original query result so list/detail uses the same cursor and handlers.
-  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(result)main.append(result);
+  if(index===profileIndex)profilePanel.append(result);else if(index===openIndex)openPanel.append(result);else if(index===reportIndex)reportPanel.append(result);else if(result)main.append(result);
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.

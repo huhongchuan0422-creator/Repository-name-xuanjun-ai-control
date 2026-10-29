@@ -47,3 +47,6 @@
 .community-admin .open-action-buttons{display:flex;gap:10px;flex-wrap:wrap}
 .community-admin .open-action-buttons>button{margin:0}
 @media(max-width:520px){.community-admin .open-query{align-items:stretch;flex-direction:column}.community-admin .open-query>label{max-width:none}}
+
+/* Page20 uses original query cursor; raw debug payload is not customer presentation. */
+.report-selected #records,.report-selected #result{display:none}.community-report-panel>h3[hidden]{display:none}.community-report-panel>.community-record-card{margin:16px 0}.community-report-panel>button{width:100%;margin-bottom:16px}.community-report-detail .community-record-card{margin:14px 0}.community-report-detail dl{margin:0}.community-report-detail dd{overflow-wrap:anywhere}.community-report-panel .open-query{flex-wrap:wrap}

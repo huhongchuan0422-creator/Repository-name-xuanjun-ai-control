@@ -148,6 +148,34 @@ class SessionBrowser(unittest.TestCase):
                         expect(page.locator('.community-open-panel')).not_to_contain_text('测试联系人 · 00000000000')
                         expect(page.locator('.community-open-panel')).not_to_contain_text('不得显示的测试联系人')
                         shot('19-denied-cleared-1440')
+                        # Page20 uses real original reports over the same HTTP fixture.
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区订单、收益与结算观察',exact=True).click()
+                        report_panel=page.locator('.community-report-panel')
+                        page.locator('#reportReference').fill(own_community_id)
+                        expect(page.locator('#bindReceiver')).to_be_hidden()
+                        shot('20-before-query-1440')
+                        with directory('community_earnings'):page.locator('#communityEarnings').click()
+                        report_card=report_panel.locator(':scope > .community-record-card')
+                        expect(report_card.locator('dt')).to_have_text(['社区收益观察','分账快照','退款观察','查询状态'])
+                        expect(report_card).to_contain_text('仅当前页 · 财务核销未确认')
+                        expect(report_panel).to_contain_text('已读取当前页 0 条记录')
+                        shot('20-list-empty-1440')
+                        report_panel.get_by_role('button',name='查看分账快照',exact=True).click()
+                        expect(report_panel.locator('.community-report-detail')).to_be_visible()
+                        expect(report_panel.locator('.community-report-detail')).to_contain_text('当前页没有记录')
+                        shot('20-detail-empty-1440')
+                        report_panel.get_by_role('button',name='返回观察记录',exact=True).click()
+                        expect(report_card).to_be_visible();shot('20-return-1440')
+                        with directory('community_orders'):page.locator('#communityOrders').click()
+                        expect(report_panel).to_contain_text('当前社区归属订单；未读取分账快照')
+                        page.locator('#reportReference').fill(foreign_id)
+                        with directory('community_earnings',403):page.locator('#communityEarnings').click()
+                        expect(report_panel.locator('.report-rows')).to_be_empty()
+                        expect(page.locator('#records')).to_be_empty()
+                        expect(page.locator('#more')).to_be_hidden()
+                        expect(report_panel).to_contain_text('读取失败或无权查看，旧记录已清除')
+                        expect(report_card).not_to_contain_text('¥0.00')
+                        shot('20-denied-cleared-1440')
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
@@ -172,7 +200,7 @@ class SessionBrowser(unittest.TestCase):
                             finally:conn.close()
                         self.assertEqual(errors,[])
                         (evidence/'receipt.json').write_text(json.dumps(dict(source=os.environ.get('GITHUB_SHA','LOCAL'),
-                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19'],screenshots=shots,
+                            scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',pages=['18','19','20'],screenshots=shots,
                             production=False,customer_accepted=False),ensure_ascii=False,indent=2)+'\n')
                     except Exception:
                         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
