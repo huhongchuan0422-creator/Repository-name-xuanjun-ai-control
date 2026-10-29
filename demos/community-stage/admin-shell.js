@@ -437,7 +437,7 @@
  let homeContext=null,homeRevision=0;
  const platformHome=()=>!!homeContext&&['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(homeContext.role);
  const communityHome=()=>!!homeContext&&['CUSTOMER','COMMUNITY_ADMIN','MERCHANT_ADMIN'].includes(homeContext.role);
- function syncHomeTitle(){if(activeIndex!==null)return;const title=platformHome()?'平台管理':communityHome()?'社区运营总览':'工作台';heading.textContent=title;heading.hidden=!!pageTitle;homeHeroTitle.textContent=title;if(pageTitle){pageTitle.textContent=title;pageTitle.hidden=true;}if(platformBrandText)platformBrandText.textContent=platformHome()?'社区服务 · 平台':platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=platformHome()?'平台管理工作台':platformBrandSubtitleOriginal;}
+ function syncHomeTitle(){if(activeIndex!==null)return;const title=platformHome()?'平台管理':communityHome()?'社区运营总览':'工作台';heading.textContent=title;heading.hidden=!!pageTitle;homeHeroTitle.textContent=title;const roleHome=platformHome()||communityHome();homeHeroTitle.hidden=!roleHome;if(pageTitle){pageTitle.textContent=title;pageTitle.hidden=roleHome;}if(platformBrandText)platformBrandText.textContent=platformHome()?'社区服务 · 平台':platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=platformHome()?'平台管理工作台':platformBrandSubtitleOriginal;}
  function openPlatformHomeView(operation){select(panels.indexOf(platformPanel));const field=document.getElementById('platformView');field.value=operation;field.onchange();syncOrderPageTitle();syncOperationsTitle();orderQuery.open=true;document.getElementById('readPlatformView').click();}
  function renderHome(){
   const revision=++homeRevision;cards.replaceChildren();cards.className='admin-home-groups';homeHeroActions.replaceChildren();homeEyebrow.textContent=platformHome()?'平台控制台':communityHome()?'社区工作台':'原账户工作台';
@@ -501,7 +501,8 @@
  operationQuery.classList.add('operation-query-action');reportPanel.append(reportControls);platformPanel.append(orderQuery);customerPanel.insertBefore(customerForm,customerBack);receiverPanel.insertBefore(receiverActions,receiverQueryControls);
  // Move original actions outside the data cards, never clone listeners or permission state.
  const profileSecondary=document.createElement('details'),profileSecondaryTitle=document.createElement('summary');profileSecondary.className='restored-secondary';profileSecondaryTitle.textContent='编辑与回读';profileSecondary.append(profileSecondaryTitle,edit,reread);profilePanel.append(toList,profileSecondary);
- openPanel.append(backOpen,refreshOpen);promotionPanel.append(promotionBack);memberPanel.append(memberBack,memberRefresh);
+ profilePanel.insertBefore(toList,profileQuery);profilePanel.insertBefore(profileSecondary,profileQuery);
+ openPanel.insertBefore(backOpen,openActions);openPanel.insertBefore(refreshOpen,openActions);promotionPanel.insertBefore(promotionBack,promotionActions);memberPanel.insertBefore(memberBack,memberQueryDisclosure);memberPanel.insertBefore(memberRefresh,memberQueryDisclosure);
  for(const button of [toList,backOpen,promotionBack,memberBack])button.classList.add('restored-primary-return');
  const workspaceReturn=document.createElement('button');workspaceReturn.type='button';workspaceReturn.className='restored-workspace-return';workspaceReturn.textContent='返回工作台';workspaceReturn.onclick=()=>select(null);nav.append(workspaceReturn);
  const safeText=(node,text)=>{if(node&&node.textContent!==text)node.textContent=text;};

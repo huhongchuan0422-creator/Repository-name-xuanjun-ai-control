@@ -1,5 +1,8 @@
 import re
 import unittest
+import subprocess
+import tempfile
+from pathlib import Path
 from scripts.community_web_entries import asset,entries,PAGES,ASSETS,PREFIX
 
 class RoleEntries(unittest.TestCase):
@@ -30,6 +33,22 @@ class RoleEntries(unittest.TestCase):
         self.assertIn("fetch('/community-preview/merchant/onboarding'",js)
         self.assertIn("link.href='/community-preview/merchant/workbench'",js)
         self.assertIn('credentials:',js)
+    def test_admission_same_origin_root_and_preview_return_contract(self):
+        root=Path(__file__).resolve().parents[1]
+        original=(root/'demos/community-stage/onboarding.js').read_bytes()
+        projected=asset('/merchant/onboarding.js')[0]
+        for prefix,source in [('',original),(PREFIX,projected)]:
+            with self.subTest(prefix=prefix):
+                text=source.decode()
+                self.assertIn("location.pathname==='"+prefix+"/merchant/review'",text)
+                self.assertIn("fetch('"+prefix+"/merchant/onboarding'",text)
+                self.assertIn("link.href='"+prefix+"/merchant/workbench'",text)
+                self.assertIn("r.top.href=selected?'#admission-list':'"+prefix+"/community/portal'",text)
+                self.assertIn('/community/portal',PAGES)
+                with tempfile.NamedTemporaryFile(suffix='.js') as f:
+                    f.write(source);f.flush()
+                    subprocess.run(['node',str(root/'tests/community_admission_layout_dom.cjs'),f.name,prefix],check=True,timeout=30)
+
     def test_unregistered_paths_queries_traversal_and_external_urls_never_read_files(self):
         for path in ['/etc/passwd','/merchant/../workbench','/merchant/workbench?role=admin',
                      'https://evil.invalid/merchant/workbench','/platform/anything',PREFIX+'/merchant/workbench']:

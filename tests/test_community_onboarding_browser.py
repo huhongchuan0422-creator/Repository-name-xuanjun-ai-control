@@ -16,6 +16,7 @@ import threading
 import time
 import traceback
 import unittest
+from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright,expect
 import test_community_merchant_onboarding as fixture
 from scripts.community_merchant_onboarding import BASE
@@ -35,7 +36,10 @@ def reviewer_open(page):
     def shot(label):
         if capture:
             os.makedirs('community-admin-browser-evidence',exist_ok=True);page.evaluate('window.scrollTo(0,0)');page.screenshot(path='community-admin-browser-evidence/'+prefix+'-'+label+'-1440.png',full_page=True)
-    expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#reviewTopBack')).to_have_attribute('href','/community-preview/community/portal');expect(page.locator('#reviewTopBack')).to_have_text('‹ 返回工作台');shot('30-list')
+    review_path=urlsplit(page.url).path
+    assert review_path in ('/merchant/review','/community-preview/merchant/review'),review_path
+    workspace_path=review_path.removesuffix('/merchant/review')+'/community/portal'
+    expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#reviewTopBack')).to_have_attribute('href',workspace_path);expect(page.locator('#reviewTopBack')).to_have_text('‹ 返回工作台');shot('30-list')
     page.locator('#applications button').first.click();expect(page.locator('#detail > .admission-record-card')).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核 · 详情');shot('60-detail')
     page.locator('#reviewTopBack').click();expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核');shot('30-return')
     page.locator('#applications button').first.click();page.locator('#reviewOriginalControls > summary').click();expect(page.locator('#reviewOriginalControls')).to_have_attribute('open','');expect(page.locator('#title')).to_have_text('商家入驻审核 · 审核操作');expect(page.locator('#detail > .admission-record-card')).to_be_hidden();expect(page.locator('.admission-operation-context')).to_be_visible();expect(page.locator('#reviewDecisionGroup')).to_have_attribute('open','');expect(page.locator('#reviewListFilters')).to_be_hidden();shot('61-controls')

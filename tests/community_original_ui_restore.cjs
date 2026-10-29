@@ -21,7 +21,7 @@ class Node{
 }
 const names=['main','nav','pageTitle','back','profilePanel','openPanel','promotionPanel','memberPanel','customerPanel','reportPanel','platformPanel','receiverPanel','actions','openQuery','promotionQuery','memberQuery','reportControls','orderQuery','edit','reread','toList','backOpen','refreshOpen','promotionBack','memberBack','memberRefresh','profileForm','detail','openActions','openDetails','promotionActions','promotionDetail','memberDetail','customerForm','operationQuery','receiverQueryControls','customerBack','reviewBack','merchantBack','receiverActions','receiverQuery','receiverDetail','receiverBack','orderDetail','orderBack','operationBack','snapshotDetail'];
 const c=Object.fromEntries(names.map(n=>[n,new Node(n.endsWith('Back')||n==='back'?'button':'div')]));
-c.customerPanel.append(c.customerBack,c.customerForm);c.receiverPanel.append(c.receiverQueryControls,c.receiverActions);
+c.customerPanel.append(c.customerBack,c.customerForm);c.receiverPanel.append(c.receiverQueryControls,c.receiverActions);c.openPanel.append(c.openDetails,c.openActions);c.promotionPanel.append(c.promotionDetail,c.promotionActions);
 const indices=['profile','open','promotion','member','customer','review','merchant','receiver','report'];indices.forEach((n,i)=>c[n+'Index']=i);
 c.panels=indices.map(n=>c[n+'Panel']||new Node());c.panels.push(c.platformPanel);
 c.activeIndex=null;c.customerMode=c.reviewMode=c.merchantMode=c.operationMode='list';c.snapshotMode='list';
@@ -62,3 +62,5 @@ test('10 platform nonorder edit return',()=>{const i=c.panels.indexOf(c.platform
 test('11 snapshot detail preserves current panel',()=>{active(c.reportIndex);c.snapshotMode='detail';c.sync();flush();returned(c.reportIndex,'snapshot');assert.equal(c.snapshotMode,'list');});
 test('12 reset/offpanel stale state never picks wrong handler',()=>{active(c.receiverIndex);c.receiverDetail.hidden=false;flush();active(c.profileIndex);assert.equal(c.back.textContent,'‹ 返回工作台');const before=calls.receiver||0;c.back.click();flush();assert.equal(c.activeIndex,null);assert.equal(calls.receiver||0,before);reset();active(c.receiverIndex);assert.equal(c.back.textContent,'‹ 返回工作台');c.back.click();flush();assert.equal(c.activeIndex,null);assert.equal(calls.receiver||0,before);});
 console.log(JSON.stringify({source_sha256:crypto.createHash('sha256').update(source).digest('hex'),scope:'ACTUAL_SOURCE_FRAGMENT_MOCK_EXISTING_HANDLERS_NO_BROWSER_OR_HTTP',results},null,2));if(results.some(r=>!r.pass))process.exitCode=1;
+
+for(const [panel,button,query]of [[c.profilePanel,c.toList,'profileQuery'],[c.openPanel,c.backOpen,'openQueryDisclosure'],[c.promotionPanel,c.promotionBack,'promotionQueryDisclosure'],[c.memberPanel,c.memberBack,'memberQueryDisclosure']]){const q=vm.runInContext(query,c);assert(panel.children.indexOf(button)<panel.children.indexOf(q),'primary return before auxiliary query');}

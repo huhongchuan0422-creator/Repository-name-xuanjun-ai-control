@@ -8,7 +8,7 @@ const code=readFileSync(new URL('../demos/community-stage/communities.js',import
 const merchant=(workspace,status='ACTIVE',version=0)=>({workspace,name:workspace,store_status:'ACTIVE',lifecycle:{status,version,reason:'fixture'}});
 const result=(records,cursor=null)=>({records,has_more:cursor!==null,next_cursor:cursor});
 function setup(responses){
- const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(x){this.children.push(x);},replaceChildren(...x){this.children=x;}});
+ const element=()=>({value:'',textContent:'',hidden:false,disabled:false,children:[],append(...x){this.children.push(...x);},replaceChildren(...x){this.children=x;}});
  const elements=Object.fromEntries([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>[m[1],element()]));
  elements.platformOrderStatus.value='ALL';
  const calls=[],pending=[];
@@ -48,7 +48,7 @@ test('community, platform operations and merchant paginators remain independent'
  const f=setup([{result:result([merchant('a')],'a')},{result:result([{id:'c',name:'community'}],'c')},{result:result([{id:4}],4)},{result:result([merchant('b')])},{result:result([])},{result:result([])}]);
  await f.click('platformMerchants');await f.click('mine');f.elements.platformView.value='platform_orders';await f.click('readPlatformView');await f.click('moreMerchants');
  assert.equal(f.elements.more.hidden,false);assert.equal(f.elements.morePlatformView.hidden,false);const card=f.elements.records.children[0];assert.equal(card.children[0].textContent,'记录列表 · 当前范围');
- const fields=card.children[1].children.map(x=>x.textContent);assert.deepEqual(fields,['社区名称','community','社区介绍','当前权限未返回该字段','联系人及联系方式','当前权限未返回该字段','状态','当前权限未返回该字段']);assert.equal(card.children[2].textContent,'查看详情');
+ const fields=card.children[1].children.map(x=>x.textContent);assert.deepEqual(fields,['社区名称','community','社区介绍','当前权限未返回该字段','联系人及联系方式','当前权限未返回该字段','状态','当前权限未返回该字段']);assert.equal(card.children.length,2);assert.equal(f.elements.records.children.length,2);assert.equal(f.elements.records.children[1].textContent,'查看详情');assert.equal(f.elements.records.children[1].className,'community-record-open');
  await f.click('more');await f.click('morePlatformView');
  assert.deepEqual(f.calls.map(c=>[c.body.operation,c.body.params]),[['platform_merchants',{after_workspace:''}],['mine',{}],['platform_orders',{after_id:0,status:'ALL'}],['platform_merchants',{after_workspace:'a'}],['mine',{after_id:'c'}],['platform_orders',{after_id:4,status:'ALL'}]]);
 });
