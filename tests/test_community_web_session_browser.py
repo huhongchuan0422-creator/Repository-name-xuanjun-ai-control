@@ -11,6 +11,7 @@ import socket
 import time
 import unittest
 from pathlib import Path
+from contextlib import contextmanager
 from unittest.mock import patch
 from playwright.sync_api import sync_playwright,expect
 import test_community_platform_host as fixture
@@ -67,12 +68,17 @@ class SessionBrowser(unittest.TestCase):
                         def shot(name):
                             page.screenshot(path=str(evidence/(name+'.png')),full_page=True)
                             shots.append(name+'.png')
+                        @contextmanager
                         def directory(op,status=200):
-                            return page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==status and r.request.post_data_json.get('operation')==op)
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.request.post_data_json.get('operation')==op) as event:
+                                yield
+                            response=event.value
+                            self.assertEqual(response.status,status,{'operation':op,'status':response.status,'body':response.json()})
                         page.get_by_role('button',name='登记新社区',exact=True).click()
                         page.locator('#name').fill('逐页验收测试社区')
                         page.locator('#description').fill('仅 Hosted 隔离合成数据，不代表生产记录。')
                         page.locator('#contact').fill('测试联系人 · 00000000000')
+                        shot('18-register-before-submit-1440')
                         with directory('register'):page.locator('#profile button').click()
                         expect(page.locator('.community-profile-detail')).to_be_visible()
                         with directory('mine'):page.locator('#mine').click()
@@ -132,6 +138,18 @@ class SessionBrowser(unittest.TestCase):
                         (evidence/'receipt.json').write_text(json.dumps(dict(source=os.environ.get('GITHUB_SHA','LOCAL'),
                             scope='REAL_BROWSER_ORIGINAL_UNIX_HTTP_SYNTHETIC_FIXTURE_ONLY',page='18',screenshots=shots,
                             production=False,customer_accepted=False),ensure_ascii=False,indent=2)+'\n')
+                    except Exception:
+                        evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
+                        diagnostic=dict(received=received,errors=errors,production=False,passed=False)
+                        (evidence/'failure.json').write_text(json.dumps(diagnostic,ensure_ascii=False,indent=2)+'\n')
+                        try:page.screenshot(path=str(evidence/'18-failure-1440.png'),full_page=True,timeout=5000)
+                        except Exception:pass
+                        try:diagnostic['message']=page.locator('#message').inner_text(timeout=1000)
+                        except Exception:pass
+                        try:diagnostic['input_validity']=page.locator('#profile').evaluate('(form)=>Array.from(form.elements).map(e=>({id:e.id,valid:e.checkValidity(),message:e.validationMessage}))')
+                        except Exception:pass
+                        (evidence/'failure.json').write_text(json.dumps(diagnostic,ensure_ascii=False,indent=2)+'\n')
+                        raise
                     finally:browser.close()
             # Root cannot be an admitted production peer. Only this synthetic
             # local transport substitutes source verification; Hosted uses the
