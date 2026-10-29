@@ -25,6 +25,7 @@ REVIEW_COMMUNITY='co_'+'d'*32
 
 def configure_fixture(fx):
     fx.plan['community_grants']={'platform':dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='PLATFORM_OWNER')}
+    fx.plan['community_grants']['platform_readonly']=dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='PLATFORM_REVIEWER')
     fx.plan['principals']['finance']=dict(tenant_id='tenant1',role='PLATFORM_OWNER')
     fx.plan['bindings']['finance']=dict(SCOPE)
     fx.plan['operations']['finance']=dict(user_id=fx.fx.uid1,project='project1',project_roles=['OWNER'],principal='finance')
@@ -80,6 +81,11 @@ class FinanceFixtureContract(unittest.TestCase):
                 reviewed=review_call('review',dict(community_id=REVIEW_COMMUNITY,expected_version=before['version'],decision='APPROVED',opinion='合成独立审核'))
                 self.assertEqual(reviewed['version'],2);self.assertEqual(review_call('status',dict(community_id=REVIEW_COMMUNITY))['state'],'APPROVED')
                 with self.assertRaises(PermissionError):review_call('review',dict(community_id=COMMUNITY,expected_version=1,decision='PAUSED',opinion='self review must fail'))
+                for operation,params in [('platform_overview',{}),('platform_customers',dict(after_id='')),('platform_audit',dict(after_id=0))]:
+                    value=review_call(operation,params);self.assertIsInstance(value,dict)
+                merchants=review_call('platform_merchants',dict(after_workspace=''));target=next(v for v in merchants['records'] if v['workspace']=='merchant');self.assertEqual(target['lifecycle']['version'],0)
+                changed=review_call('platform_merchant_state',dict(merchant_workspace='merchant',status='ACTIVE',expected_version=0,reason='合成原状态版本测试'));self.assertEqual(changed['version'],1)
+                with self.assertRaises(PermissionError):host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform_readonly',operation='platform_merchant_state',params=dict(merchant_workspace='merchant',status='PAUSED',expected_version=1,reason='只读审核员不得修改')))
                 with self.assertRaises(PermissionError):call('financial_records',dict(kind='REFUND',after_id=''),workspace='not_admitted')
 
 class FinanceCardsBrowser(unittest.TestCase):
@@ -156,6 +162,18 @@ class FinanceCardsBrowser(unittest.TestCase):
                             receiver_shot('finance-31-list-1440')
                             orderPanel.get_by_role('button',name='查看支付证据详情',exact=True).click();expect(orderPanel.locator('.platform-order-detail')).to_contain_text('不据此断言未支付');expect(page.locator('main h1')).to_have_text('支付证据详情');receiver_shot('finance-62-detail-1440')
                             orderPanel.get_by_role('button',name='返回原列表',exact=True).click();expect(orderPanel.locator('.platform-order-rows')).to_be_visible();expect(page.locator('main h1')).to_have_text('支付证据');receiver_shot('finance-31-return-1440')
+                            # Original28/56/57 three non-order schemas, same read scope and current filter.
+                            for operation in ['platform_overview','platform_customers','platform_audit']:
+                                orderPanel.get_by_role('button',name='打开原运营查询条件',exact=True).click() if operation!='platform_overview' else orderPanel.locator('summary').click()
+                                orderPanel.locator('#platformView').select_option(operation);orderPanel.locator('#readPlatformView').click();expect(orderPanel.locator('.platform-operation-rows .community-record-card').first).to_be_visible();orderPanel.locator('summary').click();expect(page.locator('main h1')).to_have_text('平台运营查询');receiver_shot('finance-28-'+operation+'-list-1440')
+                                orderPanel.get_by_role('button',name='查看运营记录详情',exact=True).first.click();expect(orderPanel.locator('.platform-operation-detail')).to_be_visible();expect(page.locator('main h1')).to_have_text('平台运营查询 · 详情');receiver_shot('finance-56-'+operation+'-detail-1440');orderPanel.get_by_role('button',name='返回运营查询列表',exact=True).click()
+                            orderPanel.get_by_role('button',name='打开原运营查询条件',exact=True).click();expect(page.locator('main h1')).to_have_text('平台运营查询 · 原查询条件');receiver_shot('finance-57-query-1440')
+                            # Original29/58/59 merchant lifecycle. Synthetic ACTIVE->ACTIVE version change only, not WeChat signing.
+                            page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='平台商家管理',exact=True).click();merchantPanel=page.locator('.platform-merchant-panel');expect(page.locator('.admin-brand')).to_contain_text('社区服务 · 平台');merchantPanel.locator('summary').click();merchantPanel.locator('#platformMerchants').click();expect(merchantPanel.locator('.platform-merchant-rows')).to_contain_text('merchant');merchantPanel.locator('summary').click();expect(merchantPanel.get_by_role('button',name='查看商家详情',exact=True)).to_have_css('background-color','rgb(36, 109, 79)');receiver_shot('finance-29-list-1440')
+                            merchantPanel.get_by_role('button',name='查看商家详情',exact=True).click();expect(merchantPanel.locator('.platform-merchant-detail')).to_contain_text('merchant');receiver_shot('finance-58-detail-1440');merchantPanel.get_by_role('button',name='回读所选商家当前版本',exact=True).click();expect(merchantPanel.locator('#platformMerchantVersion')).to_have_value('0')
+                            merchantPanel.get_by_role('button',name='打开原商家状态操作',exact=True).click();merchantPanel.locator('#platformMerchantState').select_option('ACTIVE');merchantPanel.locator('#platformMerchantReason').fill('合成原状态版本测试');receiver_shot('finance-59-edit-1440')
+                            with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):merchantPanel.locator('#saveMerchantState').click()
+                            merchantPanel.get_by_role('button',name='回读所选商家当前版本',exact=True).click();expect(merchantPanel.locator('#platformMerchantVersion')).to_have_value('1');expect(merchantPanel.locator('.platform-merchant-detail')).to_contain_text('合成原状态版本测试');receiver_shot('finance-59-readback-1440');merchantPanel.get_by_role('button',name='返回商家列表',exact=True).click();expect(merchantPanel.locator('.platform-merchant-rows')).to_be_visible()
                             # Real finance grant revoked on host owner thread, retaining the same browser identity.
                             page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench');expect(page.locator('#community-session [role=status]')).to_contain_text('已登录')
                             page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")

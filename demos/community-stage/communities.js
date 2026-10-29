@@ -16,11 +16,12 @@
  const promotionView=(type,record)=>{if(typeof window.communityPromotionView==='function')window.communityPromotionView({type,record});};
  const reportView=(type,record)=>{if(typeof window.communityReportView==='function')window.communityReportView({type,record});};
  const isReport=operation=>['community_orders','community_earnings'].includes(operation);
+ const merchantView=(type,record)=>{if(typeof window.communityPlatformMerchantView==='function')window.communityPlatformMerchantView({type,record});};
  let reviewSelection=null;
  const reviewView=(type,record)=>{if(typeof window.communityPlatformReviewView==='function')window.communityPlatformReviewView({type,record});};
  const profileView=(type,record)=>{if(typeof window.communityProfileView==='function')window.communityProfileView({type,record});};
  const $=id=>document.getElementById(id);let auth=null,epoch=0,current=null,page=null,busy=false,profileVersion=null,platformPage=null,merchantPage=null,directoryGeneration=0,promotionRevision=0,memberRevision=0;
- window.configureCommunityPortal=context=>{reviewSelection=null;reviewView('reset');if(typeof window.communityPlatformOrdersView==='function')window.communityPlatformOrdersView({type:'reset'});if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('identity-reset');memberView('identity-reset');$('memberCommunityReference').value='';promotionView('identity-reset');reportView('identity-reset');openView('reset');profileView('reset');epoch++;directoryGeneration++;$('directoryStatus').value='ALL';auth=null;current=null;page=null;busy=false;profileVersion=null;for(const id of ['name','description','contact','reference','opinion','nickname','customerContact','referralInput','receiverWorkspace','receiverId','receiverVersion','platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason','promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion'])$(id).value='';platformPage=null;merchantPage=null;$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('moreMerchants').hidden=true;$('moreMerchants').disabled=false;$('platformMerchants').disabled=false;$('platformMerchantState').value='ACTIVE';$('morePlatformView').hidden=true;$('platformViewResult').textContent='';$('records').replaceChildren();$('result').textContent='';$('customerResult').textContent='';$('more').hidden=true;if(context&&typeof context.csrf==='string'&&context.csrf&&typeof context.workspace==='string'&&context.workspace)auth={csrf:context.csrf,workspace:context.workspace};$('message').textContent=auth?'已连接原客户中心身份。':'请从客户中心进入已授权社区工作区。';};
+ window.configureCommunityPortal=context=>{merchantPageBoundary='';merchantView('reset');reviewSelection=null;reviewView('reset');if(typeof window.communityPlatformOrdersView==='function')window.communityPlatformOrdersView({type:'reset'});if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('identity-reset');memberView('identity-reset');$('memberCommunityReference').value='';promotionView('identity-reset');reportView('identity-reset');openView('reset');profileView('reset');epoch++;directoryGeneration++;$('directoryStatus').value='ALL';auth=null;current=null;page=null;busy=false;profileVersion=null;for(const id of ['name','description','contact','reference','opinion','nickname','customerContact','referralInput','receiverWorkspace','receiverId','receiverVersion','platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason','promotionScene','promotionTitle','promotionExpiry','promotionCode','promotionVersion'])$(id).value='';platformPage=null;merchantPage=null;$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('moreMerchants').hidden=true;$('moreMerchants').disabled=false;$('platformMerchants').disabled=false;$('platformMerchantState').value='ACTIVE';$('morePlatformView').hidden=true;$('platformViewResult').textContent='';$('records').replaceChildren();$('result').textContent='';$('customerResult').textContent='';$('more').hidden=true;if(context&&typeof context.csrf==='string'&&context.csrf&&typeof context.workspace==='string'&&context.workspace)auth={csrf:context.csrf,workspace:context.workspace};$('message').textContent=auth?'已连接原客户中心身份。':'请从客户中心进入已授权社区工作区。';};
  async function call(op,params,t){if(!auth)throw Error('需要客户中心登录');const identity=auth;const response=await fetch('/community/directory',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':identity.csrf},body:JSON.stringify({workspace:identity.workspace,operation:op,params})});const body=await response.json();if(t!==epoch)throw Error('身份已变化');if(!response.ok){const error=Error(body.error||'操作未确认，请先查询状态');error.serverRejected=true;throw error;}return body.result;}
  async function action(fn){if(busy)return;const t=epoch,generation=directoryGeneration;busy=true;try{await fn(t);if(t===epoch&&generation===directoryGeneration)$('message').textContent='操作完成';}catch(e){if(t===epoch&&generation===directoryGeneration)$('message').textContent=({ACCESS_DENIED:'无权进行此操作，请确认账户与工作区。',COMMUNITY_PRIVATE:'这条社区资料暂不可查看。'}[e.message]||e.message);}finally{if(t===epoch)busy=false;}}
  function render(r){$('result').textContent=JSON.stringify(r,null,2);if(r.id){current=r;$('reference').value=r.id;$('name').value=r.name||'';$('description').value=r.description||'';$('contact').value=r.contact||'';}}
@@ -32,7 +33,7 @@
  $('submit').onclick=()=>action(t=>communityResult(t,'submit',{community_id:id(),expected_version:version()}));
  async function readCommunity(t,reference){return communityResult(t,'status',{community_id:reference});}
  $('read').onclick=()=>action(t=>readCommunity(t,id()));
- window.communitySectionChanged=()=>{reviewSelection=null;reviewView('reset');platformSelection++;clearPlatformView();if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('reset');memberView('reset');memberRevision++;promotionView('reset');clearPromotionSelection();reportView('reset');directoryGeneration++;page=null;$('records').replaceChildren();$('result').textContent='';$('more').hidden=true;};
+ window.communitySectionChanged=()=>{merchantListRevision++;merchantSelection++;for(const field of ['platformMerchantWorkspace','platformMerchantVersion','platformMerchantReason'])$(field).value='';merchantView('reset');reviewSelection=null;reviewView('reset');platformSelection++;clearPlatformView();if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('reset');memberView('reset');memberRevision++;promotionView('reset');clearPromotionSelection();reportView('reset');directoryGeneration++;page=null;$('records').replaceChildren();$('result').textContent='';$('more').hidden=true;};
  $('reference').oninput=()=>{reviewSelection=null;reviewView('reset');if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('reset');memberView('reset');memberRevision++;promotionView('reset');clearPromotionSelection();reportView('reset');directoryGeneration++;current=null;page=null;$('records').replaceChildren();$('result').textContent='';$('more').hidden=true;for(const field of ['name','description','contact'])$(field).value='';profileView('reset');openView('reset');};
  $('mine').onclick=()=>action(async t=>{try{return await list(t,'mine',{});}catch(error){if(t===epoch){$('records').replaceChildren();$('more').hidden=true;profileView('error');}throw error;}});$('pending').onclick=()=>queryDirectory('PENDING');
  function resetDirectory(){reviewSelection=null;reviewView('reset');if(typeof window.communityReceiverReset==='function')window.communityReceiverReset('reset');memberView('reset');memberRevision++;promotionView('reset');clearPromotionSelection();openView('reset');directoryGeneration++;current=null;page=null;$('records').replaceChildren();$('result').textContent='';$('more').hidden=true;for(const field of ['reference','name','description','contact','opinion'])$(field).value='';$('message').textContent='筛选已更改，请查询平台社区';}
@@ -55,42 +56,48 @@
  $('communityEarnings').onclick=()=>action(t=>list(t,'community_earnings',{community_id:id(),after_id:''}));
  $('bindReceiver').onclick=()=>action(async t=>{const generation=directoryGeneration,selectedReference=$('reference').value;reportView('loading');$('result').textContent='';try{const r=await call('community_receiver_bind',{community_id:id(),provider_workspace:$('receiverWorkspace').value,receiver_id:$('receiverId').value,expected_version:Number($('receiverVersion').value)},t);if(t===epoch&&generation===directoryGeneration&&selectedReference===$('reference').value){$('receiverVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);reportView('binding',r);}}catch(error){if(t===epoch&&generation===directoryGeneration&&selectedReference===$('reference').value)reportView('error');throw error;}});
  let merchantListRevision=0;
- async function merchants(t,afterWorkspace=''){
+ async function merchants(t,afterWorkspace='',readWorkspace=null){
+  const readSelection=merchantSelection;merchantView('loading');
   const listRevision=++merchantListRevision;
   if(!afterWorkspace){merchantPage=null;$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('moreMerchants').hidden=true;}
   $('platformMerchants').disabled=true;$('moreMerchants').disabled=true;
   try{
-   const r=await call('platform_merchants',{after_workspace:afterWorkspace},t);if(t!==epoch)return;
+   const r=await call('platform_merchants',{after_workspace:afterWorkspace},t);if(t!==epoch||listRevision!==merchantListRevision||readWorkspace&&(readSelection!==merchantSelection||readWorkspace!==$('platformMerchantWorkspace').value))return;
    const rows=[];
    for(const item of r.records){
     const line=document.createElement('article'),select=document.createElement('button');
     line.textContent=(item.name||item.workspace)+' · '+item.workspace+' · 平台状态 '+item.lifecycle.status+' · 门店状态 '+item.store_status+' · 版本 '+item.lifecycle.version;
-    select.textContent='选择商家';select.onclick=()=>{if(busy||t!==epoch||listRevision!==merchantListRevision)return;$('platformMerchantWorkspace').value=item.workspace;$('platformMerchantVersion').value=item.lifecycle.version;$('platformMerchantState').value=item.lifecycle.status;$('platformMerchantReason').value=item.lifecycle.reason||'';};
+    select.textContent='选择商家';select.onclick=()=>{if(busy||t!==epoch||listRevision!==merchantListRevision)return;$('platformMerchantWorkspace').value=item.workspace;$('platformMerchantVersion').value=item.lifecycle.version;$('platformMerchantState').value=item.lifecycle.status;$('platformMerchantReason').value=item.lifecycle.reason||'';merchantView('detail',{item,afterWorkspace});};
     line.append(select);rows.push(line);
    }
    for(const item of r.unavailable_mappings||[]){const line=document.createElement('article');line.textContent=item.workspace+' · 原商家权限或映射不可用，未读取其门店及订单';rows.push(line);}
    $('merchantRecords').replaceChildren(...rows);
    $('merchantResult').textContent=r.coverage_complete===false?'商家覆盖不完整，共有 '+r.unavailable_mapping_count+' 个原映射不可用；当前记录不代表全部商家。\n'+JSON.stringify(r,null,2):r.records.length?JSON.stringify(r,null,2):'暂无已准入商家';
    merchantPage=r.has_more&&typeof r.next_cursor==='string'&&r.next_cursor>afterWorkspace?r.next_cursor:null;
-   $('moreMerchants').hidden=!merchantPage;
-  }catch(error){if(t===epoch){if(error.message!=='TEMPORARY_UNAVAILABLE')$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('platformMerchantWorkspace').value='';$('platformMerchantVersion').value='';$('platformMerchantReason').value='';
+   $('moreMerchants').hidden=!merchantPage;merchantPageBoundary=afterWorkspace;
+   merchantView('listed',{result:r,select:item=>{if(busy||t!==epoch||listRevision!==merchantListRevision)return;selectMerchant(item,afterWorkspace);}});
+   if(readWorkspace){const item=r.records.find(item=>item.workspace===readWorkspace);if(item)selectMerchant(item,afterWorkspace);else{$('platformMerchantVersion').value='';merchantView('error',{message:'原分页未返回所选商家，请重新查询；不能将未返回视作版本0。'});}}
+  }catch(error){if(t===epoch&&listRevision===merchantListRevision&&(!readWorkspace||readSelection===merchantSelection&&readWorkspace===$('platformMerchantWorkspace').value)){merchantView(error.message==='TEMPORARY_UNAVAILABLE'&&!readWorkspace?'temporary':'error');if(error.message!=='TEMPORARY_UNAVAILABLE')$('merchantRecords').replaceChildren();$('merchantResult').textContent='';$('platformMerchantWorkspace').value='';$('platformMerchantVersion').value='';$('platformMerchantReason').value='';
    if(error.message!=='TEMPORARY_UNAVAILABLE'){merchantPage=null;$('moreMerchants').hidden=true;}
   }throw error;}finally{if(t===epoch){$('platformMerchants').disabled=false;$('moreMerchants').disabled=false;}}
  }
  $('platformMerchants').onclick=()=>action(t=>merchants(t));
  $('moreMerchants').onclick=()=>action(t=>merchantPage&&merchants(t,merchantPage));
- let merchantSelection=0;
+ let merchantSelection=0,merchantPageBoundary='';
+ function selectMerchant(item,afterWorkspace){$('platformMerchantWorkspace').value=item.workspace;$('platformMerchantVersion').value=item.lifecycle.version;$('platformMerchantState').value=item.lifecycle.status;$('platformMerchantReason').value=item.lifecycle.reason||'';merchantPageBoundary=afterWorkspace;merchantView('detail',{item,afterWorkspace});}
+ window.communityReadMerchant=()=>action(t=>{const workspace=$('platformMerchantWorkspace').value;if(!workspace)throw Error('先选择原商家工作区');$('platformMerchantVersion').value='';return merchants(t,merchantPageBoundary,workspace);});
  const merchantSelectionKey=()=>JSON.stringify(['platformMerchantWorkspace','platformMerchantState','platformMerchantVersion','platformMerchantReason'].map(key=>$(key).value));
  for(const field of ['platformMerchantWorkspace','platformMerchantState','platformMerchantVersion','platformMerchantReason']){
-  const changed=()=>{merchantSelection++;$('result').textContent='';if(field==='platformMerchantWorkspace')$('platformMerchantVersion').value='';};
+  const changed=()=>{merchantSelection++;$('result').textContent='';if(field==='platformMerchantWorkspace')merchantView('reset');if(field==='platformMerchantWorkspace')$('platformMerchantVersion').value='';};
   $(field).oninput=changed;$(field).onchange=changed;
  }
  $('saveMerchantState').onclick=()=>action(async t=>{
+  if(String($('platformMerchantVersion').value).trim()==='')throw Error('请先回读原商家当前版本；未确认不能当作首次0');
   const selection=merchantSelection,key=merchantSelectionKey(),current=()=>t===epoch&&selection===merchantSelection&&key===merchantSelectionKey();
-  $('result').textContent='';
+  $('result').textContent='';merchantView('saving');
   try{const r=await call('platform_merchant_state',{merchant_workspace:$('platformMerchantWorkspace').value,status:$('platformMerchantState').value,expected_version:Number($('platformMerchantVersion').value),reason:$('platformMerchantReason').value},t);
-   if(!current())return;$('platformMerchantVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);
-  }catch(error){if(current())$('result').textContent='';throw error;}
+   if(!current())return;$('platformMerchantVersion').value=r.version;$('result').textContent=JSON.stringify(r,null,2);merchantView('saved',{workspace:$('platformMerchantWorkspace').value,lifecycle:r});
+  }catch(error){if(current()){$('result').textContent='';$('platformMerchantVersion').value='';merchantView('error');}throw error;}
  });
  function clearPromotionSelection(){for(const key of ['promotionCode','promotionVersion'])$(key).value='';}
  function promotionIntent(params){
@@ -116,7 +123,7 @@
  $('savePromotionState').onclick=()=>action(t=>promotionMutation(t,'promotion_state',{community_id:id(),code:$('promotionCode').value,expected_version:Number($('promotionVersion').value),status:$('promotionState').value}));
  let platformSelection=0;
  const platformSelectionKey=()=>JSON.stringify([$('platformView').value,$('platformOrderStatus').value]);
- function clearPlatformView(){if(typeof window.communityPlatformOrdersView==='function')window.communityPlatformOrdersView({type:'reset'});platformPage=null;$('morePlatformView').hidden=true;$('platformViewResult').textContent='';}
+ function clearPlatformView(){if(typeof window.communityPlatformOrdersView==='function')window.communityPlatformOrdersView({type:'reset'});if(typeof window.communityPlatformOperationsView==='function')window.communityPlatformOperationsView({type:'reset'});platformPage=null;$('morePlatformView').hidden=true;$('platformViewResult').textContent='';}
  for(const field of ['platformView','platformOrderStatus']){const changed=()=>{platformSelection++;clearPlatformView();};$(field).oninput=changed;$(field).onchange=changed;}
  // Insert inside existing communities IIFE after the original bind handler.
  let receiverGeneration=0,receiverPage=null,receiverAfter='';
@@ -160,6 +167,7 @@
   try{const r=await call(operation,params,t);if(!current())return;
    $('platformViewResult').textContent=(r.coverage_complete===false?'部分商家权限或映射不可用；以下仅为可访问门店小计，不能作为完整总额。\n':'')+JSON.stringify(r,null,2);
    if(typeof window.communityPlatformOrdersView==='function')window.communityPlatformOrdersView({type:operation==='platform_orders'?'listed':'reset',record:r,current});
+   if(typeof window.communityPlatformOperationsView==='function')window.communityPlatformOperationsView({type:operation==='platform_orders'?'reset':'listed',operation,record:r,current});
    platformPage=r.has_more?{operation,params:{...params,after_id:r.next_cursor}}:null;$('morePlatformView').hidden=!platformPage;
   }catch(error){if(current())clearPlatformView();throw error;}
  }

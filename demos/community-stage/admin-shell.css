@@ -72,3 +72,11 @@
 .platform-order-card{background:#fff;border:1px solid #d9e3dd;border-radius:16px;padding:20px;margin:20px 0}.platform-order-card h3{margin:0 0 20px;font-size:18px}.platform-order-card dl{margin:0}.platform-order-card dt{font-size:13px;color:#6d8379;margin:22px 0 4px}.platform-order-card dd{margin:0;overflow-wrap:anywhere}.platform-order-button{display:block;width:100%;background:#246d4f;color:#fff;text-align:left;padding:15px 18px;border-radius:9px;margin:0 0 22px}.platform-orders-panel>details{margin-bottom:16px}.platform-orders-panel>details>summary{cursor:pointer;color:#246d4f}.platform-order-detail[hidden]{display:none}
 
 .platform-review-panel>h2{display:none}.platform-review-button{display:block;width:100%;margin:14px 0 22px;background:#246d4f;color:white;border:0;text-align:left;padding:15px 18px;border-radius:9px;font-weight:600}.platform-review-panel>details{margin-top:22px;padding-top:14px;border-top:1px solid #d9e3dd}.platform-review-panel>details summary{color:#246d4f;cursor:pointer}.platform-review-editor{padding:20px;border:1px solid #d9e3dd;border-radius:14px;margin:20px 0}.platform-review-detail .community-record-card{margin:0 0 20px}
+
+.platform-merchant-panel>h2{display:none}.platform-merchant-editor{border:1px solid #d9e3dd;border-radius:14px;padding:20px;margin:20px 0}.platform-merchant-panel>details{border-top:1px solid #d9e3dd;padding-top:16px;margin-top:24px}.platform-merchant-panel>details summary{cursor:pointer;color:#246d4f}
+/* Confirmed external record actions only; outrank the generic admin button palette. */
+.community-admin button.platform-review-button,.community-admin button.platform-order-button{background:#246d4f;color:#fff}
+
+/* Original platform page canvases; keep the record cards as the single white surface. */
+.community-admin .platform-review-panel,.community-admin .platform-orders-panel,.community-admin .platform-merchant-panel,.community-admin .community-receiver-panel{background:transparent;border:0;padding:0;box-shadow:none}
+.community-admin .community-receiver-panel .open-detail-action{background:#246d4f;color:#fff}
