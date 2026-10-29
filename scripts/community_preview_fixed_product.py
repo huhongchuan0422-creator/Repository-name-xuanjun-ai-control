@@ -1,4 +1,4 @@
-"""Fixed 211a9 product admission for the ORIGINAL preview workflow, never deployment.
+"""Fixed c831 native product admission for the ORIGINAL preview workflow, never deployment.
 GITHUB_SHA remains the control revision. No arbitrary artifact/ref/product is accepted.
 """
 import argparse, datetime, hashlib, io, json, os, re, stat, tempfile, time, zipfile
@@ -9,36 +9,39 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
 WORKFLOW = '.github/workflows/chatgpt-community-wechat-sp-offline.yml'
-PRODUCT_SHA = '211a9f4a1425c4b2667c13052b8590c0af3b3ac1'
-PRODUCT_RUN = 40871297771
-PRODUCT_JOB = 123438740248
-ARTIFACT_ID = 12897330655
-ARTIFACT_SIZE = 12684828
-ARTIFACT_SHA256 = '0ae29468bdecce636e063cfdbe259c41db2fb72c79f0eb2f4fc7cf3bdb85d033'
-SOURCE_SHA256 = '0b326fc77a109c2b061eba3146dcee47acb07c49f5e0aa08e92bf4ee4cdc18f9'
-MANIFEST_SHA256 = 'f71eb501b8c73824ae8d2dd552e2feecbfb8b322710b95b65b8b62bd722a42a6'
+PRODUCT_SHA = 'c8317f88c91aa9d81546e7c25f6436a68e186b50'
+PRODUCT_RUN = 40956400516
+PRODUCT_JOB = 123737520252
+ARTIFACT_ID = 12934502297
+ARTIFACT_SIZE = 12746486
+ARTIFACT_SHA256 = 'e04e1c09c006e80e5cbf9bf8b66ed8d8c2fb802122e9c856a8a9975c935cd08a'
+SOURCE_SHA256 = '4e4f937949c7db90f6c226b09ed1e5dcf4ce88766a000542d226e103e0782219'
+MANIFEST_SHA256 = 'ff7b79c8b2e693ca3dc9808af8a4877eb318169b1587b0021edea882faff8d2d'
 APPID = 'wx1d5f8873eaea5392'
 PROFILE = 'uk-path-candidate'
+BACKEND_SHA = '211a9f4a1425c4b2667c13052b8590c0af3b3ac1'
+COMPATIBILITY_SHA256 = 'ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d'
+COMPATIBILITY = 'REVIEWED_FIXED_NATIVE_BACKEND_PAIR'
 BASE_URL = 'https://uk.wenwenwenyiyiyi.work/community-preview'
 CONNECTED_APP_SHA256 = '07eaedb76bc73f278eeab7235cf2f921cee0c875f890fdc26c82fb4e4699b42e'
 MAX_BYTES = 20000000
 # Exact actual product evidence archive; no arbitrary extra member admission.
 ARTIFACT_MEMBERS = {
+  "community-tests.log": [
+    606201,
+    "d3e1eb61c5ff83d3163d5e4073dee99da6b773b5575d10b5fd165c7537d130e2"
+  ],
+  "stage5-tests.log": [
+    45344,
+    "b467ee9cff969c75ff6405ae854adb35b72b583f03f797c2b8be06da0c61d7c2"
+  ],
   "community-stage-source.zip": [
-    5933336,
-    "0b326fc77a109c2b061eba3146dcee47acb07c49f5e0aa08e92bf4ee4cdc18f9"
+    6196622,
+    "4e4f937949c7db90f6c226b09ed1e5dcf4ce88766a000542d226e103e0782219"
   ],
   "community-admin-browser-evidence/16-community-home-1440.png": [
     222829,
     "9ef7897f0c7f8eae7a3c10a2c169a3ec8cc12d0b234271b5424e48352f32195d"
-  ],
-  "community-tests.log": [
-    603588,
-    "fc48904bc1b5ab0edc8e222840779a2ffb1cbcc7bb1ff445aee31f1048f1a8e4"
-  ],
-  "stage5-tests.log": [
-    45344,
-    "5c65a57acf6615aaf5e992b52ed022ebbd515f7ef0e287bfc6cacb524108b138"
   ],
   "community-admin-browser-evidence/16-community-home-390.png": [
     160800,
@@ -61,8 +64,8 @@ ARTIFACT_MEMBERS = {
     "b8b0d6b7654caae34104ca32f50d7c69074e103c3c27d91d35ff47e9ba3d0342"
   ],
   "community-admin-browser-evidence/18-list-1440.png": [
-    123882,
-    "66d4d1570a2fb5793587fd3aef3d4cad8901480c7d3edb359ff6e991e4bc11f2"
+    123918,
+    "5e80d1f8ebc2846a83cd199b26f2dcb4985517bcdc70c767ba6728fe86f635f4"
   ],
   "community-admin-browser-evidence/18-readback-1440.png": [
     108698,
@@ -73,28 +76,28 @@ ARTIFACT_MEMBERS = {
     "34dac62a55f68e018e5985d3df973302e5125bb712b7a636f726185d8d666af6"
   ],
   "community-admin-browser-evidence/18-return-1440.png": [
-    127158,
-    "0287500a621395333ed78eb0d38aa6d7f5a9fe694ff9b3db43b325068f350a20"
-  ],
-  "community-admin-browser-evidence/19-denied-cleared-1440.png": [
-    81572,
-    "4dd66d797a43fd77df3b5fda68267de2ae9344c5a933be5350280daad96e8d5c"
+    127192,
+    "1e45633c740bd4fa03a06e9575826d8905bb17640eefc56c8119a98070b0fc24"
   ],
   "community-admin-browser-evidence/19-detail-1440.png": [
-    129775,
-    "c3f6913c1ebe45747134a74039bfd4a7607513f910670f0e62eb3a431eead75c"
+    128887,
+    "29157b38c102e86a13dbc0d10264d488dfee0b30cd1ab058f7a67b2b41cbed61"
+  ],
+  "community-admin-browser-evidence/19-denied-cleared-1440.png": [
+    81588,
+    "44e028865b258e9af96b8efbe7cde41708e3c10c3b3c648b1980f708b103c337"
   ],
   "community-admin-browser-evidence/19-list-1440.png": [
-    110203,
-    "2f706c190ae46b12f30d1383b6cd7677a682e65675b9d0b3046c2dac1e91d48b"
+    109323,
+    "25725a07614cb7a2acd4720fd785e147dca6b500b384a2ae866645f33cd28f16"
   ],
   "community-admin-browser-evidence/19-return-1440.png": [
-    110203,
-    "2f706c190ae46b12f30d1383b6cd7677a682e65675b9d0b3046c2dac1e91d48b"
+    109323,
+    "25725a07614cb7a2acd4720fd785e147dca6b500b384a2ae866645f33cd28f16"
   ],
   "community-admin-browser-evidence/20-before-query-1440.png": [
-    143291,
-    "e2144af296a7df501415d47f0e4e028abc565c34fe026738d8736cb2c985c300"
+    142745,
+    "efeffcdc919146d9bbbea523a4ff13c86be10a126346b8352935b732254b77f3"
   ],
   "community-admin-browser-evidence/20-denied-cleared-1440.png": [
     142237,
@@ -105,40 +108,40 @@ ARTIFACT_MEMBERS = {
     "1e21c3a9147c55c003e63ce2fa33608589f5659d65af1d94ad7575bcdbdd1bc8"
   ],
   "community-admin-browser-evidence/20-list-empty-1440.png": [
-    129656,
-    "0c28daa05547729800fbf2b4e35dea9b81f3779f06b4f13f1a16f96406a10cc9"
+    129648,
+    "1b683cac6329a922eb4e81fb8e7a983bdf39bf9736470c99519c6de1e694ad41"
   ],
   "community-admin-browser-evidence/20-nonempty-synthetic-1440.png": [
     132773,
     "93bdd61a4fd53a6309dee24cbe5c7f38ae5300a489294d5e8053b111de263470"
   ],
   "community-admin-browser-evidence/20-return-1440.png": [
-    129647,
-    "2ddcafaf8fa3647a4fe3bf7e845667d64ac145bbe7999d05a3d7ee2fef6e395c"
+    129640,
+    "9818408bbbf50b6db502a7c0c3efa0f833d3820f9068c02a6712fd140ff8cfa5"
   ],
   "community-admin-browser-evidence/21-denied-cleared-1440.png": [
-    94962,
-    "2780f5fbbc8fe93343917f6ef162bfd149ad64ffc50754b955da1cc80f96b147"
-  ],
-  "community-admin-browser-evidence/21-list-1440.png": [
-    120388,
-    "9f6f9f1881650ea9e7cc32cf0a4bd05e2112894d3cd06d5f74c1111fd5c59107"
+    94960,
+    "e3d0b4e0a3ea68f7b7f8e388b7c030e7619db66054eb56ee2220a51fcd78a8c3"
   ],
   "community-admin-browser-evidence/21-detail-1440.png": [
-    121226,
-    "a05f263a724a38066cd483cc3de938ddce77e8cc56a7ff8c1742ab9798882f04"
+    120925,
+    "314c5c88088143fa0f2025c37371e33335d29ca18cfc180cd827207e901e647f"
+  ],
+  "community-admin-browser-evidence/21-list-1440.png": [
+    120088,
+    "34df4e49b30bc208f3bad9dd7a1fc63affe430f0ee983f1e1c6a5f6821ceb6be"
   ],
   "community-admin-browser-evidence/21-return-1440.png": [
-    120371,
-    "c5a0ada4b6830b0ab3cd5fda860c6b1c92cd4a76590aa74e4559074c34a6d61e"
+    120072,
+    "b6e2fad3860ff63a800ef54d3bb1ec784e8b46063efd3da21499cd07cd9d4fa7"
   ],
   "community-admin-browser-evidence/21-state-readback-1440.png": [
-    121529,
-    "67d364d3bbbf792cc848d18d743251eeacf7f25b3277a8a4dcc2d4d722400840"
+    121224,
+    "ba8d0d8b02c05433d0ae97f2449ecb67bec71bf5f82c5a5f63e829fe38d80a17"
   ],
   "community-admin-browser-evidence/22-denied-cleared-1440.png": [
-    98553,
-    "d38edfa2b9e1c3c8ca5038cfd457b2dba4b060e0d380ee9ba2f501661021ae19"
+    98562,
+    "0ada505b077b57fbef066a2db7a28858573a36b8a8de06e8cc942f895bb6f5b5"
   ],
   "community-admin-browser-evidence/22-list-1440.png": [
     122929,
@@ -169,8 +172,8 @@ ARTIFACT_MEMBERS = {
     "6ad170e10b1dedada1270a7459771da23b5af33a1c79ab1d6eb6feae2d971ef0"
   ],
   "community-admin-browser-evidence/24-refund-list-synthetic-1440.png": [
-    146697,
-    "d33599de9733e7548ac67836ab6a986411fe6b3e40b577362a8ee527df298562"
+    146695,
+    "beaf60742c0de81883fe0c08f8eccfd1fd36276a7c8eae5841debe40dc68072a"
   ],
   "community-admin-browser-evidence/24-refund-return-1440.png": [
     146695,
@@ -181,8 +184,8 @@ ARTIFACT_MEMBERS = {
     "b5ad8f26e7c9555af925361f924815d007dff90cc35ba06a5d149f0f3cb5540a"
   ],
   "community-admin-browser-evidence/25-platform-home-1440.png": [
-    293984,
-    "195a9177ed4468c217957177be02b2951ecfbe61f49efc77dc9f4270ee41e580"
+    293978,
+    "e44e9549cb3987eec08bb423264c00555488a35164c704e1fb943e6e584a7237"
   ],
   "community-admin-browser-evidence/25-platform-home-390.png": [
     219761,
@@ -201,16 +204,16 @@ ARTIFACT_MEMBERS = {
     "f7fc8801d0152fd16b6625fc5f1bb8689789099a7375fa63005854c441102576"
   ],
   "community-admin-browser-evidence/46-members-read-1440.png": [
-    78605,
-    "7f74d3d8e0a0c5da4e61de08499920e98a7cd133e2ac32826223f9087b9a2a18"
+    78165,
+    "d6618624486e4c54a87d609b0f4eec6050bf1ed0b5ef17720fa13d9e2ca971a6"
   ],
   "community-admin-browser-evidence/46-original-relation-controls-1440.png": [
-    104247,
-    "24eff11455fac39315673cec282f84a2046ea3c883512936acbbaae9ddc0c239"
+    103778,
+    "51e8b3b6a495d8ade29dc9ebc1d25b132d29abc7ff1704cafc51ccc9c912f6d8"
   ],
   "community-admin-browser-evidence/46-relation-controls-390.png": [
-    56328,
-    "fe72dd70b5e31f30b3681f5a73fb295813b03807a1d5d5d9b716dd8c09cefead"
+    56082,
+    "30082db7e457d9969f3098f140f547b623dc5aa9f5c810a1d73959949923b79b"
   ],
   "community-admin-browser-evidence/46-subject-denied-cleared-1440.png": [
     86370,
@@ -221,28 +224,28 @@ ARTIFACT_MEMBERS = {
     "8c5d6cc265f5229a55b97c9565dc64a3efb9119c99eb3864660f512c552cb358"
   ],
   "community-admin-browser-evidence/49-detail-1440.png": [
-    143188,
-    "7a101015b9d7363742156ce113e5510a287f5dd5b3d403c3a1fd7c60fbc73eb7"
+    142650,
+    "bbeb836a59f20796a0ef2213991333561847923e321aa71b69fc87184cd82632"
   ],
   "community-admin-browser-evidence/50-detail-synthetic-1440.png": [
     142741,
     "c317a1601c2d5f7df3ea1d2a3e08968880ab140f679da5acd7466feacdf47b72"
   ],
-  "community-admin-browser-evidence/51-refund-detail-synthetic-1440.png": [
-    162563,
-    "8340a0ae19fb51a1dc2c07511728e41f02963399cdbd4010006012fb02071e2c"
-  ],
   "community-admin-browser-evidence/admission-30-list-1440.png": [
     59152,
     "64e5a227ae638f77de972b0a97e12afffcca2d2032ec78b441a18bde560023d9"
+  ],
+  "community-admin-browser-evidence/51-refund-detail-synthetic-1440.png": [
+    163338,
+    "63f3fd44c097c247c1e7d3e2dc98bc2e842ff3cd269e283f8dc87006009fb6b7"
   ],
   "community-admin-browser-evidence/admission-30-return-1440.png": [
     59152,
     "64e5a227ae638f77de972b0a97e12afffcca2d2032ec78b441a18bde560023d9"
   ],
   "community-admin-browser-evidence/admission-60-detail-1440.png": [
-    102106,
-    "31209da06322b5fc56d8c8d0c6e7fee07516c34018ce442e3dc747fd1c4a2062"
+    103703,
+    "c20b7d0f99602e9efbfb85b21b814da0a47bc6c6ceb75e061750a36e2cb2308b"
   ],
   "community-admin-browser-evidence/admission-61-controls-1440.png": [
     103940,
@@ -261,8 +264,8 @@ ARTIFACT_MEMBERS = {
     "64e5a227ae638f77de972b0a97e12afffcca2d2032ec78b441a18bde560023d9"
   ],
   "community-admin-browser-evidence/admission-reopen-60-detail-1440.png": [
-    102638,
-    "7ed242849edf4dfa55bdac215b61b3404199be3218ee64f129327e7e6fe99f0c"
+    102897,
+    "1c867ecf81877e1c3b0659b9af4c50bb4d6d978b5fdff2919956df042dbe324c"
   ],
   "community-admin-browser-evidence/admission-reopen-61-controls-1440.png": [
     103940,
@@ -284,13 +287,13 @@ ARTIFACT_MEMBERS = {
     98540,
     "9bf6b53fe0471809e9ef32667dfe99feafb0fbeaa970d925226b5e6dab3c7bc3"
   ],
-  "community-admin-browser-evidence/finance-26-return-1440.png": [
-    98524,
-    "581318c101d196359543952b082307b9d6e665e9b2b190c323e3260f3b57bad4"
-  ],
   "community-admin-browser-evidence/finance-27-denied-1440.png": [
     99005,
     "5ee704e2422690ea94334fcb352f03ada56b5e73621d29f0e5fea5f263ae42e8"
+  ],
+  "community-admin-browser-evidence/finance-26-return-1440.png": [
+    98524,
+    "581318c101d196359543952b082307b9d6e665e9b2b190c323e3260f3b57bad4"
   ],
   "community-admin-browser-evidence/finance-27-list-1440.png": [
     110782,
@@ -301,12 +304,12 @@ ARTIFACT_MEMBERS = {
     "f94539d393c641bfb0003fb5dcfb55153714776b67c199dd51a72859a071dce5"
   ],
   "community-admin-browser-evidence/finance-28-platform_audit-list-1440.png": [
-    489558,
-    "a7fac2626a4fd762bbf82dd4b52a2b6f16bc33c667547fad3cc3e0be401c9e26"
+    489708,
+    "ea166cfb966e66ae7ae0f62dde14dbc5eb04daabd8b2d70cb3b2ab8339760ef1"
   ],
   "community-admin-browser-evidence/finance-28-platform_customers-list-1440.png": [
-    130609,
-    "26f8a6e7c22a5a1b04ec6e553faf537b46a98b17b8017aa657b85cc130a34a42"
+    130481,
+    "a6a6d1b47fa1411adc95cdd77b885febf00469778795ddf6cf64f97c6856ace8"
   ],
   "community-admin-browser-evidence/finance-28-platform_overview-list-1440.png": [
     101693,
@@ -328,11 +331,11 @@ ARTIFACT_MEMBERS = {
     88706,
     "6bd909fd5b5eb12a2964507c90aa1aeb0628e54930a04d08e3d18e10dc3c2079"
   ],
-  "community-admin-browser-evidence/finance-32-return-1440.png": [
+  "community-admin-browser-evidence/finance-32-list-1440.png": [
     60881,
     "83ec99eb68e4807614c1f354289a57b0742c69e663e324bc6403c835c7516cef"
   ],
-  "community-admin-browser-evidence/finance-32-list-1440.png": [
+  "community-admin-browser-evidence/finance-32-return-1440.png": [
     60881,
     "83ec99eb68e4807614c1f354289a57b0742c69e663e324bc6403c835c7516cef"
   ],
@@ -381,8 +384,8 @@ ARTIFACT_MEMBERS = {
     "f224686f7ce0bce5aed78f13cedf19dd5ae6973a39756bc2812791357a1e2441"
   ],
   "community-admin-browser-evidence/finance-42-profile-edit-1440.png": [
-    101767,
-    "2ac9021a0b6224c9f119450bb38e3c16ce3424244ebe96a847a636563da4762b"
+    101761,
+    "21d74d1d9572e298110956325e27ed286f1ddec2ac0bb455214c0052d399fc1e"
   ],
   "community-admin-browser-evidence/finance-42-profile-edit-390.png": [
     53578,
@@ -393,8 +396,8 @@ ARTIFACT_MEMBERS = {
     "1fdaeb6eae793df9c38b0dcfee61af42223e5b074b889dd52dab243c55d0b08c"
   ],
   "community-admin-browser-evidence/finance-53-edit-1440.png": [
-    97955,
-    "6994a810b4ff7b20aa117f15934af22d57ad032f77c86803c3cc557a8b62bcd5"
+    97932,
+    "7cc630c54ebc7e8ca9f1e489606b83071b9cb4c997d3864eba17f4fd4a07deb4"
   ],
   "community-admin-browser-evidence/finance-53-readback-1440.png": [
     121579,
@@ -417,12 +420,12 @@ ARTIFACT_MEMBERS = {
     "7093ce4e0f2b7903df086bbcd61638075ff8b9eced7973df3d3534f23384c86c"
   ],
   "community-admin-browser-evidence/finance-56-platform_audit-detail-1440.png": [
-    131168,
-    "e1c164748aca73fbb18c16160365d7f74ec88a62111cae26b5972c99326a0ed9"
+    130901,
+    "78e2a5290edfec23234a112dd1e5796c354d6982274338d53c083ce3d97d72f4"
   ],
   "community-admin-browser-evidence/finance-56-platform_customers-detail-1440.png": [
-    113464,
-    "763f71e28a09fe81bc4fd9c804affee241513869b96a61345a2719be7cc47e1d"
+    113658,
+    "edacfb11dac9ab33c15c09f6a11d55fc5d8d83485e608f8d0fa1f65ebd1c91b7"
   ],
   "community-admin-browser-evidence/finance-56-platform_overview-detail-1440.png": [
     125204,
@@ -474,7 +477,7 @@ ARTIFACT_MEMBERS = {
   ],
   "community-admin-browser-evidence/receipt.json": [
     1412,
-    "3e64852259b8de922c4f7b439ba69371889d30dca40cfe04cd077c73817a0ced"
+    "2830a0e9278aa103dbeef5bdfa36be68434c33dfd7a3c4dd882fc7e29db93c8f"
   ],
   "community-admin-browser-evidence/split-snapshot-receipt.json": [
     2053,
@@ -551,7 +554,7 @@ def evidence(run, jobs, artifacts, env, now=None):
             and binding.get('repository_id') == 1413132159
             and binding.get('head_repository_id') == 1413132159,
             'FIXED_UNEXPIRED_ARTIFACT_BINDING_REQUIRED')
-    return dict(status='FIXED_211A9_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
+    return dict(status='FIXED_C831_NATIVE_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
                 product_source_sha=PRODUCT_SHA, product_run_id=PRODUCT_RUN,
                 product_test_job_id=PRODUCT_JOB, artifact_id=ARTIFACT_ID,
                 artifact_sha256=ARTIFACT_SHA256, source_zip_sha256=SOURCE_SHA256,
@@ -679,7 +682,7 @@ def paths(env):
 
 def verify_receipt(receipt, env):
     control = context(env)
-    require(receipt.get('status') == 'FIXED_211A9_PRODUCT_EVIDENCE_VERIFIED'
+    require(receipt.get('status') == 'FIXED_C831_NATIVE_PRODUCT_EVIDENCE_VERIFIED'
             and receipt.get('control_source_sha') == control
             and receipt.get('product_source_sha') == PRODUCT_SHA
             and receipt.get('product_run_id') == PRODUCT_RUN
@@ -719,6 +722,21 @@ def stage(source, receipt, env):
     write_new(context_file, (json.dumps(receipt, sort_keys=True) + '\n').encode())
     return receipt
 
+def compatibility_binding():
+    raw = read_regular(Path(__file__).resolve().parents[1] /
+                       'deploy/community-preview/native-backend-compatibility.json', 300000)
+    require(hashlib.sha256(raw).hexdigest() == COMPATIBILITY_SHA256,
+            'FIXED_COMPATIBILITY_PROOF_REQUIRED')
+    proof = strict_json(raw)
+    require(proof.get('frontend_source_sha') == PRODUCT_SHA
+            and proof.get('backend_source_sha') == BACKEND_SHA
+            and proof.get('archives', {}).get('frontend', {}).get('sha256') == SOURCE_SHA256
+            and proof.get('source_scope_result') == 'SCOPED_PASS'
+            and proof.get('all_delta_classified') is True and proof.get('unknown_delta') == [],
+            'FIXED_COMPATIBILITY_PROOF_REQUIRED')
+    return dict(backend_source_sha=BACKEND_SHA, compatibility=COMPATIBILITY,
+                compatibility_sha256=COMPATIBILITY_SHA256)
+
 def identity(env):
     require(env.get('COMMUNITY_FIXED_PRODUCT_PREVIEW', 'false') in ('true', 'false'), 'EXACT_PRODUCT_MODE_REQUIRED')
     if env.get('COMMUNITY_FIXED_PRODUCT_PREVIEW', 'false') != 'true':
@@ -749,9 +767,10 @@ def identity(env):
     require(actual == expected, 'FIXED_PRODUCT_SOURCE_CHANGED')
     prepared = {k: v for k, v in expected.items() if not k.endswith('.test.cjs')}
     prepared['app.js'] = CONNECTED_APP_SHA256
-    require(len(prepared) == 27, 'FIXED_PREPARED_SOURCE_SET_REQUIRED')
+    require(len(prepared) == 35, 'FIXED_PREPARED_SOURCE_SET_REQUIRED')
     return dict(product_source_sha=PRODUCT_SHA, control_source_sha=receipt['control_source_sha'],
-                source_root=str(destination), prepared_files=prepared, fixed_product=True)
+                source_root=str(destination), prepared_files=prepared, fixed_product=True,
+                **compatibility_binding())
 
 def main():
     parser = argparse.ArgumentParser()
@@ -782,6 +801,7 @@ def safe_failure_reason(exc):
     # Publish only fixed non-sensitive diagnoses, never URLs, token values or traces.
     allowed = frozenset(('FIXED_ARTIFACT_MEMBER_BYTES_SHA_REQUIRED', 'FIXED_ARTIFACT_MEMBERS_REQUIRED', 'FIXED_ARTIFACT_BYTES_SHA_REQUIRED',
         'FIXED_PRODUCT_SOURCE_SHA_REQUIRED', 'FIXED_PRODUCT_MANIFEST_SHA_REQUIRED',
+        'FIXED_COMPATIBILITY_PROOF_REQUIRED',
         'FIXED_PRODUCT_PUSH_EVIDENCE_REQUIRED', 'FIXED_PRODUCT_TEST_REQUIRED',
         'FIXED_UNEXPIRED_ARTIFACT_BINDING_REQUIRED', 'GITHUB_ARTIFACT_STORAGE_REQUIRED',
         'FIXED_ARTIFACT_REDIRECT_REQUIRED', 'EXACT_FIXED_PRODUCT_CONTROL_CONTEXT_REQUIRED'))

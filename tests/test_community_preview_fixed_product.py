@@ -39,9 +39,9 @@ class Contracts(unittest.TestCase):
     def test_control_product_separate_and_fixed_literals(self):
         r=p.evidence(*self.records,self.env)
         self.assertEqual(r['control_source_sha'],CONTROL)
-        self.assertEqual(r['product_source_sha'],'211a9f4a1425c4b2667c13052b8590c0af3b3ac1')
+        self.assertEqual(r['product_source_sha'],'c8317f88c91aa9d81546e7c25f6436a68e186b50')
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
-        self.assertEqual(r['artifact_id'],12897330655)
+        self.assertEqual(r['artifact_id'],12934502297)
         self.assertFalse(r['upload_performed'])
     def test_context_rejects_wrong_branch_control_product_mode_run_and_target(self):
         for key,value in [('GITHUB_EVENT_NAME','push'),('GITHUB_REPOSITORY','other/repo'),
@@ -111,7 +111,7 @@ class Contracts(unittest.TestCase):
         for values in ({'COMMUNITY_PREVIEW_PRODUCT_CONTEXT':'anything'},{'COMMUNITY_FIXED_PRODUCT_PREVIEW':'maybe'}):
             with self.assertRaises(ValueError):p.identity(dict(env,**values))
     def test_health_exact_product_and_freshness_not_control_sha(self):
-        identity=dict(product_source_sha=p.PRODUCT_SHA,control_source_sha=CONTROL,fixed_product=True)
+        identity=dict(product_source_sha=p.PRODUCT_SHA,control_source_sha=CONTROL,fixed_product=True,**p.compatibility_binding())
         class Headers:
             def get_content_type(self):return 'application/json'
         class Response:
@@ -123,7 +123,7 @@ class Contracts(unittest.TestCase):
             def __exit__(self,*args):pass
         now=int(time.time())
         body=dict(status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
-          runtime_source_sha=p.PRODUCT_SHA,version_source='IMAGE_BUILD_STAMP',observed_at=now)
+          runtime_source_sha=p.BACKEND_SHA,version_source='IMAGE_BUILD_STAMP',observed_at=now)
         report=health.check(lambda *a,**k:Response(body),p.PROFILE,identity)
         self.assertEqual(report['status'],'BACKEND_HEALTH_VERIFIED')
         self.assertEqual(report['frontend_source_sha'],p.PRODUCT_SHA)
@@ -135,7 +135,7 @@ class Contracts(unittest.TestCase):
             handlers=builder.call_args.args
             self.assertTrue(any(isinstance(h,health.ProxyHandler) and h.proxies=={} for h in handlers))
             self.assertTrue(any(isinstance(h,health.NoRedirect) for h in handlers))
-        for values in ({'runtime_source_sha':CONTROL},{'observed_at':now-601},{'observed_at':now+31},
+        for values in ({'runtime_source_sha':CONTROL},{'runtime_source_sha':p.PRODUCT_SHA},{'runtime_source_sha':'06053b6a16a8e6efcd324dffe06612b9384aaaf1'},{'observed_at':now-601},{'observed_at':now+31},
                        {'observed_at':True},{'production_acceptance':True},{'version_source':'CLIENT_ENV'}):
             report=health.check(lambda *a,**k:Response(dict(body,**values)),p.PROFILE,identity)
             self.assertEqual(report['status'],'BACKEND_NOT_READY')
@@ -143,7 +143,7 @@ class Contracts(unittest.TestCase):
         w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         preview=w.split('  mini-preview:\n',1)[1]
         self.assertIn("inputs.preview_source_sha == github.sha",preview)
-        self.assertIn("inputs.preview_evidence_run_id == '40871297771'",preview)
+        self.assertIn("inputs.preview_evidence_run_id == '40956400516'",preview)
         self.assertIn("github.ref == 'refs/heads/"+p.BRANCH+"'",preview)
         self.assertIn('runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]',preview)
         self.assertIn('test "$(hostname -s)" = iZvt5t8tlrm8oiZ',preview)
@@ -189,7 +189,7 @@ class Contracts(unittest.TestCase):
                 return Response()
         with patch.object(p,'build_opener',return_value=Opener()):
             self.assertEqual(p.download_archive('SYNTHETIC_TOKEN'),b'fixture bytes')
-        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12897330655/zip')
+        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12934502297/zip')
         self.assertEqual(requests[0].get_header('Authorization'),'Bearer SYNTHETIC_TOKEN')
         self.assertIsNone(requests[1].get_header('Authorization'))
     def test_download_rejects_untrusted_redirect_and_missing_token(self):
@@ -207,15 +207,39 @@ class Contracts(unittest.TestCase):
         now=int(time.time())
         report=dict(target,status='BACKEND_HEALTH_VERIFIED',http_status=200,login_verified=False,
           customer_acceptance=False,payment_enabled=False,frontend_source_sha=p.PRODUCT_SHA,
-          backend_source_sha=p.PRODUCT_SHA,backend_version_source='IMAGE_BUILD_STAMP',compatibility='EXACT_SOURCE_MATCH',
+          backend_source_sha=p.BACKEND_SHA,backend_version_source='IMAGE_BUILD_STAMP',compatibility=p.COMPATIBILITY,compatibility_sha256=p.COMPATIBILITY_SHA256,
           control_source_sha=CONTROL,backend_observed_at=now,observed_at=now)
         program="const {verifyReadiness}=require(process.argv[1]);const x=JSON.parse(process.argv[2]);verifyReadiness(x.report,x.target,x.head,x.now,x.control);for(const v of [undefined,'b'.repeat(40)]){try{verifyReadiness({...x.report,control_source_sha:v},x.target,x.head,x.now,x.control);}catch(e){if(e.message==='MATCHING_CONTROL_READINESS_REQUIRED')continue;throw e;}throw Error('missing control gate');}"
         result=subprocess.run(['node','-e',program,str(ROOT/'deploy/community-preview/endpoint.cjs'),json.dumps(dict(report=report,target=target,head=p.PRODUCT_SHA,now=now,control=CONTROL))],capture_output=True,text=True,timeout=10)
         self.assertEqual(result.returncode,0,result.stderr)
+    def test_fixed_compatibility_proof_tamper_and_missing_rejected(self):
+        binding=p.compatibility_binding()
+        self.assertEqual(binding['backend_source_sha'],p.BACKEND_SHA)
+        self.assertNotEqual(p.BACKEND_SHA,p.PRODUCT_SHA)
+        self.assertEqual(binding['compatibility'],p.COMPATIBILITY)
+        for raw in (b'{}',b'',b'not a proof'):
+            with patch.object(p,'read_regular',return_value=raw),self.assertRaisesRegex(ValueError,'FIXED_COMPATIBILITY_PROOF_REQUIRED'):
+                p.compatibility_binding()
+    def test_node_fixed_pair_denies_old_runtime_unknown_pair_forged_proof_and_stale_health(self):
+        now=int(time.time())
+        target=dict(profile=p.PROFILE,baseUrl=p.BASE_URL,origin='https://uk.wenwenwenyiyiyi.work',health_url=p.BASE_URL+'/community/health')
+        report=dict(target,status='BACKEND_HEALTH_VERIFIED',http_status=200,login_verified=False,
+          customer_acceptance=False,payment_enabled=False,frontend_source_sha=p.PRODUCT_SHA,
+          backend_source_sha=p.BACKEND_SHA,backend_version_source='IMAGE_BUILD_STAMP',compatibility=p.COMPATIBILITY,
+          compatibility_sha256=p.COMPATIBILITY_SHA256,control_source_sha=CONTROL,backend_observed_at=now,observed_at=now)
+        changes=[{'backend_source_sha':'06053b6a16a8e6efcd324dffe06612b9384aaaf1'},
+          {'backend_source_sha':p.PRODUCT_SHA},{'backend_source_sha':'b'*40},
+          {'frontend_source_sha':'b'*40},{'compatibility_sha256':'0'*64},
+          {'compatibility':'EXACT_SOURCE_MATCH'},{'backend_observed_at':now-601},
+          {'observed_at':now-601},{'payment_enabled':True}]
+        program="const {verifyReadiness}=require(process.argv[1]);const x=JSON.parse(process.argv[2]);verifyReadiness(x.report,x.target,x.head,x.now,x.control);for(const delta of x.changes){let denied=false;try{verifyReadiness({...x.report,...delta},x.target,x.head,x.now,x.control);}catch(_){denied=true;}if(!denied)throw Error('PAIR_MUTATION_ALLOWED');}"
+        result=subprocess.run(['node','-e',program,str(ROOT/'deploy/community-preview/endpoint.cjs'),json.dumps(dict(report=report,target=target,head=p.PRODUCT_SHA,now=now,control=CONTROL,changes=changes))],capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def test_node_identity_child_does_not_receive_credentials(self):
         script="""const cp=require('node:child_process');let called=false;
 cp.execFileSync=(bin,args,opts)=>{called=true;if('WECHAT_MINIPROGRAM_PRIVATE_KEY' in opts.env||'GITHUB_TOKEN' in opts.env)throw Error('credential leaked');
-return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'211a9f4a1425c4b2667c13052b8590c0af3b3ac1',source_root:'/fixture'});};
+return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'c8317f88c91aa9d81546e7c25f6436a68e186b50',source_root:'/fixture',backend_source_sha:'211a9f4a1425c4b2667c13052b8590c0af3b3ac1',compatibility:'REVIEWED_FIXED_NATIVE_BACKEND_PAIR',compatibility_sha256:'ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d'});};
 const p=require(process.argv[1]);p.sourceIdentity();if(!called)throw Error('identity admission missing');"""
         env=dict(self.env,WECHAT_MINIPROGRAM_PRIVATE_KEY='SYNTHETIC_CANARY_NOT_A_KEY',GITHUB_TOKEN='SYNTHETIC_CANARY_NOT_A_TOKEN')
         r=subprocess.run(['node','-e',script,str(ROOT/'deploy/community-preview/endpoint.cjs')],
@@ -274,7 +298,7 @@ class ExactArtifact(unittest.TestCase):
 
     def test_actual_frozen_source_set_and_appid(self):
         files=p.source_files(self.raw)
-        self.assertEqual(len(files),505)
+        self.assertEqual(len(files),517)
         self.assertEqual(json.loads(files['clients/community-mini/project.config.json'])['appid'],p.APPID)
     def test_exact_stage_identity_and_duplicate_stage_denial(self):
         destination,context=self.stage()
@@ -305,7 +329,7 @@ class ExactArtifact(unittest.TestCase):
         prepared=json.loads((out/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
         self.assertEqual(prepared['frontend_source_sha'],p.PRODUCT_SHA)
         self.assertEqual(prepared['control_source_sha'],CONTROL)
-        self.assertEqual(len(prepared['prepared_files']),27)
+        self.assertEqual(len(prepared['prepared_files']),35)
         self.assertEqual(before,p.SOURCE_SHA256)
         self.assertFalse(prepared['upload_performed']);self.assertIsNone(prepared['scene'])
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
@@ -316,8 +340,8 @@ class ExactArtifact(unittest.TestCase):
         proof.write_text(json.dumps(dict(status='BACKEND_HEALTH_VERIFIED',http_status=200,profile=p.PROFILE,
           baseUrl=p.BASE_URL,origin='https://uk.wenwenwenyiyiyi.work',health_url=p.BASE_URL+'/community/health',
           login_verified=False,customer_acceptance=False,payment_enabled=False,frontend_source_sha=p.PRODUCT_SHA,
-          backend_source_sha=p.PRODUCT_SHA,control_source_sha=CONTROL,backend_version_source='IMAGE_BUILD_STAMP',
-          compatibility='EXACT_SOURCE_MATCH',backend_observed_at=now,observed_at=now)))
+          backend_source_sha=p.BACKEND_SHA,control_source_sha=CONTROL,backend_version_source='IMAGE_BUILD_STAMP',
+          compatibility=p.COMPATIBILITY,compatibility_sha256=p.COMPATIBILITY_SHA256,backend_observed_at=now,observed_at=now)))
         env.update(COMMUNITY_MINI_PROJECT_PATH=str(out),COMMUNITY_PREVIEW_READINESS_RECEIPT=str(proof),
                    COMMUNITY_PREVIEW_OUTPUT=str(self.root/'preview'))
         r=subprocess.run(['node',str(ROOT/'scripts/community_mini_preview.cjs')],env=env,capture_output=True,text=True,timeout=20)

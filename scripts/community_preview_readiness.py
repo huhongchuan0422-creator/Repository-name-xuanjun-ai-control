@@ -9,6 +9,11 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 ORIGIN='https://community-preview.wenwenwenyiyiyi.work'
 URL=ORIGIN+'/community/health'
 
+FIXED_FRONTEND = 'c8317f88c91aa9d81546e7c25f6436a68e186b50'
+FIXED_BACKEND = '211a9f4a1425c4b2667c13052b8590c0af3b3ac1'
+FIXED_PROOF_SHA256 = 'ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d'
+FIXED_COMPATIBILITY = 'REVIEWED_FIXED_NATIVE_BACKEND_PAIR'
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):return None
 
@@ -36,6 +41,14 @@ def check(open_url=None, profile=None, product_identity=None):
         if product_identity and product_identity['fixed_product']:
             report['control_source_sha']=product_identity['control_source_sha']
         report.update(target,frontend_source_sha=head,compatibility='UNVERIFIED')
+        expected_backend=head
+        compatibility='EXACT_SOURCE_MATCH'
+        if product_identity and product_identity.get('fixed_product'):
+            if (head != FIXED_FRONTEND or product_identity.get('backend_source_sha') != FIXED_BACKEND
+                    or product_identity.get('compatibility') != FIXED_COMPATIBILITY
+                    or product_identity.get('compatibility_sha256') != FIXED_PROOF_SHA256):return report
+            expected_backend=FIXED_BACKEND;compatibility=FIXED_COMPATIBILITY
+            report['compatibility_sha256']=FIXED_PROOF_SHA256
         if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
@@ -48,15 +61,15 @@ def check(open_url=None, profile=None, product_identity=None):
             if (type(value) is not dict or value.get('status')!='READY'
                     or value.get('scope')!='PROCESS_AND_DATABASE_CONNECTIVITY'
                     or value.get('production_acceptance') is not False):return report
-            # Only the responding runtime supplies the backend SHA. This version
-            # admits exact source equality; no unreviewed cross-version pair.
+            # Only the responding runtime supplies the backend SHA. Only the exact source equality or independently pinned native/backend pair
+            # is admitted; no arbitrary cross-version allowance.
             backend=value.get('runtime_source_sha')
             report['backend_source_sha']=backend if type(backend) is str and re.fullmatch('[0-9a-f]{40}',backend) else None
             now=int(time.time());observed=value.get('observed_at')
-            if (report['backend_source_sha']!=head or value.get('version_source')!='IMAGE_BUILD_STAMP'
+            if (report['backend_source_sha']!=expected_backend or value.get('version_source')!='IMAGE_BUILD_STAMP'
                     or type(observed) is not int or observed>now+30 or now-observed>600):return report
             report.update(observed_at=now,backend_observed_at=observed,
-                          backend_version_source='IMAGE_BUILD_STAMP',compatibility='EXACT_SOURCE_MATCH')
+                          backend_version_source='IMAGE_BUILD_STAMP',compatibility=compatibility)
             report['status']='BACKEND_HEALTH_VERIFIED'
     except Exception:
         # Never print remote content, exception text or credentials.

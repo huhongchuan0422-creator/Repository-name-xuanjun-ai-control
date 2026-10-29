@@ -1,5 +1,6 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
+const FIXED_FRONTEND='c8317f88c91aa9d81546e7c25f6436a68e186b50',FIXED_BACKEND='211a9f4a1425c4b2667c13052b8590c0af3b3ac1',FIXED_PROOF_SHA256='ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d',FIXED_COMPATIBILITY='REVIEWED_FIXED_NATIVE_BACKEND_PAIR';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
@@ -60,7 +61,8 @@ function sourceIdentity(){
   {env:childEnv,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['ignore','pipe','pipe']}));}
  catch(_){throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');}
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||
-    identity.product_source_sha!=='211a9f4a1425c4b2667c13052b8590c0af3b3ac1')throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
+    identity.product_source_sha!==FIXED_FRONTEND||identity.backend_source_sha!==FIXED_BACKEND||
+    identity.compatibility!==FIXED_COMPATIBILITY||identity.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
 
@@ -74,12 +76,16 @@ function endpoint(profile=process.env.COMMUNITY_PREVIEW_PROFILE??'legacy'){
 }
 function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),controlSha=null){
  if(controlSha!==null&&report?.control_source_sha!==controlSha)throw Error('MATCHING_CONTROL_READINESS_REQUIRED');
+ const fixedPair=head===FIXED_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
+ const expectedBackend=fixedPair?FIXED_BACKEND:head;
+ const expectedCompatibility=fixedPair?FIXED_COMPATIBILITY:'EXACT_SOURCE_MATCH';
+ if(fixedPair && report?.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||
     report.login_verified!==false||report.customer_acceptance!==false||report.payment_enabled!==false||
-    !/^[a-f0-9]{40}$/.test(head||'')||report.frontend_source_sha!==head||report.backend_source_sha!==head||
-    report.backend_version_source!=='IMAGE_BUILD_STAMP'||report.compatibility!=='EXACT_SOURCE_MATCH'||
+    !/^[a-f0-9]{40}$/.test(head||'')||report.frontend_source_sha!==head||report.backend_source_sha!==expectedBackend||
+    report.backend_version_source!=='IMAGE_BUILD_STAMP'||report.compatibility!==expectedCompatibility||
     !Number.isSafeInteger(now)||!Number.isSafeInteger(report.backend_observed_at)||
     report.backend_observed_at>now+30||now-report.backend_observed_at>600||
     !Number.isSafeInteger(report.observed_at)||report.observed_at>now+30||now-report.observed_at>600)

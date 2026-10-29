@@ -152,7 +152,7 @@ class EndpointContract(unittest.TestCase):
     def test_helpers_are_required_zip_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             source=self.extracted(Path(tmp))
-            for name in ('endpoint.cjs','endpoint-profiles.json'):
+            for name in ('endpoint.cjs','endpoint-profiles.json','native-backend-compatibility.json'):
                 p=source/'deploy/community-preview'/name
                 original=p.read_bytes();p.unlink()
                 with self.assertRaisesRegex(ValueError,'REQUIRED_SOURCE_MISSING'):
@@ -184,7 +184,7 @@ class EndpointContract(unittest.TestCase):
         def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message=''):
             contexts.append(dict(expected=expected,github=dict(event_name=event,sha=HEAD,ref=ref,
                 event=dict(head_commit=dict(message=message))),inputs=dict(preview_enabled=enabled,
-                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='40871297771')))
+                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='40956400516')))
         case(False);case(False,enabled=True,sha='b'*40)
         case(False,enabled=True,target='legacy');case(False,enabled=True,ref='refs/heads/main')
         case(True,enabled=True);case(False,event='push')

@@ -49,7 +49,8 @@ async function main(){
    entry_page:'pages/home/index',scene:null,search_query:'',entry_mode:'EXISTING_SCENELESS_GUIDANCE',
    frontend_source_sha:identity.product_source_sha,
    backend_source_sha:readiness?readiness.backend_source_sha:null,
-   compatibility:'EXACT_SOURCE_MATCH',source_hashes:{},status:'NOT_RUN'};
+   compatibility:readiness?readiness.compatibility:'UNVERIFIED',
+   compatibility_sha256:readiness?readiness.compatibility_sha256||null:null,source_hashes:{},status:'NOT_RUN'};
  function source(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   const file=path.join(dir,entry.name);if(entry.isSymbolicLink())throw Error('SYMLINK_SOURCE_DENIED');
   if(entry.isDirectory())source(file);else if(!file.endsWith('.test.cjs'))receipt.source_hashes[path.relative(projectPath,file)]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
