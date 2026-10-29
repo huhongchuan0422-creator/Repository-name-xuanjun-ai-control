@@ -60,7 +60,7 @@
  // Page 19 uses only original status/membership responses. A selected kind is not proof of membership.
  const openPanel=document.getElementById('reference').closest('section'),openIndex=panels.indexOf(openPanel);
  openPanel.classList.add('community-open-panel');
- const openHint=document.createElement('p');openHint.className='profile-hint';openHint.textContent='输入社区编号查询，只有原服务端允许的资料才会显示。';
+ const openHint=document.createElement('p');openHint.className='profile-hint';openHint.textContent='输入社区编号，查询您有权查看的社区资料。';
  const openCard=document.createElement('article');openCard.className='community-record-card';openCard.hidden=true;
  const openCardTitle=document.createElement('h3');openCardTitle.textContent='记录列表 · 当前范围';openCard.append(openCardTitle);
  const openSummary=document.createElement('dl');openCard.append(openSummary);
@@ -71,8 +71,17 @@
  const backOpen=document.createElement('button');backOpen.type='button';backOpen.textContent='返回社区记录';
  const refreshOpen=document.createElement('button');refreshOpen.type='button';refreshOpen.textContent='回读社区资料';
  openDetails.append(backOpen,refreshOpen);openPanel.append(openHint,openCard,showOpen,openDetails);
- const kindNote=document.createElement('p');kindNote.className='profile-hint';kindNote.textContent='关系类型为本次加入或退出的操作选择，不代表已确认的当前关系。';
+ const kindNote=document.createElement('p');kindNote.className='profile-hint';kindNote.textContent='选择本次加入或退出的身份，不代表您当前的社区关系。';
  document.getElementById('kind').closest('label').append(kindNote);
+ // Keep original IDs/listeners: query first, field card next, optional actions last.
+ const openQuery=document.createElement('div');openQuery.className='open-query';
+ openQuery.append(document.getElementById('reference').closest('label'),document.getElementById('read'));
+ const openActions=document.createElement('details');openActions.className='open-actions';
+ const actionsTitle=document.createElement('summary');actionsTitle.textContent='关系与成员操作';openActions.append(actionsTitle);
+ const relationButtons=document.createElement('div');relationButtons.className='open-action-buttons';
+ relationButtons.append(document.getElementById('join'),document.getElementById('leave'),document.getElementById('members'));
+ openActions.append(document.getElementById('kind').closest('label'),relationButtons);
+ openPanel.append(openQuery,openHint,openCard,showOpen,openDetails,openActions);
  let openRecord=null,openMembers=false;
  function clearOpen(message){openRecord=null;openMembers=false;openCard.hidden=true;showOpen.hidden=true;openDetails.hidden=true;openSummary.replaceChildren();openFields.replaceChildren();openHint.textContent=message;}
  function openPair(target,label,value){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;target.append(dt,dd);}
@@ -81,8 +90,8 @@
   if(type==='members'){clearOpen('成员查询使用原权限；以下仅为当前页记录。');openMembers=true;if(activeIndex===openIndex&&result)result.hidden=false;return;}
   if(type==='relation'){clearOpen(record.active?'本次加入已获服务端确认；请回读社区资料。':'本次退出已获服务端确认；请回读社区资料。');if(activeIndex===openIndex&&result)result.hidden=true;return;}
   if(type!=='status')return;
-  clearOpen('资料已读取；当前关系未由服务端返回，不从操作选择推断。');openRecord=record;
-  openPair(openSummary,'社区编号',record.id);openPair(openSummary,'关系类型','当前关系未由服务端返回');
+  clearOpen('资料已读取，可查看详情；当前社区关系尚未确认。');openRecord=record;
+  openPair(openSummary,'社区编号',record.id);openPair(openSummary,'关系类型','当前关系未确认');openPair(openSummary,'列表说明','点击下方按钮查看完整社区资料。');
   for(const [label,key] of [['社区编号','id'],['社区名称','name'],['社区介绍','description'],['状态','state'],['当前版本','version'],['联系人及联系方式','contact']]){
    if(record[key]===undefined)continue;
    const value=key==='state'?({DRAFT:'草稿',PENDING:'待审核',CORRECTION:'待补充资料',REJECTED:'已驳回',APPROVED:'已通过',PAUSED:'已暂停'}[record[key]]||String(record[key])):String(record[key]);openPair(openFields,label,value);
@@ -96,7 +105,7 @@
 
  function select(index){
   if(index!==activeIndex&&typeof window.communitySectionChanged==='function')window.communitySectionChanged();
-  if(index!==openIndex){openMembers=false;clearOpen('输入社区编号查询，只有原服务端允许的资料才会显示。');}
+  if(index!==openIndex){openMembers=false;clearOpen('输入社区编号，查询您有权查看的社区资料。');}
   if(activeIndex===profileIndex&&index!==profileIndex)emptyProfile('切换功能后请重新查询社区资料。');
   activeIndex=index;
   if(pageTitle)pageTitle.textContent=index===null?'社区运营工作台':panels[index].querySelector('h2').textContent;

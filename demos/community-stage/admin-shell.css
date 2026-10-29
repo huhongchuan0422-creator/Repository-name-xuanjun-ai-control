@@ -35,3 +35,15 @@
 .community-admin .community-open-panel .open-detail-action{display:block;width:100%;background:var(--green);color:white;text-align:left;margin:18px 0}
 .community-admin .community-open-panel .open-detail-action[hidden]{display:none}
 .community-admin .community-open-panel>section{border:0;padding:0;background:transparent}
+
+/* Page19 matched information hierarchy: compact query, real record, retained optional actions. */
+.community-admin .open-query{display:flex;align-items:flex-end;gap:12px;margin:0 0 12px}
+.community-admin .open-query>label{display:grid;gap:6px;flex:1;margin:0;font-size:14px;max-width:640px}
+.community-admin .open-query input{box-sizing:border-box;width:100%;max-width:none;margin:0;padding:10px 12px;border:1px solid #b8ccbf;border-radius:8px;font:inherit}
+.community-admin .open-query>button{margin:0;flex:none}
+.community-admin .open-actions{border-top:1px solid var(--line);padding:16px 0;margin-top:24px}
+.community-admin .open-actions>summary{color:var(--green);font-size:14px}
+.community-admin .open-actions>label{display:block;margin:16px 0 12px}
+.community-admin .open-action-buttons{display:flex;gap:10px;flex-wrap:wrap}
+.community-admin .open-action-buttons>button{margin:0}
+@media(max-width:520px){.community-admin .open-query{align-items:stretch;flex-direction:column}.community-admin .open-query>label{max-width:none}}
