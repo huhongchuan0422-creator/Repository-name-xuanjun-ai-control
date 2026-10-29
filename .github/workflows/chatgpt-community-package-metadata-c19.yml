@@ -10,7 +10,7 @@ permissions:
   contents: read
 jobs:
   deliver-fixed-metadata:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-c9d1ab]')
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-f9603d]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
           retention-days: 3
 
   deliver-fixed-installer:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-installer-c9d1ab]')
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-installer-f9603d]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,14 +51,14 @@ jobs:
           python - <<'PYVERIFY'
           import hashlib,pathlib
           raw=pathlib.Path('delivery/community-package-metadata-c19/COMMUNITY_211_ORIGINAL_INSTALL.py').read_bytes()
-          assert len(raw)==437353
-          assert hashlib.sha256(raw).hexdigest()=='c9d1ab1cff4c066690cbd327ae4596bc1cebfb8e25a33abfa28c7c2acc06d5f9'
+          assert len(raw)==444025
+          assert hashlib.sha256(raw).hexdigest()=='f9603de88dc5379e63e639542b3512c4baea8a3503539f00a462bf6f63e61887'
           print('FIXED_INSTALLER_BYTES_MATCH; NOT_EXECUTED; NOT_INSTALLED')
           PYVERIFY
       - name: Publish exact single installer member
         uses: actions/upload-artifact@v4
         with:
-          name: reviewed-community-211a9-installer-c9d1ab
+          name: reviewed-community-211a9-installer-f9603d
           path: delivery/community-package-metadata-c19/COMMUNITY_211_ORIGINAL_INSTALL.py
           compression-level: 0
           if-no-files-found: error
