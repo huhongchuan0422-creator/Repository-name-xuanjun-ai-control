@@ -205,7 +205,13 @@ class HistoricalFixtureContract(unittest.TestCase):
         prep=condition('Verify original historical inputs for source tests')
         full=condition('Complete Phase1 and Phase2 source regression')
         self.assertEqual(prep,condition('Retrieve and verify immutable nested 1d and 005c carrier fixtures'))
-        self.assertTrue(prep.endswith(' || ('+full+')'))
+        # Preflight remains the original superset; only full regression excludes
+        # the narrowly classified screenshot capture test with its explicit tag.
+        capture_guard = " && !(steps.scope.outputs.capture_only == 'true' && contains(github.event.head_commit.message, '[web-session-browser-scope]'))"
+        self.assertTrue(full.startswith('(') and full.endswith(')'+capture_guard))
+        full_core = full[1:-len(')'+capture_guard)]
+        self.assertEqual(full, '('+full_core+')'+capture_guard)
+        self.assertTrue(prep.endswith(' || ('+full_core+')'))
         for marker in ['preview-b-resume-scope','preview-stopped-handoff-scope','preview-stage-a-scope','preview-post-receipt-scope','preview-preupdate-observation-scope']:self.assertIn('['+marker+']',prep)
         self.assertLess(workflow.index('      - name: Verify original historical inputs for source tests'),workflow.index('      - name: Issue76 carrier handoff isolated candidate tests'))
         block=workflow.split('      - name: Verify original historical inputs for source tests\n',1)[1].split('      - name:',1)[0]
