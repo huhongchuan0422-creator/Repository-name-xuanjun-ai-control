@@ -22,6 +22,7 @@ class SessionBrowser(unittest.TestCase):
     def test_original_login_workspaces_role_reads_csrf_and_logout(self):
         fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.tearDown)
         fx.plan['community_grants']={'community':dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='COMMUNITY_ADMIN')}
+        fx.plan['community_grants']['community_member']=dict(user_id=fx.fx.uid1,project='project1',tenant='tenant1',role='CUSTOMER')
         fx.plan['nginx_uid']=os.geteuid() or 65534
         fx.write('host.json',fx.plan)
         with fx.open() as host:
@@ -41,6 +42,11 @@ class SessionBrowser(unittest.TestCase):
                 dict(id=promotion_community,tenant='tenant1',owner=fx.fx.uid1,name='推广隔离测试社区',
                      description='仅页面21测试',contact='合成联系人',state='APPROVED',
                      version=1,opinion='',updated_at=host.center.now()))
+            # Exact original same-subject encrypted membership fixture. Not a real join.
+            relation_key=host.application.communities.key('tenant1','CUSTOMER:'+fx.fx.uid1)
+            relation=dict(community_id=promotion_community,tenant='tenant1',user_id=fx.fx.uid1,kind='CUSTOMER',updated_at=host.center.now())
+            from scripts.pr122_customer_core import canonical
+            host.center.db.execute("INSERT INTO links VALUES('COMMUNITY_RELATION_V1',?,?,?,?,1)",(relation_key,fx.fx.uid1,'project1',host.center.encrypt(canonical(relation),'community-relation:'+relation_key)))
             from scripts.community_consumer_communities import PROMOTIONS
             from scripts.pr122_customer_core import canonical
             promotion_record=dict(id=promotion_code,community_id=promotion_community,tenant='tenant1',
@@ -83,10 +89,10 @@ class SessionBrowser(unittest.TestCase):
                             expect(panel.locator('[role=status]')).to_contain_text('已登录')
                         base=fx.plan['https_origin']+'/community-preview'
                         page.goto(base+'/merchant/workbench');login('one@example.org')
-                        self.assertEqual(page.locator('#community-session select').input_value(),'merchant')
+                        self.assertEqual(page.locator('#community-session select[aria-label="已授权工作区"]').input_value(),'merchant')
                         with page.expect_response(lambda r:r.url.endswith('/community/operations') and r.status==200):page.locator('#loadOrders').click()
                         page.goto(base+'/community/portal')
-                        expect(page.locator('#community-session select')).to_have_value('community')
+                        expect(page.locator('#community-session select[aria-label="已授权工作区"]')).to_have_value('community')
                         page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
                         expect(page.locator('#mine')).to_be_visible()
                         evidence=Path('community-admin-browser-evidence');evidence.mkdir(exist_ok=True)
@@ -95,6 +101,16 @@ class SessionBrowser(unittest.TestCase):
                             page.evaluate('window.scrollTo(0,0)')
                             page.screenshot(path=str(evidence/(name+'.png')),full_page=True)
                             shots.append(name+'.png')
+                        home_nav=page.get_by_role('navigation',name='社区功能',exact=True)
+                        home_nav.get_by_role('button',name='工作台首页',exact=True).click()
+                        expect(page.locator('main h1')).to_have_text('社区运营总览')
+                        expect(page.locator('.admin-home .admin-card')).to_have_count(9)
+                        expect(page.locator('.admin-home-group')).to_have_count(2)
+                        shot('16-community-home-1440')
+                        page.set_viewport_size({'width':390,'height':844});shot('16-community-home-390')
+                        self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),390)
+                        page.set_viewport_size({'width':1440,'height':1100})
+                        home_nav.get_by_role('button',name='社区资料',exact=True).click()
                         @contextmanager
                         def directory(op,status=200):
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.request.post_data_json.get('operation')==op) as event:
@@ -148,7 +164,7 @@ class SessionBrowser(unittest.TestCase):
                         open_card=page.locator('.community-open-panel .community-record-card')
                         expect(open_card).to_be_visible()
                         expect(open_card.locator('dt')).to_have_text(['社区编号','关系类型','列表说明'])
-                        expect(open_card.locator('dd')).to_have_text([own_community_id,'当前关系未确认','点击下方按钮查看完整社区资料。'])
+                        expect(open_card.locator('dd')).to_have_text([own_community_id,'当前工作区角色不适用加入关系','点击下方按钮查看完整社区资料。'])
                         expect(page.locator('#members')).to_be_hidden()
                         self.assertLess(page.locator('.community-open-panel .open-query').bounding_box()['y'],open_card.bounding_box()['y'])
                         self.assertLess(open_card.bounding_box()['y'],page.locator('.community-open-panel .open-actions').bounding_box()['y'])
@@ -160,7 +176,10 @@ class SessionBrowser(unittest.TestCase):
                         page.get_by_role('button',name='返回社区记录',exact=True).click()
                         expect(open_card).to_be_visible();shot('19-return-1440')
                         page.locator('.community-open-panel .open-actions > summary').click()
+                        for original in ('kind','join','leave','members'):expect(page.locator('#'+original)).to_be_visible()
+                        shot('46-original-relation-controls-1440')
                         with directory('members'):page.locator('#members').click()
+                        expect(page.locator('#records')).to_be_visible();shot('46-members-read-1440')
                         page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
                         with directory('mine'):page.locator('#mine').click()
                         expect(card).to_be_visible()
@@ -177,9 +196,11 @@ class SessionBrowser(unittest.TestCase):
                         # Page20 uses real original reports over the same HTTP fixture.
                         page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区订单、收益与结算观察',exact=True).click()
                         report_panel=page.locator('.community-report-panel')
+                        if page.locator('.report-query-controls').get_attribute('open') is None:page.locator('.report-query-controls > summary').click()
                         page.locator('#reportReference').fill(own_community_id)
                         expect(page.locator('#bindReceiver')).to_be_hidden()
                         shot('20-before-query-1440')
+                        if page.locator('.report-query-controls').get_attribute('open') is None:page.locator('.report-query-controls > summary').click()
                         with directory('community_earnings'):page.locator('#communityEarnings').click()
                         report_card=report_panel.locator(':scope > .community-record-card')
                         expect(report_card.locator('dt')).to_have_text(['社区收益观察','分账快照','退款观察','查询状态'])
@@ -192,9 +213,12 @@ class SessionBrowser(unittest.TestCase):
                         shot('20-detail-empty-1440')
                         report_panel.get_by_role('button',name='返回观察记录',exact=True).click()
                         expect(report_card).to_be_visible();shot('20-return-1440')
+                        if page.locator('.report-query-controls').get_attribute('open') is None:page.locator('.report-query-controls > summary').click()
                         with directory('community_orders'):page.locator('#communityOrders').click()
                         expect(report_panel).to_contain_text('当前社区归属订单；未读取分账快照')
+                        if page.locator('.report-query-controls').get_attribute('open') is None:page.locator('.report-query-controls > summary').click()
                         page.locator('#reportReference').fill(foreign_id)
+                        if page.locator('.report-query-controls').get_attribute('open') is None:page.locator('.report-query-controls > summary').click()
                         with directory('community_earnings',403):page.locator('#communityEarnings').click()
                         expect(report_panel.locator('.report-rows')).to_be_empty()
                         expect(page.locator('#records')).to_be_empty()
@@ -262,11 +286,26 @@ class SessionBrowser(unittest.TestCase):
                         expect(member_detail).to_be_hidden();expect(page.locator('#more')).to_be_hidden()
                         expect(member_panel).not_to_contain_text('原商家表合成门店')
                         shot('22-denied-cleared-1440')
+                        account=page.locator('.admin-account')
+                        if account.get_attribute('open') is None:account.locator('summary').click()
+                        page.locator('#community-session select').select_option('community_member')
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='打开社区',exact=True).click()
+                        page.locator('#reference').fill(promotion_community)
+                        with directory('status'):page.locator('#read').click()
+                        expect(open_card).to_contain_text('已加入当前社区 · 消费者')
+                        if page.locator('.community-open-panel .open-actions').get_attribute('open') is None:page.locator('.community-open-panel .open-actions > summary').click()
+                        shot('46-current-subject-relation-1440')
+                        page.locator('#reference').fill(foreign_id)
+                        with directory('status',403):page.locator('#read').click()
+                        expect(open_card).to_be_hidden();expect(page.locator('.community-open-panel')).not_to_contain_text('已加入当前社区')
+                        shot('46-subject-denied-cleared-1440')
+                        if account.get_attribute('open') is not None:account.locator('summary').click()
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
                         self.assertEqual(result,403)
                         page.locator('.admin-account summary').click()
                         page.locator('[data-logout]').click();expect(page.locator('#community-session [role=status]')).to_have_text('已退出登录。')
+                        expect(page.locator('.admin-home .admin-card')).to_have_count(0);expect(page.locator('main h1')).to_have_text('工作台');shot('16-logout-neutral-1440')
                         page.goto(base+'/merchant/review')
                         with page.expect_response(lambda r:r.url.endswith('/merchant/onboarding') and r.request.post_data_json.get('operation')=='review_list' and r.status==200):
                             login('two@example.org')
@@ -378,7 +417,7 @@ class SessionMutationRaces(unittest.TestCase):
                             submit('one@example.org');logged();pair=live()
                             held.pop('check')();page.wait_for_timeout(80)
                             self.assertEqual(live(),pair)
-                            expect(panel.locator('select')).to_have_value('merchant')
+                            expect(panel.locator('select[aria-label="已授权工作区"]')).to_have_value('merchant')
                         self.assertEqual(errors,[])
                     finally:browser.close()
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:

@@ -3,6 +3,8 @@
 No provider network, payment, refund, split, reconciliation execution, or API
 response fabrication. Screenshots prove only isolated browser rendering.
 """
+from email.message import Message
+from scripts.community_web_session import WebSession,COOKIE
 import concurrent.futures
 import hashlib
 import http.client
@@ -60,17 +62,43 @@ def seed_observations(host,uid,independent_owner):
     key=hashlib.sha256(canonical([SCOPE,value['reference']])).hexdigest()
     c.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',('COMMUNITY_ORDER_RECONCILIATION',key,uid,'project1',c.encrypt(canonical(value),'community-order-reconciliation:'+key)))
 
+def seed_unknown_return_observation(host,uid):
+    # Synthetic persisted PRE-RESPONSE return envelope, shaped exactly like the
+    # original SplitReturns reservation. No result/body_sha: NOT verified success.
+    from scripts.community_provider_reference import provider_order_reference
+    actions=host.application.provider_actions;c=host.center
+    web=c.login('one@example.org','FixturePassword123!')
+    grant,policy=actions._authorize(web['token'],web['csrf'],'finance')
+    p=dict(reference='synthetic_return_order',request_id='req_return',receiver_id='community',amount_minor=7,description='Synthetic saved unknown return')
+    return_ref='sr'+hashlib.sha256(canonical([actions.reader._mchid,grant['scope'],p['reference'],p['request_id']])).hexdigest()[:30]
+    key=hashlib.sha256(canonical([actions.reader._mchid,'RETURN',return_ref])).hexdigest()
+    value=dict(reference=p['reference'],request_id=p['request_id'],receiver_id=p['receiver_id'],scope=grant['scope'],project=grant['project'],user_id=grant['user_id'],policy_hash=actions._policy_hash(policy),payload=dict(sub_mchid=policy['sub_mchid'],out_order_no='synthetic_prior_split',out_return_no=return_ref,return_mchid=policy['receivers']['community']['account'],amount=p['amount_minor'],description=p['description']),request_hash=hashlib.sha256(canonical(p)).hexdigest())
+    assert grant['user_id']==uid and grant['scope']==SCOPE
+    with c.tx():c.db.execute("INSERT INTO links VALUES('COMMUNITY_PROVIDER_RETURN',?,?,?,?,1)",(key,uid,grant['project'],c.encrypt(canonical(value),'community-provider-return:'+key)))
+    # No original split/budget/return execution is claimed by a saved fixture.
+    return value
+
 class FinanceFixtureContract(unittest.TestCase):
     def test_original_dispatch_without_socket_or_provider(self):
         fx=fixture.FormalHost();fx.setUp();self.addCleanup(fx.doCleanups);configure_fixture(fx)
         with patch('urllib.request.urlopen',side_effect=AssertionError('NO_PROVIDER_NETWORK')):
             with fx.open() as host:
                 seed_observations(host,fx.fx.uid1,fx.fx.uid2);web=host.center.login('one@example.org','FixturePassword123!')
+                # The real Host fixture already grants the exact same scope; no new grant here.
+                session=WebSession(host.center,host.application.operations,host.application.communities,host.application.onboarding,provider_actions=host.application.provider_actions,merchant_bills=host.application.merchant_bills)
+                headers=Message();headers['Cookie']=COOKIE+'='+web['token'];headers['X-CSRF-Token']=web['csrf']
+                checked,_=session.dispatch('/community/session/check',headers,{},'127.0.0.1')
+                selected=next(w for w in checked['workspaces'] if w['kind']=='MERCHANT' and w['workspace']=='merchant')
+                self.assertEqual(selected['finance_options'],{'provider':[{'workspace':'finance'}],'merchant_bill':[]})
+                merchant=host.application.operations.grants['merchant'];finance,_=host.application.provider_actions._authorize(web['token'],web['csrf'],'finance')
+                for key in ('user_id','project','tenant','scope'):self.assertEqual(merchant[key],finance[key])
                 def call(op,p,workspace='finance'):
                     return host.application.provider_actions.dispatch(web['token'],web['csrf'],dict(workspace=workspace,operation=op,params=p))
                 for kind in ('REFUND','SPLIT'):
                     r=call('financial_records',dict(kind=kind,after_id=''));self.assertEqual(len(r['records']),1);self.assertFalse(r['records'][0]['provider_response_verified']);self.assertFalse(r['records'][0]['automatic_retry_allowed'])
                 self.assertEqual(call('financial_records',dict(kind='RETURN',after_id=''))['records'],[])
+                seed_unknown_return_observation(host,fx.fx.uid1)
+                returned=call('financial_records',dict(kind='RETURN',after_id=''))['records'];self.assertEqual(len(returned),1);self.assertEqual(returned[0]['amount_minor'],7);self.assertEqual(returned[0]['receiver_id'],'community');self.assertEqual(returned[0]['status'],'UNKNOWN_QUERY_EXISTING_ONLY');self.assertFalse(returned[0]['provider_response_verified']);self.assertFalse(returned[0]['automatic_retry_allowed']);self.assertNotIn('currency',returned[0])
                 self.assertEqual(call('reconciliation_read',dict(reference='synthetic_order'))['finance_status'],'UNCONFIRMED')
                 read=host.application.communities.dispatch(web['token'],web['csrf'],dict(workspace='platform',operation='community_receiver_list',params=dict(community_id=COMMUNITY,provider_workspace='finance',after_id='')))
                 self.assertEqual(read['records'][0]['version'],1);self.assertFalse(read['funds_operation_executed'])
@@ -104,7 +132,7 @@ class FinanceCardsBrowser(unittest.TestCase):
             with fx.open() as host:
                 seed_observations(host,fx.fx.uid1,fx.fx.uid2)
                 server=host.application.listen_proxy(fx.plan['socket_path'],fx.plan['https_origin'],fx.plan['nginx_uid'],fx.plan['nginx_gid']);server.timeout=.1
-                received=[];shots=[];revoke_finance=threading.Event();revoked_finance=threading.Event()
+                received=[];shots=[];revoke_finance=threading.Event();revoked_finance=threading.Event();seed_return=threading.Event();return_seeded=threading.Event()
                 def flow():
                     def forward(route):
                         req=route.request;path=req.url.removeprefix(fx.plan['https_origin']+'/community-preview')
@@ -123,8 +151,14 @@ class FinanceCardsBrowser(unittest.TestCase):
                             page.route(fx.plan['https_origin']+'/**',forward)
                             page.goto(fx.plan['https_origin']+'/community-preview/merchant/workbench')
                             panel=page.locator('#community-session');panel.locator('[name=email]').fill('one@example.org');panel.locator('[name=password]').fill('FixturePassword123!');panel.get_by_role('button',name='登录',exact=True).click();expect(panel.locator('[role=status]')).to_contain_text('已登录')
-                            # Existing session CSRF; explicit synthetic admitted finance workspace, no new auth.
-                            page.evaluate("configureCommunityWorkbench({csrf:sessionStorage.getItem('community-original-csrf'),workspace:'merchant',providerWorkspace:'finance'})")
+                            # Normal session/check supplies options; selection enables only an existing grant.
+                            panel.get_by_role('combobox',name='已授权工作区',exact=True).select_option('merchant')
+                            financeSelector=panel.get_by_role('combobox',name='已授权门店财务工作区',exact=True)
+                            expect(financeSelector).to_have_value('');expect(page.locator('#providerActions')).to_be_hidden()
+                            expect(financeSelector.locator('option')).to_have_count(2)
+                            expect(financeSelector.locator('option[value="finance"]')).to_have_count(1)
+                            expect(panel.get_by_role('combobox',name='已授权整商户账单只读工作区',exact=True)).to_be_hidden()
+                            financeSelector.select_option('finance');expect(page.locator('#providerActions')).to_be_visible()
                             def shot(name):
                                 page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/(name+'.png')),full_page=True);shots.append(name+'.png')
                             for kind,prefix in [('REFUND','finance-32'),('SPLIT','finance-33')]:
@@ -134,6 +168,14 @@ class FinanceCardsBrowser(unittest.TestCase):
                                 page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('摘要未提供金额');shot(prefix+'-detail-1440')
                                 page.locator('#financialObservationBack').click();expect(page.locator('#financialKind')).to_have_value(kind);expect(page.locator('#financialObservationList')).to_be_visible();shot(prefix+'-return-1440')
                             page.locator('#financeReturn').click();page.locator('#financialReadControls summary').click();page.locator('#financialRecords').click();expect(page.locator('#financialObservationList')).to_contain_text('当前范围没有可见记录');page.locator('#financialReadControls summary').click();shot('finance-33-return-empty-1440')
+                            seed_return.set()
+                            if not return_seeded.wait(5):raise AssertionError('synthetic return fixture seed not acknowledged')
+                            page.locator('#financialReadControls summary').click()
+                            with page.expect_response(lambda r:r.url.endswith('/community/provider-actions') and r.status==200):page.locator('#financialRecords').click()
+                            expect(page.locator('#financialObservationList')).to_contain_text('req_return');page.locator('#financialReadControls summary').click();shot('finance-33-return-nonempty-1440')
+                            page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click()
+                            expect(page.locator('#workbenchTitle')).to_have_text('分账回退详情');expect(page.locator('#financialObservationDetail')).to_contain_text('community');expect(page.locator('#financialObservationDetail')).to_contain_text('7 最小货币单位（原记录未返回币种）');expect(page.locator('#financialObservationDetail')).to_contain_text('UNKNOWN_QUERY_EXISTING_ONLY');expect(page.locator('#financialObservationDetail')).to_contain_text('未验证');expect(page.locator('#financialObservationDetail')).to_contain_text('未确认');shot('finance-65-return-detail-1440')
+                            page.locator('#financialObservationBack').click();expect(page.locator('#financialObservationList')).to_contain_text('req_return');expect(page.locator('#financialKind')).to_have_value('RETURN');shot('finance-65-return-back-1440')
                             page.locator('#financeReconciliation').click();page.locator('#financialReadControls summary').click();page.locator('#providerOrder').fill('synthetic_order');page.locator('#readReconciliation').click();expect(page.locator('#financialObservationList')).to_contain_text('synthetic_order');page.locator('#financialReadControls summary').click();shot('finance-34-list-1440')
                             page.locator('#financialObservationList').get_by_role('button',name='查看详情',exact=True).click();expect(page.locator('#financialObservationDetail')).to_contain_text('不是全量日账单');shot('finance-34-detail-1440')
                             # Original page27 reads the same real fixture receiver binding; no second system.
@@ -199,11 +241,13 @@ class FinanceCardsBrowser(unittest.TestCase):
                             expect(page.locator('#financialObservation')).to_be_hidden();expect(page.locator('#financialObservationDetail')).to_be_empty();expect(page.locator('#providerActionResult')).to_be_empty();page.locator('#financialReadControls summary').click();page.evaluate('window.scrollTo(0,0)');page.screenshot(path=str(evidence/'finance-denied-1440.png'),full_page=True);shots.append('finance-denied-1440.png')
                             self.assertEqual(errors,[])
                             self.assertTrue(all(r['operation'] in ('financial_records','reconciliation_read') for r in received if r['operation']))
-                            (evidence/'finance-receipt.json').write_text(json.dumps(dict(scope='SYNTHETIC_ORIGINAL_HOST_HTTP_NOT_CUSTOMER_ACCEPTANCE',shots=shots,received=received,browser_assertions_passed=True),ensure_ascii=False,indent=2)+'\n')
+                            (evidence/'finance-receipt.json').write_text(json.dumps(dict(scope='SYNTHETIC_ORIGINAL_HOST_HTTP_NOT_CUSTOMER_ACCEPTANCE',return_fixture='SYNTHETIC_PERSISTED_UNKNOWN_NO_PROVIDER_RESULT_NO_FUNDS_EXECUTION',shots=shots,received=received,browser_assertions_passed=True),ensure_ascii=False,indent=2)+'\n')
                         finally:browser.close()
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future=pool.submit(flow);deadline=time.monotonic()+90
                     while not future.done() and time.monotonic()<deadline:
+                        if seed_return.is_set() and not return_seeded.is_set():
+                            seed_unknown_return_observation(host,fx.fx.uid1);return_seeded.set()
                         if revoke_finance.is_set() and not revoked_finance.is_set():
                             host.application.provider_actions.operations.grants.pop('finance');revoked_finance.set()
                         server.handle_request()

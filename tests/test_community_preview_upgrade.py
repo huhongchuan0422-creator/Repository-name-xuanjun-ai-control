@@ -40,6 +40,14 @@ def legacy_onboarding_asset(filename="community_preview_2330_onboarding.html"):
     return raw.encode()
 
 
+def legacy_session_asset():
+    """Pinned original session transport, not the current role/finance projection."""
+    raw=(Path(__file__).parent/'fixtures/community_preview_2330_web-session.js').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!='021e4e78e275d71a350b0e010e6544ac61e458c70060c458a021b0c553e2261f':
+        raise AssertionError('FROZEN_ORIGINAL_SESSION_BYTES_CHANGED')
+    return re.sub(r"([\"'])(/(?:merchant|community)/[A-Za-z0-9_./-]+)\1",lambda m:m[1]+'/community-preview'+m[2]+m[1],raw.decode()).encode()
+
+
 class UpgradeBoundary(unittest.TestCase):
     def test_fixed_source_fragment_image_and_original_role_assets(self):
         # Frozen historical installer bytes remain immutable; current candidate adds only two assets.
@@ -47,12 +55,12 @@ class UpgradeBoundary(unittest.TestCase):
         self.assertEqual(hashlib.sha256(u.FRAGMENT).hexdigest(),'df55f5f11413c623d3f9d966b6feacf54fda25ecfe42ee11d70052d544f2ca83')
         self.assertEqual(hashlib.sha256(current).hexdigest(),'82e81b56e2adeb1519ff34a981e0f5a8037923df59718192ee5eafe2d03f11a9')
         self.assertEqual(current,u.FRAGMENT.replace(b'|web-session',b'|admin-shell\\.(css|js)|web-session',1))
-        from scripts.community_web_entries import asset
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():
             raw=(legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else
                  legacy_onboarding_asset('community_preview_2330_communities.html') if path=='/community/portal' else
-                 legacy_onboarding_asset('community_preview_2330_workbench.html') if path=='/merchant/workbench' else asset(path)[0])
+                 legacy_onboarding_asset('community_preview_2330_workbench.html') if path=='/merchant/workbench' else
+                 legacy_session_asset())
             self.assertEqual(digest,hashlib.sha256(raw).hexdigest(),path)
         self.assertEqual(u.SOURCE,'2330dd55c07f58d7f45a7c4510a9761d0d4735d6')
     def test_only_existing_bounded_container_and_mounts_are_admitted(self):
@@ -208,10 +216,10 @@ class PublicReloadReadiness(unittest.TestCase):
 
 class PublicRealHTTP(unittest.TestCase):
     def test_real_http_404_then_exact_assets_and_catalog(self):
+        from scripts.community_web_entries import asset
         import json,threading
         from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
         from urllib.request import urlopen
-        from scripts.community_web_entries import asset
         requests=[]
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):pass

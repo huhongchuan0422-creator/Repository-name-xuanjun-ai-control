@@ -82,6 +82,26 @@ class CenterCommunities:
             if changed.rowcount != 1:
                 raise ValueError('COMMUNITY_VERSION_CONFLICT')
 
+    def current_subject_relation(self,grant,community_id):
+        kind={'CUSTOMER':'CUSTOMER','MERCHANT_ADMIN':'MERCHANT'}.get(grant['role'])
+        result=dict(state='NOT_APPLICABLE' if kind is None else 'NOT_JOINED',kind=kind,community_id=community_id,updated_at=None)
+        if kind is None:return result
+        key=self.key(grant['tenant'],kind+':'+grant['user_id'])
+        row=self.center.db.execute('SELECT user_id,payload,active FROM links WHERE channel=? AND subject_idx=? AND project=?',
+            (MEMBERS,key,grant['project'])).fetchone()
+        if row is None:return result
+        try:record=json.loads(self.center.decrypt(row[1],'community-relation:'+key))
+        except Exception:raise ValueError('CURRENT_SUBJECT_RELATION_INTEGRITY_CONFLICT') from None
+        if (type(record)is not dict or set(record)!={'community_id','tenant','user_id','kind','updated_at'}
+                or row[0]!=grant['user_id'] or record['user_id']!=grant['user_id'] or record['tenant']!=grant['tenant'] or record['kind']!=kind
+                or type(record['community_id'])is not str or not re.fullmatch('co_[0-9a-f]{32}',record['community_id'])
+                or type(record['updated_at'])is not int or not 0<=record['updated_at']<=9007199254740991
+                or type(row[2])is not int or row[2] not in (0,1)):
+            raise ValueError('CURRENT_SUBJECT_RELATION_INTEGRITY_CONFLICT')
+        if record['community_id']==community_id:
+            result.update(state='ACTIVE' if row[2] else 'INACTIVE',updated_at=record['updated_at'])
+        return result
+
     def dispatch(self, session, csrf, body):
         if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('platform_overview','platform_orders','platform_customers','platform_audit'):
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
@@ -157,6 +177,7 @@ class CenterCommunities:
                     if not (owner or platform) and record['state'] != 'APPROVED':
                         raise PermissionError('COMMUNITY_PRIVATE')
                     result = record if owner or platform else {k: record[k] for k in ('id', 'name', 'description', 'state', 'version')}
+                    result=dict(result,current_subject_relation=self.current_subject_relation(g,record['id']))
                 elif op in ('update', 'submit', 'review'):
                     if type(p['expected_version']) is not int or p['expected_version'] != record['version']:
                         raise ValueError('COMMUNITY_VERSION_CONFLICT')

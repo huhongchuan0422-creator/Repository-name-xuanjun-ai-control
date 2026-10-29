@@ -271,7 +271,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
                 if web_session:
                     from scripts.community_web_session import WebSession
-                    result,cookie=WebSession(gateway.identity.center,operations,communities,onboarding).dispatch(self.path,self.headers,body,proxy_source)
+                    result,cookie=WebSession(gateway.identity.center,operations,communities,onboarding,provider_actions=provider_actions,merchant_bills=merchant_bills).dispatch(self.path,self.headers,body,proxy_source)
                     return self.answer(200,{'result':result,'payment_enabled':False},cookie=cookie)
                 token=self.headers.get('X-Community-Session','')
                 if self.path=='/mini/merchant':

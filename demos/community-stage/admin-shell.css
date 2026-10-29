@@ -86,3 +86,14 @@
 .community-admin button.snapshot-detail-action{display:block;width:100%;text-align:left;background:#246d4f;color:#fff;padding:16px;margin:16px 0}.community-snapshot-detail .community-record-card{margin-bottom:16px}
 
 .community-admin .community-report-panel{background:transparent;border:0;padding:0;box-shadow:none}
+
+/* Original home16 4+5 and home25 5+3+4+2; scoped navigation, not a role grant. */
+.community-admin .admin-home{padding:28px;border:1px solid var(--line);background:#f8fbf9;border-radius:24px}
+.community-admin .admin-home>h2{font-size:28px;margin:0 0 10px;color:#174c3b}
+.community-admin .admin-home>p{color:#647d71;max-width:760px;margin-bottom:30px}
+.community-admin .admin-home-groups{display:grid;gap:28px}
+.community-admin .admin-home-group{background:white;border:1px solid var(--line);border-radius:18px;padding:22px}
+.community-admin .admin-home-group>h3{font-size:19px;margin:0 0 18px}
+.community-admin .admin-home .admin-card{display:block;box-sizing:border-box;text-decoration:none;color:var(--ink);background:white;border:1px solid var(--line);width:100%;font:inherit;cursor:pointer}
+.community-admin .admin-home .admin-card:hover,.community-admin .admin-home .admin-card:focus-visible{background:#edf5ef;border-color:#246d4f}
+@media(max-width:520px){.community-admin .admin-home{padding:20px 14px}.community-admin .admin-home-group{padding:16px}.community-admin .admin-home .admin-card{min-height:96px;padding:18px}}

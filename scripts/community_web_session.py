@@ -22,13 +22,38 @@ def token(headers):
     return values[0]
 
 class WebSession:
-    def __init__(self,center,operations=None,communities=None,onboarding=None):
+    def __init__(self,center,operations=None,communities=None,onboarding=None,*,provider_actions=None,merchant_bills=None):
         if type(center) is not Center or hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=PIN:
             raise PermissionError('PINNED_ORIGINAL_CENTER_REQUIRED')
         self.center=center
         self.operations,self.communities,self.onboarding=operations,communities,onboarding
         if any(service is not None and service.center is not center for service in (operations,communities,onboarding)):
             raise PermissionError("SAME_CENTER_REQUIRED")
+        self.provider_actions,self.merchant_bills=provider_actions,merchant_bills
+        if provider_actions is not None:
+            from scripts.community_wechat_sp_actions import ProviderActions
+            if type(provider_actions) is not ProviderActions or provider_actions.center is not center or provider_actions.operations is not operations:
+                raise ValueError('SAME_ORIGINAL_PROVIDER_ACTIONS_REQUIRED')
+        if merchant_bills is not None:
+            from scripts.community_merchant_bills import MerchantBills
+            if type(merchant_bills) is not MerchantBills or merchant_bills.center is not center or merchant_bills.actions is not provider_actions:
+                raise ValueError('SAME_ORIGINAL_MERCHANT_BILLS_REQUIRED')
+    def finance_options(self,session,csrf,selected):
+        # Read authorization only; never dispatch provider/bill operations here.
+        options={'provider':[],'merchant_bill':[]}
+        def matches(grant):
+            return all(grant[k]==selected[k] for k in ('user_id','project','tenant','scope'))
+        if self.provider_actions is not None:
+            for workspace in sorted(self.operations.grants):
+                try:grant,_=self.provider_actions._authorize(session,csrf,workspace)
+                except PermissionError:continue
+                if matches(grant):options['provider'].append({'workspace':workspace})
+        if self.merchant_bills is not None:
+            for workspace in sorted(self.merchant_bills.grants):
+                try:context=self.merchant_bills._context(session,csrf,workspace)
+                except PermissionError:continue
+                if matches(context['anchor']):options['merchant_bill'].append({'workspace':workspace})
+        return options
     def dispatch(self,path,headers,body,source):
         if type(body) is not dict:raise ValueError('EXACT_SESSION_BODY_REQUIRED')
         if path=='/community/session/login':
@@ -59,7 +84,7 @@ class WebSession:
                             from scripts.community_merchant_opening import authorize_workspace
                             authorize_workspace(self.onboarding,self.operations,name,uid)
                     except PermissionError:continue
-                    workspaces.append({'kind':'MERCHANT','workspace':name})
+                    workspaces.append({'kind':'MERCHANT','workspace':name,'finance_options':self.finance_options(session,values[0],grant)})
             if self.communities is not None:
                 for name in self.communities.grants:
                     try:grant=self.communities.authorize(session,values[0],name)

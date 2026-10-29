@@ -34,3 +34,9 @@ class FinanceUIContract(unittest.TestCase):
  def test_community_split_snapshot(self):subprocess.run(['node',str(ROOT/'tests/community_snapshot_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
 
  def test_community_refund_observation(self):subprocess.run(['node',str(ROOT/'tests/community_refund_observation_dom.cjs'),str(ROOT/'demos/community-stage/communities.js'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_community_role_home(self):subprocess.run(['node',str(ROOT/'tests/community_role_home_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_current_subject_relation(self):subprocess.run(['node',str(ROOT/'tests/community_current_relation_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
+
+ def test_report_read_semantics(self):subprocess.run(['node',str(ROOT/'tests/community_report_read_semantics.cjs'),str(ROOT/'demos/community-stage/communities.js')],check=True,timeout=30)

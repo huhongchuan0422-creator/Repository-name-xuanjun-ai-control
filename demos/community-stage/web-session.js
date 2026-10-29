@@ -13,10 +13,26 @@
    channel=new BroadcastChannel('community-original-session');coordinated=true;
   }
  }catch(_){/* Unavailable coordination must clear saved state before any IO. */}
+ // Explicit selections only; these names were separately authorized by session/check.
+ const financeSelectors={};
+ if(kind==='MERCHANT')for(const [name,title]of [['provider','已授权门店财务工作区'],['merchant_bill','已授权整商户账单只读工作区']]){
+  const label=document.createElement('label'),selector=document.createElement('select');label.textContent=title;selector.setAttribute('aria-label',title);label.append(selector);root.append(label);financeSelectors[name]={label,selector};
+  selector.addEventListener('change',()=>{if(active===null)configure(selectedContext());});
+ }
+ function resetFinanceSelectors(){
+  const selected=workspaces.find(w=>w.workspace===select.value);
+  for(const [name,{label,selector}]of Object.entries(financeSelectors)){
+   selector.replaceChildren();const blank=document.createElement('option');blank.value='';blank.textContent='未选择（不启用）';selector.append(blank);
+   const options=selected?.finance_options?.[name];
+   if(Array.isArray(options))for(const item of options){if(!item||typeof item.workspace!=='string'||! /^[A-Za-z0-9_-]{1,64}$/.test(item.workspace))continue;const option=document.createElement('option');option.value=item.workspace;option.textContent=item.workspace;selector.append(option);}
+   selector.value='';label.hidden=selector.children.length===1;
+  }
+ }
  const current=t=>t===generation;
  const controls=()=>{
   for(const button of root.querySelectorAll('button'))button.disabled=active!==null||!coordinated;
   select.disabled=active!==null||!csrf||!workspaces.length;
+  for(const {selector}of Object.values(financeSelectors))selector.disabled=active!==null||!csrf||!workspaces.length;
  };
  const configure=value=>{
   if(window.communityHomeContext)window.communityHomeContext(value);
@@ -25,7 +41,7 @@
   if(window.configureCommunityOnboarding)window.configureCommunityOnboarding(value);
   controls();
  };
- const clear=text=>{csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();configure(null);message.textContent=text;};
+ const clear=text=>{csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
  if(channel)channel.onmessage=event=>{
   if(event.data!=='changed')return;
   generation++;clear('其他窗口已变更原会话，请重新登录。');
@@ -42,16 +58,22 @@
  function selectedContext(){
   if(!csrf)return null;
   const selected=workspaces.find(w=>w.workspace===select.value);
-  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null}:{})};
+  const financial={};
+  if(selected&&kind==='MERCHANT')for(const [name,key]of [['provider','providerWorkspace'],['merchant_bill','merchantBillWorkspace']]){
+   const value=financeSelectors[name].selector.value,options=selected.finance_options?.[name];
+   if(value&&Array.isArray(options)&&options.some(item=>item&&item.workspace===value))financial[key]=value;
+  }
+  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null}:{}),...financial};
  }
  function choose(){
   if(active!==null)return;
-  configure(selectedContext());
+  resetFinanceSelectors();configure(selectedContext());
  }
  async function check(t){
   const result=await call('check',{},t,csrf);if(!current(t))return;
   workspaces=result.workspaces.filter(w=>w.kind===kind);
   select.replaceChildren();for(const w of workspaces){const option=document.createElement('option');option.value=w.workspace;option.textContent=w.workspace;select.append(option);}
+  resetFinanceSelectors();
   const review=location.pathname.endsWith('/merchant/review');
   message.textContent=review?(result.reviewer?'已登录原平台审核账户。':'已登录；当前账户没有平台审核权限。'):(workspaces.length?'已登录，请选择已授权工作区。':'已登录；当前账户没有此角色的工作区。');
   configure(selectedContext());

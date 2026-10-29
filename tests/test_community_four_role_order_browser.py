@@ -92,7 +92,7 @@ class OriginalCenterSameOrderBrowser(unittest.TestCase):
                     community.evaluate("csrf=>window.configureCommunityPortal({csrf,workspace:'community'})",fx.web['csrf'])
                     community.locator('#reference').fill(fx.cid)
                     community.locator('#read').click();expect(community.locator('#message')).to_have_text('操作完成')
-                    community.locator('#communityOrders').click();expect(community.locator('#message')).to_have_text('操作完成')
+                    community.locator('#communityOrders').click();expect(community.locator('#message')).to_have_text('记录查询完成')
                     expect(community.locator('#records')).to_contain_text(reference)
                     expect(community.locator('#records')).to_contain_text('101分')
 

@@ -7,6 +7,7 @@ const flush=async()=>{for(let i=0;i<120;i++)await Promise.resolve();};
 function harness(initial='',community=false){
  class Element{
   constructor(){this.value='';this.textContent='';this.disabled=false;this.children=[];this.events={};}
+  setAttribute(name,value){this[name]=value;}
   addEventListener(name,fn){this.events[name]=fn;}
   replaceChildren(){this.children=[];this.value='';}
   append(child){this.children.push(child);if(this.children.length===1)this.value=child.value;}
@@ -14,7 +15,8 @@ function harness(initial='',community=false){
  const form=new Element(),email=new Element(),password=new Element(),login=new Element(),logout=new Element(),select=new Element(),message=new Element();
  form.querySelector=selector=>selector==='[name=password]'?password:null;
  form.reset=()=>{email.value='';password.value='';};
- const root={querySelector:selector=>({'form':form,'[role=status]':message,'select':select,'[data-logout]':logout}[selector]),querySelectorAll:()=>[login,logout]};
+ const extra=[];
+ const root={append:el=>extra.push(el),querySelector:selector=>({'form':form,'[role=status]':message,'select':select,'[data-logout]':logout}[selector]),querySelectorAll:()=>[login,logout]};
  const data=new Map(initial?[['community-original-csrf',initial]]:[]),requests=[],configured=[],homeContexts=[],messages=[];let channel;
  const locks={tail:Promise.resolve(),request(name,fn){assert.equal(name,'community-original-session');const p=this.tail.then(fn);this.tail=p.catch(()=>{});return p;}};
  const context={document:{getElementById:()=>root,createElement:()=>new Element()},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
@@ -27,7 +29,7 @@ function harness(initial='',community=false){
  vm.runInNewContext(source,context);
  const submit=address=>{email.value=address;password.value='SyntheticPassword!';form.events.submit({preventDefault(){}});};
  const completeLogin=async(csrf,workspace)=>{const request=requests.filter(r=>r.action==='login').at(-1);request.reply({csrf,user_id:workspace});await flush();requests.filter(r=>r.action==='check').at(-1).reply({workspaces:[{kind:'MERCHANT',workspace}],reviewer:false});await flush();};
- return{requests,configured,homeContexts,messages,form,email,password,login,logout,select,message,data,submit,completeLogin,
+ return{requests,configured,homeContexts,messages,extra,form,email,password,login,logout,select,message,data,submit,completeLogin,
  notify:()=>channel.onmessage({data:'changed'}),csrf:()=>data.get('community-original-csrf')};
 }
 (async()=>{
@@ -85,6 +87,17 @@ function harness(initial='',community=false){
  {
   const h=harness('old-csrf',true);await flush();h.requests[0].reply({workspaces:[{kind:'COMMUNITY',workspace:'platform',role:'PLATFORM_REVIEWER'}],reviewer:false});await flush();
   h.logout.events.click();await flush();assert.equal(h.configured.at(-1),null);h.requests.at(-1).reply({logged_out:true});await flush();assert.equal(h.configured.at(-1),null);
+ }
+ {
+  const h=harness('original');await flush();h.requests[0].reply({workspaces:[{kind:'MERCHANT',workspace:'store',finance_options:{provider:[{workspace:'finance1'},{workspace:'finance2'}],merchant_bill:[{workspace:'bills'}]}},{kind:'MERCHANT',workspace:'legacy'}],reviewer:false});await flush();
+  const provider=h.extra[0].children[0],bill=h.extra[1].children[0];
+  assert.equal(h.configured.at(-1).providerWorkspace,undefined);assert.equal(h.configured.at(-1).merchantBillWorkspace,undefined);
+  provider.value='finance2';provider.events.change();assert.equal(h.configured.at(-1).providerWorkspace,'finance2');assert.equal(h.configured.at(-1).merchantBillWorkspace,undefined);
+  bill.value='bills';bill.events.change();assert.equal(h.configured.at(-1).merchantBillWorkspace,'bills');
+  provider.value='invented';provider.events.change();assert.equal(h.configured.at(-1).providerWorkspace,undefined);
+  h.select.value='legacy';h.select.events.change();assert.equal(provider.value,'');assert.equal(bill.value,'');assert.equal(h.configured.at(-1).merchantBillWorkspace,undefined);
+  h.select.value='store';h.select.events.change();assert.equal(h.configured.at(-1).providerWorkspace,undefined);
+  provider.value='finance1';provider.events.change();h.notify();assert.equal(h.configured.at(-1),null);assert.equal(provider.value,'');assert.equal(bill.value,'');
  }
  console.log('original web session race regression: race/state schedules PASS');
 })().catch(error=>{console.error(error);process.exitCode=1;});
