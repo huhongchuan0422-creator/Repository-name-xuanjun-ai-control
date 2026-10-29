@@ -22,9 +22,9 @@ def info(image=u.OLD_IMAGE,cid=u.OLD_ID,running=True):
         'log':{'Type':'json-file','Config':{'max-size':'10m','max-file':'2'}},
         'mounts':[{'Type':'bind','Source':p,'Destination':p,'RW':rw} for p,rw in [(u.ROOT+'/config',False),(u.ROOT+'/data',True),(u.RUN,True)]]}
 
-def legacy_onboarding_asset():
+def legacy_onboarding_asset(filename="community_preview_2330_onboarding.html"):
     """Rebuild immutable 2330 role-page bytes; never compare its pin to current onboarding."""
-    raw=(Path(__file__).parent/'fixtures'/'community_preview_2330_onboarding.html').read_text()
+    raw=(Path(__file__).parent/'fixtures'/filename).read_text()
     prefix='/community-preview'
     raw=re.sub(r"""((?:href|src)=[\"'])(/(?:merchant|community)/[^\"']+)""",lambda m:m[1]+prefix+m[2],raw)
     pages={
@@ -42,11 +42,16 @@ def legacy_onboarding_asset():
 
 class UpgradeBoundary(unittest.TestCase):
     def test_fixed_source_fragment_image_and_original_role_assets(self):
-        self.assertEqual(u.FRAGMENT,(Path(__file__).resolve().parents[1]/'deploy/community-preview/nginx-uk-path-candidate.conf').read_bytes())
+        # Frozen historical installer bytes remain immutable; current candidate adds only two assets.
+        current=(Path(__file__).resolve().parents[1]/'deploy/community-preview/nginx-uk-path-candidate.conf').read_bytes()
+        self.assertEqual(hashlib.sha256(u.FRAGMENT).hexdigest(),'df55f5f11413c623d3f9d966b6feacf54fda25ecfe42ee11d70052d544f2ca83')
+        self.assertEqual(hashlib.sha256(current).hexdigest(),'82e81b56e2adeb1519ff34a981e0f5a8037923df59718192ee5eafe2d03f11a9')
+        self.assertEqual(current,u.FRAGMENT.replace(b'|web-session',b'|admin-shell\\.(css|js)|web-session',1))
         from scripts.community_web_entries import asset
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():
-            raw=legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else asset(path)[0]
+            raw=(legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else
+                 legacy_onboarding_asset('community_preview_2330_communities.html') if path=='/community/portal' else asset(path)[0])
             self.assertEqual(digest,hashlib.sha256(raw).hexdigest(),path)
         self.assertEqual(u.SOURCE,'2330dd55c07f58d7f45a7c4510a9761d0d4735d6')
     def test_only_existing_bounded_container_and_mounts_are_admitted(self):

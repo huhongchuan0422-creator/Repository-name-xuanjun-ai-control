@@ -47,7 +47,8 @@ test('50-row first page, next page, row selection and refresh use merchant curso
 test('community, platform operations and merchant paginators remain independent',async()=>{
  const f=setup([{result:result([merchant('a')],'a')},{result:result([{id:'c',name:'community'}],'c')},{result:result([{id:4}],4)},{result:result([merchant('b')])},{result:result([])},{result:result([])}]);
  await f.click('platformMerchants');await f.click('mine');f.elements.platformView.value='platform_orders';await f.click('readPlatformView');await f.click('moreMerchants');
- assert.equal(f.elements.more.hidden,false);assert.equal(f.elements.morePlatformView.hidden,false);assert.equal(f.elements.records.children[0].textContent,'community ');
+ assert.equal(f.elements.more.hidden,false);assert.equal(f.elements.morePlatformView.hidden,false);const card=f.elements.records.children[0];assert.equal(card.children[0].textContent,'记录列表 · 当前范围');
+ const fields=card.children[1].children.map(x=>x.textContent);assert.deepEqual(fields,['社区名称','community','社区介绍','当前权限未返回该字段','联系人及联系方式','当前权限未返回该字段','状态','当前权限未返回该字段']);assert.equal(card.children[2].textContent,'查看详情');
  await f.click('more');await f.click('morePlatformView');
  assert.deepEqual(f.calls.map(c=>[c.body.operation,c.body.params]),[['platform_merchants',{after_workspace:''}],['mine',{}],['platform_orders',{after_id:0,status:'ALL'}],['platform_merchants',{after_workspace:'a'}],['mine',{after_id:'c'}],['platform_orders',{after_id:4,status:'ALL'}]]);
 });

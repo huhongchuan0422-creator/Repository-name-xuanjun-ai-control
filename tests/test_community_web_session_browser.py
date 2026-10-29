@@ -53,6 +53,8 @@ class SessionBrowser(unittest.TestCase):
                         with page.expect_response(lambda r:r.url.endswith('/community/operations') and r.status==200):page.locator('#loadOrders').click()
                         page.goto(base+'/community/portal')
                         expect(page.locator('#community-session select')).to_have_value('community')
+                        page.get_by_role('navigation',name='社区功能',exact=True).get_by_role('button',name='社区资料',exact=True).click()
+                        expect(page.locator('#mine')).to_be_visible()
                         with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==200):page.locator('#mine').click()
                         # Frontend workspace selection is not an authorization grant.
                         result=page.evaluate("""async()=>{const r=await fetch('/community-preview/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:JSON.stringify({workspace:'merchant',operation:'community.summary',params:{}})});return r.status;}""")
