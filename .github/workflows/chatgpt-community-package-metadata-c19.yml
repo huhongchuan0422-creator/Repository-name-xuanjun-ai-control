@@ -1,0 +1,38 @@
+name: Fixed reviewed community package metadata delivery
+on:
+  push:
+    branches: [feature/chatgpt-community-wechat-sp-offline-20261017]
+    paths:
+      - '.github/workflows/chatgpt-community-package-metadata-c19.yml'
+      - 'delivery/community-package-metadata-c19/package-metadata.json'
+permissions:
+  contents: read
+jobs:
+  deliver-fixed-metadata:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify fixed metadata bytes only; no payload execution or carrier download
+        run: |
+          python - <<'PY'
+          import hashlib,json,pathlib
+          raw=pathlib.Path('delivery/community-package-metadata-c19/package-metadata.json').read_bytes()
+          assert len(raw)==227678
+          assert hashlib.sha256(raw).hexdigest()=='2e77aff3dc2c53869057917e731410740f8c526e8450cf0ab580c1f3f014657c'
+          value=json.loads(raw)
+          assert value['object_spec']['artifact_id']==12866799825
+          assert value['object_spec']['package'] is None
+          print('FIXED_METADATA_BYTES_MATCH; NOT_DOWNLOADED; NOT_INSTALLED')
+          PY
+      - name: Publish exact single metadata member
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-c19-package-metadata
+          path: delivery/community-package-metadata-c19/package-metadata.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
