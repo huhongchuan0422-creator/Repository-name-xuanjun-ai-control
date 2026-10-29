@@ -103,13 +103,13 @@ class SessionBrowser(unittest.TestCase):
                             shots.append(name+'.png')
                         home_nav=page.get_by_role('navigation',name='社区功能',exact=True)
                         home_nav.get_by_role('button',name='工作台首页',exact=True).click()
-                        expect(page.locator('main h1')).to_have_text('社区运营总览')
+                        expect(page.locator('main h1')).to_have_text('社区运营总览');expect(page.locator('.admin-home-hero h2')).to_be_visible();expect(page.locator('.admin-home-hero h2')).to_have_text('社区运营总览')
                         expect(page.locator('.admin-home .admin-card')).to_have_count(9)
                         expect(page.locator('.admin-home-group')).to_have_count(2)
                         shot('16-community-home-1440')
-                        page.set_viewport_size({'width':390,'height':844});shot('16-community-home-390')
+                        page.set_viewport_size({'width':390,'height':844});expect(page.locator('.admin-navigation-disclosure')).not_to_have_attribute('open','');expect(page.locator('.admin-home-hero')).to_be_visible();shot('16-community-home-390')
                         self.assertLessEqual(page.evaluate('document.documentElement.scrollWidth'),390)
-                        page.set_viewport_size({'width':1440,'height':1100})
+                        page.set_viewport_size({'width':1440,'height':1100});expect(page.locator('.admin-navigation-disclosure')).to_have_attribute('open','')
                         home_nav.get_by_role('button',name='社区资料',exact=True).click()
                         @contextmanager
                         def directory(op,status=200):

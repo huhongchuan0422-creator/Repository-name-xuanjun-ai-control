@@ -40,3 +40,5 @@ class FinanceUIContract(unittest.TestCase):
  def test_current_subject_relation(self):subprocess.run(['node',str(ROOT/'tests/community_current_relation_dom.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)
 
  def test_report_read_semantics(self):subprocess.run(['node',str(ROOT/'tests/community_report_read_semantics.cjs'),str(ROOT/'demos/community-stage/communities.js')],check=True,timeout=30)
+
+ def test_community_home_mobile_navigation(self):subprocess.run(['node',str(ROOT/'tests/community_home_mobile_nav.cjs'),str(ROOT/'demos/community-stage/admin-shell.js')],check=True,timeout=30)

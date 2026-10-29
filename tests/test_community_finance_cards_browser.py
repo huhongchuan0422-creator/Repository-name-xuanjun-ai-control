@@ -197,7 +197,8 @@ class FinanceCardsBrowser(unittest.TestCase):
                             panel27.get_by_role('button',name='查看接收关系详情',exact=True).click();expect(panel27.locator('.community-receiver-detail')).to_contain_text('finance');receiver_shot('finance-54-detail-1440')
                             panel27.get_by_role('button',name='返回接收关系列表',exact=True).click();expect(panel27.locator('.community-record-card')).to_be_visible();receiver_shot('finance-27-return-1440')
                             panel27.locator('.open-actions:not(.receiver-query-controls) > summary').click();panel27.locator('#receiverId').fill('community');panel27.locator('#readReceiverRelation').click();expect(panel27.locator('#receiverVersion')).to_have_value('1');receiver_shot('finance-55-readback-1440')
-                            panel27.locator('.receiver-query-controls > summary').click();panel27.locator('#receiverWorkspace').fill('not_admitted')
+                            if panel27.locator('.receiver-query-controls').get_attribute('open') is None:panel27.locator('.receiver-query-controls > summary').click()
+                            expect(panel27.locator('#receiverWorkspace')).to_be_visible();panel27.locator('#receiverWorkspace').fill('not_admitted')
                             with page.expect_response(lambda r:r.url.endswith('/community/directory') and r.status==403):panel27.locator('#listReceiverRelations').click()
                             expect(panel27.locator('.community-receiver-detail')).to_be_hidden();expect(panel27.locator('#receiverVersion')).to_have_value('');receiver_shot('finance-27-denied-1440')
                             # Original26/52/53: independent synthetic reviewer, exact original CAS and status reread.

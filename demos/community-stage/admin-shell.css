@@ -102,3 +102,17 @@
 main.compact-finance-selected > #message[data-generic-complete="true"]{display:none}
 main.compact-finance-selected .admin-back{margin:0 0 20px}
 main.compact-finance-selected > h1{margin-top:0}
+
+/* Original receiver detail card: keep fields and the original return action separate. */
+.community-admin .community-receiver-detail{padding:16px;border-radius:16px;margin:16px 0 24px}
+.community-receiver-detail h3{font-size:18px;margin:0 0 18px}.community-receiver-detail dl{margin:0}.community-receiver-detail dt{font-size:13px;color:#6d8379;margin:22px 0 4px}.community-receiver-detail dd{margin:0;color:#243f35;overflow-wrap:anywhere}
+.community-admin .community-receiver-panel>.platform-order-button{display:block;width:100%;background:#246d4f;color:white;text-align:left;padding:15px 18px;margin:0 0 24px;border:0;border-radius:9px}
+
+/* Original 16/25 hero hierarchy; existing real actions and counts, not prototype data. */
+.community-admin .admin-home-hero{position:relative;overflow:hidden;background:linear-gradient(115deg,#edf5ef,#fff);border:1px solid var(--line);border-radius:18px;padding:26px;margin:0 0 34px;box-shadow:0 10px 25px #194f3f08}
+.community-admin .admin-home-eyebrow{font-size:13px;font-weight:700;color:#246d4f;margin:0 0 8px}.community-admin .admin-home-hero h2{font-size:28px;line-height:1.35;margin:0 0 10px}.community-admin .admin-home-hero>p:not(.admin-home-eyebrow){color:#647d71;margin:0;max-width:740px}
+.admin-home-hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.admin-home-hero-actions:empty{display:none}.community-admin .admin-home-hero-actions>*{text-decoration:none;padding:12px 16px;border:0;border-radius:10px;background:#e5efe9;color:#194f3f;font:inherit;font-weight:600;margin:0}.community-admin .admin-home-hero-actions>button{background:#246d4f;color:white}
+.community-admin .admin-home-group>h3{display:flex;align-items:center;justify-content:space-between;gap:10px}.admin-group-count{font-size:12px;font-weight:400;color:#6d8379;background:#edf4ef;padding:3px 9px;border-radius:20px}.community-admin .admin-card-action{display:block;padding:11px 12px;margin-top:14px;background:#e6f0e9;border-radius:9px;color:#194f3f}
+.admin-navigation-disclosure>summary{display:none;cursor:pointer;font-weight:600;color:#246d4f}
+@media(max-width:900px){.admin-navigation-disclosure>summary{display:list-item}.community-admin .admin-sidebar{padding:14px 18px}.admin-navigation-disclosure[open]>summary{margin-bottom:14px}}
+@media(max-width:520px){.community-admin .admin-home-hero{padding:22px 18px;margin-bottom:28px}.community-admin .admin-home-hero h2{font-size:27px}.community-admin .admin-home{padding:20px 14px}}
