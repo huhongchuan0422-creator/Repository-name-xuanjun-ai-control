@@ -5,7 +5,7 @@
 | 批次 | 独立功能 | 原数据来源 | 验收 | 回滚 |
 |---|---|---|---|---|
 | 0 | 冻结导航、设计token、组件、移动规则 | Owner确认的UI候选 | 文档/CSS同版、独立源码审核；浏览器截图单列 | `SOURCE_IMPLEMENTED`，浏览器验收待补 |
-| 1 | AppShell、候选登录、总览、只读入口目录 | 候选为本地演示状态；正式版依赖现有Identity/RBAC、入口注册表 | 登录互斥/退出、导航/返回/权限状态/响应式 | 源码框架已开工；正式Identity与Hosted均`NOT_CONNECTED` |
+| 1 | AppShell、候选登录、总览、十一项一级/二级入口、通用管理列表/详情/权限/日志 | 候选为本地演示状态；正式版依赖现有Identity/RBAC及各原服务 | 登录互斥/退出、导航/返回/权限状态/跨模块清理/响应式 | 源码框架已实现；正式Identity与Hosted均`NOT_CONNECTED` |
 | 2 | 项目列表、项目详情、阶段/待办 | CRM、Customer Project Center、Project Delivery投影 | 同一项目/版本/责任/UNKNOWN准确 | 断开adapter，显示NOT_CONNECTED |
 | 3 | 预览与审核中心只读版 | PR122 Preview/Changes、页面/UI版本、证据索引 | 页面与版本绑定、旧受保护入口可追溯返回 | 关闭中心路由，不动原preview |
 | 4 | 意见草稿、逐页提交、复验 | 原项目/验收服务的鉴权写接口 | 幂等、权限、版本冲突、拒绝原因、审计 | 停写入口，保留只读与原记录 |

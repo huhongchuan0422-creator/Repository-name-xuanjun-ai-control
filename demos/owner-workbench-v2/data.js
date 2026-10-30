@@ -6,12 +6,22 @@
     mode:'UI_CANDIDATE',
     observed_at:'2026-10-30 13:30 CST',
     source_notice:'合成数据，仅验证信息架构和交互；不代表部署、安装或客户验收。',
+    management_modules:{
+      'operations':{name:'运营',producer:'Operations projection',status:'NOT_CONNECTED'},
+      'customer':{name:'客户',producer:'Identity / CRM / Customer Project Center',status:'NOT_CONNECTED'},
+      'research-development':{name:'研发',producer:'Task Registry / Git / Artifact / Quality',status:'NOT_CONNECTED'},
+      'acceptance-delivery':{name:'验收交付',producer:'Evidence / Release / Install / Acceptance',status:'NOT_CONNECTED'},
+      'maintenance':{name:'维护',producer:'Runtime / Incident / Recovery / Backup',status:'NOT_CONNECTED'},
+      'shared-ecosystem':{name:'共享生态',producer:'Member / Contribution / Credential / Partner',status:'NOT_CONNECTED'},
+      'finance':{name:'财务',producer:'Price / Order / Usage / Ledger / Settlement',status:'NOT_CONNECTED'}
+    },
+    digital_twin_link:{label:'数字孪生对象入口',object_ref:'UNKNOWN',target_route:'/task-center-test/',status:'TEST_ONLY / NOT_CONNECTED'},
     metrics:[
       {label:'项目进度',value:'3',delta:'SYNTHETIC · 1 个开发中',tone:'info',href:'#projects'},
       {label:'AI 任务',value:'2',delta:'SYNTHETIC · 心跳与成果分开',tone:'success',href:'#tasks'},
       {label:'待审核',value:'2',delta:'SYNTHETIC · 按项目进入',tone:'warning',href:'#review'},
       {label:'异常阻塞',value:'1',delta:'SYNTHETIC · 证据不足',tone:'danger',href:'#project/PRJ-BIN-007'},
-      {label:'关键业务指标',value:'UNKNOWN',delta:'NOT_CONNECTED · 不显示为 0',tone:'unknown',href:'#finance'}
+      {label:'关键业务指标',value:'UNKNOWN',delta:'NOT_CONNECTED · 不显示为 0',tone:'unknown',href:'#finance-profit'}
     ],
     projects:[
       {

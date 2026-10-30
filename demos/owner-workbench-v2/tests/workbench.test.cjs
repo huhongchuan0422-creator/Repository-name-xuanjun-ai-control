@@ -122,7 +122,7 @@ test('all required exception states are visible',()=>{
 
 test('navigation includes unified product domains',()=>{
   const html=app.navHtml('overview',false);
-  for(const value of ['工作台','客户与项目','预览与审核','应用与生态','开发与执行','客户运营','商业与财务','自营业务','平台治理'])assert.match(html,new RegExp(value));
+  for(const value of ['总览','运营','客户','研发','验收交付','维护','共享生态','财务','自营业务','预览审核','配置'])assert.match(html,new RegExp(value));
   assert.match(html,/aria-current="page"/);
 });
 
@@ -199,22 +199,22 @@ test('review tab resets only when project identity changes',()=>{
   assert.deepEqual(app.reviewStateForProject('PRJ-B',null,'evidence'),{project:null,tab:'feedback'});
 });
 
-test('all nine domains expose expandable second-level navigation',()=>{
+test('all eleven domains expose expandable second-level navigation',()=>{
   const html=app.navHtml('overview',false);
-  const domains=['overview','projects','review','ecosystem','tasks','operations','finance','business','settings'];
+  const domains=['overview','operations','customer','research-development','acceptance-delivery','maintenance','shared-ecosystem','finance','business','review','settings'];
   for(const id of domains){
     assert.match(html,new RegExp('data-domain="'+id+'"'));
     assert.match(html,new RegExp('data-nav-toggle="'+id+'"'));
   }
-  for(const child of ['统一状态','项目列表','详情与交付','审核队列','版本与证据','应用目录','版本与发布','任务与 AI','数字孪生','客服与渠道','工单与知识','业务指标','账单与对账','自营项目','运行证据','权限与设置','审计与运维'])assert.match(html,new RegExp(child));
+  for(const child of ['目标与计划','运营任务','渠道与活动','经营指标','异常与人工待办','客户与租户','CRM线索','需求与SOW','客户项目','合同与权益','客户反馈','开发任务','仓库与版本','构建与制品','测试与质量','独立审核','模块产品化','测试证据','发布与安装','客户验收','交付与归档','服务与运行时','健康与告警','事件与故障','检查点与恢复','备份与演练','到期与安全退出','生态成员','贡献记录','声誉与凭证','生态权益','伙伴与推荐','方案知识与产品化','产品与价格','成本与利润','报价与订单','钱包与用量','账单与付款','对账退款','推荐结算','自营项目','运行证据','审核队列','页面与版本','验收记录','身份与RBAC','模块接入','平台设置','操作日志'])assert.match(html,new RegExp(child));
 });
 
 test('detail and deep routes highlight their owning domain and child',()=>{
-  assert.equal(app.domainForView('project'),'projects');
-  assert.equal(app.domainForView('review-help'),'review');
-  assert.equal(app.domainForView('twin'),'tasks');
+  assert.equal(app.domainForView('project'),'customer');
+  assert.equal(app.domainForView('review-pages'),'review');
+  assert.equal(app.domainForView('research-builds'),'research-development');
   const projectNav=app.navHtml('project',false);
-  assert.match(projectNav,/data-domain="projects"[^]*?class="nav-child" href="#projects" aria-current="page"/);
+  assert.match(projectNav,/data-domain="customer"[^]*?class="nav-child" href="#projects" aria-current="page"/);
   const reviewNav=app.navHtml('review',false);
   assert.match(reviewNav,/data-domain="review"[^]*?aria-expanded="true"/);
 });
@@ -254,7 +254,7 @@ test('dashboard is synthetic, unknown-safe, and deep-linked',()=>{
   assert.match(html,/SYNTHETIC/);
   assert.match(html,/UNKNOWN/);
   assert.match(html,/NOT_CONNECTED · 不显示为 0/);
-  for(const href of ['#projects','#tasks','#review','#project/PRJ-BIN-007','#finance'])assert.match(html,new RegExp('href="'+href+'"'));
+  for(const href of ['#projects','#tasks','#review','#project/PRJ-BIN-007','#finance-profit'])assert.match(html,new RegExp('href="'+href+'"'));
 });
 
 test('common framework components are local-only',()=>{
@@ -265,4 +265,74 @@ test('common framework components are local-only',()=>{
   assert.match(index,/NO_PRODUCTION_WRITE/);
   assert.match(projects,/aria-label="项目分页"/);
   assert.match(projects,/第 1 \/ 1 页 · SYNTHETIC/);
+});
+
+const ADMIN_MODULES={
+  operations:['operations-plan','operations-tasks','operations-channels','operations-metrics','operations-exceptions'],
+  customer:['customer-tenants','customer-leads','customer-requirements','projects','customer-contracts','customer-feedback'],
+  'research-development':['tasks','research-repositories','research-builds','research-tests','research-audit','research-products'],
+  'acceptance-delivery':['acceptance-evidence','acceptance-release','acceptance-customer','acceptance-archive'],
+  maintenance:['maintenance-services','maintenance-alerts','maintenance-incidents','maintenance-recovery','maintenance-backup','maintenance-expiry'],
+  'shared-ecosystem':['ecosystem-members','ecosystem-contributions','ecosystem-reputation','ecosystem-rights','ecosystem-partners','ecosystem-knowledge'],
+  finance:['finance-products','finance-profit','finance-orders','finance-usage','finance-billing','finance-refunds','finance-referrals']
+};
+
+test('seven fixed management modules and every secondary route are registered',()=>{
+  assert.deepEqual(Object.keys(data.management_modules),Object.keys(ADMIN_MODULES));
+  for(const [moduleId,views] of Object.entries(ADMIN_MODULES)){
+    for(const view of views){
+      const parsed=app.route('#'+view);
+      assert.equal(parsed.view,view,moduleId+' '+view);
+      assert.equal(app.domainForView(view),moduleId,moduleId+' owner');
+      const nav=app.navHtml(view,false);
+      assert.match(nav,new RegExp('data-domain="'+moduleId+'"[^]*?aria-expanded="true"'));
+    }
+  }
+});
+
+test('generic management pages contain overview filter list detail capability and logs',()=>{
+  const special=new Set(['projects','tasks']);
+  for(const views of Object.values(ADMIN_MODULES))for(const view of views){
+    if(special.has(view))continue;
+    const list=app.render(data,app.route('#'+view));
+    for(const label of ['UNKNOWN','NOT_CONNECTED','筛选关键词','对象','权限范围操作','操作日志','页码 UNKNOWN'])assert.match(list,new RegExp(label),view+' '+label);
+    const detail=app.render(data,app.route('#'+view+'/OBJECT-UNKNOWN'));
+    assert.match(detail,/对象摘要/);
+    assert.match(detail,/OBJECT-UNKNOWN/);
+    assert.match(detail,/SERVER_AUTHORITATIVE/);
+    assert.match(detail,/disabled/);
+    assert.match(detail,/操作日志/);
+  }
+});
+
+test('unconnected management projections never infer zero or success',()=>{
+  for(const module of Object.values(data.management_modules))assert.equal(module.status,'NOT_CONNECTED');
+  const html=app.render(data,app.route('#operations-plan'));
+  assert.match(html,/不用 0 或成功替代 UNKNOWN/);
+  assert.doesNotMatch(html,/metric-value">0</);
+  assert.doesNotMatch(html,/REAL_VERIFIED|已成功/);
+});
+
+test('digital twin is only a TEST_ONLY object jump card',()=>{
+  const html=app.render(data,app.route('#tasks'));
+  assert.match(html,/数字孪生对象入口/);
+  assert.match(html,/object_ref: UNKNOWN/);
+  assert.match(html,/target_route: \/task-center-test\//);
+  assert.doesNotMatch(html,/target_route: \/task-center-test\/digital-twin\//);
+  assert.match(html,/TEST_ONLY/);
+  assert.match(html,/NOT_CONNECTED/);
+  assert.doesNotMatch(html,/拓扑|连线|健康大屏/);
+});
+
+test('permission actions remain disabled without server capability',()=>{
+  const html=app.render(data,app.route('#finance-orders/OBJECT-UNKNOWN'));
+  assert.match(html,/服务端 capability 未接入/);
+  assert.match(html,/前端隐藏按钮不构成授权/);
+  assert.match(html,/disabled>执行操作（无 capability）/);
+});
+
+test('cross-module navigation clears review-scoped state',()=>{
+  assert.equal(app.clearScopedState('review'),'review');
+  assert.equal(app.clearScopedState('finance-orders'),'finance-orders');
+  assert.deepEqual(app.reviewStateForProject(null,'PRJ-XJ-042','diff'),{project:'PRJ-XJ-042',tab:'feedback'});
 });
