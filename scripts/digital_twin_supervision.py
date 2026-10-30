@@ -23,6 +23,9 @@ HEARTBEAT_KINDS = frozenset(('HEARTBEAT', 'HEARTBEAT_OBSERVED'))
 ACK_KINDS = frozenset(('RECEIVED', 'EXECUTOR_ACK'))
 EXIT_KINDS = frozenset(('PROCESS_EXITED',))
 TERMINAL_KINDS = frozenset(('TERMINAL', 'TERMINAL_RECEIPT'))
+TRUSTED_PROCESS_OBSERVERS = frozenset((
+    'Task Supervisor process observer',
+))
 
 
 def _canonical(value):
@@ -63,6 +66,26 @@ def _identity_matches(task, execution):
         if _known(observed) and _known(expected_value) and observed != expected_value:
             mismatches.append(name)
     return expected, mismatches
+
+
+def _trusted_process_observation(execution):
+    return (execution.get('source') in TRUSTED_PROCESS_OBSERVERS
+            and _known(execution.get('evidence_ref')))
+
+
+def _trusted_exit_event(event, task):
+    """Bind exit evidence to the exact current execution generation."""
+    if event is None or event.get('producer') not in TRUSTED_PROCESS_OBSERVERS:
+        return False
+    if not _known(event.get('evidence_ref')):
+        return False
+    expected = {
+        'run_id': task.get('run_id'),
+        'session_id': task.get('session_id'),
+        'writer_epoch': task.get('epoch'),
+    }
+    return all(_known(value) and event.get(name) == value
+               for name, value in expected.items())
 
 
 def _checkpoint(snapshot, task):
@@ -151,6 +174,8 @@ def evaluate_supervision(snapshot, now, progress_max_age=600,
     progress_at = max([x for x in (canonical_progress, event_progress)
                        if _finite(x)], default=None)
     heartbeat_at = _event_time(last_heartbeat) if last_heartbeat else None
+    trusted_execution = _trusted_process_observation(execution)
+    trusted_exit_event = _trusted_exit_event(last_exit, task)
 
     sup_heartbeat = supervisor.get('last_heartbeat_at')
     supervisor_stale = (supervisor.get('process_state') == 'PROVEN_EXITED'
@@ -178,9 +203,11 @@ def evaluate_supervision(snapshot, now, progress_max_age=600,
         reason = 'UNKNOWN_SIDE_EFFECTS_REQUIRE_READBACK'
         next_action = 'RECONCILE_UNKNOWN_EFFECTS_NO_REDISPATCH'
     elif (execution.get('process_state') in ('PROVEN_RUNNING', 'PROVEN_EXITED')
-          and not identity_complete):
+          and (not identity_complete or not trusted_execution)):
         decision = 'HOLD'
-        reason = 'EXECUTION_OBSERVATION_NOT_BOUND_TO_CURRENT_IDENTITY'
+        reason = ('EXECUTION_OBSERVATION_NOT_BOUND_TO_CURRENT_IDENTITY'
+                  if not identity_complete else
+                  'UNTRUSTED_EXECUTION_OBSERVATION')
         next_action = 'READ_ORIGINAL_RUN_SESSION_PROCESS_EPOCH'
     elif task.get('state') in TERMINAL_STATES:
         if last_terminal is None:
@@ -191,7 +218,8 @@ def evaluate_supervision(snapshot, now, progress_max_age=600,
             decision = 'COMPLETE' if task.get('state') == 'SUCCESS' else 'TERMINAL'
             reason = 'CANONICAL_TERMINAL_WITH_BOUND_RECEIPT'
             next_action = 'NONE'
-    elif execution.get('process_state') == 'PROVEN_EXITED' or last_exit:
+    elif (execution.get('process_state') == 'PROVEN_EXITED'
+          and identity_complete and trusted_execution) or trusted_exit_event:
         # Exit is an observation, never an automatic failure.
         if last_terminal:
             decision = 'RESULT_MISSING'
@@ -214,7 +242,8 @@ def evaluate_supervision(snapshot, now, progress_max_age=600,
                   'RECEIPT_WITHOUT_PROCESS_START')
         next_action = 'VERIFY_ORIGINAL_EXECUTION_UNIT'
     elif task.get('state') in ('STARTED', 'RUNNING') or last_start:
-        if execution.get('process_state') != 'PROVEN_RUNNING':
+        if (execution.get('process_state') != 'PROVEN_RUNNING'
+                or not identity_complete or not trusted_execution):
             decision = 'LIVENESS_UNKNOWN'
             reason = 'TASK_STATE_DOES_NOT_PROVE_PROCESS'
             next_action = 'READ_ORIGINAL_RUN_SESSION_PROCESS'

@@ -79,6 +79,24 @@ class DigitalTwinProjectionTests(unittest.TestCase):
         self.assertFalse(by_id['task-b']['animation_allowed'])
         self.assertEqual(by_id['task-a']['heartbeat_state'], 'UNKNOWN')
 
+    def test_ack_or_heartbeat_evidence_cannot_enable_animation(self):
+        task_projection, model_projection = self.fixture()
+        task_projection['tasks'][0]['last_real_progress_at'] = None
+        task_projection['timeline'] = [
+            {'task_id': 'task-a', 'attempt_id': 'a-1',
+             'event_id': 'ack', 'kind': 'EXECUTOR_ACK',
+             'observed_at': 10, 'evidence_kind': 'REMOTE_ACK',
+             'evidence_ref': 'ack://not-progress'},
+            {'task_id': 'task-a', 'attempt_id': 'a-1',
+             'event_id': 'heartbeat', 'kind': 'HEARTBEAT_OBSERVED',
+             'observed_at': 11, 'evidence_kind': 'HEARTBEAT',
+             'evidence_ref': 'heartbeat://not-progress'},
+        ]
+        task = build_projection(task_projection, model_projection)[
+            'records']['tasks'][0]
+        self.assertEqual(task['display_state'], 'EXECUTING')
+        self.assertFalse(task['animation_allowed'])
+
     def test_missing_customer_install_and_liveness_stay_unknown(self):
         value = build_projection(*self.fixture())
         project = value['records']['projects'][0]

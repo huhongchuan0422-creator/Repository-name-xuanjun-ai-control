@@ -16,7 +16,12 @@ service.
 - A heartbeat is displayed separately and never advances real progress.
 - A task state does not prove process/session liveness. The process must be
   matched to the canonical run, session and writer epoch.
-- A process exit is an observation, not an automatic failure. The next step is
+- A process exit is an observation, not an automatic failure. It may open
+  recovery eligibility only when a trusted process observation is exactly
+  bound to the current run/session/epoch, or a `PROCESS_EXITED` event contains
+  the same complete identity, evidence reference and the fixed trusted process
+  observer producer. Same-attempt events with missing, untrusted or old
+  execution identity do not prove exit. The next step is
   result/checkpoint/effect reconciliation.
 - A result from a mismatched run, session or old writer epoch is rejected
   before its apparent terminal state is interpreted.

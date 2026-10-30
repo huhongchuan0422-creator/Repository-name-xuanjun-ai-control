@@ -36,6 +36,11 @@ EVENT_CONTRACT = [
     'WRITER_RELEASED', 'RESUME_STARTED', 'RESUME_SUCCEEDED', 'RESUME_FAILED',
 ]
 
+REAL_ACTIVITY_EVENT_KINDS = frozenset((
+    'PROCESS_STARTED', 'PROGRESS_EVIDENCED', 'TEST_STARTED', 'TEST_PROGRESS',
+    'TEST_COMPLETED', 'RESUME_STARTED', 'RESUME_PROGRESS',
+))
+
 EXTENSION_CONTRACTS = {
     'project_delivery': {
         'reader': 'project_delivery_contract.build_project_delivery_projection',
@@ -109,7 +114,8 @@ def _animation_allowed(display_state, task, events):
         return False
     if task.get('last_real_progress_at') is not None:
         return True
-    return any(item.get('evidence_ref') not in (None, '', UNKNOWN)
+    return any(item.get('kind') in REAL_ACTIVITY_EVENT_KINDS and
+               item.get('evidence_ref') not in (None, '', UNKNOWN)
                for item in events)
 
 

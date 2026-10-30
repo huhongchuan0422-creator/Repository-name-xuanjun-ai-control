@@ -30,12 +30,19 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
                             'current_request_id': 'request-1'},
           'model_request': {'tenant_id': 'tenant-a', 'request_id': 'request-1',
             'task_id': 'task-1', 'attempt_id': 'attempt-1',
-            'role_id': 'developer', 'state': 'SUCCEEDED'},
+            'role_id': 'developer', 'provider_id': 'provider-1',
+            'model_id': 'model-1', 'state': 'SUCCEEDED'},
           'model_request_binding': {'request_id': 'request-1',
+            'connection_id': 'connection-1', 'connection_config_version': 3,
+            'provider_config_version': 4, 'model_config_version': 5,
             'writer_principal': 'writer-1', 'writer_fence': 7,
             'writer_epoch': 9},
           'execution_intent': {'tenant_id': 'tenant-a', 'intent_id': 'intent-1',
             'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5,
             'writer_principal': 'writer-1', 'writer_fence': 7,
             'writer_epoch': 9, 'state': 'SUCCEEDED', 'execution_id': 'exec-1',
             'session_id': 'session-1', 'thread_id': 'thread-1',
@@ -65,17 +72,33 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
             'state': 'ACCEPTED'},
           'reviews': [
             {'tenant_id': 'tenant-a', 'candidate_id': 'candidate-1',
+             'task_id': 'task-1', 'attempt_id': 'attempt-1',
+             'artifact_sha256': 'c'*64, 'checklist_sha256': 'b'*64,
              'review_id': 'qa-1', 'review_kind': 'QA', 'reviewer': 'qa-1',
              'decision': 'QA_PASSED'},
             {'tenant_id': 'tenant-a', 'candidate_id': 'candidate-1',
+             'task_id': 'task-1', 'attempt_id': 'attempt-1',
+             'artifact_sha256': 'c'*64, 'checklist_sha256': 'b'*64,
              'review_id': 'security-1', 'review_kind': 'SECURITY',
              'reviewer': 'security-1', 'decision': 'SECURITY_PASSED'}],
           'terminal_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
             'attempt_id': 'attempt-1', 'state': 'SUCCESS',
             'artifact_sha256': 'c'*64, 'authority_state': 'REVOKED'},
-          'connection': {'purpose': 'CODEX_EXECUTION', 'status': 'ACTIVE'},
+          'connection': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5, 'purpose': 'CODEX_EXECUTION',
+            'status': 'ACTIVE'},
           'quota': {'quota_state': 'AVAILABLE',
-                    'quota_source': 'EXISTING_SUBSCRIPTION_INCLUDED'},
+            'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5, 'verified_at': 90,
+            'provider_price_state': 'KNOWN_FREE',
+            'model_price_state': 'KNOWN_FREE',
+            'quota_source': 'EXISTING_SUBSCRIPTION_INCLUDED'},
         }
 
     def test_complete_chain_requires_same_identity_and_every_stage(self):
@@ -155,6 +178,32 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
         self.assertEqual(evaluate_closure(value, observed_at=100)[
           'stages']['ACCEPTED']['status'], UNKNOWN)
 
+    def test_review_kind_decisions_cannot_be_reversed(self):
+        value = self.snapshot()
+        value['reviews'][0]['decision'] = 'SECURITY_PASSED'
+        value['reviews'][1]['decision'] = 'QA_PASSED'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_review_cannot_splice_candidate_artifact_or_checklist(self):
+        for field, replacement in (('candidate_id', 'candidate-old'),
+                                   ('attempt_id', 'attempt-old'),
+                                   ('artifact_sha256', 'd'*64),
+                                   ('checklist_sha256', 'e'*64)):
+            value = self.snapshot(); value['reviews'][0][field] = replacement
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                             UNKNOWN, field)
+
+    def test_review_missing_explicit_binding_is_unknown(self):
+        for field in ('task_id', 'attempt_id', 'artifact_sha256',
+                      'checklist_sha256'):
+            value = self.snapshot(); value['reviews'][0].pop(field)
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                             UNKNOWN, field)
+
     def test_acceptance_requires_canonical_terminal_artifact(self):
         value = self.snapshot(); value['terminal_receipt']['artifact_sha256'] = 'd'*64
         result = evaluate_closure(value, observed_at=100)
@@ -171,6 +220,41 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
         held = admission_for_real_task(value, observed_at=100)
         self.assertEqual(held['status'], HOLD)
         self.assertIn('ATTRIBUTABLE_QUOTA_AVAILABLE_REQUIRED', held['holds'])
+
+    def test_admission_rejects_cross_tenant_connection_and_quota(self):
+        for section in ('connection', 'quota'):
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section]['tenant_id'] = 'tenant-b'
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, section)
+            self.assertIn(section.upper() + '_EVIDENCE_IDENTITY_MISMATCH',
+                          held['holds'])
+
+    def test_admission_rejects_wrong_connection_config_request_or_task(self):
+        cases = (('connection', 'connection_id', 'other-connection'),
+                 ('connection', 'connection_config_version', 99),
+                 ('quota', 'provider_config_version', 99),
+                 ('quota', 'request_id', 'other-request'),
+                 ('connection', 'task_id', 'other-task'),
+                 ('execution_intent', 'model_config_version', 99))
+        for section, field, replacement in cases:
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section][field] = replacement
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, (section, field))
+
+    def test_admission_missing_destination_binding_fails_closed(self):
+        for section, field in (('model_request_binding', 'model_config_version'),
+                               ('execution_intent', 'model_id'),
+                               ('connection', 'request_id'),
+                               ('quota', 'verified_at')):
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section].pop(field)
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, (section, field))
 
     def test_late_event_from_other_intent_is_not_ack(self):
         value = self.snapshot()

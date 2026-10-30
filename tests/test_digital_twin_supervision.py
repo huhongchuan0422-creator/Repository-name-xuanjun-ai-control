@@ -37,6 +37,7 @@ class DigitalTwinSupervisionTests(unittest.TestCase):
                 'process_id': 'pid:42', 'writer_epoch': 7,
                 'process_state': 'PROVEN_RUNNING', 'observed_at': 1000,
                 'evidence_ref': 'proc://42',
+                'source': 'Task Supervisor process observer',
             },
             'supervisor': {
                 'instance_id': 'supervisor-1',
@@ -146,6 +147,71 @@ class DigitalTwinSupervisionTests(unittest.TestCase):
         result = evaluate_supervision(value, 1000)
         self.assertEqual(result['decision'], 'HOLD')
         self.assertFalse(result['recovery']['allowed'])
+
+    def test_untrusted_same_attempt_exit_event_cannot_allow_recovery(self):
+        value = self.snapshot()
+        value['execution']['process_state'] = 'UNKNOWN'
+        value['events'].append({
+            'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'event_id': 'exit-forged', 'kind': 'PROCESS_EXITED',
+            'observed_at': 950})
+        value['checkpoints'] = [{
+            'attempt_id': 'attempt-1', 'checkpoint_id': 'checkpoint-1',
+            'created_at': 940, 'effects_state': 'RECONCILED'}]
+        result = evaluate_supervision(value, 1000)
+        self.assertNotEqual(result['decision'], 'RECOVERABLE_SAME_ATTEMPT')
+        self.assertFalse(result['recovery']['allowed'])
+
+    def test_untrusted_process_exit_observation_cannot_allow_recovery(self):
+        value = self.snapshot()
+        value['execution']['process_state'] = 'PROVEN_EXITED'
+        value['execution']['source'] = 'caller-asserted'
+        value['checkpoints'] = [{
+            'attempt_id': 'attempt-1', 'checkpoint_id': 'checkpoint-1',
+            'created_at': 940, 'effects_state': 'RECONCILED'}]
+        result = evaluate_supervision(value, 1000)
+        self.assertEqual(result['decision'], 'HOLD')
+        self.assertEqual(result['reason'], 'UNTRUSTED_EXECUTION_OBSERVATION')
+        self.assertFalse(result['recovery']['allowed'])
+
+    def test_old_or_untrusted_exit_identity_cannot_allow_recovery(self):
+        for changed in ('run_id', 'session_id', 'writer_epoch', 'producer'):
+            value = self.snapshot()
+            value['execution']['process_state'] = 'UNKNOWN'
+            event = {
+                'task_id': 'task-1', 'attempt_id': 'attempt-1',
+                'event_id': 'exit-' + changed, 'kind': 'PROCESS_EXITED',
+                'observed_at': 950, 'run_id': 'run-1',
+                'session_id': 'session-1', 'writer_epoch': 7,
+                'producer': 'Task Supervisor process observer',
+                'evidence_ref': 'proc://exit'}
+            event[changed] = ('untrusted' if changed == 'producer'
+                              else (6 if changed == 'writer_epoch' else 'old'))
+            value['events'].append(event)
+            value['checkpoints'] = [{
+                'attempt_id': 'attempt-1', 'checkpoint_id': 'checkpoint-1',
+                'created_at': 940, 'effects_state': 'RECONCILED'}]
+            result = evaluate_supervision(value, 1000)
+            self.assertNotEqual(result['decision'],
+                                'RECOVERABLE_SAME_ATTEMPT', changed)
+            self.assertFalse(result['recovery']['allowed'], changed)
+
+    def test_trusted_exact_exit_event_can_make_same_attempt_recoverable(self):
+        value = self.snapshot()
+        value['execution']['process_state'] = 'UNKNOWN'
+        value['events'].append({
+            'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'event_id': 'exit-trusted', 'kind': 'PROCESS_EXITED',
+            'observed_at': 950, 'run_id': 'run-1',
+            'session_id': 'session-1', 'writer_epoch': 7,
+            'producer': 'Task Supervisor process observer',
+            'evidence_ref': 'proc://exit'})
+        value['checkpoints'] = [{
+            'attempt_id': 'attempt-1', 'checkpoint_id': 'checkpoint-1',
+            'created_at': 940, 'effects_state': 'RECONCILED'}]
+        result = evaluate_supervision(value, 1000)
+        self.assertEqual(result['decision'], 'RECOVERABLE_SAME_ATTEMPT')
+        self.assertTrue(result['recovery']['allowed'])
 
     def test_success_requires_bound_terminal_receipt(self):
         value = self.snapshot()

@@ -217,9 +217,17 @@ def evaluate_closure(snapshot, observed_at=None):
 
     reviews = [item for item in snapshot.get('reviews', [])
                if item.get('tenant_id') == identity['tenant_id'] and
-               item.get('candidate_id') == candidate.get('candidate_id')]
+               item.get('candidate_id') == candidate.get('candidate_id') and
+               item.get('task_id') == identity['task_id'] and
+               item.get('attempt_id') == identity['attempt_id'] and
+               item.get('artifact_sha256') == candidate.get('artifact_sha256') and
+               item.get('checklist_sha256') == candidate.get('checklist_sha256')]
+    expected_review_decision = {'QA': 'QA_PASSED',
+                                'SECURITY': 'SECURITY_PASSED'}
     passed = {item.get('review_kind'): item for item in reviews
-              if item.get('decision') in ('QA_PASSED', 'SECURITY_PASSED')}
+              if (item.get('review_kind') in expected_review_decision and
+                  item.get('decision') == expected_review_decision[
+                    item.get('review_kind')])}
     reviewers = {item.get('reviewer') for item in passed.values()}
     review_ok = (artifact_ok and set(passed) == {'QA', 'SECURITY'} and
                  len(reviewers) == 2 and
@@ -264,8 +272,39 @@ def admission_for_real_task(snapshot, observed_at=None):
     """
     identity = _identity(snapshot)
     holds = _integrity(snapshot, identity, observed_at)
+    request = snapshot.get('model_request') or {}
+    binding = snapshot.get('model_request_binding') or {}
+    intent = snapshot.get('execution_intent') or {}
     connection = snapshot.get('connection') or {}
     quota = snapshot.get('quota') or {}
+    admission_identity = {
+      'tenant_id': identity.get('tenant_id'),
+      'task_id': identity.get('task_id'),
+      'request_id': identity.get('request_id'),
+      'connection_id': binding.get('connection_id'),
+      'connection_config_version': binding.get('connection_config_version'),
+      'provider_id': request.get('provider_id'),
+      'provider_config_version': binding.get('provider_config_version'),
+      'model_id': request.get('model_id'),
+      'model_config_version': binding.get('model_config_version'),
+    }
+    for name, value in admission_identity.items():
+        if value in (None, '', UNKNOWN):
+            holds.append('MISSING_' + name.upper())
+    intent_names = ('tenant_id', 'task_id', 'request_id', 'connection_id',
+                    'connection_config_version', 'provider_id',
+                    'provider_config_version', 'model_id',
+                    'model_config_version')
+    if not _same(intent, admission_identity, intent_names):
+        holds.append('INTENT_EXECUTION_DESTINATION_MISMATCH')
+    connection_names = ('tenant_id', 'task_id', 'request_id', 'connection_id',
+                        'connection_config_version', 'provider_id',
+                        'provider_config_version', 'model_id',
+                        'model_config_version')
+    if not _same(connection, admission_identity, connection_names):
+        holds.append('CONNECTION_EVIDENCE_IDENTITY_MISMATCH')
+    if not _same(quota, admission_identity, connection_names):
+        holds.append('QUOTA_EVIDENCE_IDENTITY_MISMATCH')
     if (connection.get('purpose') not in ('CODEX_EXECUTION', 'MODEL_INFERENCE') or
             connection.get('status') != 'ACTIVE'):
         holds.append('ACTIVE_EXECUTION_CONNECTION_REQUIRED')
@@ -274,6 +313,15 @@ def admission_for_real_task(snapshot, observed_at=None):
     if quota.get('quota_source') not in ('EXISTING_SUBSCRIPTION_INCLUDED',
                                           'VERIFIED_FREE_TIER'):
         holds.append('ZERO_NEW_SPEND_SOURCE_REQUIRED')
+    verified_at = quota.get('verified_at')
+    if (type(verified_at) not in (int, float) or
+            type(observed_at) not in (int, float) or
+            verified_at > observed_at or observed_at - verified_at > 3600):
+        holds.append('CURRENT_ATTRIBUTABLE_QUOTA_EVIDENCE_REQUIRED')
+    if (quota.get('quota_source') == 'VERIFIED_FREE_TIER' and
+            (quota.get('provider_price_state') != 'KNOWN_FREE' or
+             quota.get('model_price_state') != 'KNOWN_FREE')):
+        holds.append('VERIFIED_FREE_DESTINATION_REQUIRED')
     if not snapshot.get('idempotency_key'):
         holds.append('IDEMPOTENCY_KEY_REQUIRED')
     return {'status': PROVEN if not holds else HOLD, 'identity': identity,

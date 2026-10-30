@@ -39,7 +39,10 @@ role instance's `current_request_id`, when present, must match the request.
 6. `ARTIFACT_SUBMITTED`: canonical 64-hex artifact bound to that checklist,
    attempt, and authenticated executor.
 7. `INDEPENDENT_REVIEW`: distinct QA and Security reviewers, neither the
-   executor, passed the same current candidate.
+   executor, passed the same current candidate. QA must state `QA_PASSED` and
+   Security must state `SECURITY_PASSED`; each review must explicitly bind the
+   same task, attempt, candidate, artifact SHA, and checklist SHA. Missing or
+   cross-spliced review bindings fail closed as `UNKNOWN`.
 8. `ACCEPTED`: a third independent acceptor plus canonical task `SUCCESS`,
    revoked Writer authority, and a terminal receipt for the exact artifact.
 
@@ -54,6 +57,14 @@ executor assignment, consistent request/intent generation, an active
 `CODEX_EXECUTION` or `MODEL_INFERENCE` connection, attributable included/free
 quota, and an idempotency key. Admission never claims that a process, model
 call, artifact, review, or acceptance occurred.
+
+The request, request binding, execution intent, connection evidence, and quota
+evidence must all explicitly bind the same tenant, task, request, connection,
+provider, model, and connection/provider/model configuration versions. Quota
+evidence must be current (not future-dated and no older than one hour) and must
+name an attributable included source; verified-free evidence additionally
+requires both provider and model price states to be `KNOWN_FREE`. Missing
+fields, cross-tenant records, or changed destination/configuration are `HOLD`.
 
 For two consecutive tasks, retain two separate admission and closure receipts;
 do not copy run/session/process/provider receipts between task IDs. After an
