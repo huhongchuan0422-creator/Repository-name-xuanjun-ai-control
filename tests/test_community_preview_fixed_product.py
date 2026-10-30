@@ -39,9 +39,9 @@ class Contracts(unittest.TestCase):
     def test_control_product_separate_and_fixed_literals(self):
         r=p.evidence(*self.records,self.env)
         self.assertEqual(r['control_source_sha'],CONTROL)
-        self.assertEqual(r['product_source_sha'],'c8317f88c91aa9d81546e7c25f6436a68e186b50')
+        self.assertEqual(r['product_source_sha'],'57242e0be52e0535746c3f8c02dcf36bb69d6281')
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
-        self.assertEqual(r['artifact_id'],12934502297)
+        self.assertEqual(r['artifact_id'],12981650732)
         self.assertFalse(r['upload_performed'])
     def test_context_rejects_wrong_branch_control_product_mode_run_and_target(self):
         for key,value in [('GITHUB_EVENT_NAME','push'),('GITHUB_REPOSITORY','other/repo'),
@@ -135,7 +135,7 @@ class Contracts(unittest.TestCase):
             handlers=builder.call_args.args
             self.assertTrue(any(isinstance(h,health.ProxyHandler) and h.proxies=={} for h in handlers))
             self.assertTrue(any(isinstance(h,health.NoRedirect) for h in handlers))
-        for values in ({'runtime_source_sha':CONTROL},{'runtime_source_sha':p.PRODUCT_SHA},{'runtime_source_sha':'06053b6a16a8e6efcd324dffe06612b9384aaaf1'},{'observed_at':now-601},{'observed_at':now+31},
+        for values in ({'runtime_source_sha':CONTROL},{'runtime_source_sha':'211a9f4a1425c4b2667c13052b8590c0af3b3ac1'}, {'runtime_source_sha':'c8317f88c91aa9d81546e7c25f6436a68e186b50'},{'runtime_source_sha':'06053b6a16a8e6efcd324dffe06612b9384aaaf1'},{'observed_at':now-601},{'observed_at':now+31},
                        {'observed_at':True},{'production_acceptance':True},{'version_source':'CLIENT_ENV'}):
             report=health.check(lambda *a,**k:Response(dict(body,**values)),p.PROFILE,identity)
             self.assertEqual(report['status'],'BACKEND_NOT_READY')
@@ -143,7 +143,7 @@ class Contracts(unittest.TestCase):
         w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         preview=w.split('  mini-preview:\n',1)[1]
         self.assertIn("inputs.preview_source_sha == github.sha",preview)
-        self.assertIn("inputs.preview_evidence_run_id == '40956400516'",preview)
+        self.assertIn("inputs.preview_evidence_run_id == '41061935977'",preview)
         self.assertIn("github.ref == 'refs/heads/"+p.BRANCH+"'",preview)
         self.assertIn('runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]',preview)
         self.assertIn('test "$(hostname -s)" = iZvt5t8tlrm8oiZ',preview)
@@ -189,7 +189,7 @@ class Contracts(unittest.TestCase):
                 return Response()
         with patch.object(p,'build_opener',return_value=Opener()):
             self.assertEqual(p.download_archive('SYNTHETIC_TOKEN'),b'fixture bytes')
-        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12934502297/zip')
+        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12981650732/zip')
         self.assertEqual(requests[0].get_header('Authorization'),'Bearer SYNTHETIC_TOKEN')
         self.assertIsNone(requests[1].get_header('Authorization'))
     def test_download_rejects_untrusted_redirect_and_missing_token(self):
@@ -215,11 +215,43 @@ class Contracts(unittest.TestCase):
     def test_fixed_compatibility_proof_tamper_and_missing_rejected(self):
         binding=p.compatibility_binding()
         self.assertEqual(binding['backend_source_sha'],p.BACKEND_SHA)
-        self.assertNotEqual(p.BACKEND_SHA,p.PRODUCT_SHA)
+        self.assertEqual(p.BACKEND_SHA,p.PRODUCT_SHA)
         self.assertEqual(binding['compatibility'],p.COMPATIBILITY)
         for raw in (b'{}',b'',b'not a proof'):
             with patch.object(p,'read_regular',return_value=raw),self.assertRaisesRegex(ValueError,'FIXED_COMPATIBILITY_PROOF_REQUIRED'):
                 p.compatibility_binding()
+    def test_same_source_binding_rejects_old_cross_version_proof_even_with_recomputed_hash(self):
+        original=json.loads((ROOT/'deploy/community-preview/native-backend-compatibility.json').read_bytes())
+        self.assertEqual(original['compatibility'],'EXACT_SOURCE_MATCH')
+        self.assertEqual(original['backend_image_id'],p.BACKEND_IMAGE_ID)
+        changes=[{'frontend_source_sha':CONTROL},
+          {'backend_source_sha':'211a9f4a1425c4b2667c13052b8590c0af3b3ac1'},
+          {'backend_source_sha':'c8317f88c91aa9d81546e7c25f6436a68e186b50'},
+          {'backend_image_id':'sha256:ac84d9482a5f6dc3ddd0795216110cfee61c389f994f864df2390858c1ce7364'},
+          {'compatibility':'REVIEWED_FIXED_NATIVE_BACKEND_PAIR'},
+          {'status':'SOURCE_COMPATIBILITY_CANDIDATE_NOT_RUNTIME_ADMISSION'},
+          {'complete_classified_delta':[{'old_cross_version_delta':True}]},
+          {'runtime_admission':'INSTALLED'}, {'unknown_delta':['unknown']}]
+        for side in ('frontend','backend'):
+            archives=copy.deepcopy(original['archives']);archives[side]['sha256']='0'*64
+            changes.append({'archives':archives})
+        for change in changes:
+            raw=json.dumps(dict(original,**change)).encode()
+            with self.subTest(change=change),patch.object(p,'read_regular',return_value=raw),\
+                 patch.object(p,'COMPATIBILITY_SHA256',hashlib.sha256(raw).hexdigest()),\
+                 self.assertRaisesRegex(ValueError,'FIXED_COMPATIBILITY_PROOF_REQUIRED'):
+                p.compatibility_binding()
+    def test_same_source_identity_mismatch_rejects_before_health_io(self):
+        identity=dict(product_source_sha=p.PRODUCT_SHA,control_source_sha=CONTROL,
+                      fixed_product=True,**p.compatibility_binding())
+        def forbidden(*args,**kwargs):
+            self.fail('mismatched identity must not access health')
+        for changes in ({'product_source_sha':CONTROL},
+                        {'backend_source_sha':'211a9f4a1425c4b2667c13052b8590c0af3b3ac1'},
+                        {'compatibility':'REVIEWED_FIXED_NATIVE_BACKEND_PAIR'},
+                        {'compatibility_sha256':'ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d'}):
+            with self.subTest(changes=changes):
+                self.assertEqual(health.check(forbidden,p.PROFILE,dict(identity,**changes))['status'],'BACKEND_NOT_READY')
     def test_node_fixed_pair_denies_old_runtime_unknown_pair_forged_proof_and_stale_health(self):
         now=int(time.time())
         target=dict(profile=p.PROFILE,baseUrl=p.BASE_URL,origin='https://uk.wenwenwenyiyiyi.work',health_url=p.BASE_URL+'/community/health')
@@ -228,9 +260,9 @@ class Contracts(unittest.TestCase):
           backend_source_sha=p.BACKEND_SHA,backend_version_source='IMAGE_BUILD_STAMP',compatibility=p.COMPATIBILITY,
           compatibility_sha256=p.COMPATIBILITY_SHA256,control_source_sha=CONTROL,backend_observed_at=now,observed_at=now)
         changes=[{'backend_source_sha':'06053b6a16a8e6efcd324dffe06612b9384aaaf1'},
-          {'backend_source_sha':p.PRODUCT_SHA},{'backend_source_sha':'b'*40},
+          {'backend_source_sha':'211a9f4a1425c4b2667c13052b8590c0af3b3ac1'}, {'backend_source_sha':'c8317f88c91aa9d81546e7c25f6436a68e186b50'}, {'backend_source_sha':CONTROL},{'backend_source_sha':'b'*40},
           {'frontend_source_sha':'b'*40},{'compatibility_sha256':'0'*64},
-          {'compatibility':'EXACT_SOURCE_MATCH'},{'backend_observed_at':now-601},
+          {'compatibility':'REVIEWED_FIXED_NATIVE_BACKEND_PAIR'},{'backend_observed_at':now-601},
           {'observed_at':now-601},{'payment_enabled':True}]
         program="const {verifyReadiness}=require(process.argv[1]);const x=JSON.parse(process.argv[2]);verifyReadiness(x.report,x.target,x.head,x.now,x.control);for(const delta of x.changes){let denied=false;try{verifyReadiness({...x.report,...delta},x.target,x.head,x.now,x.control);}catch(_){denied=true;}if(!denied)throw Error('PAIR_MUTATION_ALLOWED');}"
         result=subprocess.run(['node','-e',program,str(ROOT/'deploy/community-preview/endpoint.cjs'),json.dumps(dict(report=report,target=target,head=p.PRODUCT_SHA,now=now,control=CONTROL,changes=changes))],capture_output=True,text=True,timeout=10)
@@ -239,7 +271,7 @@ class Contracts(unittest.TestCase):
     def test_node_identity_child_does_not_receive_credentials(self):
         script="""const cp=require('node:child_process');let called=false;
 cp.execFileSync=(bin,args,opts)=>{called=true;if('WECHAT_MINIPROGRAM_PRIVATE_KEY' in opts.env||'GITHUB_TOKEN' in opts.env)throw Error('credential leaked');
-return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'c8317f88c91aa9d81546e7c25f6436a68e186b50',source_root:'/fixture',backend_source_sha:'211a9f4a1425c4b2667c13052b8590c0af3b3ac1',compatibility:'REVIEWED_FIXED_NATIVE_BACKEND_PAIR',compatibility_sha256:'ea82c69ae5944c4ef23b2341da1c9f999396759d5305d22a7abad79f9896aa1d'});};
+return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'57242e0be52e0535746c3f8c02dcf36bb69d6281',source_root:'/fixture',backend_source_sha:'57242e0be52e0535746c3f8c02dcf36bb69d6281',compatibility:'EXACT_SOURCE_MATCH',compatibility_sha256:'a44125664276adae415d9a67734aee3aea3c03a92604a64482beb1761ac456f0'});};
 const p=require(process.argv[1]);p.sourceIdentity();if(!called)throw Error('identity admission missing');"""
         env=dict(self.env,WECHAT_MINIPROGRAM_PRIVATE_KEY='SYNTHETIC_CANARY_NOT_A_KEY',GITHUB_TOKEN='SYNTHETIC_CANARY_NOT_A_TOKEN')
         r=subprocess.run(['node','-e',script,str(ROOT/'deploy/community-preview/endpoint.cjs')],
@@ -298,7 +330,7 @@ class ExactArtifact(unittest.TestCase):
 
     def test_actual_frozen_source_set_and_appid(self):
         files=p.source_files(self.raw)
-        self.assertEqual(len(files),517)
+        self.assertEqual(len(files),536)
         self.assertEqual(json.loads(files['clients/community-mini/project.config.json'])['appid'],p.APPID)
     def test_exact_stage_identity_and_duplicate_stage_denial(self):
         destination,context=self.stage()
@@ -329,7 +361,12 @@ class ExactArtifact(unittest.TestCase):
         prepared=json.loads((out/'CONNECTED_PREVIEW_RECEIPT.json').read_text())
         self.assertEqual(prepared['frontend_source_sha'],p.PRODUCT_SHA)
         self.assertEqual(prepared['control_source_sha'],CONTROL)
-        self.assertEqual(len(prepared['prepared_files']),35)
+        self.assertEqual(len(prepared['prepared_files']),36)
+        self.assertEqual(prepared['profile'],'uk-path-candidate')
+        self.assertEqual(prepared['connected_app_sha256'],'07eaedb76bc73f278eeab7235cf2f921cee0c875f890fdc26c82fb4e4699b42e')
+        asset='assets/community-demo-storefront-v1.jpg'
+        self.assertEqual((out/asset).stat().st_size,160523)
+        self.assertEqual(prepared['prepared_files'][asset],'f8e066fc2153b5beff1ae65faf9be5383d877eb77336cc5e16c90468b13b65b6')
         self.assertEqual(before,p.SOURCE_SHA256)
         self.assertFalse(prepared['upload_performed']);self.assertIsNone(prepared['scene'])
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
@@ -351,13 +388,33 @@ class ExactArtifact(unittest.TestCase):
         self.assertEqual(actual['control_source_sha'],CONTROL)
         self.assertEqual(actual['frontend_source_sha'],p.PRODUCT_SHA)
         self.assertFalse((self.root/'preview/preview.png').exists())
+        # The actual 36-file frozen product, not a rewritten receipt, owns the JPG.
+        original_asset=(out/asset).read_bytes()
+        for mode in ('changed-jpg','missing-jpg','extra-asset'):
+            forged=copy.deepcopy(prepared)
+            if mode=='changed-jpg':
+                (out/asset).write_bytes(original_asset+b'changed')
+                forged['prepared_files'][asset]=hashlib.sha256((out/asset).read_bytes()).hexdigest()
+            elif mode=='missing-jpg':
+                (out/asset).unlink();del forged['prepared_files'][asset]
+            else:
+                (out/'assets/extra.jpg').write_bytes(original_asset)
+                forged['prepared_files']['assets/extra.jpg']=hashlib.sha256(original_asset).hexdigest()
+            (out/'CONNECTED_PREVIEW_RECEIPT.json').write_text(json.dumps(forged))
+            env['COMMUNITY_PREVIEW_OUTPUT']=str(self.root/mode)
+            failed=subprocess.run(['node',str(ROOT/'scripts/community_mini_preview.cjs')],env=env,capture_output=True,text=True,timeout=20)
+            self.assertEqual(failed.returncode,4,mode+failed.stdout+failed.stderr)
+            self.assertFalse((self.root/mode/'receipt.json').exists())
+            (out/asset).write_bytes(original_asset)
+            if mode=='extra-asset':(out/'assets/extra.jpg').unlink()
+        (out/'CONNECTED_PREVIEW_RECEIPT.json').write_text(json.dumps(prepared))
         # Changed prepared source is rejected even with a synthetically valid health fixture.
         (out/'session.js').write_text('changed')
         env['COMMUNITY_PREVIEW_OUTPUT']=str(self.root/'preview-mutated')
         r=subprocess.run(['node',str(ROOT/'scripts/community_mini_preview.cjs')],env=env,capture_output=True,text=True,timeout=20)
         self.assertEqual(r.returncode,4)
         self.assertFalse((self.root/'preview-mutated/receipt.json').exists())
-        # Self-reported manifest edits cannot turn changed code into pinned 211a9.
+        # Self-reported manifest edits cannot turn changed code into pinned 572.
         prepared['prepared_files']['session.js']=hashlib.sha256((out/'session.js').read_bytes()).hexdigest()
         (out/'CONNECTED_PREVIEW_RECEIPT.json').write_text(json.dumps(prepared))
         env['COMMUNITY_PREVIEW_OUTPUT']=str(self.root/'preview-forged-manifest')
