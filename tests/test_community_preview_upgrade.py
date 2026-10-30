@@ -50,11 +50,16 @@ def legacy_session_asset():
 
 class UpgradeBoundary(unittest.TestCase):
     def test_fixed_source_fragment_image_and_original_role_assets(self):
-        # Frozen historical installer bytes remain immutable; current candidate adds only two assets.
+        # Frozen 2330 installer and intermediate admin-shell projection remain pinned.
+        # Current successor additionally permits only the reviewed fixed WeChat session path.
         current=(Path(__file__).resolve().parents[1]/'deploy/community-preview/nginx-uk-path-candidate.conf').read_bytes()
         self.assertEqual(hashlib.sha256(u.FRAGMENT).hexdigest(),'df55f5f11413c623d3f9d966b6feacf54fda25ecfe42ee11d70052d544f2ca83')
-        self.assertEqual(hashlib.sha256(current).hexdigest(),'82e81b56e2adeb1519ff34a981e0f5a8037923df59718192ee5eafe2d03f11a9')
-        self.assertEqual(current,u.FRAGMENT.replace(b'|web-session',b'|admin-shell\\.(css|js)|web-session',1))
+        admin_projection=u.FRAGMENT.replace(b'|web-session',b'|admin-shell\\.(css|js)|web-session',1)
+        self.assertEqual(hashlib.sha256(admin_projection).hexdigest(),'82e81b56e2adeb1519ff34a981e0f5a8037923df59718192ee5eafe2d03f11a9')
+        self.assertEqual(admin_projection.count(b'session/(login|check|logout)'),1)
+        self.assertEqual(current,admin_projection.replace(b'session/(login|check|logout)',
+                                                        b'session/(login|check|logout|wechat)',1))
+        self.assertEqual(hashlib.sha256(current).hexdigest(),'a5ccafb9421929a1e5076b41af7a3c08542458aeec24274587dffee4bd6eca9d')
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():
             raw=(legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else
