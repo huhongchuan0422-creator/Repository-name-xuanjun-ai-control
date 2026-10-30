@@ -1,5 +1,26 @@
 # P3 lifecycle / host-boundary isolated candidate (2026-10-30)
 
+## 2026-10-31 default-off host-carrier successor
+
+The exact reviewed core at Commit `875121c4e329ae47650b66a9a3b9c28ba4f1574b`
+and Tree `6422b209c22e353914fb06733ea44b0db9b8ad48` is now the frozen base of a
+bounded host-carrier successor.  The successor adds only:
+
+- `src/p3_host_callsite.py`, which verifies actual imported frozen source bytes,
+  reuses the one existing `P3Ledger`, and hard-gates composition on real P2
+  acceptance plus explicit P3 release;
+- one immutable default-off carrier installer with readback, interrupted-attempt
+  recovery, and evidence-preserving rollback for an unbound release; and
+- the exact previously reviewed core/host-wiring/reminder ZIPs and QA/Security
+  receipts.
+
+The carrier configuration keeps `execution_enabled=false` and
+`notifications_enabled=false`.  It has not been installed, bound, enabled, or
+run against a real task.  See `docs/HOST_CARRIER_AND_GATES.md` for the exact
+pre-install versus post-install acceptance split.  The original status and
+evidence below remain the base review record and are not relabelled as review of
+the new installation delta.
+
 ## Status
 
 `SCOPED_LOCAL_CORRECTED_CANDIDATE` only. This is not installed, deployed, admitted, field

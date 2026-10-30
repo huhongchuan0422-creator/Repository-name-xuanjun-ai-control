@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "kind": "P3_LIFECYCLE_INDEPENDENT_QA_R2_EVIDENCE",
+  "status": "PASS_LOCAL_INCREMENT_ONLY",
+  "qa_started_at": "2026-10-31T00:40:17+08:00",
+  "candidate_commit": "875121c4e329ae47650b66a9a3b9c28ba4f1574b",
+  "candidate_tree": "6422b209c22e353914fb06733ea44b0db9b8ad48",
+  "candidate_clean_before": true,
+  "candidate_clean_after": true,
+  "writer_stopped_before_qa": true,
+  "installed": false,
+  "deployed": false,
+  "real_dispatch_called": false,
+  "external_transport_called": false,
+  "hosted_ci": false,
+  "security_review": false,
+  "test": {
+    "runtime": "Python 3.6.8",
+    "original": {"run": 21, "passed": 21, "failures": 0, "errors": 0, "skipped": 0},
+    "existing_counterexamples": {"run": 4, "passed": 4, "failures": 0, "errors": 0, "skipped": 0},
+    "new_completion_fence": {"run": 1, "passed": 1, "failures": 0, "errors": 0, "skipped": 0},
+    "all_counterexamples": {"run": 5, "passed": 5, "failures": 0, "errors": 0, "skipped": 0},
+    "combined": {"run": 26, "passed": 26, "failures": 0, "errors": 0, "skipped": 0}
+  },
+  "semantic_probe": {
+    "subject_fence": 7,
+    "recovery_payload_current_fence": 999,
+    "rejected": true,
+    "error": "COMPLETION_LINEAGE_CHANGED"
+  },
+  "files": [
+    {"path": "ENVIRONMENT.md", "bytes": 1262, "sha256": "68347d087b38048835f292b06910554bc77503f56ffdd02e1032d1cdcb8dde89"},
+    {"path": "QA_R2_REPORT.md", "bytes": 2625, "sha256": "ba427caeaa9495ba0f2b6c732764c984d980353847b8777298f1f79a5cadc821"},
+    {"path": "R2_COMPLETION_FENCE_REJECTION_PROBE.py", "bytes": 2039, "sha256": "6f07d9546517cac73896adf91413148002aea9c9e4c46f166eb1a5992fdb6072"},
+    {"path": "R2_COMPLETION_FENCE_REJECTION_PROBE_RAW.log", "bytes": 248, "sha256": "bdf287d46c234b2cd1c324490f10d476d2b5b23d1abd5589c46e5f8fed52c11c"},
+    {"path": "R2_INDEPENDENT_COMBINED_26_RAW.log", "bytes": 2882, "sha256": "12093044516b721bec5880fddf11a24c64284aeaff9ab04d7650725479cc8afa"},
+    {"path": "R2_INDEPENDENT_COUNTEREXAMPLES_5_RAW.log", "bytes": 763, "sha256": "9a4692ba413b9a8f29ea33496cd902f5963c5e1c8705f8e8abffbe0e94067476"},
+    {"path": "R2_INDEPENDENT_EXISTING_4_RAW.log", "bytes": 645, "sha256": "579d2d97be1ab5ac828ef4075599bac65c472c63889233845c8f882a3428af1c"},
+    {"path": "R2_INDEPENDENT_NEW_1_RAW.log", "bytes": 306, "sha256": "f312429b25652a7e57e1026b5bcc18f1fd28d9066f6baac895dceb0b52d37e30"},
+    {"path": "R2_INDEPENDENT_ORIGINAL_21_RAW.log", "bytes": 2308, "sha256": "1a9a25ab26c02a88489a95d336132b99b4045a30595d26fc0fd104ba56412627"}
+  ],
+  "manifest_self_hash": "excluded to avoid recursion",
+  "checksum_file_hash": "reported externally; SHA256SUMS excludes itself"
+}

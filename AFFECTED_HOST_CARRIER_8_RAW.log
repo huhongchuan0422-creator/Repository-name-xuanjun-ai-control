@@ -1,0 +1,13 @@
+test_admitted_callsite_reuses_existing_host_and_stays_notifications_off (tests.test_p3_host_callsite.CallsiteTests) ... ok
+test_default_off_verifies_sources_without_composing_or_reading_gate (tests.test_p3_host_callsite.CallsiteTests) ... ok
+test_loaded_source_hash_mismatch_fails_closed (tests.test_p3_host_callsite.CallsiteTests) ... ok
+test_p2_and_release_are_both_hard_gates_before_composition (tests.test_p3_host_callsite.CallsiteTests) ... ok
+test_changed_member_is_rejected (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+test_install_is_default_off_idempotent_and_recoverable (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+test_missing_current_controlled_authority_fails_before_effect (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+test_rollback_only_quarantines_unbound_default_off_release (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.030s
+
+OK

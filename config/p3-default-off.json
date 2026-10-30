@@ -1,0 +1,7 @@
+{
+  "execution_enabled": false,
+  "notifications_enabled": false,
+  "ratio_bands": [[0, 100, 10]],
+  "task_to_blocker": {},
+  "worker_prefix": "p3-disabled-unbound"
+}
