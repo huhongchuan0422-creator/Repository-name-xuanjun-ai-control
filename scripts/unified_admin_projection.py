@@ -76,6 +76,25 @@ def _provider_record(value):
     }
 
 
+def _model_usage_record(value):
+    """Expose ModelControl usage without turning estimates into billing facts."""
+    cost_state = value.get('cost_state', UNKNOWN)
+    estimated_cost = (value.get('known_cost')
+                      if cost_state in ('KNOWN', 'KNOWN_ZERO') else None)
+    return {
+        'provider_id': value.get('provider_id', UNKNOWN),
+        'model_id': value.get('model_id', UNKNOWN),
+        'request_count': value.get('request_count', UNKNOWN),
+        'input_tokens': value.get('input_tokens', UNKNOWN),
+        'output_tokens': value.get('output_tokens', UNKNOWN),
+        'cost_state': cost_state,
+        'estimated_cost': (estimated_cost if estimated_cost is not None
+                           else UNKNOWN),
+        'cost_unit': UNKNOWN,
+        'semantic': 'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',
+    }
+
+
 def build_projection(task_projection, model_projection, observed_at):
     """Build one fail-closed TEST_ONLY admin projection."""
     if not isinstance(task_projection, dict) or not isinstance(
@@ -91,6 +110,8 @@ def build_projection(task_projection, model_projection, observed_at):
     raw_tasks = task_projection.get('tasks', [])
     providers = [_provider_record(item) for item in
                  model_projection.get('providers', [])]
+    model_usage = [_model_usage_record(item) for item in
+                   model_projection.get('usage', [])]
     events = [{key: item.get(key, UNKNOWN) for key in
                ('task_id', 'attempt_id', 'event_id', 'kind', 'observed_at',
                 'evidence_kind', 'evidence_ref')}
@@ -184,6 +205,9 @@ def build_projection(task_projection, model_projection, observed_at):
                 'advanced': {
                     'quota_status': model_projection.get('quota_status', []),
                     'modules': model_projection.get('modules', []),
+                    'model_usage': model_usage,
+                    'model_usage_semantic':
+                        'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',
                 },
             },
             'finance': {

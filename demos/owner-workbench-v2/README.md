@@ -16,7 +16,9 @@
 `NOT_CONNECTED/UNKNOWN`。该 API 仅接受管理员只读访问，不提供写 capability。
 
 Hosted 配置侧栏按“大模型 / 自媒体 / 服务器”分开：大模型仅显示 ModelControl
-TEST_ONLY 只读字段；自媒体和服务器显示候选来源、证据与精确缺口，保持
+TEST_ONLY 只读字段，并可显示其已持久化用量事件和已配单价导出的
+估算成本。该值明确不是 Finance 账本、实际扣费或付款凭证，未知币种不会
+被推断；自媒体和服务器显示候选来源、证据与精确缺口，保持
 `allowed_actions=[]`。本地 `file:` 候选仍显著标记合成；Hosted 可见区域只使用
 `TEST_ONLY / READ_ONLY`，不把 fixture 文案带入真实接口页。
 

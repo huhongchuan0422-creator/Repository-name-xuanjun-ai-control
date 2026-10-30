@@ -25,7 +25,17 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
                                  'secret_configured': True,
                                  'secret_mask': 'must-not-leak',
                                  'secret_cipher': 'must-not-leak-either'}],
-                  'quota_status': [], 'modules': []}
+                  'quota_status': [], 'modules': [],
+                  'usage': [
+                      {'provider_id': 'free', 'model_id': 'model-free',
+                       'request_count': 2, 'input_tokens': 10,
+                       'output_tokens': 4, 'cost_state': 'KNOWN_ZERO',
+                       'known_cost': 0},
+                      {'provider_id': 'paid', 'model_id': 'model-unknown',
+                       'request_count': 1, 'input_tokens': 3,
+                       'output_tokens': 1, 'cost_state': 'UNKNOWN',
+                       'known_cost': 999}]
+                  }
         return tasks, models
 
     def test_builds_read_only_fail_closed_projection(self):
@@ -110,6 +120,20 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
         provider = value['modules']['configuration']['records'][0]
         self.assertEqual(provider['secret']['state'], 'CONFIGURED')
         self.assertNotIn('must-not-leak', json.dumps(value))
+
+    def test_model_usage_is_read_only_estimate_not_a_finance_fact(self):
+        value = build_projection(*self.fixtures(), observed_at=123)
+        advanced = value['modules']['configuration']['advanced']
+        self.assertEqual(advanced['model_usage_semantic'],
+                         'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE')
+        usage = advanced['model_usage']
+        self.assertEqual(usage[0]['estimated_cost'], 0)
+        self.assertEqual(usage[0]['cost_unit'], 'UNKNOWN')
+        self.assertEqual(usage[1]['estimated_cost'], 'UNKNOWN')
+        self.assertEqual(usage[1]['semantic'],
+                         'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE')
+        self.assertEqual(value['modules']['finance']['status'],
+                         'NOT_CONNECTED')
 
     def test_rejects_production_or_cross_tenant_sources(self):
         tasks, models = self.fixtures()
