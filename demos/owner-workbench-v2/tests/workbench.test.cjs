@@ -291,9 +291,21 @@ test('seven fixed management modules and every secondary route are registered',(
 });
 
 test('generic management pages contain overview filter list detail capability and logs',()=>{
-  const special=new Set(['projects','tasks']);
   for(const views of Object.values(ADMIN_MODULES))for(const view of views){
-    if(special.has(view))continue;
+    if(view==='projects'){
+      const list=app.render(data,app.route('#projects'));
+      for(const label of ['搜索项目','项目分页','权限范围操作','SERVER_AUTHORITATIVE','操作日志'])assert.match(list,new RegExp(label));
+      const detail=app.render(data,app.route('#project/PRJ-XJ-042'));
+      for(const label of ['PRJ-XJ-042','权限范围操作','SERVER_AUTHORITATIVE','操作日志','disabled'])assert.match(detail,new RegExp(label));
+      continue;
+    }
+    if(view==='tasks'){
+      const list=app.render(data,app.route('#tasks'));
+      for(const label of ['筛选任务','任务分页','#tasks/TASK-2042','权限范围操作','SERVER_AUTHORITATIVE','操作日志'])assert.match(list,new RegExp(label));
+      const detail=app.render(data,app.route('#tasks/TASK-2042'));
+      for(const label of ['详情摘要','TASK-2042','ATT-03','权限范围操作','操作日志','disabled'])assert.match(detail,new RegExp(label));
+      continue;
+    }
     const list=app.render(data,app.route('#'+view));
     for(const label of ['UNKNOWN','NOT_CONNECTED','筛选关键词','对象','权限范围操作','操作日志','页码 UNKNOWN'])assert.match(list,new RegExp(label),view+' '+label);
     const detail=app.render(data,app.route('#'+view+'/OBJECT-UNKNOWN'));
@@ -318,10 +330,20 @@ test('digital twin is only a TEST_ONLY object jump card',()=>{
   assert.match(html,/数字孪生对象入口/);
   assert.match(html,/object_ref: UNKNOWN/);
   assert.match(html,/target_route: \/task-center-test\//);
+  assert.match(html,/href="\/task-center-test\/"/);
   assert.doesNotMatch(html,/target_route: \/task-center-test\/digital-twin\//);
+  assert.doesNotMatch(html,/href="\/task-center-test\/digital-twin\//);
   assert.match(html,/TEST_ONLY/);
   assert.match(html,/NOT_CONNECTED/);
   assert.doesNotMatch(html,/拓扑|连线|健康大屏/);
+});
+
+test('unknown task deep link fails closed without cross-task fallback',()=>{
+  const html=app.render(data,app.route('#tasks/TASK-NOT-THERE'));
+  assert.match(html,/开发任务不存在/);
+  assert.match(html,/UNKNOWN/);
+  assert.match(html,/不回退到其他任务/);
+  assert.doesNotMatch(html,/TASK-2042 · ATT-03/);
 });
 
 test('permission actions remain disabled without server capability',()=>{

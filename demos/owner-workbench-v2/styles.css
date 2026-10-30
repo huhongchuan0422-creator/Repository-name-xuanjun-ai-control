@@ -31,6 +31,6 @@
 @media(max-width:1120px){.metric-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:820px){.top-logout{padding:6px 8px;font-size:12px}.nav-domain{display:grid}.metric-grid{grid-template-columns:repeat(2,1fr)}.sidebar nav{padding-bottom:18px}}
 @media(max-width:560px){.metric-grid{grid-template-columns:1fr}.top-logout{font-size:0;min-width:42px}.top-logout:after{content:"退出";font-size:12px}.pagination{justify-content:center;flex-wrap:wrap}}
-.admin-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.operation-log{margin-top:18px}.twin-link-card{margin-top:16px;border-style:dashed}.twin-link-card .status-chip{margin-bottom:10px}
+.admin-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.operation-log{margin-top:18px}.admin-boundary{margin-top:20px}.admin-boundary .operation-log{margin-top:0}.twin-link-card{margin-top:16px;border-style:dashed}.twin-link-card .status-chip{margin-bottom:10px}
 @media(max-width:1120px){.admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.admin-metrics{grid-template-columns:1fr}}
