@@ -9,6 +9,9 @@ function harness({delayLogin=false}={}) {
   let definition,loginRequest,loginCount=0;
   const calls=[],writes=[];
   const wx={login(o){loginCount++;o.success({code:'fixture-code'});},request(o){
+    // Independent startup directory read; original test queue retains only the operation under test.
+    if(o.data&&o.data.operation==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
+
     if(o.url.endsWith('/mini/login')){
       loginRequest=o;
       if(!delayLogin)finishLogin();

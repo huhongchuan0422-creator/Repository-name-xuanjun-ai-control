@@ -12,6 +12,7 @@ function customerError(error) {
   if(code==='SESSION_EXPIRED')return '登录已失效，请重新登录';
   if(code==='UNTRUSTED_SESSION')return '登录结果未通过验证，请联系项目负责人';
   if(typeof code==='string'&&/^未配置业务后端/.test(code))return '当前服务尚未接通，请联系项目负责人';
+  if(code==='SIGNED_OUT')return '已退出登录，点击微信登录后再进入';
   return '操作未能完成，请稍后重试';
 }
 function parseScene(options) {
@@ -75,6 +76,50 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       // Business remains explicitly simulated even when WeChat login is real.
       return {offline_only:true,result:reply.result};
     },
+    async customer(operation, params={}) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+      const keys=(value,allowed)=>object(value)&&Object.keys(value).every(key=>allowed.includes(key));
+      const hex=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
+      const demoId=value=>typeof value==='string'&&/^demo_[0-9a-f]{64}$/.test(value);
+      const demoRecord=value=>object(value)&&demoId(value.id)&&typeof value.name==='string'&&typeof value.description==='string'&&
+        value.is_demo===true&&value.display_only===true&&value.payment_enabled===false&&value.purchasing_enabled===false&&
+        value.include_in_real_statistics===false&&value.storefront_photo===null&&value.photo_asset_id==='community-demo-storefront-v1'&&
+        value.photo_state==='BUNDLED_DEMO_ASSET_PENDING'&&value.category_state==='DEMO'&&value.version===1&&value.profile_version===0;
+      const scene=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,32}$/.test(value);
+      const optional=(name,valid)=>!(name in params)||params[name]===''||valid(params[name]);
+      let valid=false;
+      if(operation==='contexts')valid=keys(params,['after_scene'])&&optional('after_scene',scene);
+      else if(operation==='directory')valid=keys(params,['after_id','category_id'])&&optional('after_id',hex)&&optional('category_id',value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(value));
+      else if(operation==='store')valid=keys(params,['id'])&&Object.keys(params).length===1&&(hex(params.id)||demoId(params.id));
+      if(!valid)throw Error('INVALID_CUSTOMER_READ');
+      const version=generation;
+      const reply=await request('/mini/api',{scene:'',operation:'customer.'+operation,params:{...params}},token);
+      if(version!==generation)throw Error('STALE_SESSION');
+      const result=reply&&reply.result;
+      if(!reply||reply.payment_enabled!==false||!object(result))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+      // Empty/malformed replies must never become a successful empty directory.
+      if(operation==='store'){
+        if(result.id!==params.id||typeof result.name!=='string'||typeof result.description!=='string'||
+          (demoId(params.id)?!demoRecord(result):result.is_demo===true))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+      }else{
+        const rows=operation==='contexts'?result.contexts:result.records;
+        const cursor=operation==='contexts'?scene:hex;
+        if(!Array.isArray(rows)||rows.length>50||typeof result.has_more!=='boolean'||
+          (result.has_more?!cursor(result.next_cursor):result.next_cursor!==null))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+        if(operation==='contexts'){
+          if(result.scope!=='CURRENT_CUSTOMER_AUTHORIZED_CONTEXTS'||result.payment_enabled!==false||
+            rows.some(row=>!object(row)||!scene(row.scene)))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+        }else if(result.visibility!=='CURRENT_AUTHORIZED_PROJECT_TENANT'||result.storefront_photo_supported!==false||!Array.isArray(result.categories)||
+          rows.some(row=>!object(row)||!hex(row.id)||row.is_demo===true||typeof row.name!=='string'||typeof row.description!=='string'))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+      }
+      if(operation==='directory'&&Object.prototype.hasOwnProperty.call(result,'demo')){
+        const demo=result.demo;
+        if(!object(demo)||!['VISIBLE','HIDDEN_REAL_APPROVAL_OBSERVED','UNKNOWN','NOT_CURRENT_PROJECT'].includes(demo.state)||
+          (demo.state==='VISIBLE'?!demoRecord(demo.record):demo.record!==null))throw Error('UNTRUSTED_CUSTOMER_REPLY');
+      }
+      return result;
+    },
     async commerce(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!['communities','community_mine','community_join','community_leave','promotion_redeem','profile_read','profile_update','referral_code','referral_bind','notices','notice_read','orders','products','purchase','purchase_read','purchase_recover','receipt_ad','project_summary','project_checklist','project_feedback','project_messages','project_save_reference','project_submit','refund_apply','refund_application','refund_current'].includes(operation))throw Error('INVALID_COMMERCE_REQUEST');
@@ -97,6 +142,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(!reply||reply.payment_enabled!==false||!reply.result)throw Error('UNTRUSTED_MERCHANT_REPLY');
       return reply.result;
     },
+    isAuthenticated() {return !!token && now()<expires;},
     getGeneration() {return generation;},
     async projectDocument(scene, params, expectedGeneration=generation) {
       if(expectedGeneration!==generation)throw Error('STALE_SESSION');
@@ -155,4 +201,62 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     clear() {generation++;token=null;expires=0;}
   };
 }
-module.exports={parseScene,createSession,customerError};
+// App configuration identity scopes credentials to this runtime/backend, never storage.
+const sharedSessions=new WeakMap();
+function getSharedSession(wx, config, now, page) {
+  if(!config || typeof config!=='object')throw Error('TRUSTED_BACKEND_REQUIRED');
+  let entry=sharedSessions.get(config);
+  if(entry && (entry.baseUrl!==config.baseUrl || entry.wx!==wx)){
+    entry.session.clear();sharedSessions.delete(config);entry=null;
+  }
+  if(entry){entry.session.prepareRestore();if(page)entry.pages.add(page);return entry.session;}
+  const session=createSession(wx,config.baseUrl,now);
+  const login=session.login.bind(session),clear=session.clear.bind(session),logout=session.logout.bind(session);
+  const auth=require('./customer-auth');
+  const pages=new Set(page?[page]:[]);
+  // This preference is NOT a credential. Never persist token/code/session_key.
+  const logoutKey='community.explicitLogout.v1:'+config.baseUrl;
+  let signedOut=false;
+  try{signedOut=typeof wx.getStorageSync==='function'&&wx.getStorageSync(logoutKey)===true;}catch(_){signedOut=true;}
+  function setSignedOut(value){signedOut=value;if(typeof wx.setStorageSync==='function')wx.setStorageSync(logoutKey,value);}
+  session.isSignedOut=()=>signedOut;
+  let epoch=auth.current(),flight=null;
+  const authenticated=session.isAuthenticated.bind(session);
+  session.isAuthenticated=()=>auth.active(epoch)&&authenticated();
+  for(const method of ['transport','customer','commerce','merchant','projectDocument','payment']){
+    const original=session[method].bind(session);
+    session[method]=async function(...args){
+      if(!auth.active(epoch)){session.clear();throw Error('STALE_SESSION');}
+      const version=session.getGeneration(),requestEpoch=epoch;
+      try{const result=await original(...args);if(!auth.active(requestEpoch)||version!==session.getGeneration())throw Error('STALE_SESSION');return result;}catch(error){
+        if(!auth.active(requestEpoch)||version!==session.getGeneration())throw Error('STALE_SESSION');
+        if(error.code==='ACCESS_DENIED'&&version===session.getGeneration()&&requestEpoch===epoch)session.clear();
+        throw error;
+      }
+    };
+  }
+  let clearedGeneration=-1;
+  session.prepareRestore=function(){
+    if(!flight&&!signedOut&&!session.isAuthenticated()&&session.getGeneration()>0&&clearedGeneration!==session.getGeneration()){
+      auth.revokePages([...pages]);epoch=auth.current();clearedGeneration=session.getGeneration();
+    }
+  };
+  session.ensureLogin=function(options={}){
+    if(options.automatic&&signedOut)return Promise.reject(Error('SIGNED_OUT'));
+    if(!options.automatic)setSignedOut(false);
+    if(!options.prepared)session.prepareRestore();
+    if(!auth.active(epoch)){session.clear();epoch=auth.current();}
+    if(session.isAuthenticated())return Promise.resolve({authenticated:true,payment_enabled:false});
+    if(flight)return flight;
+    const pending=login();flight=pending;
+    pending.then(()=>{if(flight===pending)flight=null;},()=>{if(flight===pending)flight=null;});
+    return pending;
+  };
+  session.detachPage=page=>pages.delete(page);
+  session.login=function(){setSignedOut(false);flight=null;auth.revokePages([...pages]);epoch=auth.current();return login();};
+  session.clear=function(){flight=null;clear();};
+  session.logout=function(){flight=null;const task=logout();try{setSignedOut(true);}catch(error){return task.then(()=>{throw Error('LOGOUT_PREFERENCE_NOT_SAVED');});}return task;};
+  sharedSessions.set(config,{baseUrl:config.baseUrl,wx,session,pages});
+  return session;
+}
+module.exports={parseScene,createSession,getSharedSession,customerError};

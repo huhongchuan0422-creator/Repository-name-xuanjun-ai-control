@@ -16,6 +16,8 @@ function environment(baseUrl='https://fixture.invalid'){
         session_token:String(tokenNo).repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});}
       if(o.url.endsWith('/mini/logout'))return o.success({statusCode:200,data:{payment_enabled:false,result:{logged_out:true}}});
       const op=o.data&&o.data.operation;
+      if(op==='customer.contexts')return o.success({statusCode:200,data:{payment_enabled:false,result:{contexts:[],has_more:false,next_cursor:null,scope:'CURRENT_CUSTOMER_AUTHORIZED_CONTEXTS',payment_enabled:false}}});
+      if(op==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
       if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
         user_id:'user1',project_customer_id:'customer1',nickname:'',contact:'',version:0}}});
       if(op==='commerce.notices')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],has_more:false,next_cursor:null}}});
@@ -127,15 +129,15 @@ test('access denial during update clears private state and requires explicit rel
 
 
 test('missing scene permits explicit identity login and public navigation, never private data',async()=>{
-  const h=loadPage('pages/home/index.js');h.page.onLoad({});
-  assert.equal(h.page.data.authenticated,false);assert.equal(h.calls.length,0);
-  assert.match(h.page.data.status,/未选择门店/);
+  const h=loadPage('pages/home/index.js');await h.page.onLoad({});
+  assert.equal(h.page.data.authenticated,true);assert.equal(h.calls.filter(x=>x.kind==='login').length,1);
+  assert.match(h.page.data.status,/微信身份已验证/);
   await h.page.retryLogin();
   assert.equal(h.page.data.authenticated,true);
-  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
+  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')&&!x.data.operation.startsWith('customer.')).length,0);
   assert.equal(h.config.scene,undefined);h.page.openProfile();
   assert.deepEqual(h.nav,['/pages/profile/index']);
-  const p=loadPage('pages/profile/index.js');p.page.onLoad({});await p.page.loginAndLoad();
+  const p=loadPage('pages/profile/index.js');await p.page.onLoad({});await p.page.loginAndLoad();
   assert.equal(p.page.data.authenticated,true);assert.equal(p.page.data.loaded,false);
   assert.equal(p.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
 });
@@ -258,6 +260,8 @@ test('late rejected profile save cannot revoke a newer successful login',async()
     if(o.url.endsWith('/mini/login'))return o.success({statusCode:200,data:{payment_enabled:false,result:{
       session_token:'9'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
     const op=o.data&&o.data.operation;
+      if(op==='customer.contexts')return o.success({statusCode:200,data:{payment_enabled:false,result:{contexts:[],has_more:false,next_cursor:null,scope:'CURRENT_CUSTOMER_AUTHORIZED_CONTEXTS',payment_enabled:false}}});
+      if(op==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
     if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
       user_id:'user1',project_customer_id:'customer1',nickname:'Fresh',contact:'',version:2}}});
     if(op==='commerce.profile_update'){oldSave=o;return;}
@@ -284,6 +288,8 @@ test('late profile save finally cannot release a newer save request lock',async(
     if(o.url.endsWith('/mini/login'))return o.success({statusCode:200,data:{payment_enabled:false,result:{
       session_token:'8'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
     const op=o.data&&o.data.operation;
+      if(op==='customer.contexts')return o.success({statusCode:200,data:{payment_enabled:false,result:{contexts:[],has_more:false,next_cursor:null,scope:'CURRENT_CUSTOMER_AUTHORIZED_CONTEXTS',payment_enabled:false}}});
+      if(op==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
     if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
       user_id:'user1',project_customer_id:'customer1',nickname:'Fresh',contact:'',version:freshVersion}}});
     if(op==='commerce.profile_update'){updates.push(o);return;}
@@ -325,9 +331,9 @@ test('consumer store page excludes internal delivery forms and preserves communi
 });
 
 
-test('ordinary home exposes public entry and keeps initial login explicit',()=>{
- const h=loadPage('pages/home/index.js');h.page.onLoad({});
- assert.equal(h.page.data.needsScene,true);assert.equal(h.calls.length,0);
+test('ordinary home restores real identity automatically without selecting a store',async()=>{
+ const h=loadPage('pages/home/index.js');await h.page.onLoad({});
+ assert.equal(h.page.data.needsScene,true);assert.equal(h.calls.filter(x=>x.kind==='login').length,1);
  assert.equal(h.config.scene,undefined);assert.equal(h.page.scene,null);
  const wxml=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
  assert.match(wxml,/wx:if="{{!authenticated}}"/);assert.doesNotMatch(wxml,/bindtap="openMerchantJoin"/);assert.match(fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8'),/bindtap="openMerchantEntry"/);
@@ -353,25 +359,25 @@ test('privacy entry invokes only platform contract and handles absent, failed an
 });
 
 // Regression for the Owner's actual scene-less official preview, not a fixture store.
-test('all four public tabs navigate without a scene and repeated navigation has bounded stack',()=>{
+test('all four public tabs navigate without a scene and repeated navigation has bounded stack',async()=>{
  for(const source of ['home','profile','checkout']){
-  const h=loadPage('pages/'+source+'/index.js');h.page.onLoad({});
+  const h=loadPage('pages/'+source+'/index.js');await h.page.onLoad({});
   for(let i=0;i<3;i++)for(const section of ['home','recommendations','orders','profile'])h.page.navigateSection({currentTarget:{dataset:{section}}});
   assert.equal(h.nav.length,12);assert.ok(h.nav.every(url=>!url.includes('scene=')));
-  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
+  assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')&&!x.data.operation.startsWith('customer.')).length,0);
  }
 });
-test('public navigation errors surface and caller can retry, arbitrary scan never selects a store',()=>{
- const h=loadPage('pages/home/index.js');h.page.onLoad({});
+test('public navigation errors surface and caller can retry, arbitrary scan never selects a store',async()=>{
+ const h=loadPage('pages/home/index.js');await h.page.onLoad({});
  h.wx.redirectTo=o=>o.fail({errMsg:'private transport detail'});h.page.openProfile();
  assert.match(h.page.data.status,/页面暂时无法打开/);assert.equal(h.page._navigationPending,false);
  h.wx.scanCode=o=>o.success({result:'https://evil.invalid',path:'pages/other/index?scene=shop1'});h.page.scanStore();
  assert.equal(h.config.scene,undefined);assert.match(h.page.data.status,/有效门店码/);
 });
 
-test('recommendations and orders admission buttons navigate without a scene; back helper is exported',async()=>{for(const view of ['recommendations','orders']){const f=loadPage('pages/checkout/index.js');await f.page.onLoad({view});f.page.openMerchantJoin();assert.equal(f.nav.at(-1),'/pages/merchant-join/index');f.page.openMerchant();assert.equal(f.nav.at(-1),'/pages/merchant/index');f.page.goBack();assert.equal(f.nav.at(-1),'/pages/home/index');assert.equal(f.calls.some(c=>c.url&&c.url.endsWith('/mini/api')),false);}assert.equal(typeof authModule.back,'function');});
+test('recommendations and orders admission buttons navigate without a scene; back helper is exported',async()=>{for(const view of ['recommendations','orders']){const f=loadPage('pages/checkout/index.js');await f.page.onLoad({view});f.page.openMerchantJoin();assert.equal(f.nav.at(-1),'/pages/merchant-join/index');f.page.openMerchant();assert.equal(f.nav.at(-1),'/pages/merchant/index');f.page.goBack();assert.equal(f.nav.at(-1),'/pages/home/index');assert.equal(f.calls.some(c=>c.url&&c.url.endsWith('/mini/api')&&!c.data.operation.startsWith('customer.')),false);}assert.equal(typeof authModule.back,'function');});
 
-test('original more-services entry is reachable but never reads private data without a scene',async()=>{const f=loadPage('pages/home/index.js');await f.page.onLoad({});f.page.navigateSection({currentTarget:{dataset:{section:'services'}}});assert.equal(f.nav.at(-1),'/pages/checkout/index?view=services');const c=loadPage('pages/checkout/index.js');await c.page.onLoad({view:'services'});assert.equal(c.page.data.viewMode,'services');assert.equal(c.page.data.sessionReady,false);assert.equal(c.calls.length,0);const wxml=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(wxml,/viewMode==='services' && !needsScene && sessionReady/);assert.match(wxml,/绑定推荐人/);assert.match(wxml,/我的社区关系/);});
+test('original more-services entry uses authenticated context discovery, never scene-scoped private reads without selection',async()=>{const f=loadPage('pages/home/index.js');await f.page.onLoad({});f.page.navigateSection({currentTarget:{dataset:{section:'services'}}});assert.equal(f.nav.at(-1),'/pages/checkout/index?view=services');const c=loadPage('pages/checkout/index.js');await c.page.onLoad({view:'services'});assert.equal(c.page.data.viewMode,'services');assert.equal(c.page.data.sessionReady,true);assert.equal(c.calls.filter(r=>r.kind==='login').length,1);assert.equal(c.calls.some(r=>r.data&&r.data.operation&&r.data.operation.startsWith('commerce.')),false);const wxml=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(wxml,/viewMode==='services' && !needsScene && sessionReady/);assert.match(wxml,/绑定推荐人/);assert.match(wxml,/我的社区关系/);});
 
 test('visible order list preserves original next-page action rather than stranding it in more services',()=>{const text=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8').split("viewMode==='orders'")[1].split("viewMode==='services'")[0];assert.match(text,/wx:if="{{ordersMore}}" bindtap="loadOrders" data-more="true"/);});
 

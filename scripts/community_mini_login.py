@@ -177,6 +177,14 @@ class MiniGateway:
                 or type(body) is not dict or set(body) != {'scene','operation','params'}):
             raise PermissionError('SESSION_REQUIRED')
         scene = body['scene']
+        if body['operation'] in ('customer.directory','customer.store'):
+            if scene != '':raise ValueError('DIRECTORY_WITHOUT_SCENE_REQUIRED')
+            from scripts.community_public_directory import consumer
+            return consumer(self,token,body['operation'],body['params'])
+        if body['operation'] == 'customer.contexts':
+            if scene != '':raise ValueError('CONTEXT_DISCOVERY_WITHOUT_SCENE_REQUIRED')
+            from scripts.community_customer_contexts import customer_contexts
+            return customer_contexts(self, token, body['params'])
         if type(scene) is not str or not SCENE.fullmatch(scene):
             raise ValueError('INVALID_SCENE')
         principal = self.identity.resolve(token,scene,self.runtime.clock())

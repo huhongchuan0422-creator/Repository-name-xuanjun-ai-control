@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const {createSession,parseScene}=require('./session');
+const {createSession,getSharedSession,parseScene}=require('./session');
 const auth=require('./customer-auth');
 const fixture=Buffer.from('%PDF-1.4\nsynthetic fixture only\n').toString('base64');
 const version='v_'+'a'.repeat(32);
@@ -14,13 +14,16 @@ function harness(){
   let definition,choose,read,loginCount=0;
   const requests=[],writes=[],reads=[];
   const wx={login(o){loginCount++;o.success({code:'fixture-code'});},request(o){
+    // Independent startup directory read; original test queue retains only the operation under test.
+    if(o.data&&o.data.operation==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
+
     if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{
       session_token:String(loginCount).repeat(32),expires_at:Math.floor(Date.now()/1000)+1000,
       provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});else requests.push(o);
   },chooseMessageFile(o){choose=o;},getFileSystemManager(){return {readFile(o){reads.push(o);read=o;}};}};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{
     Page:p=>{definition=p;},wx,getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
-    require:path=>path==='../../customer-auth'?auth:path==='../../session'?{createSession,parseScene}:path==='../../client'?{
+    require:path=>path==='../../customer-auth'?auth:path==='../../session'?{createSession,getSharedSession,parseScene}:path==='../../client'?{
       makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})
     }:{createPaymentFlow:()=>({reset(){}})}
   });

@@ -14,7 +14,7 @@ function fixture(){
  }};
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/profile/index.js','utf8'),{
   Page:value=>{definition=value;},
-  require:path=>path==='../../session'?{parseScene:o=>o.scene,createSession:()=>session,customerError:e=>e.message}:auth,
+  require:path=>path==='../../session'?{parseScene:o=>o.scene,getSharedSession:()=>({...session,ensureLogin:session.login}),customerError:e=>e.message}:auth,
   getApp:()=>({globalData:{baseUrl:'https://fixture.invalid',scene:'shop1'}}),wx:{}
  });
  const page={...definition,data:{...definition.data},setData(values,callback){Object.assign(this.data,values);if(typeof callback==='function')callback();}};

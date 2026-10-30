@@ -11,12 +11,16 @@ function harness(count=63){
   let definition,logins=0;
   const records=Array.from({length:count},(_,i)=>record(i+1)),requests=[],writes=[];
   const wx={login(o){logins++;o.success({code:'fixture'});},request(o){
+    // Independent startup directory read; original test queue retains only the operation under test.
+    if(o.data&&o.data.operation==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
+
     if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{
       session_token:String(logins).repeat(32),expires_at:Math.floor(Date.now()/1000)+1000,
       provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});else requests.push(o);
   }};
+  const app={globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}};
   vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{
-    Page:p=>{definition=p;},wx,getApp:()=>({globalData:{mode:'CONNECTED',baseUrl:'https://fixture.invalid'}}),
+    Page:p=>{definition=p;},wx,getApp:()=>app,
     require:path=>path==='../../customer-auth'?auth:path==='../../session'?sessionModule:path==='../../client'?{
       makeClient:()=>({reset(){},storefront:async()=>({merchant:{name:'fixture'},ads:{}})})
     }:{createPaymentFlow:()=>({reset(){}})}
@@ -107,7 +111,7 @@ for(const operation of ['page','receipt'])for(const change of ['unload','reauth'
 }
 test('new identity clears prior records/cursor before first page, and old finally cannot release new request',async()=>{
   const h=await ready();await initial(h);const old=h.page.loadNotices(event({more:'true'}));
-  await h.page.session.login();const fresh=h.page.loadNotices(event({}));
+  await h.page.session.login();await h.page.onLoad({scene:'shop1'});const fresh=h.page.loadNotices(event({}));
   assert.equal(h.page.data.notices.length,0);assert.equal(h.page.data.noticeCursor,null);assert.equal(h.page.data.noticePending,true);
   assert.equal(h.requests[2].data.params.after_id,'');assert.equal(h.requests[2].header['X-Community-Session'],'2'.repeat(32));
   h.fail(1);await old;assert.equal(h.page.data.noticePending,true);
@@ -161,7 +165,7 @@ test('page reload clears old notices immediately and ignores prior response',asy
 test('profile reauthentication discards old result but releases its owned pending for retry',async()=>{
   const h=await ready();const old=h.page.profileAction(event({operation:'profile_read'}));
   await h.page.session.login();h.reply(0,{version:1,nickname:'Old identity',contact:'',user_id:'old-user',project_customer_id:'old-customer'});await old;
-  assert.equal(h.page.data.pending,false);assert.equal(h.page.data.userId,'user1');assert.equal(h.page._profileRequest,null);
+  assert.equal(h.page.data.pending,false);assert.equal(h.page.data.userId,'');assert.equal(h.page._profileRequest,null);await h.page.onLoad({scene:'shop1'});
   const fresh=h.page.profileAction(event({operation:'profile_read'}));assert.equal(h.requests.length,2);
   h.reply(1,{version:2,nickname:'New identity',contact:'',user_id:'new-user',project_customer_id:'new-customer'});await fresh;
   assert.equal(h.page.data.pending,false);assert.equal(h.page.data.userId,'new-user');
@@ -169,7 +173,7 @@ test('profile reauthentication discards old result but releases its owned pendin
 });
 test('old profile finally cannot release a newer profile request after reauthentication',async()=>{
   const h=await ready();const old=h.page.profileAction(event({operation:'profile_read'}));
-  await h.page.session.login();h.page.setData({pending:false});
+  await h.page.session.login();await h.page.onLoad({scene:'shop1'});h.page.setData({pending:false});
   const fresh=h.page.profileAction(event({operation:'profile_read'}));h.fail(0);await old;
   assert.equal(h.page.data.pending,true);
   h.reply(1,{version:2,nickname:'Current identity',contact:'',user_id:'new-user',project_customer_id:'new-customer'});await fresh;

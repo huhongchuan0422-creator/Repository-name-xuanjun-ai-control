@@ -236,6 +236,54 @@ class OriginalTransport:
             raise Hold('EXACT_LOADED_IMAGE_REQUIRED')
         names=original.command(plan.DOCKER+['container','ls','--all','--format','{{.Names}}','--filter','name=^/xuanjun-community-preview']).splitlines()
         if candidate['rollback_name'] in names or candidate['failed_name'] in names:raise Hold('EXISTING_RECOVERY_NAME_INSPECT_ONLY')
+    def applicant_ocr_release_preflight(self, image, source, contract):
+        """Same fixed compiler contract for the outer pre-freeze path."""
+        if not plan.image_id(image) or not plan.exact_hex(source,40):
+            raise Hold('EXACT_OCR_RELEASE_REQUIRED')
+        argv=plan.run_argv(image,source,contract)
+        candidate={'source':{'source_sha':source,'applicant_ocr':contract},
+            'image':{'image_id':image},'actions':[{}, {}, {}, {'argv':argv}]}
+        candidate['plan_sha256']=hashlib.sha256(json.dumps(candidate,sort_keys=True).encode()).hexdigest()
+        fmt='{{json .Id}}\n{{json (index .Config.Labels "org.opencontainers.image.revision")}}\n{{json .Config.User}}'
+        rows=original.command(plan.DOCKER+['image','inspect','--format',fmt,image]).splitlines()
+        if len(rows)!=3 or [json.loads(v) for v in rows]!=[image,source,'10001:1008']:
+            raise Hold('EXACT_LOADED_IMAGE_REQUIRED')
+        return self.applicant_ocr_config_preflight(candidate)
+
+    def applicant_ocr_config_preflight(self, candidate):
+        """Configuration-only original-image probe; never mounts business DBs.
+
+        Called before OLD_STOP_INTENT. Its result is NOT reviewer membership,
+        OCR activation, inference or customer acceptance evidence.
+        """
+        args=candidate['actions'][3]['argv']
+        expected=plan.run_argv(candidate['image']['image_id'],candidate['source']['source_sha'],candidate['source'].get('applicant_ocr'))
+        if args!=expected:raise Hold('EXACT_COMPILED_OCR_LAUNCH_REQUIRED')
+        flags=('--applicant-ocr-key-reference','--applicant-ocr-store-reference')
+        if not any(flag in args for flag in flags):return 'OCR_NOT_REQUESTED'
+        if any(args.count(flag)!=1 or args.index(flag)+1>=len(args) for flag in flags):
+            raise Hold('OCR_EXACT_REFERENCE_PAIR_REQUIRED')
+        # Fixed original config-only module; do not forward arbitrary argv,
+        # key values, OCR DB references, writable data roots or listener mounts.
+        name='xuanjun-community-preview-ocr-preflight-'+candidate['plan_sha256'][:16]
+        names=original.command(plan.DOCKER+['container','ls','--all','--format','{{.Names}}']).splitlines()
+        if name in names:raise Hold('OCR_PREFLIGHT_IN_FLIGHT_OR_UNKNOWN_INSPECT_ONLY')
+        command=plan.DOCKER+['run','--rm','--pull','never','--name',name,
+            '--network','none','--read-only','--user','10001:1008',
+            '--cap-drop','ALL','--security-opt','no-new-privileges','--pids-limit','64',
+            '--memory','512m','--memory-swap','512m','--cpus','0.5',
+            '--mount','type=bind,src='+original.ROOT+'/config,dst='+original.ROOT+'/config,readonly',
+            '--entrypoint','python',candidate['image']['image_id'],'-B','-m','scripts.community_platform_host',
+            '--check-applicant-ocr-plan','--plan',original.ROOT+'/config/host.json',
+            '--center-keys',original.ROOT+'/config/center-keys.json',
+            '--wechat-secret',original.ROOT+'/config/wechat.json']
+        try:result=original.command(command).strip()
+        except BaseException:
+            raise Hold('OCR_CONFIGURATION_PREFLIGHT_UNPROVEN_OLD_UNTOUCHED') from None
+        if result!='OCR_CONFIGURATION_VALIDATED_NOT_ACTIVATED':
+            raise Hold('OCR_CONFIGURATION_PREFLIGHT_REJECTED_OLD_UNTOUCHED')
+        return result
+
     def socket_absent(self):
         if os.path.lexists(plan.RUN+'/preview.sock'):raise Hold('SOCKET_REMAINS')
 
@@ -305,7 +353,12 @@ class Update:
             'RECOVERY_RESTORE_OLD_INTENT':p['rollback']['old_rename_argv'],
             'RECOVERY_START_OLD_INTENT':p['rollback']['old_start_argv']}
         if intent not in allowed or argv!=allowed[intent]:raise Hold('EXACT_STAGE_ACTION_REQUIRED')
-        self.guard(intent=='OLD_STOP_INTENT');self.journal.write(intent,new_id)
+        self.guard(intent=='OLD_STOP_INTENT')
+        if intent=='OLD_STOP_INTENT':
+            self.t.applicant_ocr_config_preflight(p)
+            # Recheck same old writer and protected bindings after the probe.
+            self.guard(True);self.t.inspect(p['current']['container_id'],p['current']['image_id'],True)
+        self.journal.write(intent,new_id)
         try:
             # Durable intent is not a permit: inspect the exact writer pair and
             # socket AFTER publishing it, immediately before original mutate.

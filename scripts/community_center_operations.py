@@ -84,7 +84,10 @@ class CenterOperations:
         with c.tx():
             c.limit('community-operations:'+uid,60,60)
             c.audit(grant['project'],uid,'COMMUNITY_OPERATION_ATTEMPT',request_hash)
-        if body['operation']=='community.merchant_settings' and 'allowed_operations' in grant:
+        if body['operation'] in ('community.public_profile_read','community.public_profile_save'):
+            from scripts.community_public_directory import settings
+            result=settings(self,body['workspace'],grant,body['operation'],body['params'])
+        elif body['operation']=='community.merchant_settings' and 'allowed_operations' in grant:
             # An original, live Staff grant explicitly delegates this read.
             # Static STORE_STAFF principals keep the runtime's existing denial;
             # no merchant role or edit permission is borrowed for this path.

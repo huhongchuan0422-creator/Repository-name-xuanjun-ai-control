@@ -14,6 +14,9 @@ RUN='/run/xuanjun-community-preview'
 DOCKER=['/usr/bin/docker','--host','unix:///var/run/docker.sock']
 OBSERVED_OCI='2330dd55c07f58d7f45a7c4510a9761d0d4735d6'
 OCR_SHA='90aca1cfca1ec2a354950c394a4b0c2689b37d13'
+APPLICANT_OCR_CONTRACT='ORIGINAL_APPLICANT_OCR_V1'
+OCR_KEY_REFERENCE=ROOT+'/config/ocr-applicant-key.json'
+OCR_STORE_REFERENCE=ROOT+'/data/ocr-applicant.sqlite'
 URL='https://uk.wenwenwenyiyiyi.work/community-preview/community/health'
 
 
@@ -53,7 +56,7 @@ def _current_identity(value,running):
 
 def source_evidence(value):
     keys={'source_sha','tree_sha','source_zip_sha256','artifact_id','artifact_sha256','run_id','ocr_source_sha'}
-    require(type(value) is dict and set(value) in (keys,keys|{'push_evidence_run_id'}),'EXACT_SOURCE_EVIDENCE_REQUIRED')
+    require(type(value) is dict and keys <= set(value) <= keys|{'push_evidence_run_id','applicant_ocr'},'EXACT_SOURCE_EVIDENCE_REQUIRED')
     require(exact_hex(value['source_sha'],40) and exact_hex(value['tree_sha'],40),'SOURCE_TREE_REQUIRED')
     for key in ('source_zip_sha256','artifact_sha256'):
         require(exact_hex(value[key],64),'SOURCE_DIGEST_REQUIRED')
@@ -61,6 +64,8 @@ def source_evidence(value):
         require(type(value[key]) is int and value[key]>0,'SOURCE_RUN_ARTIFACT_REQUIRED')
     if 'push_evidence_run_id' in value:
         require(type(value['push_evidence_run_id']) is int and value['push_evidence_run_id']>0,'PUSH_EVIDENCE_RUN_REQUIRED')
+    if 'applicant_ocr' in value:
+        require(value['applicant_ocr']==APPLICANT_OCR_CONTRACT,'FIXED_APPLICANT_OCR_CONTRACT_REQUIRED')
     require(value['ocr_source_sha']==OCR_SHA,'LOCKED_OCR_DEPENDENCY_REQUIRED')
     return dict(value)
 
@@ -80,9 +85,10 @@ def image_evidence(value,source):
     return dict(value)
 
 
-def run_argv(image,source):
+def run_argv(image,source,applicant_ocr=None):
     # Same socket/mount/uid/limits as the original UK run_args, no port publish.
-    return DOCKER+['run','--pull','never','--detach','--restart','no','--name',NAME,
+    require(applicant_ocr is None or applicant_ocr==APPLICANT_OCR_CONTRACT,'FIXED_APPLICANT_OCR_CONTRACT_REQUIRED')
+    args=DOCKER+['run','--pull','never','--detach','--restart','no','--name',NAME,
         '--label','community.source='+source,'--read-only','--user','10001:1008',
         '--cap-drop','ALL','--security-opt','no-new-privileges','--pids-limit','64',
         '--cpus','0.5','--memory','512m','--memory-swap','512m',
@@ -93,6 +99,10 @@ def run_argv(image,source):
         '--mount','type=bind,src='+RUN+',dst='+RUN,image,
         '--plan',ROOT+'/config/host.json','--center-keys',ROOT+'/config/center-keys.json',
         '--wechat-secret',ROOT+'/config/wechat.json']
+    if applicant_ocr is not None:
+        args += ['--applicant-ocr-key-reference',OCR_KEY_REFERENCE,
+                 '--applicant-ocr-store-reference',OCR_STORE_REFERENCE]
+    return args
 
 
 def prepare(source,current=None,image=None):
@@ -120,6 +130,9 @@ def _prepare(source,current,image,stopped):
             preview_evidence_run_id=str(source.get('push_evidence_run_id',source['run_id'])),entry_page='pages/home/index',scene=None,
             next_enable_requires='ROOT_REVIEW_AND_EXPLICIT_OWNER_PREVIEW_AUTHORIZATION'),
         actions=[])
+    if 'applicant_ocr' in source:
+        report['ocr_requested']=True
+        report['ocr_readiness']='CONFIGURATION_AND_MEMBERSHIP_AND_REAL_INFERENCE_NOT_YET_PROVEN'
     if missing:return report
     require(current['image_id']!=image['image_id'],'ALREADY_CURRENT_NO_REPLACEMENT')
     attempt='community-update-'+source['source_sha'][:12]+'-'+current['container_id'][:12]
@@ -135,7 +148,7 @@ def _prepare(source,current,image,stopped):
                 postcondition='EXACT_OLD_STOPPED_AND_OWN_SOCKET_REMOVED'),
             dict(phase='OLD_RENAME_INTENT',argv=DOCKER+['rename',current['container_id'],rollback_name],
                 postcondition='EXACT_OLD_RETAINED_NEVER_DELETE'),
-            dict(phase='NEW_RUN_INTENT',argv=run_argv(image['image_id'],source['source_sha']),
+            dict(phase='NEW_RUN_INTENT',argv=run_argv(image['image_id'],source['source_sha'],source.get('applicant_ocr')),
                 postcondition='PERSIST_ACTUAL_NEW_64_HEX_ID_BEFORE_NEXT_ACTION'),
             dict(phase='VERIFY_ONLY',requires=['EXACT_NEW_ID_IMAGE_NONROOT_ISOLATION_MOUNTS',
                 'ROUTES_UNCHANGED','PRIVATE_AND_PUBLIC_FRESH_RUNTIME_SOURCE_IMAGE_MATCH',

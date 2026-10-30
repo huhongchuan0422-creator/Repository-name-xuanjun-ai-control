@@ -258,6 +258,33 @@ class PlatformHost:
         app.gateway.ocr=self.ocr
         return self.ocr
 
+    @classmethod
+    def preflight_applicant_ocr_plan(cls, plan_path, keys_path, wechat_path):
+        """Protected config-only check before service replacement or host open.
+
+        No writable DB, lock, listener, provider request or grant is created.
+        Success is configuration validation, not installed OCR readiness.
+        """
+        _require_nonroot()
+        plan = load_protected(plan_path)
+        _configuration(plan, load_protected(keys_path), load_protected(wechat_path))
+        if not plan['reviewers']:
+            raise PermissionError('OCR_ONBOARDING_REQUIRED')
+        if any(type(k) is not str or not k or type(v) is not str or not v
+               for k, v in plan['reviewers'].items()):
+            raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')
+        # Validate original protected Reader locally; construction has no IO.
+        _open_provider_reader(plan['provider_reader_config'], lambda: 0)
+        return 'OCR_CONFIGURATION_VALIDATED_NOT_ACTIVATED'
+
+    def preflight_applicant_ocr(self):
+        """No store construction or writes; retain the original opt-in gate."""
+        if self.application is None or self.application.server is not None or self.ocr is not None:
+            raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        if self.application.onboarding is None:
+            raise PermissionError('OCR_ONBOARDING_REQUIRED')
+        self.application.center.db.execute('SELECT 1')
+
     def configure_applicant_ocr(self,key_reference,store_reference):
         """Explicit original-install opt-in using pre-existing protected inputs.
 
@@ -266,6 +293,7 @@ class PlatformHost:
         """
         if self.application is None or self.application.server is not None or self.ocr is not None:
             raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        self.preflight_applicant_ocr()  # Must precede key/model/store handling.
         _require_nonroot()
         key_path=Path(key_reference);db_path=Path(store_reference)
         for path in (key_path,db_path):
@@ -281,6 +309,11 @@ class PlatformHost:
         material=load_protected(str(key_path))
         if type(material) is not dict or set(material)!={'ocr_encryption_key'} or type(material['ocr_encryption_key']) is not str:
             raise ValueError('EXISTING_OCR_KEY_REFERENCE_REQUIRED')
+        from cryptography.fernet import Fernet
+        try:
+            Fernet(material['ocr_encryption_key'].encode('ascii'))
+        except (ValueError, TypeError, UnicodeError):
+            raise ValueError('INVALID_EXISTING_OCR_KEY') from None
         from services.ocr_engine import api,ocr_core
         ocr_core._verified_model_paths()  # Original immutable model hashes; no download.
         import json
@@ -355,6 +388,7 @@ def main(argv=None):
     parser.add_argument('--plan',required=True)
     parser.add_argument('--center-keys',required=True)
     parser.add_argument('--wechat-secret',required=True)
+    parser.add_argument('--check-applicant-ocr-plan', action='store_true')
     parser.add_argument('--applicant-ocr-key-reference')
     parser.add_argument('--applicant-ocr-store-reference')
     args = parser.parse_args(argv)
@@ -364,15 +398,27 @@ def main(argv=None):
         raise KeyboardInterrupt()
     previous = signal.signal(signal.SIGTERM,stop)
     try:
+        if args.check_applicant_ocr_plan or args.applicant_ocr_key_reference:
+            result = PlatformHost.preflight_applicant_ocr_plan(args.plan,args.center_keys,args.wechat_secret)
+            if args.check_applicant_ocr_plan:
+                print(result, flush=True)
+                return 0
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
             if args.applicant_ocr_key_reference:
                 host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference)
             host.serve()
     except KeyboardInterrupt:
         return 0
-    except Exception:
-        # No plan, keys, provider exception, source path or login details in logs.
-        print('BACKEND_NOT_READY', flush=True)
+    except Exception as error:
+        # Only fixed allowlisted codes; never arbitrary exception text.
+        code = str(error)
+        if code not in ('OCR_ONBOARDING_REQUIRED', 'OCR_HOST_CONFIGURATION_DENIED',
+                        'INVALID_EXISTING_OCR_KEY', 'OCR_PINNED_DEPENDENCY_REQUIRED',
+                        'PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING',
+                        'ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED',
+                        'EXACT_PROTECTED_PROVIDER_READER_CONFIG_REQUIRED'):
+            code = 'BACKEND_NOT_READY'
+        print(code, flush=True)
         return 2
     finally:
         signal.signal(signal.SIGTERM,previous)

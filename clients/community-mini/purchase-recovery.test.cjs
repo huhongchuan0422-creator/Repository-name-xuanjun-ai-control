@@ -11,6 +11,9 @@ function basket(reference='original') {return {reference,user_id:'user1',amount_
 function harness(){
   let definition,logins=0;const calls=[],writes=[],money=[];
   const wx={login(o){logins++;o.success({code:'fixture'});},request(o){
+    // Independent startup directory read; original test queue retains only the operation under test.
+    if(o.data&&o.data.operation==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
+
     if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{
       session_token:String(logins).repeat(32),expires_at:Math.floor(Date.now()/1000)+1000,
       provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});
@@ -28,7 +31,7 @@ function harness(){
 }
 async function ready(){const h=harness();await h.page.onLoad({scene:'shop1'});h.page.setData({commerceEnabled:true,
   reference:'original',userId:'user1',projectCustomerId:'customer1',products:[{item_id:'item1',unit_minor:999,revision:9,quantity:3}],
-  orders:[{reference:'original',order:{state:'CREATION_UNKNOWN_RECOVER_SAME_REFERENCE'}}]});return h;}
+  orders:[{scene:'shop1',reference:'original',order:{state:'CREATION_UNKNOWN_RECOVER_SAME_REFERENCE'}}]});return h;}
 test('explicit recovery sends only original reference and keeps frozen price without another checkout or payment',async()=>{
   const h=await ready(),p=h.page;
   p.selectOrder(event({reference:'original'}));

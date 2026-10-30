@@ -414,6 +414,9 @@ class MerchantOnboarding:
             c.audit(application,uid,'MERCHANT_ONBOARDING_'+op.upper(),str(revision))
             from scripts.community_onboarding_history import append
             append(self,application,owner,uid,op,params,data,meta,revision)
+            if op=='review' and params['action']=='APPROVE':
+                from scripts.community_demo_directory import retire_on_approval
+                retire_on_approval(self,application,owner,uid,revision,meta)
             if op=='review':
                 from scripts.community_onboarding_notices import append as notify_result
                 notify_result(self,application,owner,revision,params['action'])
