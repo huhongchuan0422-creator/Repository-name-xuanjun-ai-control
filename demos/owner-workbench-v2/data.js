@@ -7,10 +7,11 @@
     observed_at:'2026-10-30 13:30 CST',
     source_notice:'合成数据，仅验证信息架构和交互；不代表部署、安装或客户验收。',
     metrics:[
-      {label:'活跃项目',value:'3',delta:'2 个等待审核',tone:'info'},
-      {label:'我的待办',value:'7',delta:'1 个阻塞',tone:'warning'},
-      {label:'执行中的 AI',value:'2',delta:'心跳与成果分开',tone:'success'},
-      {label:'今日成本',value:'UNKNOWN',delta:'未接 Finance',tone:'unknown'}
+      {label:'项目进度',value:'3',delta:'SYNTHETIC · 1 个开发中',tone:'info',href:'#projects'},
+      {label:'AI 任务',value:'2',delta:'SYNTHETIC · 心跳与成果分开',tone:'success',href:'#tasks'},
+      {label:'待审核',value:'2',delta:'SYNTHETIC · 按项目进入',tone:'warning',href:'#review'},
+      {label:'异常阻塞',value:'1',delta:'SYNTHETIC · 证据不足',tone:'danger',href:'#project/PRJ-BIN-007'},
+      {label:'关键业务指标',value:'UNKNOWN',delta:'NOT_CONNECTED · 不显示为 0',tone:'unknown',href:'#finance'}
     ],
     projects:[
       {

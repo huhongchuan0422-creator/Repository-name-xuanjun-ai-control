@@ -154,3 +154,115 @@ test('mobile and reduced-motion contracts exist',()=>{
   const review=app.render(data,app.route('#review/PRJ-XJ-042/PAGE-004/v2.3-r2'));
   assert.match(review,/aria-label="移动审核动作"/);
 });
+
+test('login and shell visibility are strictly exclusive',()=>{
+  assert.deepEqual(app.shellVisibility(false),{loginHidden:false,shellHidden:true});
+  assert.deepEqual(app.shellVisibility(true),{loginHidden:true,shellHidden:false});
+  const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+  assert.match(css,/\[hidden\]\{display:none!important\}/);
+  assert.match(index,/id="loginScreen"/);
+  assert.match(index,/id="shell" hidden/);
+  assert.match(index,/id="logoutButton"/);
+  assert.match(app.shellVisibility.toString(),/loginHidden/);
+});
+
+test('candidate session supports logout refresh history and mobile overlay cleanup without formal auth',()=>{
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+  assert.match(source,/sessionStorage\.getItem\('XJ_UI_CANDIDATE_SESSION'\)/);
+  assert.match(source,/sessionStorage\.removeItem\('XJ_UI_CANDIDATE_SESSION'\)/);
+  assert.match(source,/logout\.addEventListener\('click'/);
+  assert.match(source,/win\.addEventListener\('hashchange'/);
+  assert.match(source,/function closeMenu\(returnFocus\)/);
+  assert.match(css,/@media\(max-width:820px\)/);
+  assert.match(css,/\[hidden\]\{display:none!important\}/);
+  assert.doesNotMatch(source,/fetch\(|XMLHttpRequest|Authorization/);
+});
+
+test('mobile menu closes by Escape and restores focus deterministically',()=>{
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(source,/function closeMenu\(returnFocus\)/);
+  assert.match(source,/if\(returnFocus&&wasOpen\)menu\.focus\(\)/);
+  assert.match(source,/function openMenu\(\)/);
+  assert.match(source,/side\.querySelector\('\.nav-parent,\.nav-child'\)/);
+  assert.match(source,/if\(first\)first\.focus\(\)/);
+  assert.match(source,/e\.key==='Escape'/);
+  assert.match(source,/scrim\.addEventListener\('click',function\(\)\{closeMenu\(true\)/);
+  assert.match(source,/if\(e\.target\.closest\('a'\)\)closeMenu\(false\)/);
+});
+
+test('review tab resets only when project identity changes',()=>{
+  assert.deepEqual(app.reviewStateForProject(null,'PRJ-A','diff'),{project:'PRJ-A',tab:'feedback'});
+  assert.deepEqual(app.reviewStateForProject('PRJ-A','PRJ-A','evidence'),{project:'PRJ-A',tab:'evidence'});
+  assert.deepEqual(app.reviewStateForProject('PRJ-A','PRJ-B','diff'),{project:'PRJ-B',tab:'feedback'});
+  assert.deepEqual(app.reviewStateForProject('PRJ-B',null,'evidence'),{project:null,tab:'feedback'});
+});
+
+test('all nine domains expose expandable second-level navigation',()=>{
+  const html=app.navHtml('overview',false);
+  const domains=['overview','projects','review','ecosystem','tasks','operations','finance','business','settings'];
+  for(const id of domains){
+    assert.match(html,new RegExp('data-domain="'+id+'"'));
+    assert.match(html,new RegExp('data-nav-toggle="'+id+'"'));
+  }
+  for(const child of ['统一状态','项目列表','详情与交付','审核队列','版本与证据','应用目录','版本与发布','任务与 AI','数字孪生','客服与渠道','工单与知识','业务指标','账单与对账','自营项目','运行证据','权限与设置','审计与运维'])assert.match(html,new RegExp(child));
+});
+
+test('detail and deep routes highlight their owning domain and child',()=>{
+  assert.equal(app.domainForView('project'),'projects');
+  assert.equal(app.domainForView('review-help'),'review');
+  assert.equal(app.domainForView('twin'),'tasks');
+  const projectNav=app.navHtml('project',false);
+  assert.match(projectNav,/data-domain="projects"[^]*?class="nav-child" href="#projects" aria-current="page"/);
+  const reviewNav=app.navHtml('review',false);
+  assert.match(reviewNav,/data-domain="review"[^]*?aria-expanded="true"/);
+});
+
+test('route parsing is stable across repeated navigation and refresh inputs',()=>{
+  const hashes=['#overview','#project/PRJ-XJ-042','#review/PRJ-XJ-042/PAGE-004/v2.3-r2','#tasks','#overview'];
+  const first=hashes.map(app.route);
+  const second=hashes.map(app.route);
+  assert.deepEqual(first,second);
+  assert.equal(first[1].id,'PRJ-XJ-042');
+  assert.equal(first[2].page_id,'PAGE-004');
+});
+
+test('cross-project review does not retain the previous project page',()=>{
+  const clone=JSON.parse(JSON.stringify(data));
+  clone.projects[1].pages=[{id:'PAGE-B-001',page_id:'PAGE-B-001',name:'B 项目页面',status:'PENDING_REVIEW',label:'待审核',version:'b-v1',ui_version:'b-v1',previous:'NONE_FOUND',changes:1}];
+  const first=app.render(clone,app.route('#review/PRJ-XJ-042/PAGE-004/v2.3-r2'));
+  const second=app.render(clone,app.route('#review/PRJ-CUS-118/PAGE-B-001/b-v1'));
+  assert.match(first,/PAGE-004/);
+  assert.match(second,/PAGE-B-001/);
+  assert.doesNotMatch(second,/PAGE-004/);
+});
+
+test('permission denial and unconnected children remain explicit',()=>{
+  const denied=app.render(data,{view:'states'});
+  assert.match(denied,/无权限/);
+  for(const view of ['project-help','review-help','app-versions','twin','tickets','billing','business-evidence','audit']){
+    const html=app.render(data,{view});
+    assert.match(html,/NOT_CONNECTED/);
+    assert.match(html,/UNKNOWN/);
+  }
+});
+
+test('dashboard is synthetic, unknown-safe, and deep-linked',()=>{
+  const html=app.render(data,{view:'overview'});
+  for(const label of ['项目进度','AI 任务','待审核','异常阻塞','关键业务指标'])assert.match(html,new RegExp(label));
+  assert.match(html,/SYNTHETIC/);
+  assert.match(html,/UNKNOWN/);
+  assert.match(html,/NOT_CONNECTED · 不显示为 0/);
+  for(const href of ['#projects','#tasks','#review','#project/PRJ-BIN-007','#finance'])assert.match(html,new RegExp('href="'+href+'"'));
+});
+
+test('common framework components are local-only',()=>{
+  const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  const projects=app.render(data,{view:'projects'});
+  assert.match(index,/id="demoDialog"/);
+  assert.match(index,/SYNTHETIC STEP FLOW/);
+  assert.match(index,/NO_PRODUCTION_WRITE/);
+  assert.match(projects,/aria-label="项目分页"/);
+  assert.match(projects,/第 1 \/ 1 页 · SYNTHETIC/);
+});

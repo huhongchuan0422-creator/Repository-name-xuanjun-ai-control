@@ -38,12 +38,22 @@
         <label class="search"><span aria-hidden="true">⌕</span><input id="globalSearch" type="search" placeholder="搜索项目、任务或证据" aria-label="全局搜索"></label>
         <button class="icon-button" data-demo-action="notifications" aria-label="消息">◌<span class="notification-dot"></span></button>
         <button class="profile" id="profileButton" aria-label="当前演示身份"><span>玄</span><b>Owner 演示</b></button>
+        <button class="button top-logout" id="logoutButton" type="button">退出演示</button>
       </header>
       <main id="app" tabindex="-1"></main>
       <nav class="bottom-nav mobile-only" id="bottomNav" aria-label="移动导航"></nav>
     </div>
   </div>
   <div class="scrim" id="scrim" hidden></div>
+  <dialog class="demo-dialog" id="demoDialog" aria-labelledby="dialogTitle">
+    <form method="dialog" class="dialog-card">
+      <div class="card-head"><div><p class="eyebrow">SYNTHETIC STEP FLOW</p><h2 id="dialogTitle">新建项目（演示）</h2></div><button class="icon-button" value="cancel" aria-label="关闭">×</button></div>
+      <ol class="step-list"><li class="active">基础信息</li><li>范围与页面</li><li>确认与证据</li></ol>
+      <label>项目名称<input value="仅本地演示，不会保存"></label>
+      <div class="callout unknown"><strong>NO_PRODUCTION_WRITE</strong><span>分步输入组件只验证交互框架。</span></div>
+      <div class="head-actions"><button class="button" value="cancel">取消</button><button class="button primary" value="next">下一步（演示）</button></div>
+    </form>
+  </dialog>
   <div class="live-region" id="liveRegion" aria-live="polite"></div>
   <script src="data.js"></script>
   <script src="app.js"></script>
