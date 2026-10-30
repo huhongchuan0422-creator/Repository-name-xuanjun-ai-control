@@ -109,7 +109,107 @@ jobs:
           
           def command(hostname, nonce):
               import shlex
-              code = "import json,os,sys,subprocess,re,time\nif os.uname().nodename != 'iZmj7a5kwr75qc1tul4kf9Z' or os.geteuid()!=0:\n    raise SystemExit(42)\ndef run(args):\n    try:\n        p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)\n        return p.stdout.decode('utf-8','replace'),p.returncode\n    except Exception:\n        return '',-1\nunits,rc=run(['systemctl','list-units','--all','--type=service','--plain','--no-legend','--no-pager'])\nnames=[l.split()[0] for l in units.splitlines() if l.split() and re.search(r'openclaw|feishu|lark|binance|trading',l.split()[0],re.I)]\nrows=[]\nfor name in names[:40]:\n    if not re.match(r'^[A-Za-z0-9_.@:-]+[.]service$',name): continue\n    raw,c=run(['systemctl','show',name,'--no-pager','-p','ActiveState','-p','SubState','-p','MainPID','-p','NRestarts','-p','Result','-p','MemoryCurrent','-p','TasksCurrent'])\n    props=dict(l.split('=',1) for l in raw.splitlines() if '=' in l)\n    j,jc=run(['journalctl','-u',name,'--since','2026-10-30 06:40:00 UTC','--until','2026-10-30 09:30:00 UTC','-n','3000','-o','json','--no-pager'])\n    tags={k:0 for k in ['error','timeout','rate_limit','websocket','received','ack','close_all','emergency']}\n    stamps=[]\n    for line in j.splitlines():\n        try:\n            event=json.loads(line); msg=str(event.get('MESSAGE','')).lower()\n            for key,pattern in [('error',r'error|exception|failed'),('timeout',r'timeout|timed out'),('rate_limit',r'429|rate.limit|quota'),('websocket',r'websocket|disconnect'),('received',r'receiv|message.*inbound'),('ack',r'acknowledg|instant.ack'),('close_all',r'平仓所有|所有仓位|close.all|close_all'),('emergency',r'紧急|emergency')]:\n                if re.search(pattern,msg): tags[key]+=1\n            if re.search(r'平仓所有|所有仓位|close.all|close_all|紧急',msg):\n                stamps.append(event.get('__REALTIME_TIMESTAMP','UNKNOWN'))\n        except Exception: pass\n    rows.append({'unit':name,'state':props,'journal_exit':jc,'scanned_lines':len(j.splitlines()),'pattern_counts_not_receipts':tags,'emergency_match_utc_microseconds':stamps[-20:]})\nmem,_=run(['free','-m'])\nprint(json.dumps({'hostname':os.uname().nodename,'uid':os.geteuid(),'python':list(sys.version_info[:3]),'nonce':NONCE,'diagnostic':{'unit_scan_exit':rc,'units':rows,'memory_mib':mem,'loadavg':list(os.getloadavg()),'historical_close_status':'UNKNOWN_NO_ORDER_LEDGER_READ','mutations':0}}))\n".replace('NONCE', repr(nonce))
+              code = "import json,os,sys,subprocess,re,time\nif os.uname().nodename != 'iZmj7a5kwr75qc1tul4kf9Z' or os.geteuid()!=0:\n    raise SystemExit(42)\ndef run(args):\n    try:\n        p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=8)\n        return p.stdout.decode('utf-8','replace'),p.returncode\n    except Exception:\n        return '',-1\nunits,rc=run(['systemctl','list-units','--all','--type=service','--plain','--no-legend','--no-pager'])\nnames=[l.split()[0] for l in units.splitlines() if l.split() and re.search(r'openclaw|feishu|lark|binance|trading',l.split()[0],re.I)]\nrows=[]\nfor name in names[:40]:\n    if not re.match(r'^[A-Za-z0-9_.@:-]+[.]service.replace('NONCE', repr(nonce))
+              return '#!/bin/sh\nset -eu\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -B -c ' + shlex.quote(code) + '\n'
+          
+          
+          def validate_output(output, expected, nonce):
+              if not isinstance(output, str) or len(output) > 8192:
+                  raise Hold('OUTPUT_REJECTED')
+              try:
+                  data = json.loads(output.strip())
+              except Exception:
+                  # Some legacy service responses use base64 despite current plaintext docs.
+                  try:
+                      data = json.loads(base64.b64decode(output.strip(), validate=True))
+                  except Exception:
+                      raise Hold('OUTPUT_NOT_PROBE_JSON') from None
+              if not isinstance(data, dict) or set(data) != {'hostname', 'uid', 'python', 'nonce', 'diagnostic'}:
+                  raise Hold('PROBE_SCHEMA_MISMATCH')
+              if data['hostname'] != expected or type(data['uid']) is not int or data['uid'] != 0 or data['nonce'] != nonce:
+                  raise Hold('HOST_ROOT_OR_NONCE_MISMATCH')
+              version = data['python']
+              if not isinstance(version, list) or len(version) != 3 or any(type(v) is not int or v < 0 or v > 100 for v in version):
+                  raise Hold('PYTHON_VERSION_INVALID')
+              return {'hostname': expected, 'uid': 0, 'python': version, 'diagnostic': data['diagnostic']}
+          
+          
+          def probe(host, master):
+              name, role, region, instance, expected = host
+              row = {'host': name, 'instance_id': instance, 'region': region,
+                     'status': 'HOLD', 'stage': 'ASSUME_ROLE', 'production_service_actions': 0}
+              try:
+                  result = rpc('sts.aliyuncs.com', '2015-04-01', 'AssumeRole', master,
+                               RoleArn=role, RoleSessionName='xuanjun-check-' + uuid.uuid4().hex[:16], DurationSeconds=900)
+                  c = result['Credentials']
+                  credentials = (c['AccessKeyId'], c['AccessKeySecret'], c['SecurityToken'])
+                  for value in credentials:
+                      if not isinstance(value, str) or not value or '\n' in value or '\r' in value:
+                          raise Hold('CREDENTIAL_RESPONSE_INVALID')
+                      print('::add-mask::' + value, flush=True)
+                  endpoint = 'swas.' + region + '.aliyuncs.com'
+                  nonce = uuid.uuid4().hex
+                  row['stage'] = 'DISPATCH_ONCE'
+                  result = rpc(endpoint, '2020-06-01', 'RunCommand', credentials,
+                               CommandContent=command(expected, nonce), RegionId=region,
+                               Type='RunShellScript', InstanceId=instance, WorkingUser='root',
+                               WorkingDir='/root', Timeout=180, Name='xuanjun-korea-openclaw-readonly-20261030')
+                  invoke = result.get('InvokeId')
+                  if not isinstance(invoke, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,180}', invoke):
+                      raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+                  row['invoke_id'] = invoke
+                  row['stage'] = 'QUERY_RESULT'
+                  print(json.dumps({'host': name, 'invoke_id': invoke, 'status': 'DISPATCHED'}), flush=True)
+                  deadline = time.monotonic() + 180
+                  while time.monotonic() < deadline:
+                      result = rpc(endpoint, '2020-06-01', 'DescribeInvocationResult', credentials,
+                                   RegionId=region, InstanceId=instance, InvokeId=invoke)
+                      detail = result.get('InvocationResult', {})
+                      status = detail.get('InvocationStatus')
+                      if status in ('Pending', 'Running', 'Stopping'):
+                          time.sleep(5)
+                          continue
+                      row['invocation_status'] = safe(status)
+                      if status != 'Success' or detail.get('ExitCode') != 0:
+                          row['api_error_code'] = safe(detail.get('ErrorCode'))
+                          raise Hold('COMMAND_NOT_SUCCESS')
+                      if detail.get('InstanceId') != instance or detail.get('InvokeId') != invoke:
+                          raise Hold('INVOCATION_IDENTITY_MISMATCH')
+                      row.update(validate_output(detail.get('Output'), expected, nonce))
+                      row.update(status='PASS', stage='VERIFIED')
+                      return row
+                  raise Hold('REMOTE_RESULT_UNKNOWN_PRESERVE_NO_RETRY')
+              except Hold as error:
+                  row['error_code'] = safe(str(error))
+              except Exception:
+                  row['error_code'] = 'UNEXPECTED_RESPONSE_PRESERVE_NO_RETRY'
+              return row
+          
+          
+          def main():
+              master = (os.environ.get('ALIYUN_ACCESS_KEY_ID', ''), os.environ.get('ALIYUN_ACCESS_KEY_SECRET', ''), '')
+              if not all(master[:2]):
+                  print('HOLD=MISSING_GITHUB_SECRETS')
+                  return 2
+              with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                  rows = list(pool.map(lambda host: probe(host, master), HOSTS))
+              receipt = {'schema': 1, 'status': 'PASS' if all(r['status'] == 'PASS' for r in rows) else 'HOLD',
+                         'scope': 'KOREA_OPENCLAW_READONLY_NO_TRADING', 'hosts': rows,
+                         'production_service_actions': 0, 'deployment_performed': False}
+              encoded = json.dumps(receipt, indent=2, sort_keys=True)
+              print(encoded, flush=True)
+              Path('aliyun-four-host-receipt.json').write_text(encoded + '\n')
+              summary = os.environ.get('GITHUB_STEP_SUMMARY')
+              if summary:
+                  with open(summary, 'a') as out:
+                      out.write('### Four-host Alibaba Cloud check\n```json\n' + encoded + '\n```\n')
+              return 0 if receipt['status'] == 'PASS' else 2
+          
+          
+          if __name__ == '__main__':
+              raise SystemExit(main())
+          PY
+,name): continue\n    raw,c=run(['systemctl','show',name,'--no-pager','-p','ActiveState','-p','SubState','-p','MainPID','-p','NRestarts','-p','Result','-p','MemoryCurrent','-p','TasksCurrent'])\n    props=dict(l.split('=',1) for l in raw.splitlines() if '=' in l)\n    j,jc=run(['journalctl','-u',name,'--since','2026-10-30 06:40:00 UTC','--until','2026-10-30 09:30:00 UTC','-n','3000','-o','json','--no-pager'])\n    tags={k:0 for k in ['error','timeout','rate_limit','websocket','received','ack','close_all','emergency']}\n    stamps=[]\n    for line in j.splitlines():\n        try:\n            event=json.loads(line); msg=str(event.get('MESSAGE','')).lower()\n            for key,pattern in [('error',r'error|exception|failed'),('timeout',r'timeout|timed out'),('rate_limit',r'429|rate.limit|quota'),('websocket',r'websocket|disconnect'),('received',r'receiv|message.*inbound'),('ack',r'acknowledg|instant.ack'),('close_all',r'平仓所有|所有仓位|close.all|close_all'),('emergency',r'紧急|emergency')]:\n                if re.search(pattern,msg): tags[key]+=1\n            if re.search(r'平仓所有|所有仓位|close.all|close_all|紧急',msg):\n                stamps.append(event.get('__REALTIME_TIMESTAMP','UNKNOWN'))\n        except Exception: pass\n    rows.append({'unit':name,'state':props,'journal_exit':jc,'scanned_lines':len(j.splitlines()),'pattern_counts_not_receipts':tags,'emergency_match_utc_microseconds':stamps[-20:]})\ndetails={}\nfor prop in ['FragmentPath','WorkingDirectory','User','ExecMainStartTimestamp','ActiveEnterTimestamp','RestartUSec','TimeoutStopUSec']:\n    v,c=run(['systemctl','show','pr99-korea-openclaw.service','--value','-p',prop])\n    details[prop]=v.strip()\nraw,c=run(['systemctl','show','pr99-korea-openclaw.service','--value','-p','ExecStart'])\ndetails['executable_paths']=re.findall(r'(?:path=|argv\\\\[\\\\]=)(/[^ ;}]+)',raw)\nj,c=run(['journalctl','-u','pr99-korea-openclaw.service','--since','2026-10-30 06:40:00 UTC','-n','500','-o','json','--no-pager'])\nevents=[]\npatterns={'embedded_timeout':r'embedded run timeout','agent_timeout':r'agent.*timed out|agent.*timeout','request_timeout':r'request.*timed out|request.*timeout','llm_timeout':r'llm.*timed out|llm.*timeout','model_error':r'unknown model|model not found|no api key','abort':r'abort','dispatch':r'dispatch','received':r'received message|message received','completed':r'dispatch complete|run complete','duplicate':r'duplicate|dedup','websocket':r'websocket|disconnect|reconnect','close_all':r'平仓所有|所有仓位|close.all|close_all','emergency':r'紧急|emergency','oom':r'out of memory|oom|heap limit','error':r'error|exception|failed','session_lock':r'session.*lock|lock.*timeout','pending':r'pending|queue|enqueue'}\nfor line in j.splitlines():\n    try:\n        e=json.loads(line);msg=str(e.get('MESSAGE','')).lower()\n        tags=[k for k,p in patterns.items() if re.search(p,msg)]\n        if tags:\n            events.append({'utc_us':e.get('__REALTIME_TIMESTAMP'),'tags':tags,'http_codes':re.findall(r'\\\\b(?:401|403|429|500|502|503|504)\\\\b',msg),'error_codes':re.findall(r'\\\\b(?:econnreset|econnrefused|etimedout|enotfound|eai_again)\\\\b',msg),'durations':re.findall(r'\\\\b(?:durationms|timeoutms|elapsedms|replies|queuedfinal)=[0-9a-z]+',msg)})\n    except Exception: pass\ndetails['events']=events[-75:]\n\nmem,_=run(['free','-m'])\nprint(json.dumps({'hostname':os.uname().nodename,'uid':os.geteuid(),'python':list(sys.version_info[:3]),'nonce':NONCE,'diagnostic':{'unit_scan_exit':rc,'units':rows,'memory_mib':mem,'loadavg':list(os.getloadavg()),'historical_close_status':'UNKNOWN_NO_ORDER_LEDGER_READ','mutations':0,'details':details}}))\n".replace('NONCE', repr(nonce))
               return '#!/bin/sh\nset -eu\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -B -c ' + shlex.quote(code) + '\n'
           
           
