@@ -22,7 +22,8 @@ def package(root,source,output,derive_navigation=False, delivery_review=False):
     with tempfile.TemporaryDirectory() as td:
         stage=Path(td)/'stage'
         if delivery_review and not derive_navigation:raise ValueError('DELIVERY_REQUIRES_FULL_NAVIGATION_BUILD')
-        if derive_navigation:build(root,source,stage,derive_navigation=True,delivery_review=delivery_review)
+        if delivery_review:build(root,source,stage,derive_navigation=True,delivery_review=True)
+        elif derive_navigation:build(root,source,stage,derive_navigation=True)
         else:build(root,source,stage)
         with tarfile.open(source) as archive:
             raw=archive.extractfile('package/MANIFEST.json').read()
