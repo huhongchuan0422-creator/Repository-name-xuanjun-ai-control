@@ -22,17 +22,17 @@ jobs:
           python - <<'PY'
           import hashlib,json,pathlib
           raw=pathlib.Path('delivery/community-package-metadata-c19/package-metadata.json').read_bytes()
-          assert len(raw)==976
-          assert hashlib.sha256(raw).hexdigest()=='2c8c15b4b6ae3cf1ee95af41b75f6ffbe14458454f071fdf361678c8868d4fd8'
+          assert len(raw)==228340
+          assert hashlib.sha256(raw).hexdigest()=='b2191e3f45b51d8b3a7333714e62ebd76b2794d7ebd4c09787b1a10ec722f2d7'
           value=json.loads(raw)
-          assert value['object_spec']['artifact_id']==12933691362
-          assert value['object_spec']['package']['payload']=='COMMUNITY_211_ORIGINAL_INSTALL.py'
+          assert value['object_spec']['artifact_id']==12982446450
+          assert value['object_spec']['package']['payload']=='community-backend-image.tar.gz'
           print('FIXED_METADATA_BYTES_MATCH; NOT_DOWNLOADED; NOT_INSTALLED')
           PY
       - name: Publish exact single metadata member
         uses: actions/upload-artifact@v4
         with:
-          name: reviewed-community-211a9-installer-metadata-f9603d
+          name: reviewed-community-57242-package-metadata
           path: delivery/community-package-metadata-c19/package-metadata.json
           compression-level: 0
           if-no-files-found: error
