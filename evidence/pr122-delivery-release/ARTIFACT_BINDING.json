@@ -1,0 +1,10 @@
+{
+  "static_artifact_sha256": "4881d1e30da4815969cb44fd82411e0bef179cafa3444bf03f58e0ad8aabed80",
+  "package_manifest_sha256": "4a217baeefa4543a2729cb43bf2aa850dceb9e3a81ff0d1d13c842bf40610268",
+  "candidate_manifest_sha256": "938add31780986c4840d2cf54b8a5f73df78720db35a60388fb5b8d42745c5ac",
+  "package_schema": "FULL_STATIC_DELIVERY_REVIEW_V1",
+  "source_archive_sha256": "74545480300d8f5ba9b3bd87c6f7e40930eb914e34330923ab4b5a57d6f66e63",
+  "publisher_sha256": "f03c2cf0346a6048090807cf83bd2e4a1fedb415e5351992bcf5b1deab989771",
+  "full_stage_manifest_sha256": "add02f438f3f5284c56483d5b89c5f7a392581ec8b6fe07112c178bf54b21a54",
+  "build_provenance_sha256": "3334310dfc83755b9c82dcf8d69c3f48384d8fa35b24d542f56ccbc37ed3b416"
+}
