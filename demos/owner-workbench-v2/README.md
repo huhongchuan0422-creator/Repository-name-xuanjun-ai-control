@@ -28,6 +28,14 @@ TEST_ONLY 只读字段，并可显示其已持久化用量事件和已配单价�
 OAuth 已过期时，`effective_channel=NONE` 并明确 HOLD，不会自动回退另一通道。
 API Key/OAuth token 均不进入投影或页面。赠额适用性仍以官方规则和实际账单为准。
 
+大模型页还包含 `MODEL_SERVICE_DUAL_ENTRY_UI_CANDIDATE_V1` 交互候选：
+
+- **自带账号接入**：客户向上游付款，模型绑定平台、账号/连接、已验证授权通道和项目；
+- **购买玄钧AI新 API 服务**：沿原 Price Book、Contract、Order、项目权益、Usage、Ledger；
+- 硅基流动、OpenAI、DeepSeek、百炼均仅是 `PENDING_VERIFICATION` 候选，核通前没有可用按钮；
+- 未经官方与现场验证的 OAuth 不显示授权入口；
+- 当前仅验证交互，未实现连接创建、订单、权益、真实用量或账本写入。
+
 页面包含：
 
 - 简洁的标签页级演示登录/退出、严格互斥的登录与工作台、可展开十一项一级导航；

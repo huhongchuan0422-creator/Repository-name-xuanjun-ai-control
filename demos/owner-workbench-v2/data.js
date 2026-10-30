@@ -19,6 +19,38 @@
           reason:'SYNTHETIC_PREVIEW'}
       }
     },
+    model_service_dual_entry_preview:{
+      version:'MODEL_SERVICE_DUAL_ENTRY_UI_CANDIDATE_V1',
+      state:'UI_CANDIDATE',
+      selected_entry:'BYO_ACCOUNT',
+      effective_source:'NONE',
+      failure_reason:'BACKEND_NOT_IMPLEMENTED',
+      fallback:'DISABLED',
+      byo_account:{
+        payee:'客户直接向上游平台付款',
+        credential_source:'客户账号的安全录入或官方授权',
+        entitlement_source:'上游账号与连接可用范围',
+        metering_source:'上游平台用量；平台接入服务费沿既有确认方案',
+        billing_source:'上游账单（平台不代收模型费）',
+        project_binding:'平台 + 账号/连接 + 授权通道 + 模型 + 项目',
+        platforms:[
+          {id:'siliconflow',label:'硅基流动',state:'PENDING_VERIFICATION',verified_channels:[],models_state:'NOT_LOADED'},
+          {id:'openai',label:'OpenAI',state:'PENDING_VERIFICATION',verified_channels:[],models_state:'NOT_LOADED'},
+          {id:'deepseek',label:'DeepSeek',state:'PENDING_VERIFICATION',verified_channels:[],models_state:'NOT_LOADED'},
+          {id:'bailian',label:'百炼',state:'PENDING_VERIFICATION',verified_channels:[],models_state:'NOT_LOADED'}
+        ]
+      },
+      xuanjun_api_service:{
+        payee:'客户向玄钧AI新购买 API 服务',
+        credential_source:'平台受保护供应连接；客户无需上游 Key',
+        entitlement_source:'原 Contract / Order 生效后的项目权益',
+        metering_source:'原 Usage 的实际 API 用量',
+        billing_source:'原 Ledger / 对账；供应成本估算不等于客户应付账单',
+        project_binding:'API 商品 + 合同/订单 + 项目权益 + 用量',
+        price_book:'NOT_CONNECTED',contract:'NOT_CONNECTED',order:'NOT_CONNECTED',
+        entitlement:'NOT_CONNECTED',usage:'NOT_CONNECTED',ledger:'NOT_CONNECTED'
+      }
+    },
     management_modules:{
       'operations':{name:'运营',producer:'Operations projection',status:'NOT_CONNECTED'},
       'customer':{name:'客户',producer:'Identity / CRM / Customer Project Center',status:'NOT_CONNECTED'},

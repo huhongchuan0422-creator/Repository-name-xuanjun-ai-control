@@ -130,6 +130,38 @@ test('OpenAI channel preference preview is manual truthful and no fallback',()=>
   assert.doesNotMatch(source,/api[_-]?key\s*[:=]\s*['"][^'"]+/i);
 });
 
+test('model service UI candidate separates BYO and Xuanjun billed entry',()=>{
+  const html=app.render(data,{view:'config-models'});
+  for(const text of ['自带账号接入','购买玄钧AI新API服务','客户直接向上游平台付款','客户向玄钧AI新购买 API 服务','客户无需上游 Key'])assert.match(html,new RegExp(text));
+  for(const key of ['付款对象','凭据来源','权益来源','计量来源','账单来源','项目绑定键'])assert.match(html,new RegExp(key));
+  assert.match(html,/不串用、不重复收费/);
+  assert.match(html,/供应成本估算不等于客户应付账单/);
+  assert.match(html,/真实服务端接线[^]*NOT_IMPLEMENTED/);
+  assert.match(html,/自动 fallback[^]*DISABLED/);
+  assert.doesNotMatch(html,/免费接入|自动切换到/);
+});
+
+test('provider candidates stay unavailable until platform and channel verification',()=>{
+  const html=app.render(data,{view:'config-models'});
+  for(const platform of ['硅基流动','OpenAI','DeepSeek','百炼'])assert.match(html,new RegExp(platform));
+  assert.equal(data.model_service_dual_entry_preview.byo_account.platforms.every(p=>p.state==='PENDING_VERIFICATION'),true);
+  assert.equal(data.model_service_dual_entry_preview.byo_account.platforms.every(p=>p.verified_channels.length===0),true);
+  assert.match(html,/已验证通道：<strong>NONE_FOUND/);
+  assert.match(html,/当前候选不展示 OAuth 授权按钮/);
+  assert.doesNotMatch(html,/开始 OAuth 授权|已验证可用/);
+});
+
+test('dual entry interaction remains local candidate without write capability',()=>{
+  const html=app.render(data,{view:'config-models'});
+  assert.match(html,/data-model-entry="BYO_ACCOUNT"/);
+  assert.match(html,/data-model-entry="XUANJUN_API_SERVICE"/);
+  assert.match(html,/UI候选 · 不创建连接/);
+  assert.match(html,/UI候选 · 不创建订单/);
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(source,/selectedModelServiceEntry=button\.getAttribute\('data-model-entry'\)/);
+  assert.doesNotMatch(source,/CREATE_MODEL_SERVICE_CONNECTION|CREATE_API_ORDER|ACTIVATE_PROJECT_ENTITLEMENT/);
+});
+
 test('all required exception states are visible',()=>{
   const html=app.render(data,{view:'states',id:null});
   for(const value of ['加载中','空状态','读取失败','无权限','版本冲突','未接入','NOT_CONNECTED'])assert.match(html,new RegExp(value));
