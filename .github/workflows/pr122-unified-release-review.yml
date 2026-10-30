@@ -74,9 +74,33 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install cryptography==46.0.3
-          python -B -m unittest tests.test_pr122_static_github_approval tests.test_pr122_static_public_transport tests.test_pr122_static_package_schema tests.test_pr122_static_workflow tests.test_pr122_static_signature tests.test_pr122_static_operations tests.test_pr122_static_source_gate tests.test_pr122_static_source_package tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_review tests.test_pr122_customer_workflow_signature tests.test_pr122_customer_login_release -v
+          python -B -m unittest tests.test_pr122_delivery_controlled_apply tests.test_pr122_static_github_approval tests.test_pr122_static_public_transport tests.test_pr122_static_package_schema tests.test_pr122_static_workflow tests.test_pr122_static_signature tests.test_pr122_static_operations tests.test_pr122_static_source_gate tests.test_pr122_static_source_package tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_review tests.test_pr122_customer_workflow_signature tests.test_pr122_customer_login_release -v
       - name: Package exact controlled static source closure
         run: python -B -m scripts.pr122_static_source_package --output /tmp/pr122-static-controlled-source
+      - name: Bind exact controller CI to the independently delivered public artifact
+        run: |
+          python -B - <<'PYDELIVERY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          reference=json.loads(Path('evidence/pr122-delivery-release/ARTIFACT_BINDING.json').read_bytes())
+          assert reference['package_schema']=='FULL_STATIC_DELIVERY_REVIEW_V1'
+          assert reference['static_artifact_sha256']=='4881d1e30da4815969cb44fd82411e0bef179cafa3444bf03f58e0ad8aabed80'
+          folder=Path('/tmp/pr122-static-controlled-source')
+          source=(folder/'PR122_STATIC_CONTROLLED_SOURCE_REVIEW_ONLY.tar.gz').read_bytes()
+          binding=json.loads((folder/'STATIC_SOURCE_BINDING.json').read_bytes())
+          assert binding['source_commit']==os.environ['GITHUB_SHA']
+          assert hashlib.sha256(source).hexdigest()==binding['archive_sha256']
+          assert binding['source_members']==24 and binding['source_bindings']==23
+          report={'source_commit':os.environ['GITHUB_SHA'],
+                  'source_tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+                  'run_id':os.environ['GITHUB_RUN_ID'],'controller_source':binding,
+                  'public_artifact_reference':reference,
+                  'public_tar_bytes_in_this_run':'NOT_READ_NOT_REBUILT_USE_COORDINATOR_VERIFIED_ORIGINAL',
+                  'scope':'EXACT_CONTROLLER_SOURCE_CI_WITH_UNCHANGED_PUBLIC_REFERENCE',
+                  'production_execution':'NOT_RUN','installation_permission':'NOT_ISSUED'}
+          Path('/tmp/pr122-unified-reports/DELIVERY_CI_BINDING.json').write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
+          print(json.dumps(report,sort_keys=True))
+          PYDELIVERY
       - name: Reconstruct historical mobile fixture from its exact reviewed source
         run: |
           git fetch --depth=1 origin 790937a5c96afcf3b3660e36cf36cfaab2002a72
