@@ -39,7 +39,7 @@ class DigitalTwinProjectionTests(unittest.TestCase):
                  'assignments':[{'task_id':'task-a','attempt_id':'a-1',
                    'role_id':'DEVELOPER','role_version':'v1',
                    'principal_id':'ai-1','state':'ACTIVE','created_at':1}],
-                 'candidates':[]})
+                 'candidates':[], 'candidate_reviews':[]})
 
     def test_same_records_drive_project_node_and_ai_views(self):
         value = build_projection(*self.fixture())
@@ -49,6 +49,26 @@ class DigitalTwinProjectionTests(unittest.TestCase):
         self.assertEqual(value['views']['ai_task_ids']['ai-1'], ['task-a'])
         self.assertEqual(len(value['records']['tasks']), 2)
         self.assertEqual(value['permissions']['mutation'], 'NONE')
+        self.assertEqual(
+            value['extension_contracts']['project_delivery']['status'],
+            'NOT_CONNECTED')
+        self.assertEqual(
+            value['extension_contracts']['mcp_development_closure'][
+                'missing_producers'],
+            ['TRUSTED_PROCESS_OBSERVER', 'LIVE_PROVIDER_RECEIPT'])
+
+    def test_same_node_name_in_two_projects_stays_project_scoped(self):
+        task_projection, model_projection = self.fixture()
+        task_projection['tasks'][0]['node_id'] = 'node-a'
+        task_projection['tasks'][1]['project_id'] = 'project-2'
+        task_projection['tasks'][1]['node_id'] = 'node-a'
+        value = build_projection(task_projection, model_projection)
+        nodes = {(item['project_id'], item['node_id']): item
+                 for item in value['records']['nodes']}
+        self.assertEqual(nodes[('project-1', 'node-a')]['task_ids'],
+                         ['task-a'])
+        self.assertEqual(nodes[('project-2', 'node-a')]['task_ids'],
+                         ['task-b'])
 
     def test_animation_requires_real_execution_evidence(self):
         value = build_projection(*self.fixture())
@@ -83,4 +103,25 @@ class DigitalTwinProjectionTests(unittest.TestCase):
         task = next(item for item in value['records']['tasks']
                     if item['task_id'] == 'task-a')
         self.assertEqual(task['display_state'], 'RECOVERING')
+        self.assertNotEqual(task['display_state'], 'COMPLETE')
+
+    def test_old_attempt_candidate_and_event_cannot_upgrade_current_task(self):
+        task_projection, model_projection = self.fixture()
+        task_projection['timeline'].extend([
+          {'task_id':'task-a','attempt_id':'old-attempt','event_id':'old-test',
+           'kind':'TEST_RECORDED','observed_at':99,
+           'evidence_kind':'TEST','evidence_ref':'test://old'},
+          {'task_id':'task-a','attempt_id':'old-attempt','event_id':'old-install',
+           'kind':'INSTALL_RECORDED','observed_at':100,
+           'evidence_kind':'INSTALL','evidence_ref':'install://old'}])
+        model_projection['candidates'].append({
+          'candidate_id':'old-candidate','task_id':'task-a',
+          'attempt_id':'old-attempt','artifact_sha256':'old-sha',
+          'state':'ACCEPTED','updated_at':101})
+        value = build_projection(task_projection, model_projection)
+        task = next(item for item in value['records']['tasks']
+                    if item['task_id'] == 'task-a')
+        self.assertEqual(task['artifact_sha256'], 'UNKNOWN')
+        self.assertEqual(task['test_ref'], 'UNKNOWN')
+        self.assertEqual(task['install_ref'], 'UNKNOWN')
         self.assertNotEqual(task['display_state'], 'COMPLETE')

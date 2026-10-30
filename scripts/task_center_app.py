@@ -222,6 +222,11 @@ def read_only_twin_projection(db_path, authority_key, tenant_id,
               checklist_sha256,submitted_by,reviewed_by,accepted_by,state,
               created_at,updated_at FROM delivery_candidates WHERE tenant_id=?
               ORDER BY created_at,candidate_id''', (tenant_id,))],
+            'candidate_reviews': [dict(x) for x in connection.execute('''SELECT
+              candidate_id,review_id,reviewer,review_kind,decision,
+              observed_at FROM candidate_reviews
+              WHERE tenant_id=? ORDER BY observed_at,review_id''',
+              (tenant_id,))],
         }
         return build_twin_projection(task_projection, model_projection)
     finally:

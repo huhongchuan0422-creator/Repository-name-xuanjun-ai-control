@@ -36,6 +36,32 @@ EVENT_CONTRACT = [
     'WRITER_RELEASED', 'RESUME_STARTED', 'RESUME_SUCCEEDED', 'RESUME_FAILED',
 ]
 
+EXTENSION_CONTRACTS = {
+    'project_delivery': {
+        'reader': 'project_delivery_contract.build_project_delivery_projection',
+        'producer': 'Customer Project Center / CRM',
+        'status': 'NOT_CONNECTED',
+        'mutation': 'ORIGINAL_SERVICE_ONLY',
+    },
+    'mcp_development_closure': {
+        'reader': 'mcp_development_closure.evaluate_closure',
+        'producer': ('GatewayKernel / ModelControl / trusted process observer '
+                     '/ live provider receipt'),
+        'status': 'PARTIALLY_CONNECTED',
+        'missing_producers': [
+            'TRUSTED_PROCESS_OBSERVER', 'LIVE_PROVIDER_RECEIPT'],
+        'mutation': 'NONE',
+    },
+    'supervision_recovery': {
+        'reader': 'digital_twin_supervision.evaluate_supervision',
+        'producer': ('Task Supervisor / GatewayKernel / trusted process '
+                     'observer'),
+        'status': 'PARTIALLY_CONNECTED',
+        'missing_producers': ['TRUSTED_PROCESS_OBSERVER'],
+        'mutation': 'ORIGINAL_SERVICE_ONLY',
+    },
+}
+
 
 def _json(value, fallback):
     if value in (None, ''):
@@ -87,6 +113,21 @@ def _animation_allowed(display_state, task, events):
                for item in events)
 
 
+def _latest_event(events, kinds):
+    candidates = [item for item in events if item.get('kind') in kinds]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: (
+        item.get('observed_at') or 0, item.get('event_id') or ''))
+
+
+def _event_ref(events, kinds):
+    event = _latest_event(events, kinds)
+    if event is None:
+        return UNKNOWN
+    return event.get('evidence_ref') or UNKNOWN
+
+
 def build_projection(task_projection, model_projection):
     """Build one immutable multi-view document from existing projections."""
     tenant_id = task_projection['tenant_id']
@@ -95,14 +136,20 @@ def build_projection(task_projection, model_projection):
     for event in timeline:
         events_by_task.setdefault(event.get('task_id'), []).append(event)
 
-    candidates_by_task = {}
+    candidates_by_attempt = {}
     for candidate in model_projection.get('candidates') or []:
-        current = candidates_by_task.get(candidate.get('task_id'))
+        key = (candidate.get('task_id'), candidate.get('attempt_id'))
+        current = candidates_by_attempt.get(key)
         if current is None or ((candidate.get('updated_at') or 0),
                                candidate.get('candidate_id') or '') > (
                                    (current.get('updated_at') or 0),
                                    current.get('candidate_id') or ''):
-            candidates_by_task[candidate.get('task_id')] = candidate
+            candidates_by_attempt[key] = candidate
+
+    reviews_by_candidate = {}
+    for review in model_projection.get('candidate_reviews') or []:
+        reviews_by_candidate.setdefault(review.get('candidate_id'), []).append(
+            review)
 
     assignments = list(model_projection.get('assignments') or [])
     requests = {item.get('request_id'): item
@@ -111,9 +158,23 @@ def build_projection(task_projection, model_projection):
     evidence = []
     for source in task_projection.get('tasks') or []:
         task = dict(source)
-        task_events = events_by_task.get(task['task_id'], [])
-        candidate = candidates_by_task.get(task['task_id'])
+        historical_events = events_by_task.get(task['task_id'], [])
+        task_events = [item for item in historical_events
+                       if item.get('attempt_id') == task.get('attempt_id')]
+        candidate = candidates_by_attempt.get(
+            (task['task_id'], task.get('attempt_id')))
+        candidate_reviews = reviews_by_candidate.get(
+            (candidate or {}).get('candidate_id'), [])
         display_state = _task_display_state(task, candidate, task_events)
+        review_ref = UNKNOWN
+        if candidate_reviews:
+            latest_review = max(candidate_reviews, key=lambda item: (
+                item.get('observed_at') or 0, item.get('review_id') or ''))
+            review_ref = latest_review.get('review_id') or UNKNOWN
+        acceptance_ref = _event_ref(task_events, {'ACCEPTANCE_RECORDED'})
+        if (acceptance_ref == UNKNOWN and candidate and
+                candidate.get('state') in ('ACCEPTED', 'DELIVERED')):
+            acceptance_ref = candidate.get('candidate_id') or UNKNOWN
         task.update({
             'display_state': display_state,
             'animation_allowed': _animation_allowed(display_state, task,
@@ -124,13 +185,28 @@ def build_projection(task_projection, model_projection):
                                                      UNKNOWN),
             'review_state': (candidate or {}).get('state', UNKNOWN),
             'requirement_id': UNKNOWN,
+            'requirement_source_ref': UNKNOWN,
             'baseline_version': task.get('input_version') or UNKNOWN,
+            'confirmed_ui_version': UNKNOWN,
             'page_id': UNKNOWN,
+            'source_commit': UNKNOWN,
+            'source_tree': UNKNOWN,
+            'test_ref': _event_ref(task_events,
+                                   {'TEST_RECORDED', 'TEST_COMPLETED'}),
+            'review_ref': review_ref,
+            'install_ref': _event_ref(task_events, {'INSTALL_RECORDED'}),
+            'acceptance_ref': acceptance_ref,
+            'current_responsible_party': (task.get('responsible_party') or
+                                          UNKNOWN),
+            'state_source': ('candidate:' + candidate['candidate_id']
+                             if candidate else
+                             'task-runtime:' +
+                             (task.get('runtime_status') or UNKNOWN)),
             'source_ref': 'canonical-task-center://tasks/' + task['task_id'],
             'source_version': task.get('checkpoint_sha256') or UNKNOWN,
         })
         tasks.append(task)
-        for event in task_events:
+        for event in historical_events:
             evidence.append({
                 'evidence_id': event.get('event_id') or UNKNOWN,
                 'task_id': task['task_id'],
@@ -161,11 +237,20 @@ def build_projection(task_projection, model_projection):
         instance = dict(source)
         instance_assignments = [item for item in assignments
                                 if item.get('principal_id') ==
-                                instance.get('instance_id')]
+                                instance.get('instance_id') and any(
+                                  task['task_id'] == item.get('task_id') and
+                                  task.get('attempt_id') ==
+                                  item.get('attempt_id') for task in tasks)]
         linked_task_ids = sorted({item.get('task_id')
                                   for item in instance_assignments
                                   if item.get('task_id') in task_ids})
         request = requests.get(instance.get('current_request_id')) or {}
+        linked_tasks = [task for task in tasks
+                        if task['task_id'] in linked_task_ids]
+        bound_task = linked_tasks[0] if len(linked_tasks) == 1 else {}
+        progress_values = [task.get('last_real_progress_at')
+                           for task in linked_tasks
+                           if task.get('last_real_progress_at') is not None]
         ai_instances.append({
             'role_instance_id': instance.get('instance_id') or UNKNOWN,
             'role_id': instance.get('role_id') or UNKNOWN,
@@ -174,12 +259,13 @@ def build_projection(task_projection, model_projection):
             'desired_state': instance.get('desired_state') or UNKNOWN,
             'task_ids': linked_task_ids,
             'current_request_id': instance.get('current_request_id') or UNKNOWN,
-            'run_id': UNKNOWN,
-            'session_id': UNKNOWN,
+            'run_id': bound_task.get('run_id') or UNKNOWN,
+            'session_id': bound_task.get('session_id') or UNKNOWN,
             'process_id': UNKNOWN,
-            'writer_epoch': UNKNOWN,
+            'writer_epoch': bound_task.get('epoch') or UNKNOWN,
             'last_heartbeat_at': request.get('last_heartbeat') or UNKNOWN,
-            'last_progress_at': UNKNOWN,
+            'last_progress_at': (max(progress_values) if progress_values
+                                 else UNKNOWN),
             'checkpoint': _json(instance.get('last_checkpoint_json'), UNKNOWN),
             'source_ref': ('canonical-task-center://role_instances/' +
                            (instance.get('instance_id') or UNKNOWN)),
@@ -188,9 +274,13 @@ def build_projection(task_projection, model_projection):
 
     project_index = {}
     node_index = {}
+    project_node_index = {}
     for task in tasks:
         project_index.setdefault(task['project_id'], []).append(task['task_id'])
         node_index.setdefault(task['node_id'], []).append(task['task_id'])
+        project_node_index.setdefault(task['project_id'] + '::' +
+                                      task['node_id'], []).append(
+                                          task['task_id'])
     ai_index = {item['role_instance_id']: item['task_ids']
                 for item in ai_instances}
     projects = [{'project_id': key,
@@ -202,12 +292,13 @@ def build_projection(task_projection, model_projection):
                  'confirmed_version': UNKNOWN,
                  'source_ref': 'canonical-task-center://projects/' + key}
                 for key, value in sorted(project_index.items())]
-    nodes = [{'node_id': key,
-              'project_id': next(task['project_id'] for task in tasks
-                                 if task['task_id'] in value),
+    nodes = [{'node_id': key.split('::', 1)[1],
+              'project_id': key.split('::', 1)[0],
               'task_ids': sorted(value),
-              'source_ref': 'canonical-task-center://nodes/' + key}
-             for key, value in sorted(node_index.items())]
+              'source_ref': ('canonical-task-center://projects/' +
+                             key.split('::', 1)[0] + '/nodes/' +
+                             key.split('::', 1)[1])}
+             for key, value in sorted(project_node_index.items())]
 
     return {
         'schema': 1,
@@ -226,6 +317,7 @@ def build_projection(task_projection, model_projection):
             'ai_may_confirm': False,
             'sent_ack_heartbeat_are_completion': False,
         },
+        'extension_contracts': EXTENSION_CONTRACTS,
         'sources': [
             {'producer': 'Task Supervisor + GatewayKernel',
              'interface': '/api/projection', 'status': 'CONNECTED'},
@@ -250,6 +342,9 @@ def build_projection(task_projection, model_projection):
                                  for key, value in sorted(project_index.items())},
             'node_task_ids': {key: sorted(value)
                               for key, value in sorted(node_index.items())},
+            'project_node_task_ids': {
+                key: sorted(value)
+                for key, value in sorted(project_node_index.items())},
             'ai_task_ids': ai_index,
         },
         'integration_boundaries': task_projection.get(
