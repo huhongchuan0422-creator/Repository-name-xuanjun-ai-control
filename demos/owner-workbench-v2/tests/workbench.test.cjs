@@ -276,19 +276,29 @@ test('hosted mode uses same-origin session and projection without fixture fallba
 test('hosted controller refreshes each route/manual cycle and fails closed',async()=>{
   let projectionNumber=0,failProjection=false;const calls=[],states=[];
   function projection(){projectionNumber+=1;return{projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:projectionNumber,modules:{overview:{summary:{}},'research-development':{records:[]},configuration:{records:[]},finance:{status:'NOT_CONNECTED'}}};}
-  const fakeFetch=(url,options)=>{calls.push([url,options]);if(url.includes('/session'))return Promise.resolve({ok:true,status:200});if(failProjection)return Promise.resolve({ok:false,status:503});return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});};
+  const fakeFetch=(url,options)=>{calls.push([url,options]);if(url.includes('/session'))return Promise.resolve({ok:true,status:200});if(url.includes('/customer/center/'))return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve({scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[]})});if(failProjection)return Promise.resolve({ok:false,status:503});return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});};
   const controller=app.createHostedController({fetch:fakeFetch,onLoading:reason=>states.push('LOADING:'+reason),onData:value=>states.push('READY:'+value.observed_at),onError:error=>states.push('ERROR:'+error.message),onLoginRequired:()=>states.push('LOGIN')});
   await controller.refresh('INITIAL');await controller.refresh('ROUTE_CHANGE');await controller.refresh('MANUAL_REFRESH');
-  assert.deepEqual(calls.map(x=>x[0]),['../api/session','../api/admin/workbench','../api/session','../api/admin/workbench','../api/session','../api/admin/workbench']);
+  assert.deepEqual(calls.map(x=>x[0]),['../api/session','../api/admin/workbench','/customer/center/api/review_queue','../api/session','../api/admin/workbench','/customer/center/api/review_queue','../api/session','../api/admin/workbench','/customer/center/api/review_queue']);
   assert.ok(calls.every(x=>x[1].credentials==='same-origin'&&x[1].cache==='no-store'));
   assert.equal(controller.current().observed_at,3);
   failProjection=true;const failed=await controller.refresh('RETRY');
   assert.equal(failed.state,'ERROR');assert.equal(controller.current(),null);assert.match(states.join('|'),/LOADING:RETRY.*ERROR:HOSTED_HTTP_503/);
 
   let releaseFirst;const firstSession=new Promise(resolve=>{releaseFirst=resolve;}),fresh=[];let sessionCalls=0;
-  const staleController=app.createHostedController({fetch:url=>{if(url.includes('/session')){sessionCalls+=1;return sessionCalls===1?firstSession:Promise.resolve({ok:true,status:200});}return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});},onLoading:()=>{},onData:value=>fresh.push(value.observed_at),onError:()=>assert.fail('stale request must not error'),onLoginRequired:()=>assert.fail('unexpected login')});
+  const staleController=app.createHostedController({fetch:url=>{if(url.includes('/session')){sessionCalls+=1;return sessionCalls===1?firstSession:Promise.resolve({ok:true,status:200});}if(url.includes('/customer/center/'))return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve({scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[]})});return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});},onLoading:()=>{},onData:value=>fresh.push(value.observed_at),onError:()=>assert.fail('stale request must not error'),onLoginRequired:()=>assert.fail('unexpected login')});
   const old=staleController.refresh('OLD'),latest=staleController.refresh('NEW');await latest;releaseFirst({ok:true,status:200});const stale=await old;
   assert.equal(stale.state,'STALE');assert.equal(fresh.length,1);
+});
+
+test('hosted PR122 review queue binds canonical task and shows actor reason receipt',()=>{
+  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'tenant-a',observed_at:1,modules:{overview:{summary:{}},'research-development':{records:[{task_id:'task-pr122',project_id:'project-a',state:'RUNNING',runtime_status:'RUNNING',responsible_party:'UI Writer'}],advanced:{audit_records:[{task_id:'task-pr122',attempt_id:'attempt-1'}]}},configuration:{records:[]},finance:{status:'NOT_CONNECTED'}}});
+  const state={state:'DESIGN_APPROVED_TASK_BOUND',comments:[],events:[{kind:'DESIGN_APPROVAL',actor:'owner-1',created:1,payload:{reason:'本版本设计通过',task_id:'task-pr122'}}],approval_receipt:{task_id:'task-pr122',event_id:'ce_1',record_sha256:'a'.repeat(64)}};
+  const data=app.attachAuthoritativeReviewQueue(hosted,{scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[{id:'project-a',title:'真实项目',pages:[{path:'/home/',sha256:'b'.repeat(64),url:'/customer/center/preview/project-a/page/version',review:state}]}]});
+  const html=app.render(data,app.route('#review/project-a/%2Fhome%2F/'+('b'.repeat(64))));
+  for(const text of ['task-pr122','owner-1','本版本设计通过','ce_1','DESIGN_APPROVED_TASK_BOUND'])assert.match(html,new RegExp(text));
+  assert.match(html,/AUTHORIZED_PRIVATE_PREVIEW/);
+  assert.doesNotMatch(html,/明确设计通过并绑定原任务/);
 });
 
 test('all finance children remain unknown without a finance ledger',()=>{
