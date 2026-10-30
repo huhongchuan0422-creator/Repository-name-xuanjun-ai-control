@@ -44,7 +44,7 @@ test('review separates artifact layers and evidence',()=>{
   const html=app.render(data,app.route('#review/PRJ-XJ-042/PAGE-004/v2.3-r2'));
   for(const label of ['设计稿','合成演示','开发版本','已安装','已验收'])assert.match(html,new RegExp(label));
   assert.match(html,/NOT_EXECUTED/);
-  assert.match(html,/无 iframe/);
+  assert.match(html,/PREVIEW_URL_BINDING_FAILED/);
 });
 
 test('review starts with a project queue and remains project scoped',()=>{
@@ -291,14 +291,30 @@ test('hosted controller refreshes each route/manual cycle and fails closed',asyn
   assert.equal(stale.state,'STALE');assert.equal(fresh.length,1);
 });
 
-test('hosted PR122 review queue binds canonical task and shows actor reason receipt',()=>{
+test('hosted PR122 review queue shows server-bound receipt and exact safe preview',()=>{
   const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'tenant-a',observed_at:1,modules:{overview:{summary:{}},'research-development':{records:[{task_id:'task-pr122',project_id:'project-a',state:'RUNNING',runtime_status:'RUNNING',responsible_party:'UI Writer'}],advanced:{audit_records:[{task_id:'task-pr122',attempt_id:'attempt-1'}]}},configuration:{records:[]},finance:{status:'NOT_CONNECTED'}}});
   const state={state:'DESIGN_APPROVED_TASK_BOUND',comments:[],events:[{kind:'DESIGN_APPROVAL',actor:'owner-1',created:1,payload:{reason:'本版本设计通过',task_id:'task-pr122'}}],approval_receipt:{task_id:'task-pr122',event_id:'ce_1',record_sha256:'a'.repeat(64)}};
-  const data=app.attachAuthoritativeReviewQueue(hosted,{scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[{id:'project-a',title:'真实项目',pages:[{path:'/home/',sha256:'b'.repeat(64),url:'/customer/center/preview/project-a/page/version',review:state}]}]});
+  const key='c'.repeat(64),version='b'.repeat(64);
+  const data=app.attachAuthoritativeReviewQueue(hosted,{scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[{id:'project-a',title:'真实项目',approval_capability:{enabled:false,reason:'TASK_REGISTRY_REQUESTER_PRINCIPAL_NOT_AVAILABLE'},pages:[{path:'/home/',page_key:key,sha256:version,url:'/customer/center/preview/project-a/'+key+'/'+version,review:state}]}]});
   const html=app.render(data,app.route('#review/project-a/%2Fhome%2F/'+('b'.repeat(64))));
   for(const text of ['task-pr122','owner-1','本版本设计通过','ce_1','DESIGN_APPROVED_TASK_BOUND'])assert.match(html,new RegExp(text));
   assert.match(html,/AUTHORIZED_PRIVATE_PREVIEW/);
   assert.doesNotMatch(html,/明确设计通过并绑定原任务/);
+});
+
+test('review approval and preview links fail closed without trusted server bindings',()=>{
+  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'tenant-a',observed_at:1,modules:{overview:{summary:{}},'research-development':{records:[{task_id:'colliding-task',project_id:'project-a',state:'RUNNING'}]},configuration:{records:[]},finance:{status:'NOT_CONNECTED'}}});
+  const pending={state:'PENDING_REVIEW',comments:[],events:[]},version='b'.repeat(64),key='c'.repeat(64);
+  for(const url of ['javascript:alert(1)','https://evil.example/customer/center/preview/project-a/'+key+'/'+version,'/customer/center/preview/other/'+key+'/'+version,'/customer/center/preview/project-a/'+key+'/'+'d'.repeat(64)]){
+    const data=app.attachAuthoritativeReviewQueue(hosted,{scope:'AUTHORIZED_OWNER_PROJECTS_ONLY',projects:[{id:'project-a',title:'真实项目',pages:[{path:'/home/',page_key:key,sha256:version,url:url,review:pending}]}]});
+    const html=app.render(data,app.route('#review/project-a/%2Fhome%2F/'+version));
+    assert.match(html,/PREVIEW_URL_BINDING_FAILED/);
+    assert.doesNotMatch(html,/href="javascript:|evil\.example/);
+    assert.match(html,/disabled/);
+    assert.match(html,/SERVER_CAPABILITY_MISSING/);
+    assert.equal(data.projects[0].task_id,'UNKNOWN');
+  }
+  assert.equal(app.exactPreviewUrl('project-a',{page_key:key,version:version,url:'/customer/center/preview/project-a/'+key+'/'+version}),'/customer/center/preview/project-a/'+key+'/'+version);
 });
 
 test('all finance children remain unknown without a finance ledger',()=>{
