@@ -42,6 +42,7 @@ from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
                                      ensure_schema as ensure_mcp_task_schema,
                                      recover_incomplete_mcp_starts)
 from digital_twin_projection import build_projection as build_twin_projection
+from unified_admin_projection import build_projection as build_admin_projection
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -61,6 +62,7 @@ class TaskCenterHTTPServer(HTTPServer):
 
 
 ASSET_ROOT = os.path.join(ROOT, 'demos', 'task-center-digital-twin')
+WORKBENCH_ROOT = os.path.join(ROOT, 'demos', 'owner-workbench-v2')
 ASSETS = {
     '/': ('index.html', 'text/html; charset=utf-8'),
     '/index.html': ('index.html', 'text/html; charset=utf-8'),
@@ -71,6 +73,13 @@ ASSETS = {
     '/login.html': ('login.html', 'text/html; charset=utf-8'),
     '/login.js': ('login.js', 'application/javascript; charset=utf-8'),
     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
+}
+WORKBENCH_ASSETS = {
+    '/workbench/': ('index.html', 'text/html; charset=utf-8'),
+    '/workbench/index.html': ('index.html', 'text/html; charset=utf-8'),
+    '/workbench/app.js': ('app.js', 'application/javascript; charset=utf-8'),
+    '/workbench/data.js': ('data.js', 'application/javascript; charset=utf-8'),
+    '/workbench/styles.css': ('styles.css', 'text/css; charset=utf-8'),
 }
 
 PROJECTION_TABLES = frozenset((
@@ -559,7 +568,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'expires_at':session['expires_at']}),
                   'application/json; charset=utf-8');return
             if (session_store is not None and path in ('/','/index.html',
-                    '/admin.html') and self._session() is None):
+                    '/admin.html','/workbench/','/workbench/index.html') and
+                    self._session() is None):
                 self.send_response(302);self.send_header('Location',self._external_path('/login.html'))
                 self.send_header('Cache-Control','no-store');self.end_headers();return
             if path == '/api/projection':
@@ -606,6 +616,32 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         'detail':str(exc),
                         'production_status':'NOT_IMPLEMENTED'}),
                         'application/json; charset=utf-8')
+                return
+            if path == '/api/admin/workbench':
+                if not self._admin_allowed():
+                    self._send(403, _json_bytes({'error':'ADMIN_REQUIRED'}),
+                               'application/json; charset=utf-8'); return
+                try:
+                    tasks=read_only_projection(db_path,authority_key,
+                                               tenant_id,principal_id)
+                    models=read_only_model_projection(db_path,authority_key,
+                                                      tenant_id,principal_id)
+                    models['tenant_id']=tenant_id
+                    result=build_admin_projection(tasks,models,int(time.time()))
+                    self._send(200,_json_bytes(result),
+                               'application/json; charset=utf-8')
+                except Exception as exc:
+                    self._send(500,_json_bytes({
+                        'mode':'TEST_ONLY','error':type(exc).__name__,
+                        'detail':str(exc),
+                        'production_status':'NOT_IMPLEMENTED'}),
+                        'application/json; charset=utf-8')
+                return
+            workbench_asset = WORKBENCH_ASSETS.get(path)
+            if workbench_asset is not None:
+                with open(os.path.join(WORKBENCH_ROOT,
+                                       workbench_asset[0]), 'rb') as stream:
+                    self._send(200,stream.read(),workbench_asset[1])
                 return
             asset = ASSETS.get(path)
             if asset is None:

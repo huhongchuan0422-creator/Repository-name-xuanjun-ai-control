@@ -1,6 +1,6 @@
 # Owner Workbench V2 — UI Candidate
 
-状态：`UI_CANDIDATE / SYNTHETIC_DATA / NO_PRODUCTION_WRITE`
+状态：`LOCAL=UI_CANDIDATE / HOSTED=TEST_ONLY_READ_ONLY / NO_PRODUCTION_WRITE`
 
 这是独立 vanilla HTML/CSS/JS 候选，只验证统一后台信息架构、视觉与交互。
 它不创建后端、账本、Identity、CRM 或发布入口，不读取客户资料，不连接生产。
@@ -8,6 +8,11 @@
 ## 本地查看
 
 直接打开 `index.html`。演示登录只切换本地界面，输入不会发送或保存。
+
+由原 Task Center Host 访问 `/workbench/` 时，页面先读取同源真实 Session，再读取
+`../api/admin/workbench` 的 `UNIFIED_ADMIN_PROJECTION_V1`。Hosted 读取失败会明确
+显示失败，绝不回退本地 fixture；未接项目、财务、自媒体和服务器保持
+`NOT_CONNECTED/UNKNOWN`。该 API 仅接受管理员只读访问，不提供写 capability。
 
 页面包含：
 
@@ -37,6 +42,6 @@ node demos/owner-workbench-v2/tests/workbench.test.cjs
 
 ## 接线边界
 
-未来若接入，只消费原服务的只读投影。确认、审核、部署、权限和财务动作必须回
+Hosted 只消费原服务的只读投影。确认、审核、部署、权限和财务动作必须回
 原服务执行鉴权与留痕。现有 `/task-center-test/`、`/customer/center/` 和旧预览
 网址保持不变；本候选不得自行创建重定向或替换生产入口。

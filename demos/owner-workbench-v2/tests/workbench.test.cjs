@@ -167,7 +167,7 @@ test('login and shell visibility are strictly exclusive',()=>{
   assert.match(app.shellVisibility.toString(),/loginHidden/);
 });
 
-test('candidate session supports logout refresh history and mobile overlay cleanup without formal auth',()=>{
+test('local candidate session supports logout refresh history and mobile overlay cleanup without formal auth',()=>{
   const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
   const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
   assert.match(source,/sessionStorage\.getItem\('XJ_UI_CANDIDATE_SESSION'\)/);
@@ -177,7 +177,39 @@ test('candidate session supports logout refresh history and mobile overlay clean
   assert.match(source,/function closeMenu\(returnFocus\)/);
   assert.match(css,/@media\(max-width:820px\)/);
   assert.match(css,/\[hidden\]\{display:none!important\}/);
-  assert.doesNotMatch(source,/fetch\(|XMLHttpRequest|Authorization/);
+  assert.match(source,/win\.location\.protocol!==\x27file:\x27/);
+});
+
+test('hosted mode uses same-origin session and projection without fixture fallback',()=>{
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(source,/fetch\('\.\.\/api\/session'/);
+  assert.match(source,/fetch\('\.\.\/api\/admin\/workbench'/);
+  assert.match(source,/credentials:'same-origin'/);
+  assert.match(source,/未回退合成 fixture/);
+  assert.doesNotMatch(source,/fetch\(['"]https?:/);
+  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:1,source_observed_at:0,modules:{overview:{summary:{task_count:1,research_task_count:1}},'research-development':{status:'CONNECTED_TEST_ONLY',records:[{task_id:'T1',project_id:'P1',state:'RUNNING',runtime_status:'LIVENESS_UNKNOWN',responsible_party:'writer',next_action:'review',last_real_progress_at:5,blocker:null}],advanced:{audit_records:[{task_id:'T1',attempt_id:'A1',run_id:'R1',session_id:'S1',epoch:2,evidence:[]}]}},configuration:{status:'CONNECTED_TEST_ONLY',records:[{provider_id:'p1',display_name:'Provider',enabled:true,price_state:'UNKNOWN',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:p1'}}]},finance:{status:'NOT_CONNECTED'}}});
+  assert.equal(hosted.mode,'HOSTED_TEST_ONLY');
+  assert.equal(hosted.tasks[0].id,'T1');
+  assert.equal(hosted.tasks[0].advanced.attempt_id,'A1');
+  assert.equal(hosted.metrics[2].value,'UNKNOWN');
+  const overview=app.render(hosted,{view:'overview'});
+  for(const label of ['数据读取时间','源数据时间','tenant','TASK_CENTER_ADMIN / READ_ONLY'])assert.match(overview,new RegExp(label));
+  const detail=app.render(hosted,{view:'tasks',id:'T1'});
+  assert.match(detail,/高级详情 \/ 审计证据/);
+  assert.match(detail,/attempt_id/);
+  assert.doesNotMatch(detail.split('<details')[0],/attempt_id|artifact_sha|epoch/);
+  const config=app.render(hosted,{view:'settings'});
+  for(const label of ['大模型','自媒体','服务器','NOT_CONNECTED \/ UNKNOWN'])assert.match(config,new RegExp(label));
+  assert.match(config,/PROTECTED_PROVIDER_SECRET:p1/);
+  assert.throws(()=>app.normalizeHostedProjection(data),/HOSTED_PROJECTION_REQUIRED/);
+});
+
+test('all finance children remain unknown without a finance ledger',()=>{
+  for(const view of ['finance-products','finance-profit','finance-orders','finance-usage','finance-billing','finance-refunds','finance-referrals']){
+    const html=app.render(data,{view});
+    assert.match(html,/NOT_CONNECTED/);
+    assert.match(html,/UNKNOWN/);
+  }
 });
 
 test('mobile menu closes by Escape and restores focus deterministically',()=>{

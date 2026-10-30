@@ -180,6 +180,39 @@ class TaskCenterAppTests(unittest.TestCase):
         self.assertTrue(all(item['heartbeat_state'] == 'UNKNOWN'
                             for item in value['records']['tasks']))
 
+    def test_workbench_host_and_admin_projection_are_read_only(self):
+        status, headers, body = self.get('/workbench/')
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Cache-Control'], 'no-store')
+        self.assertIn(b'owner-workbench-v2', body)
+        with self.assertRaises(HTTPError) as denied:
+            self.get('/api/admin/workbench')
+        self.assertEqual(denied.exception.code, 403)
+        with open(self.db, 'rb') as stream:
+            before = hashlib.sha256(stream.read()).hexdigest()
+        request = Request(self.base + '/api/admin/workbench', headers={
+            'X-Test-Admin-Token': 'test-admin-token-123456'})
+        response = urlopen(request, timeout=3)
+        self.assertEqual(response.status, 200)
+        value = json.loads(response.read().decode('utf-8'))
+        self.assertEqual(value['projection'], 'UNIFIED_ADMIN_PROJECTION_V1')
+        self.assertEqual(value['mode'], 'TEST_ONLY')
+        self.assertEqual(value['tenant_id'], 'tenant-ui')
+        self.assertEqual(value['capability']['mutation'], 'NONE')
+        self.assertEqual(value['modules']['finance']['status'],
+                         'NOT_CONNECTED')
+        with open(self.db, 'rb') as stream:
+            after = hashlib.sha256(stream.read()).hexdigest()
+        self.assertEqual(after, before)
+        post = Request(self.base + '/api/admin/workbench', method='POST',
+                       data=b'{}', headers={
+                           'Content-Type': 'application/json',
+                           'X-Test-Admin-Token':
+                           'test-admin-token-123456'})
+        with self.assertRaises(HTTPError) as rejected:
+            urlopen(post, timeout=3)
+        self.assertEqual(rejected.exception.code, 405)
+
     def test_simple_provider_onboarding_http_chain_is_real_server_backed(self):
         secret='sk-ui-test-123456789'
         fake={'platform':'siliconflow','auth_state':'SUCCEEDED',
