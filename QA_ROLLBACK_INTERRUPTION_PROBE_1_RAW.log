@@ -1,0 +1,6 @@
+test_interrupted_rollback_has_recoverable_evidence (qa_probe.RecoveryDeltaProbes) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.019s
+
+OK

@@ -91,6 +91,74 @@ class CarrierInstallTests(unittest.TestCase):
             self.root, self.manifest_path, self.manifest_sha,
             self.archive_sha, self.releases)["state"])
 
+    def test_interrupted_rollback_recovers_receipt_without_rename_replay(self):
+        installer.install(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases, self.state, "install-attempt-01",
+            lambda: True, enforce_root=False)
+        original = installer._atomic_json
+
+        def interrupt(path, value, mode=0o440):
+            if path.endswith("ROLLBACK_RECEIPT.json"):
+                raise RuntimeError("SIMULATED_INTERRUPT_AFTER_ROLLBACK_RENAME")
+            return original(path, value, mode)
+
+        installer._atomic_json = interrupt
+        try:
+            with self.assertRaisesRegex(
+                    RuntimeError, "SIMULATED_INTERRUPT_AFTER_ROLLBACK_RENAME"):
+                installer.rollback(
+                    self.root, self.manifest_path, self.manifest_sha,
+                    self.archive_sha, self.releases, self.state,
+                    "rollback-attempt-01", lambda: True,
+                    enforce_root=False)
+        finally:
+            installer._atomic_json = original
+        result = installer.rollback(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases, self.state,
+            "rollback-attempt-01", lambda: True, enforce_root=False)
+        self.assertEqual("ROLLBACK_EFFECT_RECOVERED_NO_REPLAY",
+                         result["recovery"])
+        self.assertTrue(os.path.isfile(
+            os.path.join(result["destination"], "ROLLBACK_RECEIPT.json")))
+
+    def test_interrupted_rollback_rejects_changed_quarantine_checkpoint(self):
+        installer.install(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases, self.state, "install-attempt-01",
+            lambda: True, enforce_root=False)
+        original = installer._atomic_json
+
+        def interrupt(path, value, mode=0o440):
+            if path.endswith("ROLLBACK_RECEIPT.json"):
+                raise RuntimeError("SIMULATED_INTERRUPT_AFTER_ROLLBACK_RENAME")
+            return original(path, value, mode)
+
+        installer._atomic_json = interrupt
+        try:
+            with self.assertRaises(RuntimeError):
+                installer.rollback(
+                    self.root, self.manifest_path, self.manifest_sha,
+                    self.archive_sha, self.releases, self.state,
+                    "rollback-attempt-01", lambda: True,
+                    enforce_root=False)
+        finally:
+            installer._atomic_json = original
+        destination_member = os.path.join(
+            self.state, "rolled-back", "rollback-attempt-01",
+            "src", "module.py")
+        os.chmod(destination_member, 0o600)
+        with open(destination_member, "ab") as output:
+            output.write(b"changed")
+        with self.assertRaisesRegex(
+                ValueError, "ROLLBACK_DESTINATION_CHECKPOINT_MISMATCH_HOLD"):
+            installer.rollback(
+                self.root, self.manifest_path, self.manifest_sha,
+                self.archive_sha, self.releases, self.state,
+                "rollback-attempt-01", lambda: True,
+                enforce_root=False)
+
     def test_changed_member_is_rejected(self):
         with open(self.member, "ab") as output:
             output.write(b"changed")

@@ -60,8 +60,10 @@ controlled entry, so a request body cannot substitute authority.  It does
 callsite, service, activation descriptor, ledger/WAL, task rows, outbox, or
 provider.  An interrupted attempt is recovered by `recover`/`readback`; the
 same intent is never replayed.  Rollback is a separate root-gated operation and
-only quarantines an unbound, never-executed default-off release while preserving
-evidence.
+only quarantines an unbound, never-executed default-off release.  It persists a
+same-attempt source/destination/member checkpoint before rename; interrupted
+rename/receipt writes reconcile that checkpoint and finalize evidence without
+replaying an already-observed rename.
 
 ## After-install, before-live prerequisites
 

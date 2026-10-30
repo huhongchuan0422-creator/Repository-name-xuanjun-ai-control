@@ -1,0 +1,8 @@
+test_rollback_only_quarantines_unbound_default_off_release (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+test_interrupted_rollback_recovers_receipt_without_rename_replay (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+test_interrupted_rollback_rejects_changed_quarantine_checkpoint (tests.test_p3_carrier_install.CarrierInstallTests) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.050s
+
+OK

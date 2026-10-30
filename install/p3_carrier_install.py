@@ -303,6 +303,31 @@ def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     return dict(observed, recovery="RESULT_MISSING_HOLD_NO_REPLAY")
 
 
+def _rollback_checkpoint(path, manifest):
+    receipt = os.path.join(path, "INSTALL_RECEIPT.json")
+    if os.path.islink(receipt) or not os.path.isfile(receipt):
+        raise ValueError("ROLLBACK_INSTALL_RECEIPT_MISSING")
+    members = {}
+    for name in manifest["release_files"]:
+        member = os.path.join(path, name)
+        if os.path.islink(member) or not os.path.isfile(member):
+            raise ValueError("ROLLBACK_MEMBER_MISSING:%s" % name)
+        members[name] = _digest(member)
+    return {"install_receipt_sha256": _digest(receipt), "members": members}
+
+
+def _rollback_receipt(attempt_id, carrier_archive_sha256, manifest):
+    return {
+        "schema": 1, "state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
+        "attempt_id": attempt_id,
+        "carrier_archive_sha256": carrier_archive_sha256,
+        "source_commit": manifest["source_commit"],
+        "source_tree": manifest["source_tree"],
+        "ledger_modified": False, "host_binding_modified": False,
+        "evidence_preserved": True,
+    }
+
+
 def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
              release_root, state_root, attempt_id, fresh_authority,
              enforce_root=True):
@@ -317,6 +342,63 @@ def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     manifest = verify_carrier(root, manifest_path, manifest_sha256)
     _fresh_authority(fresh_authority)
     target = os.path.join(release_root, "p3-" + carrier_archive_sha256[:20])
+    quarantine_root = os.path.join(state_root, "rolled-back")
+    destination = os.path.join(quarantine_root, attempt_id)
+    rollback_attempts = os.path.join(state_root, "rollback-attempts")
+    intent_path = os.path.join(rollback_attempts, attempt_id + ".intent.json")
+
+    if os.path.isfile(intent_path) and not os.path.islink(intent_path):
+        intent, _ = _read_json(intent_path, maximum=1024 * 1024)
+        expected = {
+            "schema": 1, "state": "ROLLBACK_INTENT",
+            "attempt_id": attempt_id, "source": target,
+            "destination": destination,
+            "carrier_manifest_sha256": manifest_sha256,
+            "carrier_archive_sha256": carrier_archive_sha256,
+            "source_commit": manifest["source_commit"],
+            "source_tree": manifest["source_tree"],
+        }
+        if (not isinstance(intent, dict)
+                or set(intent) != set(expected) | {"checkpoint"}
+                or any(intent.get(key) != value for key, value in expected.items())
+                or not isinstance(intent.get("checkpoint"), dict)):
+            raise ValueError("ROLLBACK_INTENT_MISMATCH_HOLD")
+        target_exists = os.path.isdir(target) and not os.path.islink(target)
+        destination_exists = (os.path.isdir(destination)
+                              and not os.path.islink(destination))
+        if target_exists and destination_exists:
+            raise ValueError("ROLLBACK_DUPLICATE_LOCATION_HOLD")
+        if not target_exists and not destination_exists:
+            raise RuntimeError("ROLLBACK_RESULT_MISSING_HOLD_NO_REPLAY")
+        current = destination if destination_exists else target
+        if _rollback_checkpoint(current, manifest) != intent["checkpoint"]:
+            raise ValueError("ROLLBACK_DESTINATION_CHECKPOINT_MISMATCH_HOLD")
+        if destination_exists:
+            receipt_path = os.path.join(destination, "ROLLBACK_RECEIPT.json")
+            expected_receipt = _rollback_receipt(
+                attempt_id, carrier_archive_sha256, manifest)
+            if os.path.isfile(receipt_path) and not os.path.islink(receipt_path):
+                receipt, _ = _read_json(receipt_path, maximum=65536)
+                if receipt != expected_receipt:
+                    raise ValueError("ROLLBACK_RECEIPT_MISMATCH_HOLD")
+            else:
+                _atomic_json(receipt_path, expected_receipt)
+            return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
+                    "destination": destination, "verified": True,
+                    "recovery": "ROLLBACK_EFFECT_RECOVERED_NO_REPLAY"}
+        # The durable intent exists but rename did not occur.  The exact target
+        # checkpoint is unchanged, so resume from that checkpoint once.
+        _fresh_authority(fresh_authority)
+        os.rename(target, destination)
+        _atomic_json(os.path.join(destination, "ROLLBACK_RECEIPT.json"),
+                     _rollback_receipt(
+                         attempt_id, carrier_archive_sha256, manifest))
+        return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
+                "destination": destination, "verified": True,
+                "recovery": "ROLLBACK_RESUMED_FROM_DURABLE_INTENT"}
+
+    if os.path.lexists(intent_path):
+        raise ValueError("ROLLBACK_INTENT_NOT_REGULAR_HOLD")
     observed = _readback_target(target, manifest, manifest_sha256,
                                 carrier_archive_sha256)
     if observed["state"] == "ABSENT":
@@ -326,22 +408,25 @@ def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     receipt, _ = _read_json(os.path.join(target, "INSTALL_RECEIPT.json"), 65536)
     if receipt.get("host_bound") is not False or receipt.get("real_task_executed") is not False:
         raise PermissionError("BOUND_OR_EXECUTED_RELEASE_REQUIRES_HOST_STOP_RECONCILIATION")
+    checkpoint = _rollback_checkpoint(target, manifest)
     _fresh_authority(fresh_authority)
-    quarantine_root = os.path.join(state_root, "rolled-back")
     os.makedirs(quarantine_root, mode=0o750, exist_ok=True)
-    destination = os.path.join(quarantine_root, attempt_id)
+    os.makedirs(rollback_attempts, mode=0o750, exist_ok=True)
     if os.path.lexists(destination):
         raise RuntimeError("ROLLBACK_ATTEMPT_ALREADY_EXISTS_RECONCILE_FIRST")
-    os.rename(target, destination)
-    _atomic_json(os.path.join(destination, "ROLLBACK_RECEIPT.json"), {
-        "schema": 1, "state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
-        "attempt_id": attempt_id,
+    _exclusive_json(intent_path, {
+        "schema": 1, "state": "ROLLBACK_INTENT", "attempt_id": attempt_id,
+        "source": target, "destination": destination,
+        "carrier_manifest_sha256": manifest_sha256,
         "carrier_archive_sha256": carrier_archive_sha256,
         "source_commit": manifest["source_commit"],
         "source_tree": manifest["source_tree"],
-        "ledger_modified": False, "host_binding_modified": False,
-        "evidence_preserved": True,
+        "checkpoint": checkpoint,
     })
+    _fresh_authority(fresh_authority)
+    os.rename(target, destination)
+    _atomic_json(os.path.join(destination, "ROLLBACK_RECEIPT.json"),
+                 _rollback_receipt(attempt_id, carrier_archive_sha256, manifest))
     return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
             "destination": destination, "verified": True}
 
