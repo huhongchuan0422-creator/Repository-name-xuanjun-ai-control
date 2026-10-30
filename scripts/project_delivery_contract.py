@@ -130,6 +130,8 @@ def _new_page(event):
         'task_id': event['task_id'],
         'attempt_id': event['attempt_id'],
         'state': UNKNOWN,
+        'baseline_state': UNKNOWN,
+        'acceptance_blocker': UNKNOWN,
         'change_id': UNKNOWN,
         'acceptance_id': UNKNOWN,
         'rejection_reason_ref': UNKNOWN,
@@ -170,17 +172,18 @@ def build_project_delivery_projection(task_projection, normalized_events=None,
     events.sort(key=lambda item: (item['occurred_at'], item['event_id']))
 
     pages = {}
-    active_page_keys = {}
     delivery_results = {}
     showcase_refs = []
     for event in events:
         kind = event['canonical_event_type']
         if kind == 'PROJECT_DELIVERED':
-            current_keys = [key for (project_id, _), key in
-                            active_page_keys.items()
-                            if project_id == event['project_id']]
+            current_keys = [key for key in pages
+                            if (key[0] == event['project_id'] and
+                                key[2] == event['ui_version'])]
             accepted = (bool(current_keys) and all(
-                pages[key]['state'] == 'ACCEPTED' for key in current_keys))
+                pages[key]['baseline_state'] == 'CONFIRMED' and
+                pages[key]['state'] == 'ACCEPTED'
+                for key in current_keys))
             delivery_results[event['project_id']] = {
                 'effective': accepted,
                 'delivery_id': event['delivery_id'],
@@ -197,14 +200,12 @@ def build_project_delivery_projection(task_projection, normalized_events=None,
             continue
         key = _page_key(event)
         page = pages.setdefault(key, _new_page(event))
-        page_selector = (event['project_id'], event['page_id'])
-        if (kind == 'UI_BASELINE_CONFIRMED' or
-                page_selector not in active_page_keys):
-            active_page_keys[page_selector] = key
         page['last_event_id'] = event['event_id']
         page['attempt_id'] = event['attempt_id']
         if kind == 'UI_BASELINE_CONFIRMED':
             page['state'] = 'CONFIRMED'
+            page['baseline_state'] = 'CONFIRMED'
+            page['acceptance_blocker'] = UNKNOWN
         elif kind in ('PAGE_COMMENT_RECORDED', 'PAGE_CHANGE_REQUESTED'):
             page['state'] = 'PENDING_CHANGE'
             page['change_id'] = event['change_id']
@@ -214,9 +215,14 @@ def build_project_delivery_projection(task_projection, normalized_events=None,
         elif kind == 'PAGE_RECHECK_RECORDED':
             page['state'] = 'PENDING_ACCEPTANCE'
         elif kind == 'PAGE_ACCEPTED':
-            page['state'] = 'ACCEPTED'
-            page['acceptance_id'] = event['acceptance_id']
-            page['rejection_reason_ref'] = UNKNOWN
+            if page['baseline_state'] != 'CONFIRMED':
+                page['state'] = 'BLOCKED_BASELINE_UNCONFIRMED'
+                page['acceptance_blocker'] = 'UI_BASELINE_NOT_CONFIRMED'
+            else:
+                page['state'] = 'ACCEPTED'
+                page['acceptance_id'] = event['acceptance_id']
+                page['acceptance_blocker'] = UNKNOWN
+                page['rejection_reason_ref'] = UNKNOWN
         elif kind == 'PAGE_REJECTED':
             page['state'] = 'REJECTED'
             page['acceptance_id'] = event['acceptance_id']

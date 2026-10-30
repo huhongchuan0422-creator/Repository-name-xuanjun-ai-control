@@ -32,6 +32,15 @@ def _sha(value):
       char in '0123456789abcdef' for char in value)
 
 
+def _known(value):
+    """Reject absent, empty, whitespace, and UNKNOWN evidence selectors."""
+    if value is None or isinstance(value, bool):
+        return False
+    if isinstance(value, str):
+        return bool(value.strip()) and value.strip() != UNKNOWN
+    return True
+
+
 def _decision(status, reason, refs=None):
     return {'status': status, 'reason': reason,
             'evidence_refs': sorted(set(refs or []))}
@@ -78,8 +87,9 @@ def _integrity(snapshot, identity, observed_at, require_current_writer=True):
     intent = snapshot.get('execution_intent') or {}
     problems = []
     for name in ('tenant_id', 'task_id', 'attempt_id', 'role_id',
-                 'principal_id', 'writer_principal', 'run_id', 'session_id'):
-        if identity.get(name) in (None, '', UNKNOWN):
+                 'role_instance_id', 'principal_id', 'request_id', 'intent_id',
+                 'writer_principal', 'run_id', 'session_id'):
+        if not _known(identity.get(name)):
             problems.append('MISSING_' + name.upper())
     if type(identity.get('writer_fence')) is not int or identity['writer_fence'] < 1:
         problems.append('INVALID_WRITER_FENCE')
@@ -158,16 +168,19 @@ def evaluate_closure(snapshot, observed_at=None):
     events = [item for item in snapshot.get('execution_events', [])
               if _same(item, identity, ('tenant_id', 'intent_id')) and
               item.get('accepted') in (1, True)]
-    sent = [item for item in events if item.get('event_kind') == 'SENT_INTENT']
+    sent = [item for item in events if item.get('event_kind') == 'SENT_INTENT'
+            and _known(item.get('event_id'))]
     stages['SENT'] = (_decision(PROVEN, 'ACCEPTED_SEND_INTENT_EVENT',
                                 [_event_ref(item) for item in sent]) if sent else
                       _decision(UNKNOWN, 'NO_ACCEPTED_SEND_INTENT_EVENT'))
 
-    ack = [item for item in events if item.get('event_kind') in
+    ack = [item for item in events if _known(item.get('event_id')) and
+           item.get('event_kind') in
            ('ACKED', 'RUNNING', 'WAITING_APPROVAL', 'EXECUTION_COMPLETED',
             'SUCCEEDED')]
     intent = snapshot.get('execution_intent') or {}
-    ack_identity = bool(intent.get('execution_id') or intent.get('thread_id'))
+    ack_identity = (_known(intent.get('execution_id')) or
+                    _known(intent.get('thread_id')))
     stages['ACK'] = (_decision(PROVEN, 'REMOTE_EXECUTION_ID_ACKNOWLEDGED',
                                [_event_ref(item) for item in ack])
                      if ack and ack_identity else
@@ -176,10 +189,12 @@ def evaluate_closure(snapshot, observed_at=None):
     process = snapshot.get('process_receipt') or {}
     process_ok = (_same(process, identity, ('tenant_id', 'task_id', 'attempt_id',
       'run_id', 'session_id', 'writer_epoch')) and
-      bool(process.get('process_id')) and
+      _known(process.get('receipt_id')) and
+      _known(process.get('process_id')) and
       process.get('state') == 'STARTED' and
       process.get('source_kind') == 'TRUSTED_PROCESS_OBSERVER' and
-      bool(process.get('observed_at')))
+      type(process.get('observed_at')) in (int, float) and
+      process.get('observed_at') > 0)
     stages['PROCESS_STARTED'] = (_decision(PROVEN, 'TRUSTED_PROCESS_RECEIPT',
       ['process:' + str(identity['process_id'])]) if process_ok else
       _decision(UNKNOWN, 'TRUSTED_PROCESS_RECEIPT_NOT_CONNECTED'))
@@ -189,7 +204,9 @@ def evaluate_closure(snapshot, observed_at=None):
     call_ok = (_same(call, identity, ('tenant_id', 'task_id', 'attempt_id',
       'request_id', 'role_id', 'writer_epoch')) and
       call.get('source_kind') == 'LIVE_PROVIDER_RECEIPT' and
-      bool(call.get('provider_request_id')) and _sha(call.get('response_sha256')) and
+      _known(call.get('receipt_id')) and
+      _known(call.get('provider_request_id')) and
+      _sha(call.get('response_sha256')) and
       request.get('state') == 'SUCCEEDED')
     stages['REAL_AI_CALL'] = (_decision(PROVEN, 'ATTRIBUTABLE_LIVE_PROVIDER_RECEIPT',
       ['provider-request:' + str(call.get('provider_request_id'))]) if call_ok else
@@ -205,7 +222,8 @@ def evaluate_closure(snapshot, observed_at=None):
       _decision(UNKNOWN, 'COMPLETE_EXECUTED_CHECKLIST_NOT_PROVEN'))
 
     candidate = snapshot.get('candidate') or {}
-    artifact_ok = (_same(candidate, identity,
+    artifact_ok = (_known(candidate.get('candidate_id')) and
+      _same(candidate, identity,
       ('tenant_id', 'task_id', 'attempt_id')) and
       _sha(candidate.get('artifact_sha256')) and checklist_ok and
       candidate.get('checklist_sha256') == checklist.get('content_sha256') and
@@ -222,16 +240,22 @@ def evaluate_closure(snapshot, observed_at=None):
                item.get('attempt_id') == identity['attempt_id'] and
                item.get('artifact_sha256') == candidate.get('artifact_sha256') and
                item.get('checklist_sha256') == candidate.get('checklist_sha256')]
+    accepted_by = candidate.get('accepted_by')
     expected_review_decision = {'QA': 'QA_PASSED',
                                 'SECURITY': 'SECURITY_PASSED'}
     passed = {item.get('review_kind'): item for item in reviews
               if (item.get('review_kind') in expected_review_decision and
                   item.get('decision') == expected_review_decision[
-                    item.get('review_kind')])}
+                    item.get('review_kind')] and
+                  _known(item.get('review_id')) and
+                  _known(item.get('reviewer')))}
     reviewers = {item.get('reviewer') for item in passed.values()}
+    reviewer_acceptor_distinct = (not _known(accepted_by) or
+                                  accepted_by not in reviewers)
     review_ok = (artifact_ok and set(passed) == {'QA', 'SECURITY'} and
                  len(reviewers) == 2 and
                  identity['principal_id'] not in reviewers and
+                 reviewer_acceptor_distinct and
                  candidate.get('state') in ('REVIEW_PASSED', 'ACCEPTED'))
     stages['INDEPENDENT_REVIEW'] = (_decision(PROVEN,
       'DISTINCT_QA_AND_SECURITY_REVIEW_PASSED',
@@ -239,12 +263,13 @@ def evaluate_closure(snapshot, observed_at=None):
       if review_ok else _decision(UNKNOWN,
       'DISTINCT_CURRENT_ARTIFACT_QA_AND_SECURITY_REVIEW_NOT_PROVEN'))
 
-    accepted_by = candidate.get('accepted_by')
     accepted_ok = (review_ok and candidate.get('state') == 'ACCEPTED' and
-      bool(accepted_by) and accepted_by != identity['principal_id'] and
+      _known(accepted_by) and
+      accepted_by != identity['principal_id'] and
       accepted_by not in reviewers and
       _same(terminal, identity, ('tenant_id', 'task_id', 'attempt_id')) and
       terminal.get('state') == 'SUCCESS' and
+      _known(terminal.get('receipt_id')) and
       terminal.get('artifact_sha256') == candidate.get('artifact_sha256') and
       terminal.get('authority_state') == 'REVOKED' and completed_generation)
     stages['ACCEPTED'] = (_decision(PROVEN,
@@ -289,7 +314,7 @@ def admission_for_real_task(snapshot, observed_at=None):
       'model_config_version': binding.get('model_config_version'),
     }
     for name, value in admission_identity.items():
-        if value in (None, '', UNKNOWN):
+        if not _known(value):
             holds.append('MISSING_' + name.upper())
     intent_names = ('tenant_id', 'task_id', 'request_id', 'connection_id',
                     'connection_config_version', 'provider_id',

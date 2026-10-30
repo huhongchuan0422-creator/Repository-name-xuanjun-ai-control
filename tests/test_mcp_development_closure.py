@@ -54,6 +54,7 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
              'event_id': 'ack-1', 'event_kind': 'RUNNING', 'accepted': 1}],
           'process_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
             'attempt_id': 'attempt-1', 'run_id': 'run-1',
+            'receipt_id': 'process-receipt-1',
             'session_id': 'session-1', 'process_id': 'pid-123',
             'writer_epoch': 9, 'state': 'STARTED',
             'source_kind': 'TRUSTED_PROCESS_OBSERVER', 'observed_at': 110},
@@ -61,6 +62,7 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
             'attempt_id': 'attempt-1', 'request_id': 'request-1',
             'role_id': 'developer', 'writer_epoch': 9,
             'source_kind': 'LIVE_PROVIDER_RECEIPT',
+            'receipt_id': 'provider-receipt-1',
             'provider_request_id': 'provider-1', 'response_sha256': 'a'*64},
           'checklist': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
             'attempt_id': 'attempt-1', 'content_sha256': 'b'*64,
@@ -83,6 +85,7 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
              'reviewer': 'security-1', 'decision': 'SECURITY_PASSED'}],
           'terminal_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
             'attempt_id': 'attempt-1', 'state': 'SUCCESS',
+            'receipt_id': 'terminal-receipt-1',
             'artifact_sha256': 'c'*64, 'authority_state': 'REVOKED'},
           'connection': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
             'request_id': 'request-1', 'connection_id': 'connection-1',
@@ -117,6 +120,33 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
         self.assertEqual(result['stages']['PROCESS_STARTED']['status'], UNKNOWN)
         self.assertEqual(result['stages']['REAL_AI_CALL']['status'], UNKNOWN)
         self.assertEqual(result['verdict'], UNKNOWN)
+
+    def test_unknown_or_empty_remote_identity_is_not_ack(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot()
+            value['execution_intent']['execution_id'] = invalid
+            value['execution_intent']['thread_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACK']['status'], UNKNOWN, invalid)
+
+    def test_unknown_or_empty_process_evidence_is_not_started(self):
+        for field in ('receipt_id', 'process_id'):
+            for invalid in (UNKNOWN, '', True):
+                value = self.snapshot(); value['process_receipt'][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['PROCESS_STARTED']['status'],
+                                 UNKNOWN, (field, invalid))
+
+    def test_unknown_or_empty_provider_evidence_is_not_real_call(self):
+        for field in ('receipt_id', 'provider_request_id'):
+            for invalid in (UNKNOWN, '', True):
+                value = self.snapshot(); value['ai_call_receipt'][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['REAL_AI_CALL']['status'],
+                                 UNKNOWN, (field, invalid))
+        value = self.snapshot(); value['ai_call_receipt']['response_sha256'] = UNKNOWN
+        self.assertEqual(evaluate_closure(value, observed_at=100)[
+          'stages']['REAL_AI_CALL']['status'], UNKNOWN)
 
     def test_process_receipt_cannot_self_assert_another_run(self):
         value = self.snapshot(); value['process_receipt']['run_id'] = 'other-run'
@@ -203,6 +233,44 @@ class MCPDevelopmentClosureTests(unittest.TestCase):
             result = evaluate_closure(value, observed_at=100)
             self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
                              UNKNOWN, field)
+
+    def test_review_identity_fields_must_be_known_and_nonempty(self):
+        for field in ('review_id', 'reviewer'):
+            for invalid in (None, '', UNKNOWN):
+                value = self.snapshot(); value['reviews'][0][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                                 UNKNOWN, (field, invalid))
+                self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_reviewer_and_acceptor_must_be_distinct(self):
+        value = self.snapshot(); value['reviews'][0]['reviewer'] = 'acceptor-1'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_acceptor_must_be_known_and_nonempty(self):
+        for invalid in (None, '', UNKNOWN):
+            value = self.snapshot(); value['candidate']['accepted_by'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN,
+                             invalid)
+
+    def test_unknown_or_empty_terminal_receipt_is_not_acceptance(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot(); value['terminal_receipt']['receipt_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN,
+                             invalid)
+
+    def test_unknown_or_empty_event_and_candidate_ids_fail_closed(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot(); value['execution_events'][0]['event_id'] = invalid
+            self.assertEqual(evaluate_closure(value, observed_at=100)[
+              'stages']['SENT']['status'], UNKNOWN)
+            value = self.snapshot(); value['candidate']['candidate_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ARTIFACT_SUBMITTED']['status'], UNKNOWN)
 
     def test_acceptance_requires_canonical_terminal_artifact(self):
         value = self.snapshot(); value['terminal_receipt']['artifact_sha256'] = 'd'*64

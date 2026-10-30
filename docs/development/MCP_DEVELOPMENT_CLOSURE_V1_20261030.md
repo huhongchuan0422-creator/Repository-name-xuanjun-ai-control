@@ -42,12 +42,21 @@ role instance's `current_request_id`, when present, must match the request.
    executor, passed the same current candidate. QA must state `QA_PASSED` and
    Security must state `SECURITY_PASSED`; each review must explicitly bind the
    same task, attempt, candidate, artifact SHA, and checklist SHA. Missing or
-   cross-spliced review bindings fail closed as `UNKNOWN`.
+   cross-spliced review bindings fail closed as `UNKNOWN`. Both `review_id` and
+   reviewer identity must be explicit, non-empty, and not `UNKNOWN`; the two
+   reviewers must be distinct from each other, the executor, and any known
+   acceptor.
 8. `ACCEPTED`: a third independent acceptor plus canonical task `SUCCESS`,
    revoked Writer authority, and a terminal receipt for the exact artifact.
+   The acceptor identity must be explicit, non-empty, and not `UNKNOWN`.
 
 All eight stages must be `PROVEN` on the same identity for a closure verdict of
 `PROVEN`. Missing producers are `UNKNOWN`; invalid/stale authority is `HOLD`.
+All evidence selectors use one strict known-value rule: `None`, empty or
+whitespace-only strings, and the `UNKNOWN` sentinel are never evidence. Hash
+fields additionally require canonical lowercase 64-hex form. This covers event
+and remote execution/thread IDs, process/provider/terminal receipt IDs,
+provider request IDs, candidate IDs, reviewer/review IDs, and acceptor IDs.
 
 ## Strict admission for two future real tasks
 

@@ -132,6 +132,57 @@ class ProjectDeliveryContractTests(unittest.TestCase):
         self.assertEqual(project['delivery_state'],
                          'BLOCKED_INCOMPLETE_PAGE_ACCEPTANCE')
 
+    def test_direct_accept_without_confirmed_baseline_fails_closed(self):
+        raw = [
+            self.event('PAGE_ACCEPTED', 'accept-no-baseline',
+                       actor_kind='customer', actor_id='customer-1',
+                       authorization_ref='auth://customer/1',
+                       acceptance_id='acceptance-unbound'),
+            self.event('PROJECT_DELIVERED', 'delivery-no-baseline',
+                       occurred_at=2, page_id='PROJECT', actor_kind='owner',
+                       actor_id='owner-1', authorization_ref='auth://owner/1',
+                       delivery_id='delivery-unbound'),
+        ]
+        value = self.projection([self.contract.normalize(x) for x in raw])
+        page = value['records']['page_versions'][0]
+        project = value['records']['projects'][0]
+        self.assertEqual(page['baseline_state'], 'UNKNOWN')
+        self.assertEqual(page['state'], 'BLOCKED_BASELINE_UNCONFIRMED')
+        self.assertEqual(page['acceptance_blocker'],
+                         'UI_BASELINE_NOT_CONFIRMED')
+        self.assertEqual(page['acceptance_id'], 'UNKNOWN')
+        self.assertTrue(project['active_development'])
+        self.assertEqual(project['delivery_state'],
+                         'BLOCKED_INCOMPLETE_PAGE_ACCEPTANCE')
+
+    def test_confirmed_baseline_from_other_ui_version_cannot_accept(self):
+        baseline = self.contract.normalize(self.event(
+            'PAGE_UI_CONFIRMED', 'baseline-v1', ui_version='input-v1',
+            actor_kind='requester', actor_id='requester-1',
+            authorization_ref='auth://requester/1'))
+        self.gateway.db.execute('''UPDATE gateway_task_metadata
+          SET input_version='input-v2' WHERE task_id='demo-b' ''')
+        acceptance = self.contract.normalize(self.event(
+            'PAGE_ACCEPTED', 'accept-v2', ui_version='input-v2',
+            actor_kind='customer', actor_id='customer-1',
+            authorization_ref='auth://customer/1',
+            acceptance_id='acceptance-v2'))
+        delivery = self.contract.normalize(self.event(
+            'PROJECT_DELIVERED', 'delivery-v2', ui_version='input-v2',
+            page_id='PROJECT', occurred_at=2, actor_kind='owner',
+            actor_id='owner-1', authorization_ref='auth://owner/1',
+            delivery_id='delivery-v2'))
+        value = self.projection([baseline, acceptance, delivery])
+        pages = {item['ui_version']: item
+                 for item in value['records']['page_versions']}
+        self.assertEqual(pages['input-v1']['baseline_state'], 'CONFIRMED')
+        self.assertEqual(pages['input-v2']['state'],
+                         'BLOCKED_BASELINE_UNCONFIRMED')
+        project = value['records']['projects'][0]
+        self.assertTrue(project['active_development'])
+        self.assertEqual(project['delivery_state'],
+                         'BLOCKED_INCOMPLETE_PAGE_ACCEPTANCE')
+
     def test_showcase_emits_only_double_allowlisted_opaque_reference(self):
         allowed = self.event(
             'SHOWCASE_REFERENCE_ALLOWED', 'showcase-1',

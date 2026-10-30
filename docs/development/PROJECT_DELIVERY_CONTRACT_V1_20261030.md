@@ -49,11 +49,21 @@ facts are explicit `UNKNOWN`; they are not omitted or inferred.
 The reducer keys page records by `(project_id, page_id, ui_version)`, so a new
 version never overwrites the old baseline or its audit events. Page states are
 `CONFIRMED`, `PENDING_CHANGE`, `PENDING_RECHECK`, `PENDING_ACCEPTANCE`,
-`ACCEPTED`, `REJECTED`, or `UNKNOWN`. A rejection exposes only its evidence
-reference as `rejection_reason_ref`.
+`ACCEPTED`, `REJECTED`, `BLOCKED_BASELINE_UNCONFIRMED`, or `UNKNOWN`. A
+rejection exposes only its evidence reference as `rejection_reason_ref`.
+
+`PAGE_ACCEPTED` is effective only after an earlier
+`UI_BASELINE_CONFIRMED` for the exact same `(project_id, page_id, ui_version)`.
+Comments, change requests, rectification and recheck events without a confirmed
+baseline remain in the audit trail, but cannot establish acceptance. A direct
+or cross-version acceptance is shown as `BLOCKED_BASELINE_UNCONFIRMED` with
+`UI_BASELINE_NOT_CONFIRMED`; its reported acceptance ID remains only in the
+event audit and does not enter the page's accepted fact.
 
 `PROJECT_DELIVERED` exits the project from active development only when every
-tracked page/version is `ACCEPTED`. Otherwise it remains active with
+tracked page for that exact delivery `ui_version` has both a confirmed baseline
+and `ACCEPTED` state. A baseline from another UI version cannot satisfy this
+gate. Otherwise the project remains active with
 `BLOCKED_INCOMPLETE_PAGE_ACCEPTANCE`; the attempted delivery event remains in
 the audit list. The contract cannot manufacture a front-end "passed" state.
 
