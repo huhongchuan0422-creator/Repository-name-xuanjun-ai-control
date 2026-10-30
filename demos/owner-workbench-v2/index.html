@@ -7,8 +7,8 @@
   <title>玄钧统一管理台 · UI候选</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body data-app="owner-workbench-v2">
-  <div class="candidate-bar" role="status">UI_CANDIDATE · 合成数据 · 无生产写入 · 不连接真实服务</div>
+<body data-app="owner-workbench-v2" data-local-mode="UI_CANDIDATE">
+  <div class="candidate-bar" role="status">正在判定运行模式 · 无生产写入</div>
   <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
     <div class="login-brand"><span class="brand-mark" aria-hidden="true">玄</span><span>玄钧AI新</span></div>
     <form class="login-card" id="loginForm">
@@ -18,7 +18,7 @@
       <label>演示账号<input name="username" autocomplete="username" value="owner-demo" required></label>
       <label>演示口令<input name="password" type="password" autocomplete="current-password" value="synthetic-only" required></label>
       <button class="button primary wide" type="submit">进入合成工作台</button>
-      <p class="form-note">不发送网络请求，不保存账号或口令。</p>
+      <p class="form-note">本地候选不连接真实服务，不发送或保存账号口令。</p>
     </form>
   </section>
 
@@ -27,17 +27,18 @@
       <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">玄</span><span><strong>玄钧AI新</strong><small>统一管理台</small></span></a>
       <nav aria-label="主导航" id="sideNav"></nav>
       <div class="sidebar-foot">
-        <span class="status-dot"></span><span>合成环境</span>
-        <small>数据源：fixture v3</small>
+        <span class="status-dot"></span><span id="sidebarMode">合成环境</span>
+        <small id="sidebarSource">数据源：fixture v3</small>
       </div>
     </aside>
     <div class="workspace">
       <header class="topbar">
         <button class="icon-button mobile-only" id="menuButton" aria-label="打开导航" aria-expanded="false">☰</button>
-        <div class="top-context"><span id="contextLabel">工作台</span><small>所有操作均无真实副作用</small></div>
+        <div class="top-context"><span id="contextLabel">工作台</span><small id="contextMode">所有操作均无真实副作用</small></div>
         <label class="search"><span aria-hidden="true">⌕</span><input id="globalSearch" type="search" placeholder="搜索项目、任务或证据" aria-label="全局搜索"></label>
-        <button class="icon-button" data-demo-action="notifications" aria-label="消息">◌<span class="notification-dot"></span></button>
-        <button class="profile" id="profileButton" aria-label="当前演示身份"><span>玄</span><b>Owner 演示</b></button>
+        <button class="icon-button" data-local-only data-demo-action="notifications" aria-label="消息">◌<span class="notification-dot"></span></button>
+        <button class="profile" id="profileButton" aria-label="当前身份"><span>玄</span><b id="profileLabel">Owner 演示</b></button>
+        <button class="button" id="refreshButton" type="button" hidden>刷新数据</button>
         <button class="button top-logout" id="logoutButton" type="button">退出演示</button>
       </header>
       <main id="app" tabindex="-1"></main>
@@ -45,7 +46,7 @@
     </div>
   </div>
   <div class="scrim" id="scrim" hidden></div>
-  <dialog class="demo-dialog" id="demoDialog" aria-labelledby="dialogTitle">
+  <dialog class="demo-dialog" id="demoDialog" data-local-only aria-labelledby="dialogTitle">
     <form method="dialog" class="dialog-card">
       <div class="card-head"><div><p class="eyebrow">SYNTHETIC STEP FLOW</p><h2 id="dialogTitle">新建项目（演示）</h2></div><button class="icon-button" value="cancel" aria-label="关闭">×</button></div>
       <ol class="step-list"><li class="active">基础信息</li><li>范围与页面</li><li>确认与证据</li></ol>

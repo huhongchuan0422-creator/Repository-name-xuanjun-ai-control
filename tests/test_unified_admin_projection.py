@@ -51,6 +51,48 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
                          'UNKNOWN')
         for name in ('project', 'social_media', 'servers'):
             self.assertEqual(value['modules'][name]['status'], 'NOT_CONNECTED')
+            self.assertEqual(value['modules'][name]['capability'][
+                'allowed_actions'], [])
+
+    def test_disconnected_sources_expose_exact_gaps_without_claiming_connection(self):
+        value = build_projection(*self.fixtures(), observed_at=123)
+        finance = value['sources']['finance']
+        self.assertEqual(finance['status'], 'NOT_CONNECTED')
+        self.assertEqual(finance['source_level'],
+                         'CANDIDATE_ONLY_UNVERIFIED')
+        self.assertEqual(finance['evidence_refs'], [
+            'git:0b47f98d656f0ac7b182a724746a72b7f7028e40:'
+            'scripts/community_saas_offer_catalog.py',
+            'git:0cd56648867bcb6bc0d8c35fda82f05e4fe58a5f:'
+            'scripts/owner_finance_takeover_combined_inspect.py'])
+        for gap in ('CANONICAL_ADAPTER', 'IDENTITY', 'SCHEMA_VERSION',
+                    'TENANT_MAPPING', 'CURRENT_WRITER', 'INSTALL_EVIDENCE'):
+            self.assertIn(gap, finance['gaps'])
+        social = value['sources']['social_media']
+        self.assertEqual(social['source_candidates'],
+                         ['Channel Registry', 'Channel Metrics projection'])
+        self.assertEqual(social['evidence_refs'], [
+            'git:b021d8059654570aa8caeb0ee88befe3214fc9a3:'
+            'deploy/pr122-oauth-candidate/',
+            'git:ce76432a7050cfd0bd3410a1967624f969a253d9:'
+            'deploy/pr122-minimal-cutover/tokyo-nginx-source-inventory.json'])
+        for gap in ('CHANNEL_REGISTRY', 'METRICS', 'RBAC',
+                    'INSTALL_EVIDENCE'):
+            self.assertIn(gap, social['gaps'])
+        servers = value['sources']['servers']
+        self.assertEqual(servers['source_candidates'],
+                         ['Infrastructure Registry',
+                          'Blueprint HTTP adapter'])
+        self.assertEqual(servers['evidence_refs'], [
+            'git:3398098ffffe741fd087e854a8f3c75007113481:'
+            'scripts/v27-batch-readonly.sh',
+            'git:ce76432a7050cfd0bd3410a1967624f969a253d9:'
+            'scripts/pr122_domestic_channel_inventory.py'])
+        for gap in ('INFRA_REGISTRY', 'BLUEPRINT_HTTP', 'CAPABILITY',
+                    'CURRENT_INVENTORY'):
+            self.assertIn(gap, servers['gaps'])
+        self.assertEqual({finance['status'], social['status'],
+                          servers['status']}, {'NOT_CONNECTED'})
 
     def test_secrets_are_reduced_to_status_and_reference(self):
         value = build_projection(*self.fixtures(), observed_at=123)

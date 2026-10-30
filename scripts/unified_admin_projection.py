@@ -14,6 +14,20 @@ def _source(source_id, status, observed_at, detail):
             'observed_at': observed_at, 'detail': detail}
 
 
+def _disconnected_source(source_id, observed_at, candidates, evidence_refs,
+                         gaps):
+    return {
+        'source_id': source_id,
+        'status': NOT_CONNECTED,
+        'source_level': 'CANDIDATE_ONLY_UNVERIFIED',
+        'observed_at': observed_at,
+        'source_candidates': candidates,
+        'evidence_refs': evidence_refs,
+        'gaps': gaps,
+        'detail': 'No authoritative adapter is registered.',
+    }
+
+
 def _capability():
     return {'authority': 'SERVER', 'access': 'READ_ONLY',
             'allowed_actions': [], 'mutation': 'NONE'}
@@ -84,9 +98,37 @@ def build_projection(task_projection, model_projection, observed_at):
     research_raw = [task for task in raw_tasks if
                     task.get('board_id') == 'research-development']
     tasks = [_task_record(item) for item in raw_tasks]
-    unknown_source = lambda name: _source(
-        name, NOT_CONNECTED, observed_at,
-        'No authoritative adapter is registered for this projection.')
+    project_source = _disconnected_source(
+        'PROJECT_DELIVERY', observed_at, ['Project Delivery adapter'],
+        ['NONE_FOUND'],
+        ['CANONICAL_ADAPTER', 'IDENTITY', 'SCHEMA_VERSION',
+         'TENANT_MAPPING', 'CURRENT_WRITER', 'INSTALL_EVIDENCE'])
+    finance_source = _disconnected_source(
+        'FINANCE_LEDGER', observed_at,
+        ['Canonical Finance adapter', 'Finance ledger projection'],
+        ['git:0b47f98d656f0ac7b182a724746a72b7f7028e40:'
+         'scripts/community_saas_offer_catalog.py',
+         'git:0cd56648867bcb6bc0d8c35fda82f05e4fe58a5f:'
+         'scripts/owner_finance_takeover_combined_inspect.py'],
+        ['CANONICAL_ADAPTER', 'IDENTITY', 'SCHEMA_VERSION',
+         'TENANT_MAPPING', 'CURRENT_WRITER', 'INSTALL_EVIDENCE'])
+    social_source = _disconnected_source(
+        'SOCIAL_MEDIA', observed_at,
+        ['Channel Registry', 'Channel Metrics projection'],
+        ['git:b021d8059654570aa8caeb0ee88befe3214fc9a3:'
+         'deploy/pr122-oauth-candidate/',
+         'git:ce76432a7050cfd0bd3410a1967624f969a253d9:'
+         'deploy/pr122-minimal-cutover/tokyo-nginx-source-inventory.json'],
+        ['CHANNEL_REGISTRY', 'METRICS', 'RBAC', 'INSTALL_EVIDENCE'])
+    server_source = _disconnected_source(
+        'SERVER_INVENTORY', observed_at,
+        ['Infrastructure Registry', 'Blueprint HTTP adapter'],
+        ['git:3398098ffffe741fd087e854a8f3c75007113481:'
+         'scripts/v27-batch-readonly.sh',
+         'git:ce76432a7050cfd0bd3410a1967624f969a253d9:'
+         'scripts/pr122_domestic_channel_inventory.py'],
+        ['INFRA_REGISTRY', 'BLUEPRINT_HTTP', 'CAPABILITY',
+         'CURRENT_INVENTORY'])
     sources = {
         'task_registry': _source('CANONICAL_TASK_REGISTRY',
                                  'CONNECTED_TEST_ONLY', observed_at,
@@ -94,10 +136,10 @@ def build_projection(task_projection, model_projection, observed_at):
         'model_control': _source('MODEL_CONTROL', 'CONNECTED_TEST_ONLY',
                                  observed_at,
                                  'Read-only ModelControl projection.'),
-        'project': unknown_source('PROJECT_DELIVERY'),
-        'finance': unknown_source('FINANCE_LEDGER'),
-        'social_media': unknown_source('SOCIAL_MEDIA'),
-        'servers': unknown_source('SERVER_INVENTORY'),
+        'project': project_source,
+        'finance': finance_source,
+        'social_media': social_source,
+        'servers': server_source,
     }
     research = [_task_record(task) for task in research_raw]
     research_audit = [_task_audit(task, events) for task in research_raw]
@@ -151,12 +193,16 @@ def build_projection(task_projection, model_projection, observed_at):
                 'metrics': {'revenue': UNKNOWN, 'cost': UNKNOWN,
                             'profit': UNKNOWN, 'balance': UNKNOWN},
                 'records': [], 'capability': _capability(),
+                'source': finance_source,
             },
             'project': {'status': NOT_CONNECTED, 'records': [],
-                        'capability': _capability()},
+                        'capability': _capability(),
+                        'source': project_source},
             'social_media': {'status': NOT_CONNECTED, 'records': [],
-                             'capability': _capability()},
+                             'capability': _capability(),
+                             'source': social_source},
             'servers': {'status': NOT_CONNECTED, 'records': [],
-                        'capability': _capability()},
+                        'capability': _capability(),
+                        'source': server_source},
         },
     }

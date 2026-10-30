@@ -11,8 +11,14 @@
 
 由原 Task Center Host 访问 `/workbench/` 时，页面先读取同源真实 Session，再读取
 `../api/admin/workbench` 的 `UNIFIED_ADMIN_PROJECTION_V1`。Hosted 读取失败会明确
-显示失败，绝不回退本地 fixture；未接项目、财务、自媒体和服务器保持
+显示失败并清空旧数据，绝不回退本地 fixture；初始加载、每次 hash 切页和手动刷新
+都会依次重新读取 Session 与投影，迟到响应会被 generation fence 拒绝。未接项目、财务、自媒体和服务器保持
 `NOT_CONNECTED/UNKNOWN`。该 API 仅接受管理员只读访问，不提供写 capability。
+
+Hosted 配置侧栏按“大模型 / 自媒体 / 服务器”分开：大模型仅显示 ModelControl
+TEST_ONLY 只读字段；自媒体和服务器显示候选来源、证据与精确缺口，保持
+`allowed_actions=[]`。本地 `file:` 候选仍显著标记合成；Hosted 可见区域只使用
+`TEST_ONLY / READ_ONLY`，不把 fixture 文案带入真实接口页。
 
 页面包含：
 
@@ -36,7 +42,7 @@
 node demos/owner-workbench-v2/tests/workbench.test.cjs
 ```
 
-测试覆盖候选边界、登录互斥/退出、路由刷新与重复切页、十一项一级及全部二级导航、详情高亮、
+测试覆盖候选边界、登录互斥/退出、Hosted 初始/切页/手动刷新、加载/失败/重试/迟到响应、十一项一级及全部二级导航、详情高亮、
 跨项目状态清理、筛选、五层状态、心跳/进展分离、自营业务身份、权限拒绝、
 异常状态、无 iframe/外部依赖、移动端和减少动画契约。
 

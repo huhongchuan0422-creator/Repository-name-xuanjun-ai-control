@@ -7,7 +7,8 @@ require(path.join(root,'data.js'));
 const app=require(path.join(root,'app.js'));
 const data=globalThis.XJ_WORKBENCH_FIXTURE;
 
-function test(name,fn){try{fn();process.stdout.write('ok - '+name+'\n');}catch(error){process.stderr.write('not ok - '+name+'\n'+error.stack+'\n');process.exitCode=1;}}
+const TESTS=[];
+function test(name,fn){TESTS.push({name,fn});}
 
 test('fixture is explicitly candidate-only',()=>{
   assert.equal(data.mode,'UI_CANDIDATE');
@@ -182,12 +183,13 @@ test('local candidate session supports logout refresh history and mobile overlay
 
 test('hosted mode uses same-origin session and projection without fixture fallback',()=>{
   const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
-  assert.match(source,/fetch\('\.\.\/api\/session'/);
-  assert.match(source,/fetch\('\.\.\/api\/admin\/workbench'/);
+  assert.match(source,/options\.fetch\('\.\.\/api\/session'/);
+  assert.match(source,/options\.fetch\('\.\.\/api\/admin\/workbench'/);
   assert.match(source,/credentials:'same-origin'/);
-  assert.match(source,/未回退合成 fixture/);
+  assert.match(source,/没有保留或回退旧数据/);
+  assert.match(source,/function bootHosted[^]*globalSearch[^]*win\.location\.hash='#projects'/);
   assert.doesNotMatch(source,/fetch\(['"]https?:/);
-  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:1,source_observed_at:0,modules:{overview:{summary:{task_count:1,research_task_count:1}},'research-development':{status:'CONNECTED_TEST_ONLY',records:[{task_id:'T1',project_id:'P1',state:'RUNNING',runtime_status:'LIVENESS_UNKNOWN',responsible_party:'writer',next_action:'review',last_real_progress_at:5,blocker:null}],advanced:{audit_records:[{task_id:'T1',attempt_id:'A1',run_id:'R1',session_id:'S1',epoch:2,evidence:[]}]}},configuration:{status:'CONNECTED_TEST_ONLY',records:[{provider_id:'p1',display_name:'Provider',enabled:true,price_state:'UNKNOWN',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:p1'}}]},finance:{status:'NOT_CONNECTED'}}});
+  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:1,source_observed_at:0,sources:{social_media:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Channel Registry'],evidence_refs:['NONE_FOUND'],gaps:['RBAC']},servers:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Infrastructure Registry'],evidence_refs:['NONE_FOUND'],gaps:['CURRENT_INVENTORY']}},modules:{overview:{summary:{task_count:1,research_task_count:1}},'research-development':{status:'CONNECTED_TEST_ONLY',records:[{task_id:'T1',project_id:'P1',state:'RUNNING',runtime_status:'LIVENESS_UNKNOWN',responsible_party:'writer',next_action:'review',last_real_progress_at:5,blocker:null}],advanced:{audit_records:[{task_id:'T1',attempt_id:'A1',run_id:'R1',session_id:'S1',epoch:2,evidence:[]}]}},configuration:{status:'CONNECTED_TEST_ONLY',records:[{provider_id:'p1',display_name:'Provider',enabled:true,price_state:'UNKNOWN',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:p1'}}]},finance:{status:'NOT_CONNECTED'}}});
   assert.equal(hosted.mode,'HOSTED_TEST_ONLY');
   assert.equal(hosted.tasks[0].id,'T1');
   assert.equal(hosted.tasks[0].advanced.attempt_id,'A1');
@@ -198,10 +200,31 @@ test('hosted mode uses same-origin session and projection without fixture fallba
   assert.match(detail,/高级详情 \/ 审计证据/);
   assert.match(detail,/attempt_id/);
   assert.doesNotMatch(detail.split('<details')[0],/attempt_id|artifact_sha|epoch/);
-  const config=app.render(hosted,{view:'settings'});
-  for(const label of ['大模型','自媒体','服务器','NOT_CONNECTED \/ UNKNOWN'])assert.match(config,new RegExp(label));
-  assert.match(config,/PROTECTED_PROVIDER_SECRET:p1/);
+  const models=app.render(hosted,{view:'config-models'});
+  assert.match(models,/PROTECTED_PROVIDER_SECRET:p1/);
+  assert.match(models,/allowed_actions=\[\]/);
+  const media=app.render(hosted,{view:'config-media'}),servers=app.render(hosted,{view:'config-servers'});
+  for(const pair of [[media,'Channel Registry','RBAC'],[servers,'Infrastructure Registry','CURRENT_INVENTORY']]){assert.match(pair[0],new RegExp(pair[1]));assert.match(pair[0],new RegExp(pair[2]));assert.match(pair[0],/NOT_CONNECTED/);assert.match(pair[0],/allowed_actions/);}
+  for(const html of [overview,app.render(hosted,{view:'tasks'}),models,media,servers])assert.doesNotMatch(html,/SYNTHETIC|合成|演示/);
   assert.throws(()=>app.normalizeHostedProjection(data),/HOSTED_PROJECTION_REQUIRED/);
+});
+
+test('hosted controller refreshes each route/manual cycle and fails closed',async()=>{
+  let projectionNumber=0,failProjection=false;const calls=[],states=[];
+  function projection(){projectionNumber+=1;return{projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:projectionNumber,modules:{overview:{summary:{}},'research-development':{records:[]},configuration:{records:[]},finance:{status:'NOT_CONNECTED'}}};}
+  const fakeFetch=(url,options)=>{calls.push([url,options]);if(url.includes('/session'))return Promise.resolve({ok:true,status:200});if(failProjection)return Promise.resolve({ok:false,status:503});return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});};
+  const controller=app.createHostedController({fetch:fakeFetch,onLoading:reason=>states.push('LOADING:'+reason),onData:value=>states.push('READY:'+value.observed_at),onError:error=>states.push('ERROR:'+error.message),onLoginRequired:()=>states.push('LOGIN')});
+  await controller.refresh('INITIAL');await controller.refresh('ROUTE_CHANGE');await controller.refresh('MANUAL_REFRESH');
+  assert.deepEqual(calls.map(x=>x[0]),['../api/session','../api/admin/workbench','../api/session','../api/admin/workbench','../api/session','../api/admin/workbench']);
+  assert.ok(calls.every(x=>x[1].credentials==='same-origin'&&x[1].cache==='no-store'));
+  assert.equal(controller.current().observed_at,3);
+  failProjection=true;const failed=await controller.refresh('RETRY');
+  assert.equal(failed.state,'ERROR');assert.equal(controller.current(),null);assert.match(states.join('|'),/LOADING:RETRY.*ERROR:HOSTED_HTTP_503/);
+
+  let releaseFirst;const firstSession=new Promise(resolve=>{releaseFirst=resolve;}),fresh=[];let sessionCalls=0;
+  const staleController=app.createHostedController({fetch:url=>{if(url.includes('/session')){sessionCalls+=1;return sessionCalls===1?firstSession:Promise.resolve({ok:true,status:200});}return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(projection())});},onLoading:()=>{},onData:value=>fresh.push(value.observed_at),onError:()=>assert.fail('stale request must not error'),onLoginRequired:()=>assert.fail('unexpected login')});
+  const old=staleController.refresh('OLD'),latest=staleController.refresh('NEW');await latest;releaseFirst({ok:true,status:200});const stale=await old;
+  assert.equal(stale.state,'STALE');assert.equal(fresh.length,1);
 });
 
 test('all finance children remain unknown without a finance ledger',()=>{
@@ -238,7 +261,7 @@ test('all eleven domains expose expandable second-level navigation',()=>{
     assert.match(html,new RegExp('data-domain="'+id+'"'));
     assert.match(html,new RegExp('data-nav-toggle="'+id+'"'));
   }
-  for(const child of ['目标与计划','运营任务','渠道与活动','经营指标','异常与人工待办','客户与租户','CRM线索','需求与SOW','客户项目','合同与权益','客户反馈','开发任务','仓库与版本','构建与制品','测试与质量','独立审核','模块产品化','测试证据','发布与安装','客户验收','交付与归档','服务与运行时','健康与告警','事件与故障','检查点与恢复','备份与演练','到期与安全退出','生态成员','贡献记录','声誉与凭证','生态权益','伙伴与推荐','方案知识与产品化','产品与价格','成本与利润','报价与订单','钱包与用量','账单与付款','对账退款','推荐结算','自营项目','运行证据','审核队列','页面与版本','验收记录','身份与RBAC','模块接入','平台设置','操作日志'])assert.match(html,new RegExp(child));
+  for(const child of ['目标与计划','运营任务','渠道与活动','经营指标','异常与人工待办','客户与租户','CRM线索','需求与SOW','客户项目','合同与权益','客户反馈','开发任务','仓库与版本','构建与制品','测试与质量','独立审核','模块产品化','测试证据','发布与安装','客户验收','交付与归档','服务与运行时','健康与告警','事件与故障','检查点与恢复','备份与演练','到期与安全退出','生态成员','贡献记录','声誉与凭证','生态权益','伙伴与推荐','方案知识与产品化','产品与价格','成本与利润','报价与订单','钱包与用量','账单与付款','对账退款','推荐结算','自营项目','运行证据','审核队列','页面与版本','验收记录','身份与RBAC','大模型','自媒体','服务器','操作日志'])assert.match(html,new RegExp(child));
 });
 
 test('detail and deep routes highlight their owning domain and child',()=>{
@@ -390,3 +413,13 @@ test('cross-module navigation clears review-scoped state',()=>{
   assert.equal(app.clearScopedState('finance-orders'),'finance-orders');
   assert.deepEqual(app.reviewStateForProject(null,'PRJ-XJ-042','diff'),{project:'PRJ-XJ-042',tab:'feedback'});
 });
+
+(async()=>{
+  let failures=0;
+  for(const item of TESTS){
+    try{await item.fn();process.stdout.write('ok - '+item.name+'\n');}
+    catch(error){failures+=1;process.stderr.write('not ok - '+item.name+'\n'+error.stack+'\n');}
+  }
+  if(failures){process.stderr.write('failures: '+failures+' / '+TESTS.length+'\n');process.exitCode=1;}
+  else process.stdout.write('tests: '+TESTS.length+' passed, 0 failed\n');
+})();
