@@ -133,7 +133,13 @@ class NativeSourceRender(unittest.TestCase):
                 expect(page.locator('#material-'+group+' [data-handler="upload"]').first).to_be_disabled()
             expect(page.locator('[data-handler="selectDocumentType"]').first).to_be_disabled()
             self.assertFalse(page.evaluate('window.__nativeEvidence.state.ready'));snapshot('17-login-error')
-            calls=page.evaluate('window.__nativeEvidence.calls');self.assertFalse(any(x.get('url','').endswith('/mini/api') for x in calls))
+            calls=page.evaluate('window.__nativeEvidence.calls')
+            # Original no-store navigation makes these scoped read attempts, not business writes.
+            customer_reads=[x for x in calls if x.get('url','').endswith('/mini/api')]
+            self.assertEqual([x.get('operation') for x in customer_reads],['customer.contexts','customer.directory','customer.contexts'])
+            self.assertTrue(all(x.get('url')=='https://fixture.invalid/mini/api' and x.get('scene')=='' for x in customer_reads))
+            # Failed admission and its retry cannot spill into any customer API or write action.
+            self.assertFalse(any(x.get('url','').endswith('/mini/api') for x in failure['calls'][len(before_failure):]))
             self.assertFalse(any(x.get('suboperation') in ('wechat_execute','wechat_query','refund_execute') for x in calls))
             self.assertEqual(errors,[])
             report=dict(kind='ISOLATED_CHROMIUM_ACTUAL_NATIVE_SOURCE_PROJECTION',wechat_device='NOT_EXECUTED',provider='SYNTHETIC_TEST_SUBSTITUTE',platform_identity='SYNTHETIC_ACCOUNT_INFO_MATCH_NOT_REAL_WECHAT',picker='TEST_ONLY_COMPOSITE_MULTISELECTOR_NOT_WECHAT',http_acceptance='SEPARATE_REAL_ORIGINAL_HTTP_TEST',customer_acceptance=False,source_html_sha256=hashlib.sha256(html.read_bytes()).hexdigest(),records=records,calls=calls)
