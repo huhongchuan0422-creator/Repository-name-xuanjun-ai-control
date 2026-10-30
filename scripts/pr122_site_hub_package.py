@@ -16,12 +16,13 @@ from scripts.pr122_site_hub_release_delta import publisher_source, BASE_SHA256
 def canonical(value):return (json.dumps(value,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode()
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
-def package(root,source,output,derive_navigation=False):
+def package(root,source,output,derive_navigation=False, delivery_review=False):
     if output.exists():raise ValueError('PACKAGE_OUTPUT_EXISTS')
     if sha(source.read_bytes())!=SOURCE_HASH:raise ValueError('SOURCE_HASH_MISMATCH')
     with tempfile.TemporaryDirectory() as td:
         stage=Path(td)/'stage'
-        if derive_navigation:build(root,source,stage,derive_navigation=True)
+        if delivery_review and not derive_navigation:raise ValueError('DELIVERY_REQUIRES_FULL_NAVIGATION_BUILD')
+        if derive_navigation:build(root,source,stage,derive_navigation=True,delivery_review=delivery_review)
         else:build(root,source,stage)
         with tarfile.open(source) as archive:
             raw=archive.extractfile('package/MANIFEST.json').read()
@@ -56,7 +57,7 @@ def package(root,source,output,derive_navigation=False):
         entries.update({'runtime-config/'+p.name:p.read_bytes() for p in sorted((root/'deploy/pr122-site-hub-preview').glob('*')) if p.is_file()})
         entries['RUNTIME_MANIFEST.json']=canonical({'scope':'In-memory synthetic preview only','files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items()) if p.startswith(('runtime/','runtime-config/'))]})
         package_schema='FULL_STATIC_REVIEW_V1' if derive_navigation else None
-        if derive_navigation and 'brand_projection' in stage_binding:
+        if derive_navigation and 'brand_projection' in stage_binding and not delivery_review:
             brand_contract={'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}
             if (stage_binding['brand_projection'].get('brand')!=brand_contract['brand'] or len(entries)+1!=1241 or len(changed)!=1197 or len(final)!=1288 or sum(v is None for v in baselines.values())!=101):
                 raise ValueError('BRAND_PACKAGE_CONTRACT')
@@ -64,6 +65,15 @@ def package(root,source,output,derive_navigation=False):
             provenance['brand_contract']=brand_contract
             entries['BUILD_PROVENANCE.json']=canonical(provenance)
             package_schema=brand_contract['schema']
+        if delivery_review:
+            provenance=json.loads(entries['BUILD_PROVENANCE.json'])
+            provenance['delivery_review']=stage_binding['delivery_review']
+            provenance['mechanisms'].append({'path':'scripts/pr122_delivery_host.py','sha256':sha((root/'scripts/pr122_delivery_host.py').read_bytes())})
+            provenance['brand_contract']={'schema':'FULL_STATIC_DELIVERY_REVIEW_V1','brand':'玄钧AI新','archive_members':1256,'overlay_files':1212,'new_files':116,'public_files':1303}
+            if len(entries)+1!=1256 or len(changed)!=1212 or len(final)!=1303 or sum(v is None for v in baselines.values())!=116:raise ValueError('DELIVERY_PACKAGE_CONTRACT')
+            provenance['parent_brand_contract']={'schema':'FULL_STATIC_BRAND_REVIEW_V1','archive_members':1241,'public_files':1288}
+            entries['BUILD_PROVENANCE.json']=canonical(provenance)
+            package_schema='FULL_STATIC_DELIVERY_REVIEW_V1'
         package_manifest={'schema_version':2,'files':[{'path':p,'size':len(raw),'sha256':sha(raw)} for p,raw in sorted(entries.items())]}
         entries['PACKAGE_MANIFEST.json']=canonical(package_manifest)
         output.mkdir(parents=True)
@@ -78,5 +88,5 @@ def package(root,source,output,derive_navigation=False):
         (output/'PACKAGE_RECEIPT.json').write_bytes(canonical(receipt));print(json.dumps(receipt,sort_keys=True));return receipt
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--source-archive',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--derive-navigation',action='store_true');a=p.parse_args()
-    package(Path(__file__).resolve().parents[1],a.source_archive,a.output,a.derive_navigation)
+    p=argparse.ArgumentParser();p.add_argument('--source-archive',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--derive-navigation',action='store_true');p.add_argument('--delivery-review',action='store_true');a=p.parse_args()
+    package(Path(__file__).resolve().parents[1],a.source_archive,a.output,a.derive_navigation,a.delivery_review)

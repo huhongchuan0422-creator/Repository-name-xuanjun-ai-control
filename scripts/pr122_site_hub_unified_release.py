@@ -59,10 +59,11 @@ def __getattr__(name):
 def entries(raw,pins):
     need(digest(raw)==pins['static_artifact_sha256'],'STATIC_PACKAGE_HASH')
     schema=pins.get('package_schema','LEGACY_UNIFIED_V1')
-    need(schema in ('LEGACY_UNIFIED_V1','FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1'),'PACKAGE_SCHEMA')
-    brand=schema=='FULL_STATIC_BRAND_REVIEW_V1'
-    full=schema in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1')
-    count=1241 if brand else 460 if full else 459
+    need(schema in ('LEGACY_UNIFIED_V1','FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1'),'PACKAGE_SCHEMA')
+    delivery=schema=='FULL_STATIC_DELIVERY_REVIEW_V1'
+    brand=schema=='FULL_STATIC_BRAND_REVIEW_V1' or delivery
+    full=schema in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1')
+    count=1256 if delivery else 1241 if brand else 460 if full else 459
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
         members=archive.getmembers()
         need(len(members)==count and len({m.name for m in members})==count,'ARCHIVE_MEMBERS')
@@ -90,10 +91,23 @@ def entries(raw,pins):
         need(stage.get('source_archive_sha256')==pins['source_archive_sha256']==provenance.get('source_archive_sha256'),'FULL_SOURCE_BINDING')
         need(provenance.get('stage_manifest_sha256')==pins['full_stage_manifest_sha256'],'BUILD_STAGE_BINDING')
         candidate=json.loads(result['candidate-manifest.json'])['files']
-        need(len(candidate)==1288 and len({r['path'] for r in candidate})==1288,'FULL_CANDIDATE_SET')
-        need(stage.get('final_files')==1288 and stage.get('files')=={r['path']:r['sha256'] for r in candidate},'FULL_STAGE_FILE_BINDING')
+        public_count=1303 if delivery else 1288
+        need(len(candidate)==public_count and len({r['path'] for r in candidate})==public_count,'FULL_CANDIDATE_SET')
+        need(stage.get('final_files')==public_count and stage.get('files')=={r['path']:r['sha256'] for r in candidate},'FULL_STAGE_FILE_BINDING')
         if brand:
             contract={'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}
+            if delivery:
+                contract={'schema':'FULL_STATIC_DELIVERY_REVIEW_V1','brand':'玄钧AI新','archive_members':1256,'overlay_files':1212,'new_files':116,'public_files':1303}
+                FROZEN={'DESIGN-NOTES.md': '8af0aaaa1d236bd9e648e354088a872594d67683cc58d873dd19e59db292d308', 'index.html': '44c030ceb88b5ea740fb68e098c0e51be349d20ad9359bf0c5fe0e53b1097662', 'join/app.js': 'ad720e58ba6ff648cf13be62fb779668ae51d2b11ade3c88a7a59fc1b99f1ffb', 'join/index.html': 'dd5134d4652a1bec1bd9a2b603bd540cb2687a3039ad7f306c16243862e4887c', 'join/original-form.js': 'b1f515141fc2954fe64e568d9e6ac35f1cb5b0eededa2730f734182bf576725c', 'join/source-provenance.json': 'df5109f467f4a2be8486faddf6d260bf4a65fb4abf9485637222b94d60a78a44', 'join/style.css': '4c2290edc92c6cbdf4c41d72000fca0b4c57f083c6161d5b039b8a3c759527cb', 'suite.css': 'ff3d1c8e8d2b85302290750160e6c91ff5ecc07a1de5cfcb076b8720661b7efa', 'suite.js': '0656915654039b21bbf0ec21e341c72ceed074d3f3a3903d7666ca806b5761a7'}
+                HOST_FILES=('index.html', 'cases.html', 'host.css', 'host.mjs', 'feedback-client.mjs', 'project-projection.mjs')
+                declaration=stage.get('delivery_review',{})
+                need(declaration.get('frozen_files')==FROZEN and declaration.get('scope')=='SYNTHETIC_REVIEW_ONLY','DELIVERY_TEMPLATE_PROVENANCE')
+                need(provenance.get('delivery_review')==declaration,'DELIVERY_BUILD_BINDING')
+                by_path={r['path']:r for r in candidate}
+                expected={'delivery/'+name for name in HOST_FILES}|{'delivery/community-next/'+name for name in FROZEN}
+                need({n for n in by_path if n.startswith('delivery/')}==expected,'DELIVERY_HOST_FILE_SET')
+                for name,value in FROZEN.items():need(by_path['delivery/community-next/'+name]['sha256']==value,'DELIVERY_FROZEN_HASH')
+                need(all(declaration.get(k) is False for k in ('customer_identity_connected','persistent_feedback_connected','task_source_connected','public_case_authorizations_present')),'DELIVERY_UNCONNECTED_STATUS')
             need(type(provenance.get('brand_contract')) is dict and provenance['brand_contract']==contract and all(type(provenance['brand_contract'][key]) is type(value) for key,value in contract.items()),'BRAND_CONTRACT')
             need(stage.get('brand_projection',{}).get('brand')==contract['brand'],'BRAND_STAGE_CONTRACT')
             source=json.loads(result['source-pin.json'])
@@ -102,8 +116,8 @@ def entries(raw,pins):
             need({name for name in result if not name.startswith('overlay/public/')}==fixed_members,'BRAND_FIXED_MEMBERS')
             baselines=source.get('overlay_baselines')
             overlay={name.removeprefix('overlay/public/'):value for name,value in result.items() if name.startswith('overlay/public/')}
-            need(type(baselines) is dict and len(overlay)==1197 and set(baselines)==set(overlay),'BRAND_OVERLAY_SET')
-            need(sum(value is None for value in baselines.values())==101,'BRAND_NEW_SET')
+            need(type(baselines) is dict and len(overlay)==contract['overlay_files'] and set(baselines)==set(overlay),'BRAND_OVERLAY_SET')
+            need(sum(value is None for value in baselines.values())==contract['new_files'],'BRAND_NEW_SET')
             by_path={r['path']:r for r in candidate}
             need(set(overlay)<=set(by_path),'BRAND_CANDIDATE_OVERLAY_SET')
             for name,value in overlay.items():
@@ -113,7 +127,7 @@ def entries(raw,pins):
     else:
         need(digest(result['COMPOSITION_MANIFEST.json'])==pins['composition_manifest_sha256'],'COMPOSITION_HASH')
     need(digest(result['bin/pr122_website_release.py'])==pins['publisher_sha256'],'PUBLISHER_HASH')
-    need(len(json.loads(result['candidate-manifest.json'])['files'])==1288,'PUBLIC_COUNT')
+    need(len(json.loads(result['candidate-manifest.json'])['files'])==(1303 if delivery else 1288),'PUBLIC_COUNT')
     return result
 
 
@@ -172,7 +186,7 @@ def gate(value,pins):
 
 def baseline_receipt_state(pins,state):
     historical='HTTPS_SMOKE_PASS_AWAIT_BROWSER'
-    if pins.get('package_schema') not in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1'):return state==historical
+    if pins.get('package_schema') not in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1'):return state==historical
     expected=pins.get('previous_receipt_state',historical)
     return expected in (historical,'STATIC_READONLY_HTTP_COMPLETE_AWAIT_BROWSER') and state==expected
 
@@ -214,7 +228,7 @@ def _load_transaction_type():
                 need(c.RUNTIME.joinpath('current').is_symlink() and os.readlink(c.RUNTIME/'current')==str(c.RUNTIME/c.RELEASE),'RUNTIME_LINK_DRIFT')
                 return self.ops.sandbox()
             def baseline(self):
-                full=self.pins.get('package_schema') in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1')
+                full=self.pins.get('package_schema') in ('FULL_STATIC_REVIEW_V1','FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1')
                 previous_id=self.pins.get('previous_transaction_id') if full else 'pr122-hub-experience-20261016-r2'
                 need(type(previous_id) is str and re.fullmatch(r'pr122-[a-z0-9-]{1,90}',previous_id) is not None,'BASELINE_TRANSACTION_ID')
                 previous=c.CONTROL/'transactions'/previous_id/'receipt.json'

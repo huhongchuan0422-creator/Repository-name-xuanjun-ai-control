@@ -1,9 +1,19 @@
 import {FeedbackClient} from './feedback-client.mjs';
 import {projectProjection} from './project-projection.mjs';
 const $=id=>document.getElementById(id),client=new FeedbackClient();let generation=0,bindings=null,current=null;
+let templatePath='community-next/index.html',templateGeneration=0;
+async function loadTemplate(path,hash){
+  if(!['community-next/index.html','community-next/join/index.html'].includes(path))throw Error('未知模板路径');
+  const token=++templateGeneration,response=await fetch(path,{credentials:'same-origin',redirect:'error'});
+  if(!response.ok)throw Error('模板读取失败：'+response.status);
+  const text=await response.text();if(token!==templateGeneration)return;
+  const doc=new DOMParser().parseFromString(text,'text/html'),base=new URL(path,location.href);
+  for(const n of doc.querySelectorAll('script[src],link[rel=stylesheet][href]')){const key=n.tagName==='SCRIPT'?'src':'href';const u=new URL(n.getAttribute(key),base);if(u.origin!==location.origin)throw Error('模板外部依赖拒绝');n.setAttribute(key,u.pathname);}
+  templatePath=path;$('template').dataset.initialHash=hash;$('template').srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
+}
 const node=(t,s)=>{const n=document.createElement(t);if(s!==undefined)n.textContent=s;return n;};
 function catalog(){generation++;current=null;$('review').hidden=true;$('catalog').hidden=false;location.hash='developing';}
-function openDemo(){generation++;$('catalog').hidden=true;$('review').hidden=false;$('template').src='community-next/#recommendations';location.hash='review';}
+function openDemo(){generation++;$('catalog').hidden=true;$('review').hidden=false;loadTemplate('community-next/index.html','#recommendations').catch(e=>$('feedback-status').textContent=e.message);location.hash='review';}
 $('open-demo').onclick=openDemo;$('return-projects').onclick=catalog;
 function fit(){const f=$('template'),d=f.contentDocument;if(!d?.body)return;f.style.height='1px';f.style.height=(Math.max(d.documentElement.scrollHeight,d.body.scrollHeight)+4)+'px';}
 $('desktop-view').onclick=()=>{$('template').style.width='100%';requestAnimationFrame(fit);};
@@ -17,7 +27,7 @@ async function sync(){
   // remain byte-identical. No missing comparison page is invented.
   for(const a of doc.querySelectorAll('a[href*="website-original"]')){a.removeAttribute('href');a.textContent='现行UI对照原件尚未接入';a.setAttribute('aria-disabled','true');}
   const root=doc.querySelector('.review-header a');if(root){root.onclick=e=>{e.preventDefault();catalog();};root.textContent='← 开发中项目';}
-  const view=(win.location.pathname.includes('/join/')?'join/':'')+(win.location.hash.slice(1)||'home');
+  const view=(templatePath.includes('/join/')?'join/':'')+(win.location.hash.slice(1)||'home');
   if(!bindings)return;
   const b=await bindings(view);if(g!==generation||!b)return;
   current={...b,view};$('saved-feedback').hidden=false;$('submit-feedback').disabled=false;$('feedback-status').textContent='正在核对本页历史…';
@@ -26,7 +36,16 @@ async function sync(){
     $('feedback-status').textContent=rows.length?'已读取本页原归档记录。':'本页尚无已归档意见。';
   }catch(e){if(g===generation){current=null;$('feedback-status').textContent='本页权限或版本尚未核实：'+e.message;$('submit-feedback').disabled=true;}}
 }
-$('template').onload=()=>{const win=$('template').contentWindow;win.addEventListener('hashchange',sync);win.document.querySelector('#scenario')?.addEventListener('change',sync);sync().catch(e=>$('feedback-status').textContent=e.message);};
+$('template').onload=()=>{const frame=$('template'),win=frame.contentWindow;if(!frame.hasAttribute('srcdoc'))return;
+  win.document.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;const href=a.getAttribute('href');if(!href)return;if(href.startsWith('#')){e.preventDefault();win.location.hash=href;return;}
+    e.preventDefault();if(href.includes('website-original'))return;
+    const u=new URL(href,new URL(templatePath,location.href));
+    const main=new URL('community-next/index.html',location.href),join=new URL('community-next/join/index.html',location.href);
+    if(u.pathname===join.pathname||u.pathname===join.pathname.replace('index.html',''))loadTemplate('community-next/join/index.html',u.hash||'#start').catch(e=>$('feedback-status').textContent=e.message);
+    else if(u.pathname===main.pathname||u.pathname===main.pathname.replace('index.html',''))loadTemplate('community-next/index.html',u.hash||'#recommendations').catch(e=>$('feedback-status').textContent=e.message);
+    else catalog();
+  });
+  if(frame.dataset.initialHash){win.location.hash=frame.dataset.initialHash;delete frame.dataset.initialHash;} win.addEventListener('hashchange',sync);win.document.querySelector('#scenario')?.addEventListener('change',sync);sync().catch(e=>$('feedback-status').textContent=e.message);};
 $('submit-feedback').onclick=async()=>{
   if(!current)return;const b=current,g=generation,button=$('submit-feedback');if(button.disabled)return;
   button.disabled=true;try {

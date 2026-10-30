@@ -268,8 +268,8 @@ class OriginalStaticOperations:
         old_raw = c.read(t.inputs / 'R2_CANDIDATE_MANIFEST.json')
         need(digest(old_raw) == t.pins['previous_manifest_sha256'], 'STATIC_PREVIOUS_MANIFEST_DRIFT')
         schema = t.pins.get('package_schema', 'LEGACY_UNIFIED_V1')
-        need(schema in ('LEGACY_UNIFIED_V1', 'FULL_STATIC_REVIEW_V1', 'FULL_STATIC_BRAND_REVIEW_V1'), 'STATIC_BACKUP_PACKAGE_SCHEMA')
-        count = t.pins.get('previous_file_count') if schema in ('FULL_STATIC_REVIEW_V1', 'FULL_STATIC_BRAND_REVIEW_V1') else 1279
+        need(schema in ('LEGACY_UNIFIED_V1', 'FULL_STATIC_REVIEW_V1', 'FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1'), 'STATIC_BACKUP_PACKAGE_SCHEMA')
+        count = t.pins.get('previous_file_count') if schema in ('FULL_STATIC_REVIEW_V1', 'FULL_STATIC_BRAND_REVIEW_V1','FULL_STATIC_DELIVERY_REVIEW_V1') else 1279
         need(type(count) is int and 1 <= count <= 10000, 'STATIC_PREVIOUS_FILE_COUNT')
         old = {r['path']: {'size': r['size'], 'sha256': r['sha256']} for r in json.loads(old_raw)['files']}
         need(len(old) == count and backup.get('static_files') == old, 'STATIC_BACKUP_MANIFEST')
