@@ -132,41 +132,32 @@ test('OpenAI channel preference preview is manual truthful and no fallback',()=>
 
 test('unified admin shows concise model-service summary instead of customer forms',()=>{
   const html=app.render(data,{view:'config-models'});
-  for(const text of ['模型服务','客户侧服务方式','同一后台','已验证平台','真实业务接线','查看客户侧选择流程'])assert.match(html,new RegExp(text));
+  for(const text of ['模型服务','官网服务方式','独立候选','已验证平台','真实业务接线','客户购买流程不属于管理后台'])assert.match(html,new RegExp(text));
   for(const text of ['Provider 与受保护引用','OpenAI 执行通道偏好','模型用量与估算成本'])assert.match(html,new RegExp('<summary>'+text));
-  assert.match(html,/href="#customer-model-service"/);
-  assert.doesNotMatch(html,/data-customer-model-mode|你希望如何使用模型/);
+  assert.match(html,/官网原型 · NOT_DEPLOYED/);
+  assert.doesNotMatch(html,/customer-model-service|data-customer-model-mode|你希望如何使用模型/);
 });
 
-test('two model-service modes are customer-side choices in the same admin shell',()=>{
-  const html=app.render(data,{view:'customer-model-service'});
-  for(const text of ['这是统一管理台中的客户侧开通流程','不是第二套后台','我已有上游账号','购买玄钧AI新 API 服务','客户直接向上游平台付款','查看费用、凭据与权益边界'])assert.match(html,new RegExp(text));
-  assert.match(html,/data-customer-model-mode="BYO_ACCOUNT"/);
-  assert.match(html,/data-customer-model-mode="XUANJUN_API_SERVICE"/);
-  assert.match(html,/不会创建连接、订单或权益/);
-  assert.match(html,/待 Owner 确认/);
-  assert.equal(app.domainForView('customer-model-service'),'customer');
-  assert.doesNotMatch(html,/免费接入|自动切换到/);
+test('customer purchase mode has no route or navigation in unified admin',()=>{
+  assert.equal(app.route('#customer-model-service').view,'overview');
+  assert.doesNotMatch(app.navHtml('overview',false),/customer-model-service|客户模型服务/);
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.doesNotMatch(source,/renderCustomerModelService|selectedCustomerModelMode|data-customer-model-mode/);
 });
 
 test('provider candidates stay unavailable until platform and channel verification',()=>{
-  const html=app.render(data,{view:'customer-model-service'});
+  const html=app.render(data,{view:'config-models'});
   for(const platform of ['硅基流动','OpenAI','DeepSeek','百炼'])assert.match(html,new RegExp(platform));
   assert.equal(data.model_service_dual_entry_preview.byo_account.platforms.every(p=>p.state==='PENDING_VERIFICATION'),true);
   assert.equal(data.model_service_dual_entry_preview.byo_account.platforms.every(p=>p.verified_channels.length===0),true);
-  assert.match(html,/已验证通道[^]*NONE_FOUND/);
-  assert.match(html,/模型列表[^]*NOT_LOADED/);
+  assert.match(html,/已验证平台[^]*NONE_FOUND/);
+  assert.match(html,/真实服务端接线[^]*NOT_IMPLEMENTED/);
   assert.doesNotMatch(html,/开始 OAuth 授权|已验证可用/);
 });
 
-test('customer mode interaction remains local candidate without write capability',()=>{
-  const html=app.render(data,{view:'customer-model-service'});
-  assert.match(html,/data-customer-model-mode="BYO_ACCOUNT"/);
-  assert.match(html,/data-customer-model-mode="XUANJUN_API_SERVICE"/);
-  assert.match(html,/继续（候选未接线）/);
+test('admin correction adds no customer purchase write capability',()=>{
   const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
-  assert.match(source,/selectedCustomerModelMode=button\.getAttribute\('data-customer-model-mode'\)/);
-  assert.doesNotMatch(source,/CREATE_MODEL_SERVICE_CONNECTION|CREATE_API_ORDER|ACTIVATE_PROJECT_ENTITLEMENT/);
+  assert.doesNotMatch(source,/customer-model-service|CREATE_MODEL_SERVICE_CONNECTION|CREATE_API_ORDER|ACTIVATE_PROJECT_ENTITLEMENT/);
 });
 
 test('all required exception states are visible',()=>{

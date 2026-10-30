@@ -1,4 +1,4 @@
-# 统一后台 · 客户模型服务入口返修 V2
+# 统一后台 · 模型服务边界纠正 V3
 
 状态：`UI_CANDIDATE / OWNER_CONFIRMATION_REQUIRED / NOT_DEPLOYED`
 
@@ -7,19 +7,19 @@
 
 ## 返修结果
 
-- 管理员 `#config-models`：首屏仅呈现模型服务状态、风险、证据和客户侧入口；
+- 管理员 `#config-models`：首屏仅呈现模型服务状态、风险和证据；
   Provider、OpenAI 执行通道、用量估算全部默认折叠，避免长技术表单。
-- 客户侧 `#customer-model-service`：在同一后台外壳中用两张选择卡表达“自带
-  上游账号”和“购买玄钧AI新 API 服务”。付款、凭据、权益、计量和账单边界
-  仅在“查看费用、凭据与权益边界”中展开。
-- 两种服务方式不创建两套后台，不改变 `API_FIRST` /
+- 撤销 6cd0a569 误加的 `#customer-model-service` 路由、页面、交互状态与后台跳转；
+  两种服务方式属于官方网站的客户购买与配置流程。
+- 两种服务方式不创建第二套后台，不改变 `API_FIRST` /
   `SUBSCRIPTION_OAUTH_FIRST` 的既有执行通道语义，也不新增写 capability。
 - 所有真实平台、OAuth/API、安全录入、订单、权益、用量、账本和模型调用仍为
   `NOT_IMPLEMENTED / NOT_CONNECTED`；本候选没有部署或安装。
 
 ## 需要 Owner 确认的受影响页面
 
-1. `#config-models`：管理员摘要的三项指标、默认折叠层级和客户侧跳转。
-2. `#customer-model-service`：两张选择卡、首屏文案、选择态和边界详情。
+1. `#config-models`：管理员摘要的三项指标、默认折叠层级和官网边界文案。
+2. 独立证据原型：官方网站模块选择、购买与配置流程；不属于后台路由，未修改
+   官方网站源码，未部署、未验收。
 
 其余已确认页面未改版，不重复索批。

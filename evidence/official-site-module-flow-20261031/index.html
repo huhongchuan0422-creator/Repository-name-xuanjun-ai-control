@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>玄钧AI新 · 官网功能模块选择原型</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="evidence-bar" role="status">证据原型 · 待确认 · 未部署 · 未验收 · 无真实购买</div>
+  <header class="site-header">
+    <a class="brand" href="#catalog" aria-label="返回功能模块"><span>玄</span><strong>玄钧AI新</strong></a>
+    <nav aria-label="官网候选导航"><a href="#catalog">功能模块</a><a href="#service">服务方式</a><a href="#summary">配置摘要</a></nav>
+    <button class="quiet" type="button" disabled>登录（未接线）</button>
+  </header>
+
+  <main>
+    <section class="hero" id="catalog">
+      <div><p class="eyebrow">FUNCTION MODULES</p><h1>选择需要的功能，按项目开通</h1><p>先选业务模块，再选择模型服务方式。这里不是管理后台，也不要求客户填写长技术表单。</p></div>
+      <aside><strong>当前选择</strong><span id="selectionCount">1 个模块</span><small>本原型不会创建订单或连接</small></aside>
+    </section>
+
+    <section class="section-block" aria-labelledby="catalogTitle">
+      <div class="section-head"><div><p class="step">01 · 选择模块</p><h2 id="catalogTitle">从业务目标开始</h2></div><span class="hint">可多选 · 随时调整</span></div>
+      <div class="module-grid" id="moduleGrid">
+        <button class="module-card selected" type="button" data-module="智能客服" aria-pressed="true"><span class="module-icon">客</span><span><strong>智能客服</strong><small>知识问答、工单辅助与人工接手</small></span><b>已选择</b></button>
+        <button class="module-card" type="button" data-module="内容助手" aria-pressed="false"><span class="module-icon">创</span><span><strong>内容助手</strong><small>文案草拟、改写与多语言辅助</small></span><b>选择</b></button>
+        <button class="module-card" type="button" data-module="知识检索" aria-pressed="false"><span class="module-icon">知</span><span><strong>知识检索</strong><small>面向项目资料的检索与回答</small></span><b>选择</b></button>
+      </div>
+    </section>
+
+    <section class="section-block" id="service" aria-labelledby="serviceTitle">
+      <div class="section-head"><div><p class="step">02 · 选择服务方式</p><h2 id="serviceTitle">谁提供模型服务？</h2></div><span class="hint">两种方式只决定付款与权益来源</span></div>
+      <div class="mode-grid">
+        <button class="mode-card selected" type="button" data-mode="BYO_ACCOUNT" aria-pressed="true"><span class="radio">✓</span><span><strong>使用我的上游账号</strong><small>直接向上游平台付款</small><em>适合已有合规账号和团队技术能力的客户</em></span></button>
+        <button class="mode-card" type="button" data-mode="XUANJUN_API_SERVICE" aria-pressed="false"><span class="radio"></span><span><strong>购买玄钧AI新 API 服务</strong><small>由玄钧AI新提供项目权益</small><em>无需准备上游 Key，按合同与订单开通</em></span></button>
+      </div>
+      <div class="boundary" id="modeBoundary"><strong>使用我的上游账号</strong><span>客户管理上游账号与付款；平台仅在已验证的安全通道上为项目启用。</span></div>
+    </section>
+
+    <section class="section-block" aria-labelledby="configTitle">
+      <div class="section-head"><div><p class="step">03 · 简短配置</p><h2 id="configTitle">确认项目需要</h2></div><span class="hint">技术细节在审核通过后由安全入口处理</span></div>
+      <div class="config-list">
+        <label><span><strong>使用项目</strong><small>选择要开通模块的项目</small></span><select id="project"><option>示例项目 A</option><option>示例项目 B</option></select></label>
+        <label><span><strong>预计使用规模</strong><small>用于展示方案范围，不生成报价</small></span><select id="scale"><option>小规模试用</option><option>标准业务量</option><option>需要专项评估</option></select></label>
+        <div><span><strong>安全接入</strong><small>凭据不会进入网页、聊天或本原型</small></span><span class="pill">后续安全入口</span></div>
+      </div>
+    </section>
+
+    <section class="summary" id="summary" aria-labelledby="summaryTitle">
+      <div><p class="step">04 · 配置摘要</p><h2 id="summaryTitle">确认后再进入审核</h2><p>当前只是可点击证据原型；没有价格、订单、授权、连接或模型调用。</p></div>
+      <dl><div><dt>功能模块</dt><dd id="summaryModules">智能客服</dd></div><div><dt>服务方式</dt><dd id="summaryMode">使用我的上游账号</dd></div><div><dt>项目</dt><dd id="summaryProject">示例项目 A</dd></div><div><dt>状态</dt><dd>待确认 / 未部署</dd></div></dl>
+      <button class="primary" id="continueButton" type="button">查看确认提示</button>
+      <p class="feedback" id="feedback" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer><strong>玄钧AI新 · 官网流程证据候选</strong><span>UNCONFIRMED / NOT_DEPLOYED / NOT_ACCEPTED</span></footer>
+  <script src="app.js"></script>
+</body>
+</html>
