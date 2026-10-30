@@ -124,6 +124,7 @@ jobs:
         run: |
           python - <<'EVIDENCE'
           import datetime,json,os,re,time
+          from urllib.error import HTTPError,URLError
           from urllib.request import HTTPRedirectHandler,ProxyHandler,Request,build_opener
           REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
           BRANCH='feature/chatgpt-community-wechat-sp-offline-20261017'
@@ -185,16 +186,34 @@ jobs:
                   raw=response.read(1048577)
                   if len(raw)>1048576:raise ValueError('EVIDENCE_SIZE_LIMIT')
                   return json.loads(raw)
+          def safe_error(error):
+              if isinstance(error,HTTPError):return 'HTTP_'+str(error.code) if type(error.code) is int and 100<=error.code<=599 else 'HTTP_ERROR'
+              if isinstance(error,URLError):return 'NETWORK_ERROR'
+              if isinstance(error,TimeoutError):return 'NETWORK_TIMEOUT'
+              if isinstance(error,json.JSONDecodeError):return 'INVALID_JSON'
+              allowed={'EXACT_SUCCESSFUL_PUSH_EVIDENCE_REQUIRED','BOUNDED_EVIDENCE_REQUIRED',
+                       'SUCCESSFUL_TEST_GATE_REQUIRED','UNEXPIRED_EXACT_SOURCE_ARTIFACT_REQUIRED',
+                       'ONE_SOURCE_ARTIFACT_REQUIRED','ONE_EXPLICIT_HOSTED_OR_PREVIEW_MODE_REQUIRED',
+                       'EXACT_PREVIEW_CONTEXT_REQUIRED',
+                       'EXACT_GITHUB_RESPONSE_REQUIRED','EVIDENCE_SIZE_LIMIT'}
+              if isinstance(error,ValueError) and len(error.args)==1 and type(error.args[0]) is str and error.args[0] in allowed:return error.args[0]
+              return 'UNCLASSIFIED_ERROR'
           if __name__=='__main__':
+              stage='CONTEXT'
               try:
                   head,text=validate_context(os.environ)
                   evidence_id=int(text);prefix='/actions/runs/'+text
-                  receipt=validate(read(prefix),read(prefix+'/jobs?per_page=100'),read(prefix+'/artifacts?per_page=100'),
+                  stage='RUN';run=read(prefix)
+                  stage='JOBS';jobs=read(prefix+'/jobs?per_page=100')
+                  stage='ARTIFACTS';artifacts=read(prefix+'/artifacts?per_page=100')
+                  stage='VALIDATE'
+                  receipt=validate(run,jobs,artifacts,
                                    head,evidence_id,int(os.environ['GITHUB_RUN_ID']),time.time())
+                  stage='RECEIPT'
                   with open('preview-hosted-evidence.json','x') as out:json.dump(receipt,out,sort_keys=True)
                   print('EXACT_SHA_HOSTED_TEST_EVIDENCE_REUSED')
-              except Exception:
-                  raise SystemExit('HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW')
+              except Exception as error:
+                  raise SystemExit('HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW:'+stage+':'+safe_error(error)) from None
           EVIDENCE
       - name: Admit fixed c831 native product using original exact push evidence
         if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
@@ -1238,3 +1257,4 @@ jobs:
           name: community-mini-development-${{ github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
           path: ${{ runner.temp }}/community-mini-preview/
           retention-days: 7
+

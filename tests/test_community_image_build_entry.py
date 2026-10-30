@@ -160,3 +160,55 @@ class HostedImageEntry(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'ORIGINAL_OCR_BUNDLE_REQUIRED'):
                 prepare(root/'original-ocr-evidence/xuanjun-ocr-linux-x86_64-cp311.tar.gz',destination)
             self.assertFalse(destination.exists())
+
+    def test_evidence_errors_expose_only_fixed_codes_not_provider_content(self):
+        from urllib.error import HTTPError,URLError
+        import json
+        sentinel='DO_NOT_PRINT_PRIVATE_RESPONSE_OR_TOKEN'
+        cases=[(HTTPError('https://api.github.com/'+sentinel,403,sentinel,{},None),'HTTP_403'),
+               (URLError(sentinel),'NETWORK_ERROR'),(TimeoutError(sentinel),'NETWORK_TIMEOUT'),
+               (json.JSONDecodeError(sentinel,sentinel,0),'INVALID_JSON'),
+               (ValueError('SUCCESSFUL_TEST_GATE_REQUIRED'),'SUCCESSFUL_TEST_GATE_REQUIRED'),
+               (ValueError(sentinel),'UNCLASSIFIED_ERROR'),(RuntimeError(sentinel),'UNCLASSIFIED_ERROR')]
+        for error,expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(self.ns['safe_error'](error),expected)
+                self.assertNotIn(sentinel,self.ns['safe_error'](error))
+
+    def test_evidence_reader_preserves_anonymous_fixed_origin_and_bounds(self):
+        from unittest.mock import patch
+        class Response:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def geturl(self):return 'https://api.github.com/repos/'+self_repo+'/actions/runs/101'
+            def read(self,size):
+                self_size.append(size)
+                return b'{"id":101}'
+        self_repo='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
+        self_size=[];seen=[]
+        class Opener:
+            def open(self,request,timeout):
+                seen.append((request,timeout));return Response()
+        with patch.dict(self.ns,build_opener=lambda *args:Opener()):
+            self.assertEqual(self.ns['read']('/actions/runs/101'),{'id':101})
+        self.assertEqual(self_size,[1048577]);self.assertEqual(seen[0][1],10)
+        self.assertFalse(any(key.lower()=='authorization' for key in seen[0][0].headers))
+        self.assertEqual(self.ns['NoRedirect']().redirect_request(None,None,None,None,None,None),None)
+
+    def test_main_failure_reports_stage_and_never_writes_success_receipt(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        code=textwrap.dedent(self.workflow.split("python - <<'EVIDENCE'\n",1)[1].split('          EVIDENCE',1)[0])
+        main=code.split("if __name__=='__main__':\n",1)[1]
+        values={**self.env(), 'GITHUB_RUN_ID':'102'}
+        for stage,reads in [('RUN',0),('JOBS',1),('ARTIFACTS',2)]:
+            seen=[]
+            def read(path):
+                if len(seen)==reads:raise HTTPError('https://api.github.com/private',403,'secret',{},None)
+                seen.append(path);return {}
+            with patch.dict(self.ns,read=read),patch.dict(self.ns['os'].environ,values,clear=True),patch('builtins.open') as output:
+                with self.assertRaises(SystemExit) as caught:exec(compile(textwrap.dedent(main),'actual-main','exec'),self.ns)
+                self.assertEqual(str(caught.exception),'HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW:'+stage+':HTTP_403')
+                output.assert_not_called()
+
