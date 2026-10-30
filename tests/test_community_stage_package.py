@@ -37,6 +37,7 @@ class SourcePackage(unittest.TestCase):
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
                 'clients/community-mini/app.wxss',
+                'clients/community-mini/assets/community-demo-storefront-v1.jpg',
                 'deploy/community-preview/Dockerfile',
                 'deploy/community-preview/requirements-runtime.lock',
                 'deploy/community-preview/nginx-uk-path-candidate.conf',
@@ -72,6 +73,12 @@ class SourcePackage(unittest.TestCase):
                 raw=archive.read(name)
                 self.assertEqual(raw,(root/name).read_bytes())
                 self.assertEqual(manifest['files'][name],hashlib.sha256(raw).hexdigest())
+            photo='clients/community-mini/assets/community-demo-storefront-v1.jpg'
+            photo_sha='f8e066fc2153b5beff1ae65faf9be5383d877eb77336cc5e16c90468b13b65b6'
+            self.assertEqual(len(archive.read(photo)),160523)
+            self.assertEqual(manifest['files'][photo],photo_sha)
+            self.assertEqual(hashlib.sha256(archive.read(photo)).hexdigest(),photo_sha)
+            self.assertIn("'/assets/community-demo-storefront-v1.jpg'",archive.read('clients/community-mini/pages/checkout/index.js').decode())
             self.assertFalse(any(name.endswith(('.pem','.sqlite','.env')) for name in archive.namelist()))
             with tempfile.TemporaryDirectory() as tmp:
                 archive.extractall(tmp)
@@ -92,6 +99,13 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(receipt['appid'],json.loads((output/'project.config.json').read_text())['appid'])
                 self.assertTrue(receipt['commerce']);self.assertFalse(receipt['payments'])
                 self.assertTrue((output/'pages/home/index.wxml').is_file())
+                photo_target=output/'assets/community-demo-storefront-v1.jpg'
+                self.assertEqual(photo_target.read_bytes(),archive.read(photo))
+                self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
+                self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
+                self.assertEqual(len(receipt['prepared_files']),36)
+                prepared_names={p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file()}
+                self.assertEqual(prepared_names,set(receipt['prepared_files'])|{'CONNECTED_PREVIEW_RECEIPT.json'})
                 isolated=subprocess.run(
                     [sys.executable,'-B','-m','unittest','discover','-s','tests',
                      '-p','test_community_bill_contract_evidence.py','-v'],
@@ -106,6 +120,17 @@ class SourcePackage(unittest.TestCase):
                     text=True,timeout=60,check=False)
                 self.assertEqual(customer.returncode,0,customer.stdout)
                 self.assertIn('# fail 0',customer.stdout)
+            # One named asset only: sibling binary files must not expand the package scope.
+            with tempfile.TemporaryDirectory() as tmp:
+                archive.extractall(tmp)
+                unapproved=Path(tmp)/'clients/community-mini/assets/not-allowlisted.jpg'
+                unapproved.write_bytes(b'not approved asset')
+                self.assertEqual((data,digest),build(Path(tmp)))
+                photo_path=Path(tmp)/photo
+                photo_path.unlink()
+                photo_path.symlink_to(unapproved)
+                with self.assertRaisesRegex(ValueError,'PACKAGE_SYMLINK_DENIED'):
+                    build(Path(tmp))
             for missing in required_pages:
                 with tempfile.TemporaryDirectory() as tmp:
                     archive.extractall(tmp)
