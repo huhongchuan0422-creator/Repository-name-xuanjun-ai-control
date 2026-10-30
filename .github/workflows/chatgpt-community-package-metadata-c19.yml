@@ -91,3 +91,32 @@ jobs:
           compression-level: 0
           if-no-files-found: error
           retention-days: 3
+
+  deliver-fixed-572-installer-metadata:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-installer-253cad-metadata]') && !contains(github.event.head_commit.message, '[community-installer-f9603d]') && !contains(github.event.head_commit.message, '[community-installer-253cad]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify exact 572 installer metadata bytes only; never execute or download carrier
+        run: |
+          python - <<'PYVERIFY'
+          import hashlib,json,pathlib
+          raw=pathlib.Path('delivery/community-installer-57242-253cad/package-metadata.json').read_bytes()
+          assert len(raw)==976
+          assert hashlib.sha256(raw).hexdigest()=='8eb6b0e52380d55c3e376be0b77648929edb4a0c1ba13c9be6f8dee84c938f61'
+          value=json.loads(raw)
+          assert value['object_spec']['artifact_id']==12987480788
+          assert value['object_spec']['package']['payload']=='COMMUNITY_572_ORIGINAL_INSTALL.py'
+          print('FIXED_METADATA_BYTES_MATCH; NOT_DOWNLOADED; NOT_INSTALLED')
+          PYVERIFY
+      - name: Publish exact single 572 installer metadata member
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-57242-installer-metadata-253cad
+          path: delivery/community-installer-57242-253cad/package-metadata.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
