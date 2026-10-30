@@ -4,9 +4,12 @@ import copy
 import hashlib
 import hmac
 import json
+import os
+import sqlite3
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch,mock_open
+from contextlib import ExitStack,contextmanager
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
 from tests.test_pr122_customer_http import HttpTests
@@ -22,6 +25,13 @@ class PreviewTests(unittest.TestCase):
     imported=CustomerTests.imported
     def setUp(self):
         CustomerTests.setUp(self);self.path='/preview/consumer/'
+        self.task={'task_id':'task-pr122','state':'RUNNING','attempt_id':'attempt-1',
+            'spec_sha256':'a'*64,'writer_scope':'pr122-ui','owner':'UI Writer',
+            'authority_caller_id':'writer-pr122','project_id':'project-a','board_id':'customer',
+            'tenant_id':'tenant-a','requester_principal_id':'domestic-a'}
+        self.task['registry_record_sha256']=digest(canonical(self.task))
+        self.task['registry']='CANONICAL_TASK_REGISTRY'
+        self.c.task_registry_context=lambda project,task_id:dict(self.task)
         self.body=b'<!doctype html><html><meta name="viewport" content="width=device-width"><title>Customer preview</title><body><h1>Private project</h1><style>h1{color:#123}</style><script>document.documentElement.dataset.preview="ready";</script></body></html>'
         self.sha=digest(self.body);self.revision=1;self.install()
     def install(self,body=None,scope=True):
@@ -29,6 +39,15 @@ class PreviewTests(unittest.TestCase):
         e=snapshot(self,revision=self.revision);m=e['payload']['previews'][0]['manifest'];m['pages']=[{'path':self.path,'sha256':self.sha}]
         if scope:m['execution_scope']='TRUSTED_CUSTOMER_FRONTEND'
         entry=e['payload']['previews'][0];entry['manifest_sha256']=digest(canonical(m));entry['blobs']={self.sha:base64.b64encode(body).decode()};e['signature']=hmac.new(self.auth,canonical(e['payload']),hashlib.sha256).hexdigest();import_snapshot(self.c,e,self.auth)
+    @contextmanager
+    def registry_runtime(self,access=False,uid=12345,gid=12345,capabilities='0000000000000000'):
+        with ExitStack() as stack:
+            stack.enter_context(patch('scripts.pr122_customer_changes.os.geteuid',return_value=uid))
+            stack.enter_context(patch('scripts.pr122_customer_changes.os.getegid',return_value=gid))
+            stack.enter_context(patch('scripts.pr122_customer_changes.os.getgroups',return_value=[]))
+            stack.enter_context(patch('scripts.pr122_customer_changes.os.access',return_value=access))
+            stack.enter_context(patch('builtins.open',mock_open(read_data='CapEff:\t'+capabilities+'\n')))
+            yield
     def test_real_bytes_render_footer_and_exact_csp_hashes(self):
         raw,mime,csp=render(self.c,self.owner,'project-a',digest(self.path.encode()),self.sha)
         self.assertIn(b'data-project-feedback="project-a"',raw);self.assertIn(b'Private project',raw)
@@ -42,14 +61,20 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(pending['state'],'PENDING_REVIEW')
         self.assertEqual(pending['comment_count'],1)
         self.assertEqual(pending['comments'][0]['text'],'请调整标题')
-        approved=service.approve_reviewed_version(
-            self.owner,'project-a',self.path,self.sha,'本版本设计通过')
-        self.assertEqual(approved['state'],'PENDING_DEVELOPMENT')
+        identity={'tenant_id':'tenant-a','requester_principal_id':'domestic-a','mapping_id':'mapping-a',
+                  'mapping_version':1,'authority_revision':1}
+        with patch.object(service,'_review_identity',return_value=identity):
+            approved=service.approve_reviewed_version(
+                self.owner,'project-a',self.path,self.sha,'task-pr122','本版本设计通过')
+        self.assertEqual(approved['state'],'DESIGN_APPROVED_TASK_BOUND')
         self.assertEqual(approved['events'][0]['kind'],'DESIGN_APPROVAL')
+        self.assertEqual(approved['events'][0]['actor'],self.owner)
+        self.assertEqual(approved['events'][0]['payload']['reason'],'本版本设计通过')
+        self.assertEqual(approved['approval_receipt']['task_id'],'task-pr122')
         self.assertFalse(approved['events'][0]['payload']['technical_qa'])
         self.assertEqual(service._events(self.owner,'project-a',comment['id'])[0]['kind'],'REQUEST')
         queue=review_queue(self.c,self.owner)
-        self.assertEqual(queue['projects'][0]['pages'][0]['review']['state'],'PENDING_DEVELOPMENT')
+        self.assertEqual(queue['projects'][0]['pages'][0]['review']['state'],'DESIGN_APPROVED_TASK_BOUND')
 
         approved_version=self.sha
         self.revision=2;self.install(b'<!doctype html><title>New version</title>')
@@ -60,7 +85,96 @@ class PreviewTests(unittest.TestCase):
         approvals=[event for case in history for event in case['events']
                    if event['kind']=='DESIGN_APPROVAL']
         self.assertEqual(approvals[0]['payload']['page_sha256'],approved_version)
-        self.assertEqual(approvals[0]['payload']['state'],'PENDING_DEVELOPMENT')
+        self.assertEqual(approvals[0]['payload']['state'],'DESIGN_APPROVED_TASK_BOUND')
+
+    def test_approval_fails_closed_without_canonical_task(self):
+        self.c.task_registry_context=None
+        service=Changes(self.c)
+        identity={'tenant_id':'tenant-a','requester_principal_id':'domestic-a','mapping_id':'mapping-a',
+                  'mapping_version':1,'authority_revision':1}
+        with patch.object(service,'_review_identity',return_value=identity),self.assertRaisesRegex(Denied,'TASK_REGISTRY_NOT_CONFIGURED'):
+            service.approve_reviewed_version(self.owner,'project-a',self.path,self.sha,'task-pr122','通过')
+
+    def test_canonical_task_reads_existing_registry_without_writing(self):
+        directory=self.root/'registry';directory.mkdir();path=str(directory/'tasks.sqlite');db=sqlite3.connect(path)
+        db.executescript('''CREATE TABLE tasks(task_id TEXT PRIMARY KEY,state TEXT,
+          attempt_id TEXT,spec_sha256 TEXT,writer_scope TEXT,owner TEXT,authority_caller_id TEXT);
+          CREATE TABLE gateway_task_metadata(task_id TEXT,project_id TEXT,board_id TEXT,
+          tenant_id TEXT,requester_principal_id TEXT);''')
+        db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?)',
+            ('task-pr122','RUNNING','attempt-1','a'*64,'pr122-ui','UI Writer','writer-pr122'))
+        db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?)',
+            ('task-terminal','SUCCESS','attempt-2','b'*64,'terminal-ui','UI Writer','writer-pr122'))
+        db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?)',
+            ('task-wrong-writer','RUNNING','attempt-3','c'*64,'foreign-ui','Other Writer','writer-other'))
+        db.execute('INSERT INTO gateway_task_metadata VALUES(?,?,?,?,?)',
+            ('task-pr122','project-a','customer','tenant-a','domestic-a'))
+        db.execute('INSERT INTO gateway_task_metadata VALUES(?,?,?,?,?)',
+            ('task-terminal','project-a','customer','tenant-a','domestic-a'))
+        db.execute('INSERT INTO gateway_task_metadata VALUES(?,?,?,?,?)',
+            ('task-wrong-writer','project-a','customer','tenant-a','domestic-a'));db.commit();db.close()
+        replacement=str(directory/'replacement.sqlite');other=sqlite3.connect(replacement)
+        other.executescript('''CREATE TABLE tasks(task_id TEXT PRIMARY KEY,state TEXT,attempt_id TEXT,
+          spec_sha256 TEXT,writer_scope TEXT,owner TEXT,authority_caller_id TEXT);
+          CREATE TABLE gateway_task_metadata(task_id TEXT,project_id TEXT,board_id TEXT,
+          tenant_id TEXT,requester_principal_id TEXT);''')
+        other.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?)',
+            ('task-pr122','RUNNING','attempt-1','a'*64,'pr122-ui','SWAPPED','writer-pr122'))
+        other.execute('INSERT INTO gateway_task_metadata VALUES(?,?,?,?,?)',
+            ('task-pr122','project-a','customer','tenant-a','domestic-a'));other.commit();other.close()
+        os.chmod(replacement,0o400)
+        os.chmod(path,0o400);os.chmod(directory,0o500)
+        self.addCleanup(lambda:os.chmod(directory,0o700))
+        policy={'task_id':'task-pr122','attempt_id':'attempt-1','spec_sha256':'a'*64,
+                'owner':'UI Writer','writer_scope':'pr122-ui','authority_caller_id':'writer-pr122','board_id':'customer'}
+        with self.registry_runtime():record=Changes.canonical_task(path,'project-a','task-pr122',policy)
+        self.assertEqual(record['task_id'],'task-pr122')
+        self.assertEqual(record['registry'],'CANONICAL_TASK_REGISTRY')
+        with self.assertRaisesRegex(Denied,'CANONICAL_TASK_NOT_FOUND'):
+            with self.registry_runtime():Changes.canonical_task(path,'project-a','missing-task',{**policy,'task_id':'missing-task'})
+        terminal={**policy,'task_id':'task-terminal','attempt_id':'attempt-2','spec_sha256':'b'*64,'writer_scope':'terminal-ui'}
+        wrong={**policy,'task_id':'task-wrong-writer','attempt_id':'attempt-3','spec_sha256':'c'*64}
+        for task_id,selected in (('task-terminal',terminal),('task-wrong-writer',wrong)):
+            with self.subTest(task_id=task_id),self.registry_runtime(),self.assertRaisesRegex(Denied,'NOT_EXECUTABLE'):
+                Changes.canonical_task(path,'project-a',task_id,selected)
+        for field,value in (('task_id','task-terminal'),('attempt_id','other-attempt'),('spec_sha256','d'*64)):
+            with self.subTest(field=field),self.registry_runtime(),self.assertRaises(Denied):
+                Changes.canonical_task(path,'project-a','task-pr122',{**policy,field:value})
+        real_connect=sqlite3.connect
+        def swap_then_connect(*args,**kwargs):
+            os.chmod(directory,0o700)
+            os.rename(path,path+'.opened');os.rename(replacement,path)
+            os.chmod(directory,0o500)
+            return real_connect(*args,**kwargs)
+        with patch('scripts.pr122_customer_changes.sqlite3.connect',side_effect=swap_then_connect),self.registry_runtime():
+            stable=Changes.canonical_task(path,'project-a','task-pr122',policy)
+        self.assertEqual(stable['owner'],'UI Writer')
+        os.chmod(directory,0o700);os.rename(path,replacement);os.rename(path+'.opened',path);os.chmod(directory,0o500)
+        os.chmod(path,0o666)
+        with self.registry_runtime(access=True),self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+        os.chmod(path,0o400)
+        with self.registry_runtime(uid=os.stat(path).st_uid),self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+        with self.registry_runtime(gid=os.stat(path).st_gid),self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+        with self.registry_runtime(access=True),self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+        with self.registry_runtime(capabilities='0000000000000002'),self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+
+    def test_registry_rejects_writable_files_and_missing_identity_schema(self):
+        directory=self.root/'unsafe-registry';directory.mkdir();path=str(directory/'tasks.sqlite')
+        db=sqlite3.connect(path);db.executescript('''CREATE TABLE tasks(task_id TEXT,state TEXT,attempt_id TEXT,
+          spec_sha256 TEXT,writer_scope TEXT,owner TEXT,authority_caller_id TEXT);
+          CREATE TABLE gateway_task_metadata(task_id TEXT,project_id TEXT,board_id TEXT,tenant_id TEXT);''');db.close()
+        policy={'task_id':'task-pr122','attempt_id':'attempt-1','spec_sha256':'a'*64,
+                'owner':'UI Writer','writer_scope':'pr122-ui','authority_caller_id':'writer-pr122','board_id':'customer'}
+        with self.assertRaisesRegex(Denied,'NOT_READ_ONLY'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
+        os.chmod(path,0o400);os.chmod(directory,0o500);self.addCleanup(lambda:os.chmod(directory,0o700))
+        with self.registry_runtime(),self.assertRaisesRegex(Denied,'IDENTITY_SCHEMA'):
+            Changes.canonical_task(path,'project-a','task-pr122',policy)
 
     def test_review_queue_keeps_project_permissions(self):
         self.assertEqual(review_queue(self.c,self.other)['projects'],[])
@@ -143,17 +257,28 @@ class PreviewHTTPTests(HttpTests):
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
 
     def test_http_review_queue_and_explicit_approval_keep_actor_and_version(self):
+        task={'task_id':'task-pr122','state':'RUNNING','attempt_id':'attempt-1',
+              'spec_sha256':'a'*64,'writer_scope':'pr122-ui','owner':'UI Writer',
+              'authority_caller_id':'writer-pr122','project_id':'project-a','board_id':'customer',
+              'tenant_id':'tenant-a','requester_principal_id':'domestic-a'}
+        task['registry_record_sha256']=digest(canonical(task));task['registry']='CANONICAL_TASK_REGISTRY'
+        self.c.task_registry_context=lambda project,task_id:dict(task)
+        self.task_registry_context=self.c.task_registry_context
         headers=self.auth_headers()
         status,_,raw=self.request('api/review_queue',headers=headers)
         self.assertEqual(status,200)
         page=json.loads(raw)['projects'][0]['pages'][0]
         self.assertEqual(page['review']['state'],'PENDING_REVIEW')
-        approved_status,_,approved_raw=self.request('api/review_approve',{
-            'project':'project-a','page':self.path,'version':self.sha,
-            'reason':'本版本设计明确通过'},headers)
+        identity={'tenant_id':'tenant-a','requester_principal_id':'domestic-a','mapping_id':'mapping-a',
+                  'mapping_version':1,'authority_revision':1}
+        with patch.object(Changes,'_review_identity',return_value=identity):
+            approved_status,_,approved_raw=self.request('api/review_approve',{
+                'project':'project-a','page':self.path,'version':self.sha,
+                'task_id':'task-pr122','reason':'本版本设计明确通过'},headers)
         self.assertEqual(approved_status,200)
         approved=json.loads(approved_raw)
-        self.assertEqual(approved['state'],'PENDING_DEVELOPMENT')
+        self.assertEqual(approved['state'],'DESIGN_APPROVED_TASK_BOUND')
+        self.assertEqual(approved['approval_receipt']['task_id'],'task-pr122')
         self.assertEqual(approved['events'][0]['actor'],self.owner)
         self.assertEqual(approved['events'][0]['payload']['page_sha256'],self.sha)
         other=self.users['other']
@@ -161,7 +286,7 @@ class PreviewHTTPTests(HttpTests):
                        'X-CSRF-Token':other['csrf']}
         self.assertEqual(self.request('api/review_approve',{
             'project':'project-a','page':self.path,'version':self.sha,
-            'reason':'越权通过'},other_headers)[0],403)
+            'task_id':'task-pr122','reason':'越权通过'},other_headers)[0],403)
 
     def test_first_customer_preview_full_import_list_http_served_and_expiry_chain(self):
         headers=self.auth_headers()
