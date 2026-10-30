@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>玄钧统一管理台 · UI候选</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="candidate-bar" role="status">UI_CANDIDATE · 合成数据 · 无生产写入 · 不连接真实服务</div>
+  <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+    <div class="login-brand"><span class="brand-mark" aria-hidden="true">玄</span><span>玄钧AI新</span></div>
+    <form class="login-card" id="loginForm">
+      <p class="eyebrow">OWNER WORKBENCH V2</p>
+      <h1 id="loginTitle">回到工作现场</h1>
+      <p class="muted">这是独立交互候选。登录仅切换合成界面，不校验真实账号。</p>
+      <label>演示账号<input name="username" autocomplete="username" value="owner-demo" required></label>
+      <label>演示口令<input name="password" type="password" autocomplete="current-password" value="synthetic-only" required></label>
+      <button class="button primary wide" type="submit">进入合成工作台</button>
+      <p class="form-note">不发送网络请求，不保存账号或口令。</p>
+    </form>
+  </section>
+
+  <div class="shell" id="shell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">玄</span><span><strong>玄钧AI新</strong><small>统一管理台</small></span></a>
+      <nav aria-label="主导航" id="sideNav"></nav>
+      <div class="sidebar-foot">
+        <span class="status-dot"></span><span>合成环境</span>
+        <small>数据源：fixture v2</small>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-button mobile-only" id="menuButton" aria-label="打开导航" aria-expanded="false">☰</button>
+        <div class="top-context"><span id="contextLabel">工作台</span><small>所有操作均无真实副作用</small></div>
+        <label class="search"><span aria-hidden="true">⌕</span><input id="globalSearch" type="search" placeholder="搜索项目、任务或证据" aria-label="全局搜索"></label>
+        <button class="icon-button" data-demo-action="notifications" aria-label="消息">◌<span class="notification-dot"></span></button>
+        <button class="profile" id="profileButton" aria-label="当前演示身份"><span>玄</span><b>Owner 演示</b></button>
+      </header>
+      <main id="app" tabindex="-1"></main>
+      <nav class="bottom-nav mobile-only" id="bottomNav" aria-label="移动导航"></nav>
+    </div>
+  </div>
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="live-region" id="liveRegion" aria-live="polite"></div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
