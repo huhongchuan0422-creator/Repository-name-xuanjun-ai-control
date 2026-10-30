@@ -1,0 +1,26 @@
+test_acceptance_reads_same_artifact_independent_roles (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_acceptance_rejects_cross_commit_ci (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_completion_reader_adds_exact_current_recovery_lineage (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_default_off_never_invokes_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_inspect_and_stop_return_evidence_not_resume_authority (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_missing_p2_admission_fails_before_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_notifications_default_off_never_invoke_transport (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_outbox_lookup_and_ack_are_bound (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_outbox_send_timeout_holds_without_redial (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_progress_reader_emits_frozen_core_shape (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_resume_rejects_stale_admission_before_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_resume_revalidates_original_admission (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_runner_ack_is_not_started (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_started_receipt_is_forwarded_to_original_supervisor (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_stop_reader_binds_lineage_and_known_effects (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_tampered_receipt_is_rejected (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_unknown_launch_effect_holds_without_retry (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_completed_requires_full_recovery_chain (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_healthy_is_no_action (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_result_missing_and_progress_stalled_are_distinct (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_unknown_effect_precedes_retry (tests.test_p3_host_boundaries.BoundaryTests) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.002s
+
+OK

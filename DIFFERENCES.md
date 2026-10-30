@@ -15,7 +15,12 @@
 
 - One inert Python module defining authenticated receipt, runner, evidence-reader,
   outbox transport and watchdog classification boundaries.
-- Twenty-one isolated unit tests using only in-memory fixtures.
+- Twenty-one preserved isolated unit tests using only in-memory fixtures.
+- Four additive regression tests reproducing the independent QA findings.
+- STARTED payload-to-subject fence equality before supervisor transition.
+- Full acceptance-to-recovery run-lineage equality for completion recovery.
+- Explicit no-retry HOLD results for unverifiable post-launch/post-resume ACKs
+  and unverifiable post-send receipts.
 - Integration, gap, test and B7 dependency documentation.
 
 ## Explicitly not added
@@ -24,6 +29,7 @@
 - No real ledger/activation/Writer lookup and no second task system.
 - No daemon, timer, service, cgroup, database migration, credential, install or
   host callsite mutation.
-- No automatic retry after uncertain launch/resume/stop/send/ACK.
+- No automatic retry after uncertain launch/resume/stop/send/ACK or after a
+  returned receipt fails verification following launch/resume/send invocation.
 - No fabricated ACK, STARTED, progress, STOPPED, SENT, ACKED, DONE, ACTIVE,
   COMMITTED, CP14, CP15, CP16 or field PASS.

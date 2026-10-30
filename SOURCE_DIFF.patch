@@ -1,0 +1,536 @@
+diff --git a/COMBINED_25_RAW.log b/COMBINED_25_RAW.log
+new file mode 100644
+index 0000000..3ca7d8f
+--- /dev/null
++++ b/COMBINED_25_RAW.log
+@@ -0,0 +1,30 @@
++test_acceptance_reads_same_artifact_independent_roles (test_p3_host_boundaries.BoundaryTests) ... ok
++test_acceptance_rejects_cross_commit_ci (test_p3_host_boundaries.BoundaryTests) ... ok
++test_completion_reader_adds_exact_current_recovery_lineage (test_p3_host_boundaries.BoundaryTests) ... ok
++test_default_off_never_invokes_runner (test_p3_host_boundaries.BoundaryTests) ... ok
++test_inspect_and_stop_return_evidence_not_resume_authority (test_p3_host_boundaries.BoundaryTests) ... ok
++test_missing_p2_admission_fails_before_runner (test_p3_host_boundaries.BoundaryTests) ... ok
++test_notifications_default_off_never_invoke_transport (test_p3_host_boundaries.BoundaryTests) ... ok
++test_outbox_lookup_and_ack_are_bound (test_p3_host_boundaries.BoundaryTests) ... ok
++test_outbox_send_timeout_holds_without_redial (test_p3_host_boundaries.BoundaryTests) ... ok
++test_progress_reader_emits_frozen_core_shape (test_p3_host_boundaries.BoundaryTests) ... ok
++test_resume_rejects_stale_admission_before_runner (test_p3_host_boundaries.BoundaryTests) ... ok
++test_resume_revalidates_original_admission (test_p3_host_boundaries.BoundaryTests) ... ok
++test_runner_ack_is_not_started (test_p3_host_boundaries.BoundaryTests) ... ok
++test_started_receipt_is_forwarded_to_original_supervisor (test_p3_host_boundaries.BoundaryTests) ... ok
++test_stop_reader_binds_lineage_and_known_effects (test_p3_host_boundaries.BoundaryTests) ... ok
++test_tampered_receipt_is_rejected (test_p3_host_boundaries.BoundaryTests) ... ok
++test_unknown_launch_effect_holds_without_retry (test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_completed_requires_full_recovery_chain (test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_healthy_is_no_action (test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_result_missing_and_progress_stalled_are_distinct (test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_unknown_effect_precedes_retry (test_p3_host_boundaries.BoundaryTests) ... ok
++test_completion_rejects_mixed_acceptance_run_lineage (test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_started_payload_fence_must_match_receipt_subject (test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_unverifiable_post_launch_ack_is_explicit_hold (test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_unverifiable_post_send_receipt_is_no_redial_hold (test_p3_qa_counterexamples.QACounterexamples) ... ok
++
++----------------------------------------------------------------------
++Ran 25 tests in 0.003s
++
++OK
+diff --git a/DIFFERENCES.md b/DIFFERENCES.md
+index 9a06915..0a3548e 100644
+--- a/DIFFERENCES.md
++++ b/DIFFERENCES.md
+@@ -15,7 +15,12 @@
+
+ - One inert Python module defining authenticated receipt, runner, evidence-reader,
+   outbox transport and watchdog classification boundaries.
+-- Twenty-one isolated unit tests using only in-memory fixtures.
++- Twenty-one preserved isolated unit tests using only in-memory fixtures.
++- Four additive regression tests reproducing the independent QA findings.
++- STARTED payload-to-subject fence equality before supervisor transition.
++- Full acceptance-to-recovery run-lineage equality for completion recovery.
++- Explicit no-retry HOLD results for unverifiable post-launch/post-resume ACKs
++  and unverifiable post-send receipts.
+ - Integration, gap, test and B7 dependency documentation.
+
+ ## Explicitly not added
+@@ -24,6 +29,7 @@
+ - No real ledger/activation/Writer lookup and no second task system.
+ - No daemon, timer, service, cgroup, database migration, credential, install or
+   host callsite mutation.
+-- No automatic retry after uncertain launch/resume/stop/send/ACK.
++- No automatic retry after uncertain launch/resume/stop/send/ACK or after a
++  returned receipt fails verification following launch/resume/send invocation.
+ - No fabricated ACK, STARTED, progress, STOPPED, SENT, ACKED, DONE, ACTIVE,
+   COMMITTED, CP14, CP15, CP16 or field PASS.
+diff --git a/ENVIRONMENT_AND_RECONCILIATION.md b/ENVIRONMENT_AND_RECONCILIATION.md
+new file mode 100644
+index 0000000..b1f0186
+--- /dev/null
++++ b/ENVIRONMENT_AND_RECONCILIATION.md
+@@ -0,0 +1,22 @@
++# Environment and prior-writer reconciliation
++
++- Resume start: 2026-10-31 00:31:57 CST (Asia/Shanghai).
++- Isolated repository created: 2026-10-31 00:32:34 CST.
++- Workdir: `/home/xuanjun_dev/p3-lifecycle-resume-20261031`.
++- Imported frozen candidate:
++  `/home/xuanjun_dev/.openclaw/workspace/deliveries/p3-lifecycle-candidate-20261030`.
++- Imported baseline commit: `38650ed7de585d11d05662e8f75e68753096fcc6`.
++- Imported baseline tree: `7393bffb397a0b7a2d13f0c8f2b9b8ee18d27d80`.
++- Runtime: Python 3.6.8.
++- Kernel: Linux 5.10.134-19.1.al8.x86_64 x86_64 GNU/Linux.
++- Git: 2.43.7.
++
++Before copying, process inspection for `p3-lifecycle-candidate`,
++`p3-lifecycle-resume`, `test_p3_host_boundaries`, and `p3_host_boundaries`
++found only the inspection shell/`rg` process. `/proc/*/cwd` inspection found no
++process rooted in the frozen candidate. The requested resume directory did not
++exist. Therefore no old local Writer or same-workdir writer was observed; the
++frozen original was copied once and left unchanged.
++
++No installation, deployment, real dispatch, external transport, credential,
++network, service, scheduler, ledger or production action was performed.
+diff --git a/ORIGINAL_21_RAW.log b/ORIGINAL_21_RAW.log
+new file mode 100644
+index 0000000..bbea3f7
+--- /dev/null
++++ b/ORIGINAL_21_RAW.log
+@@ -0,0 +1,26 @@
++test_acceptance_reads_same_artifact_independent_roles (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_acceptance_rejects_cross_commit_ci (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_completion_reader_adds_exact_current_recovery_lineage (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_default_off_never_invokes_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_inspect_and_stop_return_evidence_not_resume_authority (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_missing_p2_admission_fails_before_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_notifications_default_off_never_invoke_transport (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_outbox_lookup_and_ack_are_bound (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_outbox_send_timeout_holds_without_redial (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_progress_reader_emits_frozen_core_shape (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_resume_rejects_stale_admission_before_runner (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_resume_revalidates_original_admission (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_runner_ack_is_not_started (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_started_receipt_is_forwarded_to_original_supervisor (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_stop_reader_binds_lineage_and_known_effects (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_tampered_receipt_is_rejected (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_unknown_launch_effect_holds_without_retry (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_completed_requires_full_recovery_chain (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_healthy_is_no_action (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_result_missing_and_progress_stalled_are_distinct (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++test_watchdog_unknown_effect_precedes_retry (tests.test_p3_host_boundaries.BoundaryTests) ... ok
++
++----------------------------------------------------------------------
++Ran 21 tests in 0.002s
++
++OK
+diff --git a/PY_COMPILE_RAW.log b/PY_COMPILE_RAW.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/QA_COUNTEREXAMPLES_4_RAW.log b/QA_COUNTEREXAMPLES_4_RAW.log
+new file mode 100644
+index 0000000..30c9841
+--- /dev/null
++++ b/QA_COUNTEREXAMPLES_4_RAW.log
+@@ -0,0 +1,9 @@
++test_completion_rejects_mixed_acceptance_run_lineage (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_started_payload_fence_must_match_receipt_subject (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_unverifiable_post_launch_ack_is_explicit_hold (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
++test_unverifiable_post_send_receipt_is_no_redial_hold (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
++
++----------------------------------------------------------------------
++Ran 4 tests in 0.001s
++
++OK
+diff --git a/QA_FIXES.md b/QA_FIXES.md
+new file mode 100644
+index 0000000..103609a
+--- /dev/null
++++ b/QA_FIXES.md
+@@ -0,0 +1,16 @@
++# Independent QA defect closure
++
++Source finding: `deliveries/b6-p3-independent-qa-20261030/QA_REPORT.md`.
++
++1. STARTED payload fence is compared with the already verified receipt subject
++   fence before `supervisor.accept_started` can be called.
++2. Completion recovery requires every `RUN_SUBJECT_KEYS` value in its subject
++   to equal the acceptance subject, preventing task-only cross-run mixing.
++3. After runner launch/resume returns, receipt verification or ACK-shape failure
++   yields `UNKNOWN_RUNNER_EFFECT_HOLD`, `automatic_retry=false`.
++4. After outbox send returns, receipt verification or payload-shape failure
++   yields `UNKNOWN_NO_REDIAL`, `automatic_retry=false`.
++
++`tests/test_p3_qa_counterexamples.py` contains one regression for each finding.
++The original 21-test file and its expectations are unchanged from the imported
++frozen candidate.
+diff --git a/README.md b/README.md
+index 4da39cc..3fdefd2 100644
+--- a/README.md
++++ b/README.md
+@@ -2,10 +2,14 @@
+
+ ## Status
+
+-`SCOPED_LOCAL_CANDIDATE` only. This is not installed, deployed, admitted, field
++`SCOPED_LOCAL_CORRECTED_CANDIDATE` only. This is not installed, deployed, admitted, field
+ accepted, or connected to a real runner, ledger, Writer, outbox, provider, CI,
+ review service, or notification channel.
+
++This correction was made in an isolated Git repository copied from the frozen
++2026-10-30 candidate. The frozen source directory was not modified. It closes
++only the four defects recorded by the 2026-10-30 independent QA report.
++
+ The candidate reuses, without modifying, the frozen inputs:
+
+ - P3 core ZIP SHA-256
+@@ -56,6 +60,12 @@ The additive module defines and locally tests these fail-closed host contracts:
+ 8. Pure watchdog classification separating START timeout, progress stall,
+    result missing, UNKNOWN side effects and completion recovery. It performs no
+    ledger transition and no retry; the original core remains authoritative.
++9. STARTED payload fence must equal the receipt subject fence before the frozen
++   supervisor is called; completion acceptance and recovery subjects must match
++   across the complete run lineage.
++10. Once runner launch/resume or outbox send has been invoked, any missing,
++    malformed, tampered or wrongly bound returned receipt is an explicit
++    no-retry HOLD, because the effect may already have occurred.
+
+ ## Admission and safety invariants
+
+@@ -67,6 +77,9 @@ The additive module defines and locally tests these fail-closed host contracts:
+ - Notification calls additionally require independent notification authority.
+ - Admission or receipt reader errors become a closed error/HOLD, never success.
+ - An adapter exception after invocation is `UNKNOWN_*_HOLD`; it is not retried.
++- A returned but unverifiable runner ACK is also
++  `UNKNOWN_RUNNER_EFFECT_HOLD`; a returned but unverifiable send receipt is
++  `UNKNOWN_NO_REDIAL`. Neither result authorizes redial.
+ - STOP evidence requires writer and descendants stopped plus effects NONE/KNOWN.
+ - Completion recovery requires full acceptance plus a separate immutable current
+   recovery-lineage receipt. The caller must invoke frozen
+@@ -111,6 +124,18 @@ Observed locally: Python 3.6.8, 21/21 PASS. A Python 3.12 executable was not
+ present in this environment, so this new increment has no current 3.12 rerun.
+ Historical core/host results are not relabelled as tests of this increment.
+
++For this corrected isolated repository, run the supplied suite and the added QA
++counterexamples separately:
++
++```sh
++PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundaries
++PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
++```
++
++Observed locally on Python 3.6.8: original supplied suite 21/21 PASS and added
++QA counterexamples 4/4 PASS. These are Writer-local isolated tests, not
++independent QA, security, Hosted CI, install, field execution or acceptance.
++
+ ## Remaining external blockers
+
+ Real P2 field acceptance; explicit P3 release; active descriptor/journal and DB;
+diff --git a/TEST_RESULTS.txt b/TEST_RESULTS.txt
+index c6344a1..6429117 100644
+--- a/TEST_RESULTS.txt
++++ b/TEST_RESULTS.txt
+@@ -1,12 +1,21 @@
+-P3 host-boundary isolated candidate local test result
+-Date: 2026-10-30
++P3 lifecycle corrected candidate Writer-local isolated test result
++Date: 2026-10-31 (Asia/Shanghai)
+ Runtime: Python 3.6.8
+-Command: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deliveries/p3-lifecycle-candidate-20261030/tests -v
++
++Original supplied suite (expectations unchanged)
++Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundaries
+ Result: 21 tests, 21 PASS, 0 failures, 0 errors, 0 skipped
+ Duration reported by unittest: 0.002s
++Raw log: ORIGINAL_21_RAW.log
++
++Independent-QA counterexample regression suite (additive)
++Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
++Result: 4 tests, 4 PASS, 0 failures, 0 errors, 0 skipped
++Duration reported by unittest: 0.001s
++Raw log: QA_COUNTEREXAMPLES_4_RAW.log
+
+-Scope: author local isolated tests only. No Python 3.12 runtime was available for
+-this new increment. No real runner, ledger, provider, outbox, network, model,
+-service, credential, host, CI, independent QA, security or business acceptance
+-was invoked. Historical 48/48 core and 13/13 host-wiring results are reused only
+-as preserved upstream evidence and are not counted in the 21 tests.
++Scope: sole Writer local isolated tests only. The original 21 expectations were
++not changed. No runner, ledger, provider, outbox, network, model, service,
++credential, install, deployment, external message, Hosted CI, independent QA,
++security or business acceptance was invoked. Historical 48/48 core and 13/13
++host-wiring results remain preserved upstream evidence and are not counted.
+diff --git a/src/p3_host_boundaries.py b/src/p3_host_boundaries.py
+index 5c50b9b..e62e82b 100644
+--- a/src/p3_host_boundaries.py
++++ b/src/p3_host_boundaries.py
+@@ -240,7 +240,7 @@ class EvidenceReaders(object):
+                        "receipt_sha256": receipt["receipt_sha256"]})
+         return result
+
+-    def acceptance(self, task_id):
++    def _acceptance(self, task_id):
+         if not callable(self.acceptance_index):
+             raise ValueError("ACCEPTANCE_INDEX_UNAVAILABLE")
+         index = self.acceptance_index(task_id)
+@@ -290,11 +290,15 @@ class EvidenceReaders(object):
+         if len({proof["author"], proof["qa"]["actor"],
+                 proof["security"]["actor"]}) != 3:
+             raise ValueError("INDEPENDENT_REVIEW_REQUIRED")
++        return proof, subject
++
++    def acceptance(self, task_id):
++        proof, _ = self._acceptance(task_id)
+         return proof
+
+     def completion(self, task_id):
+         """Full frozen reconcile_completed input, including current lineage."""
+-        proof = self.acceptance(task_id)
++        proof, acceptance_subject = self._acceptance(task_id)
+         if not callable(self.completion_index):
+             raise ValueError("COMPLETION_RECOVERY_INDEX_UNAVAILABLE")
+         value = self.completion_index(task_id)
+@@ -303,6 +307,9 @@ class EvidenceReaders(object):
+         subject = _subject(value["subject"])
+         if subject["task_id"] != task_id:
+             raise ValueError("COMPLETION_TASK_MISMATCH")
++        if any(subject[key] != acceptance_subject[key]
++               for key in RUN_SUBJECT_KEYS):
++            raise ValueError("COMPLETION_ACCEPTANCE_LINEAGE_MISMATCH")
+         receipt = self.verifier.read(value["evidence_ref"],
+                                      "RECOVERY_LINEAGE", subject)
+         payload = _exact(receipt["payload"], {
+@@ -340,12 +347,18 @@ class RunnerController(object):
+         except Exception:
+             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                     "automatic_retry": False, "started": False}
+-        receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
+-        payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
+-                         "EXACT_RUNNER_ACK_REQUIRED")
+-        if (payload["operation"] != operation or payload["accepted"] is not True
+-                or payload["started"] is not False or not _text(payload["native_id"])):
+-            raise ValueError("ACK_IS_NOT_STARTED")
++        try:
++            receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
++            payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
++                             "EXACT_RUNNER_ACK_REQUIRED")
++            if (payload["operation"] != operation
++                    or payload["accepted"] is not True
++                    or payload["started"] is not False
++                    or not _text(payload["native_id"])):
++                raise ValueError("ACK_IS_NOT_STARTED")
++        except Exception:
++            return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
++                    "automatic_retry": False, "started": False}
+         return {"state": "ACKNOWLEDGED_AWAITING_STARTED",
+                 "operation": operation, "started": False,
+                 "receipt_sha256": receipt["receipt_sha256"],
+@@ -367,6 +380,8 @@ class RunnerController(object):
+             "native_state", "lease_owner", "lease_until", "fence",
+             "checkpoint", "start_receipt"
+         }, "EXACT_STARTED_PAYLOAD_REQUIRED")
++        if payload["fence"] != subject["fence"]:
++            raise ValueError("STARTED_FENCE_MISMATCH")
+         if not callable(getattr(supervisor, "accept_started", None)):
+             raise TypeError("ORIGINAL_SUPERVISOR_REQUIRED")
+         return supervisor.accept_started(
+@@ -423,13 +438,16 @@ class OutboxController(object):
+             ref = self.transport.send(dict(envelope))
+         except Exception:
+             return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
+-        receipt = self.verifier.read(ref, "OUTBOX_SEND", subject)
+-        payload = _exact(receipt["payload"], {
+-            "binding", "opaque_notification_id", "attempt_nonce", "state",
+-            "delivery_receipt_id"
+-        }, "EXACT_OUTBOX_SEND_REQUIRED")
+-        if payload["state"] not in ("SENT", "UNKNOWN"):
+-            raise ValueError("INVALID_SEND_RESULT")
++        try:
++            receipt = self.verifier.read(ref, "OUTBOX_SEND", subject)
++            payload = _exact(receipt["payload"], {
++                "binding", "opaque_notification_id", "attempt_nonce", "state",
++                "delivery_receipt_id"
++            }, "EXACT_OUTBOX_SEND_REQUIRED")
++            if payload["state"] not in ("SENT", "UNKNOWN"):
++                raise ValueError("INVALID_SEND_RESULT")
++        except Exception:
++            return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
+         return dict(payload, receipt_sha256=receipt["receipt_sha256"],
+                     automatic_retry=False)
+
+diff --git a/tests/test_p3_qa_counterexamples.py b/tests/test_p3_qa_counterexamples.py
+new file mode 100644
+index 0000000..ece5360
+--- /dev/null
++++ b/tests/test_p3_qa_counterexamples.py
+@@ -0,0 +1,173 @@
++from __future__ import absolute_import
++
++import os
++import sys
++import unittest
++
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
++
++from p3_host_boundaries import (AdmissionGate, EvidenceReaders,
++    OutboxController, OutboxTransport, ReceiptVerifier, RunnerAdapter,
++    RunnerController, TrustedReceiptProvider, seal_receipt)
++
++
++NOW = 1000.0
++SPEC = "1" * 64
++ARTIFACT_SHA = "2" * 64
++COMMIT = "3" * 40
++CHECKPOINT = "4" * 64
++SUBJECT = {
++    "task_id": "P3-T1", "spec_hash": SPEC, "artifact": "artifact-v1",
++    "run_id": "run-1", "session_id": "session-1", "fence": 7,
++    "epoch": 3, "generation": 9, "resume_generation": 1
++}
++
++
++def admission():
++    value = dict(SUBJECT)
++    value.update({"p2_accepted": True, "p3_release_accepted": True,
++                  "unique_writer": True, "execution_authorized": True,
++                  "notification_authorized": True, "valid_from": 900.0,
++                  "valid_until": 1100.0, "verified": True})
++    return value
++
++
++class Provider(TrustedReceiptProvider):
++    def __init__(self):
++        self.values = {}
++
++    def add(self, ref, kind, payload, subject=None):
++        self.values[ref] = seal_receipt(
++            "fixture-provider", ref, kind, subject or SUBJECT, payload, NOW)
++        return ref
++
++    def read(self, evidence_ref):
++        return self.values[evidence_ref]
++
++
++class TamperedAckRunner(RunnerAdapter):
++    def __init__(self, provider):
++        self.provider = provider
++        self.calls = 0
++
++    def launch(self, value):
++        self.calls += 1
++        ref = self.provider.add("ack-launch", "RUNNER_ACK", {
++            "operation": "launch", "accepted": True, "started": False,
++            "native_id": "native-1"
++        })
++        self.provider.values[ref]["payload"]["native_id"] = "tampered"
++        return ref
++
++    def resume(self, value):
++        raise NotImplementedError
++
++    def inspect(self, subject):
++        raise NotImplementedError
++
++    def stop(self, subject, reason):
++        raise NotImplementedError
++
++
++class TamperedSendTransport(OutboxTransport):
++    def __init__(self, provider):
++        self.provider = provider
++        self.calls = 0
++
++    def send(self, envelope):
++        self.calls += 1
++        ref = self.provider.add("send", "OUTBOX_SEND", {
++            "binding": "binding-1", "opaque_notification_id": "notice-1",
++            "attempt_nonce": "nonce-1", "state": "SENT",
++            "delivery_receipt_id": "delivery-1"
++        })
++        self.provider.values[ref]["payload"]["delivery_receipt_id"] = "tampered"
++        return ref
++
++    def lookup(self, binding, opaque_notification_id, attempt_nonce):
++        raise NotImplementedError
++
++    def ack(self, delivery_receipt_id):
++        raise NotImplementedError
++
++
++class Supervisor(object):
++    def __init__(self):
++        self.calls = 0
++
++    def accept_started(self, *args):
++        self.calls += 1
++        return "STARTED"
++
++
++class QACounterexamples(unittest.TestCase):
++    def setUp(self):
++        self.provider = Provider()
++        self.verifier = ReceiptVerifier(self.provider)
++        self.gate = AdmissionGate(lambda: admission(), lambda: NOW,
++                                  execution_enabled=True,
++                                  notifications_enabled=True)
++
++    def test_started_payload_fence_must_match_receipt_subject(self):
++        runner = TamperedAckRunner(self.provider)
++        controller = RunnerController(self.gate, self.verifier, runner)
++        self.provider.add("started", "STARTED", {
++            "native_state": "RUNNING", "lease_owner": "writer-1",
++            "lease_until": 1050.0, "fence": 99, "checkpoint": {"step": 1},
++            "start_receipt": {"task_id": "P3-T1"}
++        })
++        supervisor = Supervisor()
++        with self.assertRaisesRegex(ValueError, "STARTED_FENCE_MISMATCH"):
++            controller.accept_started(SUBJECT, "started", supervisor)
++        self.assertEqual(0, supervisor.calls)
++
++    def test_completion_rejects_mixed_acceptance_run_lineage(self):
++        self.provider.add("terminal", "TERMINAL", {
++            "terminal_receipt": "terminal-1", "effects": "KNOWN",
++            "writer_stopped": True
++        })
++        actors = {"tests": "tester", "ci": "ci", "qa": "qa",
++                  "security": "security", "business": "business"}
++        for role, actor in actors.items():
++            self.provider.add(role, role.upper(), {
++                "status": "PASS", "commit": COMMIT,
++                "artifact_sha256": ARTIFACT_SHA, "actor": actor
++            })
++        index = {"subject": SUBJECT, "checkpoint_sha256": CHECKPOINT,
++                 "commit": COMMIT, "artifact_sha256": ARTIFACT_SHA,
++                 "scope": "FIELD", "author": "author", "terminal": "terminal",
++                 "tests": "tests", "ci": "ci", "qa": "qa",
++                 "security": "security", "business": "business"}
++        other = dict(SUBJECT, run_id="run-2", session_id="session-2", fence=8)
++        self.provider.add("recovery-other", "RECOVERY_LINEAGE", {
++            "current_fence": 8, "run_id": "run-2", "session_id": "session-2",
++            "resume_generation": 1, "epoch": 3, "generation": 9
++        }, subject=other)
++        readers = EvidenceReaders(
++            self.verifier, lambda ref: SUBJECT, lambda ref: SUBJECT,
++            lambda task_id: index,
++            completion_index=lambda task_id: {
++                "subject": other, "evidence_ref": "recovery-other"})
++        with self.assertRaisesRegex(
++                ValueError, "COMPLETION_ACCEPTANCE_LINEAGE_MISMATCH"):
++            readers.completion("P3-T1")
++
++    def test_unverifiable_post_launch_ack_is_explicit_hold(self):
++        runner = TamperedAckRunner(self.provider)
++        controller = RunnerController(self.gate, self.verifier, runner)
++        result = controller.launch(SUBJECT, {"opaque": "admission"})
++        self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", result["state"])
++        self.assertFalse(result["automatic_retry"])
++        self.assertEqual(1, runner.calls)
++
++    def test_unverifiable_post_send_receipt_is_no_redial_hold(self):
++        transport = TamperedSendTransport(self.provider)
++        controller = OutboxController(self.gate, self.verifier, transport)
++        result = controller.send(SUBJECT, {"opaque": "payload"})
++        self.assertEqual("UNKNOWN_NO_REDIAL", result["state"])
++        self.assertFalse(result["automatic_retry"])
++        self.assertEqual(1, transport.calls)
++
++
++if __name__ == "__main__":
++    unittest.main()

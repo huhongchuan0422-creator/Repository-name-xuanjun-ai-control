@@ -1,12 +1,21 @@
-P3 host-boundary isolated candidate local test result
-Date: 2026-10-30
+P3 lifecycle corrected candidate Writer-local isolated test result
+Date: 2026-10-31 (Asia/Shanghai)
 Runtime: Python 3.6.8
-Command: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deliveries/p3-lifecycle-candidate-20261030/tests -v
+
+Original supplied suite (expectations unchanged)
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundaries
 Result: 21 tests, 21 PASS, 0 failures, 0 errors, 0 skipped
 Duration reported by unittest: 0.002s
+Raw log: ORIGINAL_21_RAW.log
 
-Scope: author local isolated tests only. No Python 3.12 runtime was available for
-this new increment. No real runner, ledger, provider, outbox, network, model,
-service, credential, host, CI, independent QA, security or business acceptance
-was invoked. Historical 48/48 core and 13/13 host-wiring results are reused only
-as preserved upstream evidence and are not counted in the 21 tests.
+Independent-QA counterexample regression suite (additive)
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
+Result: 4 tests, 4 PASS, 0 failures, 0 errors, 0 skipped
+Duration reported by unittest: 0.001s
+Raw log: QA_COUNTEREXAMPLES_4_RAW.log
+
+Scope: sole Writer local isolated tests only. The original 21 expectations were
+not changed. No runner, ledger, provider, outbox, network, model, service,
+credential, install, deployment, external message, Hosted CI, independent QA,
+security or business acceptance was invoked. Historical 48/48 core and 13/13
+host-wiring results remain preserved upstream evidence and are not counted.

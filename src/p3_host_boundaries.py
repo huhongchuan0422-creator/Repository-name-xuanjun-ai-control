@@ -240,7 +240,7 @@ class EvidenceReaders(object):
                        "receipt_sha256": receipt["receipt_sha256"]})
         return result
 
-    def acceptance(self, task_id):
+    def _acceptance(self, task_id):
         if not callable(self.acceptance_index):
             raise ValueError("ACCEPTANCE_INDEX_UNAVAILABLE")
         index = self.acceptance_index(task_id)
@@ -290,11 +290,15 @@ class EvidenceReaders(object):
         if len({proof["author"], proof["qa"]["actor"],
                 proof["security"]["actor"]}) != 3:
             raise ValueError("INDEPENDENT_REVIEW_REQUIRED")
+        return proof, subject
+
+    def acceptance(self, task_id):
+        proof, _ = self._acceptance(task_id)
         return proof
 
     def completion(self, task_id):
         """Full frozen reconcile_completed input, including current lineage."""
-        proof = self.acceptance(task_id)
+        proof, acceptance_subject = self._acceptance(task_id)
         if not callable(self.completion_index):
             raise ValueError("COMPLETION_RECOVERY_INDEX_UNAVAILABLE")
         value = self.completion_index(task_id)
@@ -303,6 +307,9 @@ class EvidenceReaders(object):
         subject = _subject(value["subject"])
         if subject["task_id"] != task_id:
             raise ValueError("COMPLETION_TASK_MISMATCH")
+        if any(subject[key] != acceptance_subject[key]
+               for key in RUN_SUBJECT_KEYS):
+            raise ValueError("COMPLETION_ACCEPTANCE_LINEAGE_MISMATCH")
         receipt = self.verifier.read(value["evidence_ref"],
                                      "RECOVERY_LINEAGE", subject)
         payload = _exact(receipt["payload"], {
@@ -340,12 +347,18 @@ class RunnerController(object):
         except Exception:
             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                     "automatic_retry": False, "started": False}
-        receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
-        payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
-                         "EXACT_RUNNER_ACK_REQUIRED")
-        if (payload["operation"] != operation or payload["accepted"] is not True
-                or payload["started"] is not False or not _text(payload["native_id"])):
-            raise ValueError("ACK_IS_NOT_STARTED")
+        try:
+            receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
+            payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
+                             "EXACT_RUNNER_ACK_REQUIRED")
+            if (payload["operation"] != operation
+                    or payload["accepted"] is not True
+                    or payload["started"] is not False
+                    or not _text(payload["native_id"])):
+                raise ValueError("ACK_IS_NOT_STARTED")
+        except Exception:
+            return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                    "automatic_retry": False, "started": False}
         return {"state": "ACKNOWLEDGED_AWAITING_STARTED",
                 "operation": operation, "started": False,
                 "receipt_sha256": receipt["receipt_sha256"],
@@ -367,6 +380,8 @@ class RunnerController(object):
             "native_state", "lease_owner", "lease_until", "fence",
             "checkpoint", "start_receipt"
         }, "EXACT_STARTED_PAYLOAD_REQUIRED")
+        if payload["fence"] != subject["fence"]:
+            raise ValueError("STARTED_FENCE_MISMATCH")
         if not callable(getattr(supervisor, "accept_started", None)):
             raise TypeError("ORIGINAL_SUPERVISOR_REQUIRED")
         return supervisor.accept_started(
@@ -423,13 +438,16 @@ class OutboxController(object):
             ref = self.transport.send(dict(envelope))
         except Exception:
             return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
-        receipt = self.verifier.read(ref, "OUTBOX_SEND", subject)
-        payload = _exact(receipt["payload"], {
-            "binding", "opaque_notification_id", "attempt_nonce", "state",
-            "delivery_receipt_id"
-        }, "EXACT_OUTBOX_SEND_REQUIRED")
-        if payload["state"] not in ("SENT", "UNKNOWN"):
-            raise ValueError("INVALID_SEND_RESULT")
+        try:
+            receipt = self.verifier.read(ref, "OUTBOX_SEND", subject)
+            payload = _exact(receipt["payload"], {
+                "binding", "opaque_notification_id", "attempt_nonce", "state",
+                "delivery_receipt_id"
+            }, "EXACT_OUTBOX_SEND_REQUIRED")
+            if payload["state"] not in ("SENT", "UNKNOWN"):
+                raise ValueError("INVALID_SEND_RESULT")
+        except Exception:
+            return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
         return dict(payload, receipt_sha256=receipt["receipt_sha256"],
                     automatic_retry=False)
 

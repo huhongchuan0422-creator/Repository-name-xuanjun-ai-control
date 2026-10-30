@@ -1,57 +1,47 @@
 {
   "schema": 1,
-  "kind": "P3_LIFECYCLE_HOST_BOUNDARY_ISOLATED_CANDIDATE_NOT_INSTALLER",
-  "date": "2026-10-30",
-  "status": "SCOPED_LOCAL_CANDIDATE",
+  "kind": "P3_LIFECYCLE_CORRECTED_ISOLATED_CANDIDATE_NOT_INSTALLER",
+  "date": "2026-10-31",
+  "status": "SCOPED_LOCAL_CORRECTED_CANDIDATE",
   "default_off": true,
   "field_acceptance": false,
   "real_runner_called": false,
   "real_ledger_called": false,
   "external_transport_called": false,
-  "upstream": {
-    "handoff_transport_sha256": "fdfb2baa971ea90694aef75c88b1d926b0fad51ea327ec4ab03d4ab1f4c982b5",
-    "p3_core_zip_sha256": "34fda99283a3593daff6810f4c70b3d1b9d6afcee9c491a7030f6195e2ae0252",
-    "host_wiring_successor_zip_sha256": "d41d80623bf4e5017a277affcd5937e79ecdfa0615de7c1bf02943c4e9e2aa93"
-  },
+  "installed": false,
+  "deployed": false,
+  "independent_qa": false,
+  "imported_frozen_candidate_sha256": "8cb988431d5a1ae4da67da6b67a450d36b382a3f81af1e97f70d02e7e272450d",
+  "imported_baseline_commit": "38650ed7de585d11d05662e8f75e68753096fcc6",
+  "imported_baseline_tree": "7393bffb397a0b7a2d13f0c8f2b9b8ee18d27d80",
   "test": {
     "runtime": "Python 3.6.8",
-    "count": 21,
-    "passed": 21,
+    "original_count": 21,
+    "original_passed": 21,
+    "counterexample_count": 4,
+    "counterexample_passed": 4,
+    "combined_count": 25,
+    "combined_passed": 25,
     "failed": 0,
-    "python312_rerun": false,
-    "independent_review": false
+    "errors": 0,
+    "skipped": 0,
+    "writer_local_only": true
   },
   "files": [
-    {
-      "path": "B7_ENTRY_GATE.md",
-      "bytes": 2793,
-      "sha256": "b5570068436d3e0ce73f8847bdaaf0dff783a99d120ef948591439247bc277c8"
-    },
-    {
-      "path": "DIFFERENCES.md",
-      "bytes": 1333,
-      "sha256": "a94e79ef05b3f427e3295a37c60f5109f8153855b8c01c9f34c23896b0a1d577"
-    },
-    {
-      "path": "README.md",
-      "bytes": 6647,
-      "sha256": "c1bcff1ea8168d905ea88a17f03783c4f33751a7584a51d24e6cfb8cb12196ec"
-    },
-    {
-      "path": "TEST_RESULTS.txt",
-      "bytes": 698,
-      "sha256": "063f76720188c2a044d3b2a1e8506fe9eec001ef5ec1fa1fd33ba64172e8480a"
-    },
-    {
-      "path": "src/p3_host_boundaries.py",
-      "bytes": 24429,
-      "sha256": "261d6da6311723ad02096b8f5dc4d321f53d357e7def90cef56bf4d7dd0ce7e1"
-    },
-    {
-      "path": "tests/test_p3_host_boundaries.py",
-      "bytes": 14215,
-      "sha256": "465b6306fd70992e750c9ca37bd73f5624c956b0b5f51556190059b9fe932469"
-    }
+    {"path": "B7_ENTRY_GATE.md", "bytes": 2793, "sha256": "b5570068436d3e0ce73f8847bdaaf0dff783a99d120ef948591439247bc277c8"},
+    {"path": "COMBINED_25_RAW.log", "bytes": 2498, "sha256": "1f0839cee4a7bc6fc25c18f91b25f637057ce9d6ba65607eda1d008924bc08bc"},
+    {"path": "DIFFERENCES.md", "bytes": 1774, "sha256": "ebca281015ed7e4c9ca170453fc3bc14c0e56b9d2900906b8f536bea9c61f4fc"},
+    {"path": "ENVIRONMENT_AND_RECONCILIATION.md", "bytes": 1156, "sha256": "83954a0c8efdee5f2dbef4df488f253c922f464c6386a07bdc4ca96cf6e70b6a"},
+    {"path": "ORIGINAL_21_RAW.log", "bytes": 2196, "sha256": "c690b1230e125e0b44ee7a996a901a6a6cd871c47d8924459d4d3679da9b1477"},
+    {"path": "PY_COMPILE_RAW.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"path": "QA_COUNTEREXAMPLES_4_RAW.log", "bytes": 550, "sha256": "92c6eb5f0870b168b12a30da9847d70cc279a02b145585f96e513a710bb3cea1"},
+    {"path": "QA_FIXES.md", "bytes": 854, "sha256": "faa4f55d007ebaac05f2bbb5a5986a4c9ab0d6844ee24a4395723433cad5fc4b"},
+    {"path": "README.md", "bytes": 7994, "sha256": "940ebdf93d42f4cceb07934d2b3828f38784c43841db664d422759c369a0cbf4"},
+    {"path": "SOURCE_DIFF.patch", "bytes": 26536, "sha256": "d9d3ef224d5b6e3ac7cecd902a4eb27ad604d77cce7e5a6f8039c360c4c29eb3"},
+    {"path": "TEST_RESULTS.txt", "bytes": 1062, "sha256": "9acdc2027a3b3e92af2f008ddbf7762bdef143e15e87ae00f85ec5a1f44020c1"},
+    {"path": "src/p3_host_boundaries.py", "bytes": 25230, "sha256": "12b36b0f65780f0be9a918882b699b33f5e187d629c0166dd388c77428b40f47"},
+    {"path": "tests/test_p3_host_boundaries.py", "bytes": 14215, "sha256": "465b6306fd70992e750c9ca37bd73f5624c956b0b5f51556190059b9fe932469"},
+    {"path": "tests/test_p3_qa_counterexamples.py", "bytes": 6433, "sha256": "123e90f4ecc34e2da9d63a55dfe7955f5a76108153cb9fd9ca845fd9bab0dacf"}
   ],
   "manifest_self_hash": "excluded to avoid recursion",
   "checksum_file_hash": "reported externally; SHA256SUMS excludes itself"

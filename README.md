@@ -2,9 +2,13 @@
 
 ## Status
 
-`SCOPED_LOCAL_CANDIDATE` only. This is not installed, deployed, admitted, field
+`SCOPED_LOCAL_CORRECTED_CANDIDATE` only. This is not installed, deployed, admitted, field
 accepted, or connected to a real runner, ledger, Writer, outbox, provider, CI,
 review service, or notification channel.
+
+This correction was made in an isolated Git repository copied from the frozen
+2026-10-30 candidate. The frozen source directory was not modified. It closes
+only the four defects recorded by the 2026-10-30 independent QA report.
 
 The candidate reuses, without modifying, the frozen inputs:
 
@@ -56,6 +60,12 @@ The additive module defines and locally tests these fail-closed host contracts:
 8. Pure watchdog classification separating START timeout, progress stall,
    result missing, UNKNOWN side effects and completion recovery. It performs no
    ledger transition and no retry; the original core remains authoritative.
+9. STARTED payload fence must equal the receipt subject fence before the frozen
+   supervisor is called; completion acceptance and recovery subjects must match
+   across the complete run lineage.
+10. Once runner launch/resume or outbox send has been invoked, any missing,
+    malformed, tampered or wrongly bound returned receipt is an explicit
+    no-retry HOLD, because the effect may already have occurred.
 
 ## Admission and safety invariants
 
@@ -67,6 +77,9 @@ The additive module defines and locally tests these fail-closed host contracts:
 - Notification calls additionally require independent notification authority.
 - Admission or receipt reader errors become a closed error/HOLD, never success.
 - An adapter exception after invocation is `UNKNOWN_*_HOLD`; it is not retried.
+- A returned but unverifiable runner ACK is also
+  `UNKNOWN_RUNNER_EFFECT_HOLD`; a returned but unverifiable send receipt is
+  `UNKNOWN_NO_REDIAL`. Neither result authorizes redial.
 - STOP evidence requires writer and descendants stopped plus effects NONE/KNOWN.
 - Completion recovery requires full acceptance plus a separate immutable current
   recovery-lineage receipt. The caller must invoke frozen
@@ -110,6 +123,18 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
 Observed locally: Python 3.6.8, 21/21 PASS. A Python 3.12 executable was not
 present in this environment, so this new increment has no current 3.12 rerun.
 Historical core/host results are not relabelled as tests of this increment.
+
+For this corrected isolated repository, run the supplied suite and the added QA
+counterexamples separately:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundaries
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
+```
+
+Observed locally on Python 3.6.8: original supplied suite 21/21 PASS and added
+QA counterexamples 4/4 PASS. These are Writer-local isolated tests, not
+independent QA, security, Hosted CI, install, field execution or acceptance.
 
 ## Remaining external blockers
 
