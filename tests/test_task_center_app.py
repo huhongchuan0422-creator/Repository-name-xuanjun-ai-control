@@ -160,6 +160,26 @@ class TaskCenterAppTests(unittest.TestCase):
         status,_,body=self.get('/admin.html')
         self.assertEqual(status,200);self.assertIn(b'sessionIdentity',body)
 
+    def test_digital_twin_projection_is_admin_read_only_and_reference_based(self):
+        with self.assertRaises(HTTPError) as denied:
+            self.get('/api/admin/digital-twin')
+        self.assertEqual(denied.exception.code, 403)
+        request = Request(self.base + '/api/admin/digital-twin', headers={
+          'X-Test-Admin-Token':'test-admin-token-123456'})
+        response = urlopen(request, timeout=3)
+        self.assertEqual(response.status, 200)
+        value = json.loads(response.read().decode('utf-8'))
+        self.assertEqual(value['schema'], 1)
+        self.assertEqual(value['tenant_id'], 'tenant-ui')
+        self.assertEqual(value['permissions']['mutation'], 'NONE')
+        canonical_ids = {item['task_id'] for item in value['records']['tasks']}
+        indexed_ids = {task_id for task_ids in
+                       value['views']['project_task_ids'].values()
+                       for task_id in task_ids}
+        self.assertEqual(canonical_ids, indexed_ids)
+        self.assertTrue(all(item['heartbeat_state'] == 'UNKNOWN'
+                            for item in value['records']['tasks']))
+
     def test_simple_provider_onboarding_http_chain_is_real_server_backed(self):
         secret='sk-ui-test-123456789'
         fake={'platform':'siliconflow','auth_state':'SUCCEEDED',

@@ -41,6 +41,7 @@ from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
                                      MCPTaskService,
                                      ensure_schema as ensure_mcp_task_schema,
                                      recover_incomplete_mcp_starts)
+from digital_twin_projection import build_projection as build_twin_projection
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -84,6 +85,10 @@ MODEL_TABLES = frozenset((
     'role_instances','acceptance_checklists','model_quota_status',
     'codex_execution_intents','codex_execution_events',
     'provider_onboarding_configs'))
+
+TWIN_MODEL_TABLES = frozenset((
+    'role_instances', 'model_requests', 'model_assignments',
+    'delivery_candidates', 'candidate_reviews'))
 
 ROLE_ACTION_ROLES = {
     'START_TEST_ONLY_TASK': 'TASK_EXECUTOR',
@@ -180,6 +185,45 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
                               'mode':'TEST_ONLY','external_execution':
                               'NOT_IMPLEMENTED'}
         return result
+    finally:
+        connection.close()
+
+
+def read_only_twin_projection(db_path, authority_key, tenant_id,
+                              principal_id):
+    """Build one tenant-bound read snapshot without mutation capability."""
+    connection = _read_only_connection(
+        db_path, PROJECTION_TABLES | TWIN_MODEL_TABLES)
+    try:
+        authority = TestTenantAuthority(authority_key)
+        gateway = GatewayKernel.__new__(GatewayKernel)
+        gateway.db = connection
+        gateway.supervisor = _ReadOnlySupervisor(connection)
+        gateway.tenants = authority
+        task_projection = gateway.projection(
+            authority.issue(tenant_id, principal_id))
+        model_projection = {
+            'instances': [dict(x) for x in connection.execute('''SELECT
+              instance_id,role_id,role_version,state,desired_state,
+              current_request_id,last_checkpoint_json,updated_at
+              FROM role_instances WHERE tenant_id=? ORDER BY instance_id''',
+              (tenant_id,))],
+            'requests': [dict(x) for x in connection.execute('''SELECT
+              request_id,task_id,attempt_id,role_id,state,last_heartbeat,
+              checkpoint_json,created_at,updated_at FROM model_requests
+              WHERE tenant_id=? ORDER BY created_at,request_id''',
+              (tenant_id,))],
+            'assignments': [dict(x) for x in connection.execute('''SELECT
+              task_id,attempt_id,role_id,role_version,principal_id,state,
+              created_at FROM model_assignments WHERE tenant_id=?
+              ORDER BY task_id,role_id''', (tenant_id,))],
+            'candidates': [dict(x) for x in connection.execute('''SELECT
+              candidate_id,task_id,attempt_id,artifact_sha256,
+              checklist_sha256,submitted_by,reviewed_by,accepted_by,state,
+              created_at,updated_at FROM delivery_candidates WHERE tenant_id=?
+              ORDER BY created_at,candidate_id''', (tenant_id,))],
+        }
+        return build_twin_projection(task_projection, model_projection)
     finally:
         connection.close()
 
@@ -541,6 +585,22 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 except Exception as exc:
                     self._send(400,_json_bytes({'error':str(exc)}),
                                'application/json; charset=utf-8')
+                return
+            if path == '/api/admin/digital-twin':
+                if not self._admin_allowed():
+                    self._send(403, _json_bytes({'error':'ADMIN_REQUIRED'}),
+                               'application/json; charset=utf-8'); return
+                try:
+                    self._send(200, _json_bytes(read_only_twin_projection(
+                               db_path, authority_key, tenant_id,
+                               principal_id)),
+                               'application/json; charset=utf-8')
+                except Exception as exc:
+                    self._send(500, _json_bytes({
+                        'mode':'TEST_ONLY','error':type(exc).__name__,
+                        'detail':str(exc),
+                        'production_status':'NOT_IMPLEMENTED'}),
+                        'application/json; charset=utf-8')
                 return
             asset = ASSETS.get(path)
             if asset is None:

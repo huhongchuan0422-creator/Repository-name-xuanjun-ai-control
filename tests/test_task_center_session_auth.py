@@ -138,10 +138,21 @@ class SessionAuthIntegrationTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as denied:
             self.request('/api/admin/model-control')
         self.assertEqual(denied.exception.code,403)
+        with self.assertRaises(HTTPError) as twin_denied:
+            self.request('/api/admin/digital-twin')
+        self.assertEqual(twin_denied.exception.code,403)
         with self.assertRaises(HTTPError) as denied_post:
             self.request('/api/admin/model-control','POST',
               {'action':'RECONCILE_CODEX_RESTART'},receipt['csrf_token'])
         self.assertEqual(denied_post.exception.code,403)
+
+    def test_admin_session_can_read_digital_twin_without_action_surface(self):
+        self.login()
+        value=json.loads(self.request('/api/admin/digital-twin').read().decode())
+        self.assertEqual(value['tenant_id'],'tenant-session')
+        self.assertEqual(value['permissions']['read_role'],'TASK_CENTER_ADMIN')
+        self.assertEqual(value['permissions']['mutation'],'NONE')
+        self.assertFalse(value['event_contract']['ai_may_confirm'])
 
     def test_admin_page_uses_session_and_canonical_asset_query_contract(self):
         receipt=self.login()
