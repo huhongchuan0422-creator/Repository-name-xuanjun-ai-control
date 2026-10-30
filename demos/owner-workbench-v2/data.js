@@ -1,7 +1,8 @@
 (function(root){
   'use strict';
   root.XJ_WORKBENCH_FIXTURE={
-    schema:2,
+    schema:3,
+    tenant_id:'TENANT-SYNTHETIC-XJ',
     mode:'UI_CANDIDATE',
     observed_at:'2026-10-30 13:30 CST',
     source_notice:'合成数据，仅验证信息架构和交互；不代表部署、安装或客户验收。',
@@ -13,33 +14,33 @@
     ],
     projects:[
       {
-        id:'PRJ-XJ-042',name:'玄钧统一管理台',customer:'玄钧AI实验室',kind:'平台产品',
+        id:'PRJ-XJ-042',project_id:'PRJ-XJ-042',tenant_id:'TENANT-SYNTHETIC-XJ',name:'玄钧统一管理台',customer:'玄钧AI实验室',kind:'平台产品',
         stage:'PENDING_REVIEW',stage_label:'待 Owner 审核',owner:'产品与交付组',updated:'12 分钟前',
-        next_action:'审核首页与项目详情候选',ui_version:'ui-v2.3-candidate',task_id:'TASK-2042',
+        next_action:'审核首页与项目详情候选',ui_version:'ui-v2.3-candidate',environment:'SYNTHETIC_PREVIEW',task_id:'TASK-2042',attempt_id:'ATT-03',commit:'14a531d8',artifact_sha:'UNKNOWN',evidence_ref:'demos/owner-workbench-v2',
         progress:{done:4,total:8},risk:'LOW',legacy_entry_ref:'/task-center-test/admin.html',
         pages:[
-          {id:'PAGE-001',name:'工作台总览',status:'PENDING_REVIEW',label:'待审核',version:'v2.3',previous:'v2.2',changes:6},
-          {id:'PAGE-002',name:'项目列表',status:'CONFIRMED',label:'已确认',version:'v2.3',previous:'v2.2',changes:3},
-          {id:'PAGE-003',name:'项目详情',status:'PENDING_CHANGE',label:'待修改',version:'v2.3',previous:'v2.2',changes:4},
-          {id:'PAGE-004',name:'预览审核工作区',status:'PENDING_RECHECK',label:'待复验',version:'v2.3-r2',previous:'v2.3',changes:2}
+          {id:'PAGE-001',page_id:'PAGE-001',name:'工作台总览',status:'PENDING_REVIEW',label:'待审核',version:'v2.3',ui_version:'v2.3',previous:'v2.2',changes:6},
+          {id:'PAGE-002',page_id:'PAGE-002',name:'项目列表',status:'CONFIRMED',label:'已确认',version:'v2.3',ui_version:'v2.3',previous:'v2.2',changes:3},
+          {id:'PAGE-003',page_id:'PAGE-003',name:'项目详情',status:'PENDING_CHANGE',label:'待修改',version:'v2.3',ui_version:'v2.3',previous:'v2.2',changes:4},
+          {id:'PAGE-004',page_id:'PAGE-004',name:'预览审核工作区',status:'PENDING_RECHECK',label:'待复验',version:'v2.3-r2',ui_version:'v2.3-r2',previous:'v2.3',changes:2}
         ]
       },
       {
-        id:'PRJ-CUS-118',name:'客户项目中心升级',customer:'合成客户 A',kind:'定制项目',
+        id:'PRJ-CUS-118',project_id:'PRJ-CUS-118',tenant_id:'TENANT-SYNTHETIC-A',name:'客户项目中心升级',customer:'合成客户 A',kind:'定制项目',
         stage:'IN_DEVELOPMENT',stage_label:'开发中',owner:'交付工程组',updated:'1 小时前',
-        next_action:'等待 Identity adapter',ui_version:'customer-center-v1',task_id:'TASK-2118',
+        next_action:'等待 Identity adapter',ui_version:'customer-center-v1',environment:'UNKNOWN',task_id:'TASK-2118',attempt_id:'ATT-01',commit:'UNKNOWN',artifact_sha:'NONE_FOUND',evidence_ref:'NONE_FOUND',
         progress:{done:3,total:9},risk:'MEDIUM',legacy_entry_ref:'/customer/center/',pages:[]
       },
       {
-        id:'PRJ-BIN-007',name:'币安自营客服隔离',customer:'玄钧AI新 · 自营',kind:'自营业务',
+        id:'PRJ-BIN-007',project_id:'PRJ-BIN-007',tenant_id:'TENANT-SYNTHETIC-XJ',name:'币安自营客服隔离',customer:'玄钧AI新 · 自营',kind:'自营业务',
         stage:'BLOCKED',stage_label:'证据不足',owner:'自营业务组',updated:'昨天',
-        next_action:'补真实模型语义证据',ui_version:'support-rules-v1',task_id:'TASK-2207',
+        next_action:'补真实模型语义证据',ui_version:'support-rules-v1',environment:'NOT_CONNECTED',task_id:'TASK-2207',attempt_id:'UNKNOWN',commit:'UNKNOWN',artifact_sha:'NONE_FOUND',evidence_ref:'NONE_FOUND',
         progress:{done:2,total:6},risk:'HIGH',legacy_entry_ref:null,pages:[]
       }
     ],
     review:{
-      project_id:'PRJ-XJ-042',page_id:'PAGE-004',page_name:'预览审核工作区',version:'v2.3-r2',environment:'SYNTHETIC_PREVIEW',
-      artifact_sha:'6f1b…c20a',commit:'candidate-not-committed',responsible:'UI Writer',next_action:'Owner 逐页确认',
+      tenant_id:'TENANT-SYNTHETIC-XJ',project_id:'PRJ-XJ-042',page_id:'PAGE-004',page_name:'预览审核工作区',version:'v2.3-r2',ui_version:'v2.3-r2',environment:'SYNTHETIC_PREVIEW',task_id:'TASK-2042',attempt_id:'ATT-03',
+      artifact_sha:'UNKNOWN',commit:'14a531d8',evidence_ref:'demos/owner-workbench-v2',responsible:'UI Writer',next_action:'Owner 逐页确认',
       layers:[
         {id:'design',label:'设计稿',state:'DONE',detail:'布局与信息层级候选'},
         {id:'demo',label:'合成演示',state:'DONE',detail:'无后端、无生产写入'},
