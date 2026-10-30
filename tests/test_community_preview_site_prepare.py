@@ -37,7 +37,13 @@ class SitePreparation(unittest.TestCase):
         c=f.current();c['oci_revision']=BAD
         with self.assertRaisesRegex(ValueError,'CURRENT_OCI_DIFF'):plan.current_identity(c)
         c['oci_revision']=GOOD;self.assertEqual(plan.current_identity(c)['oci_revision'],GOOD)
-        self.assertEqual(comp.PINS[plan],hashlib.sha256(Path(plan.__file__).read_bytes()).hexdigest())
+        # Frozen production admission is not silently advanced to current OCR sources.
+        with frozen.historical_composition() as fixed:
+            self.assertEqual(comp.PINS[plan],hashlib.sha256(Path(fixed.plan.__file__).read_bytes()).hexdigest())
+        self.assertNotEqual(comp.PINS[plan],hashlib.sha256(Path(plan.__file__).read_bytes()).hexdigest())
+        with patch.object(comp.original,'read_root_file',return_value=(Path(plan.__file__).read_bytes(),0o600)):
+            with self.assertRaisesRegex(comp.controller.Hold,'APPROVED_FILE_DIGEST_CHANGED'):
+                comp.protected_body(plan.__file__,comp.PINS[plan])
     def test_refreshed_bundles_pin_only_exact_corrected_sources(self):
         with frozen.historical_tree(frozen.READONLY_COMMIT) as root,patch.object(bundle,'ROOT',root):
             python,shell=bundle.build();three,three_shell=bundle.build_three()

@@ -140,13 +140,70 @@ def post_b_carrier():
     handoff.members(archive,POST_B_MANIFEST_SHA,POST_B_ARCHIVE_SHA)
     return archive,manifest
 
+# Exact original 37cd bytes for old fixed-composition tests only. These nested
+# fixtures are outside the product package allowlist and never fetched at runtime.
+COMPOSITION_FIXTURE_COMMIT='37cd60433fa5212423a64dd4b129a4c5274b245a'
+COMPOSITION_FIXTURE_FILES={'deploy/community-preview/f131-image-receipt.json': {'bytes': 1356, 'sha256': 'cba144af0ca2f753413f7bdcec92625c370c479c4708b1d4a1db0b35907c8b45', 'git_blob_sha1': '2f49059421858507fb66b576aa378076855041c9'}, 'scripts/community_preview_release_plan.py': {'bytes': 10933, 'sha256': '81c01a2f94ff71c0af4555b9026a60db0b5ce226a158601e1cf1b6aa4b646fae', 'git_blob_sha1': '8568b083e87bab1f5b1415da19416e0c839546a7'}, 'scripts/community_preview_update_checkpoint.py': {'bytes': 26377, 'sha256': 'def3dd75f4ee71eef9e48ac97448b39b9eba1446df334e43d901c64fdb63014b', 'git_blob_sha1': '51bb073492070eb97fb151643b3ae178ee923d24'}, 'scripts/community_preview_update_composition.py': {'bytes': 34123, 'sha256': '8d1810aeb08d65b55f578eac45ade02d7da07aebfd6d370d395a2c6dbf40203d', 'git_blob_sha1': 'c2bcf537e75621f842be27219563671defc76e1f'}, 'scripts/community_preview_upgrade.py': {'bytes': 25382, 'sha256': '2584441af33e6db1c5d24596f6cbc82077364a0b2b18554c6ba550ec8f66e0ee', 'git_blob_sha1': '6a637afb440ab689ff132302591bd0a8e5448799'}, 'scripts/community_preview_version_inspect.py': {'bytes': 21615, 'sha256': '98773bcd199f5cb50d15fb3bba1b6959541a12c3f5f2a4879dcd88e5d3bb6cc3', 'git_blob_sha1': 'c44a5518720ff8dece8602508b0c87895895cb34'}}
+
+def composition_source(path):
+    expected=COMPOSITION_FIXTURE_FILES.get(path)
+    if expected is None:raise ValueError('UNREGISTERED_COMPOSITION_FIXTURE')
+    raw=bounded_file(ROOT/'tests/fixtures/community-composition-37cd'/path)
+    blob=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+    if len(raw)!=expected['bytes'] or digest(raw)!=expected['sha256'] or blob!=expected['git_blob_sha1']:
+        raise ValueError('COMPOSITION_FIXTURE_SHA_MISMATCH')
+    return raw
+
+@contextlib.contextmanager
+def historical_composition():
+    """Load exact old admitted sources, never repin current OCR code as approved."""
+    import importlib.util
+    import scripts
+    from contextlib import ExitStack
+    with tempfile.TemporaryDirectory(prefix='community-composition-37cd-test-') as tmp:
+        root=Path(tmp)
+        for path in COMPOSITION_FIXTURE_FILES:
+            target=root/path;target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(composition_source(path));target.chmod(0o600)
+        def load(name):
+            spec=importlib.util.spec_from_file_location('_community_37cd_'+name,root/'scripts'/('community_preview_'+name+'.py'))
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
+        plan=load('release_plan');original=load('upgrade');observation=load('version_inspect')
+        with ExitStack() as stack:
+            for name,module in (('community_preview_release_plan',plan),('community_preview_upgrade',original),('community_preview_version_inspect',observation)):
+                stack.enter_context(patch.object(scripts,name,module))
+            controller=load('update_checkpoint')
+            stack.enter_context(patch.object(scripts,'community_preview_update_checkpoint',controller))
+            composition=load('update_composition')
+        yield composition
+
 def verify_inputs():
+    for path in COMPOSITION_FIXTURE_FILES:composition_source(path)
     a_source();v1_carrier();bc_carrier();post_b_carrier()
     for commit,paths in HISTORY_PINS.items():
         for path in paths:source(commit,path)
     print('EXACT_HISTORICAL_TEST_INPUTS=PASS; PRODUCTION_EXECUTED=false')
 
 class HistoricalFixtureContract(unittest.TestCase):
+    def test_exact_local_composition_sources_match_old_admission_not_current_ocr(self):
+        from scripts import community_preview_update_composition as current
+        with historical_composition() as fixed:
+            self.assertEqual(digest(Path(fixed.__file__).read_bytes()),COMPOSITION_FIXTURE_FILES['scripts/community_preview_update_composition.py']['sha256'])
+            for module,pin in fixed.PINS.items():self.assertEqual(digest(Path(module.__file__).read_bytes()),pin)
+            self.assertEqual(fixed.PRODUCT,current.PRODUCT);self.assertEqual(fixed.CONTROL,current.CONTROL)
+            self.assertEqual(fixed.RECEIPT_SHA,current.RECEIPT_SHA)
+            self.assertNotEqual(digest(Path(current.controller.__file__).read_bytes()),fixed.PINS[fixed.controller])
+            self.assertNotEqual(digest(Path(current.plan.__file__).read_bytes()),fixed.PINS[fixed.plan])
+    def test_local_composition_fixture_missing_changed_or_unregistered_fails_closed(self):
+        with patch(__name__+'.bounded_file') as read:
+            with self.assertRaisesRegex(ValueError,'UNREGISTERED'):composition_source('../arbitrary.py')
+            read.assert_not_called()
+        path='scripts/community_preview_release_plan.py'
+        with patch(__name__+'.bounded_file',return_value=b'changed'):
+            with self.assertRaisesRegex(ValueError,'SHA_MISMATCH'):composition_source(path)
+        with patch(__name__+'.bounded_file',side_effect=FileNotFoundError),patch('subprocess.check_output') as git:
+            with self.assertRaises(FileNotFoundError):composition_source(path)
+            git.assert_not_called()
     def test_exact_original_entry_and_both_frozen_carriers(self):
         self.assertEqual(digest(a_source()),HISTORY_PINS[A_COMMIT]['scripts/community_preview_site_prepare.py'])
         self.assertEqual(digest(v1_carrier()[0]),V1_ARCHIVE_SHA)

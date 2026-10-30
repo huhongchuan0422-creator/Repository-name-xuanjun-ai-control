@@ -9,8 +9,17 @@
  const sources=payload.sources,cache={},host=document.getElementById('native'),screen=document.getElementById('screen'),frame=document.getElementById('frame'),identity=document.getElementById('identity');
  const error=document.getElementById('error');let page=null,route='',code=0,ready=false,rendering=false;
  const files=new Map();
+ let nativeApp=null,nativeIdentity='';
+ function getNativeApp(){
+  const selected=identity.value==='merchant'?'merchant':'consumer';
+  if(selected!==nativeIdentity){
+   if(nativeApp&&cache['session.js'])cache['session.js'].exports.getSharedSession(wx,nativeApp.globalData).clear();
+   nativeIdentity=selected;nativeApp={globalData:{baseUrl:location.origin,mode:'WECHAT_LOGIN',commerce:true,payments:false}};
+  }
+  return nativeApp;
+ }
  function pathFor(name,from=''){const url=new URL(name,new URL(from||'entry.js','https://review.invalid/'));return url.pathname.slice(1);}
- function load(name){if(cache[name])return cache[name].exports;if(name.endsWith('.json'))return JSON.parse(sources[name]);if(!Object.hasOwn(sources,name))throw Error('REVIEW_MODULE_NOT_ALLOWLISTED');const module={exports:{}};cache[name]=module;new Function('require','module','exports','Page','wx','getApp','getCurrentPages',sources[name])(p=>load(pathFor(p+(p.endsWith('.json')?'':'.js'),name)),module,module.exports,definition=>{page={...definition,data:structuredClone(definition.data),setData(patch){Object.assign(this.data,patch);render();}};},wx,()=>({globalData:{baseUrl:location.origin,mode:'WECHAT_LOGIN',commerce:true,payments:false}}),()=>page?[page]:[]);return module.exports;}
+ function load(name){if(cache[name])return cache[name].exports;if(name.endsWith('.json'))return JSON.parse(sources[name]);if(!Object.hasOwn(sources,name))throw Error('REVIEW_MODULE_NOT_ALLOWLISTED');const module={exports:{}};cache[name]=module;new Function('require','module','exports','Page','wx','getApp','getCurrentPages',sources[name])(p=>load(pathFor(p+(p.endsWith('.json')?'':'.js'),name)),module,module.exports,definition=>{page={...definition,data:structuredClone(definition.data),setData(patch){Object.assign(this.data,patch);render();}};},wx,getNativeApp,()=>page?[page]:[]);return module.exports;}
  const wx={
   login(options){const who=identity.value==='merchant'?'merchant':'consumer';options.success({code:'review-'+who+'-'+Date.now()+'-'+(++code)});},
   request(options){const target=new URL(options.url);if(target.origin!==location.origin){options.fail({errMsg:'review origin denied'});return;}fetch(target,{method:options.method||'GET',headers:options.header,...(!['GET','HEAD'].includes(String(options.method||'GET').toUpperCase())&&options.data!==undefined?{body:JSON.stringify(options.data)}:{})}).then(async r=>options.success({statusCode:r.status,data:await r.json()})).catch(()=>options.fail({errMsg:'review network unavailable'}));},

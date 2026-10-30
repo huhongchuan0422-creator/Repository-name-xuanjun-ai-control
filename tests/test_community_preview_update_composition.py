@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch,Mock
 import test_community_preview_upgrade as old
 import test_community_preview_release_plan as fixture
+import test_community_historical_fixtures as frozen
 from scripts import community_preview_update_composition as c
 
 
@@ -147,8 +148,32 @@ class CompositionScope(unittest.TestCase):
         with patch.object(c.original,'read_root_file',return_value=(b'actual',0o600)):
             self.assertEqual(c.protected_body('/fixed',hashlib.sha256(b'actual').hexdigest()),b'actual')
             with self.assertRaises(c.controller.Hold):c.protected_body('/fixed','0'*64)
-        self.assertEqual(c.PINS[c.controller],hashlib.sha256(Path(c.controller.__file__).read_bytes()).hexdigest())
-        for module,pin in c.PINS.items():self.assertEqual(pin,hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest())
+        # The old production admission remains bound to the exact historical source.
+        with frozen.historical_composition() as fixed:
+            for module,pin in fixed.PINS.items():
+                self.assertEqual(pin,hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest())
+        changed=[]
+        for module,pin in c.PINS.items():
+            raw=Path(module.__file__).read_bytes()
+            if hashlib.sha256(raw).hexdigest()!=pin:
+                changed.append(module)
+                with patch.object(c.original,'read_root_file',return_value=(raw,0o600)):
+                    with self.assertRaisesRegex(c.controller.Hold,'APPROVED_FILE_DIGEST_CHANGED'):
+                        c.protected_body(module.__file__,pin)
+        self.assertEqual(set(changed),{c.controller,c.plan})
+    def test_current_ocr_dependencies_cannot_use_old_approval_before_journal_or_transport(self):
+        approval=self.approval()
+        approval['composition_sha256']=hashlib.sha256(Path(c.__file__).read_bytes()).hexdigest()
+        raw=json.dumps(approval).encode()
+        source_paths={str(Path(module.__file__)) for module in [c,*c.PINS]}
+        def read(path):
+            if path==c.APPROVAL:return raw,0o600
+            self.assertIn(str(path),source_paths)
+            return Path(path).read_bytes(),0o600
+        with patch.object(c.original,'read_root_file',side_effect=read),patch.object(c.controller.Journal,'from_original_parent') as journal,patch.object(c,'LiveBindings') as bindings,patch.object(c.original,'mutate') as mutate:
+            with self.assertRaisesRegex(c.controller.Hold,'APPROVED_FILE_DIGEST_CHANGED'):
+                c.compose(approval_sha256=hashlib.sha256(raw).hexdigest(),backup_fd=self.fd,execution_enabled=True)
+            journal.assert_not_called();bindings.assert_not_called();mutate.assert_not_called();self.capture.assert_not_called()
     def approval(self):
         return dict(format=1,host=c.plan.HOST,control_source_sha=c.CONTROL,product_source_sha=c.PRODUCT,
             composition_sha256='a'*64,receipt_sha256=c.RECEIPT_SHA,current=fixture.current(),issued_at=999,expires_at=1500,
@@ -291,6 +316,12 @@ class CompositionScope(unittest.TestCase):
 
 
 def reopen_process(root,stage):
+    # Positive old-release recovery tests execute the old admitted bytes themselves.
+    with frozen.historical_composition() as fixed:
+        return _reopen_process(root,stage,fixed)
+
+
+def _reopen_process(root,stage,c):
     """Independent process: real files/journal/composition/controller, fake Docker.
 
     All authority/host/remote observations below are isolated synthetic fixtures.
@@ -310,7 +341,7 @@ def reopen_process(root,stage):
         p=root/path.lstrip('/');p.parent.mkdir(parents=True,exist_ok=True)
         if not p.exists():p.write_bytes(c.original.FRAGMENT if path==c.original.INC else b'unchanged fixture route');p.chmod(0o600)
     parent=root/'journal';parent.mkdir(mode=0o700,exist_ok=True)
-    approval_file=root/'approval.json';receipt_path=Path('deploy/community-preview/f131-image-receipt.json')
+    approval_file=root/'approval.json';receipt_path=Path(c.__file__).resolve().parents[1]/'deploy/community-preview/f131-image-receipt.json'
     real_readlink=os.readlink
     def capture(argv,**kwargs):
         if argv[3:5]==['container','inspect']:

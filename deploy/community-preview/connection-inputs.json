@@ -15,9 +15,9 @@
       "sha256": "09545f927ec2debd5c1a2f07e2383992e8511232efb44f1cddf31b37003630f8"
     },
     {
-      "bytes": 4508,
+      "bytes": 5403,
       "path": "scripts/community_preview_readiness.py",
-      "sha256": "697be15df297e27036090ba0d56bc14bfb3947c42a5c22f090047974e64ae368"
+      "sha256": "e1fad2ceb496dccacf4752f0484d0d57bb4b4b73f8f0a4e4dee76b7a3eddcdfb"
     },
     {
       "bytes": 10280,
