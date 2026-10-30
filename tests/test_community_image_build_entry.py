@@ -127,8 +127,8 @@ class HostedImageEntry(unittest.TestCase):
         for token in ('secrets.','self-hosted','ssh ','scp ','workflow_dispatch','docker push','docker load','community_preview_upgrade.py'):
             if token=='workflow_dispatch':continue  # job-selection expression only
             self.assertNotIn(token,image)
-        self.assertIn('docker build --network=none --target verify --build-arg SOURCE_SHA="$GITHUB_SHA"',image)
-        self.assertIn('docker image save "community-preview:$GITHUB_SHA"',image)
+        self.assertIn('docker build --network=none --target verify --build-arg SOURCE_SHA="$COMMUNITY_IMAGE_SOURCE_SHA"',image)
+        self.assertIn('docker image save "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA"',image)
         self.assertIn("manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'",image)
     def test_evidence_validate_still_requires_exact_push_and_unique_live_artifact(self):
         # The complete actual validator negative matrices run in HostedEvidence.
@@ -212,3 +212,85 @@ class HostedImageEntry(unittest.TestCase):
                 self.assertEqual(str(caught.exception),'HOSTED_EVIDENCE_NOT_VERIFIED_NO_PREVIEW:'+stage+':HTTP_403')
                 output.assert_not_called()
 
+
+class FixedProductImage(unittest.TestCase):
+    """Exact original archived bytes replace only missing list steps, never failure."""
+    def setUp(self):
+        import tempfile,hashlib,copy
+        entry=HostedImageEntry();entry.setUp();self.entry=entry;self.ns=entry.ns
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name)
+        # Synthetic byte fixtures only. Actual pinned artifacts are independently
+        # exercised by the local real-artifact proof; production pins remain literal.
+        self.original_pins=dict(self.ns['FIXED_MEMBERS'])
+        self.ns['FIXED_MEMBERS']={}
+        for name in self.original_pins:
+            raw=('SYNTHETIC ONLY '+name).encode();(self.root/name).write_bytes(raw)
+            self.ns['FIXED_MEMBERS'][name]=(len(raw),hashlib.sha256(raw).hexdigest())
+        self.run=dict(id=self.ns['FIXED_RUN'],head_sha=self.ns['FIXED_PRODUCT'],
+            head_branch=self.ns['BRANCH'],path=self.ns['WORKFLOW'],event='push',
+            status='completed',conclusion='success',repository={'full_name':self.ns['REPO']},
+            head_repository={'full_name':self.ns['REPO']})
+        self.jobs=dict(total_count=1,jobs=[dict(id=self.ns['FIXED_JOB'],name='test',
+            run_id=self.ns['FIXED_RUN'],head_sha=self.ns['FIXED_PRODUCT'],
+            status='completed',conclusion='success',steps=[])])
+        self.artifacts=dict(total_count=1,artifacts=[dict(id=13000357097,
+            name='community-phase-integration-evidence',expired=False,expires_at='2030-01-01T00:00:00Z',
+            size_in_bytes=13028520,digest='sha256:b6c49a917abe9bb07683ad41b9b98d2975a79a0be8e6f59714db05debf8c0560',
+            workflow_run=dict(id=self.ns['FIXED_RUN'],head_sha=self.ns['FIXED_PRODUCT'],
+                head_branch=self.ns['BRANCH'],repository_id=1413132159,head_repository_id=1413132159))])
+    def validate(self,**changes):
+        import time
+        args=dict(run=self.run,jobs=self.jobs,artifacts=self.artifacts,head=self.ns['FIXED_PRODUCT'],
+            evidence_id=self.ns['FIXED_RUN'],current_id=99999999999,now=time.time(),fixed_inputs=self.root)
+        args.update(changes);return self.ns['validate'](**args)
+    def test_exact_fixed_source_preserves_separate_control_and_build(self):
+        env=self.entry.env(IMAGE_SOURCE_SHA=self.ns['FIXED_PRODUCT'],IMAGE_EVIDENCE_RUN_ID=str(self.ns['FIXED_RUN']))
+        self.assertEqual(self.ns['validate_context'](env),(self.ns['FIXED_PRODUCT'],str(self.ns['FIXED_RUN'])))
+        self.assertEqual(env['GITHUB_SHA'],HEAD)
+        self.assertTrue(self.entry.enabled('community-backend-image',**{
+            'inputs.backend_image_source_sha':self.ns['FIXED_PRODUCT'],
+            'inputs.backend_image_evidence_run_id':str(self.ns['FIXED_RUN'])}))
+        self.assertFalse(self.entry.enabled('community-backend-image',**{
+            'inputs.backend_image_source_sha':self.ns['FIXED_PRODUCT'],
+            'inputs.backend_image_evidence_run_id':'101'}))
+        self.assertIn('cp --no-clobber fixed-4f-evidence/community-stage-source.zip community-stage-source.zip',self.entry.workflow)
+        self.assertNotIn('GITHUB_SHA=',self.entry.job('community-backend-image'))
+    def test_absent_steps_requires_exact_successful_original_bytes(self):
+        value=self.validate();self.assertTrue(value['fixed_payload_bytes_reverified'])
+        self.assertFalse(value['artifact_bytes_reverified'])
+        self.assertEqual(value['source_package'],'VERIFIED_FIXED_4F_ARCHIVE')
+        with self.assertRaises(ValueError):self.validate(fixed_inputs=None)
+    def test_missing_changed_and_symlinked_original_bytes_rejected(self):
+        for name in self.original_pins:
+            path=self.root/name;raw=path.read_bytes()
+            path.unlink()
+            with self.assertRaises((ValueError,OSError)):self.validate()
+            path.write_bytes(raw+b'wrong')
+            with self.assertRaises(ValueError):self.validate()
+            path.unlink();path.symlink_to(self.root/'absent')
+            with self.assertRaises(ValueError):self.validate()
+            path.unlink();path.write_bytes(raw)
+    def test_failed_skipped_unknown_steps_cannot_use_original_bytes(self):
+        import copy
+        for status in ('failure','skipped','cancelled',None):
+            jobs=copy.deepcopy(self.jobs)
+            jobs['jobs'][0]['steps']=[dict(name='Complete Phase1 and Phase2 source regression',status='completed',conclusion=status)]
+            with self.subTest(status=status),self.assertRaises(ValueError):self.validate(jobs=jobs)
+        jobs=copy.deepcopy(self.jobs);jobs['jobs'][0].pop('steps')
+        with self.assertRaises(ValueError):self.validate(jobs=jobs)
+    def test_wrong_job_run_commit_and_artifact_rejected(self):
+        import copy
+        for field,value in [('id',1),('conclusion','skipped'),('status','queued'),('name','other'),('run_id',1),('head_sha',HEAD)]:
+            jobs=copy.deepcopy(self.jobs);jobs['jobs'][0][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):self.validate(jobs=jobs)
+        for field,value in [('head_sha',HEAD),('conclusion','failure'),('event','workflow_dispatch')]:
+            run=copy.deepcopy(self.run);run[field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):self.validate(run=run)
+        for field,value in [('id',1),('digest','sha256:'+'0'*64),('expired',True),('size_in_bytes',1)]:
+            artifacts=copy.deepcopy(self.artifacts);artifacts['artifacts'][0][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):self.validate(artifacts=artifacts)
+    def test_arbitrary_source_still_cannot_use_missing_steps(self):
+        with self.assertRaises(ValueError):
+            self.ns['validate_context'](self.entry.env(IMAGE_SOURCE_SHA='b'*40,IMAGE_EVIDENCE_RUN_ID=str(self.ns['FIXED_RUN'])))
+        with self.assertRaises(ValueError):self.validate(head=HEAD)
