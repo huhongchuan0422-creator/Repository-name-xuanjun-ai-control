@@ -8,7 +8,8 @@ review service, or notification channel.
 
 This correction was made in an isolated Git repository copied from the frozen
 2026-10-30 candidate. The frozen source directory was not modified. It closes
-only the four defects recorded by the 2026-10-30 independent QA report.
+the four defects recorded by the 2026-10-30 independent QA report plus the
+completion-payload fence defect found by the 2026-10-31 independent QA rerun.
 
 The candidate reuses, without modifying, the frozen inputs:
 
@@ -132,8 +133,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundarie
 PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
 ```
 
-Observed locally on Python 3.6.8: original supplied suite 21/21 PASS and added
-QA counterexamples 4/4 PASS. These are Writer-local isolated tests, not
+Observed locally on Python 3.6.8 after the second correction: original supplied
+suite 21/21 PASS, the existing four QA counterexamples 4/4 PASS, the new
+completion-fence counterexample 1/1 PASS, and combined discovery 26/26 PASS.
+The positive completion fixture was aligned so its receipt subject carries the
+expected current fence; its test expectation was not changed. These are
+Writer-local isolated tests, not
 independent QA, security, Hosted CI, install, field execution or acceptance.
 
 ## Remaining external blockers

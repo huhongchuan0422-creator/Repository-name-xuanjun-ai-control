@@ -1,0 +1,31 @@
+test_acceptance_reads_same_artifact_independent_roles (test_p3_host_boundaries.BoundaryTests) ... ok
+test_acceptance_rejects_cross_commit_ci (test_p3_host_boundaries.BoundaryTests) ... ok
+test_completion_reader_adds_exact_current_recovery_lineage (test_p3_host_boundaries.BoundaryTests) ... ok
+test_default_off_never_invokes_runner (test_p3_host_boundaries.BoundaryTests) ... ok
+test_inspect_and_stop_return_evidence_not_resume_authority (test_p3_host_boundaries.BoundaryTests) ... ok
+test_missing_p2_admission_fails_before_runner (test_p3_host_boundaries.BoundaryTests) ... ok
+test_notifications_default_off_never_invoke_transport (test_p3_host_boundaries.BoundaryTests) ... ok
+test_outbox_lookup_and_ack_are_bound (test_p3_host_boundaries.BoundaryTests) ... ok
+test_outbox_send_timeout_holds_without_redial (test_p3_host_boundaries.BoundaryTests) ... ok
+test_progress_reader_emits_frozen_core_shape (test_p3_host_boundaries.BoundaryTests) ... ok
+test_resume_rejects_stale_admission_before_runner (test_p3_host_boundaries.BoundaryTests) ... ok
+test_resume_revalidates_original_admission (test_p3_host_boundaries.BoundaryTests) ... ok
+test_runner_ack_is_not_started (test_p3_host_boundaries.BoundaryTests) ... ok
+test_started_receipt_is_forwarded_to_original_supervisor (test_p3_host_boundaries.BoundaryTests) ... ok
+test_stop_reader_binds_lineage_and_known_effects (test_p3_host_boundaries.BoundaryTests) ... ok
+test_tampered_receipt_is_rejected (test_p3_host_boundaries.BoundaryTests) ... ok
+test_unknown_launch_effect_holds_without_retry (test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_completed_requires_full_recovery_chain (test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_healthy_is_no_action (test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_result_missing_and_progress_stalled_are_distinct (test_p3_host_boundaries.BoundaryTests) ... ok
+test_watchdog_unknown_effect_precedes_retry (test_p3_host_boundaries.BoundaryTests) ... ok
+test_completion_payload_fence_must_match_receipt_subject (test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_completion_rejects_mixed_acceptance_run_lineage (test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_started_payload_fence_must_match_receipt_subject (test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_unverifiable_post_launch_ack_is_explicit_hold (test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_unverifiable_post_send_receipt_is_no_redial_hold (test_p3_qa_counterexamples.QACounterexamples) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.003s
+
+OK

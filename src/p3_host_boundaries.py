@@ -317,6 +317,7 @@ class EvidenceReaders(object):
             "epoch", "generation"
         }, "EXACT_COMPLETION_LINEAGE_REQUIRED")
         if (type(payload["current_fence"]) is not int
+                or payload["current_fence"] != subject["fence"]
                 or payload["run_id"] != subject["run_id"]
                 or payload["session_id"] != subject["session_id"]
                 or payload["resume_generation"] != subject["resume_generation"]

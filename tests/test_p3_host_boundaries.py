@@ -215,18 +215,19 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual("KNOWN", result["effects"])
 
     def _acceptance_readers(self, mismatch=False, completion=False):
+        subject = dict(SUBJECT, fence=8) if completion else SUBJECT
         self.provider.add("terminal", "TERMINAL", {
             "terminal_receipt": "terminal-1", "effects": "KNOWN",
             "writer_stopped": True
-        })
+        }, subject=subject)
         actors = {"tests": "tester", "ci": "ci", "qa": "qa",
                   "security": "security", "business": "business"}
         for role, actor in actors.items():
             self.provider.add(role, role.upper(), {
                 "status": "PASS", "commit": ("6" * 40 if mismatch and role == "ci" else COMMIT),
                 "artifact_sha256": ARTIFACT_SHA, "actor": actor
-            })
-        index = {"subject": SUBJECT, "checkpoint_sha256": CHECKPOINT,
+            }, subject=subject)
+        index = {"subject": subject, "checkpoint_sha256": CHECKPOINT,
                  "commit": COMMIT, "artifact_sha256": ARTIFACT_SHA,
                  "scope": "FIELD", "author": "author", "terminal": "terminal",
                  "tests": "tests", "ci": "ci", "qa": "qa",
@@ -234,11 +235,11 @@ class BoundaryTests(unittest.TestCase):
         completion_index = None
         if completion:
             self.provider.add("recovery", "RECOVERY_LINEAGE", {
-                "current_fence": 8, "run_id": "run-1", "session_id": "session-1",
+                "current_fence": subject["fence"], "run_id": "run-1", "session_id": "session-1",
                 "resume_generation": 1, "epoch": 3, "generation": 9
-            })
+            }, subject=subject)
             completion_index = lambda task_id: {
-                "subject": SUBJECT, "evidence_ref": "recovery"}
+                "subject": subject, "evidence_ref": "recovery"}
         return EvidenceReaders(self.verifier, lambda ref: SUBJECT,
                                lambda ref: SUBJECT, lambda task_id: index,
                                completion_index=completion_index)

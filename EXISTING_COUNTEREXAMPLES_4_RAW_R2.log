@@ -1,0 +1,9 @@
+test_started_payload_fence_must_match_receipt_subject (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_completion_rejects_mixed_acceptance_run_lineage (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_unverifiable_post_launch_ack_is_explicit_hold (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
+test_unverifiable_post_send_receipt_is_no_redial_hold (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK

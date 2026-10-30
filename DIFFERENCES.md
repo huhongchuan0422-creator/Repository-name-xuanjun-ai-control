@@ -16,9 +16,11 @@
 - One inert Python module defining authenticated receipt, runner, evidence-reader,
   outbox transport and watchdog classification boundaries.
 - Twenty-one preserved isolated unit tests using only in-memory fixtures.
-- Four additive regression tests reproducing the independent QA findings.
+- Five additive regression tests reproducing the independent QA findings.
 - STARTED payload-to-subject fence equality before supervisor transition.
 - Full acceptance-to-recovery run-lineage equality for completion recovery.
+- Recovery payload `current_fence` equality with the verified receipt subject
+  fence; the existing positive completion fixture uses one consistent subject.
 - Explicit no-retry HOLD results for unverifiable post-launch/post-resume ACKs
   and unverifiable post-send receipts.
 - Integration, gap, test and B7 dependency documentation.

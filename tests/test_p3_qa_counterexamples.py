@@ -152,6 +152,38 @@ class QACounterexamples(unittest.TestCase):
                 ValueError, "COMPLETION_ACCEPTANCE_LINEAGE_MISMATCH"):
             readers.completion("P3-T1")
 
+    def test_completion_payload_fence_must_match_receipt_subject(self):
+        self.provider.add("terminal", "TERMINAL", {
+            "terminal_receipt": "terminal-1", "effects": "KNOWN",
+            "writer_stopped": True
+        })
+        actors = {"tests": "tester", "ci": "ci", "qa": "qa",
+                  "security": "security", "business": "business"}
+        for role, actor in actors.items():
+            self.provider.add(role, role.upper(), {
+                "status": "PASS", "commit": COMMIT,
+                "artifact_sha256": ARTIFACT_SHA, "actor": actor
+            })
+        index = {"subject": SUBJECT, "checkpoint_sha256": CHECKPOINT,
+                 "commit": COMMIT, "artifact_sha256": ARTIFACT_SHA,
+                 "scope": "FIELD", "author": "author", "terminal": "terminal",
+                 "tests": "tests", "ci": "ci", "qa": "qa",
+                 "security": "security", "business": "business"}
+        self.provider.add("recovery-wrong-current-fence", "RECOVERY_LINEAGE", {
+            "current_fence": 999, "run_id": SUBJECT["run_id"],
+            "session_id": SUBJECT["session_id"],
+            "resume_generation": SUBJECT["resume_generation"],
+            "epoch": SUBJECT["epoch"], "generation": SUBJECT["generation"]
+        })
+        readers = EvidenceReaders(
+            self.verifier, lambda ref: SUBJECT, lambda ref: SUBJECT,
+            lambda task_id: index,
+            completion_index=lambda task_id: {
+                "subject": SUBJECT,
+                "evidence_ref": "recovery-wrong-current-fence"})
+        with self.assertRaisesRegex(ValueError, "COMPLETION_LINEAGE_CHANGED"):
+            readers.completion("P3-T1")
+
     def test_unverifiable_post_launch_ack_is_explicit_hold(self):
         runner = TamperedAckRunner(self.provider)
         controller = RunnerController(self.gate, self.verifier, runner)

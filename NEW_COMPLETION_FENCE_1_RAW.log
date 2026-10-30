@@ -1,0 +1,6 @@
+test_completion_payload_fence_must_match_receipt_subject (tests.test_p3_qa_counterexamples.QACounterexamples) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK

@@ -1,4 +1,4 @@
-P3 lifecycle corrected candidate Writer-local isolated test result
+P3 lifecycle corrected candidate Writer-local isolated test result (R2)
 Date: 2026-10-31 (Asia/Shanghai)
 Runtime: Python 3.6.8
 
@@ -6,16 +6,32 @@ Original supplied suite (expectations unchanged)
 Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_host_boundaries
 Result: 21 tests, 21 PASS, 0 failures, 0 errors, 0 skipped
 Duration reported by unittest: 0.002s
-Raw log: ORIGINAL_21_RAW.log
+Raw log: ORIGINAL_21_RAW_R2.log
 
-Independent-QA counterexample regression suite (additive)
-Command: PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest -v tests.test_p3_qa_counterexamples
+Existing Independent-QA counterexamples (expectations unchanged)
 Result: 4 tests, 4 PASS, 0 failures, 0 errors, 0 skipped
 Duration reported by unittest: 0.001s
-Raw log: QA_COUNTEREXAMPLES_4_RAW.log
+Raw log: EXISTING_COUNTEREXAMPLES_4_RAW_R2.log
 
-Scope: sole Writer local isolated tests only. The original 21 expectations were
-not changed. No runner, ledger, provider, outbox, network, model, service,
+New completion payload-fence counterexample
+Result: 1 test, 1 PASS, 0 failures, 0 errors, 0 skipped
+Duration reported by unittest: 0.001s
+Raw log: NEW_COMPLETION_FENCE_1_RAW.log
+
+All counterexamples
+Result: 5 tests, 5 PASS, 0 failures, 0 errors, 0 skipped
+Duration reported by unittest: 0.003s
+Raw log: COUNTEREXAMPLES_5_RAW_R2.log
+
+Combined discovery
+Result: 26 tests, 26 PASS, 0 failures, 0 errors, 0 skipped
+Duration reported by unittest: 0.003s
+Raw log: COMBINED_26_RAW_R2.log
+
+Scope: sole Writer local isolated tests only. The original 21 and existing four
+counterexample expectations were not changed. The positive completion fixture
+was aligned so receipt subject fence equals its expected payload current fence.
+No runner, ledger, provider, outbox, network, model, service,
 credential, install, deployment, external message, Hosted CI, independent QA,
 security or business acceptance was invoked. Historical 48/48 core and 13/13
 host-wiring results remain preserved upstream evidence and are not counted.
