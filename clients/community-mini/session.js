@@ -194,6 +194,20 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(reply.payment_enabled!==true||!reply.result)throw Error('PAYMENT_NOT_ENABLED');
       return reply.result;
     },
+    async reviewerBrowser(scene, action, challenge, verification) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||typeof challenge!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(challenge)||!['DESCRIBE','CONFIRM_THIS_BROWSER'].includes(action))throw Error('INVALID_REVIEWER_BROWSER_REQUEST');
+      if(action==='CONFIRM_THIS_BROWSER'&&(typeof verification!=='string'||!/^[0-9a-f]{32}$/.test(verification)))throw Error('EXPLICIT_BROWSER_CONFIRMATION_REQUIRED');
+      const version=generation;
+      const body={scene,challenge,action,...(action==='CONFIRM_THIS_BROWSER'?{verification}:{})};
+      const reply=await request('/mini/reviewer-login',body,token);
+      if(version!==generation)throw Error('STALE_SESSION');
+      if(reply.payment_enabled!==false||!reply.result)throw Error('UNTRUSTED_BUSINESS_REPLY');
+      const result=reply.result;
+      if(action==='DESCRIBE'&&(result.origin!=='https://uk.wenwenwenyiyiyi.work'||typeof result.project!=='string'||!/^[0-9a-f]{32}$/.test(result.verification)||!Number.isSafeInteger(result.expires_at)||result.expires_at<=now()))throw Error('UNTRUSTED_BROWSER_DESCRIPTION');
+      if(action==='CONFIRM_THIS_BROWSER'&&result.state!=='CONFIRMED')throw Error('CONFIRMATION_NOT_CONFIRMED');
+      return result;
+    },
     async logout() {
       const old=token;generation++;token=null;expires=0;
       if(old)await request('/mini/logout',{},old);
@@ -223,7 +237,7 @@ function getSharedSession(wx, config, now, page) {
   let epoch=auth.current(),flight=null;
   const authenticated=session.isAuthenticated.bind(session);
   session.isAuthenticated=()=>auth.active(epoch)&&authenticated();
-  for(const method of ['transport','customer','commerce','merchant','projectDocument','payment']){
+  for(const method of ['transport','customer','commerce','merchant','projectDocument','payment','reviewerBrowser']){
     const original=session[method].bind(session);
     session[method]=async function(...args){
       if(!auth.active(epoch)){session.clear();throw Error('STALE_SESSION');}

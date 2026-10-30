@@ -1,6 +1,35 @@
 const {parseScene,getSharedSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
+  reviewerInput(e){
+    this._reviewerRequest=null;
+    const field=e.currentTarget.dataset.field;
+    if(field==='reviewerChallenge'||field==='reviewerScene')this.setData({[field]:e.detail.value,reviewerDescription:null,reviewerStatus:'内容已变化，请重新核对。',reviewerPending:false});
+  },
+  reviewerCancel(){this._reviewerRequest=null;this.setData({reviewerDescription:null,reviewerPending:false,reviewerStatus:'已关闭本次确认；如已提交确认，请在原浏览器取消该请求。'});},
+  async reviewerDescribe(){
+    if(this._dead||this.data.reviewerPending||!this.session||!this.data.authenticated)return;
+    const request={session:this.session,epoch:auth.current(),scene:(this.data.reviewerScene||this.scene||'').trim(),challenge:(this.data.reviewerChallenge||'').trim()};
+    this._reviewerRequest=request;this.setData({reviewerPending:true,reviewerDescription:null,reviewerStatus:'正在核对本人权限与浏览器…'});
+    const current=()=>!this._dead&&this._reviewerRequest===request&&this.session===request.session&&auth.active(request.epoch)&&this.data.authenticated;
+    try{const result=await request.session.reviewerBrowser(request.scene,'DESCRIBE',request.challenge);if(!current())return;this.setData({reviewerDescription:result,reviewerStatus:'核对网址与浏览器校验码；仅确认本人正在操作的浏览器。'});}
+    catch(_){if(current())this.setData({reviewerStatus:'未能核实：可能无审核权限、请求失效或身份变化；未授予任何权限。'});}
+    finally{if(current())this.setData({reviewerPending:false});}
+  },
+  async reviewerConfirm(){
+    const request=this._reviewerRequest,description=this.data.reviewerDescription;
+    if(this._dead||this.data.reviewerPending||!request||!description||this.session!==request.session||!auth.active(request.epoch)||!this.data.authenticated)return;
+    this.setData({reviewerPending:true});
+    const current=()=>!this._dead&&this._reviewerRequest===request&&this.session===request.session&&auth.active(request.epoch)&&this.data.authenticated;
+    try{
+      const accepted=await new Promise(resolve=>wx.showModal({title:'确认本人浏览器登录',content:'网址：'+description.origin+'\n项目：'+description.project+'\n校验码：'+description.verification+'\n我已逐字核对本人浏览器，不是他人发来的请求。',confirmText:'本人确认',cancelText:'取消',success:r=>resolve(r.confirm===true),fail:()=>resolve(false)}));
+      if(!current()||!accepted)return;
+      await request.session.reviewerBrowser(request.scene,'CONFIRM_THIS_BROWSER',request.challenge,description.verification);
+      if(current()){this.setData({reviewerDescription:null,reviewerStatus:'已确认。请回到本人浏览器完成登录；本操作未授予角色。'});this._reviewerRequest=null;}
+    }catch(_){if(current())this.setData({reviewerDescription:null,reviewerStatus:'确认结果未知；请在原浏览器查询或取消。不会自动重试。'});}
+    finally{if(!this._dead&&(this._reviewerRequest===request||this._reviewerRequest===null)&&this.session===request.session&&auth.active(request.epoch))this.setData({reviewerPending:false});}
+  },
+
   showProfile(){this.setData({pageMode:'profile-edit'});},
   showNotices(){if(this.data.authenticated&&this.data.loaded){this.setData({pageMode:'notices'});}else{this.setData({status:'选择门店并验证本人身份后读取通知；未读取其他门店或他人的记录'});this.showProfile();}},
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
@@ -37,7 +66,7 @@ Page({
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{this.session=null;this.clearPrivate(customerError(e));}}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
-  clearPrivate(status){this._merchantRequest=null;this._noticeRequest=null;this.setData({pageMode:'profile',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'登录后核实本人入驻状态',authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false,status});},
+  clearPrivate(status){this._reviewerRequest=null;this.setData({reviewerDescription:null,reviewerChallenge:'',reviewerStatus:'',reviewerPending:false});this._merchantRequest=null;this._noticeRequest=null;this.setData({pageMode:'profile',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'登录后核实本人入驻状态',authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false,status});},
   async loadMerchantEntry(epoch=this._authEpoch,attempt=this._loginAttempt){
     if(!this.session||!this.data.authenticated)return;
     const request={session:this.session,scene:this.scene||'',epoch,attempt};this._merchantRequest=request;

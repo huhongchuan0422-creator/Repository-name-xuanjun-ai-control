@@ -44,7 +44,7 @@
  const clear=text=>{csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
  if(channel)channel.onmessage=event=>{
   if(event.data!=='changed')return;
-  generation++;clear('其他窗口已变更原会话，请重新登录。');
+  reviewerBridge=null;bridgeInfo.textContent='其他窗口已变更会话，本请求不再继续；请重新生成。';generation++;clear('其他窗口已变更原会话，请重新登录。');
  };
  async function call(action,body,t,value=csrf){
   if(!current(t))throw Error('身份已变化');
@@ -81,6 +81,7 @@
  async function mutation(action,body){
   // This guard also rejects synthetic submit/click events on disabled buttons.
   if(active!==null||!coordinated)return;
+  reviewerBridge=null;bridgeInfo.textContent='';
   const t=++generation,previous=csrf;active=t;clear(action==='login'?'正在登录…':'正在退出…');
   try{
    await navigator.locks.request('community-original-session',async()=>{
@@ -101,6 +102,54 @@
    controls();
   }
  }
+ // Existing login panel: no alternate site, token copying, or implicit grant.
+ let reviewerBridge=null;
+ const bridgeBox=document.createElement('fieldset'),bridgeTitle=document.createElement('legend');
+ bridgeTitle.textContent='已获授权审核员 · 微信确认网页登录';bridgeBox.append(bridgeTitle);
+ const bridgeScene=document.createElement('input');bridgeScene.placeholder='原门店场景编号';bridgeScene.setAttribute('aria-label','原门店场景编号');bridgeBox.append(bridgeScene);
+ const bridgeInfo=document.createElement('p');bridgeInfo.setAttribute('aria-live','polite');bridgeBox.append(bridgeInfo);
+ const bridgeButtons={};
+ for(const [action,label] of [['BEGIN','生成网页登录请求'],['FINISH','我已在小程序确认，完成登录'],['QUERY','查询状态'],['CANCEL','取消此请求']]){
+  const button=document.createElement('button');button.type='button';button.textContent=label;bridgeBox.append(button);bridgeButtons[action]=button;
+  button.addEventListener('click',()=>{void bridgeMutation(action);});
+ }
+ root.append(bridgeBox);
+ async function bridgeMutation(action){
+  if(active!==null||!coordinated)return;
+  const previous=reviewerBridge;
+  const scene=action==='BEGIN'?bridgeScene.value.trim():previous?.scene;
+  if(!/^[A-Za-z0-9_-]{1,32}$/.test(scene||'')){bridgeInfo.textContent='请输入原门店入口的场景编号。';return;}
+  if(action!=='BEGIN'&&!previous){bridgeInfo.textContent='请先生成网页登录请求。';return;}
+  const t=++generation;active=t;if(['BEGIN','FINISH','CANCEL'].includes(action))clear(action==='CANCEL'?'正在取消网页登录请求…':'正在核实本人微信网页登录…');controls();
+  try{
+   await navigator.locks.request('community-original-session',async()=>{
+    if(!current(t))return;
+    if(action==='BEGIN'&&previous){
+     await call('wechat',{scene:previous.scene,challenge:previous.challenge,action:'CANCEL'},t,previous.csrf);
+     reviewerBridge=null;
+    }
+    const body=action==='BEGIN'?{scene,action}:{scene,challenge:previous.challenge,action};
+    let result;
+    try{result=await call('wechat',body,t,action==='BEGIN'?'':previous.csrf);}
+    finally{if(action==='BEGIN'||action==='FINISH')channel.postMessage('changed');}
+    if(!current(t))return;
+    if(action==='BEGIN'){
+     if(!result||typeof result.challenge!=='string'||! /^[A-Za-z0-9_-]{32,128}$/.test(result.challenge)||typeof result.csrf!=='string'||! /^[A-Za-z0-9_-]{32,128}$/.test(result.csrf)||! /^[0-9a-f]{32}$/.test(result.verification))throw Error('登录请求未确认');
+     reviewerBridge={...result,scene};
+     bridgeInfo.textContent='仅在本人正在使用的浏览器操作。请在原小程序“我的 → 登录与账户状态 → 确认网页登录”输入请求：'+result.challenge+'；场景：'+scene+'；核对浏览器校验码：'+result.verification+'。请求 600 秒有效；不要确认他人发来的请求。';
+     return;
+    }
+    if(action==='CANCEL'){reviewerBridge=null;bridgeInfo.textContent='此请求已取消，不会再用于登录。';return;}
+    if(result.state==='ISSUED'&&typeof result.csrf==='string'&&result.csrf){
+     csrf=result.csrf;sessionStorage.setItem(key,csrf);reviewerBridge=null;await check(t);bridgeInfo.textContent='微信确认完成，已复用原审核网页登录会话。';return;
+    }
+    if(result.state==='EXPIRED'||result.state==='CANCELLED'){reviewerBridge=null;bridgeInfo.textContent='请求已失效，请重新生成。';return;}
+    bridgeInfo.textContent=result.state==='ISSUED'?'服务端已签发，会话响应未完整收到；请取消本请求后重新生成，不会自动重复签发。':result.state==='CONFIRMED'?'本人微信已确认，请点击完成登录。':'等待本人在原小程序核对并确认。';
+   });
+  }catch(_){if(current(t))bridgeInfo.textContent='结果未确认；未自动重试。可查询或取消此请求。若生成响应丢失，请重新生成。';}
+  finally{if(active===t)active=null;controls();}
+ }
+
  form.addEventListener('submit',event=>{
   event.preventDefault();if(active!==null||!coordinated)return;
   const data=new FormData(form);void mutation('login',{email:data.get('email'),password:data.get('password')});

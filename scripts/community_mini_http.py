@@ -178,12 +178,12 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 try:proxy_source=trusted_proxy(self.connection,self.headers)
                 except PermissionError:return self.answer(403,{'error':'PROXY_DENIED'})
                 except Exception:return self.answer(503,{'error':'PROXY_UNAVAILABLE'})
-            web_session=(proxy_origin=='https://uk.wenwenwenyiyiyi.work' and self.path in ('/community/session/login','/community/session/check','/community/session/logout'))
+            web_session=(proxy_origin=='https://uk.wenwenwenyiyiyi.work' and self.path in ('/community/session/login','/community/session/check','/community/session/logout','/community/session/wechat'))
             if web_session and (self.headers.get_all('Origin',[]) != [proxy_origin] or self.headers.get_all('Sec-Fetch-Site',[]) not in ([],['same-origin'])):
                 return self.answer(403,{'error':'ORIGIN_DENIED'})
             if not web_session and self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
                     self.path=='/community/operations' and operations is not None) and not (
-                    self.path=='/mini/merchant' and onboarding is not None) and not (
+                    self.path in ('/mini/merchant','/mini/reviewer-login') and onboarding is not None) and not (
                     self.path=='/mini/payment' and getattr(gateway,'payments',None) is not None) and not (
                     self.path=='/merchant/onboarding' and onboarding is not None) and not (
                     self.path=='/customer/saas-api' and saas is not None) and not (
@@ -269,6 +269,14 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     return value
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
+                if self.path in ('/community/session/wechat','/mini/reviewer-login'):
+                    from scripts.community_web_session import WebSession
+                    from scripts.community_reviewer_web_bridge import dispatch as bridge_dispatch
+                    if onboarding is None or proxy_origin != 'https://uk.wenwenwenyiyiyi.work':
+                        raise PermissionError('ORIGINAL_HTTPS_HOST_REQUIRED')
+                    web=WebSession(gateway.identity.center,operations,communities,onboarding,provider_actions=provider_actions,merchant_bills=merchant_bills)
+                    result,cookie=bridge_dispatch(gateway,web,self.path,self.headers,body,proxy_source,proxy_origin)
+                    return self.answer(200,{'result':result,'payment_enabled':False},cookie=cookie)
                 if web_session:
                     from scripts.community_web_session import WebSession
                     result,cookie=WebSession(gateway.identity.center,operations,communities,onboarding,provider_actions=provider_actions,merchant_bills=merchant_bills).dispatch(self.path,self.headers,body,proxy_source)

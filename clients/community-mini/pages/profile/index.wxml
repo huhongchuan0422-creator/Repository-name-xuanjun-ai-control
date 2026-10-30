@@ -30,4 +30,13 @@
       <button wx:if="{{!selectedNotice.read}}" data-id="{{selectedNotice.id}}" bindtap="markNoticeRead" loading="{{noticePending}}" disabled="{{noticePending}}">标记已读</button>
     </view>
   </view>
+<view class="card" wx:if="{{pageMode==='account'&&authenticated}}">
+  <text class="title">确认网页登录 · 已获授权审核员</text>
+  <text class="hint">仅登录本人正在使用的原后台浏览器，不授予审核角色。不要确认他人发来的请求。</text>
+  <input value="{{reviewerScene}}" placeholder="原门店场景编号" data-field="reviewerScene" bindinput="reviewerInput" maxlength="32"/>
+  <input value="{{reviewerChallenge}}" placeholder="粘贴本人浏览器显示的登录请求" data-field="reviewerChallenge" bindinput="reviewerInput" maxlength="128"/>
+  <button bindtap="reviewerDescribe" loading="{{reviewerPending}}" disabled="{{reviewerPending}}">核对网页登录请求</button>
+  <view wx:if="{{reviewerDescription}}"><text>网址：{{reviewerDescription.origin}}</text><text>项目：{{reviewerDescription.project}}</text><text selectable="true">浏览器校验码：{{reviewerDescription.verification}}</text><button bindtap="reviewerConfirm" disabled="{{reviewerPending}}">校验码一致，确认本人浏览器</button></view>
+  <button bindtap="reviewerCancel">关闭本次确认</button><text>{{reviewerStatus}}</text>
+</view>
 </view>
