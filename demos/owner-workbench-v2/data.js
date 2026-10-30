@@ -20,7 +20,7 @@
       }
     },
     model_service_dual_entry_preview:{
-      version:'MODEL_SERVICE_DUAL_ENTRY_UI_CANDIDATE_V1',
+      version:'MODEL_SERVICE_CUSTOMER_ENTRY_UI_CANDIDATE_V2',
       state:'UI_CANDIDATE',
       selected_entry:'BYO_ACCOUNT',
       effective_source:'NONE',
