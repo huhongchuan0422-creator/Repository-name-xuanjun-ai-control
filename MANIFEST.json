@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "kind": "P3_LIFECYCLE_HOST_BOUNDARY_ISOLATED_CANDIDATE_NOT_INSTALLER",
+  "date": "2026-10-30",
+  "status": "SCOPED_LOCAL_CANDIDATE",
+  "default_off": true,
+  "field_acceptance": false,
+  "real_runner_called": false,
+  "real_ledger_called": false,
+  "external_transport_called": false,
+  "upstream": {
+    "handoff_transport_sha256": "fdfb2baa971ea90694aef75c88b1d926b0fad51ea327ec4ab03d4ab1f4c982b5",
+    "p3_core_zip_sha256": "34fda99283a3593daff6810f4c70b3d1b9d6afcee9c491a7030f6195e2ae0252",
+    "host_wiring_successor_zip_sha256": "d41d80623bf4e5017a277affcd5937e79ecdfa0615de7c1bf02943c4e9e2aa93"
+  },
+  "test": {
+    "runtime": "Python 3.6.8",
+    "count": 21,
+    "passed": 21,
+    "failed": 0,
+    "python312_rerun": false,
+    "independent_review": false
+  },
+  "files": [
+    {
+      "path": "B7_ENTRY_GATE.md",
+      "bytes": 2793,
+      "sha256": "b5570068436d3e0ce73f8847bdaaf0dff783a99d120ef948591439247bc277c8"
+    },
+    {
+      "path": "DIFFERENCES.md",
+      "bytes": 1333,
+      "sha256": "a94e79ef05b3f427e3295a37c60f5109f8153855b8c01c9f34c23896b0a1d577"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6647,
+      "sha256": "c1bcff1ea8168d905ea88a17f03783c4f33751a7584a51d24e6cfb8cb12196ec"
+    },
+    {
+      "path": "TEST_RESULTS.txt",
+      "bytes": 698,
+      "sha256": "063f76720188c2a044d3b2a1e8506fe9eec001ef5ec1fa1fd33ba64172e8480a"
+    },
+    {
+      "path": "src/p3_host_boundaries.py",
+      "bytes": 24429,
+      "sha256": "261d6da6311723ad02096b8f5dc4d321f53d357e7def90cef56bf4d7dd0ce7e1"
+    },
+    {
+      "path": "tests/test_p3_host_boundaries.py",
+      "bytes": 14215,
+      "sha256": "465b6306fd70992e750c9ca37bd73f5624c956b0b5f51556190059b9fe932469"
+    }
+  ],
+  "manifest_self_hash": "excluded to avoid recursion",
+  "checksum_file_hash": "reported externally; SHA256SUMS excludes itself"
+}

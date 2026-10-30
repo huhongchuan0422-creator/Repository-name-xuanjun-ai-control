@@ -1,0 +1,12 @@
+P3 host-boundary isolated candidate local test result
+Date: 2026-10-30
+Runtime: Python 3.6.8
+Command: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deliveries/p3-lifecycle-candidate-20261030/tests -v
+Result: 21 tests, 21 PASS, 0 failures, 0 errors, 0 skipped
+Duration reported by unittest: 0.002s
+
+Scope: author local isolated tests only. No Python 3.12 runtime was available for
+this new increment. No real runner, ledger, provider, outbox, network, model,
+service, credential, host, CI, independent QA, security or business acceptance
+was invoked. Historical 48/48 core and 13/13 host-wiring results are reused only
+as preserved upstream evidence and are not counted in the 21 tests.
