@@ -339,8 +339,30 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
      raise AssertionError('NONEMPTY_TYPE_PARAMS_NOT_NORMALIZED')
   return ast.dump(node,include_attributes=False)
 
+ def import_isolation_projection(self,text):
+  # Keep the original AST hashes. Invert only the exact already-delivered d016
+  # schema extension, then prove the complete old source is unchanged. This is
+  # not a new expected hash for an arbitrary modified implementation.
+  raw=(ROOT/'tests/fixtures/pr122-delivery-wrapper-reviewed-delta.json').read_bytes()
+  self.assertEqual(sha(raw),'dffb14d600f9a1bd152b4c83b749b6c3d40947247d08e0c471d6bd983b0de00b')
+  delta=json.loads(raw)
+  for change in delta['changes']:
+   self.assertEqual(text.count(change['after']),1,'UNREVIEWED_DELIVERY_DELTA')
+   text=text.replace(change['after'],change['before'],1)
+  self.assertEqual(sha(text.encode()),delta['original_source_sha256'])
+  return text
+
+ def test_reviewed_delta_requires_every_exact_guard_and_original_source(self):
+  text=(ROOT/'scripts/pr122_site_hub_unified_release.py').read_text()
+  self.import_isolation_projection(text)
+  # A missing new declaration guard is never hidden by the projection.
+  changed=text.replace("need(declaration.get('frozen_files')==FROZEN", "need(True or declaration.get('frozen_files')==FROZEN",1)
+  self.assertNotEqual(changed,text)
+  with self.assertRaises(AssertionError):self.import_isolation_projection(changed)
+
  def fixed_ast_nodes(self):
-  tree=ast.parse((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
+  text=self.import_isolation_projection((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
+  tree=ast.parse(text)
   return {name:next(n for n in ast.walk(tree) if isinstance(n,(ast.ClassDef,ast.FunctionDef)) and n.name==name)
           for name in ('Transaction','entries')}
 
