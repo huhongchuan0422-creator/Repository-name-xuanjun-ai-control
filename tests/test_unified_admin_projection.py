@@ -25,6 +25,32 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
                                  'secret_configured': True,
                                  'secret_mask': 'must-not-leak',
                                  'secret_cipher': 'must-not-leak-either'}],
+                  'provider_presets': [
+                      {'platform': 'openai', 'label': 'OpenAI API',
+                       'auth_type': 'API_KEY', 'availability': 'SUPPORTED'}],
+                  'provider_onboarding': [
+                      {'platform': 'openai', 'connection_id': 'openai-main',
+                       'connection_name': 'Main', 'model_id': 'gpt-test',
+                       'auth_state': 'SUCCEEDED', 'catalog_state': 'SAVED',
+                       'model_callable_state': 'TESTED_SUCCEEDED',
+                       'models': ['gpt-test'],
+                       'secret_mask': 'onboarding-must-not-leak'}],
+                  'connections': [
+                      {'connection_id': 'openai-main',
+                       'provider_id': 'openai', 'purpose': 'MODEL_INFERENCE',
+                       'auth_type': 'API_KEY', 'status': 'ACTIVE',
+                       'config_version': 1,
+                       'secret_mask': 'connection-must-not-leak',
+                       'secret_cipher': 'cipher-must-not-leak'}],
+                  'models': [
+                      {'provider_id': 'openai', 'model_id': 'gpt-test',
+                       'enabled': 1, 'price_state': 'UNKNOWN',
+                       'input_unit_cost': 999, 'output_unit_cost': 999}],
+                  'assignments': [
+                      {'task_id': 'T1', 'attempt_id': 'A1',
+                       'role_id': 'DEVELOPER', 'provider_id': 'openai',
+                       'model_id': 'gpt-test', 'state': 'ACTIVE',
+                       'reason': 'OWNER_SELECTED', 'created_at': 98}],
                   'quota_status': [], 'modules': [],
                   'usage': [
                       {'provider_id': 'free', 'model_id': 'model-free',
@@ -124,6 +150,28 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
         self.assertEqual(provider['secret']['state'], 'CONFIGURED')
         self.assertEqual(provider['secret']['ref'],
                          'PROTECTED_PROVIDER_SECRET:free')
+        advanced = value['modules']['configuration']['advanced']
+        self.assertEqual(advanced['provider_onboarding'][0]['secret']['ref'],
+                         'PROTECTED_CONNECTION_SECRET:openai-main')
+        self.assertEqual(advanced['connections'][0]['secret']['state'],
+                         'CONFIGURED')
+        self.assertEqual(advanced['models'][0]['input_unit_cost'], 'UNKNOWN')
+        self.assertEqual(advanced['assignments'][0]['role'], 'DEVELOPER')
+        for secret in ('onboarding-must-not-leak',
+                       'connection-must-not-leak',
+                       'cipher-must-not-leak'):
+            self.assertNotIn(secret, encoded)
+
+    def test_model_configuration_actions_are_existing_bounded_server_actions(self):
+        value = build_projection(*self.fixtures(), observed_at=123)
+        capability = value['modules']['configuration']['capability']
+        self.assertEqual(capability['access'], 'BOUNDED_ADMIN')
+        self.assertEqual(capability['mutation'], 'SERVER_REVALIDATED')
+        self.assertEqual(capability['allowed_actions'], [
+            'TEST_PROVIDER_CONNECTION', 'TEST_PROVIDER_MODEL',
+            'SAVE_PROVIDER_ONBOARDING', 'DISABLE_PROVIDER',
+            'SET_OPENAI_CHANNEL_PREFERENCE'])
+        self.assertEqual(value['capability']['mutation'], 'NONE')
 
     def test_existing_secret_mask_implies_configured_without_leaking_mask(self):
         tasks, models = self.fixtures()

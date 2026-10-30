@@ -138,6 +138,19 @@ test('unified admin shows concise model-service summary instead of customer form
   assert.doesNotMatch(html,/customer-model-service|data-customer-model-mode|你希望如何使用模型/);
 });
 
+test('unified admin reuses bounded multi-platform onboarding without exposing credentials',()=>{
+  const html=app.render(data,{view:'config-models'});
+  for(const text of ['平台接入','OpenAI 优先核验','连接名称','API Key','测试连接 / 读取模型','单次调用验证','保存连接与模型','连接、模型与任务绑定（高级）'])assert.match(html,new RegExp(text));
+  assert.match(html,/type="password"/);
+  assert.match(html,/UI 候选 · 未连接服务端 · NOT_DEPLOYED/);
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  for(const action of ['TEST_PROVIDER_CONNECTION','TEST_PROVIDER_MODEL','SAVE_PROVIDER_ONBOARDING'])assert.match(source,new RegExp(action));
+  assert.match(source,/X-CSRF-Token/);
+  assert.match(source,/credential\.value=''/);
+  assert.doesNotMatch(source,/localStorage[^\n]*credential|console\.(log|info|debug)[^\n]*credential/i);
+  assert.doesNotMatch(html,/base_url|destination_origin|secret_mask|secret_cipher/);
+});
+
 test('customer purchase mode has no route or navigation in unified admin',()=>{
   assert.equal(app.route('#customer-model-service').view,'overview');
   assert.doesNotMatch(app.navHtml('overview',false),/customer-model-service|客户模型服务/);
@@ -246,7 +259,7 @@ test('hosted mode uses same-origin session and projection without fixture fallba
   assert.doesNotMatch(detail.split('<details')[0],/attempt_id|artifact_sha|epoch/);
   const models=app.render(hosted,{view:'config-models'});
   assert.match(models,/PROTECTED_PROVIDER_SECRET:p1/);
-  assert.match(models,/SET_OPENAI_CHANNEL_PREFERENCE/);
+  assert.match(models,/SERVER · BOUNDED ADMIN/);
   assert.match(models,/模型用量与估算成本/);
   assert.match(models,/m1/);
   assert.match(models,/不是财务账本、实际扣费或付款凭证/);

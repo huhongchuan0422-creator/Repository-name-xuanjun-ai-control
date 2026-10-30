@@ -33,6 +33,19 @@ def _capability():
             'allowed_actions': [], 'mutation': 'NONE'}
 
 
+def _model_admin_capability():
+    """Describe existing server actions without granting client authority."""
+    return {
+        'authority': 'SERVER',
+        'access': 'BOUNDED_ADMIN',
+        'allowed_actions': [
+            'TEST_PROVIDER_CONNECTION', 'TEST_PROVIDER_MODEL',
+            'SAVE_PROVIDER_ONBOARDING', 'DISABLE_PROVIDER',
+            'SET_OPENAI_CHANNEL_PREFERENCE'],
+        'mutation': 'SERVER_REVALIDATED',
+    }
+
+
 def _task_record(value):
     ordinary = ('task_id', 'project_id', 'state', 'runtime_status',
                 'responsible_party', 'next_action', 'last_real_progress_at',
@@ -95,6 +108,94 @@ def _model_usage_record(value):
     }
 
 
+def _provider_preset_record(value):
+    return {
+        'platform': value.get('platform', UNKNOWN),
+        'label': value.get('label', UNKNOWN),
+        'auth_type': value.get('auth_type', 'API_KEY'),
+        'availability': value.get('availability', UNKNOWN),
+        'free_default_model': value.get('free_default_model'),
+    }
+
+
+def _model_reference(value):
+    if isinstance(value, dict):
+        return {'model_id': value.get('model_id', value.get('id', UNKNOWN))}
+    return value
+
+
+def _onboarding_record(value):
+    connection_id = value.get('connection_id', UNKNOWN)
+    return {
+        'platform': value.get('platform', UNKNOWN),
+        'connection_id': connection_id,
+        'connection_name': value.get('connection_name', UNKNOWN),
+        'model_id': value.get('model_id', UNKNOWN),
+        'auth_state': value.get('auth_state', UNKNOWN),
+        'catalog_state': value.get('catalog_state', UNKNOWN),
+        'callable_state': value.get('model_callable_state', UNKNOWN),
+        'tested_model_id': value.get('tested_model_id', UNKNOWN),
+        'models': [_model_reference(item) for item in value.get('models', [])],
+        'secret': {
+            'state': ('CONFIGURED' if value.get('secret_mask') is not None
+                      else 'NOT_CONFIGURED'),
+            'ref': 'PROTECTED_CONNECTION_SECRET:' + str(connection_id),
+        },
+        'updated_at': value.get('updated_at', UNKNOWN),
+    }
+
+
+def _connection_record(value):
+    connection_id = value.get('connection_id', UNKNOWN)
+    return {
+        'connection_id': connection_id,
+        'provider_id': value.get('provider_id', UNKNOWN),
+        'connection_name': value.get('connection_name', UNKNOWN),
+        'purpose': value.get('purpose', UNKNOWN),
+        'auth_type': value.get('auth_type', UNKNOWN),
+        'status': value.get('status', UNKNOWN),
+        'config_version': value.get('config_version', UNKNOWN),
+        'access_expires_at': value.get('access_expires_at', UNKNOWN),
+        'secret': {
+            'state': ('CONFIGURED' if value.get('secret_mask') is not None
+                      else 'NOT_CONFIGURED'),
+            'ref': 'PROTECTED_CONNECTION_SECRET:' + str(connection_id),
+        },
+        'updated_at': value.get('updated_at', UNKNOWN),
+    }
+
+
+def _model_record(value):
+    return {
+        'provider_id': value.get('provider_id', UNKNOWN),
+        'model_id': value.get('model_id', UNKNOWN),
+        'display_name': value.get('display_name', value.get('model_id',
+                                                           UNKNOWN)),
+        'enabled': bool(value.get('enabled', False)),
+        'price_state': value.get('price_state', UNKNOWN),
+        'input_unit_cost': (value.get('input_unit_cost')
+                            if value.get('price_state') == 'KNOWN'
+                            else UNKNOWN),
+        'output_unit_cost': (value.get('output_unit_cost')
+                             if value.get('price_state') == 'KNOWN'
+                             else UNKNOWN),
+        'updated_at': value.get('updated_at', UNKNOWN),
+    }
+
+
+def _assignment_record(value):
+    return {
+        'task_id': value.get('task_id', UNKNOWN),
+        'attempt_id': value.get('attempt_id', UNKNOWN),
+        'role': value.get('role_id', UNKNOWN),
+        'provider_id': value.get('provider_id', UNKNOWN),
+        'model_id': value.get('model_id', UNKNOWN),
+        'state': value.get('state', UNKNOWN),
+        'reason': value.get('reason', UNKNOWN),
+        'updated_at': value.get('created_at', UNKNOWN),
+    }
+
+
 def build_projection(task_projection, model_projection, observed_at):
     """Build one fail-closed TEST_ONLY admin projection."""
     if not isinstance(task_projection, dict) or not isinstance(
@@ -112,6 +213,16 @@ def build_projection(task_projection, model_projection, observed_at):
                  model_projection.get('providers', [])]
     model_usage = [_model_usage_record(item) for item in
                    model_projection.get('usage', [])]
+    provider_presets = [_provider_preset_record(item) for item in
+                        model_projection.get('provider_presets', [])]
+    provider_onboarding = [_onboarding_record(item) for item in
+                           model_projection.get('provider_onboarding', [])]
+    connections = [_connection_record(item) for item in
+                   model_projection.get('connections', [])]
+    models = [_model_record(item) for item in
+              model_projection.get('models', [])]
+    assignments = [_assignment_record(item) for item in
+                   model_projection.get('assignments', [])]
     events = [{key: item.get(key, UNKNOWN) for key in
                ('task_id', 'attempt_id', 'event_id', 'kind', 'observed_at',
                 'evidence_kind', 'evidence_ref')}
@@ -201,13 +312,18 @@ def build_projection(task_projection, model_projection, observed_at):
                 'source': 'MODEL_CONTROL',
                 'observed_at': observed_at,
                 'records': providers,
-                'capability': _capability(),
+                'capability': _model_admin_capability(),
                 'advanced': {
                     'quota_status': model_projection.get('quota_status', []),
                     'modules': model_projection.get('modules', []),
                     'model_usage': model_usage,
                     'model_usage_semantic':
                         'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',
+                    'provider_presets': provider_presets,
+                    'provider_onboarding': provider_onboarding,
+                    'connections': connections,
+                    'models': models,
+                    'assignments': assignments,
                     'openai_channel_preference':model_projection.get(
                         'openai_channel_preference', {
                           'selected_preference': UNKNOWN,

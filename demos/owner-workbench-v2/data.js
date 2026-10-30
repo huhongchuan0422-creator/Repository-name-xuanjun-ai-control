@@ -6,6 +6,25 @@
     mode:'UI_CANDIDATE',
     observed_at:'2026-10-30 13:30 CST',
     source_notice:'合成数据，仅验证信息架构和交互；不代表部署、安装或客户验收。',
+    hosted_configuration:{
+      status:'UI_CANDIDATE',records:[
+        {provider_id:'siliconflow',display_name:'硅基流动',enabled:true,
+          price_state:'KNOWN_ZERO',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:siliconflow'}},
+        {provider_id:'openai',display_name:'OpenAI API',enabled:false,
+          price_state:'UNKNOWN',secret:{state:'NOT_CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:openai'}}
+      ],advanced:{
+        provider_presets:[
+          {platform:'siliconflow',label:'硅基流动',auth_type:'API_KEY',availability:'SUPPORTED',free_default_model:'Qwen/Qwen2.5-7B-Instruct'},
+          {platform:'openai',label:'OpenAI API',auth_type:'API_KEY',availability:'SUPPORTED'},
+          {platform:'deepseek',label:'DeepSeek API',auth_type:'API_KEY',availability:'SUPPORTED'},
+          {platform:'bailian',label:'阿里云百炼',auth_type:'API_KEY',availability:'SUPPORTED'}
+        ],
+        provider_onboarding:[{platform:'siliconflow',connection_id:'siliconflow-team',connection_name:'团队主连接',model_id:'Qwen/Qwen2.5-7B-Instruct',auth_state:'SUCCEEDED',catalog_state:'SAVED',callable_state:'UNVERIFIED_NO_INFERENCE',models:['Qwen/Qwen2.5-7B-Instruct'],secret:{state:'CONFIGURED',ref:'PROTECTED_CONNECTION_SECRET:siliconflow-team'}}],
+        connections:[{connection_id:'siliconflow-team',provider_id:'siliconflow',purpose:'MODEL_INFERENCE',status:'ACTIVE',secret:{state:'CONFIGURED',ref:'PROTECTED_CONNECTION_SECRET:siliconflow-team'}}],
+        models:[{provider_id:'siliconflow',model_id:'Qwen/Qwen2.5-7B-Instruct',enabled:true,price_state:'KNOWN_ZERO'}],
+        assignments:[],model_usage:[],openai_channel_preference:null
+      }
+    },
     channel_preference_preview:{
       route:'OPENAI_CODEX_EXECUTION',selected_preference:'SUBSCRIPTION_OAUTH_FIRST',
       selected_channel:'SUBSCRIPTION_OAUTH',effective_channel:'SUBSCRIPTION_OAUTH',
