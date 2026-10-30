@@ -24,7 +24,8 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from reusable_task_gateway import _text, _sha
 from task_supervisor import UNKNOWN, canonical
-from connection_management import ConnectionManager
+from connection_management import (ConnectionManager,
+                                   project_openai_channel_preference)
 
 
 ADAPTERS = frozenset(('siliconflow', 'openai-compatible'))
@@ -1727,6 +1728,8 @@ class ModelControl(object):
         has_connections=self.db.execute('''SELECT 1 FROM sqlite_master WHERE
           type='table' AND name='service_connections' ''').fetchone() is not None
         return {'providers':self.list_providers(),
+          'openai_channel_preference':project_openai_channel_preference(
+            self.db,self.tenant_id,getattr(self,'clock',time.time)()),
           'quota_status':[dict(x) for x in self.db.execute('''SELECT
           provider_id,quota_state,quota_source,verified_at,unavailable_reason,
           updated_at FROM model_quota_status WHERE tenant_id=? ORDER BY

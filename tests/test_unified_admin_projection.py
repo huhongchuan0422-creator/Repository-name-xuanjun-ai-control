@@ -34,7 +34,19 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
                       {'provider_id': 'paid', 'model_id': 'model-unknown',
                        'request_count': 1, 'input_tokens': 3,
                        'output_tokens': 1, 'cost_state': 'UNKNOWN',
-                       'known_cost': 999}]
+                       'known_cost': 999}],
+                  'openai_channel_preference': {
+                      'selected_preference': 'SUBSCRIPTION_OAUTH_FIRST',
+                      'selected_channel': 'SUBSCRIPTION_OAUTH',
+                      'effective_channel': 'SUBSCRIPTION_OAUTH',
+                      'effective_connection_id': 'oauth-openai',
+                      'config_version': 2, 'status': 'ACTIVE',
+                      'reason': 'AVAILABLE', 'fallback': 'DISABLED',
+                      'channels': {
+                          'API': {'state': 'NOT_CONFIGURED',
+                                  'connection_id': None},
+                          'SUBSCRIPTION_OAUTH': {'state': 'ACTIVE',
+                              'connection_id': 'oauth-openai'}}}
                   }
         return tasks, models
 
@@ -134,6 +146,11 @@ class UnifiedAdminProjectionTest(unittest.TestCase):
                          'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE')
         self.assertEqual(value['modules']['finance']['status'],
                          'NOT_CONNECTED')
+        route = advanced['openai_channel_preference']
+        self.assertEqual(route['selected_preference'],
+                         'SUBSCRIPTION_OAUTH_FIRST')
+        self.assertEqual(route['effective_channel'], 'SUBSCRIPTION_OAUTH')
+        self.assertEqual(route['fallback'], 'DISABLED')
 
     def test_rejects_production_or_cross_tenant_sources(self):
         tasks, models = self.fixtures()

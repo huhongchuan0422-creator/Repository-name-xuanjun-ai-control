@@ -250,6 +250,20 @@ class CodexExecutionAdapterTests(unittest.TestCase):
         self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
           codex_execution_intents''').fetchone()[0],0)
 
+    def test_recent_verified_openai_promotional_credit_is_explicitly_admitted(self):
+        self.supervisor.db.execute('''UPDATE model_providers SET
+          price_state='KNOWN_PAID',config_version=config_version+1 WHERE
+          tenant_id='tenant-a' AND provider_id='codex-fixture' ''')
+        self.supervisor.db.commit()
+        ModelControl(self.gateway,self.context,self.master).set_quota_status(
+          'codex-fixture','AVAILABLE','OPENAI_VERIFIED_PROMOTIONAL_CREDIT',
+          verified_at=time.time(),unavailable_reason=None)
+        created=self.control.create_intent('demo-b','CODEX_SDK',
+          'verified-promo-credit',self.context_body)
+        self.assertEqual(created['state'],'PENDING')
+        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          codex_execution_intents WHERE state='PENDING' ''').fetchone()[0],1)
+
     def test_provider_change_after_queue_blocks_transport(self):
         self.control.create_intent('demo-b','CODEX_SDK','provider-change',
           self.context_body);called=[]

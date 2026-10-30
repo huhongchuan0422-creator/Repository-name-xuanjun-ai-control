@@ -22,6 +22,12 @@ TEST_ONLY 只读字段，并可显示其已持久化用量事件和已配单价�
 `allowed_actions=[]`。本地 `file:` 候选仍显著标记合成；Hosted 可见区域只使用
 `TEST_ONLY / READ_ONLY`，不把 fixture 文案带入真实接口页。
 
+大模型页另含 Owner 手动 OpenAI 通道选择：`API_FIRST` 与
+`SUBSCRIPTION_OAUTH_FIRST`。选择写入既有 ConnectionManager 所在数据库并从
+服务端回读；实际 Codex intent 绑定该解析结果。被选通道未配置、非 ACTIVE 或
+OAuth 已过期时，`effective_channel=NONE` 并明确 HOLD，不会自动回退另一通道。
+API Key/OAuth token 均不进入投影或页面。赠额适用性仍以官方规则和实际账单为准。
+
 页面包含：
 
 - 简洁的标签页级演示登录/退出、严格互斥的登录与工作台、可展开十一项一级导航；

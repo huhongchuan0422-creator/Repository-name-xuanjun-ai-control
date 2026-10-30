@@ -773,6 +773,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='REVOKE_CONNECTION':
                         result=ConnectionManager(control.gateway,control.context,
                           model_master_key).revoke(value['connection_id'])
+                    elif action=='SET_OPENAI_CHANNEL_PREFERENCE':
+                        result=ConnectionManager(control.gateway,control.context,
+                          model_master_key).set_openai_channel_preference(
+                            value['preference'],value.get('api_connection_id'),
+                            value.get('oauth_connection_id'),
+                            value.get('expected_version'))
                     elif action=='DISABLE_PROVIDER':
                         result=control.disable_provider(value['provider_id'])
                     elif action=='UPSERT_MODEL':result=control.upsert_model(value['config'])
@@ -903,10 +909,28 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
                         result=ModelScheduler(control).run_once()
                     elif action=='CREATE_CODEX_INTENT':
+                        codex_context=dict(value['context'])
+                        preference=control.projection().get(
+                          'openai_channel_preference',{})
+                        if preference.get('selected_preference') in (
+                                'API_FIRST','SUBSCRIPTION_OAUTH_FIRST'):
+                            resolved=ConnectionManager(control.gateway,
+                              control.context,model_master_key
+                              ).resolve_openai_channel()
+                            supplied_connection=codex_context.get('connection_id')
+                            supplied_provider=codex_context.get('provider_id')
+                            if (supplied_connection not in (None,
+                                  resolved['connection_id']) or
+                                supplied_provider not in (None,
+                                  resolved['provider_id'])):
+                                raise ValueError(
+                                  'OPENAI_CHANNEL_PREFERENCE_MISMATCH')
+                            codex_context['connection_id']=resolved['connection_id']
+                            codex_context['provider_id']=resolved['provider_id']
                         result=CodexExecutionControl(control.gateway,
                           control.context).create_intent(value['task_id'],
                           value['transport_kind'],value['idempotency_key'],
-                          value['context'])
+                          codex_context)
                     elif action=='CANCEL_CODEX_INTENT':
                         result=CodexExecutionControl(control.gateway,
                           control.context).cancel(value['intent_id'])

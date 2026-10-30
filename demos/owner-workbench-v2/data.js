@@ -6,6 +6,19 @@
     mode:'UI_CANDIDATE',
     observed_at:'2026-10-30 13:30 CST',
     source_notice:'合成数据，仅验证信息架构和交互；不代表部署、安装或客户验收。',
+    channel_preference_preview:{
+      route:'OPENAI_CODEX_EXECUTION',selected_preference:'SUBSCRIPTION_OAUTH_FIRST',
+      selected_channel:'SUBSCRIPTION_OAUTH',effective_channel:'SUBSCRIPTION_OAUTH',
+      effective_connection_id:'SYNTHETIC-OAUTH-CONNECTION',config_version:1,
+      status:'UI_CANDIDATE',reason:'SYNTHETIC_PREVIEW',fallback:'DISABLED',
+      channels:{
+        API:{state:'NOT_CONFIGURED',connection_id:null,available:false,
+          reason:'NO_API_CONNECTION'},
+        SUBSCRIPTION_OAUTH:{state:'ACTIVE',
+          connection_id:'SYNTHETIC-OAUTH-CONNECTION',available:true,
+          reason:'SYNTHETIC_PREVIEW'}
+      }
+    },
     management_modules:{
       'operations':{name:'运营',producer:'Operations projection',status:'NOT_CONNECTED'},
       'customer':{name:'客户',producer:'Identity / CRM / Customer Project Center',status:'NOT_CONNECTED'},

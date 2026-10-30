@@ -116,6 +116,20 @@ test('Binance appears only as Xuanjun self-operated domain',()=>{
   assert.doesNotMatch(html,/币安官方客服/);
 });
 
+test('OpenAI channel preference preview is manual truthful and no fallback',()=>{
+  const html=app.render(data,{view:'config-models'});
+  for(const text of ['API优先','订阅OAuth优先','Owner 选择','实际生效通道','fallback','赠额是否适用'])assert.match(html,new RegExp(text));
+  assert.match(html,/SUBSCRIPTION_OAUTH_FIRST/);
+  assert.match(html,/NOT_CONFIGURED/);
+  assert.match(html,/UI候选 · 不写服务端/);
+  assert.match(html,/不自动切换、不自动充值、不静默 fallback/);
+  const source=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  assert.match(source,/SET_OPENAI_CHANNEL_PREFERENCE/);
+  assert.match(source,/X-CSRF-Token/);
+  assert.match(source,/CHANNEL_PREFERENCE_SAVED/);
+  assert.doesNotMatch(source,/api[_-]?key\s*[:=]\s*['"][^'"]+/i);
+});
+
 test('all required exception states are visible',()=>{
   const html=app.render(data,{view:'states',id:null});
   for(const value of ['加载中','空状态','读取失败','无权限','版本冲突','未接入','NOT_CONNECTED'])assert.match(html,new RegExp(value));
@@ -189,7 +203,7 @@ test('hosted mode uses same-origin session and projection without fixture fallba
   assert.match(source,/没有保留或回退旧数据/);
   assert.match(source,/function bootHosted[^]*globalSearch[^]*win\.location\.hash='#projects'/);
   assert.doesNotMatch(source,/fetch\(['"]https?:/);
-  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:1,source_observed_at:0,sources:{social_media:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Channel Registry'],evidence_refs:['NONE_FOUND'],gaps:['RBAC']},servers:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Infrastructure Registry'],evidence_refs:['NONE_FOUND'],gaps:['CURRENT_INVENTORY']}},modules:{overview:{summary:{task_count:1,research_task_count:1}},'research-development':{status:'CONNECTED_TEST_ONLY',records:[{task_id:'T1',project_id:'P1',state:'RUNNING',runtime_status:'LIVENESS_UNKNOWN',responsible_party:'writer',next_action:'review',last_real_progress_at:5,blocker:null}],advanced:{audit_records:[{task_id:'T1',attempt_id:'A1',run_id:'R1',session_id:'S1',epoch:2,evidence:[]}]}},configuration:{status:'CONNECTED_TEST_ONLY',records:[{provider_id:'p1',display_name:'Provider',enabled:true,price_state:'UNKNOWN',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:p1'}}],advanced:{model_usage_semantic:'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',model_usage:[{provider_id:'p1',model_id:'m1',request_count:2,input_tokens:10,output_tokens:4,cost_state:'KNOWN_ZERO',estimated_cost:0,cost_unit:'UNKNOWN',semantic:'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE'}]}},finance:{status:'NOT_CONNECTED'}}});
+  const hosted=app.normalizeHostedProjection({projection:'UNIFIED_ADMIN_PROJECTION_V1',mode:'TEST_ONLY',tenant_id:'t',observed_at:1,source_observed_at:0,sources:{social_media:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Channel Registry'],evidence_refs:['NONE_FOUND'],gaps:['RBAC']},servers:{status:'NOT_CONNECTED',source_level:'CANDIDATE_ONLY_UNVERIFIED',source_candidates:['Infrastructure Registry'],evidence_refs:['NONE_FOUND'],gaps:['CURRENT_INVENTORY']}},modules:{overview:{summary:{task_count:1,research_task_count:1}},'research-development':{status:'CONNECTED_TEST_ONLY',records:[{task_id:'T1',project_id:'P1',state:'RUNNING',runtime_status:'LIVENESS_UNKNOWN',responsible_party:'writer',next_action:'review',last_real_progress_at:5,blocker:null}],advanced:{audit_records:[{task_id:'T1',attempt_id:'A1',run_id:'R1',session_id:'S1',epoch:2,evidence:[]}]}},configuration:{status:'CONNECTED_TEST_ONLY',records:[{provider_id:'p1',display_name:'Provider',enabled:true,price_state:'UNKNOWN',secret:{state:'CONFIGURED',ref:'PROTECTED_PROVIDER_SECRET:p1'}}],advanced:{model_usage_semantic:'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',model_usage:[{provider_id:'p1',model_id:'m1',request_count:2,input_tokens:10,output_tokens:4,cost_state:'KNOWN_ZERO',estimated_cost:0,cost_unit:'UNKNOWN',semantic:'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE'}],openai_channel_preference:{selected_preference:'API_FIRST',selected_channel:'API',effective_channel:'NONE',effective_connection_id:null,config_version:3,status:'HOLD',reason:'NO_API_CONNECTION',fallback:'DISABLED',channels:{API:{state:'NOT_CONFIGURED',connection_id:null,reason:'NO_API_CONNECTION'},SUBSCRIPTION_OAUTH:{state:'ACTIVE',connection_id:'oauth-1',reason:'AVAILABLE'}}}}},finance:{status:'NOT_CONNECTED'}}});
   assert.equal(hosted.mode,'HOSTED_TEST_ONLY');
   assert.equal(hosted.tasks[0].id,'T1');
   assert.equal(hosted.tasks[0].advanced.attempt_id,'A1');
@@ -202,10 +216,14 @@ test('hosted mode uses same-origin session and projection without fixture fallba
   assert.doesNotMatch(detail.split('<details')[0],/attempt_id|artifact_sha|epoch/);
   const models=app.render(hosted,{view:'config-models'});
   assert.match(models,/PROTECTED_PROVIDER_SECRET:p1/);
-  assert.match(models,/allowed_actions=\[\]/);
+  assert.match(models,/SET_OPENAI_CHANNEL_PREFERENCE/);
   assert.match(models,/模型用量与估算成本/);
   assert.match(models,/m1/);
   assert.match(models,/不是财务账本、实际扣费或付款凭证/);
+  assert.match(models,/API_FIRST/);
+  assert.match(models,/实际生效通道/);
+  assert.match(models,/NONE/);
+  assert.match(models,/不自动切换、不自动充值、不静默 fallback/);
   const media=app.render(hosted,{view:'config-media'}),servers=app.render(hosted,{view:'config-servers'});
   for(const pair of [[media,'Channel Registry','RBAC'],[servers,'Infrastructure Registry','CURRENT_INVENTORY']]){assert.match(pair[0],new RegExp(pair[1]));assert.match(pair[0],new RegExp(pair[2]));assert.match(pair[0],/NOT_CONNECTED/);assert.match(pair[0],/allowed_actions/);}
   for(const html of [overview,app.render(hosted,{view:'tasks'}),models,media,servers])assert.doesNotMatch(html,/SYNTHETIC|合成|演示/);

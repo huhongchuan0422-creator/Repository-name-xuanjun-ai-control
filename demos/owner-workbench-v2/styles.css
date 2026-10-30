@@ -34,3 +34,5 @@
 .admin-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}.operation-log{margin-top:18px}.admin-boundary{margin-top:20px}.admin-boundary .operation-log{margin-top:0}.twin-link-card{margin-top:16px;border-style:dashed}.twin-link-card .status-chip{margin-bottom:10px}
 @media(max-width:1120px){.admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.admin-metrics{grid-template-columns:1fr}}
+.channel-preference{margin:18px 0}.channel-preference form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}.channel-preference form>label{margin:0;grid-template-columns:auto 1fr;align-items:start;cursor:pointer}.channel-preference form>label input{width:auto;min-height:auto;margin-top:4px}.channel-preference form>label strong,.channel-preference form>label small{grid-column:2}.channel-preference form>.button{grid-column:1/-1;justify-self:start}.channel-preference .callout{margin:16px 0 0}
+@media(max-width:560px){.channel-preference form{grid-template-columns:1fr}.channel-preference form>.button{width:100%}}

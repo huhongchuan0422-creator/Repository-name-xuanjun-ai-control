@@ -262,9 +262,10 @@ class CodexExecutionControl(object):
         if row is None or provider is None or not provider['enabled']:return False
         source=row['quota_source']
         included=(source=='EXISTING_SUBSCRIPTION_INCLUDED')
+        promotional=(source=='OPENAI_VERIFIED_PROMOTIONAL_CREDIT')
         verified_free=(source=='VERIFIED_FREE_TIER' or (isinstance(source,str)
           and source.startswith('TEST_ONLY_INCLUDED_')))
-        attributable=(included or (verified_free and
+        attributable=(included or promotional or (verified_free and
           provider['price_state']=='KNOWN_FREE'))
         return (row['quota_state']=='AVAILABLE' and attributable and
           row['verified_at'] is not None and now-row['verified_at']<=3600)

@@ -119,6 +119,10 @@ class FullJourneyTests(unittest.TestCase):
           'authorization_endpoint':None,'token_endpoint':None,
           'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
           'scopes':[],'supports_refresh':False},'credential':'fixture-codex-key'})
+        preference=self.post({'action':'SET_OPENAI_CHANNEL_PREFERENCE',
+          'preference':'API_FIRST','api_connection_id':'codex-connection',
+          'oauth_connection_id':None,'expected_version':0})
+        self.assertEqual(preference['effective_channel'],'API')
         codex=self.post({'action':'CREATE_CODEX_INTENT',
           'task_id':'task-journey','transport_kind':'CODEX_SDK',
           'idempotency_key':'journey-codex-intent','context':{
@@ -127,6 +131,14 @@ class FullJourneyTests(unittest.TestCase):
           'reuse_evidence':['query-journey-1'],'connection_id':'codex-connection',
           'provider_id':'codex-fixture'}},'developer-token-123456')
         self.assertEqual(codex['state'],'PENDING')
+        verify=Supervisor(self.db)
+        try:
+            bound=verify.db.execute('''SELECT connection_id,provider_id FROM
+              codex_execution_intents WHERE intent_id=?''',(
+              codex['intent_id'],)).fetchone()
+            self.assertEqual(tuple(bound),
+                             ('codex-connection','codex-fixture'))
+        finally:verify.close()
         self.assertEqual(self.post({'action':'CANCEL_CODEX_INTENT',
           'intent_id':codex['intent_id']},'developer-token-123456')['state'],
           'CANCELLED')

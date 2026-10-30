@@ -208,6 +208,11 @@ def build_projection(task_projection, model_projection, observed_at):
                     'model_usage': model_usage,
                     'model_usage_semantic':
                         'MODEL_ESTIMATE_NOT_BILLING_OR_ACTUAL_CHARGE',
+                    'openai_channel_preference':model_projection.get(
+                        'openai_channel_preference', {
+                          'selected_preference': UNKNOWN,
+                          'effective_channel': 'NONE',
+                          'status': 'NOT_CONFIGURED'}),
                 },
             },
             'finance': {

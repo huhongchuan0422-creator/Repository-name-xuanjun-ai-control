@@ -160,6 +160,50 @@ class TaskCenterAppTests(unittest.TestCase):
         status,_,body=self.get('/admin.html')
         self.assertEqual(status,200);self.assertIn(b'sessionIdentity',body)
 
+    def test_manual_openai_channel_preference_persists_and_reads_back(self):
+        api={'connection_id':'openai-api','provider_id':'openai',
+          'purpose':'CODEX_EXECUTION','auth_type':'API_KEY',
+          'destination_origin':'https://api.openai.com','issuer':None,
+          'authorization_endpoint':None,'token_endpoint':None,
+          'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+          'scopes':[],'supports_refresh':False}
+        oauth={'connection_id':'openai-subscription','provider_id':'openai',
+          'purpose':'CODEX_EXECUTION','auth_type':'OAUTH2_AUTH_CODE_PKCE',
+          'destination_origin':'https://api.openai.com',
+          'issuer':'https://auth.openai.com',
+          'authorization_endpoint':'https://auth.openai.com/authorize',
+          'token_endpoint':'https://auth.openai.com/token',
+          'revocation_endpoint':None,
+          'redirect_uri':'https://example.com/oauth/callback',
+          'client_id':'existing-client','scopes':['openid'],
+          'supports_refresh':True}
+        self.post({'action':'UPSERT_CONNECTION','config':api,
+                   'credential':'fixture-api-key'})
+        self.post({'action':'UPSERT_CONNECTION','config':oauth})
+        held=self.post({'action':'SET_OPENAI_CHANNEL_PREFERENCE',
+          'preference':'SUBSCRIPTION_OAUTH_FIRST',
+          'api_connection_id':'openai-api',
+          'oauth_connection_id':'openai-subscription','expected_version':0})
+        self.assertEqual(held['selected_channel'],'SUBSCRIPTION_OAUTH')
+        self.assertEqual(held['effective_channel'],'NONE')
+        self.assertEqual(held['fallback'],'DISABLED')
+        active=self.post({'action':'SET_OPENAI_CHANNEL_PREFERENCE',
+          'preference':'API_FIRST','api_connection_id':'openai-api',
+          'oauth_connection_id':'openai-subscription','expected_version':1})
+        self.assertEqual(active['effective_channel'],'API')
+        request=Request(self.base+'/api/admin/model-control',headers={
+          'X-Test-Admin-Token':'test-admin-token-123456'})
+        projected=json.loads(urlopen(request,timeout=3).read().decode('utf-8'))
+        route=projected['openai_channel_preference']
+        self.assertEqual(route['selected_preference'],'API_FIRST')
+        self.assertEqual(route['effective_channel'],'API')
+        self.assertEqual(route['config_version'],2)
+        self.assertNotIn('fixture-api-key',json.dumps(projected))
+        self.post({'action':'SET_OPENAI_CHANNEL_PREFERENCE',
+          'preference':'API_FIRST','api_connection_id':'openai-api',
+          'oauth_connection_id':'openai-subscription','expected_version':1},
+          'VERSION_CONFLICT')
+
     def test_digital_twin_projection_is_admin_read_only_and_reference_based(self):
         with self.assertRaises(HTTPError) as denied:
             self.get('/api/admin/digital-twin')

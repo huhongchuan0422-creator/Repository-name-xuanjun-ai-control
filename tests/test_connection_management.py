@@ -186,5 +186,60 @@ class ConnectionManagementTests(unittest.TestCase):
             self.manager.refresh('oauth',broken,now=1003)
         self.assertEqual(broken.calls,1)
 
+    def test_manual_openai_channel_preference_switches_and_never_falls_back(self):
+        api=self.api_config('openai-api');api['purpose']='CODEX_EXECUTION'
+        oauth=self.oauth_config('openai-oauth');oauth['purpose']='CODEX_EXECUTION'
+        api['provider_id']=oauth['provider_id']='openai-fixture'
+        self.manager.upsert(api,credential='api-key-123456')
+        self.manager.upsert(oauth)
+        flow=self.manager.begin_oauth('openai-oauth')
+        self.manager.complete_oauth('openai-oauth',flow['flow_id'],flow['state'],
+          'one-time-code',self.base,self.base+'/callback',now=1001)
+        first=self.manager.set_openai_channel_preference('API_FIRST',
+          'openai-api','openai-oauth',expected_version=0,now=1002)
+        self.assertEqual(first['selected_channel'],'API')
+        self.assertEqual(first['effective_channel'],'API')
+        self.assertEqual(first['fallback'],'DISABLED')
+        self.assertEqual(self.manager.resolve_openai_channel(now=1002)[
+          'connection_id'],'openai-api')
+        second=self.manager.set_openai_channel_preference(
+          'SUBSCRIPTION_OAUTH_FIRST','openai-api','openai-oauth',
+          expected_version=1,now=1003)
+        self.assertEqual(second['effective_channel'],'SUBSCRIPTION_OAUTH')
+        self.assertEqual(second['config_version'],2)
+        self.manager.revoke('openai-oauth',now=1004)
+        held=self.manager.openai_channel_preference(now=1005)
+        self.assertEqual(held['selected_channel'],'SUBSCRIPTION_OAUTH')
+        self.assertEqual(held['effective_channel'],'NONE')
+        self.assertEqual(held['channels']['API']['state'],'ACTIVE')
+        self.assertEqual(held['reason'],'CONNECTION_NOT_ACTIVE')
+        with self.assertRaisesRegex(ValueError,
+                                    'SELECTED_OPENAI_CHANNEL_UNAVAILABLE'):
+            self.manager.resolve_openai_channel(now=1005)
+
+    def test_openai_channel_preference_is_tenant_admin_versioned_and_missing_safe(self):
+        api=self.api_config('openai-api');api['purpose']='CODEX_EXECUTION'
+        api['provider_id']='openai-fixture'
+        self.manager.upsert(api,credential='api-key-123456')
+        selected=self.manager.set_openai_channel_preference('API_FIRST',
+          'openai-api',None,expected_version=0)
+        self.assertEqual(selected['channels']['SUBSCRIPTION_OAUTH']['state'],
+                         'NOT_CONFIGURED')
+        with self.assertRaisesRegex(ValueError,'VERSION_CONFLICT'):
+            self.manager.set_openai_channel_preference('API_FIRST',
+              'openai-api',None,expected_version=0)
+        non_admin=ConnectionManager(self.gateway,
+          self.authority.issue('tenant-a','developer'),self.master,
+          clock=lambda:1000)
+        with self.assertRaisesRegex(ValueError,'CONNECTION_ADMIN_REQUIRED'):
+            non_admin.set_openai_channel_preference(
+              'SUBSCRIPTION_OAUTH_FIRST','openai-api',None,
+              expected_version=1)
+        other=ConnectionManager(self.gateway,
+          self.authority.issue('tenant-b','admin:other'),self.master,
+          clock=lambda:1000)
+        self.assertEqual(other.openai_channel_preference()[
+                         'selected_preference'],'UNKNOWN')
+
 
 if __name__=='__main__':unittest.main()

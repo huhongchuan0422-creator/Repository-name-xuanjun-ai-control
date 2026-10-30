@@ -25,6 +25,83 @@ from task_supervisor import canonical
 
 AUTH_TYPES=frozenset(('API_KEY','OAUTH2_AUTH_CODE_PKCE'))
 CONNECTION_PURPOSES=frozenset(('MODEL_INFERENCE','MCP_TOOL','CODEX_EXECUTION'))
+OPENAI_CHANNEL_PREFERENCES=frozenset(('API_FIRST',
+                                      'SUBSCRIPTION_OAUTH_FIRST'))
+OPENAI_CHANNEL_ROUTE='OPENAI_CODEX_EXECUTION'
+
+
+def project_openai_channel_preference(db,tenant_id,now=None):
+    """Read a fail-closed API/OAuth preference without exposing credentials."""
+    now=time.time() if now is None else now
+    tables={row[0] for row in db.execute(
+      "SELECT name FROM sqlite_master WHERE type='table'")}
+    if 'service_connections' not in tables:
+        return {'route':OPENAI_CHANNEL_ROUTE,'selected_preference':'UNKNOWN',
+          'selected_channel':'UNKNOWN','effective_channel':'NONE',
+          'effective_connection_id':None,'config_version':0,
+          'status':'NOT_CONFIGURED','reason':'CONNECTION_MANAGER_NOT_CONFIGURED',
+          'channels':{'API':{'state':'NOT_CONFIGURED','connection_id':None},
+          'SUBSCRIPTION_OAUTH':{'state':'NOT_CONFIGURED','connection_id':None}}}
+    row=(db.execute('''SELECT selected_preference,api_connection_id,
+      oauth_connection_id,config_version,updated_at FROM
+      openai_channel_preferences WHERE tenant_id=? AND route_key=?''',(
+      tenant_id,OPENAI_CHANNEL_ROUTE)).fetchone()
+      if 'openai_channel_preferences' in tables else None)
+    def candidates(auth_type):
+        return list(db.execute('''SELECT connection_id,provider_id,auth_type,
+          purpose,status,config_version,access_expires_at,updated_at FROM
+          service_connections WHERE tenant_id=? AND purpose='CODEX_EXECUTION'
+          AND auth_type=? AND (lower(provider_id) LIKE '%openai%' OR
+          lower(provider_id) LIKE '%chatgpt%' OR lower(provider_id) LIKE
+          '%codex%') ORDER BY connection_id''',(tenant_id,auth_type)))
+    api_rows=candidates('API_KEY');oauth_rows=candidates(
+      'OAUTH2_AUTH_CODE_PKCE')
+    def channel(kind,rows,bound_id):
+        if bound_id is None:
+            if len(rows)==1:target=rows[0]
+            elif not rows:return {'state':'NOT_CONFIGURED','connection_id':None,
+              'available':False,'reason':'NO_%s_CONNECTION'%kind}
+            else:return {'state':'AMBIGUOUS','connection_id':None,
+              'available':False,'reason':'MULTIPLE_%s_CONNECTIONS'%kind}
+        else:
+            target=next((item for item in rows
+                         if item['connection_id']==bound_id),None)
+            if target is None:return {'state':'NOT_CONFIGURED',
+              'connection_id':bound_id,'available':False,
+              'reason':'BOUND_%s_CONNECTION_MISSING_OR_MISMATCH'%kind}
+        item={'state':target['status'],'connection_id':target['connection_id'],
+          'provider_id':target['provider_id'],'auth_type':target['auth_type'],
+          'purpose':target['purpose'],'config_version':target['config_version'],
+          'updated_at':target['updated_at'],'available':False,'reason':None}
+        if target['status']!='ACTIVE':item['reason']='CONNECTION_NOT_ACTIVE'
+        elif (kind=='SUBSCRIPTION_OAUTH' and
+              (target['access_expires_at'] is None or
+               now>=target['access_expires_at'])):
+            item['state']='EXPIRED';item['reason']='OAUTH_ACCESS_EXPIRED_OR_UNKNOWN'
+        else:item['available']=True;item['reason']='AVAILABLE'
+        return item
+    api=channel('API',api_rows,row['api_connection_id'] if row else None)
+    oauth=channel('SUBSCRIPTION_OAUTH',oauth_rows,
+                  row['oauth_connection_id'] if row else None)
+    selected=row['selected_preference'] if row else 'UNKNOWN'
+    selected_channel=('API' if selected=='API_FIRST' else
+                      'SUBSCRIPTION_OAUTH' if
+                      selected=='SUBSCRIPTION_OAUTH_FIRST' else 'UNKNOWN')
+    chosen=api if selected_channel=='API' else oauth if (
+      selected_channel=='SUBSCRIPTION_OAUTH') else None
+    effective=(selected_channel if chosen and chosen['available'] else 'NONE')
+    reason=('AVAILABLE' if effective!='NONE' else
+            chosen['reason'] if chosen else 'PREFERENCE_NOT_CONFIGURED')
+    return {'route':OPENAI_CHANNEL_ROUTE,'selected_preference':selected,
+      'selected_channel':selected_channel,'effective_channel':effective,
+      'effective_connection_id':(chosen['connection_id'] if
+        effective!='NONE' else None),'effective_provider_id':(
+        chosen.get('provider_id') if effective!='NONE' else None),
+      'config_version':row['config_version'] if row else 0,
+      'updated_at':row['updated_at'] if row else None,
+      'status':'ACTIVE' if effective!='NONE' else 'HOLD',
+      'reason':reason,'fallback':'DISABLED',
+      'channels':{'API':api,'SUBSCRIPTION_OAUTH':oauth}}
 
 
 def _safe_endpoint(value, allow_loopback=True):
@@ -133,6 +210,11 @@ class ConnectionManager(object):
               audit_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,
               principal_id TEXT NOT NULL,action TEXT NOT NULL,target_id TEXT NOT NULL,
               detail_json TEXT NOT NULL,observed_at REAL NOT NULL)''')
+            self.db.execute('''CREATE TABLE IF NOT EXISTS openai_channel_preferences(
+              tenant_id TEXT NOT NULL,route_key TEXT NOT NULL,
+              selected_preference TEXT NOT NULL,api_connection_id TEXT,
+              oauth_connection_id TEXT,config_version INTEGER NOT NULL,
+              updated_at REAL NOT NULL,PRIMARY KEY(tenant_id,route_key))''')
             self.db.commit()
         except Exception:self.db.rollback();raise
 
@@ -225,6 +307,66 @@ class ConnectionManager(object):
         except Exception:self.db.rollback();raise
         return {'connection_id':config['connection_id'],'config_version':version,
           'status':status,'secret_mask':secret_mask}
+
+    def set_openai_channel_preference(self,preference,api_connection_id=None,
+                                      oauth_connection_id=None,
+                                      expected_version=None,now=None):
+        """Persist one manual preference; unavailable selections never fall back."""
+        principal=self._admin();now=self.clock() if now is None else now
+        if preference not in OPENAI_CHANNEL_PREFERENCES:
+            raise ValueError('OPENAI_CHANNEL_PREFERENCE_REQUIRED')
+        for value in (api_connection_id,oauth_connection_id):
+            if value is not None:_text(value,'connection_id')
+        if (api_connection_id is not None and
+                api_connection_id==oauth_connection_id):
+            raise ValueError('DISTINCT_CHANNEL_CONNECTIONS_REQUIRED')
+        def validate(connection_id,auth_type):
+            if connection_id is None:return
+            value=self.db.execute('''SELECT auth_type,purpose,provider_id FROM
+              service_connections WHERE tenant_id=? AND connection_id=?''',(
+              self.tenant_id,connection_id)).fetchone()
+            if (value is None or value['auth_type']!=auth_type or
+                    value['purpose']!='CODEX_EXECUTION' or not any(
+                      mark in value['provider_id'].lower() for mark in
+                      ('openai','chatgpt','codex'))):
+                raise ValueError('BOUND_OPENAI_CHANNEL_CONNECTION_REQUIRED')
+        validate(api_connection_id,'API_KEY')
+        validate(oauth_connection_id,'OAUTH2_AUTH_CODE_PKCE')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            existing=self.db.execute('''SELECT config_version FROM
+              openai_channel_preferences WHERE tenant_id=? AND route_key=?''',(
+              self.tenant_id,OPENAI_CHANNEL_ROUTE)).fetchone()
+            current=existing['config_version'] if existing else 0
+            if expected_version is not None and expected_version!=current:
+                raise ValueError('OPENAI_CHANNEL_PREFERENCE_VERSION_CONFLICT')
+            version=current+1
+            self.db.execute('''INSERT OR REPLACE INTO openai_channel_preferences
+              VALUES (?,?,?,?,?,?,?)''',(self.tenant_id,OPENAI_CHANNEL_ROUTE,
+              preference,api_connection_id,oauth_connection_id,version,now))
+            self._audit('OPENAI_CHANNEL_PREFERENCE_SET',OPENAI_CHANNEL_ROUTE,
+              {'selected_preference':preference,'config_version':version,
+               'api_connection_id':api_connection_id,
+               'oauth_connection_id':oauth_connection_id,
+               'automatic_fallback':False},now)
+            self.db.commit()
+        except Exception:self.db.rollback();raise
+        return project_openai_channel_preference(self.db,self.tenant_id,now)
+
+    def openai_channel_preference(self,now=None):
+        return project_openai_channel_preference(self.db,self.tenant_id,
+          self.clock() if now is None else now)
+
+    def resolve_openai_channel(self,now=None):
+        value=self.openai_channel_preference(now)
+        if value['effective_channel']=='NONE':
+            raise ValueError('SELECTED_OPENAI_CHANNEL_UNAVAILABLE:'+value['reason'])
+        return {'route':value['route'],'selected_preference':
+          value['selected_preference'],'effective_channel':
+          value['effective_channel'],'connection_id':
+          value['effective_connection_id'],'provider_id':
+          value['effective_provider_id'],'config_version':
+          value['config_version'],'fallback':'DISABLED'}
 
     def begin_oauth(self,connection_id,now=None):
         self._admin();now=self.clock() if now is None else now
