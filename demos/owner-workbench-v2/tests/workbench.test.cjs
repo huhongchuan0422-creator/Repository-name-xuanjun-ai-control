@@ -61,6 +61,37 @@ test('review starts with a project queue and remains project scoped',()=>{
   assert.doesNotMatch(missing,/PAGE-004/);
 });
 
+test('explicit unknown page is rejected without first-page fallback',()=>{
+  const html=app.render(data,app.route('#review/PRJ-XJ-042/PAGE-NOT-THERE/v9'));
+  assert.match(html,/审核页面不存在/);
+  assert.match(html,/UNKNOWN/);
+  assert.match(html,/返回审核列表/);
+  assert.doesNotMatch(html,/工作台总览/);
+  assert.doesNotMatch(html,/提交审核/);
+});
+
+test('wrong explicit version is a blocking conflict',()=>{
+  const html=app.render(data,app.route('#review/PRJ-XJ-042/PAGE-004/v0-wrong'));
+  assert.match(html,/VERSION_CONFLICT/);
+  assert.match(html,/v0-wrong/);
+  assert.match(html,/v2.3-r2/);
+  assert.doesNotMatch(html,/提交审核/);
+});
+
+test('encoded review identity round-trips and malformed encoding fails closed',()=>{
+  const href=app.reviewLink('PRJ/A','PAGE B','v/2');
+  assert.deepEqual(app.route(href),{view:'review',id:'PRJ/A',project_id:'PRJ/A',page_id:'PAGE B',version:'v/2'});
+  const malformed=app.route('#review/PRJ-XJ-042/%E0%A4%A/v2');
+  assert.equal(malformed.view,'overview');
+  assert.equal(malformed.id,null);
+});
+
+test('synthetic fixture never claims the frozen git baseline as its commit',()=>{
+  assert.equal(data.projects[0].commit,'SYNTHETIC_UI_FIXTURE_NOT_GIT_COMMIT');
+  assert.equal(data.review.commit,'SYNTHETIC_UI_FIXTURE_NOT_GIT_COMMIT');
+  assert.equal(data.projects[0].artifact_sha,'UNKNOWN');
+});
+
 test('trace fixture and review expose required source keys',()=>{
   const project=data.projects[0];
   for(const key of ['tenant_id','project_id','ui_version','environment','task_id','attempt_id','commit','artifact_sha','evidence_ref'])assert.ok(Object.hasOwn(project,key),key);

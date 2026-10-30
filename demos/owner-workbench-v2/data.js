@@ -16,7 +16,7 @@
       {
         id:'PRJ-XJ-042',project_id:'PRJ-XJ-042',tenant_id:'TENANT-SYNTHETIC-XJ',name:'玄钧统一管理台',customer:'玄钧AI实验室',kind:'平台产品',
         stage:'PENDING_REVIEW',stage_label:'待 Owner 审核',owner:'产品与交付组',updated:'12 分钟前',
-        next_action:'审核首页与项目详情候选',ui_version:'ui-v2.3-candidate',environment:'SYNTHETIC_PREVIEW',task_id:'TASK-2042',attempt_id:'ATT-03',commit:'14a531d8',artifact_sha:'UNKNOWN',evidence_ref:'demos/owner-workbench-v2',
+        next_action:'审核首页与项目详情候选',ui_version:'ui-v2.3-candidate',environment:'SYNTHETIC_PREVIEW',task_id:'TASK-2042',attempt_id:'ATT-03',commit:'SYNTHETIC_UI_FIXTURE_NOT_GIT_COMMIT',artifact_sha:'UNKNOWN',evidence_ref:'demos/owner-workbench-v2',
         progress:{done:4,total:8},risk:'LOW',legacy_entry_ref:'/task-center-test/admin.html',
         pages:[
           {id:'PAGE-001',page_id:'PAGE-001',name:'工作台总览',status:'PENDING_REVIEW',label:'待审核',version:'v2.3',ui_version:'v2.3',previous:'v2.2',changes:6},
@@ -40,7 +40,7 @@
     ],
     review:{
       tenant_id:'TENANT-SYNTHETIC-XJ',project_id:'PRJ-XJ-042',page_id:'PAGE-004',page_name:'预览审核工作区',version:'v2.3-r2',ui_version:'v2.3-r2',environment:'SYNTHETIC_PREVIEW',task_id:'TASK-2042',attempt_id:'ATT-03',
-      artifact_sha:'UNKNOWN',commit:'14a531d8',evidence_ref:'demos/owner-workbench-v2',responsible:'UI Writer',next_action:'Owner 逐页确认',
+      artifact_sha:'UNKNOWN',commit:'SYNTHETIC_UI_FIXTURE_NOT_GIT_COMMIT',evidence_ref:'demos/owner-workbench-v2',responsible:'UI Writer',next_action:'Owner 逐页确认',
       layers:[
         {id:'design',label:'设计稿',state:'DONE',detail:'布局与信息层级候选'},
         {id:'demo',label:'合成演示',state:'DONE',detail:'无后端、无生产写入'},
