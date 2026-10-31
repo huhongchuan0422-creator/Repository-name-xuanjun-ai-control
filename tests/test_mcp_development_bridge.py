@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import copy
 from pathlib import Path
 import subprocess
 import sys
@@ -146,16 +147,123 @@ class DevelopmentBridgeTests(unittest.TestCase):
 
     def test_owned_host_loader_reuses_existing_fixture_keys_and_writer(self):
         from task_center_mcp_development import load_host
-        f=self.f;keys=f.root/'existing-test-keys.json';writer=f.root/'existing-test-writer.json';config=f.root/'development-host.json'
+        f=self.f;keys=f.root/'existing-test-keys.json';writer=f.root/'existing-test-writer.json';receipts=f.root/'existing-tool-receipts.json';receipt_keys=f.root/'existing-tool-receipt-keys.json';config=f.root/'development-host.json'
         keys.write_text(json.dumps({k:v.hex() for k,v in self.keys.items()}));keys.chmod(0o600)
         writer.write_text(json.dumps({'demo-b':{'attempt_id':'attempt-b','ticket':f.ticket,'caller':f.caller,'lock_root':str(f.root/'locks')}}));writer.chmod(0o600)
-        cfg={'schema_version':1,'enabled':True,'bindings':self.bindings,'review_keyring_file':str(keys),'writer_context_file':str(writer)}
+        proof={'run_id':'run-1','session_id':'session-1',
+            'call':{'id':'call-1','name':'exec_command','arguments':{'cmd':'fixture'}},
+            'result':{'toolCallId':'call-1','name':'exec_command','isError':False,
+                      'exit_code':0,'output':'fixture'}}
+        receipt_key=b'R'*32;signature=hmac.new(receipt_key,canonical(proof).encode(),hashlib.sha256).hexdigest()
+        receipts.write_text(json.dumps({'run-1':{'key_id':'fixture-receipt','payload':proof,'signature':signature}}));receipts.chmod(0o600)
+        receipt_keys.write_text(json.dumps({'fixture-receipt':receipt_key.hex()}));receipt_keys.chmod(0o600)
+        cfg={'schema_version':1,'enabled':True,'bindings':self.bindings,
+             'review_keyring_file':str(keys),'writer_context_file':str(writer),
+             'tool_receipt_file':str(receipts),'tool_receipt_key_file':str(receipt_keys)}
         config.write_text(json.dumps(cfg));config.chmod(0o600);self.host=load_host(str(config))
+        self.assertEqual(self.host.tool_receipt_reader('run-1'),proof)
+        bad=json.loads(receipts.read_text());bad['run-1']['signature']='0'*64;receipts.write_text(json.dumps(bad))
+        with self.assertRaisesRegex(ValueError,'SIGNATURE'):self.host.tool_receipt_reader('run-1')
+        receipts.write_text(json.dumps({'run-1':{'key_id':'fixture-receipt','payload':proof,'signature':signature}}))
+        with self.assertRaisesRegex(ValueError,'EXISTING_TOOL_RECEIPT'):
+            self.host.tool_receipt_reader('run-2')
         result=self.call('developer-1','task_development_apply',request_id=f.proposal())
         self.assertEqual(result['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
         self.assertNotIn('source_comment_id',result)
         writer.chmod(0o644)
         with self.assertRaisesRegex(ValueError,'WRITER_CUSTODY'):self.host.writer_context_provider('demo-b','attempt-b')
+
+    def test_gateway_tool_observation_does_not_bypass_exact_tree_test_hold(self):
+        f=self.f
+        result=self.call('developer-1','task_development_apply',request_id=f.proposal())
+        local=f.s.development_candidate('demo-b',result['candidate_event_id'])
+        candidate=dict(local,source_kind='ORIGINAL_GATEWAY_MULTIFILE_PENDING_EFFECT',
+                       tree=f.git('rev-parse',local['code_commit']+'^{tree}'))
+        candidate_id='gateway-candidate-fixture'
+        body=canonical(candidate);evidence=hashlib.sha256(body.encode()).hexdigest()
+        f.s.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+            ('demo-b','attempt-b',candidate_id,'DEVELOPMENT_CANDIDATE',
+             f.s.clock(),'SOURCE_COMMIT',evidence,body))
+        observation={'schema':1,'source_kind':'ORIGINAL_HOST_TOOL_EVENT_OBSERVATION',
+            'candidate_event_id':candidate_id,'candidate_sha256':evidence,
+            'run_id':'123','session_id':'session-1','tool':'exec_command',
+            'tool_call_id':'call-1','call_sha256':'c'*64,'output_sha256':'d'*64,
+            'state':'TEST_EVENT_OBSERVED_NOT_ACCEPTED','tested_tree_binding':'UNKNOWN',
+            'expected_test_plan_binding':'UNKNOWN','development_complete':False}
+        obs_body=canonical(observation);obs_id='gateway-observation-fixture'
+        f.s.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+            ('demo-b','attempt-b',obs_id,'DEVELOPMENT_TEST_OBSERVATION',
+             f.s.clock(),'TOOL_EVENT',hashlib.sha256(obs_body.encode()).hexdigest(),obs_body))
+        f.s.db.commit()
+        with self.assertRaisesRegex(ValueError,'FIXED_RUNTIME_LOCAL_CANDIDATE'):
+            f.s.record_development_ci('demo-b',candidate_id,123,lambda:None)
+        with self.assertRaisesRegex(ValueError,'HOLD_GATEWAY_SOURCE_EFFECT_AND_TEST_BINDING'):
+            f.s._require_development_execution_ready(candidate)
+    def test_gateway_receipt_binds_tree_plan_reconciles_and_reaches_finalize(self):
+        from gateway_multifile_candidate import record_test_event,WORKSPACE
+        f=self.f
+        applied=self.call('developer-1','task_development_apply',request_id=f.proposal())
+        local=f.s.development_candidate('demo-b',applied['candidate_event_id'])
+        opid='gateway-source-receipt-fixture'
+        operation={'operation_id':opid,'event_id':opid,'operation_kind':'OPENCLAW_DEVELOPMENT_TURN',
+            'resource_key':'git:owner/repo/main',
+            'expected_before':{'repo':'owner/repo','branch':'feature/mcp-pr17-gateway-successor-20261031','head':f.base},
+            'requested_after':{'task_id':'demo-b','attempt_id':'attempt-b','request_id':'request-fixture',
+                               'contract_sha256':hashlib.sha256(canonical(f.contract).encode()).hexdigest()},
+            'request_sha256':'1'*64,'operation_marker':'xuanjun-op:'+opid}
+        f.fence.prepare(f.ticket,f.caller,operation)
+        with f.fence.commit_lease(f.ticket,f.caller,opid) as lease:
+            lease.unknown({'kind':'OPENCLAW_TURN_SOURCE_EFFECTS_REQUIRE_READBACK','transport_state':'GATEWAY_TURN_RETURNED',
+                           'run_id':'123','session_id':'session-1'})
+        candidate=dict(local,source_kind='ORIGINAL_GATEWAY_MULTIFILE_PENDING_EFFECT',source_operation_id=opid,
+                       tree=f.git('rev-parse',local['code_commit']+'^{tree}'),all_changes_attributed_to_task=False,
+                       source_effect_state='UNKNOWN_RECONCILIATION_REQUIRED')
+        candidate_id='gateway-candidate-receipt-fixture';body=canonical(candidate)
+        f.s.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',('demo-b','attempt-b',candidate_id,
+            'DEVELOPMENT_CANDIDATE',f.s.clock(),'SOURCE_COMMIT',hashlib.sha256(body.encode()).hexdigest(),body));f.s.db.commit()
+        spec=f.s.db.execute('SELECT goal,deliverables_json,acceptance_json FROM task_work_specs WHERE task_id=?',('demo-b',)).fetchone()
+        acceptance=json.loads(spec['acceptance_json']);command='/usr/bin/python3 -m unittest tests.test_fixture'
+        plan={'plan_id':'fixture-plan-v1','command':command,'workdir':WORKSPACE,'expected_tree':candidate['tree'],
+              'work_spec_sha256':hashlib.sha256(canonical(dict(spec)).encode()).hexdigest(),
+              'acceptance_sha256':hashlib.sha256(canonical(acceptance).encode()).hexdigest()}
+        receipt={'schema':1,'kind':'ORIGINAL_GATEWAY_FIXED_TEST_RECEIPT','task_id':'demo-b','attempt_id':'attempt-b',
+            'operation_id':opid,'candidate_event_id':candidate_id,
+            'candidate_sha256':hashlib.sha256(body.encode()).hexdigest(),'run_id':'123','session_id':'session-1',
+            'source':{'repository':'owner/repo','branch':'feature/mcp-pr17-gateway-successor-20261031','base_sha':f.base,
+                      'code_commit':candidate['code_commit'],'tree':candidate['tree'],'files':candidate['files']},
+            'test_plan':plan,'call':{'id':'call-1','name':'exec_command','arguments':{'cmd':command,'workdir':WORKSPACE}},
+            'result':{'toolCallId':'call-1','name':'exec_command','isError':False,'exit_code':0,'output':'Ran 1 test\nOK'}}
+        failed=copy.deepcopy(receipt);failed['result']['exit_code']=1
+        with self.assertRaisesRegex(ValueError,'MATCHED_SUCCESSFUL_TOOL_EVENTS'):
+            record_test_event(f.s,'demo-b',candidate_id,'123',lambda run:failed,lambda:True)
+        drift=copy.deepcopy(receipt);drift['test_plan']['expected_tree']='0'*40
+        with self.assertRaisesRegex(ValueError,'EXACT_TASK_VERSIONED_TEST_PLAN'):
+            record_test_event(f.s,'demo-b',candidate_id,'123',lambda run:drift,lambda:True)
+        self.assertEqual(f.s.db.execute('SELECT state FROM writer_operations WHERE operation_id=?',(opid,)).fetchone()[0],'UNKNOWN')
+        result=record_test_event(f.s,'demo-b',candidate_id,'123',lambda run:receipt,lambda:True)
+        self.assertEqual(result['execution_state'],'TESTS_PASSED_EXACT_TREE')
+        self.assertEqual(result['source_effect_state'],'CONFIRMED')
+        replay=record_test_event(f.s,'demo-b',candidate_id,'123',lambda run:receipt,lambda:True)
+        self.assertTrue(replay['duplicate'])
+        f.s._require_development_execution_ready(candidate)
+        checkout=f.root/'gateway-checkout';subprocess.check_call(['git','clone','-q','--branch','main',str(f.repo),str(checkout)],stderr=subprocess.DEVNULL)
+        subprocess.check_call(['git','-C',str(checkout),'remote','set-url','origin','https://github.com/owner/repo.git'])
+        for binding in self.bindings:binding['candidate_root']=str(checkout)
+        self.host=self.makehost()
+        contract=dict(f.contract,code_commit=candidate['code_commit']);files={'module.py':f.raw}
+        bundle=gate.review_bundle(contract,files,[])['bundle_sha256'];reviews=[]
+        for reviewer in f.contract['trusted_reviewers']:
+            payload={'reviewer':{k:reviewer[k] for k in ('issuer','subject')},'role':reviewer['role'],
+                     'bundle_sha256':bundle,'decision':'PASS'}
+            record={'schema':1,'key_id':reviewer['key_id'],'record_id':gate.digest(gate.canonical(payload)),'payload':payload}
+            record['signature']=hmac.new(self.keys[reviewer['key_id']],gate.canonical(record),hashlib.sha256).hexdigest();reviews.append(record)
+        reviewed=self.call('qa','task_development_review',candidate_event_id=candidate_id,reviewed_event_id='gateway-reviewed',reviews=reviews)
+        self.assertEqual(reviewed['state'],'ISOLATED_TEST_ELIGIBLE')
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'original-test-owner'}
+        f.fence.begin_revocation('demo-b',controller);f.fence.drain('demo-b',controller,timeout=1)
+        f.fence.invalidate_source_resources('demo-b','gateway-test-revocation');f.s.complete_revocation('demo-b')
+        finalized=self.call('acceptor','task_development_finalize',reviewed_event_id='gateway-reviewed',completion_event_id='gateway-complete')
+        self.assertEqual(finalized['state'],'SUCCESS')
     def test_host_loader_default_off_and_duplicate_key_rejected(self):
         from task_center_mcp_development import load_host
         p=self.f.root/'host-config.json';p.write_text(json.dumps({'schema_version':1,'enabled':False,'bindings':[],
