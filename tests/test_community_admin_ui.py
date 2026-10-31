@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 JS=Path(__file__).parents[1]/'demos/community-stage/web-session.js'
-HTML='''<!doctype html><html><body><section id="community-session"><form><input name="email"><input name="password" type="password"><button>登录</button></form><p role="status"></p><select></select><button data-logout>退出</button></section><script src="/web-session.js"></script></body></html>'''
+HTML='''<!doctype html><html><head><meta charset="utf-8"></head><body><section id="community-session"><form><input name="email"><input name="password" type="password"><button>登录</button></form><p role="status"></p><select></select><button data-logout>退出</button></section><script src="/web-session.js"></script></body></html>'''
 class UI(unittest.TestCase):
  def test_root_pagination_create_and_clear_password(self):
   with sync_playwright() as p:
@@ -19,8 +19,8 @@ class UI(unittest.TestCase):
     page.add_init_script("sessionStorage.setItem('community-original-csrf','fixture-csrf')")
     def route(r):
      url=r.request.url
-     if url.endswith('/web-session.js'):return r.fulfill(content_type='text/javascript',body=JS.read_text())
-     if r.request.method=='GET':return r.fulfill(content_type='text/html',body=HTML)
+     if url.endswith('/web-session.js'):return r.fulfill(content_type='text/javascript; charset=utf-8',body=JS.read_text())
+     if r.request.method=='GET':return r.fulfill(content_type='text/html; charset=utf-8',body=HTML)
      body=r.request.post_data_json
      if url.endswith('/session/check'):result=dict(user_id='root',workspaces=[],reviewer=False,community_admin=dict(kind='ROOT'))
      else:
@@ -36,6 +36,7 @@ class UI(unittest.TestCase):
      return r.fulfill(content_type='application/json',body=json.dumps(dict(result=result)))
     page.route('**/*',route)
     page.goto('https://fixture.invalid/community-preview/merchant/workbench')
+    self.assertEqual(page.evaluate('document.characterSet'),'UTF-8')
     page.get_by_role('button',name='刷新管理员与权限').click()
     page.get_by_role('button',name='加载下一页管理员').click()
     page.get_by_text('fixture_child_51 · DELEGATE').wait_for()
