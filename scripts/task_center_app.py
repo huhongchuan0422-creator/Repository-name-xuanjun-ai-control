@@ -106,6 +106,10 @@ MODEL_TABLES = frozenset((
     'codex_execution_intents','codex_execution_events',
     'provider_onboarding_configs'))
 
+TWIN_MODEL_TABLES = frozenset((
+    'role_instances', 'model_requests', 'model_assignments',
+    'delivery_candidates', 'candidate_reviews'))
+
 ROLE_ACTION_ROLES = {
     'START_TEST_ONLY_TASK': 'TASK_EXECUTOR',
     'CREATE_CODEX_INTENT': 'TASK_EXECUTOR',
@@ -205,6 +209,50 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
                               'mode':'TEST_ONLY','external_execution':
                               'NOT_IMPLEMENTED'}
         return result
+    finally:
+        connection.close()
+
+
+def read_only_twin_projection(db_path, authority_key, tenant_id,
+                              principal_id):
+    """Build one tenant-bound read snapshot without mutation capability."""
+    connection = _read_only_connection(
+        db_path, PROJECTION_TABLES | TWIN_MODEL_TABLES)
+    try:
+        authority = TestTenantAuthority(authority_key)
+        gateway = GatewayKernel.__new__(GatewayKernel)
+        gateway.db = connection
+        gateway.supervisor = _ReadOnlySupervisor(connection)
+        gateway.tenants = authority
+        task_projection = gateway.projection(
+            authority.issue(tenant_id, principal_id))
+        model_projection = {
+            'instances': [dict(x) for x in connection.execute('''SELECT
+              instance_id,role_id,role_version,state,desired_state,
+              current_request_id,last_checkpoint_json,updated_at
+              FROM role_instances WHERE tenant_id=? ORDER BY instance_id''',
+              (tenant_id,))],
+            'requests': [dict(x) for x in connection.execute('''SELECT
+              request_id,task_id,attempt_id,role_id,state,last_heartbeat,
+              checkpoint_json,created_at,updated_at FROM model_requests
+              WHERE tenant_id=? ORDER BY created_at,request_id''',
+              (tenant_id,))],
+            'assignments': [dict(x) for x in connection.execute('''SELECT
+              task_id,attempt_id,role_id,role_version,principal_id,state,
+              created_at FROM model_assignments WHERE tenant_id=?
+              ORDER BY task_id,role_id''', (tenant_id,))],
+            'candidates': [dict(x) for x in connection.execute('''SELECT
+              candidate_id,task_id,attempt_id,artifact_sha256,
+              checklist_sha256,submitted_by,reviewed_by,accepted_by,state,
+              created_at,updated_at FROM delivery_candidates WHERE tenant_id=?
+              ORDER BY created_at,candidate_id''', (tenant_id,))],
+            'candidate_reviews': [dict(x) for x in connection.execute('''SELECT
+              candidate_id,review_id,reviewer,review_kind,decision,
+              observed_at FROM candidate_reviews
+              WHERE tenant_id=? ORDER BY observed_at,review_id''',
+              (tenant_id,))],
+        }
+        return build_twin_projection(task_projection, model_projection)
     finally:
         connection.close()
 
