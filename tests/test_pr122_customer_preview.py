@@ -21,6 +21,11 @@ from scripts.pr122_customer_change_authority import import_snapshot,load
 from scripts.pr122_customer_preview import route,render,served,listing,review_queue
 from scripts.pr122_customer_delivery_source import issue,REQUIRED
 
+def without_center_prefix(url):
+    prefix='/customer/center/'
+    if not url.startswith(prefix):raise AssertionError('missing exact customer center prefix')
+    return url[len(prefix):]
+
 class PreviewTests(unittest.TestCase):
     imported=CustomerTests.imported
     def setUp(self):
@@ -251,7 +256,7 @@ class PreviewHTTPTests(HttpTests):
     request=HttpTests.request
     auth_headers=HttpTests.auth_headers
     def test_real_authenticated_http_page_and_no_anonymous_or_range_access(self):
-        url=route('project-a',self.path,self.sha).removeprefix('/customer/center/')
+        url=without_center_prefix(route('project-a',self.path,self.sha))
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
         self.assertEqual(self.request(url)[0],403);self.assertEqual(self.request(url,headers={**self.auth_headers(),'Range':'bytes=0-2'})[0],403)
         self.assertEqual(self.request('api/previews/project-a',headers=self.auth_headers())[0],200)
@@ -298,7 +303,7 @@ class PreviewHTTPTests(HttpTests):
         self.assertEqual(pages[0]['sha256'],self.sha)
         self.assertEqual(pages[0]['url'],route('project-a',self.path,self.sha))
 
-        exact=pages[0]['url'].removeprefix('/customer/center/')
+        exact=without_center_prefix(pages[0]['url'])
         status,_,raw=self.request(exact,headers=headers)
         self.assertEqual(status,200)
         self.assertIn(b'Private HTTP preview',raw)
@@ -329,7 +334,7 @@ class PreviewHTTPTests(HttpTests):
                        'X-CSRF-Token':other['csrf']}
         self.assertEqual(self.request(exact,headers=other_headers)[0],403)
 
-        stale=route('project-a',self.path,'f'*64).removeprefix('/customer/center/')
+        stale=without_center_prefix(route('project-a',self.path,'f'*64))
         self.assertEqual(self.request(stale,headers=headers)[0],403)
 
         self.now+=3601
@@ -391,8 +396,8 @@ class PreviewHTTPTests(HttpTests):
         import_snapshot(self.c,e,self.auth)
 
         headers=self.auth_headers()
-        page_url=route('project-a',page,page_sha).removeprefix('/customer/center/')
-        asset_url=route('project-a',asset,asset_sha).removeprefix('/customer/center/')
+        page_url=without_center_prefix(route('project-a',page,page_sha))
+        asset_url=without_center_prefix(route('project-a',asset,asset_sha))
         listing_url='api/previews/project-a'
 
         self.assertEqual(self.request(page_url,headers=headers)[0],200)
@@ -438,8 +443,8 @@ class PreviewHTTPTests(HttpTests):
         self.assertEqual(self.request('api/save',save_body,old_headers)[0],200)
         oid=self.c.db.execute("SELECT id FROM objects WHERE project='project-a'").fetchone()[0]
         download='api/download/project-a/'+oid
-        page_url=route('project-a',page,page_sha).removeprefix('/customer/center/')
-        asset_url=route('project-a',asset,asset_sha).removeprefix('/customer/center/')
+        page_url=without_center_prefix(route('project-a',page,page_sha))
+        asset_url=without_center_prefix(route('project-a',asset,asset_sha))
         listing_url='api/previews/project-a'
         protected=(download,page_url,asset_url,listing_url)
 

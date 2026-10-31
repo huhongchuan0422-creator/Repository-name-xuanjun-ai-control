@@ -84,7 +84,7 @@ def backup(center,output,backup_key,key_ref):
     # read connection sees committed snapshot, objects are immutable and encrypted.
     with center.tx():
         with tempfile.TemporaryDirectory() as td:
-            path=Path(td)/'copy.sqlite'; src=sqlite3.connect(center.root/'center.sqlite'); dst=sqlite3.connect(path)
+            path=Path(td)/'copy.sqlite'; src=sqlite3.connect(str(center.root/'center.sqlite')); dst=sqlite3.connect(str(path))
             try:src.backup(dst)
             finally:src.close();dst.close()
             blobs['center.sqlite']=path.read_bytes()
