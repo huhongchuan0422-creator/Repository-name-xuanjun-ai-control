@@ -159,6 +159,23 @@ jobs:
           from pathlib import Path
           Path('/tmp/pr122-unified-reports/CI_BINDING.json').write_text(json.dumps({'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'production_changes':0,'production_release_approved':False,'mobile_fixture_and_browser_commit':'790937a5c96afcf3b3660e36cf36cfaab2002a72','mobile_browser_blob':'9abee086b583d12117a81030ef94daea64952274','mobile_browser_sha256':'549e9c91c0efc56d606c8b1a9cb8616aad0904d8a7557a325ee247e018ca9e5b','mobile_scope':'Historical reviewed fixture, not current navigation candidate'},indent=2)+'\n')
           PY
+      - name: Verify unchanged approved full public artifact bytes
+        run: |
+          python -B - <<'PYPUBLIC'
+          import hashlib,json
+          from pathlib import Path
+          source=Path('evidence/pr122-delivery-release/PR122_SITE_HUB_REVIEW_ONLY.tar.gz')
+          raw=source.read_bytes()
+          reference=json.loads(source.with_name('ARTIFACT_BINDING.json').read_bytes())
+          assert len(raw)==537152
+          assert hashlib.sha256(raw).hexdigest()==reference['static_artifact_sha256']=='4881d1e30da4815969cb44fd82411e0bef179cafa3444bf03f58e0ad8aabed80'
+          PYPUBLIC
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-approved-full-public-${{ github.sha }}
+          path: evidence/pr122-delivery-release/PR122_SITE_HUB_REVIEW_ONLY.tar.gz
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -169,4 +186,5 @@ jobs:
             /tmp/pr122-unified-distribution/
             /tmp/pr122-static-controlled-source/
           retention-days: 14
+
 
