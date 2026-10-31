@@ -76,6 +76,16 @@ def factory(config):
     registry=config.get('task_registry')
     return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner() if selected==FULL else None,secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if selected==FULL and config.get('providers',{}).get('secretref') else None,evidence_context=(lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{})) if selected==FULL else None,privacy_policy_context=(lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{})) if selected==FULL else None,privacy_processing_context=(lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{})) if selected==FULL else None,task_registry_context=(lambda project,task_id:Changes.canonical_task(registry['db_path'],project,task_id,{k:registry[k] for k in ('task_id','attempt_id','spec_sha256','owner','writer_scope','authority_caller_id','board_id')})) if selected==FULL and registry else None)
 
+def copy_sqlite_snapshot(src,dst):
+    native=getattr(src,'backup',None)
+    if native is not None:
+        native(dst);return
+    # Python 3.6 has no Connection.backup(). The enclosing BEGIN IMMEDIATE
+    # excludes writers while this explicit read transaction is dumped.
+    src.execute('BEGIN')
+    try:dst.executescript('\n'.join(src.iterdump()))
+    finally:src.rollback()
+
 def backup(center,output,backup_key,key_ref):
     if type(backup_key) is not bytes or len(backup_key)!=32 or not key_ref:raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -85,7 +95,7 @@ def backup(center,output,backup_key,key_ref):
     with center.tx():
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/'copy.sqlite'; src=sqlite3.connect(str(center.root/'center.sqlite')); dst=sqlite3.connect(str(path))
-            try:src.backup(dst)
+            try:copy_sqlite_snapshot(src,dst)
             finally:src.close();dst.close()
             blobs['center.sqlite']=path.read_bytes()
         for p in sorted(center.objects.iterdir()):
