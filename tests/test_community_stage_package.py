@@ -11,6 +11,17 @@ from pathlib import Path
 from scripts.community_stage_package import build
 
 class SourcePackage(unittest.TestCase):
+    def test_connection_scope_installs_existing_host_dependency_before_package_import(self):
+        workflow=(Path(__file__).resolve().parents[1]/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
+        name='      - name: Community fixed action candidate affected scope\n'
+        block=workflow.split(name,1)[1].split('      - name:',1)[0]
+        self.assertIn("if: contains(github.event.head_commit.message, '[community-connection-scope]')",block)
+        self.assertIn('NODE_OPTIONS: --test-reporter=tap',block)
+        install='python -m pip install cryptography==50.0.2'
+        self.assertEqual(block.count(install),1)
+        self.assertLess(block.index(install),block.index("-p 'test_community_connection_collect.py'"))
+        self.assertLess(block.index(install),block.index("-p 'test_community_stage_package.py'"))
+
     def test_deterministic_complete_package_matches_original_bytes(self):
         root=Path(__file__).resolve().parents[1]
         data,digest=build(root)
