@@ -1,7 +1,8 @@
 """HTTPS cookie transport for this community's existing Center staff accounts.
 
-No registration, account mapping, grant creation or alternate identity store.
-Consumers retain the original WeChat registration/login path.
+Original Center email login plus explicit community Owner-provisioned login.
+Community administrator actions use the same cookie/session/CSRF and account
+store; consumers retain the original WeChat registration/login path.
 """
 import hashlib
 import re
@@ -61,9 +62,15 @@ class WebSession:
                 raise ValueError('EXISTING_ACCOUNT_CREDENTIALS_REQUIRED')
             if type(source) is not str or not 1<=len(source)<=128:raise PermissionError('TRUSTED_SOURCE_REQUIRED')
             with self.center.tx():self.center.limit('community-web-source:'+self.center.idx(source),40,300)
-            result=self.center.login(body['email'],body['password'])
+            from scripts.community_admin_authority import community_login
+            result=community_login(self.center,body['email'],body['password'])
             cookie=COOKIE+'='+result['token']+'; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600'
             return {'csrf':result['csrf'],'user_id':result['user_id']},cookie
+        if path=='/community/admin':
+            from scripts.community_admin_management import dispatch
+            values=headers.get_all('X-CSRF-Token',[])
+            if len(values)!=1 or not values[0]:raise PermissionError('CSRF_REQUIRED')
+            return dispatch(self.center,token(headers),values[0],body),None
         if body!={}:raise ValueError('EMPTY_SESSION_BODY_REQUIRED')
         session=token(headers)
         values=headers.get_all('X-CSRF-Token',[])
@@ -96,7 +103,14 @@ class WebSession:
             if self.onboarding is not None:
                 try:self.onboarding._reviewer(uid);reviewer=True
                 except PermissionError:pass
-            return {'user_id':uid,'workspaces':workspaces,'reviewer':reviewer},None
+            admin=None
+            from scripts.community_admin_authority import CommunityAdminAuthority,CHANNEL
+            if self.center.db.execute('SELECT 1 FROM links WHERE channel=? AND subject_idx=?',(CHANNEL,uid)).fetchone():
+                api=getattr(self.center,'community_admin_authority',None)
+                if type(api) is not CommunityAdminAuthority or api.c is not self.center:raise PermissionError('EXACT_COMMUNITY_AUTHORITY_COMPOSITION_REQUIRED')
+                value=api.authority(uid)
+                admin={k:value[k] for k in ('uid','project','tenant','kind','revision','capabilities','workspace_scopes')}
+            return {'user_id':uid,'workspaces':workspaces,'reviewer':reviewer,**({'community_admin':admin} if admin is not None else {})},None
         if path!='/community/session/logout':raise ValueError('UNKNOWN_SESSION_ACTION')
         self.center.logout(session)
         return {'logged_out':True},COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0'

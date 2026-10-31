@@ -5,6 +5,7 @@ intents and uncertainty; query is the only continuation after submission.
 Provider observations never substitute for Finance confirmation.
 Protocol: pay.wechatpay.cn/doc/v3/partner/4012886219 and /4012690683.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace
 import base64
 import hashlib
 import json
@@ -63,11 +64,11 @@ class ProviderActions:
     def __repr__(self):return '<ProviderActions merchant and receiver configuration redacted>'
     def _authorize(self,session,csrf,workspace):
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-        c=self.center;uid=c.session(session,csrf);g=self.operations.grants.get(workspace)
+        c=self.center;uid=c.session(session,csrf);g=resolve_admin_workspace(c,self.operations.grants,workspace,uid)
         if g is None or g['user_id']!=uid or g['role'] not in ('FINANCE_APPROVER','PLATFORM_OWNER'):raise PermissionError('REGISTERED_FINANCE_OPERATOR_REQUIRED')
         p=g['principal']
         if p.role!=g['role'] or p.tenant_id!=g['tenant'] or self.runtime.bindings.get(p)!=g['scope']:raise PermissionError('FINANCE_GRANT_CHANGED')
-        project,_,_=c.project(uid,g['project'],g['project_roles'])
+        project,_,_=community_project(c,uid,g['project'],g['project_roles'])
         identity=tuple(g['scope'][k] for k in ('tenant_id','merchant_id','store_id'))
         if project['tenant']!=g['tenant'] or identity not in self.bindings:raise PermissionError('PROVIDER_SCOPE_NOT_ADMITTED')
         return g,json.loads(canonical(self.bindings[identity]))
@@ -95,6 +96,7 @@ class ProviderActions:
                     status=saved.get('result',{}).get('status','SUBMITTED_RESULT_UNKNOWN'),
                     provider_response_verified='result' in saved,finance_status='UNCONFIRMED',
                     automatic_retry_allowed=False,provider_reference=saved['provider_reference'])
+    @community_route('/community/provider-actions')
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:raise ValueError('INVALID_PROVIDER_ACTION_FIELDS')
         if body['operation'] in ('bill_fetch','bill_rows','bill_reconcile','bill_audit'):

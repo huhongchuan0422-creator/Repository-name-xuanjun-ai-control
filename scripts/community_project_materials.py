@@ -3,6 +3,7 @@
 No scanner, identity, storage directory, or reviewer authority is created here.
 The admitted host supplies Center.scanner; absence is deliberately unavailable.
 """
+from scripts.community_admin_route_gate import community_route, community_project
 import base64
 import binascii
 import re
@@ -74,6 +75,7 @@ class ProjectMaterials:
             raise PermissionError('PROJECT_MATERIAL_IDENTITY_CHANGED')
         return self.center.save(uid, project, body['item'], body['revision'], 'DOCUMENT', raw)
 
+    @community_route('/community/project-materials')
     def reviewer(self, session, csrf, body):
         if (type(csrf) is not str or not csrf or type(body) is not dict
                 or set(body) != {'workspace', 'operation', 'params'}

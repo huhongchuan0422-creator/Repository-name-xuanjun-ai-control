@@ -3,6 +3,7 @@
 No new IAM/order/Finance tables. Ownership links remain in the Center backup
 and encryption domain. Prepared orders do not confirm payment or grant rights.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, has_admin_templates
 import hashlib
 import json
 import re
@@ -14,7 +15,7 @@ from scripts.community_saas_phase2 import Principal
 
 class CenterSaas:
     def __init__(self,center,runtime,grants):
-        if type(center) is not Center or type(runtime) is not StageRuntime or type(grants) is not dict or not grants:
+        if type(center) is not Center or type(runtime) is not StageRuntime or type(grants) is not dict or (not grants and not has_admin_templates(center,'/customer/saas-api')):
             raise ValueError('EXISTING_CENTER_RUNTIME_AND_CUSTOMER_GRANTS_REQUIRED')
         self.center,self.runtime=center,runtime;self.grants={}
         for name,g in grants.items():
@@ -29,12 +30,12 @@ class CenterSaas:
     def _authorize(self,session,csrf,workspace):
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf)
-        g=self.grants.get(workspace)
+        g=resolve_admin_workspace(c,self.grants,workspace,uid)
         if g is None or g['user_id']!=uid:raise PermissionError('CUSTOMER_WORKSPACE_REQUIRED')
         p=g['principal']
         if p.role!=g['role'] or p.tenant_id!=g['tenant'] or p not in self.runtime.bindings or self.runtime.bindings[p]!=g['scope']:
             raise PermissionError('CUSTOMER_GRANT_CHANGED')
-        project,_,_=c.project(uid,g['project'],('OWNER',) if g['role']=='PLATFORM_OWNER' else ('OWNER','EDITOR'))
+        project,_,_=community_project(c,uid,g['project'],('OWNER',) if g['role']=='PLATFORM_OWNER' else ('OWNER','EDITOR'))
         if project['tenant']!=g['tenant']:raise PermissionError('PROJECT_TENANT_MISMATCH')
         return g
     def _owned(self,g,kind,reference):
@@ -171,6 +172,7 @@ class CenterSaas:
                     module_currently_active=entitled(self.runtime.saas.modules,g['tenant'],order['module_id'],self.center.now()),
                     valid_from=saved['start'],valid_until=saved['until'])
 
+    @community_route('/customer/saas-api')
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:
             raise ValueError('INVALID_CUSTOMER_SAAS_REQUEST')

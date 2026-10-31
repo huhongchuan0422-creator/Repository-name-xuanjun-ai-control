@@ -28,6 +28,46 @@
    selector.value='';label.hidden=selector.children.length===1;
   }
  }
+ // This panel extends the original session UI; it is not another login system.
+ const adminPanel=document.createElement('section');adminPanel.hidden=true;root.append(adminPanel);
+ let adminIdentity=null,adminCatalog=null,adminRecords=[],adminNextCursor=null;
+ function adminReset(){adminIdentity=null;adminCatalog=null;adminRecords=[];adminNextCursor=null;adminPanel.replaceChildren();adminPanel.hidden=true;}
+ async function adminCall(operation,params,t){
+  if(!current(t)||!csrf)throw Error('身份已变化');
+  const response=await fetch('/community-preview/community/admin',{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({operation,params})});
+  const data=await response.json();if(!current(t))throw Error('身份已变化');
+  if(!response.ok)throw Error('管理操作未确认，请查询当前状态；不会自动重放。');
+  return data.result;
+ }
+ async function adminAction(work){
+  if(active!==null||!coordinated||!adminIdentity||adminIdentity.kind!=='ROOT')return;
+  const t=generation;active=t;controls();
+  try{await navigator.locks.request('community-original-session',async()=>{if(current(t))await work(t);});}
+  catch(_){if(current(t))message.textContent='管理员操作未确认，请刷新账户列表核实；未自动重试。';}
+  finally{if(active===t)active=null;controls();}
+ }
+ async function adminRefresh(t){const page=await adminCall('list',{after_uid:''},t);adminRecords=page.records;adminNextCursor=page.has_more?page.next_cursor:null;}
+ function adminRender(){
+  adminPanel.replaceChildren();adminPanel.hidden=!adminIdentity;
+  if(!adminIdentity)return;
+  const title=document.createElement('h3');title.textContent=adminIdentity.kind==='ROOT'?'本社区超级管理员':'本社区受限管理员';adminPanel.append(title);
+  const scope=document.createElement('p');scope.textContent='只作用于当前社区项目，不包含服务器或其他项目权限。';adminPanel.append(scope);
+  if(adminIdentity.kind!=='ROOT')return;
+  const refresh=document.createElement('button');refresh.type='button';refresh.textContent='刷新管理员与权限';adminPanel.append(refresh);
+  refresh.onclick=()=>adminAction(async t=>{adminCatalog=await adminCall('catalog',{},t);await adminRefresh(t);adminRender();});
+  if(!adminCatalog)return;
+  const f=document.createElement('form'),email=document.createElement('input'),password=document.createElement('input');
+  email.type='email';email.required=true;email.placeholder='新管理员登录邮箱';email.autocomplete='off';email.setAttribute('aria-label','新管理员登录邮箱');
+  password.type='password';password.required=true;password.minLength=12;password.maxLength=128;password.autocomplete='new-password';password.placeholder='初始密码（隐藏输入）';password.setAttribute('aria-label','新管理员初始密码');
+  f.append(email,password);
+  function picker(label,items){const box=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=label;box.append(legend);const inputs=[];for(const value of items){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=value;row.append(input,document.createTextNode(value));box.append(row);inputs.push(input);}return {box,values:()=>inputs.filter(x=>x.checked).map(x=>x.value)};}
+  const capabilities=picker('允许的业务操作',adminCatalog.capabilities.filter(x=>!x.startsWith('/community/admin#'))),scopes=picker('允许的业务范围',adminCatalog.workspace_scopes);
+  f.append(capabilities.box,scopes.box);const create=document.createElement('button');create.type='submit';create.textContent='创建受限管理员';f.append(create);adminPanel.append(f);
+  f.onsubmit=event=>{event.preventDefault();if(active!==null||!f.reportValidity())return;const params={email:email.value,password:password.value,capabilities:capabilities.values(),workspace_scopes:scopes.values(),request_id:'admin_'+crypto.randomUUID().replaceAll('-','')};password.value='';void adminAction(async t=>{try{await adminCall('create',params,t);}finally{params.password='';}await adminRefresh(t);adminRender();});};
+  for(const record of adminRecords){const row=document.createElement('div'),text=document.createElement('p');text.textContent=(record.login_label||record.uid)+' · '+record.kind+' · '+(record.active?'启用':'已撤销');row.append(text);if(record.kind==='DELEGATE'&&record.active){const cp=picker('调整操作权限',adminCatalog.capabilities.filter(x=>!x.startsWith('/community/admin#'))),sp=picker('调整业务范围',adminCatalog.workspace_scopes);for(const input of cp.box.querySelectorAll('input'))input.checked=record.capabilities.includes(input.value);for(const input of sp.box.querySelectorAll('input'))input.checked=record.workspace_scopes.includes(input.value);row.append(cp.box,sp.box);const save=document.createElement('button');save.type='button';save.textContent='保存权限';save.onclick=()=>adminAction(async t=>{await adminCall('grant',{uid:record.uid,capabilities:cp.values(),workspace_scopes:sp.values(),expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});const revoke=document.createElement('button');revoke.type='button';revoke.textContent='撤销此管理员';revoke.onclick=()=>{if(!confirm('确认撤销该社区管理员权限？'))return;void adminAction(async t=>{await adminCall('revoke',{uid:record.uid,expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});};row.append(save,revoke);}adminPanel.append(row);}
+  if(adminNextCursor){const more=document.createElement('button');more.type='button';more.textContent='加载下一页管理员';more.onclick=()=>adminAction(async t=>{const page=await adminCall('list',{after_uid:adminNextCursor},t);adminRecords.push(...page.records);adminNextCursor=page.has_more?page.next_cursor:null;adminRender();});adminPanel.append(more);}
+ }
+
  const current=t=>t===generation;
  const controls=()=>{
   for(const button of root.querySelectorAll('button'))button.disabled=active!==null||!coordinated;
@@ -41,7 +81,7 @@
   if(window.configureCommunityOnboarding)window.configureCommunityOnboarding(value);
   controls();
  };
- const clear=text=>{csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
+ const clear=text=>{adminReset();csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
  if(channel)channel.onmessage=event=>{
   if(event.data!=='changed')return;
   reviewerBridge=null;bridgeInfo.textContent='其他窗口已变更会话，本请求不再继续；请重新生成。';generation++;clear('其他窗口已变更原会话，请重新登录。');
@@ -71,6 +111,7 @@
  }
  async function check(t){
   const result=await call('check',{},t,csrf);if(!current(t))return;
+  adminIdentity=result.community_admin||null;adminRender();
   workspaces=result.workspaces.filter(w=>w.kind===kind);
   select.replaceChildren();for(const w of workspaces){const option=document.createElement('option');option.value=w.workspace;option.textContent=w.workspace;select.append(option);}
   resetFinanceSelectors();

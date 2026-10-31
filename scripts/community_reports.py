@@ -1,4 +1,5 @@
 """Community order attribution and verified payout observations, no new ledger."""
+from scripts.community_admin_route_gate import community_project, resolve_admin_workspace, admin_workspace_catalog
 import hashlib
 import json
 import re
@@ -168,7 +169,7 @@ class CommunityReports:
 
     def _read_receivers(self,session,csrf,g,community,op,p):
         if g['role']!='PLATFORM_OWNER' or self.actions is None:raise PermissionError('PLATFORM_RECEIVER_READ_AUTHORITY_REQUIRED')
-        c=self.center;c.project(g['user_id'],g['project'],('OWNER',))
+        c=self.center;community_project(c,g['user_id'],g['project'],('OWNER',))
         finance,policy=self.actions._authorize(session,csrf,p['provider_workspace'])
         if finance['project']!=g['project'] or finance['tenant']!=g['tenant']:raise PermissionError('SAME_PROJECT_ADMITTED_RECEIVER_REQUIRED')
         if op=='community_receiver_read':
@@ -207,7 +208,7 @@ class CommunityReports:
             return self._read_receivers(session,csrf,g,community,op,p)
         if op=='community_receiver_bind':
             if g['role']!='PLATFORM_OWNER' or self.actions is None or community['state']!='APPROVED':raise PermissionError('APPROVED_COMMUNITY_AND_PLATFORM_AUTHORITY_REQUIRED')
-            c.project(g['user_id'],g['project'],('OWNER',))
+            community_project(c,g['user_id'],g['project'],('OWNER',))
             finance,policy=self.actions._authorize(session,csrf,p['provider_workspace'])
             if finance['project']!=g['project'] or finance['tenant']!=g['tenant'] or p['receiver_id'] not in policy['receivers']:raise PermissionError('SAME_PROJECT_ADMITTED_RECEIVER_REQUIRED')
             scope=finance['scope'];key=hashlib.sha256(canonical([scope,p['receiver_id']])).hexdigest()

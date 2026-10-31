@@ -4,6 +4,7 @@ The Finance authority is an injected hosting dependency, never a body boolean,
 manual review or test HMAC. This module owns no Finance ledger or payment API.
 Original Center links/events coordinate original order and module databases.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace
 from abc import ABC,abstractmethod
 from dataclasses import dataclass
 import hashlib
@@ -57,18 +58,18 @@ class SaasFulfillment:
             self.prices[key]=dict(policy)
     def _operator(self,session,csrf,workspace):
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-        c=self.center;uid=c.session(session,csrf);g=self.operations.grants.get(workspace)
+        c=self.center;uid=c.session(session,csrf);g=resolve_admin_workspace(c,self.operations.grants,workspace,uid)
         if g is None or g['user_id']!=uid or g['role']!='PLATFORM_OWNER':raise PermissionError('REGISTERED_FINANCE_OPERATOR_REQUIRED')
         p=g['principal']
         if p.role!=g['role'] or p.tenant_id!=g['tenant'] or self.runtime.bindings.get(p)!=g['scope']:
             raise PermissionError('OPERATOR_GRANT_CHANGED')
-        project,_,_=c.project(uid,g['project'],('OWNER',))
+        project,_,_=community_project(c,uid,g['project'],('OWNER',))
         if project['tenant']!=g['tenant']:raise PermissionError('PROJECT_TENANT_MISMATCH')
         return g
     def _context(self,session,csrf,workspace):
         """Freeze this request's original authorization; do not persist process IDs."""
         g=self._operator(session,csrf,workspace)
-        project,role,_=self.center.project(g['user_id'],g['project'],('OWNER',))
+        project,role,_=community_project(self.center,g['user_id'],g['project'],('OWNER',))
         principal=g['principal']
         grant={k:json.loads(canonical(v)) for k,v in g.items() if k!='principal'}
         frozen=canonical(dict(grant=grant,principal=[principal.tenant_id,principal.role],
@@ -188,6 +189,7 @@ class SaasFulfillment:
                     valid_from=saved['start'],valid_until=saved['until'],proof_id=saved['binding']['proof_id'],
                     recovery_required=saved['state'] not in ('COMPLETED','REVERSED'))
 
+    @community_route('/community/fulfillment')
     def dispatch(self,session,csrf,body):
         if type(body) is not dict or set(body)!={'workspace','operation','params'} or type(body['workspace']) is not str or type(body['operation']) is not str or type(body['params']) is not dict:
             raise ValueError('INVALID_FULFILLMENT_REQUEST')

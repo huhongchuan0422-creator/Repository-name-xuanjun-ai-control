@@ -4,6 +4,7 @@ This capability is deliberately separate from ProviderActions authorization.
 It never submits funds operations or installs grants into the original runtime.
 Configured local stores are not a proof of provider population completeness.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace
 import datetime as dt
 import hashlib
 import json
@@ -83,7 +84,7 @@ class MerchantBills:
             raise PermissionError('EXPLICIT_MERCHANT_BILL_GRANT_REQUIRED')
 
     def _context(self, session, csrf, workspace):
-        grant = self.grants.get(workspace)
+        grant = resolve_admin_workspace(self.center,self.grants,workspace,self.center.session(session,csrf))
         self._validate(workspace, grant)
         grant = _copy(grant)
         original, policy = self.actions._authorize(session, csrf, grant['finance_workspace'])
@@ -94,7 +95,7 @@ class MerchantBills:
                 or self.actions.reader._mchid != grant['sp_mchid']
                 or policy['sub_mchid'] != grant['sub_mchid']):
             raise PermissionError('MERCHANT_BILL_GRANT_BINDING_CHANGED')
-        project, project_role, _ = self.center.project(grant['user_id'], grant['project'], original['project_roles'])
+        project, project_role, _ = community_project(self.center, grant['user_id'], grant['project'], original['project_roles'])
         bindings = []
         for identity, configured in list(self.actions.bindings.items()):
             if type(configured) is not dict:
@@ -163,6 +164,7 @@ class MerchantBills:
             self._bound_row(context, value, row)
         return value
 
+    @community_route('/community/merchant-bills')
     def dispatch(self, session, csrf, body):
         if (type(body) is not dict or set(body) != {'workspace', 'operation', 'params'}
                 or type(body['workspace']) is not str or type(body['operation']) is not str

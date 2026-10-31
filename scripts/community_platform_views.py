@@ -3,6 +3,7 @@
 No cross-project account search, credential fields or synthetic Finance ledger.
 Verified payment observations and local order state are reported separately.
 """
+from scripts.community_admin_route_gate import community_project, resolve_admin_workspace, admin_workspace_catalog
 import json
 import re
 from scripts.community_platform_merchants import PlatformMerchants
@@ -38,7 +39,7 @@ class PlatformViews:
         elif op=='platform_customers':
             if type(p['after_id']) is not str or p['after_id'] and not re.fullmatch('[A-Za-z0-9_-]{1,64}',p['after_id']):raise ValueError('INVALID_PLATFORM_CUSTOMER_CURSOR')
             rows=c.db.execute('SELECT m.user_id,m.role,m.active,a.verified FROM members m JOIN accounts a ON a.id=m.user_id WHERE m.project=? AND m.user_id>? ORDER BY m.user_id LIMIT 51',(g['project'],p['after_id'])).fetchall();records=[]
-            project,_,_=c.project(g['user_id'],g['project'])
+            project,_,_=community_project(c,g['user_id'],g['project'],('OWNER','EDITOR','VIEWER','REVIEWER'))
             for uid,role,active,verified in rows[:50]:
                 idx=c.idx('community-profile:'+g['project']+':'+uid)
                 profile=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_CUSTOMER_PROFILE' AND subject_idx=? AND user_id=? AND project=? AND active=1",(idx,uid,g['project'])).fetchone()

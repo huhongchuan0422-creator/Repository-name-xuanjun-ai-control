@@ -3,6 +3,7 @@
 Center reservations are durable before the original order write. A partial
 cross-database failure recovers the same reference; it never reserves twice.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace
 import hashlib
 import json
 from scripts.pr122_customer_core import canonical
@@ -51,13 +52,13 @@ class Commerce:
             raise PermissionError('CENTER_CSRF_REQUIRED')
         c = self.center
         uid = c.session(session, csrf)
-        g = self.operations.grants.get(workspace)
+        g = resolve_admin_workspace(c,self.operations.grants,workspace,uid)
         if g is None or uid != g['user_id'] or g['role'] not in ('MERCHANT_ADMIN', 'PLATFORM_OWNER'):
             raise PermissionError('MERCHANT_COMMERCE_GRANT_REQUIRED')
         principal = g['principal']
         if principal.role != g['role'] or self.runtime.bindings.get(principal) != g['scope']:
             raise PermissionError('MERCHANT_GRANT_CHANGED')
-        project, _, _ = c.project(uid, g['project'], g['project_roles'])
+        project, _, _ = community_project(c, uid, g['project'], g['project_roles'])
         if project['tenant'] != g['tenant']:
             raise PermissionError('MERCHANT_TENANT_DENIED')
         if g['onboarding_required']:
@@ -77,6 +78,7 @@ class Commerce:
             raise PermissionError('AVAILABLE_ORIGINAL_PRODUCT_REQUIRED')
         return item
 
+    @community_route('/community/commerce')
     def dispatch(self, session, csrf, body):
         if type(body) is not dict or set(body) != {'workspace', 'operation', 'params'}:
             raise ValueError('INVALID_COMMERCE_FIELDS')

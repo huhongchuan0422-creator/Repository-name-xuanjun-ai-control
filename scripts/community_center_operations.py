@@ -4,6 +4,7 @@ Grants are protected host configuration referencing original account/project
 IDs, not another IAM database. No project member automatically becomes staff,
 merchant administrator, moderator or platform owner. No money API is added.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, admin_request_active
 import hashlib
 import re
 from pathlib import Path
@@ -48,8 +49,9 @@ class CenterOperations:
             self.grants[name]={**grant,'project_roles':tuple(grant['project_roles']),
                 'onboarding_required':required,'role':p.role,'tenant':p.tenant_id,'scope':dict(runtime.bindings[p])}
 
+    @community_route('/community/operations')
     def dispatch(self,session,csrf,body):
-        if self.consumer_only:raise PermissionError('OPERATOR_WORKSPACES_DISABLED')
+        if self.consumer_only and not admin_request_active(self.center):raise PermissionError('OPERATOR_WORKSPACES_DISABLED')
         if (type(body) is not dict or set(body)!={'workspace','operation','params'}
                 or type(body['workspace']) is not str or type(body['operation']) is not str
                 or type(body['params']) is not dict):
@@ -62,7 +64,7 @@ class CenterOperations:
             return Stores(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
         if body['operation'].startswith('community.staff_'):
             return Staff(self).dispatch(session,csrf,body['workspace'],body['operation'],body['params'])
-        grant=self.grants.get(body['workspace'])
+        grant=resolve_admin_workspace(c,self.grants,body['workspace'],uid)
         if grant is None:grant=Staff(self).resolve(body['workspace'],uid)
         if grant is None or grant['user_id']!=uid:raise PermissionError('OPERATION_GRANT_REQUIRED')
         if 'allowed_operations' in grant and body['operation'] not in grant['allowed_operations']:
@@ -71,7 +73,7 @@ class CenterOperations:
         if (p not in self.runtime.bindings or p.role!=grant['role'] or p.tenant_id!=grant['tenant']
                 or self.runtime.bindings[p]!=grant['scope']):
             raise PermissionError('OPERATION_GRANT_CHANGED')
-        project,_,_=c.project(uid,grant['project'],grant['project_roles'])
+        project,_,_=community_project(c,uid,grant['project'],grant['project_roles'])
         if project['tenant']!=grant['tenant']:raise PermissionError('PROJECT_TENANT_MISMATCH')
         if grant['onboarding_required']:
             from scripts.community_merchant_opening import authorize_workspace

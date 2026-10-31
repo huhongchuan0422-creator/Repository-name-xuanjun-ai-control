@@ -3,6 +3,7 @@
 No grant creates an account/project member or grants Finance/platform powers.
 Original owner invitations and acceptance remain the sole membership process.
 """
+from scripts.community_admin_route_gate import community_project, resolve_admin_workspace, admin_workspace_catalog
 import hashlib
 import json
 import re
@@ -45,14 +46,14 @@ class Staff:
         c = self.center
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         uid = c.session(session, csrf)
-        parent = self.operations.grants.get(parent_workspace)
+        parent = resolve_admin_workspace(c,self.operations.grants,parent_workspace,uid)
         if parent is None or parent['user_id'] != uid or parent['role'] != 'MERCHANT_ADMIN':
             raise PermissionError('ORIGINAL_MERCHANT_OWNER_REQUIRED')
         principal = parent['principal']
         if (principal.role != parent['role'] or principal.tenant_id != parent['tenant']
                 or self.operations.runtime.bindings.get(principal) != parent['scope']):
             raise PermissionError('STAFF_PARENT_GRANT_CHANGED')
-        c.project(uid,parent['project'],('OWNER',))
+        community_project(c,uid,parent['project'],('OWNER',))
         if parent['onboarding_required']:
             from scripts.community_merchant_opening import authorize_workspace
             authorize_workspace(self.operations.onboarding,self.operations,parent_workspace,uid)

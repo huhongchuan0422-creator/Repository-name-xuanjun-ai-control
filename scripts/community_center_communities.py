@@ -3,6 +3,7 @@
 Uses original accounts/projects/links/audit, not a second identity database.
 Membership never authorizes payouts or changes merchant permissions.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, has_admin_templates
 import hashlib
 import json
 import re
@@ -25,7 +26,7 @@ class CenterCommunities:
               'description': 'Community review and explicit customer/merchant relationships'}
 
     def __init__(self, center, grants):
-        if type(center) is not Center or type(grants) is not dict or not grants:
+        if type(center) is not Center or type(grants) is not dict or (not grants and not has_admin_templates(center,'/community/directory')):
             raise ValueError('ORIGINAL_CENTER_AND_PROTECTED_GRANTS_REQUIRED')
         self.commerce=None;self.provider_actions=None
         self.center = center
@@ -42,11 +43,11 @@ class CenterCommunities:
         if type(csrf) is not str or not csrf:
             raise PermissionError('CENTER_CSRF_REQUIRED')
         uid = self.center.session(session, csrf)
-        grant = self.grants.get(workspace)
+        grant = resolve_admin_workspace(self.center,self.grants,workspace,uid)
         if grant is None or grant['user_id'] != uid:
             raise PermissionError('COMMUNITY_WORKSPACE_REQUIRED')
         roles = ('OWNER',) if grant['role'] == 'PLATFORM_OWNER' else ('OWNER', 'EDITOR', 'REVIEWER')
-        project, _, _ = self.center.project(uid, grant['project'], roles)
+        project, _, _ = community_project(self.center, uid, grant['project'], roles)
         if project['tenant'] != grant['tenant']:
             raise PermissionError('COMMUNITY_TENANT_DENIED')
         return grant
@@ -102,6 +103,7 @@ class CenterCommunities:
             result.update(state='ACTIVE' if row[2] else 'INACTIVE',updated_at=record['updated_at'])
         return result
 
+    @community_route('/community/directory')
     def dispatch(self, session, csrf, body):
         if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('platform_overview','platform_orders','platform_customers','platform_audit'):
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')

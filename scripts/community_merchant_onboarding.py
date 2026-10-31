@@ -3,6 +3,7 @@
 Business review does not approve WeChat submerchant registration or enable funds.
 An applicant needs an existing verified account, not a fictitious signed project.
 """
+from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, has_admin_templates
 import base64
 import hashlib
 import json
@@ -116,7 +117,7 @@ def _failure_diagnostic(error,commit_attempted,rollback,object_write):
 
 class MerchantOnboarding:
     def __init__(self,center,reviewers):
-        if type(center) is not Center or type(reviewers) is not dict or not reviewers:
+        if type(center) is not Center or type(reviewers) is not dict or (not reviewers and not has_admin_templates(center,'/merchant/onboarding')):
             raise ValueError('EXISTING_CENTER_AND_PROTECTED_REVIEWERS_REQUIRED')
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
                 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
@@ -144,9 +145,10 @@ class MerchantOnboarding:
     def _encode(self,value,aad):return base64.b64encode(self.center.encrypt(canonical(value),aad)).decode()
     def _decode(self,value,aad):return json.loads(self.center.decrypt(base64.b64decode(value,validate=True),aad))
     def _reviewer(self,uid):
-        project=self.reviewers.get(uid)
+        template=resolve_admin_workspace(self.center,{},'__community_onboarding__',uid)
+        project=template['project'] if template is not None and template['role']=='PLATFORM_REVIEWER' else self.reviewers.get(uid)
         if project is None:raise PermissionError('PLATFORM_REVIEWER_REQUIRED')
-        self.center.project(uid,project,('REVIEWER',))
+        community_project(self.center,uid,project,('REVIEWER',))
     def _load(self,application,uid,review=False):
         if type(application) is not str:raise ValueError('APPLICATION_REQUIRED')
         row=self.center.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=? AND project=? AND active=1",(application,application)).fetchone()
@@ -209,6 +211,7 @@ class MerchantOnboarding:
             opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
             opening_workspaces=workspaces,
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',payment_enabled=False)
+    @community_route('/merchant/onboarding')
     def dispatch(self,session,csrf,body,*,source_origin=None):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
             raise ValueError('INVALID_ONBOARDING_REQUEST')

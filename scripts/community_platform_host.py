@@ -21,7 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
-OPTIONAL_FIELDS = {'registration_scenes','community_grants','provider_reader_config','commerce_provider_config'}
+OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config'}
 
 
 def _require_nonroot():
@@ -59,9 +59,12 @@ def _configuration(plan, key_material, wechat):
         if (type(ref) is not str or not Path(ref).is_absolute()
                 or str(Path(ref)) != ref or '..' in Path(ref).parts):
             raise ValueError('PROTECTED_PROVIDER_READER_CONFIG_REF_REQUIRED')
-    if 'commerce_provider_config' in plan and (not plan['reviewers'] or 'provider_reader_config' not in plan):
+    admin_spec=plan.get('community_admin_authority')
+    admin_templates=admin_spec.get('workspace_bindings') if type(admin_spec) is dict else None
+    admin_onboarding=type(admin_templates) is dict and '/merchant/onboarding#__community_onboarding__' in admin_templates
+    if 'commerce_provider_config' in plan and (not (plan['reviewers'] or admin_onboarding) or 'provider_reader_config' not in plan):
         raise PermissionError('ORIGINAL_ONBOARDING_READER_REQUIRED_FOR_COMMERCE')
-    if plan['reviewers'] and 'provider_reader_config' not in plan:
+    if (plan['reviewers'] or admin_onboarding) and 'provider_reader_config' not in plan:
         raise PermissionError('PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING')
     if type(plan['principals']) is not dict or not plan['principals'] or type(plan['bindings']) is not dict or set(plan['bindings']) != set(plan['principals']):
         raise ValueError('EXACT_SERVER_PRINCIPAL_BINDINGS_REQUIRED')
@@ -212,17 +215,27 @@ class PlatformHost:
             owner.center = Center(center_root, keys, key_material['active_key'])
             owner.application = MiniApplication.from_existing_runtime(owner.center,
                 owner.persistence.runtime, principals, config, wechat['app_secret'])
+            if 'community_admin_authority' in plan:
+                from scripts.community_admin_route_gate import configure_admin_routes
+                configure_admin_routes(owner.center, owner.persistence.runtime, principals, plan['community_admin_authority'])
+            from scripts.community_admin_route_gate import has_admin_templates
             if 'registration_scenes' in plan:
                 owner.application.identity.configure_registration(plan['registration_scenes'])
-            if plan['reviewers']:
+            if plan['reviewers'] or has_admin_templates(owner.center,'/merchant/onboarding'):
+                if 'provider_reader_config' not in plan:raise PermissionError('PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING')
                 owner.application.configure_onboarding(plan['reviewers'])
                 reader = _open_provider_reader(plan['provider_reader_config'], owner.center.now)
                 owner.application.configure_wechat_applyment(reader,submission_enabled=commerce_policy[0]['applyment_submission_enabled'] if commerce_policy else False)
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
-            if plan.get('community_grants'):
-                owner.application.configure_communities(plan['community_grants'])
+            if plan.get('community_grants') or has_admin_templates(owner.center,'/community/directory'):
+                owner.application.configure_communities(plan.get('community_grants',{}))
+            if has_admin_templates(owner.center,'/customer/saas-api'):
+                owner.application.configure_saas({})
             owner.application.configure_commerce()
             if commerce_policy is not None:_wire_commerce(owner.application,reader,commerce_policy)
+            if 'community_admin_authority' not in plan:
+                from scripts.community_admin_authority import attach_core_admin
+                attach_core_admin(owner.center,{value['project'] for value in config['scenes'].values()})
             owner.plan = plan
             return owner
         except BaseException:

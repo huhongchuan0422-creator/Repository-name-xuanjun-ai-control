@@ -178,7 +178,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 try:proxy_source=trusted_proxy(self.connection,self.headers)
                 except PermissionError:return self.answer(403,{'error':'PROXY_DENIED'})
                 except Exception:return self.answer(503,{'error':'PROXY_UNAVAILABLE'})
-            web_session=(proxy_origin=='https://uk.wenwenwenyiyiyi.work' and self.path in ('/community/session/login','/community/session/check','/community/session/logout','/community/session/wechat'))
+            web_session=(proxy_origin=='https://uk.wenwenwenyiyiyi.work' and self.path in ('/community/session/login','/community/session/check','/community/session/logout','/community/session/wechat','/community/admin'))
             if web_session and (self.headers.get_all('Origin',[]) != [proxy_origin] or self.headers.get_all('Sec-Fetch-Site',[]) not in ([],['same-origin'])):
                 return self.answer(403,{'error':'ORIGIN_DENIED'})
             if not web_session and self.path not in ('/mini/login','/mini/api','/mini/logout','/mini/bind') and not (
