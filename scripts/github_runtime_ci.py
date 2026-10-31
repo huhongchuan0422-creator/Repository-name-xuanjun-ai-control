@@ -7,20 +7,28 @@ import base64,hashlib,json,re,time,urllib.request
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REPO_ID=1413132159
 WORKFLOW='.github/workflows/mcp-current-successor-gates.yml'
-WORKFLOW_BLOB='a60b56b643893daba15c7b36cc7b771f635c6ad1'
-# Filled only from the first real GitHub registration/readback. Zero is a
-# deliberate fail-closed publication checkpoint, never a wildcard.
-WORKFLOW_ID=0
+WORKFLOW_BLOB='b830b8296172ac32c4e041657262b4c8b8f62f00'
 ALLOWED_FILES=frozenset((
+ '.github/workflows/mcp-current-successor-gates.yml',
+ 'deploy/xuanjun-pr17-gateway-consumer.path.in',
+ 'deploy/xuanjun-pr17-gateway-consumer.service.in',
+ 'deploy/xuanjun-pr17-gateway-consumer.timer.in',
+ 'deploy/xuanjun-pr17-gateway-intake.service.in',
+ 'deploy/xuanjun-pr17-gateway-intake.timer.in',
+ 'deploy/xuanjun-pr17-gateway-publisher.path.in',
+ 'deploy/xuanjun-pr17-gateway-publisher.service.in',
+ 'deploy/xuanjun-pr17-gateway-publisher.timer.in',
  'scripts/development_review_continuation.py',
  'scripts/gateway_multifile_candidate.py',
  'scripts/github_runtime_ci.py',
  'scripts/original_gateway_readback.py',
  'scripts/original_gateway_transport.py',
+ 'scripts/pr17_gateway_bridge.py',
  'scripts/task_center_mcp_development.py',
  'scripts/task_skill_admission.py',
  'scripts/task_supervisor.py',
- 'tests/test_mcp_development_bridge.py'))
+ 'tests/test_mcp_development_bridge.py',
+ 'tests/test_pr17_gateway_bridge.py'))
 TEST_STEP='Validate exact current successor'
 def require(ok,code):
  if not ok:raise ValueError(code)
@@ -31,7 +39,7 @@ class GitHubRuntimeCI:
  def __init__(self):self.deadline=None;self.calls=0
  def _get(self,path):
   self.calls+=1;left=self.deadline-time.monotonic()
-  require(left>0 and self.calls<=12,'CI_READ_DEADLINE')
+  require(left>0 and self.calls<=32,'CI_READ_DEADLINE')
   # Every path is constructed below from fixed endpoints plus bounded IDs/hashes.
   url='https://api.github.com/repos/'+REPO+'/'+path
   class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -55,12 +63,16 @@ class GitHubRuntimeCI:
  def verify(self,code_commit,branch,files,run_id):
   require(_hex(code_commit) and isinstance(branch,str) and re.fullmatch(r'[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+){0,4}',branch),'CI_EXACT_CANDIDATE_REQUIRED')
   require(type(run_id)is int and 1<=run_id<10**14,'CI_RUN_ID_REQUIRED')
-  require(WORKFLOW_ID>0,'CI_WORKFLOW_REGISTRATION_REQUIRED')
   require(isinstance(files,dict) and 1<=len(files)<=len(ALLOWED_FILES) and set(files)<=ALLOWED_FILES,'CI_ORIGINAL_WORKFLOW_SOURCE_SCOPE')
   require(all(isinstance(v,str) and re.fullmatch('[0-9a-f]{64}',v) for v in files.values()),'CI_FILE_DIGESTS_REQUIRED')
   self.deadline=time.monotonic()+8;self.calls=0
   run=self._get('actions/runs/'+str(run_id))
-  require(run.get('id')==run_id and run.get('workflow_id')==WORKFLOW_ID and run.get('path')==WORKFLOW
+  workflow_id=run.get('workflow_id')
+  require(type(workflow_id)is int and workflow_id>0,'CI_WORKFLOW_REGISTRATION_REQUIRED')
+  registration=self._get('actions/workflows/'+str(workflow_id))
+  require(registration.get('id')==workflow_id and registration.get('path')==WORKFLOW
+   and registration.get('state')=='active','CI_WORKFLOW_REGISTRATION_MISMATCH')
+  require(run.get('id')==run_id and run.get('workflow_id')==workflow_id and run.get('path')==WORKFLOW
    and run.get('event')=='pull_request' and run.get('head_sha')==code_commit and run.get('head_branch')==branch
    and run.get('repository',{}).get('id')==REPO_ID and run.get('head_repository',{}).get('id')==REPO_ID,'CI_RUN_BINDING_MISMATCH')
   require(run.get('status')=='completed' and run.get('conclusion')=='success' and type(run.get('run_attempt'))is int and run['run_attempt']>0,'CI_NOT_COMPLETED_SUCCESS')
@@ -95,6 +107,6 @@ class GitHubRuntimeCI:
    require(len(raw)==item['size'] and digest(raw)==expected,'CI_CANDIDATE_FILE_CHANGED')
   require(time.monotonic()<=self.deadline,'CI_READ_DEADLINE')
   return {'schema':1,'source':'GITHUB_FIXED_RUNTIME_CI','repository':REPO,'repository_id':REPO_ID,'workflow_path':WORKFLOW,
-   'workflow_blob':WORKFLOW_BLOB,'run_id':run_id,'run_attempt':run['run_attempt'],'job_id':job['id'],'pr_number':number,
+   'workflow_blob':WORKFLOW_BLOB,'workflow_id':workflow_id,'run_id':run_id,'run_attempt':run['run_attempt'],'job_id':job['id'],'pr_number':number,
    'code_commit':code_commit,'tested_merge_commit':merge,'tree':tree,'base_sha':base['sha'],'branch':branch,
    'files':dict(files),'test_step':TEST_STEP,'state':'TESTS_PASSED_EXACT_TREE','approval_generated':False,'workflow_dispatched':False}

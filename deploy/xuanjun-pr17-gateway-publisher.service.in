@@ -10,10 +10,11 @@ WorkingDirectory=@SOURCE_ROOT@
 LoadCredential=github-token:@GITHUB_TOKEN_SECRET@
 Environment=XJ_PR17_SENT=@SENT@
 Environment=XJ_PR17_OUTBOX=@OUTBOX@
+Environment=XJ_PR17_PUBLISHED=@PUBLISHED@
 Environment=GITHUB_TOKEN_FILE=%d/github-token
 ExecStart=@PYTHON@ -I -B @SOURCE_ROOT@/scripts/pr17_gateway_bridge.py publish
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=@OUTBOX@ @SENT@
+ReadWritePaths=@OUTBOX@ @SENT@ @PUBLISHED@

@@ -41,7 +41,8 @@ jobs:
             scripts/task_center_mcp_development.py \
             scripts/task_skill_admission.py \
             scripts/task_supervisor.py \
-            tests/test_mcp_development_bridge.py
+            tests/test_mcp_development_bridge.py \
+            tests/test_pr17_gateway_bridge.py
           python3 -m unittest \
             tests.test_pr17_gateway_bridge \
             tests.test_mcp_development_bridge \
