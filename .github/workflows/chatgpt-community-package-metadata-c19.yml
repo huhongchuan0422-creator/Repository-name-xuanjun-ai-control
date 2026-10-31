@@ -11,11 +11,12 @@ on:
       - 'delivery/community-installer-4f1c3-36b564/COMMUNITY_4F_ORIGINAL_INSTALL.py'
       - 'delivery/community-installer-4f1c3-36b564/package-metadata.json'
       - 'delivery/community-superadmin-e23e186-image/package-metadata.json'
+      - 'delivery/community-installer-e23e186-2be41b/COMMUNITY_SUPERADMIN_FIRST_ENABLE_INSTALL.py'
 permissions:
   contents: read
 jobs:
   deliver-fixed-metadata:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-f9603d]') && !contains(github.event.head_commit.message, '[community-installer-253cad]') && !contains(github.event.head_commit.message, '[community-installer-253cad-metadata]') && !contains(github.event.head_commit.message, '[community-installer-36b564]') && !contains(github.event.head_commit.message, '[community-installer-36b564-metadata]') && !contains(github.event.head_commit.message, '[community-superadmin-e23e-image-metadata]')
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-f9603d]') && !contains(github.event.head_commit.message, '[community-installer-253cad]') && !contains(github.event.head_commit.message, '[community-installer-253cad-metadata]') && !contains(github.event.head_commit.message, '[community-installer-36b564]') && !contains(github.event.head_commit.message, '[community-installer-36b564-metadata]') && !contains(github.event.head_commit.message, '[community-superadmin-e23e-image-metadata]') && !contains(github.event.head_commit.message, '[community-installer-e23e-2be41b]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -207,6 +208,33 @@ jobs:
         with:
           name: reviewed-community-e23e186-image-metadata
           path: delivery/community-superadmin-e23e186-image/package-metadata.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
+
+
+  deliver-fixed-superadmin-installer:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-installer-e23e-2be41b]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify fixed cache-bound installer bytes; never execute
+        run: |
+          python - <<'PYVERIFY'
+          import hashlib,pathlib
+          raw=pathlib.Path('delivery/community-installer-e23e186-2be41b/COMMUNITY_SUPERADMIN_FIRST_ENABLE_INSTALL.py').read_bytes()
+          assert len(raw)==512685
+          assert hashlib.sha256(raw).hexdigest()=='2be41b4d3dd7b583fe84427db7f68da06d703531741e88e56a9a95ba8135c749'
+          print('FIXED_INSTALLER_BYTES_MATCH; CACHE_RECEIPT_BOUND_SITE_RECHECK_REQUIRED; NOT_EXECUTED; NOT_INSTALLED')
+          PYVERIFY
+      - name: Publish exact single cache-bound superadmin installer member
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-e23e186-installer-2be41b
+          path: delivery/community-installer-e23e186-2be41b/COMMUNITY_SUPERADMIN_FIRST_ENABLE_INSTALL.py
           compression-level: 0
           if-no-files-found: error
           retention-days: 3
