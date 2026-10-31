@@ -25,8 +25,11 @@
     "runtime/p3_owner_reminders.py": "ef52c2727978e6578d8875d2ff6212b5539fe3f42777bd4be0179cbb17094499",
     "src/p3_host_boundaries.py": "aa06589ab51298cd64ecd4ac8bb9af8746c692e6db7205da191ce7c718dfb17f",
     "src/p3_host_callsite.py": "a2c5a9684d72892e21cd91158a3a59f4d506cc777bf6dd25099079503f790c5d",
+    "TEST_DISCOVERY_IMPORT_IDENTITY_FIX.md": "b2c724e3c3f010db3dec6b00f963bac24a2494d72c50401e3ee45963c3a03cad",
     "tests/test_p3_carrier_install.py": "71a0b5d974f7d7f5997659ed4bb38cdc04cbcaca4de2f5cc63ed337952bb2422",
+    "tests/test_p3_host_boundaries.py": "90a98650c39141e944749aca57df444d595bfd2949ec26ac7edb1f9e98d53851",
     "tests/test_p3_host_callsite.py": "7487d283fe02703e5177ec5ce39fbeb8fdd383184e189ea464932f2ae61af555",
+    "tests/test_p3_qa_counterexamples.py": "31b5e05128ea40c71dcf65da7be2d51abea1d062c0095a01c8fc6eceb1e64d1b",
     "vendor/xuanjun-p3-host-wiring-increment-20261028.zip": "d41d80623bf4e5017a277affcd5937e79ecdfa0615de7c1bf02943c4e9e2aa93",
     "vendor/xuanjun-p3-lifecycle-local-candidate-20261028.zip": "34fda99283a3593daff6810f4c70b3d1b9d6afcee9c491a7030f6195e2ae0252",
     "vendor/xuanjun-p3-owner-reminder-increment-20261028.zip": "20e219cecd31967b5fbd1603ce9485fe3afd7cfb62116615cbfa9647dbf6ee3d"

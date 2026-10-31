@@ -1,12 +1,8 @@
 from __future__ import absolute_import
 
-import os
-import sys
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
-from p3_host_boundaries import (AdmissionGate, EvidenceReaders,
+from src.p3_host_boundaries import (AdmissionGate, EvidenceReaders,
     OutboxController, OutboxTransport, ReceiptVerifier, RunnerAdapter,
     RunnerController, TrustedReceiptProvider, seal_receipt)
 
