@@ -2,6 +2,7 @@
 Not original backend/device/production identity acceptance.
 """
 import json, unittest, os
+from urllib.parse import urlsplit
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 JS=Path(__file__).parents[1]/'demos/community-stage/web-session.js'
@@ -11,7 +12,10 @@ class UI(unittest.TestCase):
   with sync_playwright() as p:
    browser=p.chromium.launch(headless=True,**({'executable_path':os.environ['COMMUNITY_UI_CHROMIUM_PATH']} if os.environ.get('COMMUNITY_UI_CHROMIUM_PATH') else {}))
    try:
-    page=browser.new_page();requests=[];errors=[];page.on('pageerror',lambda e:errors.append(type(e).__name__))
+    page=browser.new_page();requests=[];errors=[];network=[]
+    page.on('pageerror',lambda e:errors.append(dict(type=type(e).__name__,message=str(e)[:500])))
+    page.on('requestfailed',lambda r:network.append(dict(kind='failed',path=urlsplit(r.url).path,method=r.method,failure=r.failure)))
+    page.on('response',lambda r:network.append(dict(kind='response',path=urlsplit(r.url).path,status=r.status)))
     page.add_init_script("sessionStorage.setItem('community-original-csrf','fixture-csrf')")
     def route(r):
      url=r.request.url
@@ -41,5 +45,16 @@ class UI(unittest.TestCase):
     page.get_by_role('button',name='创建受限管理员').click()
     page.wait_for_function("document.querySelector('[aria-label=新管理员初始密码]').value === ''")
     self.assertEqual(requests,[dict(operation='create',password_present=True)]);self.assertEqual(errors,[])
+   except Exception:
+    # Exact failed synthetic fixture context, not another test's screenshot.
+    # Never persist input values, HTTP bodies, cookies or stored CSRF.
+    target=Path('community-admin-browser-evidence');target.mkdir(exist_ok=True)
+    state=page.evaluate("""() => ({secure:window.isSecureContext,locks:typeof navigator.locks?.request,broadcast:typeof BroadcastChannel,csrf_present:!!sessionStorage.getItem('community-original-csrf'),status:document.querySelector('[role=status]')?.textContent,buttons:[...document.querySelectorAll('button')].map(b=>({label:b.textContent,disabled:b.disabled,visible:!!b.getClientRects().length})),headings:[...document.querySelectorAll('h3')].map(x=>x.textContent)})""")
+    def redact(value):
+     text=json.dumps(value,ensure_ascii=False,indent=2)
+     for secret in ('synthetic-password-123','fixture-csrf'):text=text.replace(secret,'[REDACTED]')
+     return text
+    (target/'superadmin-fixture-failure.json').write_text(redact(dict(state=state,errors=errors,network=network)))
+    raise
    finally:browser.close()
 if __name__=='__main__':unittest.main()

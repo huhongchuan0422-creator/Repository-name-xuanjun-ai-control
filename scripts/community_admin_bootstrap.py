@@ -138,7 +138,19 @@ def run(candidate=None, action=None):
             raise Denied('EXACT_COMMUNITY_AUTHORITY_COMPOSITION_REQUIRED')
         api._realm()
         if action=='--inspect':
-            return dict(status='INSPECTED',project=b['project'],tenant=b['tenant'],manifest_sha=api.manifest_sha,account_written=False)
+            recovery=dict(phase='NO_EXECUTION_INTENT',mutation=False)
+            if os.path.lexists(b['identity_record_path']):
+                _regular(b['identity_record_path'],b['run_uid'])
+                saved=load_protected(b['identity_record_path'])
+                if any(saved.get(k)!=v for k,v in dict(request_id=b['request_id'],project=b['project'],tenant=b['tenant'],manifest_sha=api.manifest_sha,host_sha256=b['host_sha256']).items()):raise Denied('EXACT_IDENTITY_RECORD_CONFLICT')
+                intent=dict(execution_binding_sha256=digest(canonical(saved)),project=b['project'],tenant=b['tenant'],email=saved['email'],manifest_sha=api.manifest_sha,request_id=b['request_id'],action='BOOTSTRAP_COMMUNITY_SUPERADMIN',owner_message_id=b['owner_message_id'],owner_body_sha256=b['owner_body_sha256'])
+                prior=api._request(b['request_id'],intent)
+                if prior is not None:
+                    api.authority(prior['uid']);recovery=dict(phase='EXISTING_DATABASE_COMMIT_READBACK',uid=prior['uid'],mutation=False)
+                else:
+                    from scripts.community_admin_recovery import ensure_backup
+                    recovery=ensure_backup(host.center,b['backup_path'],b['run_uid'],digest(canonical(saved)),b['request_id'],inspect_only=True)
+            return dict(status='INSPECTED',project=b['project'],tenant=b['tenant'],manifest_sha=api.manifest_sha,recovery=recovery,account_written=False)
         if not sys.stdin.isatty():raise Denied('INTERACTIVE_TTY_REQUIRED')
         address=email(input('本社区固定超级管理员登录邮箱: '))
         execution=dict(conversation_sources=[dict(message_id=mid,body_sha256=digest(body.encode())) for mid,body in OWNER_SOURCE_MESSAGES],kind='OWNER_TTY_COMMUNITY_SUPERADMIN',email=address,project=b['project'],tenant=b['tenant'],role='COMMUNITY_SUPERADMIN',capabilities=sorted(api.capabilities),workspace_scopes=sorted(api.workspace_scopes),manifest_sha=api.manifest_sha,scope_binding_sha=api.scope_binding_sha,host_sha256=b['host_sha256'],source_pins=b['source_pins'],route_coverage_sha256=b['route_coverage_sha256'],request_id=b['request_id'],owner_message_id=b['owner_message_id'],owner_body_sha256=b['owner_body_sha256'])
@@ -159,7 +171,8 @@ def run(candidate=None, action=None):
             api.authority(prior['uid'])
             password=repeat=None
             return dict(prior,status='EXISTING_DATABASE_COMMIT_READBACK',replayed=True,production_login_verified=False,complete_delivery=False)
-        backup_sha=_backup(host.center,b['backup_path'],b['run_uid'])
+        from scripts.community_admin_recovery import ensure_backup
+        backup_sha=ensure_backup(host.center,b['backup_path'],b['run_uid'],execution_sha,b['request_id'])
         result=api.bootstrap(address,password,b['request_id'],owner,lambda supplied:supplied==owner)
         password=repeat=None
         observed=api.authority(result['uid'])
