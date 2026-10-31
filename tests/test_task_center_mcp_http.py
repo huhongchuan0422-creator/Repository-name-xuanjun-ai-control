@@ -511,7 +511,8 @@ class MCPHTTPTests(unittest.TestCase):
           'method':'tools/list','params':{}}).encode(),{'Content-Type':
           'application/json','Authorization':'Bearer '+token['access_token']}).read())
         self.assertEqual([x['name'] for x in listed['result']['tools']],
-          ['task_capabilities','task_submit','task_get','task_query_result'])
+          ['task_dispatch_contract','task_capabilities','task_submit','task_get',
+           'task_query_result'])
         authorization={'Content-Type':'application/json','Authorization':'Bearer '+
           token['access_token']}
         capabilities=json.loads(raw('/mcp','POST',json.dumps({'jsonrpc':'2.0',

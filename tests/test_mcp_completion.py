@@ -141,7 +141,8 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(a.call('task_candidate_status',self.args(candidate_id=cid))['completion_state'],'HOLD_RESOURCE_RELEASE_RECONCILIATION')
     def test_host_acceptance_and_audit_share_original_transaction(self):
         cid=self.reviewed();a=self.facade('acceptor');trace=[]
-        a.control.db.set_trace_callback(trace.append)
+        def capture(statement):trace.append(statement)
+        a.control.db.set_trace_callback(capture)
         a.call('task_accept_candidate',self.args(candidate_id=cid))
         update=next(i for i,q in enumerate(trace) if 'UPDATE delivery_candidates SET accepted_by=' in q)
         audit=next(i for i,q in enumerate(trace) if 'INSERT' in q and 'model_audit' in q and 'CANDIDATE_ACCEPTED' in q)

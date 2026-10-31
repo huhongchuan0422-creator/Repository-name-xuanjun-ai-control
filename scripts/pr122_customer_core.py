@@ -101,7 +101,7 @@ class Center:
         self.evidence_context=evidence_context
         self.task_registry_context=task_registry_context
         dbp=self.root/'center.sqlite'; private_path(dbp)
-        self.db=sqlite3.connect(dbp,isolation_level=None,timeout=15)
+        self.db=sqlite3.connect(str(dbp),isolation_level=None,timeout=15)
         os.chmod(dbp,0o600); self.db.row_factory=sqlite3.Row
         self.db.execute('PRAGMA journal_mode=WAL'); self.db.execute('PRAGMA synchronous=FULL'); self.db.execute('PRAGMA foreign_keys=ON'); self.db.executescript(DDL)
         self.db.execute("INSERT OR IGNORE INTO settings VALUES('authority_revision','0')")
