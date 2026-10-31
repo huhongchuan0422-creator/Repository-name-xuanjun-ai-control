@@ -36,6 +36,9 @@ from provider_onboarding import (ensure_schema as ensure_onboarding_schema,
                                  saved_credential, test_connection, test_model,
                                  issue_receipt, save as save_onboarding)
 from task_center_mcp import RemoteTaskCenterMCP
+from task_center_mcp_dispatch_host import (WRITE_TOOLS, dispatch_rpc,
+    validate_config as validate_dispatch_config, load_config as load_dispatch_config,
+    check_existing_bindings)
 from task_center_mcp_auth import MCPAuthorizationStore
 from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
                                      MCPTaskService,
@@ -51,6 +54,14 @@ MCP_BODY_READ_TIMEOUT_SECONDS = 2
 
 class TaskCenterHTTPServer(HTTPServer):
     """HTTP listener whose close also releases the MCP ledger lease."""
+    def service_actions(self):
+        observer=getattr(self,"correction_observer",None)
+        if observer is not None:
+            try:observer.tick()
+            except Exception:
+                observer.last_report=None
+                observer.status={'state':'HOLD_OBSERVATION_FAILED','dispatch_performed':False,'business_mutation':False}
+
     def server_close(self):
         try:
             HTTPServer.server_close(self)
@@ -95,10 +106,6 @@ MODEL_TABLES = frozenset((
     'codex_execution_intents','codex_execution_events',
     'provider_onboarding_configs'))
 
-TWIN_MODEL_TABLES = frozenset((
-    'role_instances', 'model_requests', 'model_assignments',
-    'delivery_candidates', 'candidate_reviews'))
-
 ROLE_ACTION_ROLES = {
     'START_TEST_ONLY_TASK': 'TASK_EXECUTOR',
     'CREATE_CODEX_INTENT': 'TASK_EXECUTOR',
@@ -109,6 +116,10 @@ ROLE_ACTION_ROLES = {
     'REVIEW_CANDIDATE': 'TASK_REVIEWER',
     'REVIEW_SCOPE_CHANGE': 'TASK_REVIEWER',
     'ACCEPT_CANDIDATE': 'TASK_ACCEPTOR',
+    'PREPARE_RESULT_RECOVERY': 'TASK_CENTER_ADMIN',
+    'REVIEW_RESULT_RECOVERY': 'TASK_REVIEWER',
+    'ACCEPT_RESULT_RECOVERY': 'TASK_ACCEPTOR',
+    'RESULT_RECOVERY_STATUS': 'TASK_CENTER_ADMIN',
 }
 
 
@@ -198,50 +209,6 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
         connection.close()
 
 
-def read_only_twin_projection(db_path, authority_key, tenant_id,
-                              principal_id):
-    """Build one tenant-bound read snapshot without mutation capability."""
-    connection = _read_only_connection(
-        db_path, PROJECTION_TABLES | TWIN_MODEL_TABLES)
-    try:
-        authority = TestTenantAuthority(authority_key)
-        gateway = GatewayKernel.__new__(GatewayKernel)
-        gateway.db = connection
-        gateway.supervisor = _ReadOnlySupervisor(connection)
-        gateway.tenants = authority
-        task_projection = gateway.projection(
-            authority.issue(tenant_id, principal_id))
-        model_projection = {
-            'instances': [dict(x) for x in connection.execute('''SELECT
-              instance_id,role_id,role_version,state,desired_state,
-              current_request_id,last_checkpoint_json,updated_at
-              FROM role_instances WHERE tenant_id=? ORDER BY instance_id''',
-              (tenant_id,))],
-            'requests': [dict(x) for x in connection.execute('''SELECT
-              request_id,task_id,attempt_id,role_id,state,last_heartbeat,
-              checkpoint_json,created_at,updated_at FROM model_requests
-              WHERE tenant_id=? ORDER BY created_at,request_id''',
-              (tenant_id,))],
-            'assignments': [dict(x) for x in connection.execute('''SELECT
-              task_id,attempt_id,role_id,role_version,principal_id,state,
-              created_at FROM model_assignments WHERE tenant_id=?
-              ORDER BY task_id,role_id''', (tenant_id,))],
-            'candidates': [dict(x) for x in connection.execute('''SELECT
-              candidate_id,task_id,attempt_id,artifact_sha256,
-              checklist_sha256,submitted_by,reviewed_by,accepted_by,state,
-              created_at,updated_at FROM delivery_candidates WHERE tenant_id=?
-              ORDER BY created_at,candidate_id''', (tenant_id,))],
-            'candidate_reviews': [dict(x) for x in connection.execute('''SELECT
-              candidate_id,review_id,reviewer,review_kind,decision,
-              observed_at FROM candidate_reviews
-              WHERE tenant_id=? ORDER BY observed_at,review_id''',
-              (tenant_id,))],
-        }
-        return build_twin_projection(task_projection, model_projection)
-    finally:
-        connection.close()
-
-
 def _json_bytes(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(',', ':')).encode('utf-8')
@@ -303,7 +270,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None):
+    mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
     base_path = _normalize_base_path(base_path)
@@ -438,7 +406,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
               'CODE_RESPONSE_ONLY','OAUTH_TOKEN_PARAMETERS_REQUIRED',
               'OAUTH_GRANT_REJECTED','OAUTH_RESOURCE_MISMATCH',
               'OAUTH_CODE_OR_PKCE_REJECTED','OAUTH_CODE_REPLAY_REJECTED',
-              'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED'))
+              'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED',
+              'MCP_DISPATCH_HOST_BINDING_REQUIRED','MCP_DISPATCH_WORKER_DISABLED',
+              'MCP_DISPATCH_SUBMIT_SCOPE_REQUIRED','STALE_TASK_ATTEMPT',
+              'PROJECT_TASK_NOT_VISIBLE','ROLE_NOT_ALLOWED_BY_HOST',
+              'CURRENT_ADMITTED_WRITER_REQUIRED','CURRENT_WRITER_AUTHORITY_REQUIRED',
+              'IDEMPOTENCY_BINDING_CONFLICT','IDEMPOTENCY_CONFLICT',
+              'REQUEST_NOT_VISIBLE','ASSIGNMENT_BINDING_CONFLICT',
+              'CURRENT_TRUSTED_ASSIGNMENT_REQUIRED',
+              'ASSIGNMENT_CHANGED_BEFORE_QUEUE_COMMIT','WRITER_CHANGED_BEFORE_QUEUE_COMMIT'))
             detail=str(exc)
             if isinstance(exc,(UnicodeDecodeError,json.JSONDecodeError)):
                 detail='JSON_INVALID'
@@ -504,7 +480,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'outbound':'DISABLED' if not outbound_enabled else
                   'TEST_FIXTURE_ONLY','provider_connection_test':
                   'ENABLED' if provider_connection_test_enabled else 'DISABLED',
-                  'mcp_model_worker':worker_state}),
+                  'mcp_model_worker':worker_state,
+                  'correction_observer':(self.server.correction_observer.status if getattr(self.server,'correction_observer',None) is not None else {'state':'DISABLED'})}),
                   'application/json; charset=utf-8');return
             if path == '/readyz':
                 try:
@@ -718,7 +695,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         control=ModelControl(control.gateway,
                           control.gateway.tenants.issue(tenant_id,actor),
                           model_master_key)
-                    if action=='UPSERT_PROVIDER':
+                    if action in ('PREPARE_RESULT_RECOVERY','REVIEW_RESULT_RECOVERY','ACCEPT_RESULT_RECOVERY','RESULT_RECOVERY_STATUS'):
+                        from task_center_mcp_result_recovery import ResultRecoveryMCP
+                        names={'PREPARE_RESULT_RECOVERY':'task_prepare_result_recovery','REVIEW_RESULT_RECOVERY':'task_review_result_recovery','ACCEPT_RESULT_RECOVERY':'task_accept_result_recovery','RESULT_RECOVERY_STATUS':'task_result_recovery_status'}
+                        binding=next((r for r in mcp_dispatch_config.get('recovery_bindings',[]) if mcp_dispatch_config['enabled'] and r['tenant_id']==tenant_id and r['principal_id']==actor and r['task_id']==value.get('task_id') and r['attempt_id']==value.get('attempt_id')),None)
+                        if binding is None:raise ValueError('RECOVERY_HOST_BINDING_REQUIRED')
+                        result=ResultRecoveryMCP(control,binding).call(names[action],value)
+                    elif action=='UPSERT_PROVIDER':
                         result=control.upsert_provider(value['config'],value.get('secret'))
                     elif action=='TEST_PROVIDER_CONNECTION':
                         if not provider_connection_test_enabled:
@@ -1113,8 +1096,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     raise ValueError('JSON_OBJECT_REQUIRED')
                 rejection_stage='MCP_PROTOCOL'
                 method=value.get('method')
+                if value.get('params') is not None and not isinstance(value['params'],dict):
+                    raise ValueError('JSON_OBJECT_REQUIRED')
                 scope=('task:submit' if method=='tools/call' and
-                  (value.get('params') or {}).get('name')=='task_submit'
+                  (value.get('params') or {}).get('name') in WRITE_TOOLS
                   else 'task:read')
                 identity=mcp_auth_store.authenticate(
                   self.headers.get('Authorization'),scope)
@@ -1126,7 +1111,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 rejection_stage=('MCP_TASK_SUBMIT' if method=='tools/call' and
                   (value.get('params') or {}).get('name')=='task_submit'
                   else 'MCP_TOOL_CALL')
-                result=RemoteTaskCenterMCP(service).rpc(value)
+                result=dispatch_rpc(service,identity,mcp_dispatch_config,value,
+                                    mcp_model_worker_enabled,mcp_development_host)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),
@@ -1228,11 +1214,26 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 identity_provider=None,session_store=None,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
-                mcp_model_worker_enabled=False,mcp_worker_adapters=None):
+                mcp_model_worker_enabled=False,mcp_worker_adapters=None,
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None):
+    if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
+        raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+    if mcp_development_host is not None:
+        from task_center_mcp_development import DevelopmentHost
+        if not isinstance(mcp_development_host,DevelopmentHost) or not mcp_enabled:
+            raise ValueError('TRUSTED_DEVELOPMENT_HOST_REQUIRES_MCP')
+        if any(row['tenant_id']!=tenant_id for row in mcp_development_host.bindings):
+            raise ValueError('DEVELOPMENT_HOST_TENANT_MISMATCH')
+    mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
+    if any(row['tenant_id']!=tenant_id for row in mcp_dispatch_config['bindings']+mcp_dispatch_config.get('recovery_bindings',[])):
+        raise ValueError('MCP_DISPATCH_HOST_TENANT_MISMATCH')
+    if mcp_dispatch_config['enabled'] and not mcp_enabled:
+        raise ValueError('MCP_DISPATCH_REQUIRES_AUTHENTICATED_MCP')
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
         raise ValueError('CANONICAL_SQLITE_REQUIRED')
+    check_existing_bindings(db_path,mcp_dispatch_config)
     if mcp_model_worker_enabled and not mcp_enabled:
         raise ValueError('MCP_WORKER_REQUIRES_MCP')
     # Schema initialization is an explicit startup phase.  GET handlers remain
@@ -1275,9 +1276,13 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
+        server.correction_observer=None
+        if correction_observer_interval is not None:
+            from task_supervisor_runtime import CorrectionObserver
+            server.correction_observer=CorrectionObserver(db_path,correction_observer_interval)
         server.codex_worker=None;server.mcp_worker=None
         if mcp_enabled:
             # Bind first while holding the unique ledger lease.  Only then is
@@ -1320,6 +1325,9 @@ def main(argv=None):
     parser.add_argument('--base-path',default='/')
     parser.add_argument('--enable-mcp',action='store_true')
     parser.add_argument('--allow-mcp-model-outbound',action='store_true')
+    parser.add_argument('--mcp-dispatch-config-file')
+    parser.add_argument('--mcp-development-config-file')
+    parser.add_argument('--correction-observer-interval',type=int,choices=(180,300))
     args = parser.parse_args(argv)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
@@ -1363,13 +1371,19 @@ def main(argv=None):
         raise ValueError('ADMIN_TOKEN_OR_IDENTITY_REQUIRED')
     if identity_provider is not None and (admin_token is not None or actor_tokens):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
+    from task_center_mcp_development import load_host as load_development_host
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
                          actor_tokens,codex_transports,identity_provider,
                          session_store,args.allow_loopback_fixture_outbound,
                          args.allow_provider_connection_test,
                          args.external_origin,args.base_path,args.enable_mcp,
-                         args.allow_mcp_model_outbound)
+                         args.allow_mcp_model_outbound,
+                         mcp_dispatch_config=(load_dispatch_config(args.mcp_dispatch_config_file)
+                           if args.mcp_dispatch_config_file else None),
+                         mcp_development_host=(load_development_host(args.mcp_development_config_file)
+                           if args.mcp_development_config_file else None),
+                         correction_observer_interval=args.correction_observer_interval)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
