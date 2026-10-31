@@ -4,7 +4,7 @@ Not original backend/device/production identity acceptance.
 import json, unittest, os
 from urllib.parse import urlsplit
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 JS=Path(__file__).parents[1]/'demos/community-stage/web-session.js'
 HTML='''<!doctype html><html><head><meta charset="utf-8"></head><body><section id="community-session"><form><input name="email"><input name="password" type="password"><button>登录</button></form><p role="status"></p><select></select><button data-logout>退出</button></section><script src="/web-session.js"></script></body></html>'''
 class UI(unittest.TestCase):
@@ -12,7 +12,7 @@ class UI(unittest.TestCase):
   with sync_playwright() as p:
    browser=p.chromium.launch(headless=True,**({'executable_path':os.environ['COMMUNITY_UI_CHROMIUM_PATH']} if os.environ.get('COMMUNITY_UI_CHROMIUM_PATH') else {}))
    try:
-    page=browser.new_page();requests=[];errors=[];network=[]
+    page=browser.new_page();requests=[];errors=[];network=[];operations=[]
     page.on('pageerror',lambda e:errors.append(dict(type=type(e).__name__,message=str(e)[:500])))
     page.on('requestfailed',lambda r:network.append(dict(kind='failed',path=urlsplit(r.url).path,method=r.method,failure=r.failure)))
     page.on('response',lambda r:network.append(dict(kind='response',path=urlsplit(r.url).path,status=r.status)))
@@ -24,7 +24,7 @@ class UI(unittest.TestCase):
      body=r.request.post_data_json
      if url.endswith('/session/check'):result=dict(user_id='root',workspaces=[],reviewer=False,community_admin=dict(kind='ROOT'))
      else:
-      operation=body['operation'];params=body['params']
+      operation=body['operation'];params=body['params'];operations.append(operation)
       if operation=='catalog':result=dict(capabilities=['/community/operations#read'],workspace_scopes=['/community/operations#store1'])
       elif operation=='list':
        if params['after_uid']=='':result=dict(records=[dict(uid='fixture_root',kind='ROOT',active=True,revision=1,capabilities=[],workspace_scopes=[])],has_more=True,next_cursor='fixture_root')
@@ -43,8 +43,17 @@ class UI(unittest.TestCase):
     page.get_by_label('新管理员登录邮箱').fill('child@test.invalid');page.get_by_label('新管理员初始密码').fill('synthetic-password-123')
     form=page.locator('form').nth(1)
     for checkbox in form.locator('input[type=checkbox]').all():checkbox.check()
-    page.get_by_role('button',name='创建受限管理员').click()
-    page.wait_for_function("document.querySelector('[aria-label=新管理员初始密码]').value === ''")
+    # Password erasure is synchronous; it is not an acknowledgement of the
+    # asynchronous original browser-lock/fetch operation. Await that exact
+    # request's response and the subsequent list refresh, not a longer sleep.
+    with page.expect_response(lambda r: r.url.endswith('/community/admin') and r.request.method=='POST' and r.request.post_data_json.get('operation')=='create') as created_response, page.expect_response(lambda r: r.url.endswith('/community/admin') and r.request.method=='POST' and r.request.post_data_json.get('operation')=='list') as refreshed_response:
+     page.get_by_role('button',name='创建受限管理员').click()
+     self.assertEqual(page.get_by_label('新管理员初始密码').input_value(),'')
+    self.assertEqual(created_response.value.status,200)
+    self.assertEqual(refreshed_response.value.status,200)
+    expect(page.get_by_role('button',name='刷新管理员与权限')).to_be_enabled()
+    self.assertEqual(page.get_by_label('新管理员初始密码').input_value(),'')
+    self.assertEqual(operations[-2:],['create','list'])
     self.assertEqual(requests,[dict(operation='create',password_present=True)]);self.assertEqual(errors,[])
    except Exception:
     # Exact failed synthetic fixture context, not another test's screenshot.
