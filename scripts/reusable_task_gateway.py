@@ -1133,7 +1133,7 @@ class TestOnlyExecutor(object):
              (self.clock() if now is None else now) + 600})
 
     def complete_success(self, task_id, attempt_id, artifact_sha256,
-                         completion_evidence, now=None):
+                         completion_evidence, now=None, terminal_admission_check=None):
         self.gateway.assert_task_context(self.context, task_id)
         now = self.clock() if now is None else now
         result = self.supervisor.record(
@@ -1142,7 +1142,8 @@ class TestOnlyExecutor(object):
             {'state': 'SUCCESS', 'artifact_sha256': artifact_sha256,
              'writer_stopped': True, 'effects_reconciled': True,
              'next_action': 'DEPENDENCIES_RECHECK',
-             'completion_evidence': completion_evidence})
+             'completion_evidence': completion_evidence},
+            terminal_admission_check=terminal_admission_check)
         task = self.supervisor._task(task_id)
         resources = json.loads(task['resource_scope_json'])
         checkpoint_id = 'terminal-checkpoint-' + attempt_id

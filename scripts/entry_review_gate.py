@@ -126,7 +126,7 @@ def review_bundle(contract,files,reviews,review_keys=None):
 
 def complete_reviewed_candidate(supervisor, task_id, candidate_event_id,
                                 files, reviews, review_keys,
-                                reviewed_event_id):
+                                reviewed_event_id, admission_check=None):
     """Record exact independent review evidence for the canonical candidate.
 
     This never completes the task, releases dependencies, grants production
@@ -142,17 +142,17 @@ def complete_reviewed_candidate(supervisor, task_id, candidate_event_id,
                     canonical_review='HOLD_INDEPENDENT_REVIEW_REQUIRED')
     reviewed = supervisor.record_development_review(
         task_id, candidate_event_id, files, result['bundle_sha256'],
-        result['review_record_ids'], reviewed_event_id)
+        result['review_record_ids'], reviewed_event_id, admission_check=admission_check)
     return dict(result, canonical_review=reviewed)
 
 
 def finalize_reviewed_candidate(supervisor, task_id, reviewed_event_id,
                                 completion_event_id,
-                                next_action='DEPENDENCIES_RECHECK'):
+                                next_action='DEPENDENCIES_RECHECK', admission_check=None):
     """Release only after canonical revocation/coverage has completed."""
     return supervisor.complete_development_candidate(
         task_id, reviewed_event_id, completion_event_id,
-        next_action=next_action)
+        next_action=next_action, admission_check=admission_check)
 
 
 def controlled_development_action(review_keys=None):

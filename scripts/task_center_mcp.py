@@ -51,6 +51,10 @@ TOOLS = (
 )
 
 REMOTE_TOOLS = (
+  {'name':'task_dispatch_contract','description':
+   'Read source-only role/dispatch integration contract. Does not assign, schedule, admit or execute tasks.',
+   'inputSchema':{'type':'object','properties':{},'additionalProperties':False},
+   'annotations':{'readOnlyHint':True,'openWorldHint':False}},
   {'name':'task_capabilities','description':
    'List TEST_ONLY model execution capabilities, limits, and current holds.',
    'inputSchema':{'type':'object','properties':{},'additionalProperties':False},
@@ -80,10 +84,70 @@ REMOTE_TOOLS = (
 )
 
 
+def dispatch_contract():
+    """Source contract only: not an authority, admission, or runtime receipt."""
+    return {
+      'schema_version': 1,
+      'status': 'SOURCE_CANDIDATE_NOT_WIRED',
+      'execution_connected': False,
+      'model_text_is_execution_authority': False,
+      'new_registry_queue_or_writer': False,
+      'available_remote_task_types': ['TEXT_CLASSIFICATION'],
+      'existing_integration_points': {
+        'role_assignment': 'ModelControl.assign',
+        'dispatch_intent': 'ModelControl.queue_request',
+        'scheduler': 'ModelScheduler.run_once',
+        'dependency_ack': 'GatewayKernel.acknowledge_event',
+        'cancellation': 'ModelControl.request_cancel',
+        'writer': 'task_supervisor.Supervisor + task_writer_fence.Fence'},
+      'required_bindings': [
+        'EXISTING_REGISTERED_TASK_AND_PROJECT',
+        'SERVER_AUTHENTICATED_TENANT_AND_ACTOR',
+        'CURRENT_ATTEMPT_AND_VERSIONED_ROLE',
+        'DURABLE_DEPENDENCY_ACK', 'CURRENT_UNIQUE_WRITER_AUTHORITY',
+        'EXECUTION_POLICY_AND_REMAINING_BUDGET',
+        'IDEMPOTENCY_AND_CANCELLATION', 'RESULT_AND_USAGE_EVIDENCE'],
+      'mutating_orchestration_tools': [],
+      'unverified_runtime_gates': [
+        'LIVE_CANONICAL_LEDGER_BINDING', 'CURRENT_WRITER_OWNERSHIP',
+        'SERVER_ROLE_ALLOWLIST', 'PROJECT_SCOPED_DISPATCH_AND_CANCEL',
+        'CANONICAL_TERMINAL_RECONCILIATION'],
+      'completion_rule': 'MODEL_REQUEST_SUCCESS_IS_NOT_CANONICAL_TASK_SUCCESS',
+      'unknown_effects_policy': 'HOLD_NO_REPLAY'}
+
+
+def _validate_remote_arguments(name, args):
+    """Validate the published bounded schema before any service side effects."""
+    specs = [item for item in REMOTE_TOOLS if item['name'] == name]
+    if not specs:
+        raise ValueError('UNKNOWN_MCP_TOOL')
+    schema = specs[0]['inputSchema']
+    if (not isinstance(args, dict) or
+            set(args) - set(schema['properties']) or
+            set(schema.get('required', [])) - set(args)):
+        raise ValueError('EXACT_MCP_ARGUMENTS_REQUIRED')
+    for key, value in args.items():
+        field = schema['properties'][key]
+        if field.get('type') == 'string':
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError('NONEMPTY_STRING_REQUIRED:' + key)
+            if 'maxLength' in field and len(value) > field['maxLength']:
+                raise ValueError('MCP_STRING_LIMIT:' + key)
+        if field.get('type') == 'integer':
+            if type(value) is not int:
+                raise ValueError('MCP_INTEGER_REQUIRED:' + key)
+            if value < field['minimum'] or value > field['maximum']:
+                raise ValueError('MCP_INTEGER_LIMIT:' + key)
+        if 'enum' in field and value not in field['enum']:
+            raise ValueError('MCP_ENUM_REQUIRED:' + key)
+
+
 class RemoteTaskCenterMCP(object):
     """Stateless JSON-RPC surface over an authenticated MCPTaskService."""
     def __init__(self,service):self.service=service
     def call(self,name,args):
+        _validate_remote_arguments(name, args)
+        if name=='task_dispatch_contract':return dispatch_contract()
         if name=='task_capabilities':return self.service.capabilities()
         if name=='task_submit':return self.service.submit(args)
         if name=='task_get':return self.service.status(args['task_id'])
@@ -195,6 +259,188 @@ def main(argv=None):
         sys.stdout.write(json.dumps(response,ensure_ascii=False,
           separators=(',',':'))+'\n');sys.stdout.flush()
     return 0
+
+
+
+
+class RegisteredTaskDispatchMCP(object):
+    """Candidate facade over an already-open canonical ModelControl.
+
+    Trusted host supplies authenticated control, project, and approved role
+    bindings. No ledger/queue creation, task creation, claim or Writer transfer.
+    One host must serialize use of its existing SQLite connection as usual.
+    Scheduling is queue admission; only the existing worker runs providers.
+    """
+    def __init__(self, control, project_id, role_bindings):
+        self.control = control
+        self.project_id = project_id
+        self.roles = {key: dict(value) for key, value in role_bindings.items()}
+        for binding in self.roles.values():
+            if set(binding) != {'role_version','principal_id','provider_id',
+                                'model_id','connection_id'}:
+                raise ValueError('EXACT_TRUSTED_ROLE_BINDING_REQUIRED')
+
+    @staticmethod
+    def _args(args, required):
+        if not isinstance(args, dict) or set(args) != set(required):
+            raise ValueError('EXACT_MCP_ARGUMENTS_REQUIRED')
+        for key in required:
+            if not isinstance(args[key], str) or not args[key].strip():
+                raise ValueError('NONEMPTY_STRING_REQUIRED:' + key)
+            if len(args[key]) > (4000 if key == 'input_text' else 128):
+                raise ValueError('MCP_STRING_LIMIT:' + key)
+
+    def _task(self, args):
+        c = self.control
+        c.gateway.assert_task_context(c.context, args['task_id'])
+        row = c.db.execute('''SELECT project_id FROM gateway_task_metadata
+            WHERE task_id=? AND tenant_id=?''',
+            (args['task_id'], c.tenant_id)).fetchone()
+        if row is None or row['project_id'] != self.project_id:
+            raise ValueError('PROJECT_TASK_NOT_VISIBLE')
+        task = c.gateway.supervisor._task(args['task_id'])
+        if task['attempt_id'] != args['attempt_id']:
+            raise ValueError('STALE_TASK_ATTEMPT')
+        return task
+
+    def _role(self, args):
+        binding = self.roles.get(args['role_id'])
+        if binding is None:
+            raise ValueError('ROLE_NOT_ALLOWED_BY_HOST')
+        return binding
+
+    def _request(self, args):
+        self._task(args)
+        row = self.control.db.execute('''SELECT * FROM model_requests
+            WHERE tenant_id=? AND task_id=? AND attempt_id=? AND request_id=?''',
+            (self.control.tenant_id,args['task_id'],args['attempt_id'],
+             args['request_id'])).fetchone()
+        if row is None:
+            raise ValueError('REQUEST_NOT_VISIBLE')
+        self._role({'role_id':row['role_id']})
+        return row
+
+    def assign(self, args):
+        self._args(args, ('task_id','attempt_id','role_id'))
+        task = self._task(args)
+        binding = self._role(args)
+        if (task['state'] != 'STARTED' or task['authority_state'] != 'VALID'
+                or task['authority_valid_until'] is None or
+                self.control.clock() >= task['authority_valid_until']):
+            raise ValueError('CURRENT_ADMITTED_WRITER_REQUIRED')
+        row = self.control.db.execute('''SELECT * FROM model_assignments
+            WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
+            (self.control.tenant_id,args['task_id'],args['attempt_id'],
+             args['role_id'])).fetchone()
+        if row is not None:
+            for key in ('role_version','principal_id','provider_id','model_id'):
+                if row[key] != binding[key]:
+                    raise ValueError('ASSIGNMENT_BINDING_CONFLICT')
+            return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
+                    'role_id':args['role_id'],'state':'ASSIGNED','duplicate':True}
+        self.control.assign(args['task_id'],args['role_id'],
+            binding['role_version'],binding['principal_id'],allow_paid=False,
+            provider_id=binding['provider_id'],model_id=binding['model_id'],
+            expected_attempt_id=args['attempt_id'],expected_project_id=self.project_id)
+        return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
+                'role_id':args['role_id'],'state':'ASSIGNED','duplicate':False}
+
+    def dispatch(self, args):
+        if not isinstance(args,dict):raise ValueError('EXACT_MCP_ARGUMENTS_REQUIRED')
+        strings = {key:value for key,value in args.items() if key != 'max_output_tokens'}
+        self._args(strings, ('task_id','attempt_id','role_id','input_text','idempotency_key'))
+        if (type(args.get('max_output_tokens')) is not int or
+                not 1 <= args['max_output_tokens'] <= 128):
+            raise ValueError('BOUNDED_OUTPUT_TOKENS_REQUIRED')
+        self._task(args)
+        binding = self._role(args)
+        assignment = self.control.db.execute('''SELECT * FROM model_assignments
+            WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
+            (self.control.tenant_id,args['task_id'],args['attempt_id'],
+             args['role_id'])).fetchone()
+        if assignment is None or any(assignment[key] != binding[key] for key in
+                ('role_version','principal_id','provider_id','model_id')):
+            raise ValueError('CURRENT_TRUSTED_ASSIGNMENT_REQUIRED')
+        prior = self.control.db.execute('''SELECT b.max_output_tokens,b.connection_id
+            FROM model_requests r JOIN model_request_bindings b ON
+            r.tenant_id=b.tenant_id AND r.request_id=b.request_id
+            WHERE r.tenant_id=? AND r.idempotency_key=?''',
+            (self.control.tenant_id,args['idempotency_key'])).fetchone()
+        if prior is not None and (prior['max_output_tokens'] != args['max_output_tokens']
+                or prior['connection_id'] != binding['connection_id']):
+            raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
+        result = self.control.queue_request(args['task_id'],args['role_id'],
+            [{'role':'user','content':args['input_text']}],args['idempotency_key'],
+            args['max_output_tokens'],binding['connection_id'],
+            expected_attempt_id=args['attempt_id'],
+            expected_assignment_binding=binding,expected_project_id=self.project_id)
+        return dict(result, task_id=args['task_id'], attempt_id=args['attempt_id'],
+                    dispatch_semantics='EXISTING_QUEUE_ADMISSION_NOT_EXECUTION')
+
+    def status(self, args):
+        self._args(args, ('task_id','attempt_id','request_id'))
+        row = self._request(args)
+        task = self._task(args)
+        usage = self.control.db.execute('''SELECT input_tokens,output_tokens,
+            cost_state,cost_value,outcome FROM model_usage_events WHERE
+            tenant_id=? AND request_id=?''',
+            (self.control.tenant_id,args['request_id'])).fetchone()
+        return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
+                'request_id':row['request_id'],'request_state':row['state'],
+                'canonical_task_state':task['state'],'attempts':row['attempts'],
+                'error_kind':row['error_kind'],'cancel_requested':bool(row['cancel_requested']),
+                'result':json.loads(row['result_json']) if row['result_json'] else None,
+                'usage':dict(usage) if usage else None}
+
+    def cancel(self, args):
+        self._args(args, ('task_id','attempt_id','request_id'))
+        row = self._request(args)
+        if row['state'] == 'CANCELLED':
+            return {'request_id':row['request_id'],'state':'CANCELLED',
+                    'cancel_requested':True,'duplicate':True}
+        return self.control.request_cancel(row['request_id'],
+            expected_task_id=args['task_id'],expected_attempt_id=args['attempt_id'],
+            expected_project_id=self.project_id)
+
+    def call(self, name, args):
+        methods = {'task_assign_role':self.assign,'task_dispatch':self.dispatch,
+                   'task_dispatch_status':self.status,'task_cancel_dispatch':self.cancel}
+        if name not in methods:raise ValueError('UNKNOWN_MCP_TOOL')
+        return methods[name](args)
+
+
+    def rpc(self, value):
+        method=value.get('method')
+        if method=='tools/list':result={'tools':_registered_dispatch_tools()}
+        elif method=='initialize':result={'protocolVersion':'2025-06-18',
+            'capabilities':{'tools':{}},'serverInfo':{
+            'name':'xuanjun-task-center','version':'registered-dispatch-local-candidate'}}
+        elif method=='tools/call':
+            params=value.get('params') or {}
+            result={'content':[{'type':'text','text':json.dumps(self.call(
+                params.get('name'),params.get('arguments')),ensure_ascii=False,sort_keys=True)}]}
+        else:raise ValueError('UNSUPPORTED_MCP_METHOD')
+        return {'jsonrpc':'2.0','id':value.get('id'),'result':result}
+
+
+def _registered_dispatch_tools():
+    atom={'type':'string','minLength':1,'maxLength':128}
+    identity={'task_id':dict(atom),'attempt_id':dict(atom),'role_id':dict(atom)}
+    request={'task_id':dict(atom),'attempt_id':dict(atom),'request_id':dict(atom)}
+    dispatch=dict(identity,input_text={'type':'string','minLength':1,'maxLength':4000},
+                  idempotency_key=dict(atom),
+                  max_output_tokens={'type':'integer','minimum':1,'maximum':128})
+    rows=[]
+    for name, description, fields, readonly in (
+      ('task_assign_role','Assign a host-approved role to an existing admitted attempt; no Writer claim.',identity,False),
+      ('task_dispatch','Enqueue once in the existing queue; acceptance is not model execution or task completion.',dispatch,False),
+      ('task_dispatch_status','Read request result, usage and separate canonical task state.',request,True),
+      ('task_cancel_dispatch','Cancel the scoped request; an in-flight request may remain RUNNING until reconciled.',request,False)):
+        rows.append({'name':name,'description':description,'inputSchema':{
+            'type':'object','properties':fields,'required':list(fields),
+            'additionalProperties':False},'annotations':{
+            'readOnlyHint':readonly,'openWorldHint':False,'idempotentHint':True}})
+    return rows
 
 
 if __name__=='__main__':raise SystemExit(main())

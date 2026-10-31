@@ -257,6 +257,24 @@ def socket_timeout():
     return socket.timeout
 
 
+def _host_lifecycle_transaction(method):
+    """Opt-in host binding checked under the existing SQLite writer lock."""
+    def guarded(self, *args, **kwargs):
+        binding=kwargs.pop('_host_binding',None)
+        if binding is None:return method(self,*args,**kwargs)
+        if self.db.in_transaction:raise ValueError('CLEAN_HOST_TRANSACTION_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            self.assert_host_lifecycle(binding)
+            result=method(self,*args,**kwargs)
+            self.db.commit()
+            return result
+        except Exception:
+            self.db.rollback()
+            raise
+    return guarded
+
+
 class ModelControl(object):
     def __init__(self, gateway, context, master_key, clock=None):
         self.gateway = gateway
@@ -900,6 +918,31 @@ class ModelControl(object):
         return {'skill_id':skill_id,'status':status}
 
     def assign(self, task_id, role_id, role_version, principal_id,
+               allow_paid=False, now=None, provider_id=None, model_id=None,
+               expected_attempt_id=None,expected_project_id=None):
+        # Opt-in bounded facade CAS: lock before reading current authority.
+        if expected_attempt_id is None:
+            return self._assign_existing(task_id, role_id, role_version,
+                principal_id, allow_paid, now, provider_id, model_id)
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            self._assert_expected_project(task_id, expected_project_id)
+            task = self.gateway.supervisor._task(task_id)
+            if task['attempt_id'] != expected_attempt_id:
+                raise ValueError('STALE_TASK_ATTEMPT')
+            if (task['state'] != 'STARTED' or task['authority_state'] != 'VALID'
+                    or task['authority_valid_until'] is None or
+                    self.clock() >= task['authority_valid_until']):
+                raise ValueError('CURRENT_ADMITTED_WRITER_REQUIRED')
+            result = self._assign_existing(task_id, role_id, role_version,
+                principal_id, allow_paid, now, provider_id, model_id)
+            self.db.commit()
+            return result
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def _assign_existing(self, task_id, role_id, role_version, principal_id,
                allow_paid=False, now=None, provider_id=None, model_id=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
@@ -988,7 +1031,9 @@ class ModelControl(object):
           'AUTHORIZED_QUALIFIED_FINAL_COST')
 
     def queue_request(self, task_id, role_id, messages, idempotency_key,
-                      max_output_tokens=None,connection_id=None,now=None):
+                      max_output_tokens=None,connection_id=None,now=None,
+                      expected_attempt_id=None,expected_assignment_binding=None,
+                      expected_project_id=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -998,6 +1043,8 @@ class ModelControl(object):
             from execution_policy_gateway import ExecutionPolicyGateway
             ExecutionPolicyGateway(self.gateway,self.context).require_dispatch_ready(task_id)
         task=self.gateway.supervisor._task(task_id)
+        if expected_attempt_id is not None and task['attempt_id'] != expected_attempt_id:
+            raise ValueError('STALE_TASK_ATTEMPT')
         assignment=self.db.execute('''SELECT * FROM model_assignments WHERE
           tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
           (self.tenant_id,task_id,task['attempt_id'],role_id)).fetchone()
@@ -1079,6 +1126,13 @@ class ModelControl(object):
             expected=(task_id,task['attempt_id'],role_id,
               assignment['provider_id'],assignment['model_id'],digest)
             if actual!=expected:raise ValueError('IDEMPOTENCY_CONFLICT')
+            if expected_attempt_id is not None:
+                old_binding = self.db.execute('''SELECT max_output_tokens,connection_id
+                    FROM model_request_bindings WHERE tenant_id=? AND request_id=?''',
+                    (self.tenant_id,existing['request_id'])).fetchone()
+                if (old_binding is None or old_binding['max_output_tokens'] != max_output_tokens
+                        or old_binding['connection_id'] != connection_id):
+                    raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
             return {'request_id':existing['request_id'],'state':existing['state'],
                     'duplicate':True}
         checkpoint=canonical({'goal':'execute assigned role','input_version':
@@ -1087,6 +1141,29 @@ class ModelControl(object):
         expected_input=max(1,len(body.encode('utf-8'))//4)
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            self._assert_expected_project(task_id, expected_project_id)
+            if expected_assignment_binding is not None:
+                fresh_assignment = self.db.execute('''SELECT * FROM model_assignments
+                    WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
+                    (self.tenant_id,task_id,task['attempt_id'],role_id)).fetchone()
+                binding_fields = ('role_version','principal_id','provider_id','model_id')
+                if (fresh_assignment is None or any(
+                        fresh_assignment[key] != expected_assignment_binding[key]
+                        or fresh_assignment[key] != assignment[key]
+                        for key in binding_fields)):
+                    raise ValueError('ASSIGNMENT_CHANGED_BEFORE_QUEUE_COMMIT')
+            if expected_attempt_id is not None:
+                current = self.gateway.supervisor._task(task_id)
+                if current['attempt_id'] != expected_attempt_id:
+                    raise ValueError('STALE_TASK_ATTEMPT')
+                fields = ('attempt_id','state','authority_state','authority_caller_id',
+                          'fence','epoch','authority_valid_until')
+                if (any(current[key] != task_state[key] for key in fields) or
+                        current['state'] != 'STARTED' or
+                        current['authority_state'] != 'VALID' or
+                        current['authority_valid_until'] is None or
+                        self.clock() >= current['authority_valid_until']):
+                    raise ValueError('WRITER_CHANGED_BEFORE_QUEUE_COMMIT')
             self.db.execute('''INSERT INTO model_requests VALUES
               (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
               _text(idempotency_key,'idempotency_key'),task_id,task['attempt_id'],
@@ -1109,10 +1186,28 @@ class ModelControl(object):
             self.db.rollback();raise
         return {'request_id':request_id,'state':'QUEUED','duplicate':False}
 
-    def request_cancel(self, request_id, now=None):
+    def _assert_expected_project(self, task_id, expected_project_id):
+        if expected_project_id is None:return
+        row = self.db.execute('''SELECT project_id FROM gateway_task_metadata
+            WHERE tenant_id=? AND task_id=?''',
+            (self.tenant_id,task_id)).fetchone()
+        if row is None or row['project_id'] != expected_project_id:
+            raise ValueError('PROJECT_TASK_NOT_VISIBLE')
+
+    def request_cancel(self, request_id, now=None, expected_task_id=None,
+                       expected_attempt_id=None, expected_project_id=None):
         principal=self._admin();now=self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if expected_task_id is not None:
+                self._assert_expected_project(expected_task_id, expected_project_id)
+                task = self.gateway.supervisor._task(expected_task_id)
+                if task['attempt_id'] != expected_attempt_id:
+                    raise ValueError('STALE_TASK_ATTEMPT')
+                scoped = self.db.execute('''SELECT 1 FROM model_requests WHERE
+                    tenant_id=? AND task_id=? AND attempt_id=? AND request_id=?''',
+                    (self.tenant_id,expected_task_id,expected_attempt_id,request_id)).fetchone()
+                if scoped is None:raise ValueError('REQUEST_NOT_VISIBLE')
             row=self.db.execute('''SELECT state FROM model_requests WHERE
               tenant_id=? AND request_id=?''',(self.tenant_id,request_id)).fetchone()
             if row is None:raise KeyError(request_id)
@@ -1416,6 +1511,44 @@ class ModelControl(object):
         return {'evaluation_id':evaluation_id,'state':state,
                 'quality_score':score,'duration_ms':duration}
 
+    def assert_host_lifecycle(self, binding):
+        # Called only by trusted host wiring, never from model content/tool args.
+        task_id=binding['task_id'];attempt_id=binding['attempt_id']
+        self.gateway.assert_task_context(self.context,task_id)
+        self._assert_expected_project(task_id,binding['project_id'])
+        task=self.gateway.supervisor._task(task_id)
+        if task['attempt_id']!=attempt_id:raise ValueError('STALE_TASK_ATTEMPT')
+        if self._principal()!=binding['principal_id']:
+            raise ValueError('AUTHENTICATED_LIFECYCLE_PRINCIPAL_REQUIRED')
+        role=self.db.execute('''SELECT r.phase,r.review_kind,r.enabled,
+          a.principal_id,a.role_version FROM model_assignments a JOIN role_templates r
+          ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND r.version=a.role_version
+          WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.role_id=?''',
+          (self.tenant_id,task_id,attempt_id,binding['role_id'])).fetchone()
+        if (role is None or role['enabled']!=1 or role['phase']!=binding['phase']
+                or role['principal_id']!=binding['principal_id']
+                or role['role_version']!=binding['role_version']
+                or role['review_kind']!=binding.get('review_kind')):
+            raise ValueError('CURRENT_HOST_LIFECYCLE_ROLE_REQUIRED')
+        if self.db.execute("SELECT 1 FROM events WHERE task_id=? AND kind='DEVELOPMENT_CONTRACT'",(task_id,)).fetchone():
+            raise ValueError('CONTROLLED_DEVELOPMENT_REVIEW_REQUIRED')
+        resources=json.loads(task['resource_scope_json'])
+        if (task['stage'] not in ('TEST_ONLY','TEST_ONLY_EXECUTION') or not resources
+                or any(not isinstance(key,str) or not key.startswith('fake:') for key in resources)):
+            raise ValueError('CONTROLLED_NON_TEST_COMPLETION_REQUIRED')
+        if self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
+          AND task_id=? AND attempt_id=? AND state NOT IN ('SUCCEEDED','FAILED','CANCELLED')''',
+          (self.tenant_id,task_id,attempt_id)).fetchone():
+            raise ValueError('MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED')
+        if binding.get('candidate_id'):
+            row=self.db.execute('''SELECT task_id,attempt_id FROM delivery_candidates
+              WHERE tenant_id=? AND candidate_id=?''',
+              (self.tenant_id,binding['candidate_id'])).fetchone()
+            if row is None or tuple(row)!=(task_id,attempt_id):
+                raise ValueError('EXACT_HOST_CANDIDATE_REQUIRED')
+        return task
+
+    @_host_lifecycle_transaction
     def submit_candidate(self, task_id, artifact_sha256, checklist_sha256,
                          submitted_by, now=None):
         now=self.clock() if now is None else now
@@ -1424,12 +1557,21 @@ class ModelControl(object):
             raise ValueError('AUTHENTICATED_EXECUTOR_REQUIRED')
         _sha(artifact_sha256,'artifact_sha256')
         _sha(checklist_sha256,'checklist_sha256')
+        if self.db.in_transaction:
+            prior=self.db.execute('SELECT * FROM delivery_candidates WHERE tenant_id=? AND task_id=? AND artifact_sha256=? AND attempt_id=?',
+                (self.tenant_id,task_id,artifact_sha256,self.gateway.supervisor._task(task_id)['attempt_id'])).fetchone()
+            if prior is not None:
+                if prior['submitted_by']!=submitted_by or prior['checklist_sha256']!=checklist_sha256:
+                    raise ValueError('CANDIDATE_IDEMPOTENCY_CONFLICT')
+                self._require_candidate_snapshot(prior)
+                return {'candidate_id':prior['candidate_id'],'state':prior['state'],'duplicate':True}
         task=self.gateway.supervisor._task(task_id)
         if (task['authority_state']!='VALID' or
                 task['authority_valid_until'] is None or
                 not now<task['authority_valid_until'] or
                 task['state'] not in ('STARTED','RUNNING')):
-            raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+            if not self._recovery_ready(task,artifact_sha256):
+                raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         in_flight=self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
           AND task_id=? AND attempt_id=? AND state IN ('RUNNING',?) LIMIT 1''',(
           self.tenant_id,task_id,task['attempt_id'],UNKNOWN)).fetchone()
@@ -1471,7 +1613,7 @@ class ModelControl(object):
           if request_binding else None}
         snapshot_json=canonical(snapshot);snapshot_sha=hashlib.sha256(
           snapshot_json.encode()).hexdigest()
-        self.db.execute('BEGIN IMMEDIATE')
+        if not self.db.in_transaction:self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             self.db.execute('''INSERT INTO delivery_candidates VALUES
               (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,candidate_id,task_id,
@@ -1486,8 +1628,12 @@ class ModelControl(object):
         return {'candidate_id':candidate_id,'state':'SUBMITTED'}
 
     def _require_candidate_snapshot(self,row):
-        snapshot_row=self.db.execute('''SELECT * FROM candidate_snapshots WHERE
-          tenant_id=? AND candidate_id=?''',(self.tenant_id,
+        return self.require_snapshot_from_db(self.db,self.tenant_id,row)
+
+    @staticmethod
+    def require_snapshot_from_db(db,tenant_id,row):
+        snapshot_row=db.execute('''SELECT * FROM candidate_snapshots WHERE
+          tenant_id=? AND candidate_id=?''',(tenant_id,
           row['candidate_id'])).fetchone()
         if snapshot_row is None:raise ValueError('CANDIDATE_SNAPSHOT_REQUIRED')
         snapshot=json.loads(snapshot_row['snapshot_json'])
@@ -1496,41 +1642,41 @@ class ModelControl(object):
                 snapshot['artifact_sha256']!=row['artifact_sha256'] or
                 snapshot['checklist_sha256']!=row['checklist_sha256']):
             raise ValueError('CANDIDATE_SNAPSHOT_MISMATCH')
-        spec=self.db.execute('''SELECT goal,deliverables_json,acceptance_json FROM
-          task_work_specs WHERE tenant_id=? AND task_id=?''',(self.tenant_id,
+        spec=db.execute('''SELECT goal,deliverables_json,acceptance_json FROM
+          task_work_specs WHERE tenant_id=? AND task_id=?''',(tenant_id,
           row['task_id'])).fetchone()
         if spec is None or hashlib.sha256(canonical(dict(spec)).encode()).hexdigest()!= \
                 snapshot['task_spec_sha256']:
             raise ValueError('FROZEN_SCOPE_CHANGED')
         if snapshot['unit'] is not None:
-            unit=self.db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
-              AND task_id=?''',(self.tenant_id,row['task_id'])).fetchone()
+            unit=db.execute('''SELECT * FROM execution_units WHERE tenant_id=?
+              AND task_id=?''',(tenant_id,row['task_id'])).fetchone()
             if unit is None or canonical(dict(unit))!=canonical(snapshot['unit']):
                 raise ValueError('FROZEN_SCOPE_CHANGED')
         if snapshot['dispatch_preflight_id'] is not None:
-            dispatch=self.db.execute('''SELECT preflight_id FROM dispatch_preflights
+            dispatch=db.execute('''SELECT preflight_id FROM dispatch_preflights
               WHERE tenant_id=? AND task_id=? ORDER BY observed_at DESC,
-              preflight_id DESC LIMIT 1''',(self.tenant_id,row['task_id'])).fetchone()
+              preflight_id DESC LIMIT 1''',(tenant_id,row['task_id'])).fetchone()
             if dispatch is None or dispatch['preflight_id']!=snapshot['dispatch_preflight_id']:
                 raise ValueError('FROZEN_PREFLIGHT_CHANGED')
-        checklist=self.db.execute('''SELECT content_sha256,all_required_passed,
+        checklist=db.execute('''SELECT content_sha256,all_required_passed,
           has_unexecuted FROM acceptance_checklists WHERE tenant_id=? AND task_id=?
-          AND attempt_id=? AND content_sha256=?''',(self.tenant_id,row['task_id'],
+          AND attempt_id=? AND content_sha256=?''',(tenant_id,row['task_id'],
           row['attempt_id'],snapshot['checklist_sha256'])).fetchone()
         if checklist is None or not checklist['all_required_passed'] or \
                 checklist['has_unexecuted']:
             raise ValueError('FROZEN_CHECKLIST_INVALID')
         if snapshot['skill_snapshot_sha256'] is not None:
-            assignment=self.db.execute('''SELECT role_id,role_version FROM
+            assignment=db.execute('''SELECT role_id,role_version FROM
               model_assignments WHERE tenant_id=? AND task_id=? AND attempt_id=?
-              AND principal_id=?''',(self.tenant_id,row['task_id'],
+              AND principal_id=?''',(tenant_id,row['task_id'],
               row['attempt_id'],row['submitted_by'])).fetchone()
-            skills=list(self.db.execute('''SELECT b.skill_id,b.skill_version,
+            skills=list(db.execute('''SELECT b.skill_id,b.skill_version,
               s.content_sha256,s.state FROM role_skill_bindings b JOIN
               approved_skills s ON s.tenant_id=b.tenant_id AND
               s.skill_id=b.skill_id AND s.skill_version=b.skill_version WHERE
               b.tenant_id=? AND b.role_id=? AND b.role_version=? AND
-              b.status='APPROVED' ORDER BY b.skill_id''',(self.tenant_id,
+              b.status='APPROVED' ORDER BY b.skill_id''',(tenant_id,
               assignment['role_id'],assignment['role_version']))) if assignment else []
             current=(hashlib.sha256(canonical([dict(x) for x in skills]).encode()).hexdigest()
                      if skills else None)
@@ -1539,6 +1685,7 @@ class ModelControl(object):
                 raise ValueError('FROZEN_SKILL_CHANGED')
         return snapshot_row['snapshot_sha256']
 
+    @_host_lifecycle_transaction
     def review_candidate(self, candidate_id, reviewer, findings, passed,
                          review_kind='QA',now=None):
         now=self.clock() if now is None else now
@@ -1551,7 +1698,18 @@ class ModelControl(object):
                 task['authority_valid_until'] is None or
                 not now<task['authority_valid_until'] or
                 task['state'] not in ('STARTED','RUNNING')):
-            raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+            if not self._recovery_ready(task,row['artifact_sha256']):
+                raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+        if self.db.in_transaction:
+            prior=self.db.execute('SELECT * FROM candidate_reviews WHERE tenant_id=? AND candidate_id=? AND reviewer=?',
+                (self.tenant_id,candidate_id,reviewer)).fetchone()
+            if prior is not None:
+                prior_pass=prior['decision'] in ('QA_PASSED','SECURITY_PASSED','REVIEW_PASSED')
+                if (prior['review_kind']!=review_kind or json.loads(prior['findings_json'])!=findings
+                        or prior_pass!=(passed and not findings)):
+                    raise ValueError('REVIEW_IDEMPOTENCY_CONFLICT')
+                self._require_candidate_snapshot(row)
+                return {'candidate_id':candidate_id,'state':row['state'],'finding_count':len(findings),'duplicate':True}
         if row['state'] not in ('SUBMITTED','QA_PASSED','SECURITY_PASSED'):
             raise ValueError('REVIEWABLE_CANDIDATE_REQUIRED')
         if review_kind not in ('QA','SECURITY'):
@@ -1589,7 +1747,7 @@ class ModelControl(object):
           'review_kind':review_kind,'decision':state,'findings':findings,
           'observed_at':now})
         review_id=hashlib.sha256(review_body.encode()).hexdigest()
-        self.db.execute('BEGIN IMMEDIATE')
+        if not self.db.in_transaction:self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             changed=self.db.execute('''UPDATE delivery_candidates SET
               reviewed_by=?,state=?,findings_json=?,updated_at=? WHERE
@@ -1623,7 +1781,7 @@ class ModelControl(object):
                   task['state'] in ('STARTED','RUNNING')) or
                  (task['attempt_id']==row['attempt_id'] and
                   task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
-        if not current:
+        if not current and not self._recovery_ready(task,row['artifact_sha256']):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         if task['state']=='SUCCESS':
             self._require_terminal_artifact(row)
@@ -1647,7 +1805,9 @@ class ModelControl(object):
         if assignment is None:raise ValueError('ACCEPTOR_ASSIGNMENT_REQUIRED')
         return dict(row)
 
+    @_host_lifecycle_transaction
     def accept_candidate(self, candidate_id, acceptor, now=None):
+        host_atomic=self.db.in_transaction
         now=self.clock() if now is None else now
         row=self.db.execute('''SELECT * FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
@@ -1656,6 +1816,9 @@ class ModelControl(object):
         if (task['attempt_id']!=row['attempt_id'] or task['state']!='SUCCESS'
                 or task['authority_state']!='REVOKED'):
             raise ValueError('CANONICAL_TASK_SUCCESS_REQUIRED')
+        if host_atomic:
+            self._require_candidate_snapshot(row)
+            self.require_host_resource_release(row)
         self._require_terminal_artifact(row)
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
@@ -1679,12 +1842,35 @@ class ModelControl(object):
         changed=self.db.execute('''UPDATE delivery_candidates SET accepted_by=?,
           state='ACCEPTED',updated_at=? WHERE tenant_id=? AND candidate_id=?
           AND state='REVIEW_PASSED' ''',(acceptor,now,self.tenant_id,
-          candidate_id)).rowcount;self.db.commit()
+          candidate_id)).rowcount
+        if not host_atomic:self.db.commit()
         if changed!=1:raise ValueError('REVIEW_PASS_REQUIRED')
         self._audit(acceptor,'CANDIDATE_ACCEPTED',candidate_id,
           {'task_id':row['task_id'],'attempt_id':row['attempt_id']},now)
-        self.db.commit()
+        if not host_atomic:self.db.commit()
         return {'candidate_id':candidate_id,'state':'ACCEPTED'}
+
+    def _recovery_ready(self,task,artifact_sha256):
+        if task['authority_state']!='REVOKED':return False
+        from task_center_mcp_result_recovery import recovery_ready
+        return recovery_ready(self,task,artifact_sha256)
+
+    def require_host_resource_release(self, candidate):
+        task=self.gateway.supervisor._task(candidate['task_id'])
+        release=self.db.execute('SELECT * FROM gateway_resource_releases WHERE task_id=? AND attempt_id=?',
+            (candidate['task_id'],candidate['attempt_id'])).fetchone()
+        checkpoint=self.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',
+            (candidate['task_id'],candidate['attempt_id'],release['checkpoint_id'])).fetchone() if release else None
+        if (release is None or checkpoint is None or task['authority_state']!='REVOKED'
+                or task['attempt_id']!=candidate['attempt_id'] or task['coverage_digest'] in ('',UNKNOWN)
+                or release['coverage_digest']!=task['coverage_digest']
+                or not release['evidence_ref'].strip() or release['evidence_ref']==UNKNOWN
+                or checkpoint['effects_state']!='RECONCILED' or json.loads(checkpoint['inflight_json'])
+                or sorted(json.loads(checkpoint['resources_json']))!=sorted(json.loads(task['resource_scope_json']))
+                or self.db.execute('SELECT 1 FROM resource_claims WHERE task_id=?',(candidate['task_id'],)).fetchone()
+                or self.gateway.supervisor.unresolved_operations(candidate['task_id'])):
+            raise ValueError('HOLD_RESOURCE_RELEASE_RECONCILIATION')
+        return release
 
     def _require_terminal_artifact(self, candidate):
         rows=self.db.execute('''SELECT payload_json FROM outbox WHERE task_id=?

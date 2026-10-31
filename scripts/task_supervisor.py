@@ -596,6 +596,19 @@ class Supervisor(object):
         return json.loads(row['payload_json'])
 
     def bind_development_candidate(self, receipt, file_manifest):
+        return self._bind_development_candidate(receipt, file_manifest)
+
+    def bind_local_development_candidate(self, receipt, files, admission_check=None):
+        # Local provenance must not invent a GitHub source_comment_id.
+        if (not isinstance(files, dict) or len(files) != 1 or
+                any(not isinstance(path,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',path)
+                    for path in files) or
+                any(type(raw) is not bytes or len(raw)>131072 for raw in files.values())):
+            raise ValueError('BOUNDED_LOCAL_SOURCE_REQUIRED')
+        manifest={path:hashlib.sha256(raw).hexdigest() for path,raw in files.items()}
+        return self._bind_development_candidate(receipt, manifest, files, admission_check)
+
+    def _bind_development_candidate(self, receipt, file_manifest, local_files=None, admission_check=None):
         required = {'schema','entry','execution_path','task_id','spec_sha256',
                     'checkpoint_sha256','target_repository','target_base_sha',
                     'code_commit','event','attempt_id','lease_id','fence',
@@ -603,6 +616,13 @@ class Supervisor(object):
                     'lock_provider_id','source_comment_id','status',
                     'native_identity','quota_attribution','authority_effect',
                     'required_gate'}
+        local = local_files is not None
+        if local:
+            required.remove('source_comment_id')
+            required.add('source_operation_id')
+            if (not isinstance(receipt,dict) or 'source_comment_id' in receipt
+                    or receipt.get('execution_path')!='LOCAL_ONLY_HOST_EXECUTOR'):
+                raise ValueError('LOCAL_OPERATION_PROVENANCE_REQUIRED')
         if (not isinstance(receipt, dict)
                 or not required.issubset(set(receipt))
                 or receipt.get('status') != 'RECEIPT_VALIDATED_NOT_ADMITTED'
@@ -623,6 +643,7 @@ class Supervisor(object):
         }
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             raw_task = self._task(receipt['task_id'])
             ticket = self._authority_ticket(raw_task)
             task, now = self._validate_writer_locked(
@@ -652,6 +673,29 @@ class Supervisor(object):
                 raise ValueError('CANONICAL_CODE_READY_BINDING_MISMATCH')
             if set(file_manifest) != set(contract['allowed_files']):
                 raise ValueError('EXACT_CANDIDATE_FILE_SET_REQUIRED')
+            if local:
+                operation_row=self.db.execute('''SELECT o.*,r.receipt_json FROM
+                    writer_operations o JOIN writer_receipts r ON r.operation_id=o.operation_id
+                    WHERE o.operation_id=? AND o.task_id=? AND o.attempt_id=?
+                    AND o.state='CONFIRMED' ''', (receipt['source_operation_id'],
+                    task['task_id'],task['attempt_id'])).fetchone()
+                if operation_row is None:
+                    raise ValueError('CONFIRMED_LOCAL_OPERATION_REQUIRED')
+                operation=json.loads(operation_row['payload_json'])
+                observed=json.loads(operation_row['receipt_json'])
+                raw=next(iter(local_files.values()))
+                blob=hashlib.sha1(('blob %d\0'%len(raw)).encode()+raw).hexdigest()
+                path=next(iter(local_files))
+                tree_bytes=b'100644 '+path.encode()+b'\0'+bytes.fromhex(blob)
+                tree=hashlib.sha1(('tree %d\0'%len(tree_bytes)).encode()+tree_bytes).hexdigest()
+                if (operation['operation_kind']!='GIT_CAS' or
+                        observed.get('observed_revision')!=receipt['code_commit'] or
+                        operation['expected_before'].get('repo')!=contract['target_repository'] or
+                        operation['expected_before'].get('head')!=contract['target_base_sha'] or
+                        operation['requested_after'].get('blob')!=blob or
+                        operation['requested_after'].get('tree')!=tree or
+                        operation_row['ticket_sha256']!=self._ticket_sha(ticket)):
+                    raise ValueError('LOCAL_OPERATION_CANDIDATE_MISMATCH')
             contract_body = canonical(contract)
             candidate = {
                 'schema': 1,
@@ -666,16 +710,21 @@ class Supervisor(object):
                 'target_base_sha': contract['target_base_sha'],
                 'entry': task['entry'],
                 'code_commit': receipt['code_commit'],
-                'source_comment_id': receipt['source_comment_id'],
                 'contract_sha256': hashlib.sha256(
                     contract_body.encode('utf-8')).hexdigest(),
                 'files': {path: file_manifest[path]
                           for path in sorted(file_manifest)},
             }
+            if local:
+                candidate['source_operation_id']=receipt['source_operation_id']
+                candidate['source_kind']='LOCAL_ONLY_CONFIRMED_OPERATION'
+            else:
+                candidate['source_comment_id']=receipt['source_comment_id']
             body = canonical(candidate)
             candidate_sha = hashlib.sha256(
                 body.encode('utf-8')).hexdigest()
-            event_id = 'development-candidate:%s' % receipt['source_comment_id']
+            event_id = ('development-local-candidate:%s' % receipt['source_operation_id']
+                        if local else 'development-candidate:%s' % receipt['source_comment_id'])
             prior = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
               (task['task_id'], task['attempt_id'], event_id)).fetchone()
@@ -704,9 +753,18 @@ class Supervisor(object):
             raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
         return json.loads(row['payload_json'])
 
+    @staticmethod
+    def _require_development_execution_ready(candidate):
+        # Local source-write receipts and Writer revocation are not runtime proof.
+        # No trusted sandbox execution evidence format is implemented yet: fail
+        # closed in canonical APIs, including historical reviewed-event replay.
+        if (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
+                or 'source_operation_id' in candidate):
+            raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+
     def record_development_review(self, task_id, candidate_event_id, files,
                                   bundle_sha256, review_record_ids,
-                                  reviewed_event_id):
+                                  reviewed_event_id, admission_check=None):
         if (not isinstance(files, dict) or not files
                 or not isinstance(bundle_sha256, str)
                 or re.fullmatch(r'[0-9a-f]{64}', bundle_sha256) is None
@@ -724,6 +782,7 @@ class Supervisor(object):
             raise ValueError('FINITE_TIME_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             candidate_row = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
@@ -732,6 +791,7 @@ class Supervisor(object):
                     or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE'):
                 raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
             candidate = json.loads(candidate_row['payload_json'])
+            self._require_development_execution_ready(candidate)
             contract = self.development_contract(task_id)
             if (candidate['attempt_id'] != task['attempt_id']
                     or candidate['lease_id'] != task['lease_id']
@@ -808,7 +868,7 @@ class Supervisor(object):
 
     def complete_development_candidate(self, task_id, reviewed_event_id,
                                        completion_event_id,
-                                       next_action='DEPENDENCIES_RECHECK'):
+                                       next_action='DEPENDENCIES_RECHECK', admission_check=None):
         if (not isinstance(reviewed_event_id, str)
                 or not reviewed_event_id.strip()
                 or not isinstance(completion_event_id, str)
@@ -821,6 +881,7 @@ class Supervisor(object):
             raise ValueError('FINITE_TIME_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             reviewed_row = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
@@ -839,6 +900,7 @@ class Supervisor(object):
                        != reviewed['candidate_sha256']):
                 raise ValueError('CANONICAL_REVIEW_CANDIDATE_MISMATCH')
             candidate = json.loads(candidate_row['payload_json'])
+            self._require_development_execution_ready(candidate)
             contract = self.development_contract(task_id)
             exact = (
                 candidate['attempt_id'] == task['attempt_id']
@@ -980,7 +1042,8 @@ class Supervisor(object):
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
 
     def record(self, task_id, attempt_id, event_id, kind, observed_at,
-               evidence_kind=UNKNOWN, evidence_ref=UNKNOWN, payload=None):
+               evidence_kind=UNKNOWN, evidence_ref=UNKNOWN, payload=None,
+               terminal_admission_check=None):
         if kind not in ('RECEIVED', 'STARTED', 'PROGRESS', 'HEARTBEAT',
                         'TERMINAL', 'HANDOFF_REQUESTED',
                         'HANDOFF_ACKNOWLEDGED'):
@@ -1001,6 +1064,9 @@ class Supervisor(object):
         # event/task/outbox mutation share one serialization point.
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if terminal_admission_check is not None:
+                if kind!='TERMINAL':raise ValueError('TERMINAL_ADMISSION_ONLY')
+                terminal_admission_check()
             task = self._task(task_id)
             accepted_at = self.clock()
             if (kind in ('STARTED','PROGRESS','HEARTBEAT','TERMINAL','HANDOFF_REQUESTED',
@@ -1970,6 +2036,326 @@ class Supervisor(object):
                         'outbox_event_id': event_id})
         return sorted(actions, key=lambda x: x['task_id'])
 
+    def record_reconciled_result_checkpoint(self,task_id,attempt_id,checkpoint_id,source):
+        """Caller holds canonical transaction and verified persisted source.
+
+        This is a revoked-result reconciliation checkpoint, never an executed
+        Writer checkpoint or approval. It does not revoke or revive authority.
+        """
+        if not self.db.in_transaction:raise ValueError('RECOVERY_TRANSACTION_REQUIRED')
+        task=self._task(task_id)
+        if (task['attempt_id']!=attempt_id or task['authority_state']!='REVOKED'
+            or task['coverage_digest'] in ('',UNKNOWN) or self.unresolved_operations(task_id)
+            or not isinstance(source,dict) or source.get('task_id')!=task_id or source.get('attempt_id')!=attempt_id):
+            raise ValueError('RECOVERY_REVOKED_SOURCE_REQUIRED')
+        from task_center_mcp_result_recovery import source_snapshot_from_db
+        if source_snapshot_from_db(self.db,self,source.get('tenant_id'),source)!=source:
+            raise ValueError('RECOVERY_PERSISTED_RESULT_CHECKPOINT_REQUIRED')
+        drain=self.db.execute('SELECT 1 FROM revocation_drains WHERE task_id=? AND attempt_id=?',(task_id,attempt_id)).fetchone()
+        if drain is None:raise ValueError('RECOVERY_ORIGINAL_DRAIN_REQUIRED')
+        body=canonical({'recovery_kind':'PERSISTED_RESULT_RECONCILIATION','source':source})
+        resources=canonical(sorted(json.loads(task['resource_scope_json'])))
+        prior=self.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',(task_id,attempt_id,checkpoint_id)).fetchone()
+        if prior is not None:
+            if (prior['payload_json'],prior['inflight_json'],prior['effects_state'],prior['resources_json'])!=(body,'[]','RECONCILED',resources):raise ValueError('RECOVERY_CHECKPOINT_CONFLICT')
+            return
+        self.db.execute('INSERT INTO gateway_checkpoints VALUES (?,?,?,?,?,?,?,?)',(task_id,attempt_id,checkpoint_id,body,'[]','RECONCILED',resources,self.clock()))
+
+    def record_reconciled_result_terminal(self,task_id,attempt_id,artifact_sha256,acceptor,acceptance_check):
+        """Opt-in canonical recovery finalization, not relaxed record(TERMINAL).
+
+        Existing independent candidate acceptance and exact release evidence are
+        checked under the same SQLite transaction as terminal+outbox writes.
+        """
+        if not self.db.in_transaction or not callable(acceptance_check):raise ValueError('RECOVERY_TRANSACTION_AND_ACCEPTANCE_REQUIRED')
+        candidate=acceptance_check();task=self._task(task_id)
+        if (candidate.get('task_id')!=task_id or candidate.get('attempt_id')!=attempt_id
+            or candidate.get('artifact_sha256')!=artifact_sha256
+            or task['attempt_id']!=attempt_id or task['authority_state']!='REVOKED'
+            or task['state'] not in ('STARTED','RUNNING','HOLD')
+            or task['coverage_digest'] in ('',UNKNOWN) or self.unresolved_operations(task_id)
+            or self.db.execute('SELECT 1 FROM resource_claims WHERE task_id=?',(task_id,)).fetchone()):
+            raise ValueError('RECOVERY_TERMINAL_GATE_REQUIRED')
+        marker=self.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='RESULT_RECOVERY_SOURCE'",(task_id,attempt_id,'result-recovery-source-'+attempt_id)).fetchone()
+        release=self.db.execute('SELECT 1 FROM gateway_resource_releases WHERE task_id=? AND attempt_id=?',(task_id,attempt_id)).fetchone()
+        if marker is None or release is None or json.loads(marker['payload_json']).get('result_sha256')!=artifact_sha256:
+            raise ValueError('RECOVERY_SOURCE_RELEASE_REQUIRED')
+        proof=json.loads(marker['payload_json']);tenant=proof.get('tenant_id')
+        stored=self.db.execute('SELECT * FROM delivery_candidates WHERE tenant_id=? AND candidate_id=?',(tenant,candidate.get('candidate_id'))).fetchone()
+        reviews=list(self.db.execute('SELECT * FROM candidate_reviews WHERE tenant_id=? AND candidate_id=?',(tenant,candidate.get('candidate_id'))))
+        if (stored is None or stored['state']!='REVIEW_PASSED' or stored['task_id']!=task_id or stored['attempt_id']!=attempt_id
+            or stored['artifact_sha256']!=artifact_sha256 or len(reviews)!=2
+            or {r['review_kind'] for r in reviews}!={'QA','SECURITY'} or len({r['reviewer'] for r in reviews})!=2
+            or any(r['decision'] not in ('QA_PASSED','SECURITY_PASSED','REVIEW_PASSED') or json.loads(r['findings_json']) for r in reviews)
+            or acceptor==stored['submitted_by'] or any(r['reviewer'] in (acceptor,stored['submitted_by']) for r in reviews)):
+            raise ValueError('RECOVERY_PERSISTED_INDEPENDENT_ACCEPTANCE_REQUIRED')
+        # Independent canonical facts are checked here too: a caller-supplied
+        # callback cannot replace the persisted source or frozen snapshot gates.
+        from task_center_mcp_result_recovery import source_snapshot_from_db
+        from model_orchestration import ModelControl
+        if source_snapshot_from_db(self.db,self,tenant,proof)!=proof:raise ValueError('RECOVERY_FROZEN_SOURCE_CHANGED')
+        ModelControl.require_snapshot_from_db(self.db,tenant,stored)
+        for principal,phase,kind in [(acceptor,'ACCEPTOR',None)]+[(r['reviewer'],'REVIEWER',r['review_kind']) for r in reviews]:
+            roles=list(self.db.execute('''SELECT r.phase,r.review_kind,r.writer_allowed,r.enabled FROM model_assignments a JOIN role_templates r
+              ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND r.version=a.role_version
+              WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.principal_id=?''',(tenant,task_id,attempt_id,principal)))
+            if not any(tuple(r)==(phase,kind,0,1) for r in roles):raise ValueError('RECOVERY_CURRENT_REVIEW_AUTHORITY_REQUIRED')
+        now=self.clock()
+        if not finite(now) or now<task['last_event_at'] or (task['last_trusted_time'] is not None and now<task['last_trusted_time']):raise ValueError('RECOVERY_TRUSTED_TIME_REQUIRED')
+        eid='reconciled-terminal-'+attempt_id
+        payload={'state':'SUCCESS','artifact_sha256':artifact_sha256,'writer_stopped':True,
+            'effects_reconciled':True,'next_action':'DEPENDENCIES_RECHECK','completion_evidence':json.loads(task['completion_json'])}
+        self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(task_id,attempt_id,eid,'TERMINAL',now,'TEST_RUN','ledger:result-recovery-source-'+attempt_id,canonical(payload)))
+        self._enqueue(task_id,attempt_id,eid,payload,now)
+        self.db.execute("UPDATE tasks SET state='SUCCESS',writer_stopped='TRUE',effects_reconciled='TRUE',next_action='DEPENDENCIES_RECHECK',last_event_at=?,updated_at=? WHERE task_id=? AND attempt_id=? AND authority_state='REVOKED'",(now,now,task_id,attempt_id))
+
+    def correction_delivery_status(self, outbox_id):
+        row=self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',(outbox_id,)).fetchone()
+        if row is None:raise KeyError(outbox_id)
+        # Only a canonical current-attempt progress receipt naming this exact
+        # delivery is ACK, not SENT and not a model's prose saying "done".
+        task=self._task(row['task_id'])
+        ack=None
+        intent=self.db.execute("SELECT observed_at FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='CORRECTION_INTENT'",(row['task_id'],row['attempt_id'],'correction-intent-'+outbox_id)).fetchone()
+        if intent is not None and task['attempt_id']==row['attempt_id'] and row['delivered_at'] is not None:
+            for e in self.db.execute("SELECT event_id,evidence_ref,evidence_kind,observed_at,payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='PROGRESS'",(row['task_id'],row['attempt_id'])):
+                payload=json.loads(e['payload_json'])
+                if (payload.get('resumed_outbox_id')==outbox_id and e['observed_at']>=intent['observed_at']
+                    and e['evidence_kind'] in REAL_PROGRESS and e['evidence_ref'] not in ('',UNKNOWN)):
+                    ack={'event_id':e['event_id'],'source_ref':e['evidence_ref']}
+        return {'outbox_id':outbox_id,'task_id':row['task_id'],'attempt_id':row['attempt_id'],
+            'state':'ACK_OBSERVED' if ack else ('SENT_ACK_PENDING' if row['delivered_at'] is not None else ('HOLD_DELIVERY_UNKNOWN_NO_RETRY' if row['attempts'] or intent is not None else 'NOT_DISPATCHED')),
+            'ack':ack,'attempts':row['attempts'],'canonical_state':task['state']}
+
+    def resume_existing_owner(self, outbox_id, host_adapter=None):
+        """Opt-in original-outbox host seam; no adapter is installed by default.
+
+        admit(packet) is a LOCAL host authorization check, never model input.
+        request_resume(packet) must use the host's already admitted original
+        responsibility channel and outbox_id as its idempotency key. It may only
+        request continuation, not run code, grant authority or replace Writer.
+        An uncertain call is permanently non-retriable through this method.
+        """
+        if host_adapter is None:
+            return {'state':'HOLD_PROVIDER_NOT_ADMITTED','dispatch_performed':False}
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            row=self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',(outbox_id,)).fetchone()
+            if row is None:raise KeyError(outbox_id)
+            intent=self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='CORRECTION_INTENT'",(row['task_id'],row['attempt_id'],'correction-intent-'+outbox_id)).fetchone()
+            if intent is not None or row['attempts'] or row['delivered_at'] is not None or row['dead_lettered_at'] is not None:
+                return dict(self.correction_delivery_status(outbox_id),dispatch_performed=False)
+            task=self._task(row['task_id']);payload=json.loads(row['payload_json']);now=self.clock()
+            event=self.db.execute('SELECT kind FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(row['task_id'],row['attempt_id'],row['event_id'])).fetchone()
+            if (not event or event['kind']!='SUPERVISION_ACTION'
+                or payload.get('action')!='RECONCILE_AND_RESUME_SAME_ATTEMPT'
+                or task['attempt_id']!=row['attempt_id'] or task['state'] not in ('STARTED','RUNNING')
+                or payload.get('recovery_generation')!=task['recovery_generation']
+                or payload.get('checkpoint_sha256')!=task['checkpoint_sha256']
+                or task['authority_state']!='VALID' or not finite(now)
+                or task['authority_valid_until'] is None or now>=task['authority_valid_until']
+                or not self._dependencies_done(task)):
+                raise ValueError('HOLD_CURRENT_SAME_WRITER_RESUME_ADMISSION_REQUIRED')
+            if self.db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state NOT IN ('CONFIRMED','FAILED') LIMIT 1",(row['task_id'],)).fetchone():
+                raise ValueError('HOLD_UNRESOLVED_EFFECTS_NO_REPLAY')
+            dependencies=json.loads(task['dependencies_json'])
+            if dependencies:
+                try:
+                    accepted=[dict(x) for x in self.db.execute('''SELECT d.producer_task_id FROM gateway_dependencies d
+                      JOIN gateway_inbox i ON i.producer_task_id=d.producer_task_id AND i.producer_attempt_id=d.event_attempt_id AND i.event_id=d.event_id
+                      JOIN gateway_task_metadata m ON m.task_id=d.consumer_task_id AND m.tenant_id=i.tenant_id
+                      WHERE d.consumer_task_id=? AND d.state='RECEIVED' AND i.state='CONSUMED_ACK'
+                        AND i.output_version=d.required_version AND i.evidence_ref=d.required_evidence_ref''',(task['task_id'],))]
+                except sqlite3.OperationalError:
+                    raise ValueError('HOLD_ORIGINAL_DEPENDENCY_ACK_SOURCE_REQUIRED')
+                if sorted(x['producer_task_id'] for x in accepted)!=sorted(dependencies):
+                    raise ValueError('HOLD_ORIGINAL_DEPENDENCY_ACK_REQUIRED')
+            claims=[dict(x) for x in self.db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=?',(task['task_id'],))]
+            if (sorted(x['resource_key'] for x in claims)!=sorted(json.loads(task['resource_scope_json']))
+                or not claims or any((x['attempt_id'],x['fence'],x['epoch'],x['state'])!=(task['attempt_id'],task['fence'],task['epoch'],'VALID') for x in claims)):
+                raise ValueError('HOLD_ORIGINAL_WRITER_CLAIMS_REQUIRED')
+            packet={'outbox_id':outbox_id,'task_id':task['task_id'],'attempt_id':task['attempt_id'],
+                'owner':task['owner'],'entry':task['entry'],'run_id':task['run_id'],'session_id':task['session_id'],
+                'spec_sha256':task['spec_sha256'],'checkpoint_sha256':task['checkpoint_sha256'],
+                'scope_digest':task['resource_scope_digest'],'fence':task['fence'],'epoch':task['epoch'],
+                'action':'REQUEST_RESUME_SAME_OWNER','source_ref':'ledger:events/'+row['event_id']}
+            expected=hashlib.sha256(canonical(packet).encode('utf-8')).hexdigest()
+            admitted=host_adapter.admit(dict(packet))
+            if (not isinstance(admitted,dict) or admitted.get('approved') is not True
+                or admitted.get('packet_sha256')!=expected
+                or not isinstance(admitted.get('source_ref'),str) or admitted['source_ref'] in ('',UNKNOWN) or len(admitted['source_ref'])>1024):
+                raise ValueError('HOLD_HOST_PROVIDER_ADMISSION_REQUIRED')
+            if self._task(row['task_id'])!=task:
+                raise ValueError('HOLD_HOST_ADMISSION_SNAPSHOT_CHANGED')
+            dispatch_at=self.clock()
+            if not finite(dispatch_at):raise ValueError('FINITE_TIME_REQUIRED')
+            if (dispatch_at<now or (task['last_trusted_time'] is not None and dispatch_at<task['last_trusted_time'])):
+                raise ValueError('CLOCK_ROLLBACK_HOLD')
+            if task['authority_valid_until'] is None or not dispatch_at<task['authority_valid_until']:
+                raise ValueError('WRITER_TICKET_EXPIRED')
+            self.db.execute('UPDATE tasks SET last_trusted_time=? WHERE task_id=?',(dispatch_at,task['task_id']))
+            # Durable original-event intent is the no-retry authority, not the
+            # mutable outbox error string. It also bounds authentic early ACKs.
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                (task['task_id'],task['attempt_id'],'correction-intent-'+outbox_id,'CORRECTION_INTENT',dispatch_at,'PHASE_EXECUTION',admitted['source_ref'],canonical({'outbox_id':outbox_id,'packet_sha256':expected,'state':'DISPATCHING_NO_RETRY'})))
+            # Durable intent BEFORE the external seam: crash => UNKNOWN, not retry.
+            self.db.execute("UPDATE outbox SET attempts=attempts+1,last_error='CORRECTION_DISPATCHING_NO_RETRY' WHERE outbox_id=?",(outbox_id,))
+        try:
+            receipt=host_adapter.request_resume(dict(packet))
+            sent=(isinstance(receipt,dict) and receipt.get('state')=='SENT'
+                and receipt.get('outbox_id')==outbox_id and isinstance(receipt.get('source_ref'),str)
+                and receipt['source_ref'] not in ('',UNKNOWN) and len(receipt['source_ref'])<=1024)
+        except Exception:
+            sent=False;receipt=None
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            self.db.execute('UPDATE outbox SET delivered_at=?,last_error=? WHERE outbox_id=?',
+                (self.clock() if sent else None,'CORRECTION_SENT_ACK_PENDING' if sent else 'CORRECTION_UNKNOWN_NO_RETRY',outbox_id))
+            if sent:
+                eid='correction-delivery-'+hashlib.sha256(outbox_id.encode()).hexdigest()
+                self.db.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)',
+                    (packet['task_id'],packet['attempt_id'],eid,'CORRECTION_DELIVERY',self.clock(),'PHASE_EXECUTION',receipt['source_ref'],canonical({'outbox_id':outbox_id,'admission_source_ref':admitted['source_ref'],'state':'SENT_NOT_ACK'})))
+        return dict(self.correction_delivery_status(outbox_id),dispatch_performed=True)
+
+    def correction_rules(self, now=None, interval=300, observe_only=False):
+        """Evidence reconciliation, not a second scheduler or authority issuer.
+
+        The existing host tick remains responsible for liveness. Only this
+        rule pass is rate-limited. Missing sources are UNKNOWN, never proof of
+        inactivity; SOURCE_COMMIT is not required for real progress.
+        """
+        now = self.clock() if now is None else now
+        if type(observe_only) is not bool or not finite(now) or type(interval) is not int or interval not in (180, 300):
+            raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+        deadline=time.monotonic()+0.1 if observe_only else None
+        remaining=[256,131072]
+        def guard():
+            if observe_only and time.monotonic()>deadline:raise ValueError('OBSERVATION_TIME_LIMIT')
+        def load(raw):
+            guard()
+            if observe_only and (not isinstance(raw,str) or len(raw.encode('utf-8'))>4096):raise ValueError('OBSERVATION_JSON_LIMIT')
+            value=json.loads(raw);guard();return value
+        def read_rows(table,columns,where='1',params=(),cap=32,order=''):
+            guard();select=','.join(columns)
+            if observe_only:
+                fields=[];checks=[]
+                for col in columns:
+                    bound=4096 if col.endswith('_json') else 1024
+                    over="(typeof("+col+") IN ('text','blob') AND length(CAST("+col+" AS BLOB))>"+str(bound)+")"
+                    fields.append('CASE WHEN '+over+' THEN NULL ELSE '+col+' END AS '+col);checks.append(over)
+                select=','.join(fields)+',CASE WHEN '+' OR '.join(checks)+' THEN 1 ELSE 0 END AS _observer_overflow'
+            sql='SELECT '+select+' FROM '+table+' WHERE '+where+(' ORDER BY '+order if order else '')+(' LIMIT '+str(cap+1) if observe_only else '')
+            result=[]
+            for row in self.db.execute(sql,params):
+                guard();value=dict(row)
+                if observe_only:
+                    if value.pop('_observer_overflow') or len(result)>=cap:raise ValueError('OBSERVATION_ROW_FIELD_LIMIT')
+                    size=len(canonical(value).encode('utf-8'));remaining[0]-=1;remaining[1]-=size
+                    if remaining[0]<0 or remaining[1]<0:raise ValueError('OBSERVATION_TOTAL_LIMIT')
+                result.append(value)
+            guard();return result
+        self.db.execute('BEGIN' if observe_only else 'BEGIN IMMEDIATE')
+        with self.db:
+            previous = self.db.execute("SELECT observed_at FROM supervisor_heartbeats WHERE instance_id='correction-rules'").fetchone()
+            if not observe_only and previous and now - previous['observed_at'] < interval:
+                return {'state':'NOT_DUE','interval':interval,'observations':[]}
+            observations = []
+            for row in read_rows('tasks',TASK_COLUMNS,cap=16,order='task_id'):
+                guard()
+                task = dict(row); tid=task['task_id']; attempt=task['attempt_id']
+                refs=['ledger:tasks/'+tid]
+                events=read_rows('events',('event_id','kind','evidence_kind','evidence_ref','observed_at'),"task_id=? AND attempt_id=? AND kind NOT IN ('CORRECTION_PROPOSAL')",(tid,attempt),cap=64,order='observed_at,event_id')
+                progress=[e for e in events if e['kind']=='PROGRESS' and e['evidence_kind'] in REAL_PROGRESS and e['evidence_ref'] not in ('',UNKNOWN)]
+                latest=progress[-1] if progress else None
+                phase_events=[e for e in events if e['kind'] in ('DEVELOPMENT_CANDIDATE','DEVELOPMENT_REVIEWED','TERMINAL')]
+                phase=phase_events[-1]['kind'] if phase_events else task['state']
+                deps=[]
+                for dep in load(task['dependencies_json']):
+                    guard()
+                    producer_rows=read_rows('tasks',('task_id','owner','state','attempt_id'),'task_id=?',(dep,),cap=1)
+                    producer=producer_rows[0] if producer_rows else None
+                    deps.append(dict(producer) if producer else {'task_id':dep,'state':UNKNOWN,'owner':UNKNOWN})
+                operations=read_rows('writer_operations',('operation_id','attempt_id','state'),"task_id=? AND state NOT IN ('CONFIRMED','FAILED')",(tid,),cap=32,order='operation_id')
+                receipt=[e for e in events if e['kind'] in ('RECEIVED','PROGRESS')]
+                observed={'task_id':tid,'attempt_id':attempt,'owner':task['owner'],
+                    'registered_stage':task['stage'],'display_phase':phase,
+                    'goal_ref':task['spec_sha256'],'checkpoint_ref':task['checkpoint_sha256'],
+                    'scope_ref':task['resource_scope_digest'],'acceptance_conditions':load(task['completion_json']),
+                    'writer_authority':task['authority_state'],'dependencies':deps,
+                    'progress_evidence':latest,'receipt_evidence':receipt[-1] if receipt else None,
+                    'unresolved_operations':operations,'source_ref':refs,
+                    'source_comparison':'UNKNOWN_NO_EXTERNAL_GOAL_OR_DISPLAY_SOURCE',
+                    'resume_state':'HOLD_PROVIDER_NOT_ADMITTED','dispatch_performed':False}
+                # Optional original Gateway/model tables are not created here.
+                def optional(table,columns,where,params,order):
+                    try:return read_rows(table,columns,where,params,cap=32,order=order)
+                    except sqlite3.OperationalError:return None
+                dependency_acks=optional('gateway_dependencies',('producer_task_id','required_version','required_evidence_ref','state','event_attempt_id','event_id'),'consumer_task_id=?',(tid,),'producer_task_id')
+                requests=optional('model_requests',('request_id','state','attempts'),'task_id=?',(tid,),'request_id')
+                claims=read_rows('resource_claims',('resource_key','attempt_id','fence','epoch','state'),'task_id=?',(tid,),cap=32,order='resource_key')
+                observed['dependency_ack_evidence']=dependency_acks
+                observed['request_evidence']=requests
+                observed['claims']=claims
+                observed['rules']=[
+                    {'rule':'GOAL_AND_SCOPE','state':'OBSERVED_REGISTERED_ONLY','source_ref':refs,
+                     'correction':'COMPARE_EXISTING_SPEC_AND_ALLOWED_SCOPE_NO_NEW_REQUIREMENTS'},
+                    {'rule':'UNIQUE_WRITER','state':'OBSERVED' if task['authority_state']!=UNKNOWN else UNKNOWN,'source_ref':refs,
+                     'correction':'KEEP_ORIGINAL_OWNER_NO_TAKEOVER'},
+                    {'rule':'ACCEPTANCE','state':'OBSERVED' if phase_events else UNKNOWN,
+                     'source_ref':['ledger:events/'+e['event_id'] for e in phase_events] or refs,
+                     'correction':'USE_ORIGINAL_ACCEPTANCE_GATE_NEVER_PROMOTE_REQUEST_SUCCESS'},
+                    {'rule':'DEPENDENCY_PRODUCER_ACK','state':'OBSERVED' if dependency_acks is not None else UNKNOWN,
+                     'source_ref':['ledger:tasks/'+d['task_id'] for d in deps] or refs,
+                     'correction':'ROUTE_MISSING_EVIDENCE_TO_REGISTERED_PRODUCER_KEEP_WAIT'},
+                    {'rule':'PROGRESS_AND_RECEIPT','state':'OBSERVED' if receipt else UNKNOWN,
+                     'source_ref':['ledger:events/'+e['event_id'] for e in receipt] or refs,
+                     'correction':'USE_REAL_CI_TEST_SITE_ACCEPTANCE_OR_WAIT_EVIDENCE_NOT_COMMIT_COUNT'},
+                    {'rule':'DISPLAY_PHASE','state':'OBSERVED_CANONICAL_PROJECTION','source_ref':refs,
+                     'correction':'PROJECT_DISPLAY_ONLY_DO_NOT_REWRITE_CANONICAL_STAGE'}]
+                if requests and any(r['state']=='SUCCEEDED' for r in requests) and task['state']!='SUCCESS':
+                    observed['completion_relation']='REQUEST_SUCCEEDED_CANONICAL_NOT_ACCEPTED'
+                findings=[]
+                if task['authority_state']=='VALID' and (not claims or sorted(x['resource_key'] for x in claims)!=sorted(load(task['resource_scope_json'])) or any((x['attempt_id'],x['fence'],x['epoch'],x['state'])!=(attempt,task['fence'],task['epoch'],'VALID') for x in claims)):
+                    findings.append(('WRITER_SCOPE_MISMATCH','RECONCILE_ORIGINAL_CLAIMS_NO_TAKEOVER',refs))
+                if operations:
+                    findings.append(('UNRESOLVED_EFFECTS','RECONCILE_EXISTING_OPERATIONS_NO_REPLAY',
+                        ['ledger:writer_operations/'+o['operation_id'] for o in operations]))
+                if task['state'] in ACTIVE and task['authority_state'] in ('REVOKING','REVOKED'):
+                    findings.append(('INACTIVE_WRITER','ASK_EXISTING_OWNER_FOR_AUTHORITY_RECONCILIATION',refs))
+                if task['state'] in ACTIVE and task['authority_state']=='VALID' and (task['authority_valid_until'] is None or now>=task['authority_valid_until']):
+                    findings.append(('EXPIRED_AUTHORITY','ASK_EXISTING_OWNER_FOR_AUTHORITY_RECONCILIATION',refs))
+                # A producer wait is meaningful work, not missing commits.
+                observed['dependency_state']='WAITING' if any(d['state']!='SUCCESS' for d in deps) else 'SATISFIED_OR_NONE'
+                observed['findings']=[]
+                for rule,action,source in findings:
+                    guard()
+                    evidence={'rule':rule,'task_id':tid,'attempt_id':attempt,
+                        'generation':task['recovery_generation'],'owner':task['owner'],
+                        'authority_state':task['authority_state'],'authority_valid_until':task['authority_valid_until'],
+                        'operations':operations,'claims':claims,'scope_digest':task['resource_scope_digest'],'source_ref':source,'action':action}
+                    digest=hashlib.sha256(canonical(evidence).encode('utf-8')).hexdigest()
+                    eid='correction-'+digest
+                    payload=dict(evidence,execution_state='HOLD_PROVIDER_NOT_ADMITTED',
+                        dispatch_performed=False,takeover_allowed=False,authority_effect='NONE')
+                    prior=self.db.execute('SELECT event_id FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(tid,attempt,eid)).fetchone()
+                    if prior is None and not observe_only:
+                        self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                            (tid,attempt,eid,'CORRECTION_PROPOSAL',now,'PHASE_EXECUTION',source[0],canonical(payload)))
+                        # Reuse the one original outbox. It is not delivery or ACK.
+                        self._enqueue(tid,attempt,eid,payload,now)
+                    observed['findings'].append(dict(payload,event_id=eid,duplicate=prior is not None))
+                if observe_only and len(canonical(observed).encode('utf-8'))>65536:raise ValueError('OBSERVATION_OUTPUT_LIMIT')
+                guard();observations.append(observed)
+            guard()
+            if observe_only and len(canonical(observations).encode('utf-8'))>131072:raise ValueError('OBSERVATION_OUTPUT_LIMIT')
+            guard()
+            if not observe_only:
+                self.db.execute('INSERT OR REPLACE INTO supervisor_heartbeats VALUES (?,?,?,?,?)',
+                    ('correction-rules',now,'pid:%d'%os.getpid(),hashlib.sha256(b'correction-rules-v1').hexdigest(),now))
+            return {'state':'OBSERVATION_ONLY' if observe_only else 'RULES_OBSERVED_PROVIDER_NOT_ADMITTED','interval':interval,
+                'business_mutation':not observe_only,
+                'observations':observations,'dispatch_performed':False,'authority_effect':'NONE'}
+
     def supervisor_heartbeat(self, instance_id, process_ref, evidence_ref,
                              now=None):
         now = self.clock() if now is None else now
@@ -2013,7 +2399,10 @@ class Supervisor(object):
         now = self.clock() if now is None else now
         return [dict(r) for r in self.db.execute('''SELECT * FROM outbox
           WHERE delivered_at IS NULL AND dead_lettered_at IS NULL
-            AND next_attempt_at<=?
+            AND next_attempt_at<=? AND last_error NOT LIKE 'CORRECTION_%'
+            AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task_id=outbox.task_id
+              AND e.attempt_id=outbox.attempt_id AND ((e.event_id=outbox.event_id
+              AND e.kind='CORRECTION_PROPOSAL') OR (e.event_id='correction-intent-'||outbox.outbox_id AND e.kind='CORRECTION_INTENT')))
           ORDER BY next_attempt_at,outbox_id LIMIT ?''', (now, limit))]
 
     def outbox_result(self, outbox_id, delivered, now=None, error=''):
@@ -2027,6 +2416,11 @@ class Supervisor(object):
                                   (outbox_id,)).fetchone()
             if row is None:
                 raise KeyError(outbox_id)
+            protected=self.db.execute('''SELECT 1 FROM events WHERE task_id=? AND attempt_id=?
+              AND ((event_id=? AND kind='CORRECTION_PROPOSAL') OR (event_id=? AND kind='CORRECTION_INTENT')) LIMIT 1''',
+              (row['task_id'],row['attempt_id'],row['event_id'],'correction-intent-'+outbox_id)).fetchone()
+            if protected is not None:
+                raise ValueError('CORRECTION_OUTBOX_REQUIRES_ORIGINAL_RECEIPT_PATH')
             if row['delivered_at'] is not None:
                 return {'duplicate': True}
             if delivered:
