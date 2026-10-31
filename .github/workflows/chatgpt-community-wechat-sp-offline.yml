@@ -52,7 +52,7 @@ on:
         options: [uk-path-candidate]
         default: uk-path-candidate
       preview_evidence_run_id:
-        description: 'Fixed 572 same-source successful push evidence: 41061935977'
+        description: 'Fixed 4f same-source successful push evidence: 41101879920'
         type: string
         default: ''
 permissions:
@@ -271,7 +271,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
         env:
           PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
-          PREVIEW_SOURCE_SHA: 57242e0be52e0535746c3f8c02dcf36bb69d6281
+          PREVIEW_SOURCE_SHA: 4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5
           PREVIEW_TARGET: ${{ inputs.preview_target }}
           PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
           PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
@@ -291,7 +291,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
         uses: actions/upload-artifact@v4
         with:
-          name: community-fixed-572-preview-input
+          name: community-fixed-4f-preview-input
           path: |
             fixed-product-source.zip
             fixed-product-receipt.json
@@ -1189,7 +1189,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '41061935977' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '41101879920' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1214,7 +1214,7 @@ jobs:
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '41061935977' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_evidence_run_id == '41101879920' && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
@@ -1222,7 +1222,7 @@ jobs:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
       COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
       PREVIEW_CONTROL_SHA: ${{ inputs.preview_source_sha }}
-      PREVIEW_SOURCE_SHA: 57242e0be52e0535746c3f8c02dcf36bb69d6281
+      PREVIEW_SOURCE_SHA: 4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5
       PREVIEW_TARGET: ${{ inputs.preview_target }}
       PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
       PREVIEW_ENABLED: ${{ inputs.preview_enabled }}
@@ -1304,7 +1304,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled
         uses: actions/download-artifact@v4
         with:
-          name: community-fixed-572-preview-input
+          name: community-fixed-4f-preview-input
           path: ${{ runner.temp }}/community-mini-fixed-input-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Bind fixed product tree separately from current control source
         if: github.event_name == 'workflow_dispatch' && inputs.preview_enabled

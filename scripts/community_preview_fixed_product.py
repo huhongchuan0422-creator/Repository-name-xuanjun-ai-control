@@ -1,4 +1,4 @@
-"""Fixed 572 same-source product admission for the ORIGINAL preview workflow, never deployment.
+"""Fixed 4f same-source product admission for the ORIGINAL preview workflow, never deployment.
 GITHUB_SHA remains the control revision. No arbitrary artifact/ref/product is accepted.
 """
 import argparse, datetime, hashlib, io, json, os, re, stat, tempfile, time, zipfile
@@ -9,36 +9,36 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
 WORKFLOW = '.github/workflows/chatgpt-community-wechat-sp-offline.yml'
-PRODUCT_SHA = '57242e0be52e0535746c3f8c02dcf36bb69d6281'
-PRODUCT_RUN = 41061935977
-PRODUCT_JOB = 124083575863
-ARTIFACT_ID = 12981650732
-ARTIFACT_SIZE = 13006936
-ARTIFACT_SHA256 = '0363fb8c8b28648527d1d022749c467005da622c80a2cf07d5c9abaeb22e874a'
-SOURCE_SHA256 = '392897cbc1c45c9a77b01e338e6c17450339e8b162c9a4e217c29a7d76e4542d'
-MANIFEST_SHA256 = 'bdbf0347e95ab8a0e3efa84ba8f3a98c81d511b6e201fd668ab5510d440792dc'
+PRODUCT_SHA = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
+PRODUCT_RUN = 41101879920
+PRODUCT_JOB = 124220361504
+ARTIFACT_ID = 13000357097
+ARTIFACT_SIZE = 13028520
+ARTIFACT_SHA256 = 'b6c49a917abe9bb07683ad41b9b98d2975a79a0be8e6f59714db05debf8c0560'
+SOURCE_SHA256 = '0400d992809e09f62c4a80cb9ce011dbfc99b8842ca8f31b34303377a7eb5af1'
+MANIFEST_SHA256 = '9f203a9f0448b26b368fc0b39fbe5ec043900a2ef64ced38984e63d5ab5ef86e'
 APPID = 'wx1d5f8873eaea5392'
 PROFILE = 'uk-path-candidate'
-BACKEND_SHA = '57242e0be52e0535746c3f8c02dcf36bb69d6281'
-COMPATIBILITY_SHA256 = 'a44125664276adae415d9a67734aee3aea3c03a92604a64482beb1761ac456f0'
+BACKEND_SHA = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
+COMPATIBILITY_SHA256 = '548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'
 COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 BASE_URL = 'https://uk.wenwenwenyiyiyi.work/community-preview'
 CONNECTED_APP_SHA256 = '07eaedb76bc73f278eeab7235cf2f921cee0c875f890fdc26c82fb4e4699b42e'
-BACKEND_IMAGE_ID = 'sha256:586e4059bdb55aff4663323f85c589d8f1db29b7823d62e74393bf10f8c12d71'
+BACKEND_IMAGE_ID = 'sha256:9ceb64b5e1f4b8a677d200e7e3aa73182253e3c1ec116f979c9c4a8fd0772a6c'
 MAX_BYTES = 20000000
 # Exact actual product evidence archive; no arbitrary extra member admission.
 ARTIFACT_MEMBERS = {
   "community-tests.log": [
-    610780,
-    "f058f20105b42684e996b68ef55d28077a0f7e8049e69f9a44136d7e342eadf2"
+    621070,
+    "e93a2dea787f8c2e83babaa59ce4394d55f8a8d42ff71086d8b618454bc3786a"
   ],
   "stage5-tests.log": [
     45344,
-    "eead0ec9fae9befa38c081223ec373d8bdb48baed01422f5707a21d4d0a71907"
+    "15856607e5e66d0ccc911c80463b39e26ea4261eb89182cd52440890c0dee8f0"
   ],
   "community-stage-source.zip": [
-    6783458,
-    "392897cbc1c45c9a77b01e338e6c17450339e8b162c9a4e217c29a7d76e4542d"
+    6625013,
+    "0400d992809e09f62c4a80cb9ce011dbfc99b8842ca8f31b34303377a7eb5af1"
   ],
   "community-admin-browser-evidence/16-community-home-1440.png": [
     222829,
@@ -49,8 +49,8 @@ ARTIFACT_MEMBERS = {
     "3f55528a7a910a66e16b813ea0fd5474f809070944b32b37dc6ec8f6d7c8764b"
   ],
   "community-admin-browser-evidence/16-logout-neutral-1440.png": [
-    124510,
-    "3e68557aead56bf0c7878887029377df84096402a63b228105ef582967439a35"
+    129438,
+    "5a8b69486a4df1f6e5a6a756f484a1c4a6f85487f0b1613bf56f96096de54aa7"
   ],
   "community-admin-browser-evidence/18-denied-cleared-1440.png": [
     83125,
@@ -81,24 +81,24 @@ ARTIFACT_MEMBERS = {
     "0287500a621395333ed78eb0d38aa6d7f5a9fe694ff9b3db43b325068f350a20"
   ],
   "community-admin-browser-evidence/19-denied-cleared-1440.png": [
-    81572,
-    "4dd66d797a43fd77df3b5fda68267de2ae9344c5a933be5350280daad96e8d5c"
+    81588,
+    "44e028865b258e9af96b8efbe7cde41708e3c10c3b3c648b1980f708b103c337"
   ],
   "community-admin-browser-evidence/19-detail-1440.png": [
-    129763,
-    "755528a2ca985ff2cf6349d449d8bb6f7052dae344d73ac138339fafc2771ae0"
+    129546,
+    "f0845d7d429878ac57a2a0de9787d9c7dfe2e24d43fcb395e140bffb37e29dd4"
   ],
   "community-admin-browser-evidence/19-list-1440.png": [
-    110190,
-    "90a646406fff663846bff187a767896f4b34a7f5b005f328f4445e6c1849db8d"
+    109946,
+    "1d06a4706274e29c721a8abeb3534749fc92569551afeea90c4991d4feab4bf4"
   ],
   "community-admin-browser-evidence/19-return-1440.png": [
-    110190,
-    "90a646406fff663846bff187a767896f4b34a7f5b005f328f4445e6c1849db8d"
+    109946,
+    "1d06a4706274e29c721a8abeb3534749fc92569551afeea90c4991d4feab4bf4"
   ],
   "community-admin-browser-evidence/20-before-query-1440.png": [
-    143306,
-    "7cd60646b917f53cf2cd0ef32480d8374f4c759765a015505fa3e9837b98281b"
+    143156,
+    "9ddc5ca1e0c86f47ea6a88400a2b16d17ad0e1bed9389b9e431e81da8bbb8bda"
   ],
   "community-admin-browser-evidence/20-denied-cleared-1440.png": [
     142237,
@@ -109,40 +109,40 @@ ARTIFACT_MEMBERS = {
     "1e21c3a9147c55c003e63ce2fa33608589f5659d65af1d94ad7575bcdbdd1bc8"
   ],
   "community-admin-browser-evidence/20-list-empty-1440.png": [
-    129656,
-    "0c28daa05547729800fbf2b4e35dea9b81f3779f06b4f13f1a16f96406a10cc9"
+    129648,
+    "1b683cac6329a922eb4e81fb8e7a983bdf39bf9736470c99519c6de1e694ad41"
   ],
   "community-admin-browser-evidence/20-nonempty-synthetic-1440.png": [
-    132773,
-    "93bdd61a4fd53a6309dee24cbe5c7f38ae5300a489294d5e8053b111de263470"
+    133158,
+    "77589ded9af224a38b352cf1f2580f4f144e68e5965d831915728240cde833a7"
   ],
   "community-admin-browser-evidence/20-return-1440.png": [
-    129647,
-    "2ddcafaf8fa3647a4fe3bf7e845667d64ac145bbe7999d05a3d7ee2fef6e395c"
+    129640,
+    "9818408bbbf50b6db502a7c0c3efa0f833d3820f9068c02a6712fd140ff8cfa5"
   ],
   "community-admin-browser-evidence/21-denied-cleared-1440.png": [
-    94962,
-    "2780f5fbbc8fe93343917f6ef162bfd149ad64ffc50754b955da1cc80f96b147"
+    94960,
+    "e3d0b4e0a3ea68f7b7f8e388b7c030e7619db66054eb56ee2220a51fcd78a8c3"
   ],
   "community-admin-browser-evidence/21-detail-1440.png": [
-    120886,
-    "9ec6bb4b5ddd110859ee90e53e1dfb9982ae055b22af44c0153e2d45a30e59ef"
+    121401,
+    "3b0ec338c272d65461c70076476545df3bb3410b546db2c3e0c813a5cfd5b1c5"
   ],
   "community-admin-browser-evidence/21-list-1440.png": [
-    120054,
-    "20d4c656bcc1654aad0a701aeb28646966d394eea0470b5bfdf71ff7195d3cfa"
+    120571,
+    "73e88164aedd0370897833cceb73c20e8c709058ba1fb8967e2c825d327f4ebc"
   ],
   "community-admin-browser-evidence/21-return-1440.png": [
-    120038,
-    "dcaf7b7707ba2038bab19e55d51cd141d9753d39d6808f64c54b4b0ae24860cf"
+    120556,
+    "149d35b32f4f340c305e52c5d35b604cdca8967e4821bbf97a07a6608d407ca7"
   ],
   "community-admin-browser-evidence/21-state-readback-1440.png": [
-    121186,
-    "a9f50ac80b7e649302ddc81a98c6bbcec1f58270d83156b64d42fad9750e32b1"
+    121716,
+    "0683f8209e7fbfb9ad10de7b51d94079e5f0629fa8adf40a9a4b31608fe100e2"
   ],
   "community-admin-browser-evidence/22-denied-cleared-1440.png": [
-    98553,
-    "d38edfa2b9e1c3c8ca5038cfd457b2dba4b060e0d380ee9ba2f501661021ae19"
+    98562,
+    "0ada505b077b57fbef066a2db7a28858573a36b8a8de06e8cc942f895bb6f5b5"
   ],
   "community-admin-browser-evidence/22-list-1440.png": [
     122929,
@@ -157,84 +157,84 @@ ARTIFACT_MEMBERS = {
     "8618cbc134186ae246aab476166f4c0a5f580c6178f0be17d659e6da61aff7fa"
   ],
   "community-admin-browser-evidence/23-denied-cleared-1440.png": [
-    104849,
-    "c48bba273a5b7ed0afe522734c3a4e6071a9ae92f6ced5d22c7ca844d1fb1799"
-  ],
-  "community-admin-browser-evidence/23-list-synthetic-1440.png": [
-    114867,
-    "d851c68eb341756c8168103ce049389d970dd2a5dcc35246f5b787d2a83da089"
+    107867,
+    "d26c8a14e362cc3d53ac7c82f20593bb87c9f68140adc949d58cad58a00862ea"
   ],
   "community-admin-browser-evidence/23-return-synthetic-1440.png": [
-    114842,
-    "2c1e6f109e0f60ad1cd64e438f897d63b336a89cac2b658337e58c5a9d99db2a"
+    118898,
+    "2107cd20c6013af91b899f2bbd469b844f4901f8622b45fde70b9a4c73d6644f"
+  ],
+  "community-admin-browser-evidence/23-list-synthetic-1440.png": [
+    114981,
+    "45267a01b04461621d8832a4673497efc31820a99d9de017d3c4b353315adc32"
   ],
   "community-admin-browser-evidence/24-refund-denied-cleared-1440.png": [
-    105051,
-    "6ad170e10b1dedada1270a7459771da23b5af33a1c79ab1d6eb6feae2d971ef0"
+    108105,
+    "d777780bb71b41417acbd9535c0e35dcb8f9ef6d9913ddc8caf8b70a1ae91008"
   ],
   "community-admin-browser-evidence/24-refund-list-synthetic-1440.png": [
-    146697,
-    "d33599de9733e7548ac67836ab6a986411fe6b3e40b577362a8ee527df298562"
+    150700,
+    "57cabd1cd620474eb17802a982a29a0d1fc27eb3742152345935a3c80bfb95a2"
   ],
   "community-admin-browser-evidence/24-refund-return-1440.png": [
-    146695,
-    "beaf60742c0de81883fe0c08f8eccfd1fd36276a7c8eae5841debe40dc68072a"
+    150698,
+    "52acaa39e8fef255b30021f1154f372fbeb4b504745c9b90b9ac9357aef8ce06"
   ],
   "community-admin-browser-evidence/25-logout-neutral-1440.png": [
-    124508,
-    "b5ad8f26e7c9555af925361f924815d007dff90cc35ba06a5d149f0f3cb5540a"
+    129441,
+    "137a493373a61550dcb3094473d87a40648198e6aea315429f1cc171fea387b5"
   ],
   "community-admin-browser-evidence/25-platform-home-1440.png": [
-    293979,
-    "b4d9090045a794917f113a44eb879bf4421fa1c18c4d8c823425e19fb03470e3"
+    302415,
+    "eac2c6d270b2914da5a79049c339ddd2be0207ce5c29a2297abccc6e42fbbd88"
   ],
   "community-admin-browser-evidence/25-platform-home-390.png": [
     219761,
     "5407c03055a5f2a0139ca2792e840f80b6a69bd60a58d42266ec262d84ac5c8f"
   ],
   "community-admin-browser-evidence/25-role-switch-cleared-1440.png": [
-    301094,
-    "d5e9c03051b354bcfd3151037ec78cdd3e3c782af4f24f4b6f8a29600f087450"
+    305915,
+    "3aec56a930bb1f3d2620b1acb43be3804ffc3ecfc5de7dd886f9cca36e821a47"
   ],
   "community-admin-browser-evidence/44-profile-edit-390.png": [
     56212,
     "747c71d3ee223e85b9077f8e77b3c1785d807cdaf6d58fb91cdc4a59e9111b36"
   ],
   "community-admin-browser-evidence/46-current-subject-relation-1440.png": [
-    103895,
-    "f7fc8801d0152fd16b6625fc5f1bb8689789099a7375fa63005854c441102576"
+    105027,
+    "759c86c454bfcd6271dd3c2ee58c6dd4d3eabb431f58faa717ae6098a95fa708"
   ],
   "community-admin-browser-evidence/46-members-read-1440.png": [
-    78668,
-    "7e89c2685a4aa515902fc508ad82edddc623bb3b094de57be2940320ba5623c0"
+    78483,
+    "7088e42e6a1c1bf7668fd0490eb6119dc3bd5afd294939dda4a304e5dfbea226"
   ],
   "community-admin-browser-evidence/46-original-relation-controls-1440.png": [
-    104229,
-    "c64875a8b54fa531a86835c226aca02257e45f1cc75e073850a3a00c1cb5131a"
+    104117,
+    "f52fc8734486c4789d5dfe5477b0ccca02320280f9c5aecc6a8d61466137da59"
   ],
   "community-admin-browser-evidence/46-relation-controls-390.png": [
-    56433,
-    "c3158dee8fef3219a22a653eb525949f67f2abba9d9b9d4f24b3ed3c025db7f9"
+    56223,
+    "659022ecf7ead3173ec9d4b9fd145382dd9b38cb6160b251e73b58f14438d12a"
   ],
   "community-admin-browser-evidence/46-subject-denied-cleared-1440.png": [
-    86370,
-    "870e62ce8381719530a693e1df8416165fefe4d3782cbfcd43d518fc29f17b60"
+    87193,
+    "c141c49d6c301621899b9303262fd2f7ed58624a20dae95d16b31928d4c28d0c"
   ],
   "community-admin-browser-evidence/48-promotion-edit-390.png": [
     95371,
     "8c5d6cc265f5229a55b97c9565dc64a3efb9119c99eb3864660f512c552cb358"
   ],
   "community-admin-browser-evidence/49-detail-1440.png": [
-    142972,
-    "92d57e33ad7d1010d807170481a27f6d1b9405b9ba8c0e637ca19486cdb97721"
+    143645,
+    "397623df95fd1828ec23c9c512648db658da8e564a1cf5e43c8b4a2f6c6a9763"
   ],
   "community-admin-browser-evidence/50-detail-synthetic-1440.png": [
-    142741,
-    "c317a1601c2d5f7df3ea1d2a3e08968880ab140f679da5acd7466feacdf47b72"
+    146723,
+    "84ebd5545bb5d430faf5f3789e1777a297f6ec16c1127882dad2988032ea571c"
   ],
   "community-admin-browser-evidence/51-refund-detail-synthetic-1440.png": [
-    162974,
-    "49e321b28011a698a171681db62c53029bbd1c79ce920355a1bfc003b9c4bc41"
+    166671,
+    "35598d31bf884a68c33e1a0c34de275d9fc009221ca173712cd545aa5ae4c72a"
   ],
   "community-admin-browser-evidence/admission-30-list-1440.png": [
     59152,
@@ -245,8 +245,8 @@ ARTIFACT_MEMBERS = {
     "64e5a227ae638f77de972b0a97e12afffcca2d2032ec78b441a18bde560023d9"
   ],
   "community-admin-browser-evidence/admission-60-detail-1440.png": [
-    102221,
-    "39e2f30a5b4967eab59249e1fb84bbed1798a94c278704bde94777aaad3b8481"
+    103585,
+    "7239b245dde17d72e12f52fa253a7be167b57cd0a59c4bba7d58de24c62b286e"
   ],
   "community-admin-browser-evidence/admission-61-controls-1440.png": [
     103940,
@@ -265,8 +265,8 @@ ARTIFACT_MEMBERS = {
     "64e5a227ae638f77de972b0a97e12afffcca2d2032ec78b441a18bde560023d9"
   ],
   "community-admin-browser-evidence/admission-reopen-60-detail-1440.png": [
-    103187,
-    "61eed53c2a2e2508978308e374912cdd0154a383b25ed4715e1332358c7c2b90"
+    102750,
+    "c6966622d76c1f3ef503626131d48fadb29e182f8215b00f007f6de386de10a1"
   ],
   "community-admin-browser-evidence/admission-reopen-61-controls-1440.png": [
     103940,
@@ -296,21 +296,21 @@ ARTIFACT_MEMBERS = {
     99005,
     "5ee704e2422690ea94334fcb352f03ada56b5e73621d29f0e5fea5f263ae42e8"
   ],
-  "community-admin-browser-evidence/finance-27-return-1440.png": [
-    110784,
-    "f94539d393c641bfb0003fb5dcfb55153714776b67c199dd51a72859a071dce5"
-  ],
   "community-admin-browser-evidence/finance-27-list-1440.png": [
     110782,
     "15dc6293fb6621a280a0fca9fe699ecdeeea02d58478b115615b51c6ed6fb098"
   ],
+  "community-admin-browser-evidence/finance-27-return-1440.png": [
+    110784,
+    "f94539d393c641bfb0003fb5dcfb55153714776b67c199dd51a72859a071dce5"
+  ],
   "community-admin-browser-evidence/finance-28-platform_audit-list-1440.png": [
-    489891,
-    "bdbd29f80f61a8be3b22d9af609d7a697da1418d159973a0dfad12e3f1337260"
+    488531,
+    "a20a29a48475c67cf795d76baead86f34316b1ba6f7d41cc438f2d7ec4f5c1df"
   ],
   "community-admin-browser-evidence/finance-28-platform_customers-list-1440.png": [
-    131200,
-    "4f5d0da37818a8d5b5b072ab1b7d2aac78bcdc5058baa10b3aa08b6c324dfa8b"
+    130240,
+    "bef14a4465a9ec730b7157d80939db8993fd215dbbebac1d2d046f9c41280e63"
   ],
   "community-admin-browser-evidence/finance-28-platform_overview-list-1440.png": [
     101693,
@@ -385,8 +385,8 @@ ARTIFACT_MEMBERS = {
     "f224686f7ce0bce5aed78f13cedf19dd5ae6973a39756bc2812791357a1e2441"
   ],
   "community-admin-browser-evidence/finance-42-profile-edit-1440.png": [
-    101764,
-    "abb4ba333011a897f23d9c148a6efe1e58cb997bcefbfeef4cf774167f2e14ca"
+    101767,
+    "2ac9021a0b6224c9f119450bb38e3c16ce3424244ebe96a847a636563da4762b"
   ],
   "community-admin-browser-evidence/finance-42-profile-edit-390.png": [
     53578,
@@ -397,8 +397,8 @@ ARTIFACT_MEMBERS = {
     "1fdaeb6eae793df9c38b0dcfee61af42223e5b074b889dd52dab243c55d0b08c"
   ],
   "community-admin-browser-evidence/finance-53-edit-1440.png": [
-    97955,
-    "6994a810b4ff7b20aa117f15934af22d57ad032f77c86803c3cc557a8b62bcd5"
+    97932,
+    "7cc630c54ebc7e8ca9f1e489606b83071b9cb4c997d3864eba17f4fd4a07deb4"
   ],
   "community-admin-browser-evidence/finance-53-readback-1440.png": [
     121579,
@@ -421,12 +421,12 @@ ARTIFACT_MEMBERS = {
     "7093ce4e0f2b7903df086bbcd61638075ff8b9eced7973df3d3534f23384c86c"
   ],
   "community-admin-browser-evidence/finance-56-platform_audit-detail-1440.png": [
-    132030,
-    "4ee1e0317127ce3ca3100cacebe4eac96ea3313d35a4d39d40accda8e9a11ffc"
+    131242,
+    "4203445d4b8ae06a9b41886a38faf5b9e05ec59d8c1ca13751d5dd64c82ee10d"
   ],
   "community-admin-browser-evidence/finance-56-platform_customers-detail-1440.png": [
-    114154,
-    "0abf78fdf023099d8c28af5e0a69a0d142806a92f14acaa8b819c99ab2bdc06b"
+    113695,
+    "429378bd6c2a1af26a1d6ca54589174cfbe57bc92e498c0aedd7bb09c0a2bc23"
   ],
   "community-admin-browser-evidence/finance-56-platform_overview-detail-1440.png": [
     125204,
@@ -464,13 +464,13 @@ ARTIFACT_MEMBERS = {
     63969,
     "1bd3bb6234036d649a3ed520f1d52ba8cf05511aee0b9e15ca5eabf45aadfe69"
   ],
-  "community-admin-browser-evidence/finance-66-top-return-1440.png": [
-    59549,
-    "1751c7a9f69c42ef17cf14abc2c46edca368e48a27e2a824468a6a213d7b7250"
-  ],
   "community-admin-browser-evidence/finance-denied-1440.png": [
     42776,
     "84c1a422ea6e116edc2d049e78b2f4661e7fa829c5267a3bddb97f9571992b00"
+  ],
+  "community-admin-browser-evidence/finance-66-top-return-1440.png": [
+    59549,
+    "1751c7a9f69c42ef17cf14abc2c46edca368e48a27e2a824468a6a213d7b7250"
   ],
   "community-admin-browser-evidence/finance-receipt.json": [
     6768,
@@ -478,7 +478,7 @@ ARTIFACT_MEMBERS = {
   ],
   "community-admin-browser-evidence/receipt.json": [
     1412,
-    "88e62fb026e05cfbdc91737ef7033ce8a642ebab4d80030545a3a3a7c8b100fd"
+    "8be06a52d4e54c7f1e5327c9f407aed095e59d4624e4a2783635088c973feab2"
   ],
   "community-admin-browser-evidence/split-snapshot-receipt.json": [
     2053,
@@ -517,7 +517,7 @@ def context(env):
             'EXACT_FIXED_PRODUCT_CONTROL_CONTEXT_REQUIRED')
     return control
 
-def evidence(run, jobs, artifacts, env, now=None):
+def evidence(run, jobs, artifacts, env, now=None, archive_raw=None):
     control = context(env)
     now = time.time() if now is None else now
     require(run.get('id') == PRODUCT_RUN and run.get('head_sha') == PRODUCT_SHA
@@ -537,9 +537,11 @@ def evidence(run, jobs, artifacts, env, now=None):
     require(len(selected) == 1 and selected[0].get('id') == PRODUCT_JOB
             and selected[0].get('status') == 'completed'
             and selected[0].get('conclusion') == 'success'
-            and any(s.get('name') == 'Complete Phase1 and Phase2 source regression'
+            and (any(s.get('name') == 'Complete Phase1 and Phase2 source regression'
                     and s.get('status') == 'completed' and s.get('conclusion') == 'success'
-                    for s in selected[0].get('steps', [])), 'FIXED_PRODUCT_TEST_REQUIRED')
+                    for s in selected[0].get('steps', []))
+                 or (selected[0].get('steps') == [] and archive_raw is not None
+                     and bool(archive_source(archive_raw)))), 'FIXED_PRODUCT_TEST_REQUIRED')
     selected = [a for a in artifacts['artifacts']
                 if a.get('name') == 'community-phase-integration-evidence']
     require(len(selected) == 1, 'ONE_FIXED_SOURCE_ARTIFACT_REQUIRED')
@@ -555,7 +557,7 @@ def evidence(run, jobs, artifacts, env, now=None):
             and binding.get('repository_id') == 1413132159
             and binding.get('head_repository_id') == 1413132159,
             'FIXED_UNEXPIRED_ARTIFACT_BINDING_REQUIRED')
-    return dict(status='FIXED_572_SAME_SOURCE_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
+    return dict(status='FIXED_4F_SAME_SOURCE_PRODUCT_EVIDENCE_VERIFIED', control_source_sha=control,
                 product_source_sha=PRODUCT_SHA, product_run_id=PRODUCT_RUN,
                 product_test_job_id=PRODUCT_JOB, artifact_id=ARTIFACT_ID,
                 artifact_sha256=ARTIFACT_SHA256, source_zip_sha256=SOURCE_SHA256,
@@ -683,7 +685,7 @@ def paths(env):
 
 def verify_receipt(receipt, env):
     control = context(env)
-    require(receipt.get('status') == 'FIXED_572_SAME_SOURCE_PRODUCT_EVIDENCE_VERIFIED'
+    require(receipt.get('status') == 'FIXED_4F_SAME_SOURCE_PRODUCT_EVIDENCE_VERIFIED'
             and receipt.get('control_source_sha') == control
             and receipt.get('product_source_sha') == PRODUCT_SHA
             and receipt.get('product_run_id') == PRODUCT_RUN
@@ -800,17 +802,19 @@ def main():
         require(not Path('fixed-product-source.zip').exists() and not Path('fixed-product-receipt.json').exists(),
                 'PRODUCT_ADMISSION_OUTPUT_ALREADY_EXISTS')
         prefix = '/actions/runs/' + str(PRODUCT_RUN)
+        # Exact pinned archive includes both original successful test logs.
+        raw = download_archive(env.get('GITHUB_TOKEN', ''))
         receipt = evidence(read_api(prefix), read_api(prefix + '/jobs?per_page=100'),
-                           read_api(prefix + '/artifacts?per_page=100'), env)
-        source = archive_source(download_archive(env.get('GITHUB_TOKEN', '')))
+                           read_api(prefix + '/artifacts?per_page=100'), env, archive_raw=raw)
+        source = archive_source(raw)
         write_new('fixed-product-source.zip', source)
         write_new('fixed-product-receipt.json', (json.dumps(receipt, sort_keys=True) + '\n').encode())
-        print('FIXED_572_PRODUCT_SOURCE_VERIFIED_NO_UPLOAD')
+        print('FIXED_4F_PRODUCT_SOURCE_VERIFIED_NO_UPLOAD')
     else:
         root = Path(env['RUNNER_TEMP']) / ('community-mini-fixed-input-' + env['GITHUB_RUN_ID'] + '-' + env['GITHUB_RUN_ATTEMPT'])
         stage(read_regular(root / 'fixed-product-source.zip', MAX_BYTES),
               strict_json(read_regular(root / 'fixed-product-receipt.json', 16384)), env)
-        print('FIXED_572_PRODUCT_STAGED_NO_UPLOAD')
+        print('FIXED_4F_PRODUCT_STAGED_NO_UPLOAD')
 
 def safe_failure_reason(exc):
     # Publish only fixed non-sensitive diagnoses, never URLs, token values or traces.

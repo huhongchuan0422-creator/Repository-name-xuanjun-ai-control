@@ -39,10 +39,22 @@ class Contracts(unittest.TestCase):
     def test_control_product_separate_and_fixed_literals(self):
         r=p.evidence(*self.records,self.env)
         self.assertEqual(r['control_source_sha'],CONTROL)
-        self.assertEqual(r['product_source_sha'],'57242e0be52e0535746c3f8c02dcf36bb69d6281')
+        self.assertEqual(r['product_source_sha'],'4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5')
         self.assertEqual(self.env['GITHUB_SHA'],CONTROL)
-        self.assertEqual(r['artifact_id'],12981650732)
+        self.assertEqual(r['artifact_id'],13000357097)
         self.assertFalse(r['upload_performed'])
+    def test_empty_steps_require_exact_archive_and_no_failed_metadata(self):
+        records=copy.deepcopy(self.records); records[1]['jobs'][0]['steps']=[]
+        with self.assertRaisesRegex(ValueError,'FIXED_PRODUCT_TEST_REQUIRED'):
+            p.evidence(*records,self.env)
+        with self.assertRaisesRegex(ValueError,'FIXED_ARTIFACT_BYTES_SHA_REQUIRED'):
+            p.evidence(*records,self.env,archive_raw=b'forged')
+        for changed in ({'conclusion':'failure'},{'conclusion':'skipped'},{'id':123},
+                        {'steps':[dict(name='Complete Phase1 and Phase2 source regression',status='completed',conclusion='failure')]}):
+            bad=copy.deepcopy(records);bad[1]['jobs'][0].update(changed)
+            with patch.object(p,'archive_source',side_effect=AssertionError('must reject before archive')):
+                with self.assertRaisesRegex(ValueError,'FIXED_PRODUCT_TEST_REQUIRED'):
+                    p.evidence(*bad,self.env,archive_raw=b'anything')
     def test_context_rejects_wrong_branch_control_product_mode_run_and_target(self):
         for key,value in [('GITHUB_EVENT_NAME','push'),('GITHUB_REPOSITORY','other/repo'),
           ('GITHUB_REF','refs/heads/main'),('GITHUB_REF','refs/tags/f131'),('GITHUB_SHA','unknown'),
@@ -143,7 +155,7 @@ class Contracts(unittest.TestCase):
         w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         preview=w.split('  mini-preview:\n',1)[1]
         self.assertIn("inputs.preview_source_sha == github.sha",preview)
-        self.assertIn("inputs.preview_evidence_run_id == '41061935977'",preview)
+        self.assertIn("inputs.preview_evidence_run_id == '41101879920'",preview)
         self.assertIn("github.ref == 'refs/heads/"+p.BRANCH+"'",preview)
         self.assertIn('runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]',preview)
         self.assertIn('test "$(hostname -s)" = iZvt5t8tlrm8oiZ',preview)
@@ -189,7 +201,7 @@ class Contracts(unittest.TestCase):
                 return Response()
         with patch.object(p,'build_opener',return_value=Opener()):
             self.assertEqual(p.download_archive('SYNTHETIC_TOKEN'),b'fixture bytes')
-        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/12981650732/zip')
+        self.assertEqual(requests[0].full_url,'https://api.github.com/repos/'+p.REPO+'/actions/artifacts/13000357097/zip')
         self.assertEqual(requests[0].get_header('Authorization'),'Bearer SYNTHETIC_TOKEN')
         self.assertIsNone(requests[1].get_header('Authorization'))
     def test_download_rejects_untrusted_redirect_and_missing_token(self):
@@ -271,7 +283,7 @@ class Contracts(unittest.TestCase):
     def test_node_identity_child_does_not_receive_credentials(self):
         script="""const cp=require('node:child_process');let called=false;
 cp.execFileSync=(bin,args,opts)=>{called=true;if('WECHAT_MINIPROGRAM_PRIVATE_KEY' in opts.env||'GITHUB_TOKEN' in opts.env)throw Error('credential leaked');
-return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'57242e0be52e0535746c3f8c02dcf36bb69d6281',source_root:'/fixture',backend_source_sha:'57242e0be52e0535746c3f8c02dcf36bb69d6281',compatibility:'EXACT_SOURCE_MATCH',compatibility_sha256:'a44125664276adae415d9a67734aee3aea3c03a92604a64482beb1761ac456f0'});};
+return JSON.stringify({fixed_product:true,control_source_sha:process.env.GITHUB_SHA,product_source_sha:'4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',source_root:'/fixture',backend_source_sha:'4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',compatibility:'EXACT_SOURCE_MATCH',compatibility_sha256:'548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'});};
 const p=require(process.argv[1]);p.sourceIdentity();if(!called)throw Error('identity admission missing');"""
         env=dict(self.env,WECHAT_MINIPROGRAM_PRIVATE_KEY='SYNTHETIC_CANARY_NOT_A_KEY',GITHUB_TOKEN='SYNTHETIC_CANARY_NOT_A_TOKEN')
         r=subprocess.run(['node','-e',script,str(ROOT/'deploy/community-preview/endpoint.cjs')],
@@ -296,6 +308,13 @@ class ExactArtifact(unittest.TestCase):
         destination,context=p.paths(self.env)
         self.env['COMMUNITY_PREVIEW_PRODUCT_CONTEXT']=str(context)
         return destination,context
+    def test_actual_archive_restores_exact_success_empty_steps_only(self):
+        path=os.environ.get('COMMUNITY_FIXED_PRODUCT_TEST_ARCHIVE','')
+        if not path:self.skipTest('EXACT_PRODUCT_OUTER_ARCHIVE_FIXTURE_NOT_PROVIDED')
+        records=copy.deepcopy(self.records);records[1]['jobs'][0]['steps']=[]
+        receipt=p.evidence(*records,self.env,archive_raw=pathlib.Path(path).read_bytes())
+        self.assertEqual(receipt['product_source_sha'],p.PRODUCT_SHA)
+        self.assertTrue(receipt['artifact_bytes_reverified'])
     def test_actual_pinned_outer_archive_members_and_source(self):
         path=os.environ.get('COMMUNITY_FIXED_PRODUCT_TEST_ARCHIVE','')
         if not path:self.skipTest('EXACT_PRODUCT_OUTER_ARCHIVE_FIXTURE_NOT_PROVIDED')
@@ -330,7 +349,7 @@ class ExactArtifact(unittest.TestCase):
 
     def test_actual_frozen_source_set_and_appid(self):
         files=p.source_files(self.raw)
-        self.assertEqual(len(files),536)
+        self.assertEqual(len(files),545)
         self.assertEqual(json.loads(files['clients/community-mini/project.config.json'])['appid'],p.APPID)
     def test_exact_stage_identity_and_duplicate_stage_denial(self):
         destination,context=self.stage()
@@ -414,7 +433,7 @@ class ExactArtifact(unittest.TestCase):
         r=subprocess.run(['node',str(ROOT/'scripts/community_mini_preview.cjs')],env=env,capture_output=True,text=True,timeout=20)
         self.assertEqual(r.returncode,4)
         self.assertFalse((self.root/'preview-mutated/receipt.json').exists())
-        # Self-reported manifest edits cannot turn changed code into pinned 572.
+        # Self-reported manifest edits cannot turn changed code into pinned 4f.
         prepared['prepared_files']['session.js']=hashlib.sha256((out/'session.js').read_bytes()).hexdigest()
         (out/'CONNECTED_PREVIEW_RECEIPT.json').write_text(json.dumps(prepared))
         env['COMMUNITY_PREVIEW_OUTPUT']=str(self.root/'preview-forged-manifest')

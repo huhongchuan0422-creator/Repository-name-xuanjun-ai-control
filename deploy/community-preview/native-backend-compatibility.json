@@ -3,88 +3,121 @@
   "archives": {
     "backend": {
       "all_manifest_members_verified": true,
-      "bytes": 6783458,
-      "manifest_sha256": "bdbf0347e95ab8a0e3efa84ba8f3a98c81d511b6e201fd668ab5510d440792dc",
-      "member_count": 536,
+      "bytes": 6625013,
+      "manifest_sha256": "9f203a9f0448b26b368fc0b39fbe5ec043900a2ef64ced38984e63d5ab5ef86e",
+      "member_count": 545,
       "role": "SUCCESSFUL_SOURCE_ARCHIVE_FOR_EXACT_PRODUCT_AND_BUILD_REVISION",
-      "sha256": "392897cbc1c45c9a77b01e338e6c17450339e8b162c9a4e217c29a7d76e4542d",
-      "source_sha": "57242e0be52e0535746c3f8c02dcf36bb69d6281"
+      "sha256": "0400d992809e09f62c4a80cb9ce011dbfc99b8842ca8f31b34303377a7eb5af1",
+      "source_sha": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5"
     },
     "frontend": {
       "all_manifest_members_verified": true,
-      "bytes": 6783458,
-      "manifest_sha256": "bdbf0347e95ab8a0e3efa84ba8f3a98c81d511b6e201fd668ab5510d440792dc",
-      "member_count": 536,
+      "bytes": 6625013,
+      "manifest_sha256": "9f203a9f0448b26b368fc0b39fbe5ec043900a2ef64ced38984e63d5ab5ef86e",
+      "member_count": 545,
       "role": "SUCCESSFUL_SOURCE_ARCHIVE_FOR_EXACT_PRODUCT_AND_BUILD_REVISION",
-      "sha256": "392897cbc1c45c9a77b01e338e6c17450339e8b162c9a4e217c29a7d76e4542d",
-      "source_sha": "57242e0be52e0535746c3f8c02dcf36bb69d6281"
+      "sha256": "0400d992809e09f62c4a80cb9ce011dbfc99b8842ca8f31b34303377a7eb5af1",
+      "source_sha": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5"
     }
   },
-  "backend_image_id": "sha256:586e4059bdb55aff4663323f85c589d8f1db29b7823d62e74393bf10f8c12d71",
-  "backend_source_sha": "57242e0be52e0535746c3f8c02dcf36bb69d6281",
+  "backend_image_id": "sha256:9ceb64b5e1f4b8a677d200e7e3aa73182253e3c1ec116f979c9c4a8fd0772a6c",
+  "backend_source_sha": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5",
   "compatibility": "EXACT_SOURCE_MATCH",
   "compatibility_scope": "EXACT_DECLARED_SOURCE_REVISION_NOT_FIELD_INSTALLATION_OR_CUSTOMER_ACCEPTANCE",
   "complete_classified_delta": [],
-  "frontend_source_sha": "57242e0be52e0535746c3f8c02dcf36bb69d6281",
+  "frontend_source_sha": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5",
   "image_evidence": {
     "all_oci_blob_path_hashes_verified": true,
     "archive_layout_evidence": {
-      "bytes": 14710,
-      "sha256": "9ac353020dd9ff1fd2709bc5a3ba7d6362941ffe8b2b11e4677077f3a0d26172"
+      "bytes": 16530,
+      "sha256": "4f06619232a6a132f0df4f3dda712414c6de934ea35d4b1a5e378a56333b7d63"
     },
-    "artifact_id": 12982446450,
+    "artifact_id": 13002167810,
     "conclusion": "success",
     "docker_config": {
       "bytes": 10969,
-      "sha256": "586e4059bdb55aff4663323f85c589d8f1db29b7823d62e74393bf10f8c12d71"
+      "sha256": "9ceb64b5e1f4b8a677d200e7e3aa73182253e3c1ec116f979c9c4a8fd0772a6c"
     },
     "docker_manifest": {
       "bytes": 4180,
-      "sha256": "018564fe95ec02b81ff9cba4cccf6cb9b6490aa70bbbb351c16e1f838a801a35"
+      "sha256": "a374b61c2fe8976b61a5bf904970c8d04768d4e95ac76764ac99203d0a65fa58"
     },
-    "job_id": 124090030410,
+    "image_control_sha": "151f95b175357867d5bb426783bd74420a83cedb",
+    "job_id": 124243988517,
     "members": {
       "community-backend-image.sha256": {
         "bytes": 97,
-        "sha256": "91501ef396e31dca871eb0d8a8a827a56491cfd4e2a8221861501bff2edf3144"
+        "sha256": "334de493fc3885cb1212e56295041f4bd89e53e7653a1629d494df4b8eec8b18"
       },
       "community-backend-image.tar.gz": {
-        "bytes": 534301903,
-        "sha256": "2e67cc849820df776c7c2aacc05289899a48aa2d86cd30e22295eabcf0d0b517"
+        "bytes": 534315249,
+        "sha256": "f919885ed982019615fd4c83bfa3ce4e7286c65877cfa97d593e9adc6bcd1ef2"
       },
       "community-image-id.txt": {
         "bytes": 72,
-        "sha256": "4ecb8316c436029dcd1e1b305df0602759a6bdc033ad6990bb91c41eb673c561"
+        "sha256": "5d708a04abc2b72966d96b38c7d87b5e62d6b2f8558cdbc79ae88c496aaac0b1"
       },
       "community-image-tests.log": {
-        "bytes": 34208,
-        "sha256": "d39a560f15eab5a09521527ca8a3381be1ac54aba87a37f99d4fcd80d158332e"
+        "bytes": 41769,
+        "sha256": "e20a7b3aee8aa9ba6c84fcf8280a579efcf5305d29a8e1445887186fd8d05bb1"
       }
     },
-    "oci_revision": "57242e0be52e0535746c3f8c02dcf36bb69d6281",
+    "oci_revision": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5",
     "outer": {
-      "bytes": 532471313,
-      "sha256": "f32d856ea6a10803e16bc6498a8f6fb2c9b1c85440b3caa2427e7457db09a83b"
+      "bytes": 532467544,
+      "sha256": "e3cd59f1d12d3e1a5386e42c71b2e75f03749a6db7cb985a5758f3e1169d4f82"
     },
     "raw_uncompressed_archive": {
       "note": "Exact gzip-decoded original Docker archive; no repack or image execution.",
-      "uncompressed_tar_bytes": 1023587328,
-      "uncompressed_tar_sha256": "58604c7e294b50686104da07aafeae8c7fe5e7296fd3cc4b8b0db68aea9d752a"
+      "uncompressed_tar_bytes": 1023630848,
+      "uncompressed_tar_sha256": "4def48d78f770f17a0c9816d37544a419dd54a6d9a1d25d4f43972118f34db9c"
     },
-    "run_id": 41063829262,
-    "source_env": "57242e0be52e0535746c3f8c02dcf36bb69d6281",
+    "read_only_evidence": {
+      "control_sha": "00827843376904c8ca6bea992161e3fbcfea0a94",
+      "manifest_sha256": "6d2f2308204385efa7862028e6d32af763afdbf0a21d5fbdd019b68f1eecd06c",
+      "run_id": "41113190435"
+    },
+    "run_id": 41108321174,
+    "source_env": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5",
+    "source_files": {
+      "app/demos/community-stage/web-session.js": {
+        "bytes": 11514,
+        "layer": "blobs/sha256/ab14de3a22731ddc4001fa2dd6741be82593ca146b4aeb3f2282fdf00d7a4b78",
+        "sha256": "37428f20105d630b48e431aef7c01b5bb040215adc58f8488eabe37f529947f2"
+      },
+      "app/scripts/community_mini_http.py": {
+        "bytes": 26472,
+        "layer": "blobs/sha256/de7b86b0426dda824ac1421daa8baa27b874d66abccdad5a42ed196dbf8ad1af",
+        "sha256": "4f7f6f45955113d9d3eeaa9d0a3693a46d570a3f95b99b46c1d4c2342ead9e4f"
+      },
+      "app/scripts/community_platform_reviewer_admission.py": {
+        "bytes": 12363,
+        "layer": "blobs/sha256/de7b86b0426dda824ac1421daa8baa27b874d66abccdad5a42ed196dbf8ad1af",
+        "sha256": "b1cd7717e521908e83ee1f5d2b838c1f41c0b0a5ba00322a531c1d84685eb3ba"
+      },
+      "app/scripts/community_reviewer_maintenance.py": {
+        "bytes": 10515,
+        "layer": "blobs/sha256/de7b86b0426dda824ac1421daa8baa27b874d66abccdad5a42ed196dbf8ad1af",
+        "sha256": "99f5076b3b32a34a12a9b54a76382eeaa721673ddfbf593368fc1a54322e0520"
+      },
+      "app/scripts/community_reviewer_web_bridge.py": {
+        "bytes": 11865,
+        "layer": "blobs/sha256/de7b86b0426dda824ac1421daa8baa27b874d66abccdad5a42ed196dbf8ad1af",
+        "sha256": "2ecae7a9938c49bc2ae5288cddd3b729c01c4bacd0146195b9f44952f9432529"
+      }
+    },
     "source_stamp": [
       {
         "bytes": 41,
-        "layer": "blobs/sha256/bab415bff366c8cc740c68ba478d03db2e71ff3fa72cdf286e0102f9dffec363",
+        "layer": "blobs/sha256/be9e95e64d490a950299af09081f518f99567b716ba20b080f8cf43fb3cb8f62",
         "mode": 292,
         "path": "app/COMMUNITY_SOURCE_SHA",
-        "sha256": "c2357c55a3ecac2e8bc0b03edc2b82680365062b3186a8176bb621868240122a",
-        "source_sha": "57242e0be52e0535746c3f8c02dcf36bb69d6281"
+        "sha256": "c6c7ab37a8148b31eb15bb033756fc485f5551b98a60d6df58847f0c9092c2e5",
+        "source_sha": "4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5"
       }
     ],
     "status": "completed",
-    "tag": "community-preview:57242e0be52e0535746c3f8c02dcf36bb69d6281"
+    "tag": "community-preview:4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5"
   },
   "not_proved": [
     "field installation",
@@ -106,15 +139,15 @@
     }
   },
   "product_evidence": {
-    "artifact_id": 12981650732,
+    "artifact_id": 13000357097,
     "conclusion": "success",
     "outer": {
-      "bytes": 13006936,
-      "sha256": "0363fb8c8b28648527d1d022749c467005da622c80a2cf07d5c9abaeb22e874a"
+      "bytes": 13028520,
+      "sha256": "b6c49a917abe9bb07683ad41b9b98d2975a79a0be8e6f59714db05debf8c0560"
     },
-    "run_id": 41061935977,
+    "run_id": 41101879920,
     "status": "completed",
-    "test_job_id": 124083575863
+    "test_job_id": 124220361504
   },
   "runtime_admission": "REQUIRES_FRESH_EXACT_SOURCE_HEALTH",
   "schema": 1,

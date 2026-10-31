@@ -9,9 +9,9 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 ORIGIN='https://community-preview.wenwenwenyiyiyi.work'
 URL=ORIGIN+'/community/health'
 
-FIXED_FRONTEND = '57242e0be52e0535746c3f8c02dcf36bb69d6281'
-FIXED_BACKEND = '57242e0be52e0535746c3f8c02dcf36bb69d6281'
-FIXED_PROOF_SHA256 = 'a44125664276adae415d9a67734aee3aea3c03a92604a64482beb1761ac456f0'
+FIXED_FRONTEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
+FIXED_BACKEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
+FIXED_PROOF_SHA256 = '548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'
 FIXED_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 
 class NoRedirect(HTTPRedirectHandler):

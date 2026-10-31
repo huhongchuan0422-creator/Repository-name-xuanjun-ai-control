@@ -184,7 +184,7 @@ class EndpointContract(unittest.TestCase):
         def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message=''):
             contexts.append(dict(expected=expected,github=dict(event_name=event,sha=HEAD,ref=ref,
                 event=dict(head_commit=dict(message=message))),inputs=dict(preview_enabled=enabled,
-                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='41061935977')))
+                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='41101879920')))
         case(False);case(False,enabled=True,sha='b'*40)
         case(False,enabled=True,target='legacy');case(False,enabled=True,ref='refs/heads/main')
         case(True,enabled=True);case(False,event='push')
