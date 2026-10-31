@@ -28,7 +28,7 @@ def listing(c,uid,project):
     pages=[]
     for r in rows:
         if not r['page'].endswith(('.html','/')) or r.get('execution_scope')!='TRUSTED_CUSTOMER_FRONTEND':continue
-        pages.append({'path':r['page'],'sha256':r['page_sha256'],
+        pages.append({'path':r['page'],'page_key':digest(r['page'].encode()),'sha256':r['page_sha256'],
             'url':route(project,r['page'],r['page_sha256']),
             'review':Changes(c).review_status(uid,project,r['page'],r['page_sha256'])})
     return {'project':project,'pages':pages}
@@ -41,7 +41,8 @@ def review_queue(c,uid):
         try:pages=listing(c,uid,project['id'])['pages']
         except Denied:continue
         projects.append({'id':project['id'],'title':project.get('title',project['id']),
-                         'role':project['role'],'pages':pages})
+                         'role':project['role'],'pages':pages,
+                         'approval_capability':Changes(c).review_approval_capability(uid,project['id'])})
     return {'projects':projects,'scope':'AUTHORIZED_OWNER_PROJECTS_ONLY'}
 
 def original(c,uid,project,page_key,version):

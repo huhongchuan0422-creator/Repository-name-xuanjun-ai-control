@@ -197,7 +197,7 @@ class App:
                         'change_delivery_report':({'project','case','serve_id','report'},lambda:enqueue_preview_report(center,uid,body['project'],body['case'],body['serve_id'],body['report'])),
                         'change_updates':({'project','page','version'},lambda:Changes(center).page_updates(uid,body['project'],body['page'],body['version'])),
                         'change_retest':({'project','case','revision','page','version','delivery_sha256','action','reason'},lambda:Changes(center).retest(uid,body['project'],body['case'],body['revision'],body['page'],body['version'],body['delivery_sha256'],body['action'],body['reason'])),
-                        'review_approve':({'project','page','version','reason'},lambda:Changes(center).approve_reviewed_version(uid,body['project'],body['page'],body['version'],body['reason'])),
+                        'review_approve':({'project','page','version','task_id','reason'},lambda:Changes(center).approve_reviewed_version(uid,body['project'],body['page'],body['version'],body['task_id'],body['reason'])),
                         'change_context':({'project','page','version'},lambda:Changes(center)._preview(uid,body['project'],body['page'],body['version'])),
                         'change_submit':({'project','page','version','text','intent'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'],body['intent'])),
                         'change_submit_idempotent':({'project','page','version','text','intent','idempotency_key'},lambda:Changes(center).submit(uid,body['project'],body['page'],body['version'],body['text'],body['intent'],body['idempotency_key'])),

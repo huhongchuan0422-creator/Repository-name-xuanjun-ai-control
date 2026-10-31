@@ -3,12 +3,139 @@ import json
 import re
 import secrets
 import html
+import os
+import sqlite3
+import stat
 from scripts.pr122_customer_core import canonical, digest, safe_text, identifier, Denied, Conflict
 from scripts.pr122_customer_change_authority import preview, document, load
 
 
 class Changes:
     def __init__(self, center):self.c=center
+
+    @staticmethod
+    def canonical_task(db_path, project, task_id, policy):
+        """Read one existing task from the canonical registry; never create it."""
+        project=identifier(project);task_id=identifier(task_id)
+        required_policy={'task_id','attempt_id','spec_sha256','owner','writer_scope','authority_caller_id','board_id'}
+        if (type(db_path) is not str or not db_path.startswith('/') or
+                type(policy) is not dict or set(policy)!=required_policy or
+                any(type(policy[k]) is not str or not policy[k] for k in required_policy) or
+                identifier(policy['task_id'])!=task_id or
+                not re.fullmatch(r'[0-9a-f]{64}',policy['spec_sha256'])):
+            raise Denied('TASK_REGISTRY_CONFIG')
+        path=os.path.realpath(db_path)
+        parent=os.path.dirname(path)
+        flags=os.O_RDONLY|getattr(os,'O_CLOEXEC',0)|getattr(os,'O_NOFOLLOW',0)
+        try:
+            parent_fd=os.open(parent,os.O_RDONLY|getattr(os,'O_DIRECTORY',0)|getattr(os,'O_CLOEXEC',0)|getattr(os,'O_NOFOLLOW',0))
+            fd=os.open(os.path.basename(path),flags,dir_fd=parent_fd)
+        except OSError as exc:
+            raise Denied('TASK_REGISTRY_UNAVAILABLE') from exc
+        file_stat=os.fstat(fd);parent_stat=os.fstat(parent_fd)
+        runtime_ids={os.getegid(),*os.getgroups()}
+        try:
+            with open('/proc/self/status',encoding='ascii') as source:status=source.read()
+            capabilities=int(re.search(r'^CapEff:\s*([0-9a-fA-F]+)$',status,re.M).group(1),16)
+        except (OSError,AttributeError,ValueError) as exc:
+            os.close(fd);os.close(parent_fd)
+            raise Denied('TASK_REGISTRY_RUNTIME_IDENTITY') from exc
+        fd_path='/proc/self/fd/'+str(fd);parent_fd_path='/proc/self/fd/'+str(parent_fd)
+        if (path!=db_path or not stat.S_ISREG(file_stat.st_mode) or
+                os.geteuid()==0 or capabilities!=0 or
+                file_stat.st_uid==os.geteuid() or parent_stat.st_uid==os.geteuid() or
+                file_stat.st_gid in runtime_ids or parent_stat.st_gid in runtime_ids or
+                os.access(fd_path,os.W_OK,effective_ids=True) or
+                os.access(parent_fd_path,os.W_OK,effective_ids=True)):
+            os.close(fd);os.close(parent_fd)
+            raise Denied('TASK_REGISTRY_NOT_READ_ONLY')
+        for suffix in ('-wal','-journal'):
+            try:os.stat(os.path.basename(path)+suffix,dir_fd=parent_fd,follow_symlinks=False)
+            except FileNotFoundError:continue
+            except OSError as exc:
+                os.close(fd);os.close(parent_fd);raise Denied('TASK_REGISTRY_UNAVAILABLE') from exc
+            os.close(fd);os.close(parent_fd);raise Denied('TASK_REGISTRY_NOT_CHECKPOINTED')
+        try:db=sqlite3.connect('file:'+fd_path+'?mode=ro&immutable=1',uri=True,timeout=2)
+        except sqlite3.Error as exc:
+            os.close(fd);os.close(parent_fd);raise Denied('TASK_REGISTRY_UNAVAILABLE') from exc
+        db.row_factory=sqlite3.Row
+        try:
+            db.execute('PRAGMA query_only=ON')
+            db.execute('PRAGMA schema_version').fetchone()
+            sqlite_fds=[]
+            for value in os.listdir('/proc/self/fd'):
+                try:opened_by_sqlite=os.fstat(int(value))
+                except (OSError,ValueError):continue
+                if (int(value)!=fd and
+                        (opened_by_sqlite.st_dev,opened_by_sqlite.st_ino)==(file_stat.st_dev,file_stat.st_ino)):
+                    sqlite_fds.append(int(value))
+            if not sqlite_fds:raise Denied('TASK_REGISTRY_DESCRIPTOR_BINDING')
+            opened=os.stat(fd_path)
+            if (opened.st_dev,opened.st_ino)!=(file_stat.st_dev,file_stat.st_ino):
+                raise Denied('TASK_REGISTRY_CHANGED')
+            tables={row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            if not {'tasks','gateway_task_metadata'}<=tables:
+                raise Denied('TASK_REGISTRY_SCHEMA')
+            task_columns={row[1] for row in db.execute('PRAGMA table_info(tasks)')}
+            meta_columns={row[1] for row in db.execute('PRAGMA table_info(gateway_task_metadata)')}
+            if not {'authority_caller_id'}<=task_columns or not {'tenant_id','requester_principal_id'}<=meta_columns:
+                raise Denied('TASK_REGISTRY_IDENTITY_SCHEMA')
+            row=db.execute('''SELECT t.task_id,t.state,t.attempt_id,
+                t.spec_sha256,t.writer_scope,t.owner,t.authority_caller_id,
+                m.project_id,m.board_id,m.tenant_id,m.requester_principal_id
+                FROM tasks t JOIN gateway_task_metadata m
+                ON m.task_id=t.task_id WHERE t.task_id=? AND m.project_id=?''',
+                (task_id,project)).fetchone()
+            if row is None:raise Denied('CANONICAL_TASK_NOT_FOUND')
+            record=dict(row)
+            if (record['state'] not in {'READY','RECEIVED','STARTED','RUNNING','HANDOFF_PENDING'} or
+                    any(type(record[k]) is not str or not record[k] or record[k]=='UNKNOWN'
+                        for k in ('attempt_id','spec_sha256','writer_scope','owner','authority_caller_id','tenant_id','requester_principal_id')) or
+                    not re.fullmatch(r'[0-9a-f]{64}',record['spec_sha256']) or
+                    any(record[k]!=policy[k] for k in required_policy)):
+                raise Denied('CANONICAL_TASK_NOT_EXECUTABLE')
+            opened=os.stat(fd_path)
+            if (opened.st_dev,opened.st_ino)!=(file_stat.st_dev,file_stat.st_ino):
+                raise Denied('TASK_REGISTRY_CHANGED')
+            for sqlite_fd in sqlite_fds:
+                current=os.fstat(sqlite_fd)
+                if (current.st_dev,current.st_ino)!=(file_stat.st_dev,file_stat.st_ino):
+                    raise Denied('TASK_REGISTRY_CHANGED')
+            record['registry_record_sha256']=digest(canonical(record))
+            record['registry']='CANONICAL_TASK_REGISTRY'
+            return record
+        except sqlite3.Error as exc:
+            raise Denied('TASK_REGISTRY_UNAVAILABLE') from exc
+        finally:
+            db.close();os.close(fd);os.close(parent_fd)
+
+    def _canonical_task(self, project, task_id):
+        if self.c.task_registry_context is None:
+            raise Denied('TASK_REGISTRY_NOT_CONFIGURED')
+        record=self.c.task_registry_context(project,task_id)
+        if type(record) is not dict or record.get('task_id')!=task_id or record.get('project_id')!=project:
+            raise Denied('CANONICAL_TASK_BINDING')
+        return record
+
+    def _review_identity(self, uid, project):
+        """Return the existing explicitly confirmed PR122/Task-Center subject."""
+        from scripts.pr122_customer_identity import verified_mapping
+        p,_,_=self.c.project(uid,project,{'OWNER'})
+        row=self.c.db.execute('''SELECT * FROM identity_mappings
+            WHERE user_id=? AND tenant_id=? AND project_id=?''',(uid,p['tenant'],project)).fetchone()
+        if (row is None or row['status']!='ACTIVE' or row['expires']<=self.c.now() or
+                row['authority_revision']!=p['revision']):
+            raise Denied('CROSS_SERVICE_IDENTITY_MAPPING_UNAVAILABLE')
+        value=verified_mapping(self.c,row)
+        return {'tenant_id':p['tenant'],'requester_principal_id':value['domestic_customer_id'],
+                'mapping_id':row['id'],'mapping_version':row['version'],
+                'authority_revision':p['revision']}
+
+    def review_approval_capability(self, uid, project):
+        try:self._review_identity(uid,project)
+        except Denied:return {'enabled':False,'reason':'CROSS_SERVICE_IDENTITY_MAPPING_UNAVAILABLE'}
+        return {'enabled':False,'reason':'TASK_REGISTRY_REQUESTER_PRINCIPAL_NOT_AVAILABLE'}
 
     def _request_sha(self,events):return digest(canonical({'event_id':events[0]['id'],'payload':events[0]['payload']}))
 
@@ -129,21 +256,40 @@ class Changes:
                     'actor':row['actor'],'created':row['created'],
                     'text':payload['request'],'intent':payload['intent']})
         last=events[-1] if events else None
+        receipt=None
+        if last and last['kind']=='DESIGN_APPROVAL':
+            receipt={'event_id':last['id'],'task_id':last['payload']['task_id'],
+                'task_registry_record_sha256':last['payload']['task_registry']['registry_record_sha256'],
+                'record_sha256':digest(canonical(last['payload']))}
         return {'project':project,'page':page,'page_sha256':version,
             'state':last['payload']['state'] if last else 'PENDING_REVIEW',
             'comment_count':len(comments),'comments':comments,'events':events,
+            'approval_receipt':receipt,
             'meaning':'DESIGN_APPROVAL_ONLY_NOT_QA_RELEASE_OR_ACCEPTANCE'}
 
-    def approve_reviewed_version(self, uid, project, page, version, reason):
+    def approve_reviewed_version(self, uid, project, page, version, task_id, reason):
         self.c.project(uid,project,{'OWNER'});bound=self._preview(uid,project,page,version)
+        identity=self._review_identity(uid,project)
+        task_id=identifier(task_id);task=self._canonical_task(project,task_id)
+        if (task.get('tenant_id')!=identity['tenant_id'] or
+                task.get('requester_principal_id')!=identity['requester_principal_id']):
+            raise Denied('CROSS_SERVICE_IDENTITY_BINDING')
         status=self.review_status(uid,project,page,version)
-        if status['state']=='PENDING_DEVELOPMENT':return status
+        if status['state']=='DESIGN_APPROVED_TASK_BOUND':
+            if status['approval_receipt']['task_id']!=task_id:raise Conflict('REVIEW_TASK_CONFLICT')
+            return status
         case='review_'+digest(canonical({'project':project,'page':page,'version':version}))[:40]
         def guard():
             if self._preview(uid,project,page,version)!=bound:raise Conflict('AUTHORITY_CHANGED')
+            if self._review_identity(uid,project)!=identity:raise Conflict('IDENTITY_MAPPING_CHANGED')
+            if self._canonical_task(project,task_id)!=task:raise Conflict('TASK_REGISTRY_CHANGED')
         self._append(uid,project,case,0,'DESIGN_APPROVAL',
-            {'state':'PENDING_DEVELOPMENT','page':page,'page_sha256':version,
+            {'state':'DESIGN_APPROVED_TASK_BOUND','page':page,'page_sha256':version,
              'preview':bound,'reason':safe_text(reason),'design_approval':True,
+             'task_id':task_id,'task_registry':task,
+             'identity_binding':{'tenant_id':identity['tenant_id'],'mapping_id':identity['mapping_id'],
+                'mapping_version':identity['mapping_version'],'authority_revision':identity['authority_revision'],
+                'requester_principal_sha256':digest(identity['requester_principal_id'].encode())},
              'technical_qa':False,'release_approval':False,
              'business_acceptance':False},guard)
         return self.review_status(uid,project,page,version)
