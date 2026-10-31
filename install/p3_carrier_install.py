@@ -189,7 +189,14 @@ def _readback_target(target, manifest, manifest_sha256, carrier_archive_sha256):
         "carrier_manifest_sha256": manifest_sha256,
         "carrier_archive_sha256": carrier_archive_sha256,
         "execution_enabled": False, "notifications_enabled": False,
+        "host_bound": False, "real_task_executed": False,
     }
+    if set(receipt) != set(expected) | {"attempt_id"}:
+        return {"state": "CONFLICT", "target": target,
+                "field": "receipt_keys"}
+    if not ATTEMPT.fullmatch(receipt.get("attempt_id") or ""):
+        return {"state": "CONFLICT", "target": target,
+                "field": "attempt_id"}
     for key, value in expected.items():
         if receipt.get(key) != value:
             return {"state": "CONFLICT", "target": target, "field": key}

@@ -44,6 +44,15 @@ class CarrierInstallTests(unittest.TestCase):
         self.manifest_sha = installer._digest(self.manifest_path)
         self.archive_sha = "3" * 64
 
+    def _install_receipt_path(self):
+        return os.path.join(
+            self.releases, "p3-" + self.archive_sha[:20],
+            "INSTALL_RECEIPT.json")
+
+    def _rewrite_install_receipt(self, path, value):
+        os.chmod(path, 0o600)
+        write_json(path, value)
+
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
@@ -64,6 +73,73 @@ class CarrierInstallTests(unittest.TestCase):
             "install-attempt-01")
         self.assertEqual("INSTALLED_EFFECT_RECOVERED_NO_REPLAY",
                          recovered["recovery"])
+
+    def test_bound_or_executed_receipt_never_reads_back_idempotent_or_recovered(self):
+        mutations = (
+            {"host_bound": True},
+            {"real_task_executed": True},
+            {"host_bound": True, "real_task_executed": True},
+        )
+        for number, mutation in enumerate(mutations):
+            with self.subTest(mutation=mutation):
+                if number:
+                    shutil.rmtree(self.releases)
+                    shutil.rmtree(self.state)
+                installer.install(
+                    self.root, self.manifest_path, self.manifest_sha,
+                    self.archive_sha, self.releases, self.state,
+                    "install-attempt-01", lambda: True,
+                    enforce_root=False)
+                receipt_path = self._install_receipt_path()
+                with open(receipt_path) as source:
+                    receipt = json.load(source)
+                receipt.update(mutation)
+                self._rewrite_install_receipt(receipt_path, receipt)
+
+                observed = installer.readback(
+                    self.root, self.manifest_path, self.manifest_sha,
+                    self.archive_sha, self.releases)
+                self.assertEqual("CONFLICT", observed["state"])
+                self.assertIn(observed["field"], mutation)
+
+                with self.assertRaisesRegex(
+                        ValueError, "EXISTING_RELEASE_CONFLICT"):
+                    installer.install(
+                        self.root, self.manifest_path, self.manifest_sha,
+                        self.archive_sha, self.releases, self.state,
+                        "install-attempt-01", lambda: True,
+                        enforce_root=False)
+
+                recovered = installer.recover(
+                    self.root, self.manifest_path, self.manifest_sha,
+                    self.archive_sha, self.releases, self.state,
+                    "install-attempt-01")
+                self.assertEqual("CONFLICT", recovered["state"])
+                self.assertEqual("RESULT_MISSING_HOLD_NO_REPLAY",
+                                 recovered["recovery"])
+
+    def test_install_receipt_requires_exact_keys_and_valid_attempt(self):
+        installer.install(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases, self.state,
+            "install-attempt-01", lambda: True, enforce_root=False)
+        receipt_path = self._install_receipt_path()
+        with open(receipt_path) as source:
+            receipt = json.load(source)
+        receipt["unexpected"] = True
+        self._rewrite_install_receipt(receipt_path, receipt)
+        observed = installer.readback(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases)
+        self.assertEqual("receipt_keys", observed["field"])
+
+        del receipt["unexpected"]
+        receipt["attempt_id"] = "invalid attempt"
+        self._rewrite_install_receipt(receipt_path, receipt)
+        observed = installer.readback(
+            self.root, self.manifest_path, self.manifest_sha,
+            self.archive_sha, self.releases)
+        self.assertEqual("attempt_id", observed["field"])
 
     def test_missing_current_controlled_authority_fails_before_effect(self):
         with self.assertRaisesRegex(PermissionError,
