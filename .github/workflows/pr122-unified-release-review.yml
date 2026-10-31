@@ -188,3 +188,22 @@ jobs:
           retention-days: 14
 
 
+
+      - name: Verify exact approved full public package metadata
+        run: |
+          python -B - <<'PYMETADATA'
+          import hashlib,json
+          from pathlib import Path
+          raw=Path('evidence/pr122-delivery-release/approved-full-public-package-metadata.json').read_bytes()
+          assert len(raw)==1024 and hashlib.sha256(raw).hexdigest()=='055a5e81410566f8a763256321a430ab88b23f9a2a35158f116578b72723cd73'
+          value=json.loads(raw)
+          assert set(value)=={'project','version','source_id','object_spec','artifact'}
+          assert value['object_spec']['artifact_id']==13029845553
+          assert value['object_spec']['package']['members'][0]['sha256']=='4881d1e30da4815969cb44fd82411e0bef179cafa3444bf03f58e0ad8aabed80'
+          PYMETADATA
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr122-approved-full-public-metadata-${{ github.sha }}
+          path: evidence/pr122-delivery-release/approved-full-public-package-metadata.json
+          if-no-files-found: error
+          retention-days: 14
