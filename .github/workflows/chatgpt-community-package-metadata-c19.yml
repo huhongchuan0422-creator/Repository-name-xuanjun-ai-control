@@ -10,11 +10,12 @@ on:
       - 'delivery/community-installer-57242-253cad/package-metadata.json'
       - 'delivery/community-installer-4f1c3-36b564/COMMUNITY_4F_ORIGINAL_INSTALL.py'
       - 'delivery/community-installer-4f1c3-36b564/package-metadata.json'
+      - 'delivery/community-superadmin-e23e186-image/package-metadata.json'
 permissions:
   contents: read
 jobs:
   deliver-fixed-metadata:
-    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-f9603d]') && !contains(github.event.head_commit.message, '[community-installer-253cad]') && !contains(github.event.head_commit.message, '[community-installer-253cad-metadata]') && !contains(github.event.head_commit.message, '[community-installer-36b564]') && !contains(github.event.head_commit.message, '[community-installer-36b564-metadata]')
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && !contains(github.event.head_commit.message, '[community-installer-f9603d]') && !contains(github.event.head_commit.message, '[community-installer-253cad]') && !contains(github.event.head_commit.message, '[community-installer-253cad-metadata]') && !contains(github.event.head_commit.message, '[community-installer-36b564]') && !contains(github.event.head_commit.message, '[community-installer-36b564-metadata]') && !contains(github.event.head_commit.message, '[community-superadmin-e23e-image-metadata]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -178,3 +179,34 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+
+  deliver-fixed-superadmin-image-metadata:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && contains(github.event.head_commit.message, '[community-superadmin-e23e-image-metadata]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Verify fixed superadmin image metadata only; never download or execute image
+        run: |
+          python - <<'PYVERIFY'
+          import hashlib,json,pathlib
+          raw=pathlib.Path('delivery/community-superadmin-e23e186-image/package-metadata.json').read_bytes()
+          assert len(raw)==228342
+          assert hashlib.sha256(raw).hexdigest()=='7b17938a35b3a00813b8dec797749936c550122e2d0ead46e50e8414f53000c3'
+          value=json.loads(raw)
+          assert value['object_spec']['artifact_id']==13031974499
+          assert value['object_spec']['run_id']==41174428292
+          assert value['object_spec']['head_sha']=='e23e1868b16f6c4c3f30f158418e6557037df28e'
+          assert value['object_spec']['package']['payload']=='community-backend-image.tar.gz'
+          print('FIXED_METADATA_BYTES_MATCH; NOT_DOWNLOADED; NOT_INSTALLED')
+          PYVERIFY
+      - name: Publish exact single superadmin image metadata member
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-e23e186-image-metadata
+          path: delivery/community-superadmin-e23e186-image/package-metadata.json
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 3
