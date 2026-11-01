@@ -1291,15 +1291,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund miniprogram-ci@2.1.31
+          npm install --prefix "$RUNNER_TEMP/community-mini-ci" --no-audit --no-fund --omit=optional miniprogram-ci@2.1.31
           mkdir "$RUNNER_TEMP/community-mini-sdk-bundle"
           tar -czf "$RUNNER_TEMP/community-mini-sdk-bundle/sdk.tar.gz" -C "$RUNNER_TEMP/community-mini-ci" node_modules
           cd "$RUNNER_TEMP/community-mini-sdk-bundle"
           sha256sum sdk.tar.gz > sdk.sha256
+          split -b 8m -d -a 2 sdk.tar.gz sdk.part.
+          test -f sdk.part.00 && test -f sdk.part.06 && test ! -e sdk.part.07
       - uses: actions/upload-artifact@v4
         with:
-          name: community-mini-sdk-runtime
-          path: ${{ runner.temp }}/community-mini-sdk-bundle/
+          name: community-mini-sdk-runtime-00
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.00
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-01
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.01
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-02
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.02
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-03
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.03
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-04
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.04
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-05
+          path: ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.05
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-sdk-runtime-06
+          path: |
+            ${{ runner.temp }}/community-mini-sdk-bundle/sdk.part.06
+            ${{ runner.temp }}/community-mini-sdk-bundle/sdk.sha256
           retention-days: 1
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
@@ -1386,13 +1420,15 @@ jobs:
           SOURCE
       - uses: actions/download-artifact@v4
         with:
-          name: community-mini-sdk-runtime
+          pattern: community-mini-sdk-runtime-*
+          merge-multiple: true
           path: ${{ runner.temp }}/community-mini-sdk-bundle
       - name: Verify and unpack credential-free SDK into task temporary directory
         shell: bash
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          cat sdk.part.* > sdk.tar.gz
           sha256sum -c sdk.sha256
           mkdir -p "$RUNNER_TEMP/community-mini-ci"
           tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
