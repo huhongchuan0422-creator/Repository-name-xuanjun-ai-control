@@ -13,13 +13,19 @@ Page({
   navigateSection(e){return auth.navigate(this,e.currentTarget.dataset.section,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店',false);return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?this.data.selectedRecommendation:null;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='services'||view==='profile'?'profile':'recommendations',selectedRecommendation,sceneStorefront:view==='store-detail'?this.data.sceneStorefront:null});if((mode||this.data.demoStore)&&this.data.sessionReady){if(view==='recommendations')this.loadDirectory();else if(view==='orders')this.loadOrders();else if(view==='services'&&!this.scene)this.loadContexts();}if(!mode&&this.data.sessionReady&&this.data.selectedRecommendation&&this.data.selectedRecommendation.is_demo)this.openRecommendation({currentTarget:{dataset:{id:this.data.selectedRecommendation.id}}});if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this._sceneStale){this.onLoad({scene:this.scene,view:this.data.viewMode});}},
   async openRecommendation(e){
-    const id=e&&e.currentTarget.dataset.id;if(!this.data.directory.some(r=>r.id===id)&&!(this.data.demoStore&&this.data.demoStore.id===id))return;
+    const id=e&&e.currentTarget.dataset.id,listed=this.data.directory.find(r=>r.id===id);if(!listed&&!(this.data.demoStore&&this.data.demoStore.id===id))return;
+    if(listed&&listed.platform_self_operated===true)return this.openPlatformMall(listed);
     const request={...this.customerReadToken(),id};this._detailRequest=request;
     this.setData({viewMode:'store-detail',selectedRecommendation:null,sceneStorefront:null,detailState:'LOADING',activeSection:'recommendations'});
     try{const r=await request.session.customer('store',{id});if(!this.customerReadCurrent(request)||this._detailRequest!==request)return;
       if(!(id.startsWith('demo_')?this.validDemoStore(r):this.validPublicStore(r))||r.id!==id)throw Error('门店资料返回未确认');
       this.setData({selectedRecommendation:r,detailState:'READY',demoPhotoFailed:false});
     }catch(e){if(this.customerReadDenied(request,e))return;if(this.customerReadCurrent(request)&&this._detailRequest===request){if(id.startsWith('demo_'))this.clearDemoProjection('展示商家暂不可用');this.setData({detailState:'FAILED',directoryError:e.message});}}
+  },
+  async openPlatformMall(record){
+    if(!record||record.platform_self_operated!==true||typeof record.scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(record.scene))return;
+    getApp().globalData.scene=record.scene;this.setData({viewMode:'services',activeSection:'profile',serviceView:'products',selectedRecommendation:null});
+    await this.onLoad({scene:record.scene,view:'services'});if(!this._pageUnloaded&&this.scene===record.scene)this.setData({viewMode:'services',activeSection:'profile',serviceView:'products'});
   },
   async loadSceneStorefront(){
     if(!this.scene||!this.session||!this.client||!this.data.sessionReady)return;
@@ -67,7 +73,7 @@ Page({
   },
   validDemoStore(r){return r&&typeof r.id==='string'&&/^demo_[a-f0-9]{64}$/.test(r.id)&&r.is_demo===true&&r.display_only===true&&r.payment_enabled===false&&r.purchasing_enabled===false&&r.include_in_real_statistics===false&&r.category_state==='DEMO'&&r.version===1&&r.profile_version===0&&r.photo_asset_id==='community-demo-storefront-v1'&&r.storefront_photo===null&&r.photo_state==='BUNDLED_DEMO_ASSET_PENDING'&&typeof r.name==='string'&&typeof r.description==='string';},
   demoImageError(){this.setData({demoPhotoFailed:true});},
-  validPublicStore(r){return r&&r.is_demo!==true&&typeof r.id==='string'&&/^[a-f0-9]{64}$/.test(r.id)&&typeof r.name==='string'&&typeof r.description==='string'&&r.storefront_photo===null&&r.photo_state==='NOT_CONNECTED';},
+  validPublicStore(r){return r&&r.is_demo!==true&&typeof r.id==='string'&&/^[a-f0-9]{64}$/.test(r.id)&&typeof r.name==='string'&&typeof r.description==='string'&&r.storefront_photo===null&&r.photo_state==='NOT_CONNECTED'&&(r.platform_self_operated===undefined&&r.scene===undefined||typeof r.platform_self_operated==='boolean'&&(r.platform_self_operated?typeof r.scene==='string'&&/^[A-Za-z0-9_-]{1,32}$/.test(r.scene):r.scene===null));},
   async loadDirectory(e){
     if(!this.session||!this.data.sessionReady)return;
     const more=e?.currentTarget?.dataset?.more==='true';if(more&&!this.data.directoryMore)return;

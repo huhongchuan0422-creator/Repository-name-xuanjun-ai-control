@@ -51,18 +51,28 @@ function sourceIdentity(){
   if(env.COMMUNITY_PREVIEW_PRODUCT_CONTEXT)throw Error('UNEXPECTED_PRODUCT_CONTEXT');
   return {product_source_sha:env.GITHUB_SHA||null,control_source_sha:env.GITHUB_SHA||null,source_root:null,fixed_product:false};
  }
+ const kind=env.COMMUNITY_FIXED_PRODUCT_KIND||'legacy-4f';
+ if(!['legacy-4f','r1-7ca1ac2a','current-5e264'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
+ const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-5e264'?'community_mini_current_input.py':'community_preview_fixed_product.py';
  const keys=['PATH','GITHUB_SHA','GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT',
   'PREVIEW_CONTROL_SHA','PREVIEW_SOURCE_SHA','PREVIEW_TARGET','PREVIEW_EVIDENCE_RUN_ID','PREVIEW_ENABLED',
-  'IMAGE_BUILD_ENABLED','RUNNER_TEMP','COMMUNITY_FIXED_PRODUCT_PREVIEW','COMMUNITY_PREVIEW_PRODUCT_CONTEXT'];
+  'PREVIEW_PRODUCT_TREE','PREVIEW_PRODUCT_ZIP_SHA256','PREVIEW_BINDING_ID','IMAGE_BUILD_ENABLED','RUNNER_TEMP',
+  'COMMUNITY_FIXED_PRODUCT_PREVIEW','COMMUNITY_FIXED_PRODUCT_KIND','COMMUNITY_PREVIEW_PRODUCT_CONTEXT'];
  const childEnv=Object.fromEntries(keys.filter(k=>env[k]!==undefined).map(k=>[k,env[k]]));
  let identity;
  try{identity=JSON.parse(require('node:child_process').execFileSync('/usr/bin/python3',
-  ['-I','-B',path.resolve(__dirname,'../../scripts/community_preview_fixed_product.py'),'identity'],
+  ['-I','-B',path.resolve(__dirname,'../../scripts/'+helper),'identity'],
   {env:childEnv,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['ignore','pipe','pipe']}));}
  catch(_){throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');}
- if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||
-    identity.product_source_sha!==FIXED_FRONTEND||identity.backend_source_sha!==FIXED_BACKEND||
-    identity.compatibility!==FIXED_COMPATIBILITY||identity.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
+ const legacy=identity.product_source_sha===FIXED_FRONTEND&&identity.backend_source_sha===FIXED_BACKEND&&
+   identity.compatibility===FIXED_COMPATIBILITY&&identity.compatibility_sha256===FIXED_PROOF_SHA256;
+ const exactR1=kind==='r1-7ca1ac2a'&&identity.product_source_sha==='7ca1ac2a4e5a68704bb0cebe1c33049713070859'&&
+   identity.backend_source_sha===identity.product_source_sha&&identity.compatibility==='EXACT_SOURCE_MATCH'&&
+   identity.compatibility_sha256===undefined;
+ const exactCurrent=kind==='current-5e264'&&identity.product_source_sha==='5e26425d58bc2a1102a50be8aae3053200f6f875'&&
+   identity.backend_source_sha===identity.product_source_sha&&identity.compatibility==='EXACT_SOURCE_MATCH'&&
+   identity.compatibility_sha256===undefined;
+ if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||!(legacy||exactR1||exactCurrent))throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
 
@@ -78,7 +88,7 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),cont
  if(controlSha!==null&&report?.control_source_sha!==controlSha)throw Error('MATCHING_CONTROL_READINESS_REQUIRED');
  const fixedPair=head===FIXED_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
  const expectedBackend=fixedPair?FIXED_BACKEND:head;
- const expectedCompatibility=fixedPair?FIXED_COMPATIBILITY:'EXACT_SOURCE_MATCH';
+ const expectedCompatibility='EXACT_SOURCE_MATCH';
  if(fixedPair && report?.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||

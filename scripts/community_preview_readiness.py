@@ -44,11 +44,15 @@ def check(open_url=None, profile=None, product_identity=None):
         expected_backend=head
         compatibility='EXACT_SOURCE_MATCH'
         if product_identity and product_identity.get('fixed_product'):
-            if (head != FIXED_FRONTEND or product_identity.get('backend_source_sha') != FIXED_BACKEND
-                    or product_identity.get('compatibility') != FIXED_COMPATIBILITY
-                    or product_identity.get('compatibility_sha256') != FIXED_PROOF_SHA256):return report
-            expected_backend=FIXED_BACKEND;compatibility=FIXED_COMPATIBILITY
-            report['compatibility_sha256']=FIXED_PROOF_SHA256
+            legacy = (head == FIXED_FRONTEND and product_identity.get('backend_source_sha') == FIXED_BACKEND
+                      and product_identity.get('compatibility') == FIXED_COMPATIBILITY
+                      and product_identity.get('compatibility_sha256') == FIXED_PROOF_SHA256)
+            exact_source = (head == product_identity.get('backend_source_sha')
+                            and product_identity.get('compatibility') == 'EXACT_SOURCE_MATCH'
+                            and 'compatibility_sha256' not in product_identity)
+            if not (legacy or exact_source):return report
+            expected_backend=product_identity['backend_source_sha'];compatibility='EXACT_SOURCE_MATCH'
+            if legacy:report['compatibility_sha256']=FIXED_PROOF_SHA256
         if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
@@ -83,7 +87,12 @@ if __name__=='__main__':
     args=parser.parse_args()
     # -I keeps imports isolated; load only our checked-out adjacent control helper.
     import importlib.util
-    spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name('community_preview_fixed_product.py'))
+    kind=os.environ.get('COMMUNITY_FIXED_PRODUCT_KIND','legacy-4f')
+    if kind not in ('legacy-4f','r1-7ca1ac2a','current-5e264'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
+    helper=('community_mini_r1_input.py' if kind=='r1-7ca1ac2a' else
+            'community_mini_current_input.py' if kind=='current-5e264' else
+            'community_preview_fixed_product.py')
+    spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name(helper))
     helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)
     report=check(product_identity=helper.identity(os.environ))
     output=Path(args.output);output.parent.mkdir(parents=True,exist_ok=True,mode=0o700)

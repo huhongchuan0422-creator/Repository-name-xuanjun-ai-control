@@ -13,7 +13,10 @@ async function main(){
   catch(e){if(e.code!=='ENOENT')throw e;}
  }
  const identity=require('../deploy/community-preview/endpoint.cjs').sourceIdentity();
- if(operation==='upload'&&(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch'||!identity.fixed_product))throw Error('EXPLICIT_FIXED_PRODUCT_UPLOAD_REQUIRED');
+ const explicitDispatch=process.env.GITHUB_EVENT_NAME==='workflow_dispatch';
+ const exactPush=process.env.GITHUB_EVENT_NAME==='push'&&process.env.COMMUNITY_MINI_PUSH_UPLOAD==='true'&&
+   process.env.GITHUB_SHA===identity.control_source_sha;
+ if(operation==='upload'&&(!(explicitDispatch||exactPush)||!identity.fixed_product))throw Error('EXPLICIT_FIXED_PRODUCT_UPLOAD_REQUIRED');
  const version='ui-'+identity.product_source_sha.slice(0,12);
  const description='Community development product '+identity.product_source_sha.slice(0,12)+' control '+identity.control_source_sha.slice(0,12);
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
