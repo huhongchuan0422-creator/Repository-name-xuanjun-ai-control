@@ -9,6 +9,7 @@ on:
       - 'scripts/pr122_customer_review.py'
       - 'scripts/pr122_site_hub_host_preflight.py'
       - 'scripts/pr122_site_hub_combined.py'
+      - 'scripts/pr122_site_hub_experience_release.py'
       - 'tests/test_pr122_static_*.py'
       - 'scripts/pr122_site_hub_unified_package.py'
       - 'scripts/pr122_site_hub_unified_release.py'
