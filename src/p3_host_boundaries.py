@@ -413,14 +413,17 @@ class RunnerController(object):
             ref = self.adapter.stop(dict(subject), reason)
         except Exception:
             return {"state": "UNKNOWN_STOP_EFFECT_HOLD", "automatic_retry": False}
-        receipt = self.verifier.read(ref, "RUNNER_STOP", subject)
-        payload = _exact(receipt["payload"], {
-            "writer_stopped", "descendants_stopped", "effects"
-        }, "EXACT_RUNNER_STOP_REQUIRED")
-        if (payload["writer_stopped"] is not True
-                or payload["descendants_stopped"] is not True
-                or payload["effects"] not in ("NONE", "KNOWN")):
-            raise ValueError("STOP_NOT_RECONCILED")
+        try:
+            receipt = self.verifier.read(ref, "RUNNER_STOP", subject)
+            payload = _exact(receipt["payload"], {
+                "writer_stopped", "descendants_stopped", "effects"
+            }, "EXACT_RUNNER_STOP_REQUIRED")
+            if (payload["writer_stopped"] is not True
+                    or payload["descendants_stopped"] is not True
+                    or payload["effects"] not in ("NONE", "KNOWN")):
+                raise ValueError("STOP_NOT_RECONCILED")
+        except Exception:
+            return {"state": "UNKNOWN_STOP_EFFECT_HOLD", "automatic_retry": False}
         return dict(payload, state="STOPPED_RECONCILIATION_REQUIRED",
                     receipt_sha256=receipt["receipt_sha256"],
                     automatic_retry=False)
@@ -436,6 +439,15 @@ class OutboxController(object):
     def send(self, subject, envelope):
         self.gate.check(subject, notifications=True)
         try:
+            binding = envelope["binding"]
+            opaque_notification_id = envelope["opaque_notification_id"]
+            attempt_nonce = envelope["attempt_nonce"]
+        except (KeyError, TypeError):
+            raise ValueError("ORIGINAL_SEND_ATTEMPT_REQUIRED")
+        if not all(_text(value) for value in
+                   (binding, opaque_notification_id, attempt_nonce)):
+            raise ValueError("ORIGINAL_SEND_ATTEMPT_REQUIRED")
+        try:
             ref = self.transport.send(dict(envelope))
         except Exception:
             return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
@@ -445,8 +457,11 @@ class OutboxController(object):
                 "binding", "opaque_notification_id", "attempt_nonce", "state",
                 "delivery_receipt_id"
             }, "EXACT_OUTBOX_SEND_REQUIRED")
-            if payload["state"] not in ("SENT", "UNKNOWN"):
-                raise ValueError("INVALID_SEND_RESULT")
+            if (payload["binding"] != binding
+                    or payload["opaque_notification_id"] != opaque_notification_id
+                    or payload["attempt_nonce"] != attempt_nonce
+                    or payload["state"] not in ("SENT", "UNKNOWN")):
+                raise ValueError("SEND_NOT_BOUND_TO_ORIGINAL_ATTEMPT")
         except Exception:
             return {"state": "UNKNOWN_NO_REDIAL", "automatic_retry": False}
         return dict(payload, receipt_sha256=receipt["receipt_sha256"],
@@ -483,12 +498,15 @@ class OutboxController(object):
             ref = self.transport.ack(delivery_receipt_id)
         except Exception:
             return {"state": "ACK_UNKNOWN_HOLD", "automatic_retry": False}
-        receipt = self.verifier.read(ref, "OUTBOX_ACK", subject)
-        payload = _exact(receipt["payload"], {"delivery_receipt_id", "acked"},
-                         "EXACT_OUTBOX_ACK_REQUIRED")
-        if payload["delivery_receipt_id"] != delivery_receipt_id \
-                or payload["acked"] is not True:
-            raise ValueError("OUTBOX_ACK_NOT_BOUND")
+        try:
+            receipt = self.verifier.read(ref, "OUTBOX_ACK", subject)
+            payload = _exact(receipt["payload"], {"delivery_receipt_id", "acked"},
+                             "EXACT_OUTBOX_ACK_REQUIRED")
+            if payload["delivery_receipt_id"] != delivery_receipt_id \
+                    or payload["acked"] is not True:
+                raise ValueError("OUTBOX_ACK_NOT_BOUND")
+        except Exception:
+            return {"state": "ACK_UNKNOWN_HOLD", "automatic_retry": False}
         return {"state": "ACK_VERIFIED", "receipt_sha256": receipt["receipt_sha256"],
                 "automatic_retry": False}
 

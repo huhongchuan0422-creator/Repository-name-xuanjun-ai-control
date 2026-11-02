@@ -267,7 +267,10 @@ class BoundaryTests(unittest.TestCase):
         transport = Transport(self.provider)
         transport.fail_send = True
         outbox = OutboxController(self.gate(notifications=True), self.verifier, transport)
-        result = outbox.send(SUBJECT, {"opaque": "payload"})
+        result = outbox.send(SUBJECT, {
+            "binding": "binding-1", "opaque_notification_id": "notice-1",
+            "attempt_nonce": "nonce-1", "opaque": "payload"
+        })
         self.assertEqual("UNKNOWN_NO_REDIAL", result["state"])
         self.assertFalse(result["automatic_retry"])
 
@@ -275,7 +278,10 @@ class BoundaryTests(unittest.TestCase):
         transport = Transport(self.provider)
         outbox = OutboxController(self.gate(), self.verifier, transport)
         with self.assertRaises(PermissionError):
-            outbox.send(SUBJECT, {"opaque": "payload"})
+            outbox.send(SUBJECT, {
+                "binding": "binding-1", "opaque_notification_id": "notice-1",
+                "attempt_nonce": "nonce-1", "opaque": "payload"
+            })
 
     def test_outbox_lookup_and_ack_are_bound(self):
         transport = Transport(self.provider)

@@ -87,6 +87,50 @@ class TamperedSendTransport(OutboxTransport):
         raise NotImplementedError
 
 
+class CrossAttemptTransport(TamperedSendTransport):
+    def send(self, envelope):
+        self.calls += 1
+        return self.provider.add("send-other-attempt", "OUTBOX_SEND", {
+            "binding": "other-binding", "opaque_notification_id": "other-notice",
+            "attempt_nonce": "other-nonce", "state": "SENT",
+            "delivery_receipt_id": "delivery-other"
+        })
+
+
+class UnverifiableStopRunner(RunnerAdapter):
+    def __init__(self, provider):
+        self.provider = provider
+        self.calls = 0
+
+    def launch(self, value):
+        raise NotImplementedError
+
+    def resume(self, value):
+        raise NotImplementedError
+
+    def inspect(self, subject):
+        raise NotImplementedError
+
+    def stop(self, subject, reason):
+        self.calls += 1
+        ref = self.provider.add("stop-tampered", "RUNNER_STOP", {
+            "writer_stopped": True, "descendants_stopped": True,
+            "effects": "KNOWN"
+        })
+        self.provider.values[ref]["payload"]["effects"] = "tampered"
+        return ref
+
+
+class UnverifiableAckTransport(TamperedSendTransport):
+    def ack(self, delivery_receipt_id):
+        self.calls += 1
+        ref = self.provider.add("ack-tampered", "OUTBOX_ACK", {
+            "delivery_receipt_id": delivery_receipt_id, "acked": True
+        })
+        self.provider.values[ref]["payload"]["acked"] = False
+        return ref
+
+
 class Supervisor(object):
     def __init__(self):
         self.calls = 0
@@ -191,8 +235,38 @@ class QACounterexamples(unittest.TestCase):
     def test_unverifiable_post_send_receipt_is_no_redial_hold(self):
         transport = TamperedSendTransport(self.provider)
         controller = OutboxController(self.gate, self.verifier, transport)
-        result = controller.send(SUBJECT, {"opaque": "payload"})
+        result = controller.send(SUBJECT, {
+            "binding": "binding-1", "opaque_notification_id": "notice-1",
+            "attempt_nonce": "nonce-1", "opaque": "payload"
+        })
         self.assertEqual("UNKNOWN_NO_REDIAL", result["state"])
+        self.assertFalse(result["automatic_retry"])
+        self.assertEqual(1, transport.calls)
+
+    def test_send_receipt_for_different_attempt_is_no_redial_hold(self):
+        transport = CrossAttemptTransport(self.provider)
+        controller = OutboxController(self.gate, self.verifier, transport)
+        result = controller.send(SUBJECT, {
+            "binding": "binding-1", "opaque_notification_id": "notice-1",
+            "attempt_nonce": "nonce-1", "opaque": "payload"
+        })
+        self.assertEqual("UNKNOWN_NO_REDIAL", result["state"])
+        self.assertFalse(result["automatic_retry"])
+        self.assertEqual(1, transport.calls)
+
+    def test_unverifiable_post_stop_receipt_is_explicit_hold(self):
+        runner = UnverifiableStopRunner(self.provider)
+        controller = RunnerController(self.gate, self.verifier, runner)
+        result = controller.stop(SUBJECT, "progress deadline")
+        self.assertEqual("UNKNOWN_STOP_EFFECT_HOLD", result["state"])
+        self.assertFalse(result["automatic_retry"])
+        self.assertEqual(1, runner.calls)
+
+    def test_unverifiable_post_ack_receipt_is_explicit_hold(self):
+        transport = UnverifiableAckTransport(self.provider)
+        controller = OutboxController(self.gate, self.verifier, transport)
+        result = controller.ack(SUBJECT, "delivery-1")
+        self.assertEqual("ACK_UNKNOWN_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])
         self.assertEqual(1, transport.calls)
 
