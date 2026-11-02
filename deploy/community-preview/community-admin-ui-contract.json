@@ -2,9 +2,9 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "5982a4b16af36aac59e5c312126e0876e963bf7a",
-  "baseline_source_tree": "2f65a6e8839ff677d26afd3a8ea27166bce25355",
-  "owner_amendment_id": "PRODUCT_PRICE_STOCK_AND_PAGE_RELEVANCE_20261103",
+  "baseline_source_commit": "3ffbe59a838019d14738ffcc75b09fbd900bec91",
+  "baseline_source_tree": "1c9e16755ce7601f2f34be9874f1792046fcf0d3",
+  "owner_amendment_id": "PRODUCT_PRICE_STOCK_PAGE_RELEVANCE_AND_MULTI_KEYWORD_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
     "developer_may_amend_contract": false,
@@ -80,7 +80,7 @@
     "demos/community-stage/web-session.js": "147e2d8970c46af5e1e3ff2562620a982194a2fe9f6e4325ed26bf22f19ab5e4",
     "demos/community-stage/workbench.css": "2afa6830accb4c19e5a2b6180c209d4c1750fe45d5fc1045884ae39851a97b0b",
     "demos/community-stage/workbench.html": "66ea09bff499378b976f805420c8ffbeeefd8bdf597855a50ee38fccf0572a07",
-    "demos/community-stage/workbench.js": "d5c337ff31fb0e862cd619de9ee08d2216612cc3d89de1f75a67a32e88640d91",
+    "demos/community-stage/workbench.js": "5e5bfa6456d967a44d3ab43de40eb01035eda06602e89e368cb7ccce7663cffb",
     "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
   }
 }

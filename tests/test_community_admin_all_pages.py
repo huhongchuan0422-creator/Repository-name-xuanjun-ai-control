@@ -147,6 +147,8 @@ class CommunityAdminAllPages(unittest.TestCase):
             "['商品图片','商品编号','商品名称','商品描述','状态','售价 / 库存','操作']",
             "yuanToMinor($('itemPrice').value,'单价')",
             "commerce(t,'price_set',{item_id:itemId",
+            "keywords.every(keyword=>text.includes(keyword))",
+            "matchesCatalogKeywords(item,query)",
             "['广告图片','广告编号','广告标题','广告位','投放状态','审核状态','投放时间','操作']",
         ):
             self.assertIn(phrase, script)
