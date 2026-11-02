@@ -26,7 +26,7 @@ HERE=Path(__file__).resolve()
 ROOT=HERE.parents[1]
 PINS=ROOT/'deploy/pr122-site-hub-unified/HOST_PINS.json'
 HELPER=ROOT/'scripts/pr122_site_hub_combined.py'
-HELPER_SHA='8c403aac42253612c41465dbfdd3b9f43861449b2526a072ebd87bf02227cad3'
+HELPER_SHA='82be9c26fc834034363a1db79a25a7e4cd84e20fe9b4bf10c5b103eb26bdc534'
 
 def digest(raw):return hashlib.sha256(raw).hexdigest()
 def need(ok,reason):

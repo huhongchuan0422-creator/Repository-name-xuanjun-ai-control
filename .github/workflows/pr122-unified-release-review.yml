@@ -7,6 +7,8 @@ on:
       - 'scripts/pr122_static_*.py'
       - 'scripts/pr122_customer_workflow.py'
       - 'scripts/pr122_customer_review.py'
+      - 'scripts/pr122_site_hub_host_preflight.py'
+      - 'scripts/pr122_site_hub_combined.py'
       - 'tests/test_pr122_static_*.py'
       - 'scripts/pr122_site_hub_unified_package.py'
       - 'scripts/pr122_site_hub_unified_release.py'
@@ -74,6 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install cryptography==46.0.3
+          python -B -m unittest tests.test_pr122_static_cloud_auth_compat -v
           python -B -m unittest tests.test_pr122_delivery_controlled_apply tests.test_pr122_static_github_approval tests.test_pr122_static_public_transport tests.test_pr122_static_package_schema tests.test_pr122_static_workflow tests.test_pr122_static_signature tests.test_pr122_static_operations tests.test_pr122_static_source_gate tests.test_pr122_static_source_package tests.test_pr122_customer_workflow tests.test_pr122_customer_workflow_apply tests.test_pr122_customer_workflow_review tests.test_pr122_customer_workflow_signature tests.test_pr122_customer_login_release -v
       - name: Package exact controlled static source closure
         run: python -B -m scripts.pr122_static_source_package --output /tmp/pr122-static-controlled-source
@@ -207,3 +210,4 @@ jobs:
           path: evidence/pr122-delivery-release/approved-full-public-package-metadata.json
           if-no-files-found: error
           retention-days: 14
+

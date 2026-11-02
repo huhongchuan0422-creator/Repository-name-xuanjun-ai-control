@@ -48,7 +48,7 @@ def nginx_source():
     base=Path('/etc/nginx');files={};active=set();total=0
     def allowed(path):
         text=str(path)
-        return any(text==root or text.startswith(root+'/') for root in ('/etc/nginx','/usr/share/nginx/modules','/usr/share/nginx/modules-enabled')) or text=='/etc/letsencrypt/options-ssl-nginx.conf' or (text.startswith('/var/www/wenwenwenyiyiyi.work/releases/') and text.endswith('/release-metadata/inline-csp.conf'))
+        return any(text==root or text.startswith(root+'/') for root in ('/etc/nginx','/usr/share/nginx/modules','/usr/share/nginx/modules-enabled')) or text in ('/etc/xuanjun-cloud-oauth/tls-approved.conf','/etc/xuanjun-cloud-oauth/proxy-approved.conf') or text=='/etc/letsencrypt/options-ssl-nginx.conf' or (text.startswith('/var/www/wenwenwenyiyiyi.work/releases/') and text.endswith('/release-metadata/inline-csp.conf'))
     def expand(path,depth=0):
         nonlocal total
         path=Path(path).resolve(strict=True)
