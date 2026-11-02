@@ -358,7 +358,7 @@ jobs:
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
         env:
           PREVIEW_CONTROL_SHA: ${{ github.sha }}
-          PREVIEW_SOURCE_SHA: e66505299813e923a30f010e73eb4ec474938d7b
+          PREVIEW_SOURCE_SHA: 3859b1d15c2360fc0f178eed7d1a17d486fef97f
           PREVIEW_TARGET: uk-path-candidate
           PREVIEW_ENABLED: 'true'
           IMAGE_BUILD_ENABLED: 'false'
