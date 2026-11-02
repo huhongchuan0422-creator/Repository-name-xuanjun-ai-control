@@ -3,20 +3,22 @@
  const root=document.getElementById('community-session'), form=root.querySelector('form');
  const message=root.querySelector('[role=status]'), select=root.querySelector('select');
  const key='community-original-csrf';let csrf=sessionStorage.getItem(key)||'',generation=0,active=null,workspaces=[];
- const kind=location.pathname.endsWith('/community/portal')?'COMMUNITY':'MERCHANT';
+ const reviewerPage=location.pathname.endsWith('/merchant/review'),kind=location.pathname.endsWith('/community/portal')?'COMMUNITY':'MERCHANT';
  // Same-origin tabs share the HttpOnly cookie. Hold the browser lock until the
  // entire mutation response settles, so late Set-Cookie cannot overtake a
  // subsequent login/logout. No bearer, CSRF or identity travels on this channel.
- let coordinated=false,channel=null;
+ let coordinated=false,channel=null,tabId='';
  try{
   if(typeof navigator.locks?.request==='function'&&typeof BroadcastChannel==='function'){
+   const tabWindow=window.top||window;
+   tabId=tabWindow.__communityOriginalSessionTabId||(tabWindow.__communityOriginalSessionTabId=crypto.randomUUID());
    channel=new BroadcastChannel('community-original-session');coordinated=true;
   }
  }catch(_){/* Unavailable coordination must clear saved state before any IO. */}
  // Explicit selections only; these names were separately authorized by session/check.
  const financeSelectors={};
- if(kind==='MERCHANT')for(const [name,title]of [['provider','已授权门店财务工作区'],['merchant_bill','已授权整商户账单只读工作区']]){
-  const label=document.createElement('label'),selector=document.createElement('select');label.textContent=title;selector.setAttribute('aria-label',title);label.append(selector);root.append(label);financeSelectors[name]={label,selector};
+ if(kind==='MERCHANT')for(const [name,title]of [['provider','门店财务'],['merchant_bill','商家账单']]){
+  const label=document.createElement('label'),selector=document.createElement('select');label.className='finance-session-selector';label.textContent=title;selector.setAttribute('aria-label',title);label.append(selector);root.append(label);financeSelectors[name]={label,selector};
   selector.addEventListener('change',()=>{if(active===null)configure(selectedContext());});
  }
  function resetFinanceSelectors(){
@@ -29,9 +31,20 @@
   }
  }
  // This panel extends the original session UI; it is not another login system.
- const adminPanel=document.createElement('section');adminPanel.hidden=true;root.append(adminPanel);
- let adminIdentity=null,adminCatalog=null,adminRecords=[],adminNextCursor=null;
- function adminReset(){adminIdentity=null;adminCatalog=null;adminRecords=[];adminNextCursor=null;adminPanel.replaceChildren();adminPanel.hidden=true;}
+ const adminTarget=document.getElementById('community-admin-permissions-content');const adminPanel=adminTarget&&typeof adminTarget.replaceChildren==='function'?adminTarget:document.createElement('section');adminPanel.hidden=true;if(!adminPanel.parentNode)root.append(adminPanel);
+ let adminIdentity=null,adminCatalog=null,adminRecords=[],adminNextCursor=null,adminDaily=null,adminSettingsOpen=false,adminSettingsState='idle';
+ const syncShell=value=>{
+  const body=document.body,role=value?.role||(adminIdentity?.kind==='ROOT'?'COMMUNITY_ADMIN':null),logged=!!csrf;
+  const admitted=logged&&(typeof value?.workspace==='string'&&value.workspace||(reviewerPage&&value?.reviewer===true));
+  if(root.dataset)root.dataset.authenticated=logged?'true':'false';
+  body?.classList?.toggle('admin-logged-in',logged);body?.classList?.toggle('admin-logged-out',!logged);
+  body?.classList?.toggle('admin-no-workspace',logged&&!admitted);
+  body?.classList?.toggle('admin-role-platform',logged&&['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(role));
+  body?.classList?.toggle('admin-role-community',logged&&!['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(role));
+  const label=['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(role)?'平台管理者后台':logged?'社区管理者后台':'待确认角色';
+  for(const node of document.querySelectorAll?.('.admin-role-badge,.admin-brand-role')||[])node.textContent=label;
+ };
+ function adminReset(){adminIdentity=null;adminCatalog=null;adminRecords=[];adminNextCursor=null;adminDaily=null;adminSettingsOpen=false;adminSettingsState='idle';adminPanel.replaceChildren();adminPanel.hidden=true;}
  async function adminCall(operation,params,t){
   if(!current(t)||!csrf)throw Error('身份已变化');
   const response=await fetch('/community-preview/community/admin',{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({operation,params})});
@@ -46,26 +59,62 @@
   catch(_){if(current(t))message.textContent='管理员操作未确认，请刷新账户列表核实；未自动重试。';}
   finally{if(active===t)active=null;controls();}
  }
- async function adminRefresh(t){const page=await adminCall('list',{after_uid:''},t);adminRecords=page.records;adminNextCursor=page.has_more?page.next_cursor:null;}
+ async function adminRefresh(t){const page=await adminCall('list',{after_uid:''},t);adminRecords=page.records;adminNextCursor=page.has_more?page.next_cursor:null;adminDaily=page.daily_overview;publishAdminHomeMetrics();}
+ const permissionDefinitions=[
+  ['orders','订单查看与对账',value=>/(order|checkout|receipt|reconciliation|bill_)/.test(value)],
+  ['refunds','退款与售后',value=>/refund/.test(value)],
+  ['splits','微信分账设置与记录',value=>/(split|receiver|community_earnings)/.test(value)],
+  ['advertising','广告管理与审核',value=>/(\.ad_|\.ads$|\.ads_page$|ad_report|ad_review|ad_state)/.test(value)],
+  ['merchants','商家、门店与商品',value=>/(merchant|store|profile|item|price|staff|qr|storefront)/.test(value)],
+  ['communities','社区运营与推广',value=>/(community_|promotion|referral|join|leave|members|notices|notice_read)/.test(value)],
+  ['reviews','审核与用户查询',value=>/(review|platform_|onboarding)/.test(value)],
+  ['projects','项目与履约资料',value=>/(project|fulfillment|saas-api|checklist|download)/.test(value)],
+  ['other','其他基础业务',()=>true]
+ ];
+ function publishAdminHomeMetrics(){
+  if(!adminDaily||typeof window.communityHomeMetrics!=='function')return;
+  window.communityHomeMetrics({kind:'daily',...adminDaily});
+ }
+ window.communityLoadAdminHomeMetrics=()=>adminAction(async t=>{adminSettingsState='loading';if(adminSettingsOpen)adminRender();try{adminCatalog=await adminCall('catalog',{},t);await adminRefresh(t);adminSettingsState='ready';adminRender();}catch(error){adminSettingsState='error';adminRender();throw error;}});
+ function permissionPicker(items,selected=[]){
+  const box=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='业务权限';box.append(legend);box.className='admin-permission-groups';
+  const groups=new Map(permissionDefinitions.map(([id,label])=>[id,{id,label,values:[]}]));
+  for(const value of items){const definition=permissionDefinitions.find(([, ,match])=>match(value));groups.get(definition[0]).values.push(value);}
+  const inputs=[];
+  for(const group of groups.values()){
+   if(!group.values.length)continue;
+   const row=document.createElement('label'),input=document.createElement('input'),copy=document.createElement('span'),count=document.createElement('small');row.className='admin-permission-option permission-'+group.id;input.type='checkbox';input.dataset.permissionGroup=group.id;copy.textContent=group.label;count.textContent='包含 '+group.values.length+' 项相关操作';copy.append(count);row.append(input,copy);box.append(row);
+   const included=group.values.filter(value=>selected.includes(value));input.checked=included.length===group.values.length;input.indeterminate=included.length>0&&!input.checked;let touched=false;input.addEventListener('change',()=>{touched=true;input.indeterminate=false;});inputs.push({input,group,preserved:included,touched:()=>touched});
+  }
+  return {box,inputs,values:()=>inputs.flatMap(({input,group,preserved,touched})=>input.indeterminate&&!touched()?preserved:input.checked?group.values:[])};
+ }
+ function scopePicker(items,selected=[]){
+  const box=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent='管理范围';box.append(legend);box.className='admin-scope-groups';const inputs=[];
+  items.forEach((value,index)=>{const row=document.createElement('label'),input=document.createElement('input'),copy=document.createElement('span');row.className='admin-scope-option';input.type='checkbox';input.value=value;input.checked=selected.includes(value);copy.textContent='已授权业务范围 '+(index+1);row.append(input,copy);box.append(row);inputs.push(input);});
+  if(!items.length){const empty=document.createElement('p');empty.textContent='当前尚未配置可分配的业务范围。';box.append(empty);}
+  return {box,values:()=>inputs.filter(input=>input.checked).map(input=>input.value)};
+ }
  function adminRender(){
   adminPanel.replaceChildren();adminPanel.hidden=!adminIdentity;
   if(!adminIdentity)return;
   const title=document.createElement('h3');title.textContent=adminIdentity.kind==='ROOT'?'本社区超级管理员':'本社区受限管理员';adminPanel.append(title);
   const scope=document.createElement('p');scope.textContent='只作用于当前社区项目，不包含服务器或其他项目权限。';adminPanel.append(scope);
   if(adminIdentity.kind!=='ROOT')return;
-  const refresh=document.createElement('button');refresh.type='button';refresh.textContent='刷新管理员与权限';adminPanel.append(refresh);
-  refresh.onclick=()=>adminAction(async t=>{adminCatalog=await adminCall('catalog',{},t);await adminRefresh(t);adminRender();});
-  if(!adminCatalog)return;
-  const f=document.createElement('form'),email=document.createElement('input'),password=document.createElement('input');
+  const refresh=document.createElement('button'),settingsStatus=document.createElement('p');refresh.type='button';refresh.textContent='设置管理员';refresh.setAttribute('aria-expanded',adminSettingsOpen?'true':'false');settingsStatus.className='admin-settings-status';settingsStatus.setAttribute('role','status');adminPanel.append(refresh,settingsStatus);
+  refresh.onclick=()=>{adminSettingsOpen=true;if(adminCatalog){adminSettingsState='ready';adminRender();return;}if(active!==null){adminSettingsState=adminSettingsState==='loading'?'loading':'busy';adminRender();return;}window.communityLoadAdminHomeMetrics();};
+  if(!adminSettingsOpen){settingsStatus.textContent='点击“设置管理员”后，可添加管理员并设置具体业务权限。';return;}
+  if(!adminCatalog){settingsStatus.textContent=adminSettingsState==='error'?'管理员设置读取失败，请点击“设置管理员”重试。':adminSettingsState==='busy'?'当前操作完成后，请再次点击“设置管理员”。':'正在读取管理员与权限设置…';return;}
+  settingsStatus.textContent='可按业务功能设置权限；不会授予服务器或其他项目权限。';
+  const f=document.createElement('form'),email=document.createElement('input'),password=document.createElement('input');f.className='admin-settings-form';
   email.type='email';email.required=true;email.placeholder='新管理员登录邮箱';email.autocomplete='off';email.setAttribute('aria-label','新管理员登录邮箱');
-  password.type='password';password.required=true;password.minLength=12;password.maxLength=128;password.autocomplete='new-password';password.placeholder='初始密码（隐藏输入）';password.setAttribute('aria-label','新管理员初始密码');
+  password.type='text';password.required=true;password.minLength=12;password.maxLength=128;password.autocomplete='new-password';password.spellcheck=false;password.setAttribute('autocapitalize','none');password.placeholder='初始密码（可见，请核对后保存）';password.setAttribute('aria-label','新管理员初始密码');
   f.append(email,password);
-  function picker(label,items){const box=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=label;box.append(legend);const inputs=[];for(const value of items){const row=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=value;row.append(input,document.createTextNode(value));box.append(row);inputs.push(input);}return {box,values:()=>inputs.filter(x=>x.checked).map(x=>x.value)};}
-  const capabilities=picker('允许的业务操作',adminCatalog.capabilities.filter(x=>!x.startsWith('/community/admin#'))),scopes=picker('允许的业务范围',adminCatalog.workspace_scopes);
-  f.append(capabilities.box,scopes.box);const create=document.createElement('button');create.type='submit';create.textContent='创建受限管理员';f.append(create);adminPanel.append(f);
+  const businessCapabilities=adminCatalog.capabilities.filter(x=>!x.startsWith('/community/admin#')),capabilities=permissionPicker(businessCapabilities),scopes=scopePicker(adminCatalog.workspace_scopes);
+  const templateLabel=document.createElement('label'),templateTitle=document.createElement('span'),template=document.createElement('select');templateLabel.className='admin-role-template';templateTitle.textContent='常用角色模板';for(const [value,label]of [['','请选择'],['viewer','只读查看'],['operator','社区运营'],['finance','财务分账'],['platform','平台管理']]){const option=document.createElement('option');option.value=value;option.textContent=label;template.append(option);}templateLabel.append(templateTitle,template);template.onchange=()=>{const enabled={viewer:['orders','communities'],operator:['orders','advertising','merchants','communities'],finance:['orders','refunds','splits'],platform:permissionDefinitions.map(x=>x[0])}[template.value]||[];for(const {input}of capabilities.inputs){input.indeterminate=false;input.checked=enabled.includes(input.dataset.permissionGroup);input.dispatchEvent(new Event('change'));}};
+  f.append(templateLabel,capabilities.box,scopes.box);const create=document.createElement('button');create.type='submit';create.textContent='保存设置';f.append(create);adminPanel.append(f);
   f.onsubmit=event=>{event.preventDefault();if(active!==null||!f.reportValidity())return;const params={email:email.value,password:password.value,capabilities:capabilities.values(),workspace_scopes:scopes.values(),request_id:'admin_'+crypto.randomUUID().replaceAll('-','')};password.value='';void adminAction(async t=>{try{await adminCall('create',params,t);}finally{params.password='';}await adminRefresh(t);adminRender();});};
-  for(const record of adminRecords){const row=document.createElement('div'),text=document.createElement('p');text.textContent=(record.login_label||record.uid)+' · '+record.kind+' · '+(record.active?'启用':'已撤销');row.append(text);if(record.kind==='DELEGATE'&&record.active){const cp=picker('调整操作权限',adminCatalog.capabilities.filter(x=>!x.startsWith('/community/admin#'))),sp=picker('调整业务范围',adminCatalog.workspace_scopes);for(const input of cp.box.querySelectorAll('input'))input.checked=record.capabilities.includes(input.value);for(const input of sp.box.querySelectorAll('input'))input.checked=record.workspace_scopes.includes(input.value);row.append(cp.box,sp.box);const save=document.createElement('button');save.type='button';save.textContent='保存权限';save.onclick=()=>adminAction(async t=>{await adminCall('grant',{uid:record.uid,capabilities:cp.values(),workspace_scopes:sp.values(),expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});const revoke=document.createElement('button');revoke.type='button';revoke.textContent='撤销此管理员';revoke.onclick=()=>{if(!confirm('确认撤销该社区管理员权限？'))return;void adminAction(async t=>{await adminCall('revoke',{uid:record.uid,expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});};row.append(save,revoke);}adminPanel.append(row);}
-  if(adminNextCursor){const more=document.createElement('button');more.type='button';more.textContent='加载下一页管理员';more.onclick=()=>adminAction(async t=>{const page=await adminCall('list',{after_uid:adminNextCursor},t);adminRecords.push(...page.records);adminNextCursor=page.has_more?page.next_cursor:null;adminRender();});adminPanel.append(more);}
+  for(const record of adminRecords){const row=document.createElement('div'),text=document.createElement('p');row.className='admin-manager-card';text.textContent=(record.login_label||'管理员账户')+' · '+(record.active?'已启用':'已撤销');row.append(text);if(record.kind==='DELEGATE'&&record.active){const cp=permissionPicker(businessCapabilities,record.capabilities),sp=scopePicker(adminCatalog.workspace_scopes,record.workspace_scopes);row.append(cp.box,sp.box);const save=document.createElement('button');save.type='button';save.textContent='保存权限';save.onclick=()=>adminAction(async t=>{await adminCall('grant',{uid:record.uid,capabilities:cp.values(),workspace_scopes:sp.values(),expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});const revoke=document.createElement('button');revoke.type='button';revoke.textContent='撤销此管理员';revoke.onclick=()=>{if(!confirm('确认撤销该社区管理员权限？'))return;void adminAction(async t=>{await adminCall('revoke',{uid:record.uid,expected_revision:record.revision,request_id:'admin_'+crypto.randomUUID().replaceAll('-','')},t);await adminRefresh(t);adminRender();});};row.append(save,revoke);}adminPanel.append(row);}
+  if(adminNextCursor){const more=document.createElement('button');more.type='button';more.textContent='加载下一页管理员';more.onclick=()=>adminAction(async t=>{const page=await adminCall('list',{after_uid:adminNextCursor},t);adminRecords.push(...page.records);adminNextCursor=page.has_more?page.next_cursor:null;publishAdminHomeMetrics();adminRender();});adminPanel.append(more);}
  }
 
  const current=t=>t===generation;
@@ -75,16 +124,17 @@
   for(const {selector}of Object.values(financeSelectors))selector.disabled=active!==null||!csrf||!workspaces.length;
  };
  const configure=value=>{
-  if(window.communityHomeContext)window.communityHomeContext(value);
+  syncShell(value);
+  if(window.communityHomeContext)window.communityHomeContext(value?{...value,...(adminIdentity?{admin:{kind:adminIdentity.kind,capabilities:adminIdentity.capabilities}}:{})}:null);
   if(window.configureCommunityWorkbench)window.configureCommunityWorkbench(value);
   if(window.configureCommunityPortal)window.configureCommunityPortal(value);
   if(window.configureCommunityOnboarding)window.configureCommunityOnboarding(value);
   controls();
  };
- const clear=text=>{adminReset();csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
+ const clear=text=>{adminReset();reviewerAccess=false;csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
  if(channel)channel.onmessage=event=>{
-  if(event.data!=='changed')return;
-  reviewerBridge=null;bridgeInfo.textContent='其他窗口已变更会话，本请求不再继续；请重新生成。';generation++;clear('其他窗口已变更原会话，请重新登录。');
+  if(event.data?.type!=='changed'||event.data.tabId===tabId)return;
+  generation++;clear('其他窗口已变更原会话，请重新登录。');
  };
  async function call(action,body,t,value=csrf){
   if(!current(t))throw Error('身份已变化');
@@ -103,7 +153,7 @@
    const value=financeSelectors[name].selector.value,options=selected.finance_options?.[name];
    if(value&&Array.isArray(options)&&options.some(item=>item&&item.workspace===value))financial[key]=value;
   }
-  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null}:{}),...financial};
+  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null,reviewer:reviewerAccess}:reviewerPage&&reviewerAccess?{role:'PLATFORM_REVIEWER',reviewer:true}:{}),...financial};
  }
  function choose(){
   if(active!==null)return;
@@ -111,18 +161,19 @@
  }
  async function check(t){
   const result=await call('check',{},t,csrf);if(!current(t))return;
-  adminIdentity=result.community_admin||null;adminRender();
+  adminIdentity=result.community_admin||null;reviewerAccess=result.reviewer===true;adminRender();
   workspaces=result.workspaces.filter(w=>w.kind===kind);
-  select.replaceChildren();for(const w of workspaces){const option=document.createElement('option');option.value=w.workspace;option.textContent=w.workspace;select.append(option);}
+  select.replaceChildren();
+  if(!workspaces.length){const option=document.createElement('option');option.value='';option.textContent='暂无管理权限';select.append(option);}
+  else for(const w of workspaces){const option=document.createElement('option');option.value=w.workspace;option.textContent=({PLATFORM_OWNER:'平台管理',PLATFORM_REVIEWER:'商家审核',COMMUNITY_ADMIN:'社区管理',MERCHANT_ADMIN:'商家管理',CUSTOMER:'个人中心'})[w.role]||'管理后台';select.append(option);}
   resetFinanceSelectors();
   const review=location.pathname.endsWith('/merchant/review');
-  message.textContent=review?(result.reviewer?'已登录原平台审核账户。':'已登录；当前账户没有平台审核权限。'):(workspaces.length?'已登录，请选择已授权工作区。':'已登录；当前账户没有此角色的工作区。');
+  message.textContent=review?(result.reviewer?'已进入商家审核。':'当前账号暂无商家审核权限。'):(workspaces.length?'已登录。':'当前账号暂无管理权限。');
   configure(selectedContext());
  }
  async function mutation(action,body){
   // This guard also rejects synthetic submit/click events on disabled buttons.
   if(active!==null||!coordinated)return;
-  reviewerBridge=null;bridgeInfo.textContent='';
   const t=++generation,previous=csrf;active=t;clear(action==='login'?'正在登录…':'正在退出…');
   try{
    await navigator.locks.request('community-original-session',async()=>{
@@ -134,62 +185,17 @@
      if(action==='logout'){clear('已退出登录。');return;}
      if(typeof result.csrf!=='string'||!result.csrf)throw Error('原会话未确认');
      csrf=result.csrf;sessionStorage.setItem(key,csrf);form.reset();await check(t);
-    }finally{if(issued)channel.postMessage('changed');}
+    }finally{if(issued)channel.postMessage({type:'changed',tabId});}
    });
   }catch(_){if(current(t))clear(action==='login'?'登录未确认，请核对原账户；未自动重试。':'退出结果未确认；请勿继续业务操作。');}
   finally{
    if(active===t)active=null;
    if(current(t))form.querySelector('[name=password]').value='';
+   if(current(t)&&adminIdentity?.kind==='ROOT'&&!adminCatalog)queueMicrotask(()=>window.communityLoadAdminHomeMetrics());
    controls();
   }
  }
- // Existing login panel: no alternate site, token copying, or implicit grant.
- let reviewerBridge=null;
- const bridgeBox=document.createElement('fieldset'),bridgeTitle=document.createElement('legend');
- bridgeTitle.textContent='已获授权审核员 · 微信确认网页登录';bridgeBox.append(bridgeTitle);
- const bridgeScene=document.createElement('input');bridgeScene.placeholder='原门店场景编号';bridgeScene.setAttribute('aria-label','原门店场景编号');bridgeBox.append(bridgeScene);
- const bridgeInfo=document.createElement('p');bridgeInfo.setAttribute('aria-live','polite');bridgeBox.append(bridgeInfo);
- const bridgeButtons={};
- for(const [action,label] of [['BEGIN','生成网页登录请求'],['FINISH','我已在小程序确认，完成登录'],['QUERY','查询状态'],['CANCEL','取消此请求']]){
-  const button=document.createElement('button');button.type='button';button.textContent=label;bridgeBox.append(button);bridgeButtons[action]=button;
-  button.addEventListener('click',()=>{void bridgeMutation(action);});
- }
- root.append(bridgeBox);
- async function bridgeMutation(action){
-  if(active!==null||!coordinated)return;
-  const previous=reviewerBridge;
-  const scene=action==='BEGIN'?bridgeScene.value.trim():previous?.scene;
-  if(!/^[A-Za-z0-9_-]{1,32}$/.test(scene||'')){bridgeInfo.textContent='请输入原门店入口的场景编号。';return;}
-  if(action!=='BEGIN'&&!previous){bridgeInfo.textContent='请先生成网页登录请求。';return;}
-  const t=++generation;active=t;if(['BEGIN','FINISH','CANCEL'].includes(action))clear(action==='CANCEL'?'正在取消网页登录请求…':'正在核实本人微信网页登录…');controls();
-  try{
-   await navigator.locks.request('community-original-session',async()=>{
-    if(!current(t))return;
-    if(action==='BEGIN'&&previous){
-     await call('wechat',{scene:previous.scene,challenge:previous.challenge,action:'CANCEL'},t,previous.csrf);
-     reviewerBridge=null;
-    }
-    const body=action==='BEGIN'?{scene,action}:{scene,challenge:previous.challenge,action};
-    let result;
-    try{result=await call('wechat',body,t,action==='BEGIN'?'':previous.csrf);}
-    finally{if(action==='BEGIN'||action==='FINISH')channel.postMessage('changed');}
-    if(!current(t))return;
-    if(action==='BEGIN'){
-     if(!result||typeof result.challenge!=='string'||! /^[A-Za-z0-9_-]{32,128}$/.test(result.challenge)||typeof result.csrf!=='string'||! /^[A-Za-z0-9_-]{32,128}$/.test(result.csrf)||! /^[0-9a-f]{32}$/.test(result.verification))throw Error('登录请求未确认');
-     reviewerBridge={...result,scene};
-     bridgeInfo.textContent='仅在本人正在使用的浏览器操作。请在原小程序“我的 → 登录与账户状态 → 确认网页登录”输入请求：'+result.challenge+'；场景：'+scene+'；核对浏览器校验码：'+result.verification+'。请求 600 秒有效；不要确认他人发来的请求。';
-     return;
-    }
-    if(action==='CANCEL'){reviewerBridge=null;bridgeInfo.textContent='此请求已取消，不会再用于登录。';return;}
-    if(result.state==='ISSUED'&&typeof result.csrf==='string'&&result.csrf){
-     csrf=result.csrf;sessionStorage.setItem(key,csrf);reviewerBridge=null;await check(t);bridgeInfo.textContent='微信确认完成，已复用原审核网页登录会话。';return;
-    }
-    if(result.state==='EXPIRED'||result.state==='CANCELLED'){reviewerBridge=null;bridgeInfo.textContent='请求已失效，请重新生成。';return;}
-    bridgeInfo.textContent=result.state==='ISSUED'?'服务端已签发，会话响应未完整收到；请取消本请求后重新生成，不会自动重复签发。':result.state==='CONFIRMED'?'本人微信已确认，请点击完成登录。':'等待本人在原小程序核对并确认。';
-   });
-  }catch(_){if(current(t))bridgeInfo.textContent='结果未确认；未自动重试。可查询或取消此请求。若生成响应丢失，请重新生成。';}
-  finally{if(active===t)active=null;controls();}
- }
+ let reviewerAccess=false;
 
  form.addEventListener('submit',event=>{
   event.preventDefault();if(active!==null||!coordinated)return;

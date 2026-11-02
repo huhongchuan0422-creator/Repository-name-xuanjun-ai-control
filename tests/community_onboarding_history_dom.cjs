@@ -20,7 +20,8 @@ const material={kind:'business_license',version:'v_'+'a'.repeat(32),sequence:1,a
 const record=n=>({revision:n,event:'CORRECTION',actor:'original-reviewer',occurred_at:100,previous_revision:n-1,status_before:'IN_REVIEW',status_after:'CORRECTION_REQUIRED',note:'original reason '+n,decision:null,material_kind:null,materials:[material],evidence:'CAPTURED_AT_EVENT',unavailable:[]});
 const page=(application,after)=>({application,records:Array.from({length:after?1:50},(_,i)=>record(after+i+1)),has_more:!after,next_revision:after?null:50,material_versions:[material],material_versions_truncated:false,legacy_material_event_linkage:'NOT_ESTABLISHED',payment_enabled:false});
 const reply=result=>({ok:true,status:200,json:async()=>({result:structuredClone(result),payment_enabled:false})});
-const context={document,window:{},location:{pathname:process.argv[4]||'/merchant/join'},structuredClone,Uint8Array,atob,btoa,Blob,URL,setTimeout,fetch:async(url,options)=>{
+const testPath=process.argv[4]||'/merchant/join';
+const context={document,window:{},location:{pathname:testPath,search:testPath==='/merchant/review'?'?embedded=1':'',hash:'',replace(){}},URLSearchParams,structuredClone,Uint8Array,atob,btoa,Blob,URL,setTimeout,fetch:async(url,options)=>{
  const body=JSON.parse(options.body);calls.push(body);
  if(body.operation==='catalog')return reply({materials:[{id:'business_license',title:'营业执照'}]});
  if(['mine','review_list'].includes(body.operation))return reply({applications:[app],next_cursor:null});

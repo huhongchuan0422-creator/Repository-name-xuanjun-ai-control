@@ -37,7 +37,7 @@ class UI(unittest.TestCase):
     page.route('**/*',route)
     page.goto('https://fixture.invalid/community-preview/merchant/workbench')
     self.assertEqual(page.evaluate('document.characterSet'),'UTF-8')
-    page.get_by_role('button',name='刷新管理员与权限').click()
+    page.get_by_role('button',name='设置管理员').click()
     page.get_by_role('button',name='加载下一页管理员').click()
     page.get_by_text('fixture_child_51 · DELEGATE').wait_for()
     page.get_by_label('新管理员登录邮箱').fill('child@test.invalid');page.get_by_label('新管理员初始密码').fill('synthetic-password-123')
@@ -47,11 +47,11 @@ class UI(unittest.TestCase):
     # asynchronous original browser-lock/fetch operation. Await that exact
     # request's response and the subsequent list refresh, not a longer sleep.
     with page.expect_response(lambda r: r.url.endswith('/community/admin') and r.request.method=='POST' and r.request.post_data_json.get('operation')=='create') as created_response, page.expect_response(lambda r: r.url.endswith('/community/admin') and r.request.method=='POST' and r.request.post_data_json.get('operation')=='list') as refreshed_response:
-     page.get_by_role('button',name='创建受限管理员').click()
+     page.get_by_role('button',name='保存设置').click()
      self.assertEqual(page.get_by_label('新管理员初始密码').input_value(),'')
     self.assertEqual(created_response.value.status,200)
     self.assertEqual(refreshed_response.value.status,200)
-    expect(page.get_by_role('button',name='刷新管理员与权限')).to_be_enabled()
+    expect(page.get_by_role('button',name='设置管理员')).to_be_enabled()
     self.assertEqual(page.get_by_label('新管理员初始密码').input_value(),'')
     self.assertEqual(operations[-2:],['create','list'])
     self.assertEqual(requests,[dict(operation='create',password_present=True)]);self.assertEqual(errors,[])

@@ -45,9 +45,9 @@ def merchant_settings(db,identity,after_id=''):
     if type(after_id) is not str or after_id and not valid_id(after_id):
         raise ValueError('INVALID_CATALOG_CURSOR')
     row=db.execute('SELECT name,description,contact,status,version FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?',(t,m,s)).fetchone()
-    items=db.execute('SELECT item_id,name,status,sort_order,version FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND item_id>? ORDER BY item_id LIMIT 201',(t,m,s,after_id)).fetchall()
-    return dict(profile=None if row is None else dict(zip(('name','description','contact','status','version'),row)),
-                items=[dict(zip(('id','name','status','sort','version'),r)) for r in items[:200]],
+    items=db.execute('SELECT i.item_id,i.name,i.status,i.sort_order,i.version,COALESCE(c.description,\'\'),COALESCE(c.image_name,\'\'),COALESCE(c.image_data,\'\') FROM catalog_items i LEFT JOIN catalog_item_content c ON c.tenant_id=i.tenant_id AND c.merchant_id=i.merchant_id AND c.store_id=i.store_id AND c.item_id=i.item_id WHERE i.tenant_id=? AND i.merchant_id=? AND i.store_id=? AND i.item_id>? ORDER BY i.item_id LIMIT 201',(t,m,s,after_id)).fetchall()
+    return dict(profile=None if row is None else dict(dict(zip(('name','description','contact','status','version'),row)),merchant_id=m),
+                items=[dict(zip(('id','name','status','sort','version','description','image_name','image_data'),r)) for r in items[:200]],
                 has_more=len(items)>200,next_cursor=items[199][0] if len(items)>200 else None,
                 simulation_only=True,provider_settlement_verified=False)
 

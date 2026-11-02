@@ -89,6 +89,11 @@ class CenterOperations:
         if body['operation'] in ('community.public_profile_read','community.public_profile_save'):
             from scripts.community_public_directory import settings
             result=settings(self,body['workspace'],grant,body['operation'],body['params'])
+        elif body['operation'].startswith('community.points_'):
+            if grant['role'] not in ('MERCHANT_ADMIN','FINANCE_APPROVER','PLATFORM_OWNER'):
+                raise PermissionError('MERCHANT_POINTS_MANAGER_REQUIRED')
+            from scripts.community_merchant_points import MerchantPoints
+            result=MerchantPoints(c).dispatch(grant,body['operation'],body['params'])
         elif body['operation']=='community.merchant_settings' and 'allowed_operations' in grant:
             # An original, live Staff grant explicitly delegates this read.
             # Static STORE_STAFF principals keep the runtime's existing denial;

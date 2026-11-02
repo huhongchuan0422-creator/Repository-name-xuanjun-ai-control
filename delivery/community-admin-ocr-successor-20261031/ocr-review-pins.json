@@ -1,0 +1,38 @@
+{
+  "source": "e23e1868b16f6c4c3f30f158418e6557037df28e",
+  "files": {
+    "scripts/community_wechat_applyment.py": {
+      "base_sha256": "0cb5e1a4ec38e5e603b196866ec72f4f2aa191a6b4cfab8024b11f49b7976531",
+      "new_sha256": "8adef42f7cda83532cfecde8903ce0fbc1205883f4b06e300a03c823f336efa6",
+      "base_matches_e23e_source_zip": true
+    },
+    "scripts/community_ocr_bridge.py": {
+      "base_sha256": "8ad2d1b2086da138f4efe7b0487c4cf7b7aa146364ccb0b0d26f6eb4de73e2d1",
+      "new_sha256": "b357dac8dc35071c2dc866b1bcfa686e861d25b7dd3b27d75fae4ea6c11eed8e",
+      "base_matches_e23e_source_zip": true
+    },
+    "scripts/community_ocr_host.py": {
+      "base_sha256": "4888599b76b5b0c062223f2beded488c3eb39d52338cbe747195b2056d533704",
+      "new_sha256": "dcd13b2ab863d6c3b112871e93a8ad5e6b47928ac027e917eb7a79edd2a935aa",
+      "base_matches_e23e_source_zip": true
+    },
+    "clients/community-mini/session.js": {
+      "base_sha256": "6cafac89f0ba12a251745d4dc8a39af42e68ffed029c4b23252a8a4ddc070ea1",
+      "new_sha256": "74ce42a2d484d154eea6d8c3b11a74d130098698c9e7d5a8bd941f0eff58ac65",
+      "base_matches_e23e_source_zip": true
+    },
+    "tests/test_community_ocr_shared_composition.py": {
+      "base_sha256": "d30684ea05a450dfa4dfa32cf80dfa8cda178f5370661a5d10f47ce0e031c2e2",
+      "new_sha256": "378cca3df568901e954c1f1744752b0fae68f2171b8923f7d84429933f389cc2",
+      "base_matches_e23e_source_zip": true
+    },
+    "tests/test_community_ocr_writeback_route.py": {
+      "base_sha256": null,
+      "new_sha256": "93a6e11b294de506fbf93c0a4ecb54040345b0ba86a7fb7277f7e4f8d3410b00",
+      "base_matches_e23e_source_zip": false
+    }
+  },
+  "deployed": false,
+  "real_model_test": "SKIPPED_NO_LOCAL_MODEL_ENVIRONMENT",
+  "real_customer_documents_used": false
+}

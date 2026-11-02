@@ -49,6 +49,14 @@ class PublicDirectory(unittest.TestCase):
                 with self.subTest(operation=operation,value=value):
                     with self.assertRaisesRegex(ValueError,'INVALID_PUBLIC_DIRECTORY_FIELDS'):
                         self.inner.gateway.dispatch(self.token,dict(scene='',operation=operation,params=value))
+    def test_platform_owned_mall_is_marked_and_pinned(self):
+        self.publish()
+        merchant=self.ops.grants['merchant']
+        self.ops.grants['platform_mall']=dict(merchant,role='PLATFORM_OWNER',onboarding_required=False)
+        record=self.directory()['records'][0]
+        self.assertTrue(record['platform_self_operated'])
+        self.assertTrue(record['name'].startswith('平台自营 · '))
+        self.assertRegex(record['scene'],r'^[A-Za-z0-9_-]{1,32}$')
     def test_no_material_url_or_contact_can_be_supplied(self):
         for field in ('storefront_photo','contact','scope'):
             with self.assertRaises(ValueError):self.settings('save',dict(expected_version=0,published=False,category_id='',category_name='',**{field:'private'}))

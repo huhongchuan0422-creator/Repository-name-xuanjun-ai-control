@@ -33,6 +33,7 @@ class ProviderActions:
             raise ValueError('ORIGINAL_OPERATIONS_AND_PROTECTED_PROVIDER_CONFIG_REQUIRED')
         self.operations,self.center,self.runtime=operations,operations.center,operations.runtime
         self.reader=reader;self.bindings={}
+        self.onboarding=None
         for identity,record in bindings.items():
             if type(identity) is not tuple or len(identity)!=3:raise ValueError('INVALID_PROVIDER_STORE_BINDING')
             scope(dict(zip(('tenant_id','merchant_id','store_id'),identity)))
@@ -74,6 +75,13 @@ class ProviderActions:
         return g,json.loads(canonical(self.bindings[identity]))
     def _policy_hash(self,policy):
         return hashlib.sha256(canonical({k:v for k,v in policy.items() if k!='enabled_operations'})).hexdigest()
+    def _require_split_admission(self,g,policy):
+        if self.onboarding is None:raise PermissionError('MERCHANT_SPLIT_ONBOARDING_REQUIRED')
+        admission=self.onboarding.split_admission_for_scope(g['scope'])
+        if not admission['participates'] or admission['effective_bps']<=0:
+            raise PermissionError('MERCHANT_DID_NOT_OPT_IN_TO_SPLIT')
+        if admission['effective_bps']>policy['max_total_bps']:
+            raise PermissionError('MERCHANT_SPLIT_RATIO_EXCEEDS_CURRENT_PROVIDER_LIMIT')
     def _load(self,key):
         row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ACTION' AND subject_idx=? AND active=1",(key,)).fetchone()
         return None if row is None else json.loads(self.center.decrypt(row[0],'provider-action:'+key))
@@ -126,6 +134,7 @@ class ProviderActions:
         if op=='receivers':return dict(receivers=[dict(id=k,label=v['label'],type=v['type']) for k,v in policy['receivers'].items()],enabled_operations=policy['enabled_operations'])
         if not valid_id(p['reference']) or not valid_id(p['request_id']):raise ValueError('INVALID_PROVIDER_ACTION_REFERENCE')
         kind='REFUND' if op.endswith('refund') or op=='refund' else 'SPLIT'
+        if kind=='SPLIT' and op=='split':self._require_split_admission(g,policy)
         original=state(self.runtime.demo.db,g['scope'],p['reference'])
         provider_ref=('rf' if kind=='REFUND' else 'ps')+hashlib.sha256(canonical([self.reader._mchid,g['scope'],p['reference'],p['request_id'],kind])).hexdigest()[:30]
         key=hashlib.sha256(canonical([self.reader._mchid,kind,provider_ref])).hexdigest()
@@ -243,6 +252,9 @@ class ProviderActions:
             if previous and previous['status'] in ('SUCCESS','CLOSED','FINISHED') and previous!=result:raise ProviderActionUnknown('TERMINAL_PROVIDER_RESULT_CONFLICT')
             retain_bill_evidence(persisted,bill_evidence)
             persisted['result']=result;persisted['response_sha256']=digest;persisted['observed_at']=self.center.now();self._save(key,persisted)
+            if saved['kind']=='SPLIT' and result['status']=='FINISHED':
+                from scripts.community_merchant_points import MerchantPoints
+                MerchantPoints(self.center).record_split(g,key,saved,result)
             if terminal:
                 row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1",(lock,)).fetchone()
                 if row is not None and json.loads(self.center.decrypt(row[0],'provider-order-lock'))=={'action':key}:

@@ -52,7 +52,7 @@ def build(root):
         if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
             raise ValueError('PACKAGE_SYMLINK_DENIED')
         files[path.relative_to(root).as_posix()] = path.read_bytes()
-    required = {'docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'scripts/community_preview_fixed_product.py', 'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
+    required = {'docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'scripts/community_preview_fixed_product.py', 'scripts/community_mini_r1_input.py', 'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
                 'scripts/community_preview_readiness.py',
                 'scripts/community_mini_host_config.py',
                 'scripts/community_platform_host.py',

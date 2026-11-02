@@ -117,6 +117,14 @@ class SplitReturns:
             retain_bill_evidence(current, bill_evidence)
             current.update(result=data['result'], response_sha256=digest, observed_at=c.now())
             c.db.execute("UPDATE links SET payload=? WHERE channel='COMMUNITY_PROVIDER_RETURN' AND subject_idx=? AND active=1", (c.encrypt(canonical(current), 'community-provider-return:' + key), key))
+            if data['result']=='SUCCESS':
+                from scripts.community_merchant_points import MerchantPoints
+                budget_row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_BUDGET' AND subject_idx=? AND project=? AND active=1",(lock,g['project'])).fetchone()
+                if budget_row is not None:
+                    points_budget=json.loads(c.decrypt(budget_row[0],'provider-order-budget'))
+                    split_action=points_budget.get('split_action')
+                    if split_action is not None:
+                        MerchantPoints(c).record_return(g,split_action,key,expected['amount'])
             if data['result'] in ('SUCCESS', 'FAILED'):
                 row = c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_PROVIDER_ORDER_LOCK' AND subject_idx=? AND active=1", (lock,)).fetchone()
                 if row and json.loads(c.decrypt(row[0], 'provider-order-lock')) == dict(action=key):

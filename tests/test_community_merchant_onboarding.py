@@ -50,6 +50,17 @@ class MerchantAdmissionJourney(unittest.TestCase):
         self.assertFalse(approved['payment_enabled'])
         self.assertEqual(approved['wechat_submerchant_state'],'NOT_VERIFIED')
         self.assertEqual(self.fx.center.check_integrity()['integrity'],'PASS')
+    def test_redemption_percent_is_selected_in_application_and_frozen_on_approval(self):
+        draft=self.draft(redemption_percent=25)
+        self.assertEqual(draft['redemption_percent'],25)
+        self.assertIsNone(draft['approved_redemption_percent'])
+        with self.assertRaisesRegex(ValueError,'INVALID_REDEMPTION_PERCENT'):
+            self.draft(draft,redemption_percent=15)
+        app=draft
+        for kind in app['required_materials']:app=self.upload(app,kind)
+        app=self.call('submit',{'application':app['application'],'revision':app['revision']})
+        approved=self.review(app,'APPROVE')
+        self.assertEqual((approved['redemption_percent'],approved['approved_redemption_percent']),(25,25))
     def test_correction_edit_resubmit_and_rejection_preserve_versions(self):
         app=self.review(self.complete(),'CORRECTION','请补充清晰门头照片')
         self.assertEqual(app['reviewer_note'],'请补充清晰门头照片')

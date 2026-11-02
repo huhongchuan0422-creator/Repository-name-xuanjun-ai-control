@@ -94,6 +94,7 @@ def project_wechat_scene(identity,onboarding,reader,scene,product):
     sub_mchid=applyment['provider_sub_mchid']
     if not sub_mchid.isdigit() or not 6<=len(sub_mchid)<=32:
         raise PermissionError('TRUSTED_FINISHED_WECHAT_APPLYMENT_REQUIRED')
+    admission=onboarding.split_admission_for_application(application)
     return {
         'application':application,
         'scope':scope,
@@ -102,7 +103,7 @@ def project_wechat_scene(identity,onboarding,reader,scene,product):
             'sub_mchid':sub_mchid,
             'description':product['description'],
             'notify_url':product['notify_url'],
-            'profit_sharing':product['profit_sharing']
+            'profit_sharing':product['profit_sharing'] and admission['participates']
         }
     }
 

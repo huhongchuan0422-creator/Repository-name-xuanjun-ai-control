@@ -107,6 +107,8 @@ class MiniApplication:
         from scripts.community_wechat_sp_actions import ProviderActions
         self.provider_actions=ProviderActions(self.operations,reader,bindings)
         self.provider_actions.commerce=self.commerce
+        self.provider_actions.onboarding=self.onboarding
+        if self.onboarding is not None:self.onboarding.provider_actions=self.provider_actions
         if self.communities is not None:self.communities.provider_actions=self.provider_actions
         if getattr(self.gateway,'payments',None) is not None:self.gateway.payments.rule_actions=self.provider_actions
         return self.provider_actions

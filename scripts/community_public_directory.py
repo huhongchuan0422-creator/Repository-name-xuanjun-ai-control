@@ -85,6 +85,7 @@ def consumer(gateway,token,operation,p):
         except PermissionError:continue
         allowed.add((project,principal.tenant_id))
     records={};categories={}
+    platform_scopes={(g['project'],canonical(g['scope'])) for g in ops.grants.values() if g['role']=='PLATFORM_OWNER'}
     for workspace,g in ops.grants.items():
         if (g['project'],g['tenant']) not in allowed or g['role']!='MERCHANT_ADMIN':continue
         try:
@@ -102,11 +103,19 @@ def consumer(gateway,token,operation,p):
             category_key=(saved['category_id'],saved['category_name'])
             categories[category_key]=dict(id=saved['category_id'],name=saved['category_name'])
         if category and saved['category_id']!=category:continue
-        records[k]=dict(id=k,name=merchant['name'],description=merchant['description'],category_id=saved['category_id'] or None,category_name=saved['category_name'] or None,category_state='AVAILABLE' if saved['category_id'] else 'NOT_CONFIGURED',storefront_photo=None,photo_state='NOT_CONNECTED',version=saved['version'],profile_version=merchant['version'])
+        platform_self_operated=(g['project'],canonical(g['scope'])) in platform_scopes
+        scenes=[scene for scene,binding in identity.scenes.items() if binding['project']==g['project'] and ops.runtime.bindings.get(binding['principal'])==g['scope']]
+        if platform_self_operated and len(scenes)!=1:raise PermissionError('PLATFORM_MALL_SCENE_REQUIRED')
+        records[k]=dict(id=k,name=('平台自营 · '+merchant['name']) if platform_self_operated else merchant['name'],description=merchant['description'],category_id=saved['category_id'] or None,category_name=saved['category_name'] or None,category_state='AVAILABLE' if saved['category_id'] else 'NOT_CONFIGURED',storefront_photo=None,photo_state='NOT_CONNECTED',version=saved['version'],profile_version=merchant['version'],platform_self_operated=platform_self_operated,scene=scenes[0] if platform_self_operated else None)
     if operation=='customer.store':
         if p['id'] not in records:raise PermissionError('PUBLIC_STORE_NOT_ACCESSIBLE')
         return records[p['id']]
-    names=[k for k in sorted(records) if k>after][:51]
+    pinned=[k for k in sorted(records) if records[k]['platform_self_operated']]
+    if len(pinned)>1:raise PermissionError('ONE_PLATFORM_MALL_REQUIRED')
+    regular=[k for k in sorted(records) if not records[k]['platform_self_operated'] and k>after]
+    names=(pinned+regular[:50-len(pinned)]) if not after else regular[:50]
+    more=len(regular)>(50-len(pinned) if not after else 50)
     from scripts.community_demo_directory import presentation
     demo=presentation(gateway,token)
-    return dict(demo=demo,records=[records[k] for k in names[:50]],categories=[categories[k] for k in sorted(categories)],has_more=len(names)>50,next_cursor=names[49] if len(names)>50 else None,visibility='CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported=False)
+    regular_page=[k for k in names if not records[k]['platform_self_operated']]
+    return dict(demo=demo,records=[records[k] for k in names],categories=[categories[k] for k in sorted(categories)],has_more=more,next_cursor=regular_page[-1] if more and regular_page else None,visibility='CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported=False)

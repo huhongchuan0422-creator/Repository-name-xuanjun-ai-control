@@ -100,13 +100,14 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             if cookie is not None:self.send_header('Set-Cookie',cookie)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_GET(self):
-            if self.path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None and commerce is None:return self.answer(404,{'error':'NOT_FOUND'})
+            request_path=self.path.partition('?')[0]
+            if request_path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None and commerce is None:return self.answer(404,{'error':'NOT_FOUND'})
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if self.headers.get_all('Host')!=[host]:return self.answer(403,{'error':'ORIGIN_DENIED'})
             if trusted_proxy is not None:
                 try:trusted_proxy(self.connection,self.headers)
                 except Exception:return self.answer(403,{'error':'PROXY_DENIED'})
-            if self.path=='/community/health':
+            if request_path=='/community/health':
                 center=getattr(getattr(gateway,'identity',None),'center',None)
                 if center is None:return self.answer(503,{'status':'UNAVAILABLE'})
                 try:
@@ -129,13 +130,14 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(503 if maintenance else 200,health)
             if proxy_origin=='https://uk.wenwenwenyiyiyi.work':
                 from scripts.community_web_entries import asset,entries
-                if self.path=='/community/entrypoints':return self.answer(200,entries(value['project'] for value in gateway.identity.scenes.values()))
-                selected=asset(self.path)
+                if request_path=='/community/entrypoints':return self.answer(200,entries(value['project'] for value in gateway.identity.scenes.values()))
+                selected=asset(request_path)
                 if selected is not None:
                     raw,mime=selected
+                    frame_ancestors="'self'" if request_path in ('/merchant/review','/merchant/workbench') else "'none'"
                     self.send_response(200)
                     for key,value in [('Content-Type',mime),('Content-Length',str(len(raw))),('Cache-Control','no-store'),
-                        ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")]:
+                        ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; frame-ancestors "+frame_ancestors+"; form-action 'self'")]:
                         self.send_header(key,value)
                     self.end_headers();self.wfile.write(raw);self.close_connection=True
                     return
@@ -160,13 +162,14 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 assets.update({'/community/project-review':('project-review.html','text/html; charset=utf-8'),
                     '/community/project-review.js':('project-review.js','application/javascript; charset=utf-8'),
                     '/community/project-review.css':('workbench.css','text/css; charset=utf-8')})
-            if self.path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
+            if request_path not in assets:return self.answer(404,{'error':'NOT_FOUND'})
             from pathlib import Path
-            name,mime=assets[self.path]
+            name,mime=assets[request_path]
             raw=(Path(__file__).resolve().parents[1]/'demos'/'community-stage'/name).read_bytes()
+            frame_ancestors="'self'" if request_path in ('/merchant/review','/merchant/workbench') else "'none'"
             self.send_response(200)
             for key,value in [('Content-Type',mime),('Content-Length',str(len(raw))),('Cache-Control','no-store'),
-                    ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")]:
+                    ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; frame-ancestors "+frame_ancestors+"; form-action 'self'")]:
                 self.send_header(key,value)
             self.end_headers();self.wfile.write(raw);self.close_connection=True
         def do_POST(self):
@@ -204,7 +207,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(415,{'error':'JSON_REQUIRED'})
             try:
                 length=int(self.headers.get('Content-Length','-1'))
-                limit=7_000_000 if self.path=='/merchant/onboarding' else 1048576 if notifications is not None and self.path==notifications.path else 16384
+                limit=7_000_000 if self.path=='/merchant/onboarding' else 1_000_000 if self.path=='/community/operations' else 1048576 if notifications is not None and self.path==notifications.path else 16384
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
                 if self.path=='/mini/merchant':

@@ -17,11 +17,13 @@ function harness(initial='',community=false){
  form.reset=()=>{email.value='';password.value='';};
  const extra=[];
  const root={append:el=>extra.push(el),querySelector:selector=>({'form':form,'[role=status]':message,'select':select,'[data-logout]':logout}[selector]),querySelectorAll:()=>[login,logout]};
+ const bodyClasses=new Set(),body={classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}};
  const data=new Map(initial?[['community-original-csrf',initial]]:[]),requests=[],configured=[],homeContexts=[],messages=[];let channel;
  const locks={tail:Promise.resolve(),request(name,fn){assert.equal(name,'community-original-session');const p=this.tail.then(fn);this.tail=p.catch(()=>{});return p;}};
- const context={document:{getElementById:()=>root,createElement:()=>new Element()},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
+ const window={communityHomeContext:value=>homeContexts.push(value?{...value}:null),configureCommunityWorkbench:value=>{configured.push(value?{...value}:null);form.reset();}};window.top=window;
+ const context={document:{body,getElementById:()=>root,createElement:()=>new Element()},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
   sessionStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
-  window:{communityHomeContext:value=>homeContexts.push(value?{...value}:null),configureCommunityWorkbench:value=>{configured.push(value?{...value}:null);form.reset();}},navigator:{locks},
+  window,crypto:{randomUUID:()=> 'tab-one'},navigator:{locks},
   BroadcastChannel:class{constructor(name){assert.equal(name,'community-original-session');channel=this;}postMessage(value){messages.push(value);}},
   FormData:class{constructor(){this.data={email:email.value,password:password.value};}get(k){return this.data[k];}},
   fetch:(url,options)=>new Promise((resolve,reject)=>{requests.push({action:url.split('/').at(-1),options,
@@ -29,8 +31,8 @@ function harness(initial='',community=false){
  vm.runInNewContext(source,context);
  const submit=address=>{email.value=address;password.value='SyntheticPassword!';form.events.submit({preventDefault(){}});};
  const completeLogin=async(csrf,workspace)=>{const request=requests.filter(r=>r.action==='login').at(-1);request.reply({csrf,user_id:workspace});await flush();requests.filter(r=>r.action==='check').at(-1).reply({workspaces:[{kind:'MERCHANT',workspace}],reviewer:false});await flush();};
- return{requests,configured,homeContexts,messages,extra,form,email,password,login,logout,select,message,data,submit,completeLogin,
- notify:()=>channel.onmessage({data:'changed'}),csrf:()=>data.get('community-original-csrf')};
+ return{requests,configured,homeContexts,messages,extra,form,email,password,login,logout,select,message,data,bodyClasses,submit,completeLogin,
+ notify:()=>channel.onmessage({data:{type:'changed',tabId:'other-tab'}}),notifySelf:()=>channel.onmessage({data:{type:'changed',tabId:'tab-one'}}),csrf:()=>data.get('community-original-csrf')};
 }
 (async()=>{
  for(const result of ['failure','success']){
@@ -60,6 +62,7 @@ function harness(initial='',community=false){
  }
  {
   const h=harness();h.submit('one@example.org');await flush();const pending=h.requests[0];
+  h.notifySelf();assert.equal(h.message.textContent,'正在登录…','same-tab frame broadcast cleared shared state');
   h.notify();h.password.value='NewlyTypedPassword!';pending.reject(Error('old failure'));await flush();
   assert.equal(h.password.value,'NewlyTypedPassword!','stale finally cleared newer input');
   assert.equal(h.csrf(),undefined);assert.equal(h.configured.at(-1),null);assert.equal(h.login.disabled,false);
@@ -70,7 +73,12 @@ function harness(initial='',community=false){
   await flush();assert.equal(h.requests.length,1,'UNKNOWN automatically replayed');assert.equal(h.csrf(),undefined);
   assert.equal(h.select.children.length,0);assert.equal(h.configured.at(-1),null);
   assert.equal(h.login.disabled,false);assert(h.message.textContent.includes('未自动重试'));
-  assert.deepEqual(h.messages,['changed']);
+  assert.equal(h.messages.length,1);assert.equal(h.messages[0].type,'changed');assert.equal(h.messages[0].tabId,'tab-one');
+ }
+ {
+  const h=harness('original',true);await flush();h.requests[0].reply({workspaces:[],reviewer:false});await flush();
+  assert(h.bodyClasses.has('admin-logged-in'));assert(h.bodyClasses.has('admin-no-workspace'));
+  assert.equal(h.message.textContent,'当前账号暂无管理权限。');assert.equal(h.select.children[0].textContent,'暂无管理权限');
  }
  {
   const h=harness('old-csrf',true);await flush();

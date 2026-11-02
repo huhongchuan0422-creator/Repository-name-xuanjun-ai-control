@@ -52,6 +52,7 @@ class SplitRules:
             if op == 'rule_create':
                 if g['role'] != 'PLATFORM_OWNER':
                     raise PermissionError('PLATFORM_OWNER_RULE_POLICY_REQUIRED')
+                self.actions._require_split_admission(g,policy)
                 shares = p['shares_bps']
                 if (type(shares) is not dict or not 1 <= len(shares) <= 19
                         or any(k not in policy['receivers'] or k=='_merchant_remainder' for k in shares)

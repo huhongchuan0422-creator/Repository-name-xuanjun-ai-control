@@ -14,7 +14,8 @@ const document={getElementById:id=>nodes[id]??=(new Element()),createElement:tag
 let app={application:'app1',revision:1,status:'DRAFT',entity_type:'ENTERPRISE',fields:{},required_materials:['business_license'],materials:{}},profile={},calls=[],pending=null,denied=false,holdUpload=false,uploadReply=null;
 const kinds=['business_license','mini_program_screenshot','operator_identity','operator_identity_back',...Array.from({length:4},(_,i)=>['ubo_'+(i+1)+'_front','ubo_'+(i+1)+'_back']).flat()];
 const reply=result=>({ok:true,status:200,json:async()=>({result:structuredClone(result),payment_enabled:false})});
-const context={document,window:{},location:{pathname:process.argv[3]||'/merchant/apply'},structuredClone,Uint8Array,atob,btoa,Blob,URL,setTimeout,fetch:async(url,options)=>{
+const testPath=process.argv[3]||'/merchant/apply';
+const context={document,window:{},location:{pathname:testPath,search:testPath==='/merchant/review'?'?embedded=1':'',hash:'',replace(){}},URLSearchParams,structuredClone,Uint8Array,atob,btoa,Blob,URL,setTimeout,fetch:async(url,options)=>{
  const b=JSON.parse(options.body);calls.push(b);if(denied)return{ok:false,status:403};
  if(b.operation==='catalog')return reply({materials:kinds.map(id=>({id,title:id}))});
  if(b.operation==='mine'||b.operation==='review_list')return reply({applications:[app]});
@@ -36,7 +37,7 @@ const reload=async()=>{await context.window.configureCommunityOnboarding({csrf:'
 const read=async()=>{nodes.wechatRead.click();await flush();};
 const save=async()=>{nodes.wechatProfile.onsubmit({preventDefault(){}});await flush();};
 (async()=>{
- await flush();await reload();
+ await flush();await context.window.configureCommunityOnboarding(null);await flush();assert.equal(calls.length,0,'empty session context sent onboarding request');await reload();
  if(context.location.pathname==='/merchant/review'){
   app.status='SUBMITTED';app.materials.ubo_4_back={review:'PENDING'};await reload();
   assert(rows().includes('ubo_4_back'));nodes.note.value='Synthetic review';
@@ -62,7 +63,7 @@ const save=async()=>{nodes.wechatProfile.onsubmit({preventDefault(){}});await fl
  // Clearing an optional UBO slot removes its media references from the draft, not stored objects.
  profile={subject_info:{ubo_info_list:[{ubo_id_doc_type:'IDENTIFICATION_TYPE_IDCARD',ubo_id_doc_copy:'old-front',ubo_id_doc_copy_back:'old-back'}]}};await read();edit('subject_info.ubo_info_list.0.ubo_id_doc_type','');await save();assert(!profile.subject_info.ubo_info_list);assert(app.materials.ubo_1_back);
  // A mocked provider reply cannot contaminate a newly selected legal identity type.
- const sync=nodes.wechatMedia.children.find(e=>e.textContent==='同步已上传的身份证人像面');sync.click();await flush();edit('subject_info.identity_info.id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');pending(reply({media_id:'stale-media'}));await flush();assert.equal(control('subject_info.identity_info.id_card_info.id_card_copy').value,'');await save();assert(!JSON.stringify(profile).includes('stale-media'));
+ const sync=nodes.wechatMedia.children.find(e=>e.textContent==='同步已上传的经营者证件正面');sync.click();await flush();edit('subject_info.identity_info.id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');pending(reply({media_id:'stale-media'}));await flush();assert.equal(control('subject_info.identity_info.id_card_info.id_card_copy').value,'');await save();assert(!JSON.stringify(profile).includes('stale-media'));
  // Legal contact clears obsolete operator references; passport clears reverse reference only.
  profile={contact_info:{contact_type:'SUPER',contact_id_doc_type:'IDENTIFICATION_TYPE_IDCARD',contact_id_doc_copy:'front',contact_id_doc_copy_back:'back'},subject_info:{}};await read();edit('contact_info.contact_type','LEGAL');await save();assert(!profile.contact_info.contact_id_doc_copy);assert(app.materials.ubo_1_back);
  denied=true;nodes.wechatRead.click();await flush();assert(nodes.status.textContent.includes('权限'));

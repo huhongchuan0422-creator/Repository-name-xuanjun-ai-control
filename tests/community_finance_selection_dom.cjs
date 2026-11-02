@@ -5,7 +5,7 @@ class Element{
  constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
  append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this.textContent='';}
  addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
- reset(){}set innerHTML(_){throw Error('unsafe DOM');}
+ reset(){}closest(){return new Element('label');}set innerHTML(_){throw Error('unsafe DOM');}
 }
 const html=fs.readFileSync(process.argv[3],'utf8');
 const nodes=Object.fromEntries([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
@@ -26,7 +26,7 @@ function assertEmpty(){assert.equal(nodes.billResult.textContent,'');assert(node
  configure({csrf:'original',workspace:'merchant',providerWorkspace:'finance'});
  nodes.providerOrder.value='orderA';nodes.providerRequest.value='requestA';nodes.financialKind.value='REFUND';
  // Existing successful provider receipt must disappear if the next call is refused.
- let q=await start('readReconciliation');q.resolve(response({reference:'orderA',secret:'old-receipt'}));await flush();assert(nodes.providerActionResult.textContent.includes('old-receipt'));
+let q=await start('readReconciliation');q.resolve(response({reference:'orderA',secret:'old-receipt'}));await flush();assert(!nodes.providerActionResult.textContent.includes('old-receipt'));assert(nodes.providerActionResult.textContent.includes('服务端回执'));
  q=await start('readReconciliation');q.resolve(response(null,false));await flush();assert.equal(nodes.providerActionResult.textContent,'');
  assert.equal(nodes.providerRequest.value,'requestA');
  // Independent cursor per group, no other-kind cursor reused.

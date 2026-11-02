@@ -16,6 +16,35 @@ from scripts.community_provider_transport import request
 
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
 
+PROVIDER_WORKFLOW={
+    'APPLYMENT_STATE_AUDITING':'PENDING_REVIEW',
+    'APPLYMENT_STATE_TO_BE_CONFIRMED':'PENDING_CONFIRMATION',
+    'APPLYMENT_STATE_TO_BE_SIGNED':'PENDING_CONFIRMATION',
+    'APPLYMENT_STATE_SIGNING':'OPENING',
+    'APPLYMENT_STATE_EDITTING':'CORRECTION_OR_REJECTION',
+    'APPLYMENT_STATE_REJECTED':'CORRECTION_OR_REJECTION',
+    'APPLYMENT_STATE_CANCELED':'EXCEPTION',
+    'APPLYMENT_STATE_FINISHED':'COMPLETED',
+}
+
+
+def provider_workflow(state):
+    """Stable operator queue bucket; unknown values stay visible as exceptions."""
+    if state in ('NOT_SUBMITTED','NOT_VERIFIED',None):return 'PENDING_SUBMISSION'
+    return PROVIDER_WORKFLOW.get(state,'EXCEPTION')
+
+
+def provider_workflow_view(record):
+    state=record.get('provider_state','NOT_SUBMITTED') if type(record) is dict else 'NOT_SUBMITTED'
+    bucket=provider_workflow(state)
+    return dict(state=state,bucket=bucket,completed=bucket=='COMPLETED',
+        sign_action_available=(bucket=='PENDING_CONFIRMATION'
+            and type(record) is dict
+            and type(record.get('provider_sign_url')) is str
+            and type(record.get('provider_sign_url_proof')) is dict),
+        sync_error=record.get('provider_sync_error') if type(record) is dict else None,
+        sync_error_at=record.get('provider_sync_error_at') if type(record) is dict else None)
+
 
 def provider_applyment_id(data):
     # The official query/submit contracts use a required JSON integer (int64),
@@ -126,6 +155,20 @@ class WechatApplyment:
     def fill_confirmed_license_draft(self, session, csrf, application, *,
                                      expected_application_revision, expected_wechat_version,
                                      confirmed_fields, source_check=None):
+        return self._fill_confirmed_document_draft(session,csrf,application,document_type='business_license',
+            expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
+            confirmed_fields=confirmed_fields,source_check=source_check)
+
+    def fill_confirmed_identity_draft(self, session, csrf, application, *,
+                                     expected_application_revision, expected_wechat_version,
+                                     confirmed_fields, source_check=None):
+        return self._fill_confirmed_document_draft(session,csrf,application,document_type='id_front',
+            expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
+            confirmed_fields=confirmed_fields,source_check=source_check)
+
+    def _fill_confirmed_document_draft(self, session, csrf, application, *,document_type,
+                                     expected_application_revision, expected_wechat_version,
+                                     confirmed_fields, source_check=None):
         """Host-only empty-field fill, original Center transaction + two CAS.
 
         Caller must supply both versions from an independently bound human
@@ -144,8 +187,10 @@ class WechatApplyment:
                 or type(expected_wechat_version) is not int or expected_wechat_version<0):
             raise ValueError('EXPLICIT_DUAL_VERSIONS_REQUIRED')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
+        if document_type not in ('business_license','id_front'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
+        allowed={'company_name','registered_address'} if document_type=='business_license' else {'id_name','id_number','registered_address'}
         if (type(confirmed_fields) is not dict or not confirmed_fields
-                or not set(confirmed_fields)<= {'company_name','registered_address'}):
+                or not set(confirmed_fields)<=allowed):
             raise ValueError('CONFIRMED_LICENSE_FIELDS_ONLY')
         for value in confirmed_fields.values():
             if type(value) is not str or not value.strip():raise ValueError('CONFIRMED_LICENSE_STRING_REQUIRED')
@@ -173,28 +218,45 @@ class WechatApplyment:
             if type(profile) is not dict:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
             subject=profile.get('subject_info',{})
             if type(subject) is not dict:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
-            license_info=subject.get('business_license_info',{})
-            if type(license_info) is not dict or type(license_info.get('merchant_name','')) is not str:
-                raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
             applied=[];skipped=[]
-            name=confirmed_fields.get('company_name');existing=license_info.get('merchant_name','')
-            if name is not None:
-                # Provider names project into platform views. A different manual
-                # value on either side prevents filling the other side with a
-                # conflicting suggestion (even without changing its raw column).
-                if any(value and value!=name for value in (fields['legal_name'],existing)):
-                    skipped.append('company_name')
-                else:
-                    changed=False
-                    if not fields['legal_name']:fields['legal_name']=name;changed=True
-                    if not existing:
-                        profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['merchant_name']=name
-                        changed=True
-                    if changed:applied.append('company_name')
-            address=confirmed_fields.get('registered_address')
-            if address is not None:
-                if fields['address']:skipped.append('registered_address')
-                else:fields['address']=address;applied.append('registered_address')
+            if document_type=='business_license':
+                license_info=subject.get('business_license_info',{})
+                if type(license_info) is not dict or type(license_info.get('merchant_name','')) is not str:
+                    raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+                name=confirmed_fields.get('company_name');existing=license_info.get('merchant_name','')
+                if name is not None:
+                    # Provider names project into platform views. A different manual
+                    # value on either side prevents filling the other side with a
+                    # conflicting suggestion (even without changing its raw column).
+                    if any(value and value!=name for value in (fields['legal_name'],existing)):
+                        skipped.append('company_name')
+                    else:
+                        changed=False
+                        if not fields['legal_name']:fields['legal_name']=name;changed=True
+                        if not existing:
+                            profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['merchant_name']=name
+                            changed=True
+                        if changed:applied.append('company_name')
+                address=confirmed_fields.get('registered_address')
+                if address is not None:
+                    if fields['address']:skipped.append('registered_address')
+                    else:fields['address']=address;applied.append('registered_address')
+            else:
+                # Identity type belongs to the applicant's original provider
+                # draft. Never silently switch a passport/other document to ID.
+                identity=subject.get('identity_info')
+                if type(identity) is not dict or identity.get('id_doc_type')!='IDENTIFICATION_TYPE_IDCARD':
+                    raise ValueError('ORIGINAL_IDCARD_TYPE_SELECTION_REQUIRED')
+                card=identity.get('id_card_info',{})
+                if type(card) is not dict:raise ValueError('ORIGINAL_IDCARD_PROFILE_REQUIRED')
+                mapping={'id_name':'id_card_name','id_number':'id_card_number','registered_address':'id_card_address'}
+                for key,target in mapping.items():
+                    if key not in confirmed_fields:continue
+                    existing=card.get(target,'')
+                    if type(existing) is not str:raise ValueError('ORIGINAL_IDCARD_PROFILE_REQUIRED')
+                    if existing:skipped.append(key)
+                    else:card[target]=confirmed_fields[key];applied.append(key)
+                if applied:identity['id_card_info']=card
             if not applied:
                 if source_check is not None:source_check(platform['revision'],version)
                 return dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped)
@@ -210,7 +272,7 @@ class WechatApplyment:
                 raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             result.update(version=version+1,state='DRAFT')
             self._save(application,owner,result)
-            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
+            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL' if document_type=='business_license' else 'SHARED_IDCARD_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
             _,latest_meta,latest=self.onboarding._load(application,uid)
             if (c.session(session,csrf)!=uid or latest['revision']!=revision or latest['status']!='DRAFT'
                     or latest['fields']!=fields or latest_meta.get('reviews')!={}

@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync(process.argv[2],'utf8');
+const reference=source.match(/ function matchesReference\([\s\S]*?\n/)[0];
+const type=source.match(/ function matchesType\([\s\S]*?\n/)[0];
+const context={};vm.createContext(context);vm.runInContext(reference+type,context);
+assert.equal(context.matchesReference('ORDER-100','order-1'),true);
+assert.equal(context.matchesReference('ORDER-200','order-1'),false);
+assert.equal(context.matchesReference('ORDER-200',''),true);
+assert.equal(context.matchesType('EARN','EARN'),true);
+assert.equal(context.matchesType('RETURN','EARN'),false);
+assert.equal(context.matchesType('RETURN','ALL'),true);
+console.log('MANAGEMENT_FILTER_HELPERS_PASS');

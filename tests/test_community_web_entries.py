@@ -22,7 +22,8 @@ class RoleEntries(unittest.TestCase):
             self.assertIn('aria-label="角色入口"',text)
             for link in re.findall(r'(?:href|src)=["\']([^"\']+)',text):
                 self.assertTrue(link.startswith(PREFIX+'/'),link)
-                self.assertIsNotNone(asset(link[len(PREFIX):]),link)
+                path=link.split('#',1)[0]
+                self.assertIsNotNone(asset(path[len(PREFIX):]),link)
     def test_original_scripts_rebase_requests_and_review_route_without_credentials(self):
         for path in ASSETS:
             raw,mime=asset(path);text=raw.decode()

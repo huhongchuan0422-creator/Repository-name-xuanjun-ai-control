@@ -1,1 +1,553 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>商家工作台</title><link rel="stylesheet" href="/merchant/workbench.css"></head><body><div id="financeBrand" hidden>社区服务 · 平台</div><main id="workbenchMain"><nav id="financeNavigation" aria-label="原工作台功能"><button id="financeHome">工作台首页</button><button id="financeRefund">退款观察</button><button id="financeSplit">分账请求</button><button id="financeReturn">分账回退</button><button id="financeReconciliation">对账管理</button></nav><header><h1 id="workbenchTitle">商家工作台</h1><p>使用客户中心当前账号。订单详情标明支付证据来源；资金接口仅向已授权财务工作区开放，结算结果需独立核实。</p><a href="/merchant/join">入驻申请</a> <a href="/merchant/review">入驻审核</a></header><p id="notice" role="status">等待客户中心加载工作台权限</p><div id="workbenchOriginalSections"><section><h2>订单</h2><div class="row"><label>状态<select id="orderStatus"><option>ALL</option><option>PENDING</option><option>SUCCESS</option><option>FAILED</option><option>CANCELLED</option><option>REFUNDED</option></select></label><button id="loadOrders">查询订单</button><button id="exportOrders">导出当前页 CSV</button></div><p id="summary"></p><div class="scroll"><table><thead><tr><th>订单号</th><th>金额（分）</th><th>币种</th><th>订单状态</th><th>操作</th></tr></thead><tbody id="orders"></tbody></table></div><button id="moreOrders" hidden>下一页</button><p>导出只包含当前筛选页；不是财务结算凭证。</p></section><section id="orderDetails"><h2>订单详情、退款与分账</h2><form id="detailForm"><label>订单编号<input id="detailReference" pattern="[A-Za-z0-9_-]{1,64}" required></label><button>查询详情</button></form><pre id="orderDetail"></pre><button id="readOrderLines">读取原篮子商品快照</button><div id="orderLines"></div><label>履约修订号（首次为0）<input id="completionRevision" readonly type="number" min="0" step="1" value="0"></label><label>完成说明<textarea id="completionNote" maxlength="500"></textarea></label><button id="completeOrder">确认已付款订单履约完成</button><h3>消费者退款申请审核</h3><p>分页读取原退款申请。审核决定不代表已退款；结果未知时先读取原申请核对。</p><button id="loadRefundApplications">读取退款申请列表</button><div id="refundApplications"></div><button id="moreRefundApplications" hidden>下一页退款申请</button><label>消费者申请编号<input id="refundApplicationId"></label><button id="readRefundApplication">读取申请</button><label>申请修订号<input id="refundApplicationRevision" readonly type="number" min="1" step="1"></label><label>决定<select id="refundApplicationDecision"><option>APPROVED</option><option>REJECTED</option></select></label><label>审核意见<textarea id="refundApplicationOpinion" maxlength="1000"></textarea></label><button id="decideRefundApplication">保存审核决定</button><pre id="refundApplicationResult"></pre><h3>退款预审</h3><p>此处记录模拟退款预审，不向微信发起退款。提交结果未知时，保留相同请求编号核对，不能换编号重复提交。</p><form id="refundForm"><label>请求编号<input id="refundEvent" pattern="[A-Za-z0-9_-]{1,64}" required></label><label>退款金额（整数分）<input id="refundAmount" type="number" min="1" max="100000000" step="1" required></label><label><input id="refundConfirm" type="checkbox" required>确认仅记录退款预审</label><button>提交退款预审</button></form><pre id="refundResult"></pre><h3>分账方案计算</h3><p>以订单金额扣除原退款预审总额计算；比例合计必须为10000基点。此处不执行真实分账。</p><form id="splitForm"><label>接收方与比例，每行“接收方编号,基点”<textarea id="splitShares" placeholder="merchant,9000&#10;platform,1000" required></textarea></label><button>计算分账方案</button></form><div id="splitResult"></div></section><section><h2>门店资料</h2><button id="loadSettings">读取资料与商品</button><form id="profileForm"><label>门店名称<input id="name" maxlength="120" required></label><label>介绍<textarea id="description" maxlength="2048" required></textarea></label><label>联系方式<input id="contact" maxlength="120" required></label><label>展示状态<select id="profileStatus"><option>PAUSED</option><option>ACTIVE</option></select></label><button>保存门店资料</button></form></section><section><h2>多门店管理</h2><button id="listStores">读取我的门店</button><div id="storeList"></div><form id="storeForm"><label>已准入门店工作区编号<input id="storeWorkspace" required></label><label>门店名称<input id="storeName" maxlength="120" required></label><label>门店介绍<textarea id="storeDescription" maxlength="2048" required></textarea></label><label>联系方式<input id="storeContact" maxlength="120" required></label><label>状态<select id="storeState"><option>PAUSED</option><option>ACTIVE</option></select></label><label>当前版本（新建留空）<input id="storeVersion" type="number" min="1" step="1"></label><button>创建或更新门店资料</button></form><pre id="storeResult"></pre></section><section><h2>门店员工与权限</h2><form id="staffInviteForm"><label>已验证账户邮箱<input id="staffEmail" type="email" required></label><label>原项目角色<select id="staffProjectRole"><option>EDITOR</option><option>VIEWER</option></select></label><button>生成原客户中心邀请</button></form><form id="staffGrantForm"><label>已接受邀请的用户编号<input id="staffUser" required></label><label><input type="checkbox" id="staffOrders" checked>订单读取</label><label><input type="checkbox" id="staffOrderPages" checked>订单分页列表</label><label><input type="checkbox" id="staffOrderDetail" checked>订单详情</label><label><input type="checkbox" id="staffSummary">经营概览</label><label><input type="checkbox" id="staffSettings">门店资料只读</label><button>保存门店员工权限</button></form><button id="staffList">读取门店员工</button><div id="staffRecords"></div><button id="moreStaff" hidden>下一页门店员工</button><p id="staffSelected"></p><label>员工工作区编号<input id="staffWorkspace"></label><button id="staffRemove">撤销门店员工权限</button><pre id="staffResult"></pre></section><section><h2>商品管理</h2><div id="items"></div><button id="moreItems" hidden>加载更多商品</button><form id="itemForm"><label>商品编号<input id="itemId" pattern="[A-Za-z0-9_-]{1,64}" required></label><label>名称<input id="itemName" maxlength="120" required></label><label>排序<input id="itemSort" type="number" step="1" value="0" required></label><label>状态<select id="itemStatus"><option>ACTIVE</option><option>HIDDEN</option></select></label><button>保存商品</button></form></section><section><h2>商品定价与库存</h2><form id="priceForm"><label>商品编号<input id="priceItem" required></label><label>当前修订号（首次为0）<input id="priceRevision" type="number" min="0" step="1" value="0" required></label><label>单价（分）<input id="priceUnit" type="number" min="1" max="100000000" step="1" required></label><label>可售库存<input id="priceStock" type="number" min="0" max="100000000" step="1" required></label><label><input id="priceEnabled" type="checkbox">允许购买</label><button>保存新价格版本</button></form><button id="readPrice">读取当前价格库存</button><pre id="priceResult"></pre></section><section><h2>广告管理与审核</h2><button id="loadAds">读取广告</button><div id="ads"></div><button id="moreAds" hidden>下一页广告</button><form id="adForm"><label>广告编号<input id="adId" pattern="[A-Za-z0-9_-]{1,64}" required></label><label>标题<input id="adTitle" maxlength="160" required></label><label>目标 HTTPS 地址<input id="adUrl" type="url" required></label><label>广告位<select id="adSlot"><option value="AD_SLOT_PAYMENT_AMOUNT">金额页</option><option value="AD_SLOT_PAYMENT_SUCCESS">模拟成功页</option></select></label><label>开始时间<input id="adStart" type="datetime-local" required></label><label>结束时间<input id="adEnd" type="datetime-local" required></label><label>优先级<input id="adPriority" type="number" min="0" max="100000" value="0" required></label><button>创建广告草稿</button></form></section><section><h2>广告事件报表</h2><label>开始<input id="reportStart" type="datetime-local" required></label><label>结束<input id="reportEnd" type="datetime-local" required></label><button id="loadReport">查询</button><div id="report"></div><button id="moreReport" hidden>下一页报表</button><p>统计为已记录事件，不代表独立访客或支付收入。</p></section><section><h2>模拟对账</h2><button id="reconcile">读取对账预览</button><pre id="finance"></pre></section></div><section id="providerActions" hidden><h2 id="financeSectionTitle">财务记录</h2><p>只读既有观察；财务核销未确认。原退款、分账及实查操作保留在下方原操作区，不因查看记录自动执行。</p><div id="financialObservation" class="financial-observation" hidden><h3 id="financialObservationTitle"></h3><p id="financialObservationScope"></p><div id="financialObservationList"></div><div id="financialObservationDetail" hidden></div><button id="financialObservationBack" class="financial-wide" hidden>返回原列表</button></div><details id="financialReadControls"><summary>原查询与筛选</summary><label>原订单编号<input id="providerOrder" pattern="[A-Za-z0-9_-]{1,64}"></label><label id="financialKindLabel">记录类型<select id="financialKind"><option>REFUND</option><option>SPLIT</option><option>RETURN</option></select></label><button id="financialRecords">读取资金操作记录</button><button id="financialMore" hidden>下一页资金记录</button><button id="readReconciliation">读取最近核对记录</button></details><details id="originalFinancialActions"><summary>原财务操作（权限与资金规则不变）</summary><label>申请编号<input id="providerRequest" pattern="[A-Za-z0-9_-]{1,64}"></label><button id="newProviderRequest">生成新申请编号</button><h3>退款申请</h3><form id="providerRefundForm"><label>退款金额（分）<input id="providerRefundAmount" type="number" min="1" max="100000000" step="1" required></label><label>原因<input id="providerRefundReason" maxlength="80" required></label><button>提交微信退款</button></form><button id="queryProviderRefund">查询微信退款结果</button><button id="statusProviderRefund">读取本地退款处理状态</button><button id="executeRefundApplication">执行已批准消费者退款</button><button id="queryRefundApplication">查询消费者退款执行结果</button><h3>分账回退</h3><p>仅支持微信官方允许的商户号接收方；个人接收方进入人工处理。结果未知时查询原申请。</p><form id="splitReturnForm"><label>接收方准入编号<input id="returnReceiver" required></label><label>回退金额（分）<input id="returnAmount" type="number" min="1" step="1" required></label><label>回退说明<input id="returnDescription" maxlength="80" required></label><button>提交分账回退</button></form><button id="querySplitReturn">查询原回退</button><button id="statusSplitReturn">读取原回退状态</button><h3>分账规则</h3><form id="ruleForm"><label>规则编号<input id="ruleId" required></label><label>版本<input id="ruleVersion" type="number" min="1" step="1" required></label><label>接收方基点，每行“编号,基点”<textarea id="ruleShares" required></textarea></label><label>分账说明<input id="ruleDescription" maxlength="80" required></label><label><input id="ruleUnfreeze" type="checkbox">分账后解冻余款</label><button>保存不可变规则版本</button></form><label>当前激活修订号<input id="ruleRevision" type="number" min="0" step="1" value="0"></label><button id="activeRule">查询当前规则</button><button id="activateRule">激活此版本</button><button id="freezeRule">为当前待付款订单冻结规则</button><button id="snapshotRule">查询订单规则快照</button><button id="executeRule">按冻结规则执行分账</button><h3>分账申请</h3><button id="loadReceivers">读取已准入接收方</button><form id="providerSplitForm"><div id="providerReceivers"></div><label>分账说明<input id="providerSplitDescription" maxlength="80" required></label><label><input id="unfreezeUnsplit" type="checkbox">本次分账后解冻剩余未分资金</label><button>提交微信分账</button></form><button id="queryProviderSplit">查询微信分账结果</button><button id="statusProviderSplit">读取本地分账处理状态</button><button id="reconcileOrder">核对当前订单微信状态</button></details><pre id="providerActionResult"></pre></section><section id="billSection" hidden><h2>微信官方账单</h2><p>门店范围仅核对本店。整商户范围须另获平台财务只读授权，覆盖指定微信商户账单；不增加退款或分账执行权。明细匹配不代表财务核销，也不证明账单无遗漏。</p><label>账单范围<select id="billScope"><option value="STORE">当前门店</option><option value="MERCHANT">已单独授权的整商户</option></select></label><label>账单类型<select id="billKind"><option value="TRADE">交易</option><option value="SPLIT">分账</option></select></label><label>账单日期<input id="billDate" type="date"></label><button id="fetchBill">下载并校验</button><button id="readBill">读取脱敏明细</button><button id="moreBill" hidden>下一页明细</button><button id="reconcileBill">核对账单</button><button id="billAudit">查询原账单核对历史</button><button id="moreBillAudit" hidden>下一页核对历史</button><pre id="billResult" aria-live="polite"></pre></section></main><script src="/merchant/workbench.js" defer></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>社区分账管理后台</title>
+<link rel="stylesheet" href="/merchant/workbench.css">
+</head>
+<body class="workbench-admin">
+<header class="workbench-brand">
+<strong>社区分账管理后台</strong>
+<span>商家后台</span>
+</header>
+<aside class="workbench-sidebar">
+<nav aria-label="商家功能">
+<h3>总览</h3>
+<a href="/merchant/workbench#workbenchMain">首页</a>
+<h3>商家资料</h3>
+<a href="/merchant/workbench#store-profile">门店资料</a>
+<h3>积分商城</h3>
+<a href="/merchant/workbench#catalog-management">商品管理</a>
+<a href="/merchant/workbench#price-stock">价格与库存</a>
+<a href="/merchant/workbench#mall-orders">订单查询</a>
+<a href="/merchant/workbench#merchant-points">商家积分</a>
+<h3>交易与分账</h3>
+<a href="/merchant/workbench#orders-section">订单与结算</a>
+<a href="/merchant/workbench#split-records">分账明细</a>
+<a href="/merchant/workbench#orderDetails">退款管理</a>
+<h3>营销管理</h3>
+<a href="/merchant/workbench#advertising">广告管理</a>
+<h3>设置</h3>
+<a href="/merchant/workbench#split-settings">分账配置</a>
+</nav>
+</aside>
+<div id="financeBrand" hidden>社区分账管理后台</div>
+<main id="workbenchMain">
+<nav id="financeNavigation" aria-label="资金记录功能">
+<button id="financeHome">工作台首页</button>
+<button id="financeRefund">退款记录</button>
+<button id="financeSplit">分账请求</button>
+<button id="financeReturn">分账回退</button>
+<button id="financeReconciliation">对账管理</button>
+</nav>
+<header>
+<h1 id="workbenchTitle">商家经营工作台</h1>
+</header>
+<p id="notice" role="status">正在进入商家后台</p>
+<div id="workbenchOriginalSections">
+<section id="orders-section">
+<header class="management-page-heading">
+<div><h2>订单管理</h2></div>
+<div class="management-page-actions"><button id="loadOrders" class="primary-action">刷新订单</button><button id="exportOrders">导出当前页</button></div>
+</header>
+<div class="management-toolbar compact-toolbar">
+<label>订单号<input id="orderKeyword" type="search" placeholder="订单号"></label>
+<label>状态<select id="orderStatus">
+<option value="ALL">全部状态</option>
+<option value="PENDING">待处理</option>
+<option value="SUCCESS">支付成功</option>
+<option value="FAILED">支付失败</option>
+<option value="CANCELLED">已取消</option>
+<option value="REFUNDED">已退款</option>
+</select>
+</label>
+</div>
+<p id="summary" class="management-summary">
+</p>
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th>订单号</th>
+<th>订单金额（元）</th>
+<th>订单状态</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody id="orders">
+</tbody>
+</table>
+</div>
+<button id="moreOrders" hidden>下一页</button>
+<article id="ordersMainDetail" class="management-detail" hidden><h3>订单详情</h3><dl id="ordersMainDetailFields"></dl><button id="ordersMainDetailBack" type="button">返回订单列表</button></article>
+</section>
+<section id="mall-orders">
+<header class="management-page-heading"><div><h2>订单查询</h2></div><button id="loadMallOrders" class="primary-action">查询</button></header>
+<div class="management-toolbar compact-toolbar"><label>订单号<input id="mallOrderKeyword" type="search" placeholder="订单号"></label><label>状态<select id="mallOrderStatus"><option value="ALL">全部状态</option><option value="PENDING">待处理</option><option value="SUCCESS">支付成功</option><option value="FAILED">支付失败</option><option value="CANCELLED">已取消</option><option value="REFUNDED">已退款</option></select></label></div>
+<p id="mallOrderCoverage" class="management-summary">尚未读取订单</p>
+<div class="scroll"><table><thead><tr><th>订单号</th><th>金额</th><th>币种</th><th>状态</th><th>操作</th></tr></thead><tbody id="mallOrders"></tbody></table></div>
+<button id="moreMallOrders" hidden>加载更多订单</button>
+<article id="mallOrderDetail" class="management-detail" hidden><h3>订单详情</h3><dl id="mallOrderDetailFields"></dl><button id="mallOrderDetailBack" type="button">返回订单列表</button></article>
+</section>
+<section id="orderDetails">
+<header class="management-page-heading"><div><h2>退款管理</h2></div></header>
+<div class="management-toolbar compact-toolbar"><label>退款关键词<input id="refundKeyword" type="search" placeholder="退款单号、订单号、用户或原因"></label><label>退款状态<select id="refundStatusFilter"><option value="ALL">全部状态</option><option value="PENDING">待审核</option><option value="APPROVED">已通过</option><option value="REJECTED">已驳回</option><option value="COMPLETED">退款完成</option></select></label><button id="loadRefundApplications" class="primary-action">查询</button></div>
+<div class="scroll"><table class="management-data-table"><thead><tr><th>退款单号</th><th>订单号</th><th>用户</th><th>退款金额</th><th>状态</th><th>退款原因</th><th>操作</th></tr></thead><tbody id="refundApplications"></tbody></table></div>
+<button id="moreRefundApplications" hidden>加载更多退款申请</button>
+<article id="refundApplicationDetail" class="management-detail" hidden><h3>退款申请详情</h3><dl id="refundApplicationDetailFields"></dl><div class="management-detail-actions"><button id="refundApplicationDetailBack" type="button">返回退款列表</button><button id="refundApplicationReview" type="button">审核此申请</button></div></article>
+<details class="management-operation-group">
+<summary>按订单号查询</summary>
+<div class="management-query-card">
+<form id="detailForm">
+<label>订单编号<input id="detailReference" pattern="[A-Za-z0-9_-]{1,64}" required>
+</label>
+<button class="primary-action">查询订单</button>
+</form>
+</div>
+<div id="orderDetail"></div>
+</details>
+<details class="management-operation-group">
+<summary>履约、退款审核与高级处理</summary>
+<button id="readOrderLines">读取原篮子商品快照</button>
+<div id="orderLines">
+</div>
+<label>履约修订号（首次为0）<input id="completionRevision" readonly type="number" min="0" step="1" value="0">
+</label>
+<label>完成说明<textarea id="completionNote" maxlength="500">
+</textarea>
+</label>
+<button id="completeOrder">确认已付款订单履约完成</button>
+<h3>消费者退款申请审核</h3>
+<p>分页读取原退款申请。审核决定不代表已退款；结果未知时先读取原申请核对。</p>
+<label class="technical-field">消费者申请编号<input id="refundApplicationId">
+</label>
+<button id="readRefundApplication">读取申请</button>
+<label class="technical-field">申请修订号<input id="refundApplicationRevision" readonly type="number" min="1" step="1">
+</label>
+<label>决定<select id="refundApplicationDecision">
+<option value="APPROVED">审核通过</option>
+<option value="REJECTED">审核驳回</option>
+</select>
+</label>
+<label>审核意见<textarea id="refundApplicationOpinion" maxlength="1000">
+</textarea>
+</label>
+<button id="decideRefundApplication">保存审核决定</button>
+<div id="refundApplicationResult"></div>
+<h3>退款预审</h3>
+<p>本页用于退款预审，不会直接发起退款。结果待确认时，请使用原请求编号核对。</p>
+<form id="refundForm">
+<label class="technical-field">请求编号<input id="refundEvent" pattern="[A-Za-z0-9_-]{1,64}" required>
+</label>
+<label>退款金额（元）<input id="refundAmount" type="number" min="0.01" max="1000000" step="0.01" inputmode="decimal" required>
+</label>
+<label>
+<input id="refundConfirm" type="checkbox" required>确认仅记录退款预审</label>
+<button>提交退款预审</button>
+</form>
+<div id="refundResult" role="status"></div>
+<h3>分账方案计算</h3>
+<p>以订单金额扣除原退款预审总额计算；比例合计必须为10000基点。此处不执行真实分账。</p>
+<form id="splitForm">
+<label>接收方与比例，每行“接收方编号,基点”<textarea id="splitShares" placeholder="merchant,9000&#10;platform,1000" required>
+</textarea>
+</label>
+<button>计算分账方案</button>
+</form>
+<div id="splitResult">
+</div>
+</details>
+</section>
+<section id="store-profile">
+<header class="management-page-heading"><div><h2>商家管理</h2></div><button id="loadSettings" class="primary-action">查询</button></header>
+<div class="management-toolbar compact-toolbar"><label>商家关键词<input id="merchantKeyword" type="search" placeholder="商家名称、编号或联系方式"></label><label>经营状态<select id="merchantStatusFilter"><option value="ALL">全部状态</option><option value="ACTIVE">营业中</option><option value="PAUSED">已暂停</option></select></label></div>
+<div class="scroll"><table class="management-data-table"><thead><tr><th>商家编号</th><th>商家名称</th><th>联系方式</th><th>经营状态</th><th>操作</th></tr></thead><tbody id="merchantRecords"></tbody></table></div>
+<article id="merchantDetail" class="management-detail" hidden><h3>商家详情</h3><dl id="merchantDetailFields"></dl><button id="merchantEdit" type="button">编辑商家资料</button></article>
+<details id="merchantEditor" class="management-operation-group">
+<summary>编辑商家资料</summary>
+<form id="profileForm">
+<label>门店名称<input id="name" maxlength="120" required>
+</label>
+<label>介绍<textarea id="description" maxlength="2048" required>
+</textarea>
+</label>
+<label>联系方式<input id="contact" maxlength="120" required>
+</label>
+<label>展示状态<select id="profileStatus">
+<option value="PAUSED">已暂停</option>
+<option value="ACTIVE">营业中</option>
+</select>
+</label>
+<button>保存门店资料</button>
+</form>
+</details>
+</section>
+<section>
+<h2>多门店管理</h2>
+<button id="listStores">读取我的门店</button>
+<div id="storeList">
+</div>
+<form id="storeForm">
+<label>门店编号<input id="storeWorkspace" required>
+</label>
+<label>门店名称<input id="storeName" maxlength="120" required>
+</label>
+<label>门店介绍<textarea id="storeDescription" maxlength="2048" required>
+</textarea>
+</label>
+<label>联系方式<input id="storeContact" maxlength="120" required>
+</label>
+<label>状态<select id="storeState">
+<option>PAUSED</option>
+<option>ACTIVE</option>
+</select>
+</label>
+<label>当前版本（新建留空）<input id="storeVersion" type="number" min="1" step="1">
+</label>
+<button>创建或更新门店资料</button>
+</form>
+<pre id="storeResult">
+</pre>
+</section>
+<section id="staff-permissions">
+<h2>成员权限</h2>
+<form id="staffInviteForm">
+<label>已验证账户邮箱<input id="staffEmail" type="email" required>
+</label>
+<label>原项目角色<select id="staffProjectRole">
+<option>EDITOR</option>
+<option>VIEWER</option>
+</select>
+</label>
+<button>生成原客户中心邀请</button>
+</form>
+<form id="staffGrantForm">
+<label>已接受邀请的用户编号<input id="staffUser" required>
+</label>
+<label>
+<input type="checkbox" id="staffOrders" checked>订单读取</label>
+<label>
+<input type="checkbox" id="staffOrderPages" checked>订单分页列表</label>
+<label>
+<input type="checkbox" id="staffOrderDetail" checked>订单详情</label>
+<label>
+<input type="checkbox" id="staffSummary">经营概览</label>
+<label>
+<input type="checkbox" id="staffSettings">门店资料只读</label>
+<button>保存门店员工权限</button>
+</form>
+<button id="staffList">读取门店员工</button>
+<div id="staffRecords">
+</div>
+<button id="moreStaff" hidden>下一页门店员工</button>
+<p id="staffSelected">
+</p>
+<label>员工所属门店编号<input id="staffWorkspace">
+</label>
+<button id="staffRemove">撤销门店员工权限</button>
+<pre id="staffResult">
+</pre>
+</section>
+<section id="catalog-management">
+<header class="catalog-page-heading">
+<div>
+<h2>商品管理</h2>
+</div>
+<div class="catalog-page-actions">
+<button id="catalogRefresh" type="button">刷新商品</button>
+<button id="catalogCreate" type="button" class="primary-action">新建商品</button>
+</div>
+</header>
+<div class="catalog-summary" aria-label="商品概览">
+<article><span>商品总数</span><strong id="catalogTotal">0</strong></article>
+<article><span>销售中</span><strong id="catalogActive">0</strong></article>
+<article><span>已隐藏</span><strong id="catalogHidden">0</strong></article>
+</div>
+<div class="catalog-toolbar compact-toolbar">
+<label>搜索商品<input id="catalogSearch" type="search" placeholder="输入商品名称或编号"></label>
+<label>销售状态<select id="catalogFilter">
+<option value="ALL">全部状态</option>
+<option value="ACTIVE">销售中</option>
+<option value="HIDDEN">已隐藏</option>
+</select></label>
+</div>
+<div id="items" class="catalog-list" aria-live="polite"></div>
+<button id="moreItems" class="catalog-more" hidden>加载更多商品</button>
+<article id="catalogDetail" class="management-detail" hidden><h3>商品详情</h3><div id="catalogDetailImage" class="item-image-preview"></div><dl id="catalogDetailFields"></dl><div class="management-detail-actions"><button id="catalogDetailBack" type="button">返回商品列表</button><button id="catalogDetailEdit" type="button">编辑商品</button></div></article>
+<div id="catalogEditor" class="catalog-editor" hidden>
+<button id="catalogEditorBackdrop" class="catalog-editor-backdrop" type="button" aria-label="关闭商品编辑"></button>
+<aside role="dialog" aria-modal="true" aria-labelledby="catalogEditorTitle">
+<header><div><small>积分商城</small><h3 id="catalogEditorTitle">新建商品</h3></div><button id="catalogEditorClose" type="button" aria-label="关闭">×</button></header>
+<form id="itemForm">
+<label>商品编号<input id="itemId" pattern="[A-Za-z0-9_-]{1,64}" required>
+</label>
+<label>商品名称<input id="itemName" maxlength="120" required>
+</label>
+<label>商品图片 <small class="upload-guidance">请上传 800 × 800 像素（1:1）的图片，JPG / PNG / WebP，不超过 500KB；尺寸不符无法保存</small><input id="itemImage" type="file" accept="image/jpeg,image/png,image/webp">
+</label>
+<div id="itemImagePreview" class="item-image-preview" hidden><img alt="商品图片预览"><span></span></div>
+<label>商品描述<textarea id="itemDescription" maxlength="2000" rows="5" required></textarea>
+</label>
+<label>展示顺序<input id="itemSort" type="number" step="1" value="0" required>
+</label>
+<label>销售状态<select id="itemStatus">
+<option value="ACTIVE">销售中</option>
+<option value="HIDDEN">已隐藏</option>
+</select>
+</label>
+<footer><button id="catalogEditorCancel" type="button">取消</button><button class="primary-action">保存商品</button></footer>
+</form>
+</aside>
+</div>
+</section>
+<section class="price-stock-page">
+<header class="management-page-heading"><div><small>积分商城</small><h2>价格与库存</h2></div><button id="readPrice" class="primary-action">查询当前价格库存</button></header>
+<div class="management-summary-grid">
+<article><span>当前商品</span><strong id="priceCurrentItem">尚未选择</strong></article>
+<article><span>当前售价</span><strong id="priceCurrentValue">待读取</strong></article>
+<article><span>可售库存</span><strong id="priceCurrentStock">待读取</strong></article>
+</div>
+<div class="management-toolbar compact-toolbar"><label>商品关键词<input id="priceKeyword" type="search" placeholder="商品名称或编号"></label><label>销售状态<select id="priceStatusFilter"><option value="ALL">全部状态</option><option value="ACTIVE">销售中</option><option value="HIDDEN">已隐藏</option></select></label><button id="loadPriceCatalog" type="button">查询商品</button></div>
+<div id="priceCatalogList" class="management-record-list"><div class="management-record-header"><span>商品图片</span><span>商品编号</span><span>商品名称</span><span>销售状态</span><span>当前售价</span><span>可售库存</span><span>操作</span></div><p class="catalog-empty">暂无商品</p></div>
+<article id="priceDetail" class="management-detail" hidden><h3>价格库存详情</h3><dl id="priceDetailFields"></dl><div class="management-detail-actions"><button id="priceDetailBack" type="button">返回价格库存列表</button><button id="priceOpenEditor" type="button">编辑价格库存</button></div></article>
+<details id="priceEditor" class="management-operation-group">
+<summary>编辑价格与库存</summary>
+<form id="priceForm">
+<label>商品编号<input id="priceItem" required>
+</label>
+<label class="technical-field">当前修订号<input id="priceRevision" type="number" min="0" step="1" value="0" required>
+</label>
+<label>单价（元）<input id="priceUnit" type="number" min="0.01" max="1000000" step="0.01" inputmode="decimal" required>
+</label>
+<label>可售库存<input id="priceStock" type="number" min="0" max="100000000" step="1" required>
+</label>
+<label>
+<input id="priceEnabled" type="checkbox">允许购买</label>
+<button class="primary-action">保存新价格版本</button>
+</form>
+</details>
+<div id="priceResult" role="status"></div>
+</section>
+<section id="advertising">
+<header class="management-page-heading"><div><small>营销中心</small><h2>广告管理</h2></div><button id="loadAds" class="primary-action">刷新广告</button></header>
+<div class="management-toolbar compact-toolbar"><label>广告关键词<input id="adKeyword" type="search" placeholder="广告标题或编号"></label><label>广告位<select id="adSlotFilter"><option value="ALL">全部广告位</option><option value="AD_SLOT_PAYMENT_AMOUNT">付款金额确认页</option><option value="AD_SLOT_PAYMENT_SUCCESS">支付完成页</option></select></label><label>投放状态<select id="adStatusFilter"><option value="ALL">全部状态</option><option value="DRAFT">草稿</option><option value="REVIEW">待审核</option><option value="ACTIVE">投放中</option><option value="PAUSED">已暂停</option><option value="ARCHIVED">已归档</option></select></label></div>
+<div id="ads" class="management-record-list">
+</div>
+<button id="moreAds" hidden>下一页广告</button>
+<article id="adDetail" class="management-detail" hidden><h3>广告详情</h3><div id="adDetailImage" class="item-image-preview ad-image-preview"></div><dl id="adDetailFields"></dl><button id="adDetailBack" type="button">返回广告列表</button></article>
+<details class="management-operation-group">
+<summary>新建广告</summary>
+<form id="adForm">
+<label>广告编号<input id="adId" pattern="[A-Za-z0-9_-]{1,64}" required>
+</label>
+<label>标题<input id="adTitle" maxlength="160" required>
+</label>
+<label>广告图片 <small class="upload-guidance">请上传 1200 × 400 像素（3:1）的图片，JPG / PNG / WebP，不超过 500KB；尺寸不符无法保存</small><input id="adImage" type="file" accept="image/jpeg,image/png,image/webp" required>
+</label>
+<div id="adImagePreview" class="item-image-preview ad-image-preview" hidden><img alt="广告图片预览"><span></span></div>
+<label>点击跳转链接<input id="adUrl" type="url" required>
+</label>
+<label>广告位<select id="adSlot">
+<option value="AD_SLOT_PAYMENT_AMOUNT">付款金额确认页</option>
+<option value="AD_SLOT_PAYMENT_SUCCESS">支付完成页（核验成功后）</option>
+</select>
+</label>
+<label>开始时间<input id="adStart" type="datetime-local" required>
+</label>
+<label>结束时间<input id="adEnd" type="datetime-local" required>
+</label>
+<label>优先级<input id="adPriority" type="number" min="0" max="100000" value="0" required>
+</label>
+<button class="primary-action">保存广告草稿</button>
+</form>
+</details>
+</section>
+<section id="advertising-report">
+<h2>广告报表</h2>
+<label>开始<input id="reportStart" type="datetime-local" required>
+</label>
+<label>结束<input id="reportEnd" type="datetime-local" required>
+</label>
+<button id="loadReport">查询</button>
+<div id="report">
+</div>
+<button id="moreReport" hidden>下一页报表</button>
+<p>统计为已记录事件，不代表独立访客或支付收入。</p>
+</section>
+<section id="merchant-points">
+<h2>商家积分</h2>
+<p class="section-note">商家每实际成功分账给社区 0.1 元（即捐赠 0.1 元）获得 1 积分。失败、处理中或结果未知的分账不记积分。</p>
+<div class="points-summary">
+<article><span>可用积分</span><strong id="pointsAvailable">—</strong></article>
+<article><span>累计捐赠积分</span><strong id="pointsEarned">—</strong></article>
+<article><span>可抵扣金额</span><strong id="pointsCashValue">—</strong></article>
+<article><span>有效期</span><strong>1 年</strong></article>
+</div>
+<button id="loadMerchantPoints" type="button">刷新积分数据</button>
+<div class="management-toolbar compact-toolbar"><label>积分关键词<input id="pointsKeyword" type="search" placeholder="订单号或记录编号"></label><label>积分类型<select id="pointsTypeFilter"><option value="ALL">全部类型</option><option value="EARN">获得积分</option><option value="REDEEM">使用积分</option><option value="RETURN">退回积分</option><option value="EXPIRE">过期积分</option></select></label></div>
+<div id="pointsLedger" class="management-record-list"><div class="management-record-header points-record-grid"><span>记录编号</span><span>积分类型</span><span>积分数量</span><span>发生时间</span><span>操作</span></div><p class="catalog-empty">暂无积分流水</p></div>
+<article id="pointsDetail" class="management-detail" hidden><h3>积分流水详情</h3><dl id="pointsDetailFields"></dl><button id="pointsDetailBack" type="button">返回积分流水</button></article>
+<details class="management-operation-group"><summary>积分抵扣设置</summary><form id="pointsSettingForm" class="points-setting">
+<label>单笔消费抵扣比例
+<select id="pointsRedemptionPercent">
+<option value="0">0%（不参与）</option>
+<option value="10">10%</option>
+<option value="20">20%</option>
+<option value="25">25%</option>
+<option value="30">30%</option>
+</select>
+</label>
+<p>10 积分可抵扣 1 元，可用于积分商城兑换或联盟商家消费；新入驻商家的比例以审核通过的申请档位为准。</p>
+<button type="submit">保存积分规则</button>
+</form>
+</details>
+<div id="pointsResult" role="status"></div>
+</section>
+<section id="split-settings">
+<header class="management-page-heading"><div><small>系统设置</small><h2>微信支付分账设置</h2><p>管理接收方、比例和不可变规则版本；打开页面不会自动发起分账。</p></div></header>
+<p id="splitSettingsStatus" class="ad-provider-note">正在核对微信分账设置。</p>
+<div class="settings-action-grid"><button id="openSplitRules" type="button"><strong>分账规则设置</strong><span>维护接收方、比例与规则版本</span></button><button id="openSplitRecords" type="button"><strong>分账记录</strong><span>回读微信侧处理记录与当前状态</span></button></div>
+</section>
+<section>
+<h2>对账管理</h2>
+<button id="reconcile">读取对账预览</button>
+<pre id="finance">
+</pre>
+</section>
+</div>
+<section id="providerActions" hidden>
+<h2 id="financeSectionTitle">财务记录</h2>
+<p>本页只读已有对账记录；财务核销需另行确认。</p>
+<div id="financialObservation" class="financial-observation" hidden>
+<h3 id="financialObservationTitle">
+</h3>
+<p id="financialObservationScope">
+</p>
+<div id="financialObservationList">
+</div>
+<div id="financialObservationDetail" hidden>
+</div>
+<button id="financialObservationBack" class="financial-wide" hidden>返回原列表</button>
+</div>
+<details id="financialReadControls">
+<summary>分账明细查询与筛选</summary>
+<label>关键词<input id="splitKeyword" type="search" placeholder="订单号或分账申请编号"></label>
+<label>订单编号<input id="providerOrder" pattern="[A-Za-z0-9_-]{1,64}">
+</label>
+<label id="financialKindLabel">记录类型<select id="financialKind">
+<option value="REFUND">退款记录</option>
+<option value="SPLIT">分账记录</option>
+<option value="RETURN">分账回退</option>
+</select>
+</label>
+<label>处理状态<select id="splitStatusFilter"><option value="ALL">全部状态</option><option value="PENDING">待处理</option><option value="FINISHED">处理完成</option><option value="UNKNOWN">结果待核实</option></select></label>
+<button id="financialRecords">读取资金操作记录</button>
+<button id="financialMore" hidden>下一页资金记录</button>
+<button id="readReconciliation">读取最近核对记录</button>
+</details>
+<details id="originalFinancialActions">
+<summary>原财务操作（权限与资金规则不变）</summary>
+<label>申请编号<input id="providerRequest" pattern="[A-Za-z0-9_-]{1,64}">
+</label>
+<button id="newProviderRequest">生成新申请编号</button>
+<h3>退款申请</h3>
+<form id="providerRefundForm">
+<label>退款金额（元）<input id="providerRefundAmount" type="number" min="0.01" max="1000000" step="0.01" inputmode="decimal" required>
+</label>
+<label>原因<input id="providerRefundReason" maxlength="80" required>
+</label>
+<button>提交微信退款</button>
+</form>
+<button id="queryProviderRefund">查询微信退款结果</button>
+<button id="statusProviderRefund">读取本地退款处理状态</button>
+<button id="executeRefundApplication">执行已批准消费者退款</button>
+<button id="queryRefundApplication">查询消费者退款执行结果</button>
+<h3>分账回退</h3>
+<p>仅支持微信官方允许的商户号接收方；个人接收方进入人工处理。结果未知时查询原申请。</p>
+<form id="splitReturnForm">
+<label>接收方准入编号<input id="returnReceiver" required>
+</label>
+<label>回退金额（元）<input id="returnAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required>
+</label>
+<label>回退说明<input id="returnDescription" maxlength="80" required>
+</label>
+<button>提交分账回退</button>
+</form>
+<button id="querySplitReturn">查询原回退</button>
+<button id="statusSplitReturn">读取原回退状态</button>
+<h3>分账规则</h3>
+<form id="ruleForm">
+<label>规则编号<input id="ruleId" required>
+</label>
+<label>版本<input id="ruleVersion" type="number" min="1" step="1" required>
+</label>
+<label>接收方基点，每行“编号,基点”<textarea id="ruleShares" required>
+</textarea>
+</label>
+<label>分账说明<input id="ruleDescription" maxlength="80" required>
+</label>
+<label>
+<input id="ruleUnfreeze" type="checkbox">分账后解冻余款</label>
+<button>保存不可变规则版本</button>
+</form>
+<label>当前激活修订号<input id="ruleRevision" type="number" min="0" step="1" value="0">
+</label>
+<button id="activeRule">查询当前规则</button>
+<button id="activateRule">激活此版本</button>
+<button id="freezeRule">为当前待付款订单冻结规则</button>
+<button id="snapshotRule">查询订单规则快照</button>
+<button id="executeRule">按冻结规则执行分账</button>
+<h3>分账申请</h3>
+<button id="loadReceivers">读取已准入接收方</button>
+<form id="providerSplitForm">
+<div id="providerReceivers">
+</div>
+<label>分账说明<input id="providerSplitDescription" maxlength="80" required>
+</label>
+<label>
+<input id="unfreezeUnsplit" type="checkbox">本次分账后解冻剩余未分资金</label>
+<button>提交微信分账</button>
+</form>
+<button id="queryProviderSplit">查询微信分账结果</button>
+<button id="statusProviderSplit">读取本地分账处理状态</button>
+<button id="reconcileOrder">核对当前订单微信状态</button>
+</details>
+<pre id="providerActionResult">
+</pre>
+</section>
+<section id="billSection" hidden>
+<h2>微信官方账单</h2>
+<div class="management-toolbar bill-toolbar">
+<label>多关键字<input id="billKeyword" type="search" placeholder="交易单号、商户单号、订单号、门店或商家"></label>
+<label>账单范围<select id="billScope">
+<option value="STORE">当前门店</option>
+<option value="MERCHANT">已单独授权的整商户</option>
+</select>
+</label>
+<label>账单类型<select id="billKind">
+<option value="TRADE">交易</option>
+<option value="SPLIT">分账</option>
+</select>
+</label>
+<label>账单日期<input id="billDate" type="date">
+</label>
+</div>
+<div class="management-page-actions bill-actions">
+<button id="fetchBill">查询账单</button>
+<button id="readBill">查看明细</button>
+<button id="reconcileBill">核对账单</button>
+<button id="billAudit">核对历史</button>
+</div>
+<div class="scroll"><table class="management-data-table" id="billTable"><thead><tr>
+<th>账单日期</th><th>账单类型</th><th>交易时间</th><th>商户订单号</th><th>微信订单号</th><th>关联单号</th><th>金额</th><th>状态</th><th>核对结果</th><th>操作</th>
+</tr></thead><tbody id="billRows"></tbody></table></div>
+<button id="moreBill" hidden>下一页明细</button>
+<button id="moreBillAudit" hidden>下一页核对历史</button>
+<p id="billResult" class="management-summary" aria-live="polite"></p>
+</section>
+</main>
+<script src="/merchant/workbench.js" defer>
+</script>
+</body>
+</html>

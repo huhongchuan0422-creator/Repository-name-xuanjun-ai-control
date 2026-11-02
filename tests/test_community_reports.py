@@ -34,6 +34,7 @@ class CommunityReportJourney(unittest.TestCase):
         self.reader=PartnerOrderReader('1234567890','ABC',keys.SignedOrderQuery.private,'PUB_KEY_ID_fixture',keys.SignedOrderQuery.public,lambda:self.fx.stage.now)
         policy=dict(sp_appid=self.fx.identity.appid,sub_mchid='1234567891',sub_appid=None,refund_notify_url='https://example.org/notify',profit_sharing=True,max_total_bps=1000,receivers={'comm':dict(type='MERCHANT_ID',account='1234567892',name='Fixture Community',label='Community')},enabled_operations=['SPLIT','RETURN'])
         self.actions=ProviderActions(self.ops,self.reader,{tuple(DEMO_SCOPE[k] for k in ('tenant_id','merchant_id','store_id')):policy})
+        self.actions.onboarding=Mock(split_admission_for_scope=Mock(return_value=dict(participates=True,effective_bps=1000)))
         self.communities.commerce=self.commerce;self.communities.provider_actions=self.actions
         draft=self.call('register',dict(name='Community',description='Fixture',contact='private'))
         self.cid=draft['id'];self.call('submit',dict(community_id=self.cid,expected_version=1))
@@ -43,6 +44,12 @@ class CommunityReportJourney(unittest.TestCase):
         w=web or self.web
         return self.communities.dispatch(w['token'],w['csrf'],dict(workspace=workspace,operation=op,params=p))
     def finance(self,op,p):return self.actions.dispatch(self.web['token'],self.web['csrf'],dict(workspace='finance',operation=op,params=p))
+    def test_direct_provider_composition_without_onboarding_fails_closed(self):
+        identity=tuple(DEMO_SCOPE[k] for k in ('tenant_id','merchant_id','store_id'))
+        direct=ProviderActions(self.ops,self.reader,{identity:self.actions.bindings[identity]})
+        self.assertIsNone(direct.onboarding)
+        with self.assertRaisesRegex(PermissionError,'MERCHANT_SPLIT_ONBOARDING_REQUIRED'):
+            direct._require_split_admission({'scope':DEMO_SCOPE},direct.bindings[identity])
     def basket(self):
         self.call('join',dict(community_id=self.cid,kind='CUSTOMER'),workspace='customer')
         self.commerce.dispatch(self.web['token'],self.web['csrf'],dict(workspace='merchant',operation='price_set',params=dict(item_id='sample_item',expected_revision=0,unit_minor=101,stock=3,enabled=True)))

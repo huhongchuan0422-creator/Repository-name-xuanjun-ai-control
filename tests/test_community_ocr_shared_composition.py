@@ -179,13 +179,15 @@ class SharedOcrComposition(unittest.TestCase):
             fields=dict(legal_name='MANUAL NAME',address='MANUAL ADDRESS',store_name='SYNTHETIC',contact='SYNTHETIC'))})
         self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'business_license')
         path,_=self.confirmed();before=self.snapshot();self.assertFalse(self.apply(path)['written']);self.assertEqual(self.snapshot(),before)
-    def test_identity_has_no_destination_and_three_photos_make_zero_ocr_calls(self):
+    def test_identity_requires_original_document_selection_and_three_photos_make_zero_ocr_calls(self):
         _,_,current=self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)
         self.app=self.fx.material({'application':self.app['application'],'revision':current['revision']},kind='identity_front')
         self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'id_front')
         r=self.submit(document_type='id_front');self.assertEqual(r.status_code,202,r.text)
         path='/api/v1/ocr/jobs/'+r.json()['job_id'];r=self.confirm(path,fields={'id_name':'SYNTHETIC HUMAN'})
-        self.assertEqual(r.status_code,200,r.text);before=self.snapshot();self.assertFalse(self.apply(path)['written']);self.assertEqual(self.snapshot(),before)
+        self.assertEqual(r.status_code,200,r.text);before=self.snapshot()
+        with self.assertRaisesRegex(ValueError,'ORIGINAL_IDCARD_TYPE_SELECTION_REQUIRED'):self.apply(path)
+        self.assertEqual(self.snapshot(),before)
         for kind in ('storefront_photo','interior_photo','cashier_photo'):
             with self.assertRaises(PermissionError):self.bridge.source(self.auth(self.fx.token),self.app['application'],kind)
     def test_shared_service_removal_cannot_fall_back_to_platform_only_write(self):
@@ -259,7 +261,10 @@ class SharedOcrComposition(unittest.TestCase):
         current=self.fx.onboarding._load(self.app['application'],self.fx.fx.uid1)[2]
         mapping={'company_name':'legal_name','registered_address':'address'}
         for key,value in confirmed.items():self.assertEqual(current['fields'][mapping[key]],value)
-        # ID-front uses the same real inference and confirmation path but has no community writeback target.
+        # Select the original provider ID-card target before the real synthetic-image inference.
+        provider=self.wechat._read(self.app['application'])
+        profile=provider['profile'];profile.setdefault('subject_info',{})['identity_info']={'id_doc_type':'IDENTIFICATION_TYPE_IDCARD','id_card_info':{}}
+        self.fx.call('onboarding',{'operation':'wechat_save','params':dict(application=self.app['application'],expected_version=provider['version'],profile=profile)})
         id_bytes=image('id_front');self.raw=id_bytes
         self.app=self.fx.material({'application':self.app['application'],'revision':current['revision']},raw=id_bytes,kind='identity_front')
         self.source=self.bridge.source(self.auth(self.fx.token),self.app['application'],'id_front')
@@ -277,8 +282,10 @@ class SharedOcrComposition(unittest.TestCase):
             self.assertEqual(reply.status_code,200,reply.text)
         finally:real.close()
         self.store=self.api.SecureSQLiteJobStore(self.store.db_path,self.store_key);self.bridge.store=self.store
-        before=self.snapshot();result=self.apply(idpath);self.assertFalse(result['written']);self.assertEqual(result['reason'],'OCR_IDCARD_TARGET_UNDEFINED')
-        self.assertEqual(self.snapshot(),before)
+        result=self.apply(idpath);self.assertTrue(result['written'])
+        card=self.wechat._read(self.app['application'])['profile']['subject_info']['identity_info']['id_card_info']
+        for key,target in {'id_name':'id_card_name','id_number':'id_card_number','registered_address':'id_card_address'}.items():
+            if key in confirmed:self.assertEqual(card[target],confirmed[key])
 
     def test_original_host_transport_echoes_seen_pair_without_auto_writeback(self):
         from scripts.community_ocr_host import HostOcr

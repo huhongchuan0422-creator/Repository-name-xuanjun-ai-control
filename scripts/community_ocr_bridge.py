@@ -154,10 +154,8 @@ class CommunityOcrBridge:
                 raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
             if source['wechat_version'] != version:
                 raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            if job['document_type'] != 'business_license':
-                return {'written':False,'revision':int(revision),'reason':'OCR_IDCARD_TARGET_UNDEFINED'}
-            confirmed = {key:value for key,value in fields.items()
-                         if key in ('company_name','registered_address') and value.strip()}
+            allowed_fill=('company_name','registered_address') if job['document_type']=='business_license' else ('id_name','id_number','registered_address')
+            confirmed = {key:value for key,value in fields.items() if key in allowed_fill and value.strip()}
             if not confirmed:
                 return {'written':False,'revision':int(revision)}
             uid,_,csrf,_ = self.merchant._ocr_context(p._community_token,self.scene,self.applicant_mode)
@@ -179,7 +177,8 @@ class CommunityOcrBridge:
                 current_version = 0 if provider is None else provider['version']
                 if type(current_version) is not int or current_version != provider_version:
                     raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            return service.fill_confirmed_license_draft(p._community_token,csrf,job['onboarding_application_id'],
+            fill=service.fill_confirmed_license_draft if job['document_type']=='business_license' else service.fill_confirmed_identity_draft
+            return fill(p._community_token,csrf,job['onboarding_application_id'],
                 expected_application_revision=int(revision),expected_wechat_version=version,
                 confirmed_fields=confirmed,source_check=check)
         self.authorize_attachment(p, job['onboarding_application_id'], job['attachment_id'],

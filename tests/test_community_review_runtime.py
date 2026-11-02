@@ -129,7 +129,7 @@ class IntegratedReview(unittest.TestCase):
   frame.get_by_role('button',name='保存资料',exact=True).click();expect(frame.locator('#result')).to_contain_text('同版本测试社区')
   frame.get_by_role('button',name='提交审核',exact=True).click();expect(frame.locator('#result')).to_contain_text('PENDING')
   page.locator('#identity').select_option('platform');frame=page.frame_locator('#frame');frame.locator('body[data-review-ready="true"]').wait_for()
-  frame.get_by_role('button',name='平台审核',exact=True).click();frame.locator('#listDirectory').click();expect(frame.locator('#records')).to_contain_text('同版本测试社区')
+  expect(frame.get_by_role('button',name='社区审核',exact=True)).to_have_count(0)
   page.locator('#terminal').select_option('phone');expect(page.locator('#frame')).to_have_class('phone')
   page.screenshot(path=str(self.out/'community-platform-phone.png'),full_page=True)
   page.locator('#terminal').select_option('desktop');page.screenshot(path=str(self.out/'community-platform-desktop.png'),full_page=True)

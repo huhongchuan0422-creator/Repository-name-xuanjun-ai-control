@@ -18,7 +18,7 @@ MATERIALS={
     'business_license':'营业执照', 'identity_front':'经营者/法定代表人证件正面',
     'identity_back':'经营者/法定代表人证件反面', 'storefront_photo':'门店门头照片',
     'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'settlement_proof':'结算账户证明',
-    'operator_authorization':'经办人授权书', 'operator_identity':'经办人身份证明',
+    'operator_authorization':'经办人授权书', 'operator_identity':'经办人证件正面',
     'industry_permit':'行业经营许可（按经营类目）',
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
     'operator_identity_back':'经办人证件反面',
@@ -26,6 +26,21 @@ MATERIALS={
 BASE=('business_license','identity_front','identity_back')
 STORE_SCENE='SALES_SCENES_STORE'
 MINI_SCENE='SALES_SCENES_MINI_PROGRAM'
+REDEMPTION_PERCENT_OPTIONS=(0,10,20,25,30)
+
+
+def checked_redemption_percent(value):
+    if type(value) is not int or value not in REDEMPTION_PERCENT_OPTIONS:
+        raise ValueError('INVALID_REDEMPTION_PERCENT')
+    return value
+
+
+def checked_split_choice(participates,value):
+    if type(participates) is not bool or type(value) is not int or not 0<=value<=10000:
+        raise ValueError('INVALID_SPLIT_PARTICIPATION')
+    if participates != (value>0):
+        raise ValueError('SPLIT_PARTICIPATION_RATIO_MISMATCH')
+    return participates,value
 
 def checked_scenes(value):
     if type(value) is not list or not value or len(value)>2 or any(type(s) is not str or s not in (STORE_SCENE,MINI_SCENE) for s in value) or len(set(value))!=len(value):
@@ -128,6 +143,7 @@ class MerchantOnboarding:
         self.center=center;self.reviewers=dict(reviewers)
         self.operations=None
         self.wechat_applyment=None
+        self.provider_actions=None
         # Reuse the already developed onboarding business tables in the original
         # Center backup domain. No second account store or review queue exists.
         workflow.initialize(center.db)
@@ -176,6 +192,38 @@ class MerchantOnboarding:
     def _meta(self,application,owner,meta):
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_ONBOARDING',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",
             (application,owner,application,self._encode(meta,'onboarding-meta:'+application)))
+    def _split_policy(self,meta,owner=None):
+        origin=meta.get('ocr_origin')
+        actions=self.provider_actions
+        value=origin.get('scope') if type(origin) is dict else None
+        if value is None and owner is not None and self.operations is not None:
+            candidates=[g['scope'] for g in self.operations.grants.values() if g['user_id']==owner and g.get('onboarding_required')]
+            if len(candidates)==1:value=candidates[0]
+        if actions is None:return None
+        if type(value) is not dict or set(value)!={'tenant_id','merchant_id','store_id'}:return None
+        policy=actions.bindings.get(tuple(value[k] for k in ('tenant_id','merchant_id','store_id')))
+        if policy is None:return None
+        return policy['max_total_bps'] if policy['profit_sharing'] else 0
+    def split_admission_for_application(self,application):
+        row=self.center.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=? AND project=? AND active=1",(application,application)).fetchone()
+        if row is None:raise PermissionError('MERCHANT_SPLIT_APPLICATION_REQUIRED')
+        meta=self._decode(row['payload'],'onboarding-meta:'+application)
+        requested=meta.get('requested_split_bps',0);participates=meta.get('split_participation',False)
+        checked_split_choice(participates,requested)
+        provider_max=self._split_policy(meta,row['user_id'])
+        effective=meta.get('effective_split_bps',0)
+        if not participates:return dict(participates=False,requested_bps=0,provider_max_bps=provider_max,effective_bps=0)
+        if provider_max is None or type(effective) is not int or effective!=requested or not 0<effective<=provider_max:
+            raise PermissionError('MERCHANT_SPLIT_NOT_APPROVED')
+        return dict(participates=True,requested_bps=requested,provider_max_bps=provider_max,effective_bps=effective)
+    def split_admission_for_scope(self,scope):
+        key=hashlib.sha256(canonical(scope)).hexdigest()
+        rows=self.center.db.execute("SELECT project,payload FROM links WHERE channel='COMMUNITY_MERCHANT_OPENING' AND subject_idx=? AND active=1",(key,)).fetchall()
+        if len(rows)!=1:raise PermissionError('MERCHANT_SPLIT_OPENING_REQUIRED')
+        application,payload=rows[0]
+        opening=self._decode(payload,'community-opening:'+key+':'+application)
+        if opening.get('state')!='OPENED' or opening.get('scope')!=scope:raise PermissionError('MERCHANT_SPLIT_OPENING_REQUIRED')
+        return self.split_admission_for_application(application)
     def _required(self,meta):
         base=tuple(k for k in BASE if k!='identity_back' or meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
         # Old records without a declaration retain conservative offline requirements.
@@ -197,6 +245,7 @@ class MerchantOnboarding:
             if hashlib.sha256(raw).hexdigest()!=material['sha256']:raise PermissionError('PRIVATE_MATERIAL_INTEGRITY')
     def _view(self,application,meta,data):
         from scripts.community_merchant_opening import opening_state
+        from scripts.community_wechat_applyment import provider_workflow_view
         owner=self.center.db.execute("SELECT user_id FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=? AND project=?",(application,application)).fetchone()[0]
         workspaces=[] if self.operations is None else [name for name,g in self.operations.grants.items()
             if g['user_id']==owner and g['onboarding_required']]
@@ -205,12 +254,16 @@ class MerchantOnboarding:
         if wechat_record is not None:data['fields']=shared_application_fields(wechat_record.get('profile',{}),data['fields'])
         return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
             delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
+            redemption_percent=meta.get('redemption_percent',0),approved_redemption_percent=meta.get('approved_redemption_percent'),
+            split_participation=meta.get('split_participation',False),requested_split_bps=meta.get('requested_split_bps',0),
+            provider_max_split_bps=self._split_policy(meta,owner),effective_split_bps=meta.get('effective_split_bps',0),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
             opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
             opening_workspaces=workspaces,
-            wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',payment_enabled=False)
+            wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',
+            wechat_provider_workflow=provider_workflow_view(wechat_record),payment_enabled=False)
     @community_route('/merchant/onboarding')
     def dispatch(self,session,csrf,body,*,source_origin=None):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
@@ -234,7 +287,7 @@ class MerchantOnboarding:
                  'download':{'application','kind'}}
         listing=type(op) is str and op in ('mine','review_list')
         if (type(op) is not str or op not in schemas or
-                (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations'}) if op=='save' else set(params)!=schemas[op]))):
+                (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations','redemption_percent','split_participation','requested_split_bps'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         if op=='open_workbench':
@@ -269,7 +322,10 @@ class MerchantOnboarding:
         application=params['application']
         if op=='save' and application is None:
             application='ma_'+secrets.token_hex(16);owner=uid
-            meta={'entity_type':params['entity_type'],'category':params['category'],'delegated':params['delegated'],'materials':{}}
+            meta={'entity_type':params['entity_type'],'category':params['category'],'delegated':params['delegated'],'materials':{},
+                  'redemption_percent':checked_redemption_percent(params.get('redemption_percent',0))}
+            participates,requested=checked_split_choice(params.get('split_participation',False),params.get('requested_split_bps',0))
+            meta.update(split_participation=participates,requested_split_bps=requested,effective_split_bps=0)
             # Trusted Python composition only; never a body-supplied scope.
             if source_origin is not None:
                 if (type(source_origin) is not dict or set(source_origin)!={'project','scene','scope'}
@@ -321,6 +377,11 @@ class MerchantOnboarding:
                         expected={'store':[STORE_SCENE],'mini':[MINI_SCENE],'both':[MINI_SCENE,STORE_SCENE]}[declaration['scene']]
                         if set(meta.get('sales_scenes_type',[]))!=set(expected):raise ValueError('APPLICATION_SCENE_DECLARATION_MISMATCH')
                     meta['declarations']=declaration
+                if 'redemption_percent' in params:
+                    meta['redemption_percent']=checked_redemption_percent(params['redemption_percent'])
+                if 'split_participation' in params or 'requested_split_bps' in params:
+                    participates,requested=checked_split_choice(params.get('split_participation',meta.get('split_participation',False)),params.get('requested_split_bps',meta.get('requested_split_bps',0)))
+                    meta.update(split_participation=participates,requested_split_bps=requested,effective_split_bps=0)
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
@@ -397,6 +458,13 @@ class MerchantOnboarding:
                         review=meta.get('reviews',{}).get(kind,{})
                         if review.get('decision')!='ACCEPTED' or review.get('sha256')!=meta['materials'][kind]['sha256']:
                             raise ValueError('MATERIAL_REVIEW_REQUIRED:'+kind)
+                    meta['approved_redemption_percent']=checked_redemption_percent(meta.get('redemption_percent',0))
+                    participates,requested=checked_split_choice(meta.get('split_participation',False),meta.get('requested_split_bps',0))
+                    provider_max=self._split_policy(meta,owner)
+                    if participates and (provider_max is None or requested>provider_max):
+                        raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM' if provider_max is not None else 'WECHAT_SPLIT_MAXIMUM_NOT_VERIFIED')
+                    meta['effective_split_bps']=requested if participates else 0
+                    self._meta(application,owner,meta)
                 note='' if op in ('submit','withdraw') else safe_text(params['note'],80)
                 encoded_note=self._encode({'note':note},'onboarding-note:'+application) if note else ''
                 required_fields=workflow._FIELDS

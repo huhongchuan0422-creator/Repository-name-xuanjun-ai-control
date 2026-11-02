@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "project": "社区分账管理后台",
+  "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
+  "baseline_source_commit": "3d8f7d76ae35ea25c25c23abc3d5260aaa1c3531",
+  "baseline_source_tree": "7438c1a1b914e53c86350b06c7ae08eff9f6856a",
+  "owner_amendment_id": "CLEAN_FIELD_COMPLETE_LIST_TEMPLATE_AND_NO_TECHNICAL_COPY_20261103",
+  "change_policy": {
+    "presentation_only_may_change_inventory": false,
+    "developer_may_amend_contract": false,
+    "developer_may_replace_owner_approval_hash": false,
+    "owner_amendment_required_for_asset_change": true,
+    "release_without_expected_contract_sha256": "HOLD"
+  },
+  "reviewer_navigation": {
+    "web_login_auxiliary": "REMOVED",
+    "navigation_mode": "SAME_DOCUMENT_PANEL",
+    "route_switch_method": "HISTORY_REPLACE_STATE_NO_DOCUMENT_NAVIGATION",
+    "top_level_management_entry_policy": "ONE_PORTAL_LOGIN_REDIRECT_OTHER_MANAGEMENT_ROUTES",
+    "default_form_policy": "HIDDEN_UNTIL_EXPLICIT_ACTION",
+    "entry_data_policy": "SELECTED_ENTRY_ONLY",
+    "merchant_review_workspace_entry": {
+      "navigation": "TOP_DOCUMENT_UNCHANGED",
+      "rendering": "ON_DEMAND_SAME_WORKSPACE_PANEL",
+      "standalone_review_chrome": "HIDDEN_WHEN_EMBEDDED",
+      "covered_entries": [
+        "商家审核",
+        "待审核商家数",
+        "商家入驻审核",
+        "入驻审核"
+      ]
+    },
+    "merchant_module_workspace_entry": {
+      "navigation": "TOP_DOCUMENT_UNCHANGED",
+      "rendering": "ON_DEMAND_SAME_WORKSPACE_PANEL",
+      "standalone_navigation": "HIDDEN_WHEN_EMBEDDED"
+    },
+    "list_page_policy": {
+      "filter": "MULTI_KEYWORD_AND_BUSINESS_STATUS",
+      "layout": "FILTER_BAR_THEN_FIELD_COMPLETE_TABLE",
+      "record_detail": "ROW_ACTION_TO_DETAIL",
+      "empty_state": "KEEP_TABLE_HEADERS"
+    },
+    "main_groups_in_order": [
+      "总览",
+      "社区经营",
+      "商家管理",
+      "积分商城",
+      "交易与分账",
+      "营销管理",
+      "平台管理",
+      "系统设置"
+    ],
+    "required_entry_count": 17,
+    "review_filters_in_order": [
+      "待处理申请",
+      "全部申请",
+      "已完成申请"
+    ],
+    "mobile_drawer": {
+      "default_open": false,
+      "width": "min(76vw,300px)",
+      "top_level_layout": "SINGLE_COLUMN",
+      "top_level_behavior": "ONE_GROUP_OPEN_AT_A_TIME",
+      "default_open_group": "商家管理",
+      "trigger_layout": "FLEX_ICON_LABEL_STATE_NO_OVERLAP",
+      "top_bar_layout": "SINGLE_TOOLBAR_MENU_LEFT_TITLE_CENTER",
+      "scrollable": true,
+      "overlay": true,
+      "close_after_navigation": true
+    }
+  },
+  "assets": {
+    "demos/community-stage/admin-shell.css": "9933373d17cd4b93d56b4064dd861686dbc003a538beb919af0f2d506e8f12ef",
+    "demos/community-stage/admin-shell.js": "f1703d4e632da8bbfa2024a1a54a7fa2e610f5b348ec98a29ce75e5555f517ba",
+    "demos/community-stage/communities.js": "f2dd84bbdfaec699b19ec0133e1d2d813b31656cec2fc06a31fd08e2b3bbe5cb",
+    "demos/community-stage/onboarding.css": "2218ad6de66c61a410badd259030e9d077fb0352d6d9697a1c93faeac236fbc2",
+    "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
+    "demos/community-stage/onboarding.js": "61dc40f42521b067baab195152a067b7fc8480950f248be16441b27625b12a9d",
+    "demos/community-stage/web-session.js": "147e2d8970c46af5e1e3ff2562620a982194a2fe9f6e4325ed26bf22f19ab5e4",
+    "demos/community-stage/workbench.css": "8e1dac19e014eb650dbb1d7c23dbca94e4ef93b8fb80b9083c12574f09724d59",
+    "demos/community-stage/workbench.html": "0bc6a82cc9770aaf28ab247ab18f05d0368b6609624c9ac1cfa212073666bd31",
+    "demos/community-stage/workbench.js": "0ed2758963bb47639389e30754d0ff8cf683ae8f9c861254fa7fd41d540020e5",
+    "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
+  }
+}

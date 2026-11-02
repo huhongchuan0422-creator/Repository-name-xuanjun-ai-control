@@ -123,13 +123,16 @@ class Commerce:
                 self.center.audit(g['project'],g['user_id'],'COMMUNITY_ORDER_COMPLETED',p['reference'])
             return result
         fields = {'price_set': {'item_id', 'expected_revision', 'unit_minor', 'stock', 'enabled'},
-                  'price_read': {'item_id'}, 'order_lines': {'reference'}}
+                  'price_read': {'item_id'}, 'price_list': set(), 'order_lines': {'reference'}}
         if type(op) is not str or op not in fields or type(p) is not dict or set(p) != fields[op]:
             raise ValueError('INVALID_COMMERCE_OPERATION')
         c = self.center
         with c.tx():
             c.limit('community-commerce-operator:' + g['user_id'], 60, 60)
-            if op.startswith('price_'):
+            if op == 'price_list':
+                t,m,s=scope(g['scope']);ids=[row[0] for row in self.runtime.demo.merchant_db.execute('SELECT item_id FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? ORDER BY item_id LIMIT 200',(t,m,s))]
+                result={'records':[record for record in (self._read(g['scope'],g['project'],'PRODUCT',item_id) for item_id in ids) if record is not None]}
+            elif op.startswith('price_'):
                 if not valid_id(p['item_id']):
                     raise ValueError('INVALID_PRODUCT_ID')
                 self._catalog_item(g['scope'], p['item_id'], False)

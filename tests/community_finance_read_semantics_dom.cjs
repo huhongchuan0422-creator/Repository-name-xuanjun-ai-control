@@ -5,7 +5,7 @@ class Element{
  constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
  append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this.textContent='';}
  addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
- reset(){}set innerHTML(_){throw Error('unsafe DOM');}
+ reset(){}closest(){return new Element('label');}set innerHTML(_){throw Error('unsafe DOM');}
 }
 const html=fs.readFileSync(process.argv[3],'utf8');
 const nodes=Object.fromEntries([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
@@ -29,7 +29,7 @@ function assertEmpty(){assert.equal(nodes.billResult.textContent,'');assert(node
  let q=await start('financialRecords');q.resolve(response({records:[{request_id:'ref1',reference:'order1',status:'SUBMITTED_RESULT_UNKNOWN',provider_response_verified:false,finance_status:'UNCONFIRMED'}],has_more:true,next_cursor:'a'.repeat(64)}));await flush();
  assert.equal(nodes.financialObservation.hidden,false);assert.equal(nodes.financialObservationTitle.textContent,'退款观察');assert.equal(nodes.providerActionResult.hidden,true);
  const texts=node=>walk(node).map(n=>n.textContent).join('|');
- assert.equal(nodes.notice.textContent,'记录查询完成');assert(texts(nodes.financialObservationList).includes('已提交，结果待核实'));assert(!texts(nodes.financialObservationList).includes('SUBMITTED_RESULT_UNKNOWN'));assert(texts(nodes.financialObservationList).includes('ref1'));const n=requests.length,open=nodes.financialObservationList.children[1];open.click();assert.equal(requests.length,n);assert.equal(nodes.financialObservationDetail.hidden,false);assert.equal(nodes.workbenchTitle.textContent,'退款观察详情');assert(texts(nodes.financialObservationDetail).includes('SUBMITTED_RESULT_UNKNOWN'));assert(texts(nodes.financialObservationDetail).includes('摘要未提供金额'));assert(!texts(nodes.financialObservationDetail).includes('CNY'));
+assert.equal(nodes.notice.textContent,'记录查询完成');assert(texts(nodes.financialObservationList).includes('已提交，结果待核实'));assert(!texts(nodes.financialObservationList).includes('SUBMITTED_RESULT_UNKNOWN'));assert(texts(nodes.financialObservationList).includes('ref1'));const n=requests.length,open=nodes.financialObservationList.children[1];open.click();assert.equal(requests.length,n);assert.equal(nodes.financialObservationDetail.hidden,false);assert.equal(nodes.workbenchTitle.textContent,'退款观察详情');assert(!texts(nodes.financialObservationDetail).includes('SUBMITTED_RESULT_UNKNOWN'));assert(texts(nodes.financialObservationDetail).includes('摘要未提供金额'));assert(!texts(nodes.financialObservationDetail).includes('CNY'));
  nodes.financialObservationBack.click();assert.equal(nodes.workbenchTitle.textContent,'退款观察');assert.equal(nodes.financialObservationList.hidden,false);assert.equal(nodes.financialKind.value,'REFUND');assert.equal(nodes.financialMore.hidden,false);
  // Retained callbacks from the same group must not restore a removed snapshot after refresh/403.
  const oldBack=nodes.financialObservationBack.onclick;

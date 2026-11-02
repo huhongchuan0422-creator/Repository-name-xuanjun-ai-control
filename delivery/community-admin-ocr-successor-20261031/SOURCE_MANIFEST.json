@@ -1,0 +1,69 @@
+{
+  "base_commit": "e23e1868b16f6c4c3f30f158418e6557037df28e",
+  "base_tree": "01b2c7157640a960be214fe66aeae33f88e6be0d",
+  "files": {
+    "clients/community-mini/session.js": {
+      "bytes": 19934,
+      "sha256": "74ce42a2d484d154eea6d8c3b11a74d130098698c9e7d5a8bd941f0eff58ac65"
+    },
+    "delivery/community-admin-ocr-successor-20261031/OWNER_RECONCILE_COMMAND.txt": {
+      "bytes": 7593,
+      "sha256": "875d3059783cb36056872a57531b7b0aade9249e450b8f457442933b4c9641dd"
+    },
+    "delivery/community-admin-ocr-successor-20261031/admin_maintenance.py": {
+      "bytes": 21865,
+      "sha256": "eee4be03bd0af65807f63192ad7ce2d7d9af3705e3714c432bebbc2d409de1dc"
+    },
+    "delivery/community-admin-ocr-successor-20261031/community_runner_route_adapter.py": {
+      "bytes": 9383,
+      "sha256": "0eaaf3e8a5f52a59b0c76eb4ee155914029e094b439639ab63e1d37e0606f1cf"
+    },
+    "delivery/community-admin-ocr-successor-20261031/ocr-review-pins.json": {
+      "bytes": 1777,
+      "sha256": "4a256c3d57787c04abc12bc6784bb54e062fdbadaf9660fba8b5380550ba0015"
+    },
+    "delivery/community-admin-ocr-successor-20261031/original_manual_support.py": {
+      "bytes": 21629,
+      "sha256": "ef9917bd9adb09a4f0ffb531c0d6a98d39f804a3fd282fc6696b3ec5a7ad32ad"
+    },
+    "delivery/community-admin-ocr-successor-20261031/route_reconcile.py": {
+      "bytes": 7483,
+      "sha256": "5a315d2df20a835c85533e63622bf2a5e2449bc4dedf4499f8ab80b3cc4f4b87"
+    },
+    "scripts/community_ocr_bridge.py": {
+      "bytes": 14245,
+      "sha256": "b357dac8dc35071c2dc866b1bcfa686e861d25b7dd3b27d75fae4ea6c11eed8e"
+    },
+    "scripts/community_ocr_host.py": {
+      "bytes": 7078,
+      "sha256": "dcd13b2ab863d6c3b112871e93a8ad5e6b47928ac027e917eb7a79edd2a935aa"
+    },
+    "scripts/community_wechat_applyment.py": {
+      "bytes": 49523,
+      "sha256": "8adef42f7cda83532cfecde8903ce0fbc1205883f4b06e300a03c823f336efa6"
+    },
+    "tests/test_community_ocr_shared_composition.py": {
+      "bytes": 24337,
+      "sha256": "378cca3df568901e954c1f1744752b0fae68f2171b8923f7d84429933f389cc2"
+    },
+    "tests/test_community_ocr_writeback_route.py": {
+      "bytes": 4910,
+      "sha256": "93a6e11b294de506fbf93c0a4ecb54040345b0ba86a7fb7277f7e4f8d3410b00"
+    }
+  },
+  "production_attempt": "community-update-e23e1868b16f-2d8090633c61-stopped-v1-e23e186-first-v1",
+  "production_attempt_replayed": false,
+  "production_modified": false,
+  "review_inputs": {
+    "handoff_archive_sha256": "9c2991915540c2c49ba8ee4156b71a934c2d9a28b3cda50be4fb31465f4d6882",
+    "ocr_patch_sha256": "a86919aed1fbd860fb255e2b52165df6d2b4f392348d8ab640cf07ea889fa68c",
+    "ocr_pins_sha256": "4a256c3d57787c04abc12bc6784bb54e062fdbadaf9660fba8b5380550ba0015"
+  },
+  "schema": "community-admin-ocr-source-successor-v1",
+  "tests": {
+    "admin_authority_bootstrap_policy_preflight": "55_PASS",
+    "mini_session": "12_PASS",
+    "ocr_host": "10_PASS",
+    "ocr_writeback": "25_PASS_1_SKIP_NOTO_SANS_CJK"
+  }
+}

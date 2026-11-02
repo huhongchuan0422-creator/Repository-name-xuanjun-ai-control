@@ -211,6 +211,7 @@ class CommunityReports:
             community_project(c,g['user_id'],g['project'],('OWNER',))
             finance,policy=self.actions._authorize(session,csrf,p['provider_workspace'])
             if finance['project']!=g['project'] or finance['tenant']!=g['tenant'] or p['receiver_id'] not in policy['receivers']:raise PermissionError('SAME_PROJECT_ADMITTED_RECEIVER_REQUIRED')
+            self.actions._require_split_admission(finance,policy)
             scope=finance['scope'];key=hashlib.sha256(canonical([scope,p['receiver_id']])).hexdigest()
             with c.tx():
                 prior=receiver_communities(c,scope,g['project'],[p['receiver_id']]).get(p['receiver_id'])

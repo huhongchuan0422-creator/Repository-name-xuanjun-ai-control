@@ -70,7 +70,7 @@ class WebSession:
             from scripts.community_admin_management import dispatch
             values=headers.get_all('X-CSRF-Token',[])
             if len(values)!=1 or not values[0]:raise PermissionError('CSRF_REQUIRED')
-            return dispatch(self.center,token(headers),values[0],body),None
+            return dispatch(self.center,token(headers),values[0],body,self.operations),None
         if body!={}:raise ValueError('EMPTY_SESSION_BODY_REQUIRED')
         session=token(headers)
         values=headers.get_all('X-CSRF-Token',[])

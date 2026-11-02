@@ -65,7 +65,7 @@ class HostOcr:
             raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         action=params['action'];base={'action','application'}
         extras={'submit':{'document_type','idempotency_key'},'read':{'job_id'},
-                'confirm':{'job_id','revision','fields','idempotency_key','application_revision','provider_version'},'delete':{'job_id'}}
+                'confirm':{'job_id','revision','fields','idempotency_key','application_revision','provider_version'},'delete':{'job_id'},'apply_confirmed':{'job_id','confirmation_revision'}}
         if action not in extras or set(params)!=base|extras[action]:raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         p=self.bridge.authenticate(token)
         if not self.bridge.authorize_application(p,params['application']):raise PermissionError('OCR_APPLICATION_DENIED')
@@ -82,6 +82,12 @@ class HostOcr:
                 raise PermissionError('OCR_JOB_NOT_FOUND')
             if type(params['job_id']) is not str or not __import__('re').fullmatch('[a-f0-9-]{36}',params['job_id']):
                 raise ValueError('OCR_JOB_ID_INVALID')
+            if action=='apply_confirmed':
+                # Explicit human application of an already-persisted confirmation.
+                # Caller supplies no field values or permission; bridge rereads the
+                # encrypted job, attachment, session and both original CAS versions.
+                result=self.bridge.apply_confirmed(p,params['job_id'],expected_confirmation_revision=params['confirmation_revision'])
+                return {'status_code':200,'result':result,'writeback':'WRITTEN' if result.get('written') is True else 'NO_EMPTY_FIELDS_CHANGED'}
             path='/api/v1/ocr/jobs/'+params['job_id'];method={'read':'GET','delete':'DELETE','confirm':'POST'}[action];options={}
             if action=='confirm':
                 path+='/confirm';headers['Idempotency-Key']=params['idempotency_key']
