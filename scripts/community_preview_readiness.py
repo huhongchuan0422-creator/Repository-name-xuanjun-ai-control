@@ -13,6 +13,10 @@ FIXED_FRONTEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_BACKEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_PROOF_SHA256 = '548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'
 FIXED_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
+CURRENT_FRONTEND = 'e66505299813e923a30f010e73eb4ec474938d7b'
+CURRENT_BACKEND = '362cc98b50c1de1db32377c2a9e1bdeec4eb87d3'
+CURRENT_PROOF_SHA256 = 'a2eedb4fe2a0250e1e92539eb5362e6a3e44d33048606928b5832d800ac3b76d'
+CURRENT_COMPATIBILITY = 'PINNED_SOURCE_DERIVED_RUNTIME'
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):return None
@@ -50,9 +54,15 @@ def check(open_url=None, profile=None, product_identity=None):
             exact_source = (head == product_identity.get('backend_source_sha')
                             and product_identity.get('compatibility') == 'EXACT_SOURCE_MATCH'
                             and 'compatibility_sha256' not in product_identity)
-            if not (legacy or exact_source):return report
-            expected_backend=product_identity['backend_source_sha'];compatibility='EXACT_SOURCE_MATCH'
+            current = (head == CURRENT_FRONTEND
+                       and product_identity.get('backend_source_sha') == CURRENT_BACKEND
+                       and product_identity.get('compatibility') == CURRENT_COMPATIBILITY
+                       and product_identity.get('compatibility_sha256') == CURRENT_PROOF_SHA256)
+            if not (legacy or exact_source or current):return report
+            expected_backend=product_identity['backend_source_sha']
+            compatibility=CURRENT_COMPATIBILITY if current else 'EXACT_SOURCE_MATCH'
             if legacy:report['compatibility_sha256']=FIXED_PROOF_SHA256
+            if current:report['compatibility_sha256']=CURRENT_PROOF_SHA256
         if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
@@ -88,9 +98,9 @@ if __name__=='__main__':
     # -I keeps imports isolated; load only our checked-out adjacent control helper.
     import importlib.util
     kind=os.environ.get('COMMUNITY_FIXED_PRODUCT_KIND','legacy-4f')
-    if kind not in ('legacy-4f','r1-7ca1ac2a','current-5e264'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
+    if kind not in ('legacy-4f','r1-7ca1ac2a','current-e665'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
     helper=('community_mini_r1_input.py' if kind=='r1-7ca1ac2a' else
-            'community_mini_current_input.py' if kind=='current-5e264' else
+            'community_mini_current_input.py' if kind=='current-e665' else
             'community_preview_fixed_product.py')
     spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name(helper))
     helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)

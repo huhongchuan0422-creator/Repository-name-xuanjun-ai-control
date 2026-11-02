@@ -24,5 +24,5 @@ page.chooseRedemption({currentTarget:{dataset:{value:'15'}}});
 assert.equal(page.data.pendingRedemptionPercent,25);
 const wxml=fs.readFileSync(path.join(root,'pages/merchant-join/index.wxml'),'utf8');
 for(const tier of ['0','10','20','25','30'])assert(wxml.includes('data-value="'+tier+'"'));
-assert(wxml.includes('后台获批比例'));
+assert(wxml.includes('爱心积分抵扣比例（审核生效）'));
 console.log('POINTS_MINI_UPLOAD_DOM_OK');

@@ -1,6 +1,7 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
 const FIXED_FRONTEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_BACKEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_PROOF_SHA256='548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367',FIXED_COMPATIBILITY='EXACT_SOURCE_MATCH';
+const CURRENT_FRONTEND='e66505299813e923a30f010e73eb4ec474938d7b',CURRENT_BACKEND='362cc98b50c1de1db32377c2a9e1bdeec4eb87d3',CURRENT_PROOF_SHA256='a2eedb4fe2a0250e1e92539eb5362e6a3e44d33048606928b5832d800ac3b76d',CURRENT_COMPATIBILITY='PINNED_SOURCE_DERIVED_RUNTIME';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
@@ -52,8 +53,8 @@ function sourceIdentity(){
   return {product_source_sha:env.GITHUB_SHA||null,control_source_sha:env.GITHUB_SHA||null,source_root:null,fixed_product:false};
  }
  const kind=env.COMMUNITY_FIXED_PRODUCT_KIND||'legacy-4f';
- if(!['legacy-4f','r1-7ca1ac2a','current-5e264'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
- const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-5e264'?'community_mini_current_input.py':'community_preview_fixed_product.py';
+ if(!['legacy-4f','r1-7ca1ac2a','current-e665'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
+ const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-e665'?'community_mini_current_input.py':'community_preview_fixed_product.py';
  const keys=['PATH','GITHUB_SHA','GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT',
   'PREVIEW_CONTROL_SHA','PREVIEW_SOURCE_SHA','PREVIEW_TARGET','PREVIEW_EVIDENCE_RUN_ID','PREVIEW_ENABLED',
   'PREVIEW_PRODUCT_TREE','PREVIEW_PRODUCT_ZIP_SHA256','PREVIEW_BINDING_ID','IMAGE_BUILD_ENABLED','RUNNER_TEMP',
@@ -69,9 +70,9 @@ function sourceIdentity(){
  const exactR1=kind==='r1-7ca1ac2a'&&identity.product_source_sha==='7ca1ac2a4e5a68704bb0cebe1c33049713070859'&&
    identity.backend_source_sha===identity.product_source_sha&&identity.compatibility==='EXACT_SOURCE_MATCH'&&
    identity.compatibility_sha256===undefined;
- const exactCurrent=kind==='current-5e264'&&identity.product_source_sha==='5e26425d58bc2a1102a50be8aae3053200f6f875'&&
-   identity.backend_source_sha===identity.product_source_sha&&identity.compatibility==='EXACT_SOURCE_MATCH'&&
-   identity.compatibility_sha256===undefined;
+ const exactCurrent=kind==='current-e665'&&identity.product_source_sha===CURRENT_FRONTEND&&
+   identity.backend_source_sha===CURRENT_BACKEND&&identity.compatibility===CURRENT_COMPATIBILITY&&
+   identity.compatibility_sha256===CURRENT_PROOF_SHA256;
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||!(legacy||exactR1||exactCurrent))throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
@@ -87,9 +88,11 @@ function endpoint(profile=process.env.COMMUNITY_PREVIEW_PROFILE??'legacy'){
 function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),controlSha=null){
  if(controlSha!==null&&report?.control_source_sha!==controlSha)throw Error('MATCHING_CONTROL_READINESS_REQUIRED');
  const fixedPair=head===FIXED_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
- const expectedBackend=fixedPair?FIXED_BACKEND:head;
- const expectedCompatibility='EXACT_SOURCE_MATCH';
+ const currentPair=head===CURRENT_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
+ const expectedBackend=fixedPair?FIXED_BACKEND:currentPair?CURRENT_BACKEND:head;
+ const expectedCompatibility=currentPair?CURRENT_COMPATIBILITY:'EXACT_SOURCE_MATCH';
  if(fixedPair && report?.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
+ if(currentPair && report?.compatibility_sha256!==CURRENT_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||

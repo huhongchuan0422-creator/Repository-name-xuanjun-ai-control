@@ -19,10 +19,13 @@ from pathlib import Path, PurePosixPath
 
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
-PRODUCT_SOURCE_SHA = '5e26425d58bc2a1102a50be8aae3053200f6f875'
-MINI_TREE = 'f0676e3e010b031c2bbb38b5e4bd736c063f8f18'
-MANIFEST_SHA256 = '9f3ed70a6a4e11036767175e0a1249a1ff5f5d6ba2c36654297948e63e0f421b'
-BINDING_ID = 'community-mini-current-points-development-upload-20261101'
+PRODUCT_SOURCE_SHA = 'e66505299813e923a30f010e73eb4ec474938d7b'
+MINI_TREE = '1f99a53f49d0293087681bcce21915acdb50b246'
+MANIFEST_SHA256 = 'c7346cb6fa786ff652ff672e412c67df36ede35e5b443eb42d9aa7e1e0ab7aa4'
+BINDING_ID = 'community-mini-current-wechat-status-development-upload-20261101'
+BACKEND_SOURCE_SHA = '362cc98b50c1de1db32377c2a9e1bdeec4eb87d3'
+COMPATIBILITY = 'PINNED_SOURCE_DERIVED_RUNTIME'
+COMPATIBILITY_SHA256 = 'a2eedb4fe2a0250e1e92539eb5362e6a3e44d33048606928b5832d800ac3b76d'
 PREFIX = 'community-mini-current/clients/community-mini/'
 APPID = 'wx1d5f8873eaea5392'
 PROFILE = 'uk-path-candidate'
@@ -106,6 +109,9 @@ def receipt(raw, files, env):
         'mini_tree': MINI_TREE,
         'manifest_sha256': MANIFEST_SHA256,
         'mini_zip_sha256': hashlib.sha256(raw).hexdigest(),
+        'backend_source_sha': BACKEND_SOURCE_SHA,
+        'compatibility': COMPATIBILITY,
+        'compatibility_sha256': COMPATIBILITY_SHA256,
         'source_files': {name: files[name][1] for name in sorted(files)},
         'connected_app_sha256': hashlib.sha256(app.replace(needle, replacement).encode()).hexdigest(),
         'workflow_run_id': env['GITHUB_RUN_ID'],
@@ -145,6 +151,9 @@ def verify_receipt(value, raw, env):
             and value.get('mini_tree') == MINI_TREE
             and value.get('manifest_sha256') == MANIFEST_SHA256
             and value.get('mini_zip_sha256') == hashlib.sha256(raw).hexdigest()
+            and value.get('backend_source_sha') == BACKEND_SOURCE_SHA
+            and value.get('compatibility') == COMPATIBILITY
+            and value.get('compatibility_sha256') == COMPATIBILITY_SHA256
             and value.get('workflow_run_id') == env['GITHUB_RUN_ID']
             and value.get('workflow_run_attempt') == env['GITHUB_RUN_ATTEMPT']
             and value.get('appid') == APPID and value.get('profile') == PROFILE
@@ -225,7 +234,8 @@ def identity(env):
     require(len(prepared) == 36, 'CURRENT_PREPARED_SOURCE_SET_REQUIRED')
     return {'product_source_sha': PRODUCT_SOURCE_SHA, 'control_source_sha': value['control_source_sha'],
             'source_root': str(destination), 'prepared_files': prepared, 'fixed_product': True,
-            'backend_source_sha': PRODUCT_SOURCE_SHA, 'compatibility': 'EXACT_SOURCE_MATCH'}
+            'backend_source_sha': BACKEND_SOURCE_SHA, 'compatibility': COMPATIBILITY,
+            'compatibility_sha256': COMPATIBILITY_SHA256}
 
 
 def main():
