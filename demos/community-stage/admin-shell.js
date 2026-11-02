@@ -262,6 +262,7 @@
 
  // Pages22/49: scoped original merchant-name projection; membership never implies payment admission.
  const memberPanel=document.getElementById('communityMerchantMembers'),memberIndex=panels.indexOf(memberPanel);
+ memberPanel.querySelector(':scope > p')?.remove();
  memberPanel.classList.add('community-members-panel');
  const memberHeader=document.createElement('header');memberHeader.className='management-page-header';const memberHeaderCopy=document.createElement('div'),memberEyebrow=document.createElement('span'),memberHeading=document.createElement('h3'),memberDescription=document.createElement('p');memberEyebrow.className='management-page-eyebrow';memberEyebrow.textContent='商家管理';memberHeading.textContent='社区商家';memberDescription.textContent='';memberHeaderCopy.append(memberEyebrow,memberHeading,memberDescription);memberHeader.append(memberHeaderCopy);
  const memberStats=document.createElement('div');memberStats.className='management-stats';const memberStatNodes=new Map();for(const [key,label,note]of [['records','社区商家','尚未查询'],['signed','微信签约完成','仅签验查询记录'],['unknown','待核验渠道','不从成员关系推断']]){const card=document.createElement('article'),caption=document.createElement('span'),value=document.createElement('strong'),small=document.createElement('small');card.className='management-stat';caption.textContent=label;value.textContent='—';small.textContent=note;card.append(caption,value,small);memberStats.append(card);memberStatNodes.set(key,{value,note:small});}memberPanel.append(memberHeader,memberStats);

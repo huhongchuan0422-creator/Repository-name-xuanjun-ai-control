@@ -43,7 +43,7 @@ test('opening a listed community reads current revision before original review',
  f.elements.decision.value='PAUSED';f.elements.opinion.value='Pause reason';await f.click('review');
  assert.deepEqual(f.calls.map(c=>c.body.operation),['list','status','review']);
  assert.deepEqual(f.calls[2].body.params,{community_id:'co_one',expected_version:8,decision:'PAUSED',opinion:'Pause reason'});
- assert.match(f.elements.result.textContent,/PAUSED/);
+ assert.match(f.elements.result.textContent,/社区资料已读取/);
 });
 test('filter change discards page selection and late success or error',async()=>{
  for(const delayed of [{result:result([community('late')],'b'.repeat(64)),delay:true},{error:'OLD_ERROR',delay:true}]){
@@ -59,7 +59,7 @@ test('late selected detail cannot restore cleared revision; identity reset clear
  const f=setup([{result:result([community('old')])},{result:community('old','APPROVED',8),delay:true},{result:result([])}]);
  await f.click('pending');const pending=f.elements.records.children[0].children.find(x=>typeof x.onclick==='function').onclick();
  f.elements.directoryStatus.value='PAUSED';f.elements.directoryStatus.onchange();f.pending.shift()();await pending;
- assert.equal(f.elements.reference.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询当前社区版本/);
+ assert.equal(f.elements.reference.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询社区资料/);
  f.configure({csrf:'next',workspace:'next'});assert.equal(f.elements.directoryStatus.value,'ALL');await f.click('pending');
  assert.equal(f.calls[2].body.params.status,'PENDING');assert.equal(f.calls[2].body.workspace,'next');
 });
@@ -72,13 +72,13 @@ test('unavailable merchant mappings and partial totals are explicit without edit
   unavailable_mapping_count:61,unavailable_mappings:[{workspace:'revoked_001',status:'UNAVAILABLE'}]};
  const f=setup([{result:incomplete},{result:{coverage_complete:false,totals_scope:'ACCESSIBLE_STORE_SUBTOTAL',signed_gross_payment_minor:101}}]);
  await f.click('platformMerchants');
- assert.match(f.elements.merchantResult.textContent,/覆盖不完整/);
+ assert.match(f.elements.merchantResult.textContent,/部分商家资料暂不可用/);
  assert.match(f.elements.merchantRecords.children[0].textContent,/不可用/);
  assert.equal(f.elements.merchantRecords.children[0].children.length,0);
  assert.equal(f.elements.moreMerchants.hidden,false);
  f.elements.platformView.value='platform_overview';await f.click('readPlatformView');
- assert.match(f.elements.platformViewResult.textContent,/可访问门店小计/);
- assert.match(f.elements.platformViewResult.textContent,/不能作为完整总额/);
+ assert.match(f.elements.platformViewResult.textContent,/当前仅显示可查看门店/);
+ assert.match(f.elements.platformViewResult.textContent,/部分商家资料暂不可用/);
 });
 
 test('submit, save and membership late results cannot restore cleared community context',async()=>{
@@ -95,7 +95,7 @@ test('submit, save and membership late results cannot restore cleared community 
    f.pending.shift()();await pending;
    for(const id of ['reference','name','description','contact'])assert.equal(f.elements[id].value,'',operation+' '+id);
    assert.equal(f.elements.result.textContent,'');assert.doesNotMatch(f.elements.message.textContent,/OLD_MUTATION_ERROR|操作完成/);
-   const count=f.calls.length;await f.click('submit');assert.equal(f.calls.length,count);assert.match(f.elements.message.textContent,/先查询当前社区版本/);
+   const count=f.calls.length;await f.click('submit');assert.equal(f.calls.length,count);assert.match(f.elements.message.textContent,/先查询社区资料/);
   }
  }
 });
@@ -121,7 +121,7 @@ test('profile denied reread clears private detail and blocks stale update',async
  const f=setup([{result:community('co_one','DRAFT',7)},{error:'COMMUNITY_PRIVATE'}]);
  f.elements.reference.value='co_one';await f.click('read');await f.click('read');
  assert.equal(f.elements.result.textContent,'');assert.equal(f.elements.contact.value,'');
- await f.elements.profile.onsubmit({preventDefault(){}});assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先回读/);
+ await f.elements.profile.onsubmit({preventDefault(){}});assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先刷新当前社区资料/);
 });
 
  test('register UNKNOWN persists a guard and cannot POST again after mine or identity reset',async()=>{
@@ -201,7 +201,7 @@ test('profile denied reread clears private detail and blocks stale update',async
 
  test('original standalone portal without admin shell retains real order record rows',async()=>{
  const f=setup([{result:result([{reference:'original_order',amount_minor:101,order_state:'PENDING'}])}],false);f.elements.reference.value='co_one';await f.click('communityOrders');
- assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*101分/);
+ assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*¥1\.01/);
  });
 
 const promotion=(id='cp_one')=>({id,community_id:'co_one',scene:'shop1',title:'实际标题',expires_at:1794000000,status:'ACTIVE',version:1,new_members:2,authenticated_redemptions:3,metrics:'DISTINCT_AUTHENTICATED_REDEMPTIONS_ONLY'});
@@ -280,6 +280,6 @@ test('receiver stale read refuses changed workspace and cleared detail',async()=
 
 test('review refusal clears previous private status and cannot replay old CAS',async()=>{
  const f=setup([{result:community('co_one','PENDING',8)},{error:'ACCESS_DENIED'}]);
- f.elements.reference.value='co_one';await f.click('read');assert.match(f.elements.result.textContent,/private/);f.elements.decision.value='APPROVED';await f.click('review');
- assert.equal(f.elements.result.textContent,'');assert.equal(f.elements.contact.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询当前社区版本/);
+ f.elements.reference.value='co_one';await f.click('read');assert.match(f.elements.result.textContent,/社区资料已读取/);f.elements.decision.value='APPROVED';await f.click('review');
+ assert.equal(f.elements.result.textContent,'');assert.equal(f.elements.contact.value,'');await f.click('review');assert.equal(f.calls.length,2);assert.match(f.elements.message.textContent,/先查询社区资料/);
 });

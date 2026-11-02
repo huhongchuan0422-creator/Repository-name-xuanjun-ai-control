@@ -39,6 +39,7 @@ class Increment(unittest.TestCase):
     page.route('https://community-ui.test/**',respond)
     page.goto('https://community-ui.test'+PREFIX+'/community/portal');page.wait_for_load_state('networkidle')
     self.assertEqual(page.locator('.admin-card').count(),11)
+    self.assertNotIn('读取当前授权社区的原商家资料与已有渠道查询状态',page.locator('body').inner_text())
     self.assertFalse(page.locator('#profile').is_visible())
     page.screenshot(path='../community-home-1440.png',full_page=True)
     page.get_by_role('navigation',name='社区功能').get_by_role('button',name='社区资料',exact=True).click()

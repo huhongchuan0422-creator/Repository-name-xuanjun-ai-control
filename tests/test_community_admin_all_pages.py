@@ -134,6 +134,9 @@ class CommunityAdminAllPages(unittest.TestCase):
             '广告图片 <small class="upload-guidance">请上传 1200 × 400 像素（3:1）',
             '尺寸不符无法保存',
             'id="itemImage" type="file"', 'id="adImage" type="file"',
+            'id="itemPrice" type="number" min="0.01"',
+            'id="itemStock" type="number" min="0"',
+            'id="itemEnabled" type="checkbox" checked',
         ):
             self.assertIn(phrase, html)
         for phrase in (
@@ -141,12 +144,19 @@ class CommunityAdminAllPages(unittest.TestCase):
             "loadValidatedImage(file,{width:1200,height:400,label:'广告图片'})",
             "if(!itemEditorImageData)throw Error('请上传商品图片')",
             "if(!adEditorImageData)throw Error('请上传广告图片')",
-            "['商品图片','商品编号','商品名称','商品描述','状态','展示顺序','操作']",
+            "['商品图片','商品编号','商品名称','商品描述','状态','售价 / 库存','操作']",
+            "yuanToMinor($('itemPrice').value,'单价')",
+            "commerce(t,'price_set',{item_id:itemId",
             "['广告图片','广告编号','广告标题','广告位','投放状态','审核状态','投放时间','操作']",
         ):
             self.assertIn(phrase, script)
         self.assertIn('.catalog-image img', styles)
         self.assertIn('.ad-list-image img', styles)
+        self.assertNotIn('pattern="[A-Za-z0-9_-]', html)
+        self.assertNotIn(".pattern='[A-Za-z0-9_-]", script)
+        self.assertEqual(html.count('pattern="[A-Za-z0-9_\\-]{1,64}"'), 6)
+        self.assertIn("splitReceiver.pattern='[A-Za-z0-9_\\\\-]{1,100}'", script)
+        self.assertNotIn('服务端', script)
 
     def test_merchant_money_fields_use_yuan_and_convert_at_request_boundary(self):
         html = (STAGE / 'workbench.html').read_text()
