@@ -350,6 +350,10 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   self.assertEqual(text.count(successor),1,'UNREVIEWED_HELPER_PIN_SUCCESSOR')
   self.assertNotIn(predecessor,text,'DUPLICATE_OLD_HELPER_PIN')
   text=text.replace(successor,predecessor,1)
+  # Invert only the exact reviewed full-delivery route contract; old SHA remains authoritative.
+  route_successor="    expected_new=101\n    if 'BUILD_PROVENANCE.json' in data:\n        contract=json.loads(data['BUILD_PROVENANCE.json']).get('brand_contract')\n        if contract is not None:\n            delivery=type(contract) is dict and contract.get('schema')=='FULL_STATIC_DELIVERY_REVIEW_V1'\n            expected={'schema':'FULL_STATIC_DELIVERY_REVIEW_V1','brand':'玄钧AI新','archive_members':1256,'overlay_files':1212,'new_files':116,'public_files':1303} if delivery else {'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}\n            need(type(contract) is dict and contract==expected and all(type(contract[key]) is type(value) for key,value in expected.items()),'ROUTE_BRAND_CONTRACT')\n            expected_new=expected['new_files']\n    need(len(names)==expected_new,'NEW_PUBLIC_COUNT')\n"
+  self.assertEqual(text.count(route_successor),1,'UNREVIEWED_ROUTE_CONTRACT')
+  text=text.replace(route_successor,"    need(len(names)==101,'NEW_PUBLIC_COUNT')\n",1)
   raw=(ROOT/'tests/fixtures/pr122-delivery-wrapper-reviewed-delta.json').read_bytes()
   self.assertEqual(sha(raw),'dffb14d600f9a1bd152b4c83b749b6c3d40947247d08e0c471d6bd983b0de00b')
   delta=json.loads(raw)
@@ -366,6 +370,11 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   changed=text.replace("need(declaration.get('frozen_files')==FROZEN", "need(True or declaration.get('frozen_files')==FROZEN",1)
   self.assertNotEqual(changed,text)
   with self.assertRaises(AssertionError):self.import_isolation_projection(changed)
+
+ def test_route_projection_rejects_unknown_or_duplicate_contract(self):
+  text=(ROOT/'scripts/pr122_site_hub_unified_release.py').read_text()
+  for changed in (text.replace("expected_new=expected['new_files']","expected_new=117",1),text+"\n# unrelated source drift\n"):
+   with self.assertRaises(AssertionError):self.import_isolation_projection(changed)
 
  def test_helper_pin_projection_rejects_unknown_or_duplicate_pin(self):
   text=(ROOT/'scripts/pr122_site_hub_unified_release.py').read_text()

@@ -134,7 +134,15 @@ def entries(raw,pins):
 def routes(data):
     # Reuse the reviewed exact-location algorithm, changing only its bound count.
     names=[p for p,h in json.loads(data['source-pin.json'])['overlay_baselines'].items() if h is None]
-    need(len(names)==101,'NEW_PUBLIC_COUNT')
+    expected_new=101
+    if 'BUILD_PROVENANCE.json' in data:
+        contract=json.loads(data['BUILD_PROVENANCE.json']).get('brand_contract')
+        if contract is not None:
+            delivery=type(contract) is dict and contract.get('schema')=='FULL_STATIC_DELIVERY_REVIEW_V1'
+            expected={'schema':'FULL_STATIC_DELIVERY_REVIEW_V1','brand':'玄钧AI新','archive_members':1256,'overlay_files':1212,'new_files':116,'public_files':1303} if delivery else {'schema':'FULL_STATIC_BRAND_REVIEW_V1','brand':'玄钧AI新','archive_members':1241,'overlay_files':1197,'new_files':101,'public_files':1288}
+            need(type(contract) is dict and contract==expected and all(type(contract[key]) is type(value) for key,value in expected.items()),'ROUTE_BRAND_CONTRACT')
+            expected_new=expected['new_files']
+    need(len(names)==expected_new,'NEW_PUBLIC_COUNT')
     # Its old fixed 90 count is deliberately not disabled or globally patched.
     route_map={};text='# PR122 exact reviewed public files; original routes remain in place.\n'
     for name in names:
