@@ -1,0 +1,91 @@
+{
+  "package": "openclaw@2026.9.9",
+  "package_sha256": "a46df5fc5e4d73837d5b3eeebc286e64a85dffc429c30f3a07f6398e2a9423f7",
+  "license": "MIT",
+  "files": [
+    {
+      "path": "original-source/LICENSE",
+      "package_path": "package/LICENSE",
+      "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+      "bytes": 1170
+    },
+    {
+      "path": "original-source/browser-tool-description-DsnF2LXy.mjs",
+      "package_path": "package/dist/browser-tool-description-DsnF2LXy.mjs",
+      "sha256": "aa00c1b2bbd6d2d75760b3152f69de79cbc1a11730880e523c422017760b7deb",
+      "bytes": 21126
+    },
+    {
+      "path": "original-source/form-fields-B9V6H6db.mjs",
+      "package_path": "package/dist/form-fields-B9V6H6db.mjs",
+      "sha256": "ddac41c08d37273c8d13787172412efcb8e0e7a5c0a77fdc9ddf50798249ae02",
+      "bytes": 2052
+    },
+    {
+      "path": "original-source/gateway-question-3xF4D70D.mjs",
+      "package_path": "package/dist/gateway-question-3xF4D70D.mjs",
+      "sha256": "44979a073cda6fc9ef208ca79da1d644a82d67ff0ef8b2d79632ccedeae00306",
+      "bytes": 28758
+    },
+    {
+      "path": "original-source/kysely-sync-BMSZn9yz.mjs",
+      "package_path": "package/dist/kysely-sync-BMSZn9yz.mjs",
+      "sha256": "41838a9b6bade26589c0560e6200d770c79d9bdef445210e7ed8400ec00bcecf",
+      "bytes": 434189
+    },
+    {
+      "path": "original-source/openclaw-state-db-Dh2awMJ8.mjs",
+      "package_path": "package/dist/openclaw-state-db-Dh2awMJ8.mjs",
+      "sha256": "e5aad1c1e5a6d9b1ed371c2a176cf39015d3d3d8293d9aa9128b977cc540f75b",
+      "bytes": 68164
+    },
+    {
+      "path": "original-source/openclaw-state-db-existing-schema-DXYsEyhD.mjs",
+      "package_path": "package/dist/openclaw-state-db-existing-schema-DXYsEyhD.mjs",
+      "sha256": "830b9e419ddc2f28b3961e715e325c2c84fd8654eb94d6e27b3ffe9ca2dfb9fa",
+      "bytes": 113665
+    },
+    {
+      "path": "original-source/package.json",
+      "package_path": "package/package.json",
+      "sha256": "214e9551a924a9ced04ecf38c7ed8f6bff8beeab33431db12ed6250eaa959e95",
+      "bytes": 145276
+    },
+    {
+      "path": "original-source/pw-ai-CXSFycyo.mjs",
+      "package_path": "package/dist/pw-ai-CXSFycyo.mjs",
+      "sha256": "48b26f6714fe5a5681f79ef12bef6bbf22bc3e397668313a403725abbb8dcaf8",
+      "bytes": 86177
+    },
+    {
+      "path": "original-source/question-2U20Yooq.mjs",
+      "package_path": "package/dist/question-2U20Yooq.mjs",
+      "sha256": "9ce21960f52b422d95f1cde9c0641833cb548b73f7a6b872522da9a32a196b22",
+      "bytes": 32445
+    },
+    {
+      "path": "original-source/question-manager-27btsO43.mjs",
+      "package_path": "package/dist/question-manager-27btsO43.mjs",
+      "sha256": "17e4fccf91900f27111eb03b6c94beaee3ba57fc61653516891d560b98e19815",
+      "bytes": 12380
+    },
+    {
+      "path": "original-source/ref-contract-D0kWy5jy.mjs",
+      "package_path": "package/dist/ref-contract-D0kWy5jy.mjs",
+      "sha256": "088fc1c8d3a2dae934f9e6d2c8fcc372f7a4c8dd11c3ed279b4fc9784e9a63d3",
+      "bytes": 7379
+    },
+    {
+      "path": "original-source/secret-store-CuSJMUWv.mjs",
+      "package_path": "package/dist/secret-store-CuSJMUWv.mjs",
+      "sha256": "c98553cb9a324926eb69b50e11e95eb1b5a8832a3dd29f969ea38dd55b629498",
+      "bytes": 20112
+    },
+    {
+      "path": "original-source/sqlite-transaction-BHOCk0oF.mjs",
+      "package_path": "package/dist/sqlite-transaction-BHOCk0oF.mjs",
+      "sha256": "25193a2a2e8945bf0c433c52e333665adb4333e6cf66de46d22dd8341387ef52",
+      "bytes": 11928
+    }
+  ]
+}

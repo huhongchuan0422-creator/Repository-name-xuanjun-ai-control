@@ -1,0 +1,122 @@
+{
+  "stage": "LOCAL_CANDIDATE_NOT_DEPLOYED",
+  "original_artifact_version": "2026.9.9",
+  "original_artifact_sha256": "a46df5fc5e4d73837d5b3eeebc286e64a85dffc429c30f3a07f6398e2a9423f7",
+  "files": [
+    {
+      "path": "acceptance_questions.mjs",
+      "bytes": 1257,
+      "sha256": "901b43517dbf84c57469c3406e7cadcd330f52175b572207dc7bc5b7e4ae028b"
+    },
+    {
+      "path": "gateway_acceptance_bridge.mjs",
+      "bytes": 5118,
+      "sha256": "933e1829a3a497179a3baca8cd8bba31bf97b2977c41d1cc0a62d684c8fe86c3"
+    },
+    {
+      "path": "receipt_schema.mjs",
+      "bytes": 915,
+      "sha256": "3a9a5f3de36aa6cf418aaf37b65251e32da63eac18ea52bd6d76c82adba5d7c3"
+    },
+    {
+      "path": "durable_receipt_adapter.mjs",
+      "bytes": 8113,
+      "sha256": "a056fa86135c4a7172ab06547875dbe763a3c720e62fefd591aea4cf7d708702"
+    },
+    {
+      "path": "openclaw_store_adapter.mjs",
+      "bytes": 4092,
+      "sha256": "7ffbdfd1328de0494a3247e356f91312134db2de5d69d322c62f962d8654942f"
+    },
+    {
+      "path": "native_browser_consumer.mjs",
+      "bytes": 7250,
+      "sha256": "8a9ae999c5b13883477e733c3bfc2144374cadfb57293956806fa71206bc045f"
+    },
+    {
+      "path": "browser_ref_policy.mjs",
+      "bytes": 1919,
+      "sha256": "2d0ebac79c4d87d03ad7a3c7ef88b59f851abb79ff1f251852f8def8ed9a7a3e"
+    },
+    {
+      "path": "safe_input.py",
+      "bytes": 16189,
+      "sha256": "7931ee090a2de7758cf2c5608346c447669380289d01a48a3d05ad7fd0fcf47d"
+    },
+    {
+      "path": "native-framework.patch",
+      "bytes": 326301,
+      "sha256": "e874772cfe1924a4360049cf172ced19498068623afe20e2d24508ff3592ad3b"
+    },
+    {
+      "path": "NATIVE_PATCH_MANIFEST.json",
+      "bytes": 2475,
+      "sha256": "52f3fb462a865f3f0a29bad738e69c5c992ab443c7eb9902a4f772b513da7313"
+    },
+    {
+      "path": "NATIVE_INTEGRATION_DELTA.md",
+      "bytes": 11153,
+      "sha256": "94ccadda8f41da8dd09e7a9e6f308c7859e36860335e1d81313c4668b1e8a86d"
+    },
+    {
+      "path": "tools/build_native_patch.py",
+      "bytes": 15129,
+      "sha256": "a4ede2772d45fea01eff75a06f4b16a877040f0550d23243db2e67bb172e80ee"
+    },
+    {
+      "path": "patched-source/control-ui/assets/acceptance-signature.js",
+      "bytes": 1257,
+      "sha256": "901b43517dbf84c57469c3406e7cadcd330f52175b572207dc7bc5b7e4ae028b"
+    },
+    {
+      "path": "patched-source/control-ui/assets/control-ui-boot-shared-_B6VNra2.js",
+      "bytes": 705248,
+      "sha256": "8bc5c0faa89801dae954d618c2e72aecf3b8ca048a25bc997a2543cbb0b0f6fc"
+    },
+    {
+      "path": "patched-source/control-ui/assets/control-ui-boot-shared-mtfVQ24Y.js",
+      "bytes": 819374,
+      "sha256": "a79fedae8a3e3102565b68725a0a098b999a75ff9f061505f3152af9525d55eb"
+    },
+    {
+      "path": "patched-source/control-ui/assets/question-page-registration-Ci9YglNL.js",
+      "bytes": 6468,
+      "sha256": "1343ae4358543951b747d78bcd408f447d8744c0d935368b946c678ddc668088"
+    },
+    {
+      "path": "patched-source/openclaw-state-db-contract-CQDemVBb.mjs",
+      "bytes": 3387,
+      "sha256": "495fe02f917f8b7cfdfa8e6f3d5c274fb5f6bf0bad8ae372cc9d19660c8515df"
+    },
+    {
+      "path": "patched-source/openclaw-state-db-legacy-backfills-BSKqroDt.mjs",
+      "bytes": 150131,
+      "sha256": "e5773b1caf738f18676ce7eaad52823ae70baa5c295a83e466d50b7476302825"
+    },
+    {
+      "path": "patched-source/openclaw-state-db-schema-additive-DAFjL3MG.mjs",
+      "bytes": 13314,
+      "sha256": "d7ce5ecc516b5c1a1e59794cee1067a625c458e2493fe8c4038234f1b1f3a434"
+    },
+    {
+      "path": "patched-source/question-2U20Yooq.mjs",
+      "bytes": 35616,
+      "sha256": "98277098ff10e4e6ccdcf3e962f797b0d4f44ad3ef41928b2a00819c480691cb"
+    },
+    {
+      "path": "patched-source/question-validation-C3R346Mf.mjs",
+      "bytes": 2437,
+      "sha256": "52023273c0f4eea5553c6fa3be4c3581a5f347a117af750dc2adc46ae0ecd00a"
+    },
+    {
+      "path": "patched-source/secret-store-CuSJMUWv.mjs",
+      "bytes": 20416,
+      "sha256": "6637d64fea47fc665e7fa132ba4e103b552203f85d7cf66dc3ea2f42f8946200"
+    },
+    {
+      "path": "patched-source/server-aux-handlers-ZAnivsB0.mjs",
+      "bytes": 93434,
+      "sha256": "f8d5c9214132de532fe8abcb2c80ebd6bc5d94a48e9e5f0a03e62758ce088d57"
+    }
+  ]
+}

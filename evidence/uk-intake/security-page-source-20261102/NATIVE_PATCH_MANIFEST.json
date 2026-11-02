@@ -1,0 +1,52 @@
+[
+  {
+    "path": "question-validation-C3R346Mf.mjs",
+    "original_sha256": "2387b85d02778f9401e8f9c6353544e497f7a8f3502b9a05dd8704f21e8807ae",
+    "candidate_sha256": "52023273c0f4eea5553c6fa3be4c3581a5f347a117af750dc2adc46ae0ecd00a"
+  },
+  {
+    "path": "question-2U20Yooq.mjs",
+    "original_sha256": "9ce21960f52b422d95f1cde9c0641833cb548b73f7a6b872522da9a32a196b22",
+    "candidate_sha256": "98277098ff10e4e6ccdcf3e962f797b0d4f44ad3ef41928b2a00819c480691cb"
+  },
+  {
+    "path": "server-aux-handlers-ZAnivsB0.mjs",
+    "original_sha256": "f9d940c507699567dffffa14017197067ca17209ccd62eb0ad551dcc3fe826ca",
+    "candidate_sha256": "f8d5c9214132de532fe8abcb2c80ebd6bc5d94a48e9e5f0a03e62758ce088d57"
+  },
+  {
+    "path": "openclaw-state-db-contract-CQDemVBb.mjs",
+    "original_sha256": "0b4d0eaeaf753e6938483079638b31bd065e40ca8669b437fbe27975dff407e3",
+    "candidate_sha256": "495fe02f917f8b7cfdfa8e6f3d5c274fb5f6bf0bad8ae372cc9d19660c8515df"
+  },
+  {
+    "path": "openclaw-state-db-legacy-backfills-BSKqroDt.mjs",
+    "original_sha256": "51d950336385fb9bbb2ec571dd7252301311937f66f0b8604c93afd5bf28a6c4",
+    "candidate_sha256": "e5773b1caf738f18676ce7eaad52823ae70baa5c295a83e466d50b7476302825"
+  },
+  {
+    "path": "control-ui/assets/control-ui-boot-shared-_B6VNra2.js",
+    "original_sha256": "debc737c3b8f98a6c8c9a2a07452ce15eb0f17c656a1df823ed5f4c4dc14b5da",
+    "candidate_sha256": "8bc5c0faa89801dae954d618c2e72aecf3b8ca048a25bc997a2543cbb0b0f6fc"
+  },
+  {
+    "path": "control-ui/assets/control-ui-boot-shared-mtfVQ24Y.js",
+    "original_sha256": "938d3e6e24305a0b1c08d24e1129219dad976d18f113a14e68eb03d4e0f56f53",
+    "candidate_sha256": "a79fedae8a3e3102565b68725a0a098b999a75ff9f061505f3152af9525d55eb"
+  },
+  {
+    "path": "secret-store-CuSJMUWv.mjs",
+    "original_sha256": "c98553cb9a324926eb69b50e11e95eb1b5a8832a3dd29f969ea38dd55b629498",
+    "candidate_sha256": "6637d64fea47fc665e7fa132ba4e103b552203f85d7cf66dc3ea2f42f8946200"
+  },
+  {
+    "path": "openclaw-state-db-schema-additive-DAFjL3MG.mjs",
+    "original_sha256": "6138c7d2165088cc210337e04f072eb62ed6cebecd625eb0f2b218015ffd71c7",
+    "candidate_sha256": "d7ce5ecc516b5c1a1e59794cee1067a625c458e2493fe8c4038234f1b1f3a434"
+  },
+  {
+    "path": "control-ui/assets/question-page-registration-Ci9YglNL.js",
+    "original_sha256": "ea2a56a07eab17aa5547e7d3bb5078bac24eedcd926891a78fbbe1ef0758523b",
+    "candidate_sha256": "1343ae4358543951b747d78bcd408f447d8744c0d935368b946c678ddc668088"
+  }
+]

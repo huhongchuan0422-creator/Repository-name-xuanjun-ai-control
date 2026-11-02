@@ -1,0 +1,14 @@
+.........................................
+----------------------------------------------------------------------
+Ran 41 tests in 0.011s
+
+OK
+{"stage":"ADAPTER_SYNTHETIC_ORCHESTRATION","checks":12,"pass":true,"production":false}
+{"stage":"ORIGINAL_WRITE_KERNEL_REAL_SQLITE","checks":11,"pass":true,"full_gateway_import":false,"real_credentials":false,"production":false,"temporary_fixture_removed_on_exit":true}
+{"stage":"SAME_DB_DURABLE_RECEIPT_ORIGINAL_WRITE_KERNEL","checks":31,"pass":true,"actual_sqlite_close_reopen":true,"crash_window":"injected before/after commit, not OS kill","full_gateway":false,"production":false}
+{"stage":"BROWSER_REF_NEGATIVE_POLICY_ONLY","checks":12,"pass":true,"injection":false,"browser":false,"production":false}
+{"checks":18,"status":"PASS","realSqlite":true,"managerAndAuth":"TEST_DOUBLES","gateway":"NOT_EXECUTED","secretOutput":false}
+{"checks":13,"status":"PASS","scope":"static native fences + actual validator + SQLite receipt DDL","fullGateway":false}
+{"checks":18,"status":"PASS","requestBuilder":"original patched function executed","mobileRender":"STRUCTURE_ONLY_NOT_BROWSER_VALIDATED"}
+{"stage":"CANDIDATE_NATIVE_STORE_REVISION_REAL_SQLITE","checks":19,"pass":true,"full_gateway_import":false,"real_credentials":false,"production":false,"temporary_fixture_removed_on_exit":true}
+{"checks":24,"status":"PASS","realSqlite":true,"browser":"TEST_DOUBLE","boundary":"TEST_DOUBLE","originalBrowserSupport":"UNSUPPORTED_UNTIL_INTEGRATED"}
