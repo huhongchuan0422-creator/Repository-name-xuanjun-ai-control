@@ -30,12 +30,7 @@ COPY scripts/community_wechat_payment_activation.py /app/scripts/community_wecha
 COPY scripts/community_split_rules.py /app/scripts/community_split_rules.py
 COPY scripts/community_reports.py /app/scripts/community_reports.py
 COPY scripts/community_merchant_points.py /app/scripts/community_merchant_points.py
-COPY scripts/community_ad_contract.py /app/scripts/community_ad_contract.py
-COPY scripts/community_ad_store.py /app/scripts/community_ad_store.py
-COPY scripts/community_commerce.py /app/scripts/community_commerce.py
-COPY scripts/community_merchant_store.py /app/scripts/community_merchant_store.py
-COPY scripts/community_workbench.py /app/scripts/community_workbench.py
-COPY scripts/community_stage_migration.py /app/scripts/community_stage_migration.py
+COPY scripts/community_ad_contract.py scripts/community_ad_store.py scripts/community_commerce.py scripts/community_merchant_store.py scripts/community_workbench.py scripts/community_stage_migration.py /app/scripts/
 COPY clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/checkout/index.js
 COPY clients/community-mini/pages/merchant-join/index.wxml /app/clients/community-mini/pages/merchant-join/index.wxml
 COPY deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA

@@ -34,8 +34,15 @@ class CommunityUiSuccessorPackage(unittest.TestCase):
         self.copies = []
         for line in self.docker.splitlines():
             parts = line.split()
-            if len(parts) == 3 and parts[0] == 'COPY':
-                self.copies.append((parts[1], parts[2]))
+            if len(parts) >= 3 and parts[0] == 'COPY':
+                sources = parts[1:-1]
+                destination = parts[-1]
+                for source in sources:
+                    target = destination
+                    if len(sources) > 1:
+                        self.assertTrue(destination.endswith('/'))
+                        target += Path(source).name
+                    self.copies.append((source, target))
 
     def frozen_runtime_binding(self):
         rows = []
