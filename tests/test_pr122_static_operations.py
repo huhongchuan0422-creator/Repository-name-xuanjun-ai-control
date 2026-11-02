@@ -71,10 +71,29 @@ class StaticOperationsTests(unittest.TestCase):
             'NGINX_RELOADED', 'HTTPS_SMOKE', 'STATIC_CHECK'))
         self.assertTrue(all(v == {'RECONCILE_STATIC'} for v in static.STATIC_RECOVERY.values()))
 
+    def reviewed_combined_projection(self, raw):
+        self.assertEqual(digest(raw), '82be9c26fc834034363a1db79a25a7e4cd84e20fe9b4bf10c5b103eb26bdc534')
+        successor = b"PREFLIGHT_SHA='8017e955ab07da78327366f93d4546541949d4ab694a697a86030a1f9ebe4b14'"
+        predecessor = b"PREFLIGHT_SHA='6b6a8b5fab42c54970d49e41cd1572dfbc58683f0ab90ac993d43653d9f39138'"
+        self.assertEqual(raw.count(successor), 1)
+        self.assertNotIn(predecessor, raw)
+        original = raw.replace(successor, predecessor, 1)
+        self.assertEqual(digest(original), '8c403aac42253612c41465dbfdd3b9f43861449b2526a072ebd87bf02227cad3')
+        return original
+
+    def test_combined_pin_projection_rejects_unreviewed_change(self):
+        raw = (Path(__file__).resolve().parents[1] / 'scripts/pr122_site_hub_combined.py').read_bytes()
+        for changed in (raw + b'\n# unreviewed\n', raw.replace(b'8017e955', b'00000000', 1)):
+            with self.assertRaises(AssertionError):
+                self.reviewed_combined_projection(changed)
+
     def test_static_readonly_http_scope_does_not_claim_original_synthetic_smoke(self):
         # Inspect syntax only; neither root helper nor its preview POST is run.
         root = Path(__file__).resolve().parents[1]
         original_raw = (root / 'scripts/pr122_site_hub_combined.py').read_bytes()
+        # Preserve the old complete-source assertion by reversing exactly the
+        # separately reviewed preflight-pin successor, never arbitrary edits.
+        original_raw = self.reviewed_combined_projection(original_raw)
         self.assertEqual(digest(original_raw), '8c403aac42253612c41465dbfdd3b9f43861449b2526a072ebd87bf02227cad3')
         adapter_tree = ast.parse((root / 'scripts/pr122_static_operations.py').read_bytes())
         cls = next(n for n in adapter_tree.body if isinstance(n, ast.ClassDef) and n.name == 'OriginalStaticOperations')
@@ -668,3 +687,4 @@ def path_open_write(path):
 
 
 if __name__ == '__main__': unittest.main()
+

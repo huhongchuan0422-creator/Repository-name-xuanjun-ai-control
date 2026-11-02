@@ -343,6 +343,13 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   # Keep the original AST hashes. Invert only the exact already-delivered d016
   # schema extension, then prove the complete old source is unchanged. This is
   # not a new expected hash for an arbitrary modified implementation.
+  # Invert only the reviewed helper-pin successor before applying the old
+  # delivery projection. Unknown pins or any other source change still fail.
+  successor="HELPER_SHA='82be9c26fc834034363a1db79a25a7e4cd84e20fe9b4bf10c5b103eb26bdc534'"
+  predecessor="HELPER_SHA='8c403aac42253612c41465dbfdd3b9f43861449b2526a072ebd87bf02227cad3'"
+  self.assertEqual(text.count(successor),1,'UNREVIEWED_HELPER_PIN_SUCCESSOR')
+  self.assertNotIn(predecessor,text,'DUPLICATE_OLD_HELPER_PIN')
+  text=text.replace(successor,predecessor,1)
   raw=(ROOT/'tests/fixtures/pr122-delivery-wrapper-reviewed-delta.json').read_bytes()
   self.assertEqual(sha(raw),'dffb14d600f9a1bd152b4c83b749b6c3d40947247d08e0c471d6bd983b0de00b')
   delta=json.loads(raw)
@@ -359,6 +366,12 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
   changed=text.replace("need(declaration.get('frozen_files')==FROZEN", "need(True or declaration.get('frozen_files')==FROZEN",1)
   self.assertNotEqual(changed,text)
   with self.assertRaises(AssertionError):self.import_isolation_projection(changed)
+
+ def test_helper_pin_projection_rejects_unknown_or_duplicate_pin(self):
+  text=(ROOT/'scripts/pr122_site_hub_unified_release.py').read_text()
+  successor="HELPER_SHA='82be9c26fc834034363a1db79a25a7e4cd84e20fe9b4bf10c5b103eb26bdc534'"
+  for changed in (text.replace(successor,"HELPER_SHA='"+'0'*64+"'",1),text+'\n'+successor):
+   with self.assertRaises(AssertionError):self.import_isolation_projection(changed)
 
  def fixed_ast_nodes(self):
   text=self.import_isolation_projection((ROOT/'scripts/pr122_site_hub_unified_release.py').read_text())
@@ -443,3 +456,4 @@ def mkdir(path,mode):Path(path).mkdir(mode=mode)
    with self.assertRaisesRegex(RuntimeError,'GATE_EXPIRED'):module.gate(value,pins)
 
 if __name__=='__main__':unittest.main()
+
