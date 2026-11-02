@@ -1351,7 +1351,7 @@ jobs:
       PREVIEW_PRODUCT_TREE: ${{ inputs.preview_product_tree }}
       PREVIEW_PRODUCT_ZIP_SHA256: ${{ inputs.preview_product_zip_sha256 }}
       PREVIEW_BINDING_ID: ${{ inputs.preview_binding_id }}
-      PREVIEW_TARGET: ${{ inputs.preview_target }}
+      PREVIEW_TARGET: ${{ github.event_name == 'push' && 'uk-path-candidate' || inputs.preview_target }}
       PREVIEW_EVIDENCE_RUN_ID: ${{ inputs.preview_evidence_run_id }}
       PREVIEW_ENABLED: ${{ github.event_name == 'push' && 'true' || inputs.preview_enabled }}
       IMAGE_BUILD_ENABLED: ${{ github.event_name == 'push' && 'false' || inputs.backend_image_enabled }}
