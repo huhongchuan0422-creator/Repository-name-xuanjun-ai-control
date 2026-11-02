@@ -35,8 +35,8 @@ COPY clients/community-mini/pages/merchant-join/index.wxml /app/clients/communit
 COPY deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA
 RUN cd /app && python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
 RUN chmod 0444 /app/COMMUNITY_SOURCE_SHA /app/deploy/community-preview/community-admin-ui-contract.json /app/demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.js /app/demos/community-stage/communities.js /app/demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.js /app/demos/community-stage/workbench.html /app/demos/community-stage/workbench.css /app/demos/community-stage/workbench.js /app/demos/community-stage/web-session.js /app/scripts/community_admin_ui_release_guard.py /app/scripts/community_web_entries.py /app/scripts/community_mini_http.py /app/scripts/community_admin_management.py /app/scripts/community_admin_route_inventory.py /app/scripts/community_center_operations.py /app/scripts/community_public_directory.py /app/scripts/community_split_returns.py /app/scripts/community_wechat_sp_actions.py /app/scripts/community_merchant_onboarding.py /app/scripts/community_wechat_applyment.py /app/scripts/community_mini_application.py /app/scripts/community_wechat_payment_activation.py /app/scripts/community_split_rules.py /app/scripts/community_reports.py /app/scripts/community_merchant_points.py /app/clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/merchant-join/index.wxml
-ENV COMMUNITY_SOURCE_SHA=9a8284ccedf031410467b7da33e1c9f5c801e2e0
-LABEL org.opencontainers.image.revision=9a8284ccedf031410467b7da33e1c9f5c801e2e0 \
-      community.source.tree=d63f0aadde1cd1ce6bbe986eb52cc44831f3bdfc
+ENV COMMUNITY_SOURCE_SHA=ae8b6ee23e9442900f85eaf125d759df1ce55dca
+LABEL org.opencontainers.image.revision=ae8b6ee23e9442900f85eaf125d759df1ce55dca \
+      community.source.tree=060819d60aa7235f9aa50531c4337e60c2251ef1
 USER 10001:1008
 CMD ["--plan","/var/lib/xuanjun-community-preview/config/host.json","--center-keys","/var/lib/xuanjun-community-preview/config/center-keys.json","--wechat-secret","/var/lib/xuanjun-community-preview/config/wechat.json"]
