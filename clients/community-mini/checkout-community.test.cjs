@@ -30,13 +30,15 @@ test('simulated or pending provider result never requests verified success creat
  assert.equal(result.data.afterAd,'');assert.equal(result.data.afterAdVerified,false);
  assert.equal(calls.filter(c=>c.operation==='receipt_ad').length,0);
 });
-test('signed success advertisement is scoped to current reference',async()=>{
- const {result,calls}=page(false,(scene,params)=>({payment_success_verified:true,creative:{title:'verified fixture'}}));
+test('signed success advertisement is scoped to current reference and carries its image',async()=>{
+ const {result,calls}=page(false,(scene,params)=>({payment_success_verified:true,creative:{title:'verified fixture',image_data:'data:image/png;base64,YWQ='}}));
  await result.onLoad({scene:'shop1'});result.setData({reference:'order1'});
  await result.showPayment({provider_state:'SUCCESS',amount_minor:101});
  assert.equal(result.data.afterAd,'verified fixture');assert.equal(result.data.afterAdVerified,true);
+ assert.equal(result.data.afterAdImage,'data:image/png;base64,YWQ=');
  assert.equal(calls.at(-1).params.reference,'order1');
 });
+test('product and advertisement images use fixed aspect-fill slots',()=>{const markup=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(markup,/src="{{item\.image_data}}" mode="aspectFill"/);assert.match(markup,/src="{{beforeAdImage}}" mode="aspectFill"/);assert.match(markup,/src="{{afterAdImage}}" mode="aspectFill"/);});
 test('unverified or unavailable creative never changes paid status',async()=>{
  for(const mode of ['unverified','error']){
   const {result}=page(false,()=>{if(mode==='error')throw Error('ads offline');return {payment_success_verified:false,creative:{title:'forged'}};});

@@ -55,7 +55,7 @@ test('refund recovery needs no manually entered ID and restores original version
   const h=await ready(),pending=h.page.recoverRefundApplication();const c=h.calls[0];
   assert.equal(c.data.operation,'commerce.refund_current');assert.deepEqual(Object.keys(c.data.params),['reference']);
   h.reply(0,application('order1','LEGACY_PROVIDER_RESULT_UNKNOWN'));await pending;
-  assert.equal(h.page.data.refundApplication,'ra_original');assert.equal(h.page.data.refundAmount,'125');assert.equal(h.page.data.refundReason,'Original reason');
+  assert.equal(h.page.data.refundApplication,'ra_original');assert.equal(h.page.data.refundAmount,'1.25');assert.equal(h.page.data.refundReason,'Original reason');
   assert.equal(h.page.data.refundCurrent.revision,3);assert.equal(h.page.data.refundCurrent.status,'LEGACY_PROVIDER_RESULT_UNKNOWN');
   assert.equal(h.page.data.refundCurrent.opinion,'Original opinion');assert.equal(h.calls.length,1);assert.equal(h.money.length,0);
 });
@@ -116,18 +116,19 @@ test('detail/recovery errors cannot change payment status or release a payment p
 });
 test('WXML exposes frozen totals, read-only fulfillment and separate recovery without completion action',()=>{
   const markup=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
-  for(const token of ['loadOrderDetails','recoverRefundApplication','item.unit_minor','item.subtotal_minor','orderDetails.fulfillment_state','refundCurrent.status'])assert.ok(markup.includes(token));
+  for(const token of ['loadOrderDetails','recoverRefundApplication','item.unit_yuan','item.subtotal_yuan','orderDetails.amount_yuan','orderDetails.fulfillment_state','refundCurrent.status','refundCurrent.amount_yuan','申请退款金额（元）'])assert.ok(markup.includes(token));
+  assert.doesNotMatch(markup,/(?:amount_minor|unit_minor|subtotal_minor)}}.*分/);
   assert.ok(markup.includes('不作为支付核验或财务核销凭证'));assert.ok(markup.includes('不会执行退款'));
   assert.doesNotMatch(markup,/bindtap="(?:order_complete|refund_execute|refund_decide)"/);
 });
 
 for(const suppliedId of ['', 'ra_existing_request'])for(const settleFirst of [false,true])test(`late refund read cannot erase ${suppliedId?'supplied':'generated'} application identity ${settleFirst?'after timeout':'while submitting'}`,async()=>{
-  const h=await ready(),p=h.page;p.setData({refundApplication:suppliedId,refundAmount:'125',refundReason:'New requested reason'});
+  const h=await ready(),p=h.page;p.setData({refundApplication:suppliedId,refundAmount:'1.25',refundReason:'New requested reason'});
   const read=p.recoverRefundApplication();const submit=p.requestRefund();const applicationId=p.data.refundApplication;
   assert.ok(applicationId);assert.equal(h.calls[1].data.operation,'commerce.refund_apply');
   if(settleFirst){h.fail(1);await submit;}
   h.reply(0,{reference:'order1',application:null});await read;
-  assert.equal(p.data.refundApplication,applicationId);assert.equal(p.data.refundAmount,'125');assert.equal(p.data.refundReason,'New requested reason');
+  assert.equal(p.data.refundApplication,applicationId);assert.equal(p.data.refundAmount,'1.25');assert.equal(p.data.refundReason,'New requested reason');
   assert.equal(p.data.refundRecoveryLoaded,false);assert.equal(p.data.refundRecoveryPending,false);
   if(!settleFirst){assert.equal(p.data.pending,true);h.fail(1);await submit;}
   assert.equal(p.data.refundApplication,applicationId);assert.match(p.data.status,/保留原申请编号/);

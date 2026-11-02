@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const auth=require('./customer-auth');
 const event=more=>({currentTarget:{dataset:{more}}});
-const product=id=>({item_id:id,name:'Product '+id,revision:1,unit_minor:101,currency:'CNY',available:true});
+const product=id=>({item_id:id,name:'Product '+id,description:'Description '+id,image_data:'data:image/png;base64,aW1hZ2U=',revision:1,unit_minor:101,currency:'CNY',available:true});
 function harness(){
  let definition,generation=1;const calls=[],writes=[];
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8'),{Page:p=>definition=p,require:p=>p==='../../customer-auth'?auth:{},Set});
@@ -18,6 +18,7 @@ test('catalog continues beyond 100, preserves basket selection, refresh resets p
  assert.equal(p.data.products.length,2);assert.equal(p.data.products[0].quantity,2);assert.equal(p.data.products[1].quantity,0);assert.equal(p.data.productsMore,false);
  request=p.reloadProducts();assert.equal(p.data.products.length,0);assert.equal(p.data.productCursor,null);
  h.calls[2].resolve({products:[product('fresh')],has_more:false,next_cursor:null});await request;assert.equal(p.data.products[0].item_id,'fresh');
+ assert.equal(p.data.products[0].price_yuan,'1.01');assert.equal(p.data.products[0].image_data,'data:image/png;base64,aW1hZ2U=');
 });
 test('sparse page remains reachable and does not perform automatic requests',async()=>{
  const h=harness();let request=h.page.reloadProducts();h.calls[0].resolve({products:[],has_more:true,next_cursor:'[0,"sparse"]'});await request;
@@ -47,4 +48,5 @@ test('invalid or looping cursor never replaces successful prior page and read-on
 test('legacy first-page response remains usable without invented continuation',async()=>{
  const h=harness(),request=h.page.reloadProducts();h.calls[0].resolve({products:[product('legacy')]});await request;assert.equal(h.page.data.productsMore,false);assert.equal(h.page.data.productCursor,null);
  const markup=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(markup,/bindtap="reloadProducts" data-more="true"/);assert.match(markup,/productsPending/);
+ assert.match(markup,/src="{{item\.image_data}}" mode="aspectFill"/);assert.match(markup,/¥{{item\.price_yuan}}/);assert.doesNotMatch(markup,/item\.unit_minor}}\s*分/);
 });

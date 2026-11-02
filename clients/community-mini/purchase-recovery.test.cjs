@@ -40,7 +40,7 @@ test('explicit recovery sends only original reference and keeps frozen price wit
   assert.deepEqual(Object.keys(call.data.params),['reference']);assert.equal(call.data.params.reference,'original');
   assert.equal(call.header['X-Community-Session'],'1'.repeat(32));assert.equal(call.data.scene,'shop1');
   h.reply(0,basket());await pending;
-  assert.equal(p.data.amount,'202');assert.equal(p.data.orders[0].order.state,'PENDING');
+  assert.equal(p.data.amount,'2.02');assert.equal(p.data.orders[0].order.amount_yuan,'2.02');assert.equal(p.data.orders[0].order.state,'PENDING');
   assert.equal(p.data.orders[0].lines[0].revision,1);assert.equal(p.data.products[0].unit_minor,999);
   assert.equal(p.data.products[0].quantity,3);assert.equal(p.data.pending,false);assert.match(p.data.status,/未发起支付/);
   assert.equal(h.calls.length,1);assert.equal(h.money.length,0);assert.equal(h.logins(),1);
@@ -75,7 +75,7 @@ test('same-reference ABA selection and late finally do not release a newer recov
   const h=await ready(),p=h.page,old=p.recoverPurchase();
   p.inputReference({detail:{value:'another'}});p.inputReference({detail:{value:'original'}});
   const fresh=p.recoverPurchase();assert.equal(h.calls.length,2);h.fail(0);await old;assert.equal(p.data.pending,true);
-  h.reply(1,basket());await fresh;assert.equal(p.data.pending,false);assert.equal(p.data.amount,'202');
+  h.reply(1,basket());await fresh;assert.equal(p.data.pending,false);assert.equal(p.data.amount,'2.02');
 });
 test('mismatched reference owner amount or frozen lines cannot replace order view',async()=>{
   for(const patch of [{reference:'other'},{user_id:'other-user'},{amount_minor:203},{lines:[]},
