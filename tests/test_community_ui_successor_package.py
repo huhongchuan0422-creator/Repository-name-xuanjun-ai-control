@@ -19,6 +19,12 @@ RUNTIME_CHANGED = {
     'scripts/community_split_rules.py',
     'scripts/community_wechat_payment_activation.py',
     'scripts/community_wechat_sp_actions.py',
+    'scripts/community_ad_contract.py',
+    'scripts/community_ad_store.py',
+    'scripts/community_commerce.py',
+    'scripts/community_merchant_store.py',
+    'scripts/community_workbench.py',
+    'scripts/community_stage_migration.py',
 }
 
 

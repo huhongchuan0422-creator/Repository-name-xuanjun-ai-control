@@ -17,8 +17,8 @@ from pathlib import Path
 
 from scripts.community_stage_recovery import NAMES, _private_root, _create, _read, _sync
 from scripts.community_order_store import DDL as ORDER_SCHEMA
-from scripts.community_merchant_store import SCHEMA as MERCHANT_SCHEMA
-from scripts.community_ad_store import SCHEMA as AD_SCHEMA
+from scripts.community_merchant_store import SCHEMA as MERCHANT_SCHEMA, SCHEMA_V1 as MERCHANT_SCHEMA_V1
+from scripts.community_ad_store import SCHEMA as AD_SCHEMA, SCHEMA_V1 as AD_SCHEMA_V1
 from scripts.community_refund_preview_store import SCHEMA as REFUND_SCHEMA
 from scripts.community_saas_modules import SCHEMA as MODULE_SCHEMA
 from scripts.community_saas_offer_catalog import SCHEMA as OFFER_SCHEMA
@@ -35,6 +35,16 @@ BASE_HISTORY = {
             'f39590ba4344ae4e1f68cadcca3f13c06899d75efeb3f97762283fb05f42f3de'),
     'refunds': ('scripts/community_refund_preview_store.py', 'e03f592db03ce5f1d6ed85db77cc523679907300',
                 'ebaa300938fc041d091fcb99f71591d4810b83913a11604b331e526e5cfbf6c5'),
+}
+CURRENT_ADDITIVE_HISTORY = {
+    'merchants': ('scripts/community_merchant_store.py', '31c8954f51a1d069c8dff436dab409affa34f5ba',
+                  '0ec03744b415670134e197ed583b547fcaf49468aa55949b5fc155c9f9d5d859'),
+    'ads': ('scripts/community_ad_store.py', '31c8954f51a1d069c8dff436dab409affa34f5ba',
+            '36c63aa7efb1737e0766e13e3978480afab429391b335fe6fda186f7d69c8634'),
+}
+LEGACY_ADDITIVE = {
+    'merchants': (MERCHANT_SCHEMA_V1, (1,)),
+    'ads': (AD_SCHEMA_V1, (0, 1)),
 }
 # Canonical sqlite_master fingerprints read from the original Git history.
 # Each value is an exact source commit, with the source path in the group key.
@@ -64,8 +74,8 @@ GROUPS = {
 }
 SPECS = {
     'orders': (ORDER_SCHEMA, (1,), ()),
-    'merchants': (MERCHANT_SCHEMA, (1,), ()),
-    'ads': (AD_SCHEMA, (0, 1), ()),
+    'merchants': (MERCHANT_SCHEMA, (2,), ()),
+    'ads': (AD_SCHEMA, (2,), ()),
     'refunds': (REFUND_SCHEMA, (2,), ()),
     'modules': (MODULE_SCHEMA + OFFER_SCHEMA, (1,), ('modules', 'offers')),
     'saas-orders': (PREP_SCHEMA + LIFECYCLE_SCHEMA + REVIEW_SCHEMA, (0,),
@@ -128,16 +138,26 @@ def _identify(name, db):
     schema, versions, groups = SPECS[name]
     version = db.execute('PRAGMA user_version').fetchone()[0]
     actual, target = _catalog(db), _template(schema)
-    if version not in versions:
-        raise ValueError('UNKNOWN_SOURCE_SCHEMA_VERSION:' + name)
     if not groups:
-        path, commit, digest = BASE_HISTORY[name]
-        if actual != target or _fingerprint(actual) != digest:
+        if version in versions and actual == target and name in CURRENT_ADDITIVE_HISTORY:
+            path, commit, digest = CURRENT_ADDITIVE_HISTORY[name]
+        elif name in LEGACY_ADDITIVE and version in LEGACY_ADDITIVE[name][1] and actual == _template(LEGACY_ADDITIVE[name][0]):
+            path, commit, digest = BASE_HISTORY[name]
+        elif version in versions and actual == target:
+            path, commit, digest = BASE_HISTORY[name]
+        elif version not in versions and (name not in LEGACY_ADDITIVE or version not in LEGACY_ADDITIVE[name][1]):
+            raise ValueError('UNKNOWN_SOURCE_SCHEMA_VERSION:' + name)
+        else:
+            raise ValueError('UNKNOWN_SOURCE_SCHEMA:' + name)
+        if _fingerprint(actual) != digest:
             raise ValueError('UNKNOWN_SOURCE_SCHEMA:' + name)
         return {'schema_sha256': _fingerprint(actual), 'user_version': version,
-                'components': {}, 'changed': False, 'source_commit': commit,
+                'components': {}, 'source_commit': commit,
                 'source_path': path, 'source_url': 'https://github.com/' + REPOSITORY +
-                '/blob/' + commit + '/' + path}
+                '/blob/' + commit + '/' + path,
+                'changed': actual != target or version not in versions}
+    if version not in versions:
+        raise ValueError('UNKNOWN_SOURCE_SCHEMA_VERSION:' + name)
     covered, matches = set(), {}
     for group in groups:
         key, sql = GROUPS[group]
@@ -210,6 +230,10 @@ def _upgrade(name, db):
                 for kind, obj, table, sql in wanted:
                     if kind == typ and (typ == 'trigger' or obj not in present):
                         db.execute(sql)
+            versions = SPECS[name][1]
+            if len(versions) != 1:
+                raise ValueError('TARGET_SCHEMA_VERSION_AMBIGUOUS:' + name)
+            db.execute('PRAGMA user_version=' + str(versions[0]))
             if _catalog(db) != wanted:
                 raise ValueError('TARGET_SCHEMA_ATTESTATION_FAILED')
             after = _rows(db)
