@@ -179,7 +179,8 @@ Page({
       }
     if(this.scene&&this.data.viewMode==='store-detail'){await this.loadSceneStorefront();return;}
     this.client.storefront().then(s=>current()&&this.setData({merchant:s.merchant.name,
-      beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : ''}))
+      beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : '',
+      beforeAdImage:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.image_data||'' : ''}))
       .catch(e=>{if(current())this.setData({status:e.message});});
     } catch(e) {if(current())this.setData({status:e.message});}
   },
@@ -546,7 +547,7 @@ Page({
       if(!r||!Array.isArray(r.products)||r.products.some(p=>!p||typeof p.item_id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(p.item_id)||typeof p.name!=='string'||!Number.isSafeInteger(p.unit_minor)||p.unit_minor<1||!Number.isSafeInteger(p.revision)||p.revision<1||typeof p.available!=='boolean')||
         (r.has_more!==undefined&&typeof r.has_more!=='boolean')||(r.has_more&&(typeof r.next_cursor!=='string'||!r.next_cursor||r.next_cursor===request.after)))throw Error('商品分页结果无效，请刷新重试');
       const products=more?[...this.data.products]:[],known=new Set(products.map(p=>p.item_id));
-      for(const product of r.products)if(!known.has(product.item_id)){known.add(product.item_id);products.push({...product,quantity:0});}
+      for(const product of r.products)if(!known.has(product.item_id)){known.add(product.item_id);products.push({...product,price_yuan:(product.unit_minor/100).toFixed(2),quantity:0});}
       this.setData({products,productCursor:r.has_more?r.next_cursor:null,productsMore:r.has_more===true,
         productsStatus:r.has_more?(r.products.length?'本页商品已加载，可继续加载更多':'本页没有可售商品，后续仍有商品待查'):products.length?'当前商品已全部加载':'当前没有可售商品'});
     } catch(error){if(current())this.setData({productsStatus:error.message+'；已有订单可继续查询和申请售后'});}
@@ -745,7 +746,7 @@ Page({
       const reply=await this.session.commerce(this.scene,'receipt_ad',{reference});
       if(this.data.reference!==reference)return;
       if(reply.payment_success_verified===true&&reply.creative&&typeof reply.creative.title==='string')
-        this.setData({afterAd:reply.creative.title,afterAdVerified:true});
+        this.setData({afterAd:reply.creative.title,afterAdImage:reply.creative.image_data||'',afterAdVerified:true});
     } catch(_) { /* Advertisement failure never changes payment status. */ }
   },
   async queryPayment() {

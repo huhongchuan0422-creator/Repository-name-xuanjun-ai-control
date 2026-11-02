@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime, timezone
 from scripts.community_ad_contract import AMOUNT, SUCCESS, SLOTS, safe_creative_url, ALLOWED_TRANSITIONS
 
-SCHEMA = """
+SCHEMA_V1 = """
 CREATE TABLE campaigns (
   tenant_id TEXT NOT NULL, merchant_id TEXT NOT NULL, store_id TEXT NOT NULL,
   campaign_id TEXT NOT NULL, slot TEXT NOT NULL CHECK(slot IN ('AD_SLOT_PAYMENT_AMOUNT','AD_SLOT_PAYMENT_SUCCESS')),
@@ -40,6 +40,16 @@ CREATE TABLE audit_events (
 CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT, 'AUDIT_APPEND_ONLY'); END;
 CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT, 'AUDIT_APPEND_ONLY'); END;
 """
+CREATIVE_SCHEMA = """
+CREATE TABLE campaign_creatives (
+  tenant_id TEXT NOT NULL, merchant_id TEXT NOT NULL, store_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL, image_name TEXT NOT NULL, image_data TEXT NOT NULL,
+  PRIMARY KEY(tenant_id,merchant_id,store_id,campaign_id),
+  FOREIGN KEY(tenant_id,merchant_id,store_id,campaign_id)
+    REFERENCES campaigns(tenant_id,merchant_id,store_id,campaign_id) ON DELETE CASCADE
+);
+"""
+SCHEMA = SCHEMA_V1 + CREATIVE_SCHEMA
 
 def _schema_catalog(db):
     return sorted((typ, name, table, statement)
@@ -59,14 +69,21 @@ def open_offline(path=":memory:"):
             target=_schema_catalog(expected)
         finally:
             expected.close()
-        if not existing:
-            if db.execute("PRAGMA user_version").fetchone()[0] != 0:
-                raise ValueError("INCOMPATIBLE_AD_SCHEMA")
-            db.executescript("BEGIN IMMEDIATE;" + SCHEMA + "PRAGMA user_version=1; COMMIT;")
-        elif existing != target:
-            raise ValueError("INCOMPATIBLE_AD_SCHEMA")
         version=db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0,1):
+        if not existing:
+            if version != 0:
+                raise ValueError("INCOMPATIBLE_AD_SCHEMA")
+            db.executescript("BEGIN IMMEDIATE;" + SCHEMA + "PRAGMA user_version=2; COMMIT;")
+        elif version == 1:
+            legacy=sqlite3.connect(":memory:")
+            try:
+                legacy.executescript(SCHEMA_V1)
+                if existing != _schema_catalog(legacy):
+                    raise ValueError("INCOMPATIBLE_AD_SCHEMA")
+            finally:
+                legacy.close()
+            db.executescript("BEGIN IMMEDIATE;" + CREATIVE_SCHEMA + "PRAGMA user_version=2; COMMIT;")
+        elif existing != target or version != 2:
             raise ValueError("INCOMPATIBLE_AD_SCHEMA")
         if db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
             raise ValueError("INVALID_AD_DATABASE")
@@ -81,9 +98,16 @@ def _scope(scope):
     if not isinstance(scope, dict) or set(scope) != {"tenant_id","merchant_id","store_id"}:
         raise ValueError("INVALID_SCOPE")
     values=tuple(scope[k] for k in ("tenant_id","merchant_id","store_id"))
-    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and _ascii(x) and x.replace("_","").replace("-","").isalnum() for x in values):
         raise ValueError("INVALID_SCOPE")
     return values
+
+def _ascii(value):
+    try:
+        value.encode("ascii")
+        return True
+    except (AttributeError,UnicodeEncodeError):
+        return False
 
 def _now(value):
     if type(value) is not int or not 0<=value<=253402300799:
@@ -97,19 +121,28 @@ def create_campaign(db,scope,record,actor,now):
         raise ValueError("UNAUTHENTICATED_ACTOR")
     if actor["role"]=="MERCHANT_ADMIN" and (actor.get("tenant_id"),actor.get("merchant_id"))!=(t,m):
         raise ValueError("CROSS_TENANT_DENIED")
-    if not isinstance(record,dict) or set(record)!={"id","slot","starts_at","ends_at","title","target_url","priority"}:
+    legacy=isinstance(record,dict) and set(record)=={"id","slot","starts_at","ends_at","title","target_url","priority"}
+    complete=isinstance(record,dict) and set(record)=={"id","slot","starts_at","ends_at","title","target_url","priority","image_name","image_data"}
+    if not (legacy or complete):
         raise ValueError("INVALID_CAMPAIGN")
     cid=record["id"]
-    if not isinstance(cid,str) or not cid.isascii() or not 1<=len(cid)<=100 or not cid.replace("-","").replace("_","").isalnum():
+    if not isinstance(cid,str) or not _ascii(cid) or not 1<=len(cid)<=100 or not cid.replace("-","").replace("_","").isalnum():
         raise ValueError("INVALID_CAMPAIGN_ID")
     if record["slot"] not in SLOTS or type(record["priority"]) is not int or not 0<=record["priority"]<=100000:
         raise ValueError("INVALID_CAMPAIGN_SETTINGS")
     start,end=_now(record["starts_at"]),_now(record["ends_at"])
     if start>=end or not isinstance(record["title"],str) or not 1<=len(record["title"])<=160 or not safe_creative_url(record["target_url"]):
         raise ValueError("INVALID_CREATIVE")
+    if complete and (not isinstance(record["image_name"],str) or not 1<=len(record["image_name"])<=160
+                     or not isinstance(record["image_data"],str) or len(record["image_data"])>750000
+                     or not record["image_data"].startswith("data:image/") or ";base64," not in record["image_data"]):
+        raise ValueError("INVALID_CREATIVE_IMAGE")
     with db:
         db.execute("INSERT INTO campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                    (t,m,s,cid,record["slot"],"DRAFT","PENDING",record["priority"],start,end,record["title"],record["target_url"],1))
+        if complete:
+            db.execute("INSERT INTO campaign_creatives VALUES(?,?,?,?,?,?)",
+                       (t,m,s,cid,record["image_name"],record["image_data"]))
         db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    (t,m,s,cid,actor["actor_id"],"CREATE",None,1,now))
     return {"campaign_id":cid,"version":1,"status":"DRAFT","publication":False}
@@ -118,9 +151,9 @@ def list_campaigns(db,scope,limit=50,after_id=""):
     t,m,s=_scope(scope)
     if type(limit) is not int or not 1<=limit<=200 or not isinstance(after_id,str) or len(after_id)>100:
         raise ValueError("INVALID_PAGE")
-    rows=db.execute("SELECT campaign_id,slot,status,moderation,priority,version FROM campaigns WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id>? ORDER BY campaign_id LIMIT ?",
+    rows=db.execute("SELECT c.campaign_id,c.title,c.target_url,c.slot,c.status,c.moderation,c.priority,c.starts_at,c.ends_at,c.version,COALESCE(i.image_name,''),COALESCE(i.image_data,'') FROM campaigns c LEFT JOIN campaign_creatives i ON i.tenant_id=c.tenant_id AND i.merchant_id=c.merchant_id AND i.store_id=c.store_id AND i.campaign_id=c.campaign_id WHERE c.tenant_id=? AND c.merchant_id=? AND c.store_id=? AND c.campaign_id>? ORDER BY c.campaign_id LIMIT ?",
                     (t,m,s,after_id,limit+1)).fetchall()
-    return {"campaigns":[dict(zip(("id","slot","status","moderation","priority","version"),row)) for row in rows[:limit]],
+    return {"campaigns":[dict(zip(("id","title","target_url","slot","status","moderation","priority","starts_at","ends_at","version","image_name","image_data"),row)) for row in rows[:limit]],
             "has_more":len(rows)>limit,"next_cursor":rows[limit-1][0] if len(rows)>limit else None}
 
 def metric_report(db, scope, starts_at, ends_at, limit=50, after_id=""):
@@ -131,7 +164,7 @@ def metric_report(db, scope, starts_at, ends_at, limit=50, after_id=""):
         raise ValueError("INVALID_REPORT_WINDOW")
     if (type(limit) is not int or not 1 <= limit <= 200 or
             type(after_id) is not str or len(after_id) > 100 or
-            (after_id and (not after_id.isascii() or
+            (after_id and (not _ascii(after_id) or
              not after_id.replace("_", "").replace("-", "").isalnum()))):
         raise ValueError("INVALID_PAGE")
     rows = db.execute("""
@@ -159,9 +192,9 @@ def metric_report(db, scope, starts_at, ends_at, limit=50, after_id=""):
 def choose(db,scope,slot,now):
     t,m,s=_scope(scope); _now(now)
     if slot not in SLOTS: raise ValueError("INVALID_SLOT")
-    row=db.execute("SELECT campaign_id,title,target_url FROM campaigns WHERE tenant_id=? AND merchant_id=? AND store_id=? AND slot=? AND status='ACTIVE' AND moderation='APPROVED' AND starts_at<=? AND ends_at>? ORDER BY priority DESC,campaign_id LIMIT 1",
+    row=db.execute("SELECT c.campaign_id,c.title,c.target_url,COALESCE(i.image_data,'') FROM campaigns c LEFT JOIN campaign_creatives i ON i.tenant_id=c.tenant_id AND i.merchant_id=c.merchant_id AND i.store_id=c.store_id AND i.campaign_id=c.campaign_id WHERE c.tenant_id=? AND c.merchant_id=? AND c.store_id=? AND c.slot=? AND c.status='ACTIVE' AND c.moderation='APPROVED' AND c.starts_at<=? AND c.ends_at>? ORDER BY c.priority DESC,c.campaign_id LIMIT 1",
                    (t,m,s,slot,now,now)).fetchone()
-    return None if row is None else {"id":row[0],"title":row[1],"url":row[2],"slot":slot}
+    return None if row is None else {"id":row[0],"title":row[1],"url":row[2],"image_data":row[3],"slot":slot}
 
 def record_metric(db,scope,slot,kind,event_id,campaign_id,now):
     t,m,s=_scope(scope);_now(now)

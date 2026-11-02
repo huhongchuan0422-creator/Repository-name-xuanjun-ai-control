@@ -27,6 +27,18 @@ class StoreTests(unittest.TestCase):
   put_item(self.db,S,A,{"id":"p1","name":"产品","status":"ACTIVE","sort":2})
   put_item(self.db,S,A,{"id":"p2","name":"隐藏","status":"HIDDEN","sort":1})
   self.assertEqual([x["id"] for x in list_items(self.db,S)],["p1"])
+ def test_catalog_content_is_persisted(self):
+  self.create();image='data:image/png;base64,aGVsbG8='
+  put_item(self.db,S,A,{"id":"p1","name":"产品","description":"商品介绍","image_name":"product.png","image_data":image,"status":"ACTIVE","sort":2})
+  row=self.db.execute("SELECT description,image_name,image_data FROM catalog_item_content WHERE item_id='p1'").fetchone()
+  self.assertEqual(row,("商品介绍","product.png",image))
+ def test_version_one_store_migrates_content_table(self):
+  from scripts.community_merchant_store import SCHEMA_V1
+  with tempfile.TemporaryDirectory() as d:
+   path=os.path.join(d,"merchant.sqlite");raw=sqlite3.connect(path);raw.executescript(SCHEMA_V1+"PRAGMA user_version=1;");raw.close()
+   db=open_store(path)
+   try:self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0],2);self.assertIsNotNone(db.execute("SELECT name FROM sqlite_master WHERE name='catalog_item_content'").fetchone())
+   finally:db.close()
  def test_foreign_key(self):
   with self.assertRaises(sqlite3.IntegrityError):put_item(self.db,S,A,{"id":"p1","name":"产品","status":"ACTIVE","sort":1})
  def test_bool_sort_rejected(self):

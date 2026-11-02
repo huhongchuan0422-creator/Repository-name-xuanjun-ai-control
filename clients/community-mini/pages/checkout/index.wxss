@@ -10,3 +10,6 @@ page{background:#f5f8f7;color:#192e30}.page{padding:36rpx}.hero{padding:24rpx 6r
 
 /* Reserved owned-ad surfaces. Rendering never changes payment state. */
 .payment-ad-slot{box-sizing:border-box;min-height:150rpx;margin:24rpx 0;padding:24rpx 28rpx;border:1rpx solid #dce8f4;border-radius:22rpx;background:linear-gradient(135deg,#f8fbff,#edf7ff);display:flex;flex-direction:column;justify-content:center}.payment-ad-success{border-color:#d9eadf;background:linear-gradient(135deg,#f7fcf8,#edf8f1)}.payment-ad-label{font-size:20rpx;color:#8b98a8;letter-spacing:2rpx}.payment-ad-title{display:block;margin-top:12rpx;color:#26384c;font-size:28rpx;font-weight:600;line-height:1.55;overflow-wrap:anywhere}
+
+/* Product artwork is square; owned advertisement artwork is a 3:1 banner. */
+.product-card{display:flex;gap:24rpx;align-items:flex-start}.product-image{width:176rpx;height:176rpx;flex:0 0 176rpx;border-radius:20rpx}.product-copy{flex:1;min-width:0}.product-price{display:block;margin-top:12rpx;color:#cf3f2f;font-size:32rpx;font-weight:650}.payment-ad-slot{padding:0 0 22rpx;overflow:hidden}.payment-ad-image{display:block;width:100%;height:200rpx;margin-bottom:20rpx}.payment-ad-label,.payment-ad-title{margin-left:28rpx;margin-right:28rpx}

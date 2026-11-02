@@ -69,7 +69,11 @@ def safe_creative_url(url):
             return False  # require externally validated hostname policy
         except ValueError:
             pass
-        return "." in host and host.isascii() and all(label and len(label) <= 63 and
+        try:
+            host.encode("ascii")
+        except UnicodeEncodeError:
+            return False
+        return "." in host and all(label and len(label) <= 63 and
                                    label.replace("-", "").isalnum() and
                                    not label.startswith("-") and not label.endswith("-")
                                    for label in host.split("."))

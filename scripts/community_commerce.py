@@ -73,7 +73,7 @@ class Commerce:
         t, m, s = scope(identity)
         merchant = self.runtime.demo.merchant_db
         profile = merchant.execute('SELECT status FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?', (t, m, s)).fetchone()
-        item = merchant.execute('SELECT name,status FROM catalog_items WHERE tenant_id=? AND merchant_id=? AND store_id=? AND item_id=?', (t, m, s, item_id)).fetchone()
+        item = merchant.execute("SELECT i.name,i.status,COALESCE(c.description,''),COALESCE(c.image_data,'') FROM catalog_items i LEFT JOIN catalog_item_content c ON c.tenant_id=i.tenant_id AND c.merchant_id=i.merchant_id AND c.store_id=i.store_id AND c.item_id=i.item_id WHERE i.tenant_id=? AND i.merchant_id=? AND i.store_id=? AND i.item_id=?", (t, m, s, item_id)).fetchone()
         if profile is None or item is None or public and (profile[0] != 'ACTIVE' or item[1] != 'ACTIVE'):
             raise PermissionError('AVAILABLE_ORIGINAL_PRODUCT_REQUIRED')
         return item
@@ -287,7 +287,7 @@ class Commerce:
                 item = self._catalog_item(identity, item_id)
                 price = self._read(identity, project, 'PRODUCT', item_id)
                 if price and price['enabled']:
-                    result.append(dict(item_id=item_id, name=item[0], unit_minor=price['unit_minor'], currency='CNY', revision=price['revision'], available=price['stock'] > 0))
+                    result.append(dict(item_id=item_id, name=item[0], description=item[2], image_data=item[3], unit_minor=price['unit_minor'], currency='CNY', revision=price['revision'], available=price['stock'] > 0))
             # Disabled/unpriced items still advance the bounded scan cursor.
             # This is a live directory, not an immutable inventory snapshot.
             return dict(products=result, has_more=len(items) > 100,

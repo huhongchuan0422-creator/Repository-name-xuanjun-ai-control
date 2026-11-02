@@ -17,6 +17,16 @@ class OfflineAdStoreTests(unittest.TestCase):
         result=self.create()
         self.assertEqual(result["status"],"DRAFT")
         self.assertEqual(self.db.execute("SELECT count(*) FROM audit_events").fetchone()[0],1)
+    def test_creative_image_is_persisted_listed_and_selected(self):
+        record=dict(self.record,image_name="banner.png",image_data="data:image/png;base64,AAAA")
+        create_campaign(self.db,self.scope,record,self.actor,100)
+        listed=list_campaigns(self.db,self.scope)["campaigns"][0]
+        self.assertEqual(listed["title"],"Safe ad")
+        self.assertEqual(listed["target_url"],"https://example.org/ad")
+        self.assertEqual(listed["image_name"],"banner.png")
+        self.assertEqual(listed["image_data"],"data:image/png;base64,AAAA")
+        self.db.execute("UPDATE campaigns SET status='ACTIVE',moderation='APPROVED' WHERE campaign_id='campaign1'")
+        self.assertEqual(choose(self.db,self.scope,AMOUNT,120)["image_data"],"data:image/png;base64,AAAA")
     def test_cross_tenant_actor_rejected(self):
         with self.assertRaises(ValueError):
             create_campaign(self.db,self.scope,self.record,dict(self.actor,tenant_id="other"),100)
@@ -143,6 +153,19 @@ class OfflineAdStoreTests(unittest.TestCase):
             db=sqlite3.connect(path)
             self.assertEqual(db.execute("SELECT unrelated FROM campaigns").fetchone()[0],"keep")
             db.close()
+
+    def test_version_one_store_migrates_creative_table(self):
+        import tempfile,pathlib,sqlite3
+        from scripts.community_ad_store import SCHEMA_V1
+        with tempfile.TemporaryDirectory() as directory:
+            path=str(pathlib.Path(directory)/"legacy.sqlite")
+            db=sqlite3.connect(path)
+            db.executescript(SCHEMA_V1+"PRAGMA user_version=1;")
+            db.close()
+            migrated=open_offline(path)
+            self.assertEqual(migrated.execute("PRAGMA user_version").fetchone()[0],2)
+            self.assertEqual(migrated.execute("SELECT count(*) FROM campaign_creatives").fetchone()[0],0)
+            migrated.close()
 
     def test_partial_schema_rejected_without_reconstruction(self):
         import tempfile,pathlib,sqlite3
