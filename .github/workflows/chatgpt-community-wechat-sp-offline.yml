@@ -1347,7 +1347,7 @@ jobs:
       COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
       COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'current-e665' || inputs.preview_product }}
       PREVIEW_CONTROL_SHA: ${{ github.event_name == 'push' && github.sha || inputs.preview_source_sha }}
-      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'e66505299813e923a30f010e73eb4ec474938d7b' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
+      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && '3859b1d15c2360fc0f178eed7d1a17d486fef97f' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
       PREVIEW_PRODUCT_TREE: ${{ inputs.preview_product_tree }}
       PREVIEW_PRODUCT_ZIP_SHA256: ${{ inputs.preview_product_zip_sha256 }}
       PREVIEW_BINDING_ID: ${{ inputs.preview_binding_id }}
