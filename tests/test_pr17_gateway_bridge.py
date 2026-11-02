@@ -170,7 +170,9 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(WORKFLOW_BLOB, blob)
         required = {
             workflow_path, 'scripts/pr17_gateway_bridge.py',
+            'scripts/reusable_task_gateway.py',
             'tests/test_pr17_gateway_bridge.py',
+            'tests/test_reusable_task_gateway.py',
             'deploy/xuanjun-pr17-gateway-intake.service.in',
             'deploy/xuanjun-pr17-gateway-intake.timer.in',
             'deploy/xuanjun-pr17-gateway-consumer.path.in',

@@ -7,7 +7,7 @@ import base64,hashlib,json,re,time,urllib.request
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REPO_ID=1413132159
 WORKFLOW='.github/workflows/mcp-current-successor-gates.yml'
-WORKFLOW_BLOB='b830b8296172ac32c4e041657262b4c8b8f62f00'
+WORKFLOW_BLOB='3e4c1893bdbf8bb109912f4b37cd1103a9763cc4'
 ALLOWED_FILES=frozenset((
  '.github/workflows/mcp-current-successor-gates.yml',
  'deploy/xuanjun-pr17-gateway-consumer.path.in',
@@ -24,11 +24,13 @@ ALLOWED_FILES=frozenset((
  'scripts/original_gateway_readback.py',
  'scripts/original_gateway_transport.py',
  'scripts/pr17_gateway_bridge.py',
+ 'scripts/reusable_task_gateway.py',
  'scripts/task_center_mcp_development.py',
  'scripts/task_skill_admission.py',
  'scripts/task_supervisor.py',
  'tests/test_mcp_development_bridge.py',
- 'tests/test_pr17_gateway_bridge.py'))
+ 'tests/test_pr17_gateway_bridge.py',
+ 'tests/test_reusable_task_gateway.py'))
 TEST_STEP='Validate exact current successor'
 def require(ok,code):
  if not ok:raise ValueError(code)
