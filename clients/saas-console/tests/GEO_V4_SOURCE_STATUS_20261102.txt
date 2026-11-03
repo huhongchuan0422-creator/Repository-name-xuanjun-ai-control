@@ -1,0 +1,63 @@
+GEO V4 SOURCE / INTEGRATION STATUS — 2026-11-02
+
+OWNER-FROZEN VISUAL SOURCE
+  URL: https://xuanjun-geo-design-20261102.alive-gnat-7824.chatgpt.site
+  Sites project: appgprj_6ae8cd2496188191a100ab382ac88e31
+  Sites version: 4
+  Sites prototype commit: 842cc9707600aa3d47ad517ca67d14d0ffb31246
+
+IMPORTANT
+  The prototype commit belongs to the Sites prototype repository, not the main business GitHub repository.
+  Do not search or resolve that SHA in the business repository.
+
+CURRENT TOOL LIMIT
+  Available tools in this window expose GitHub, Files, web, and other connectors, but no Sites project/source reader.
+  Library search did not return the Sites source artifact.
+  Therefore exact V4 HTML/CSS/source cannot be read through the formal Sites source path in this window.
+
+VISUAL STATUS
+  HOLD_SITES_SOURCE_UNAVAILABLE
+  No HTML/CSS/layout/visual implementation has been changed.
+  No replacement shell, redraw, inferred layout, or screenshot is claimed.
+
+NON-VISUAL WORK COMPLETED
+  clients/saas-console/src/geo.js adds customer-side state semantics only:
+    - six fixed functional areas: overview, brand, diagnosis, optimization, versions, results
+    - tenant isolation guard
+    - module entitlement separated from service connectivity
+    - unknown quota/validity/retry/timeout stay null/UNKNOWN
+    - metrics never convert missing data into zero
+    - effects support improved/unchanged/declined/insufficient-data
+    - UNKNOWN task result requires QUERY before any retry
+    - retry only when server explicitly says FAILED + retryable
+    - OWNER/EDITOR/VIEWER execution boundary
+    - approval state does not create reviewer authority
+    - no fixed-ranking/recommendation/growth promise
+
+REUSED BUSINESS FACTS FROM EXISTING GEO PLAN
+  GEO is one SaaS purchasable module and must reuse unified identity/tenant, task, usage/billing/referral and approval systems.
+  No second identity/billing/task system is created.
+  Existing Stage5 module/offer code found in the repository is OFFLINE contract infrastructure and is not treated as a connected GEO customer API.
+  No connected GEO entitlement/Usage/Billing/task customer HTTP endpoint was found in the current repository search.
+
+KNOWN / UNKNOWN BEFORE REAL CONNECTION
+  product scope: known
+  customer-side sections: known
+  exact quota: UNKNOWN
+  exact capacity per connected tenant: UNKNOWN
+  validity/expiry: UNKNOWN
+  retry limit: UNKNOWN
+  timeout: UNKNOWN
+  default enabled state: UNKNOWN and must come from entitlement authority
+  actual provider/surface coverage: UNKNOWN until connected source returns it
+  actual task execution: NOT_CONNECTED
+  real monitoring/diagnosis/results: NOT_CONNECTED
+  formal V4 visual acceptance: BLOCKED by missing Sites source reader in this window
+
+NO CLAIMS
+  No production connection.
+  No real customer data.
+  No real GEO billing.
+  No GEO task dispatch.
+  No browser V4 visual match.
+  No screenshot comparison.

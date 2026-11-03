@@ -41,12 +41,14 @@ jobs:
           node --check src/journey.js
           node --check src/main.js
           node --check src/submission.js
+          node --check src/geo.js
           node --check tests/api.test.js
           node --check tests/contract-journey.test.js
           node --check tests/http-integration.test.js
           node --check tests/main.test.js
           node --check tests/prototype-map.test.js
           node --check tests/submission.test.js
+          node --check tests/geo.test.js
           python3 -m py_compile tests/real_python_backend_integration.py
           bash -n tests/run_real_python_backend_integration.sh
           node --check tests/e7-js-client-integration.mjs
