@@ -13,11 +13,15 @@ from scripts.pr122_customer_core import canonical
 class PlatformViews:
     def __init__(self,directory):self.directory=directory;self.center=directory.center
     def dispatch(self,session,csrf,body):
-        op,p=body['operation'],body['params'];fields={'platform_overview':set(),'platform_orders':{'after_id','status'},'platform_customers':{'after_id'},'platform_customer_update':{'user_id','nickname','contact','expected_version'},'platform_audit':{'after_id'}}
-        if op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_PLATFORM_VIEW_FIELDS')
+        op,p=body['operation'],body['params'];fields={'platform_overview':set(),'platform_orders':{'after_id','status'},'platform_audit':{'after_id'}}
+        customer_update_fields={'user_id','nickname','contact','expected_version'}
+        customer_fields=(set(p) if op=='platform_customers' and type(p) is dict else None)
+        customer_update=customer_fields==customer_update_fields
+        if (type(p) is not dict or (op=='platform_customers' and customer_fields not in ({'after_id'},customer_update_fields))
+                or (op!='platform_customers' and (op not in fields or set(p)!=fields[op]))):raise ValueError('INVALID_PLATFORM_VIEW_FIELDS')
         g=self.directory.authorize(session,csrf,body['workspace'])
         if g['role'] not in ('PLATFORM_OWNER','PLATFORM_REVIEWER'):raise PermissionError('PLATFORM_READ_PERMISSION_REQUIRED')
-        if op=='platform_customer_update' and g['role']!='PLATFORM_OWNER':raise PermissionError('PLATFORM_OWNER_WRITE_REQUIRED')
+        if customer_update and g['role']!='PLATFORM_OWNER':raise PermissionError('PLATFORM_OWNER_WRITE_REQUIRED')
         c=self.center;ops=self.directory.commerce.operations
         unavailable=[]
         # Customer membership and project audit do not depend on a merchant's
@@ -38,7 +42,7 @@ class PlatformViews:
                 identity=dict(tenant_id=t,merchant_id=m,store_id=s);evidence=provider_evidence(db,identity,ref)
                 records.append(dict(id=idx,scope=identity,reference=ref,amount_minor=amount,currency=currency,order_state=status,payment_evidence=evidence['source'] if evidence else None,finance_status='UNCONFIRMED'))
             result=dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None)
-        elif op=='platform_customer_update':
+        elif customer_update:
             uid=p['user_id']
             if (type(uid) is not str or re.fullmatch('[A-Za-z0-9_-]{1,64}',uid) is None
                     or any(type(p[key]) is not str or len(p[key])>maximum or any(ord(ch)<32 for ch in p[key]) for key,maximum in (('nickname',80),('contact',200)))
@@ -112,6 +116,6 @@ class PlatformViews:
             result.update(coverage_complete=not unavailable,unavailable_mapping_count=len(unavailable),
                 unavailable_mappings=unavailable[:50],unavailable_mappings_truncated=len(unavailable)>50,
                 totals_scope='ACCESSIBLE_STORE_SUBTOTAL' if unavailable else 'ALL_CURRENT_ADMITTED_STORES')
-        if op!='platform_customer_update':
+        if not customer_update:
             with c.tx():c.audit(g['project'],g['user_id'],op.upper(),'SCOPED_READ')
         return result

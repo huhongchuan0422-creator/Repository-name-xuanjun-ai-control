@@ -52,14 +52,14 @@ class PlatformViewJourney(unittest.TestCase):
     def test_platform_owner_updates_user_profile_with_versioned_readback(self):
         before=self.call('platform_customers',dict(after_id=''))
         row=next(item for item in before['records'] if item['user_id']==self.fx.fx.uid1)
-        saved=self.call('platform_customer_update',dict(user_id=row['user_id'],nickname='社区用户一',contact='13800000000',expected_version=row['profile_version']))
+        saved=self.call('platform_customers',dict(user_id=row['user_id'],nickname='社区用户一',contact='13800000000',expected_version=row['profile_version']))
         self.assertEqual(saved['version'],row['profile_version']+1)
         readback=next(item for item in self.call('platform_customers',dict(after_id=''))['records'] if item['user_id']==row['user_id'])
         self.assertEqual((readback['nickname'],readback['contact'],readback['profile_version']),('社区用户一','13800000000',saved['version']))
         with self.assertRaisesRegex(ValueError,'VERSION_CHANGED'):
-            self.call('platform_customer_update',dict(user_id=row['user_id'],nickname='stale',contact='',expected_version=row['profile_version']))
+            self.call('platform_customers',dict(user_id=row['user_id'],nickname='stale',contact='',expected_version=row['profile_version']))
         with self.assertRaises(PermissionError):
-            self.fx.call('platform_customer_update',dict(user_id=self.fx.fx.uid2,nickname='denied',contact='',expected_version=0),workspace='reviewer',web=self.fx.reviewer)
+            self.fx.call('platform_customers',dict(user_id=self.fx.fx.uid2,nickname='denied',contact='',expected_version=0),workspace='reviewer',web=self.fx.reviewer)
     def test_audit_page_authorization_and_cursor_validation(self):
         self.call('platform_overview',{})
         logs=self.call('platform_audit',dict(after_id=0))
