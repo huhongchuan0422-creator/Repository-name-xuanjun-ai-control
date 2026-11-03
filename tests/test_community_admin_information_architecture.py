@@ -31,7 +31,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn("openMerchantWorkbench('split-settings','分账配置')", shell)
         self.assertNotIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1#workbenchMain'", shell)
         self.assertIn("merchantWorkbenchFrame.loading='lazy'", shell)
-        self.assertIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1#'+target", shell)
+        self.assertIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1&v=owner25-ad-route#'+target", shell)
         self.assertIn("location.replace('/community-preview/community/portal#merchant-workbench='", (ROOT / 'demos/community-stage/workbench.js').read_text())
         self.assertIn("location.replace('/community-preview/community/portal#merchant-review')", (ROOT / 'demos/community-stage/onboarding.js').read_text())
         self.assertIn("window.addEventListener('hashchange',applyWorkspaceRoute)", shell)
