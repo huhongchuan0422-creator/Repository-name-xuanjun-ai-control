@@ -54,10 +54,10 @@ class StageRuntime:
             'reconciliation': set(), 'ads': set(), 'ads_page': {'limit','after_id'},
             'ad_report': {'starts_at', 'ends_at', 'limit', 'after_id'},
             'profile': {'record', 'expected_version'}, 'item': {'item'},
-            'ad_create': {'record'}, 'ad_update': {'campaign_id','record','expected_version'}, 'ad_state': {'campaign_id', 'state', 'expected_version'},
+            'ad_create': ({'record'},{'campaign_id','record','expected_version'}), 'ad_state': {'campaign_id', 'state', 'expected_version'},
             'ad_review': {'campaign_id', 'approved', 'expected_version'},
         }
-        if name not in fields or (set(params) != fields[name] and not (name == 'merchant_settings' and set(params) == {'after_id'})):
+        if name not in fields or ((set(params) not in fields[name] if isinstance(fields[name],tuple) else set(params) != fields[name]) and not (name == 'merchant_settings' and set(params) == {'after_id'})):
             raise ValueError('INVALID_COMMUNITY_FIELDS')
         public = {'storefront', 'qr', 'checkout', 'receipt'}
         permissions={
@@ -115,8 +115,7 @@ class StageRuntime:
                     'provider_settlement_verified': False,
                     'financial_receipt_issued': False, 'finance_effect': 'NONE'}
         admin_routes = {'profile': '/demo/admin/profile', 'item': '/demo/admin/item',
-                        'ad_create': '/demo/admin/campaign/create',
-                        'ad_update': '/demo/admin/campaign/update',
+                        'ad_create': '/demo/admin/campaign/update' if 'campaign_id' in params else '/demo/admin/campaign/create',
                         'ad_state': '/demo/admin/campaign/state',
                         'ad_review': '/demo/admin/campaign/review'}
         if name in admin_routes:
