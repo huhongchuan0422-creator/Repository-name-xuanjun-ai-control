@@ -72,16 +72,16 @@
     }
   },
   "assets": {
-    "demos/community-stage/admin-shell.css": "6eebd258eee46ab2177cabed21a7fa06d40d0dd7ef18bbf1fca53dbd4600e9ef",
-    "demos/community-stage/admin-shell.js": "5bc47dc30d726d590a1ba4ef684b6756797e3ea23ee981a8145557a9a2e13391",
-    "demos/community-stage/communities.js": "58dda8189e853494bc76d452e22c60e6684be603aa31ca8791b42e12041d5c48",
-    "demos/community-stage/onboarding.css": "e7f72aeacbfc49435fdd0ed50c27f3847de1563f6dafa4f3d5c9fb344ec9240f",
+    "demos/community-stage/admin-shell.css": "b7fa4bb57c37a97359fc49d3fdb94b50cf5494046d149393618ae718f40a4fc0",
+    "demos/community-stage/admin-shell.js": "2fb0453aeaed7975ef380bc8fba82cbb6f7210bf4105e606ad1bf033c4109c00",
+    "demos/community-stage/communities.js": "09717389eba6f57209a74eec314ca992704f47bcc47374d1725c09dca82f72af",
+    "demos/community-stage/onboarding.css": "bc0fb89f2fb5c564a018ccbb9dd841e88dd944908bbffc8ce9d27fd41f9a92ff",
     "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
-    "demos/community-stage/onboarding.js": "20cb9f16785c6771875d58b6bcaf330bbcf8c8749c485f2ae93d0d5aa460eb20",
-    "demos/community-stage/web-session.js": "b875b58651d99abcf080c19110d0fed944b107b2ef1304ddd02ac4259ca65cfd",
-    "demos/community-stage/workbench.css": "a81035cddfa613d9c2db898acc533094329a2908abda4067f8c98bf81a8fddc1",
-    "demos/community-stage/workbench.html": "554795277da8ac64af00a8b6ed3c44943df3d9255fe2716794785e8c51db1bee",
-    "demos/community-stage/workbench.js": "1cded6dcda5df8dc8e46ca9d656d0c1677ecacea2753bc210a4151c0cc931fb4",
-    "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
+    "demos/community-stage/onboarding.js": "b01f6646c9bda1d33723f61a70bd91849cab453dba0a59760db909371a6be57c",
+    "demos/community-stage/web-session.js": "6bad6bf62df5cee63d73c48065d4ddfdb116699a52551d64af1db0a952f386f9",
+    "demos/community-stage/workbench.css": "387672b1bd4f9bd3cc1a810fdb1b02ffa40de9980fbf2bad1aa729a6bad20177",
+    "demos/community-stage/workbench.html": "5dbbefcce375a1199a3585f9e84489bf855282db8739a1d257398290d297ac67",
+    "demos/community-stage/workbench.js": "743b6084661e2e1bbb5b84eeace433d223011348110603d0e155ad03f7d03284",
+    "scripts/community_web_entries.py": "2353480f9cecaddf41d1464ff44bd76a936fac50c3c3d932702cd1b5cc3bcd4a"
   }
 }

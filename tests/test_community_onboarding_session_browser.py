@@ -26,6 +26,7 @@ class AdmissionClientEpoch(unittest.TestCase):
                         route.fulfill(status=200,body=(root/name).read_bytes(),content_type='text/html' if name.endswith('html') else 'text/css' if name.endswith('css') else 'application/javascript')
                     else:route.fulfill(status=404,body='')
                 page.route('**/*',serve);page.goto('http://127.0.0.1:19876/merchant/join')
+                page.evaluate('window.configureCommunityOnboarding(null)')
                 expect(page.locator('#status')).to_contain_text('请先登录')
                 yield page
             finally:browser.close()

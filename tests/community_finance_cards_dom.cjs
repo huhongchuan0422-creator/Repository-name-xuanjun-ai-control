@@ -2,10 +2,10 @@
 // Actual workbench source and HTML, with deterministic synthetic HTTP timing.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 class Element{
- constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
+ constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};this.style={setProperty(){}};this.open=false;}
  append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this.textContent='';}
  addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
- reset(){}closest(){return new Element('label');}set innerHTML(_){throw Error('unsafe DOM');}
+ reset(){}closest(){return new Element('label');}querySelector(){return this._query??=new Element('aside');}set innerHTML(_){throw Error('unsafe DOM');}
 }
 const html=fs.readFileSync(process.argv[3],'utf8');
 const nodes=Object.fromEntries([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
