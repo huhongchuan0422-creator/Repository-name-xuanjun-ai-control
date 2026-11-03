@@ -24,6 +24,12 @@ def environment(temp):
                 COMMUNITY_PREVIEW_PRODUCT_CONTEXT=str(pathlib.Path(temp)/'community-mini-product-context-99999999999-1.json'))
 
 
+def source_available():
+    return subprocess.run(['git', '-C', str(ROOT), 'cat-file', '-e', r1.SOURCE_SHA+'^{commit}'],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+@unittest.skipUnless(source_available(), 'exact R1 source is supplied by the dedicated R1 affected scope')
 class R1Input(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
