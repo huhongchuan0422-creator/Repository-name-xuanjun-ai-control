@@ -41,6 +41,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
     def test_authenticated_account_without_workspace_never_sees_business_shell(self):
         session = (ROOT / 'demos/community-stage/web-session.js').read_text()
         styles = (ROOT / 'demos/community-stage/admin-shell.css').read_text()
+        self.assertIn('.community-admin .platform-merchant-rows{max-width:100%;overflow-x:auto}', styles)
         self.assertIn("classList?.toggle('admin-no-workspace',logged&&!admitted)", session)
         self.assertIn('.community-admin.admin-no-workspace>.admin-brand', styles)
         self.assertIn('.community-admin.admin-no-workspace>.admin-sidebar', styles)
