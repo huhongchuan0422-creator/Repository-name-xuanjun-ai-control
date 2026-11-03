@@ -8,14 +8,20 @@ import json
 import re
 from scripts.community_platform_merchants import PlatformMerchants
 from scripts.community_order_provider_projection import provider_evidence
+from scripts.pr122_customer_core import canonical
 
 class PlatformViews:
     def __init__(self,directory):self.directory=directory;self.center=directory.center
     def dispatch(self,session,csrf,body):
-        op,p=body['operation'],body['params'];fields={'platform_overview':set(),'platform_orders':{'after_id','status'},'platform_customers':{'after_id'},'platform_audit':{'after_id'}}
-        if op not in fields or type(p) is not dict or set(p)!=fields[op]:raise ValueError('INVALID_PLATFORM_VIEW_FIELDS')
+        op,p=body['operation'],body['params'];fields={'platform_overview':set(),'platform_orders':{'after_id','status'},'platform_audit':{'after_id'}}
+        customer_update_fields={'user_id','nickname','contact','expected_version'}
+        customer_fields=(set(p) if op=='platform_customers' and type(p) is dict else None)
+        customer_update=customer_fields==customer_update_fields
+        if (type(p) is not dict or (op=='platform_customers' and customer_fields not in ({'after_id'},customer_update_fields))
+                or (op!='platform_customers' and (op not in fields or set(p)!=fields[op]))):raise ValueError('INVALID_PLATFORM_VIEW_FIELDS')
         g=self.directory.authorize(session,csrf,body['workspace'])
         if g['role'] not in ('PLATFORM_OWNER','PLATFORM_REVIEWER'):raise PermissionError('PLATFORM_READ_PERMISSION_REQUIRED')
+        if customer_update and g['role']!='PLATFORM_OWNER':raise PermissionError('PLATFORM_OWNER_WRITE_REQUIRED')
         c=self.center;ops=self.directory.commerce.operations
         unavailable=[]
         # Customer membership and project audit do not depend on a merchant's
@@ -36,6 +42,22 @@ class PlatformViews:
                 identity=dict(tenant_id=t,merchant_id=m,store_id=s);evidence=provider_evidence(db,identity,ref)
                 records.append(dict(id=idx,scope=identity,reference=ref,amount_minor=amount,currency=currency,order_state=status,payment_evidence=evidence['source'] if evidence else None,finance_status='UNCONFIRMED'))
             result=dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None)
+        elif customer_update:
+            uid=p['user_id']
+            if (type(uid) is not str or re.fullmatch('[A-Za-z0-9_-]{1,64}',uid) is None
+                    or any(type(p[key]) is not str or len(p[key])>maximum or any(ord(ch)<32 for ch in p[key]) for key,maximum in (('nickname',80),('contact',200)))
+                    or type(p['expected_version']) is not int or p['expected_version']<0):raise ValueError('INVALID_PLATFORM_CUSTOMER_UPDATE')
+            member=c.db.execute('SELECT active FROM members WHERE project=? AND user_id=?',(g['project'],uid)).fetchone()
+            if member is None:raise PermissionError('PROJECT_CUSTOMER_REQUIRED')
+            key=c.idx('community-profile:'+g['project']+':'+uid)
+            with c.tx():
+                current=c.db.execute("SELECT user_id,payload FROM links WHERE channel='COMMUNITY_CUSTOMER_PROFILE' AND subject_idx=? AND project=? AND active=1",(key,g['project'])).fetchone()
+                record=(json.loads(c.decrypt(current['payload'],'COMMUNITY_CUSTOMER_PROFILE:'+key)) if current else dict(user_id=uid,nickname='',contact='',version=0))
+                if current and current['user_id']!=uid or record.get('user_id')!=uid or record.get('version')!=p['expected_version']:raise ValueError('CUSTOMER_PROFILE_VERSION_CHANGED')
+                saved=dict(user_id=uid,nickname=p['nickname'],contact=p['contact'],version=record['version']+1)
+                c.db.execute("INSERT INTO links VALUES('COMMUNITY_CUSTOMER_PROFILE',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET user_id=excluded.user_id,payload=excluded.payload,active=1",(key,uid,g['project'],c.encrypt(canonical(saved),'COMMUNITY_CUSTOMER_PROFILE:'+key)))
+                c.audit(g['project'],g['user_id'],'PLATFORM_CUSTOMER_PROFILE_UPDATED',uid)
+            result=saved
         elif op=='platform_customers':
             if type(p['after_id']) is not str or p['after_id'] and not re.fullmatch('[A-Za-z0-9_-]{1,64}',p['after_id']):raise ValueError('INVALID_PLATFORM_CUSTOMER_CURSOR')
             rows=c.db.execute('SELECT m.user_id,m.role,m.active,a.verified FROM members m JOIN accounts a ON a.id=m.user_id WHERE m.project=? AND m.user_id>? ORDER BY m.user_id LIMIT 51',(g['project'],p['after_id'])).fetchall();records=[]
@@ -63,14 +85,13 @@ class PlatformViews:
                     balances=[]
                     for scope in merchant_scopes:
                         import hashlib
-                        from scripts.pr122_customer_core import canonical
                         point_key=hashlib.sha256(canonical(scope)).hexdigest();point_row=c.db.execute("SELECT payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1",(POINTS_CHANNEL,point_key,g['project'])).fetchone()
                         if point_row:
                             points=json.loads(c.decrypt(point_row[0],'merchant-points:'+point_key));balances.append(MerchantPoints._available(points,c.now()))
                     points_balance=sum(balances)
                 referrer=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_CUSTOMER_REFERRER' AND subject_idx=? AND user_id=? AND project=? AND active=1",(idx,uid,g['project'])).fetchone()
                 referrer_user_id=json.loads(c.decrypt(referrer[0],'COMMUNITY_CUSTOMER_REFERRER:'+idx)).get('referrer_user_id') if referrer else None
-                records.append(dict(user_id=uid,user_type='SPLIT_MERCHANT' if merchant_scopes else 'ORDINARY_USER',project_customer_id=project['customer'],project_role=role,membership_active=bool(active),verified=bool(verified),nickname=value.get('nickname',''),community_id=community,owned_order_count=len(owned),consumption_minor=spend,points_balance=points_balance,referrer_user_id=referrer_user_id))
+                records.append(dict(user_id=uid,user_type='SPLIT_MERCHANT' if merchant_scopes else 'ORDINARY_USER',project_customer_id=project['customer'],project_role=role,membership_active=bool(active),verified=bool(verified),nickname=value.get('nickname',''),contact=value.get('contact',''),profile_version=value.get('version',0),community_id=community,owned_order_count=len(owned),consumption_minor=spend,points_balance=points_balance,referrer_user_id=referrer_user_id))
             result=dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None,coverage='ORIGINAL_PROJECT_MEMBERS_NOT_GLOBAL_ACCOUNTS')
         elif op=='platform_audit':
             if type(p['after_id']) is not int or not 0<=p['after_id']<=9223372036854775807:raise ValueError('INVALID_PLATFORM_AUDIT_CURSOR')
@@ -95,5 +116,6 @@ class PlatformViews:
             result.update(coverage_complete=not unavailable,unavailable_mapping_count=len(unavailable),
                 unavailable_mappings=unavailable[:50],unavailable_mappings_truncated=len(unavailable)>50,
                 totals_scope='ACCESSIBLE_STORE_SUBTOTAL' if unavailable else 'ALL_CURRENT_ADMITTED_STORES')
-        with c.tx():c.audit(g['project'],g['user_id'],op.upper(),'SCOPED_READ')
+        if not customer_update:
+            with c.tx():c.audit(g['project'],g['user_id'],op.upper(),'SCOPED_READ')
         return result

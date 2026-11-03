@@ -98,7 +98,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         ('Cache-Control','no-store'),('X-Content-Type-Options','nosniff'),
                         ('Content-Security-Policy',"default-src 'none'")]:self.send_header(k,v)
             if cookie is not None:self.send_header('Set-Cookie',cookie)
-            self.end_headers();self.wfile.write(raw);self.close_connection=True
+            self.end_headers()
+            if self.command!='HEAD':self.wfile.write(raw)
+            self.close_connection=True
+        def do_HEAD(self):
+            return self.do_GET()
         def do_GET(self):
             request_path=self.path.partition('?')[0]
             if request_path!='/community/health' and onboarding is None and operations is None and saas is None and communities is None and commerce is None:return self.answer(404,{'error':'NOT_FOUND'})
@@ -139,7 +143,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     for key,value in [('Content-Type',mime),('Content-Length',str(len(raw))),('Cache-Control','no-store'),
                         ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; frame-ancestors "+frame_ancestors+"; form-action 'self'")]:
                         self.send_header(key,value)
-                    self.end_headers();self.wfile.write(raw);self.close_connection=True
+                    self.end_headers()
+                    if self.command!='HEAD':self.wfile.write(raw)
+                    self.close_connection=True
                     return
             assets={'/merchant/join':('onboarding.html','text/html; charset=utf-8'),
                     '/merchant/review':('onboarding.html','text/html; charset=utf-8'),
@@ -171,7 +177,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             for key,value in [('Content-Type',mime),('Content-Length',str(len(raw))),('Cache-Control','no-store'),
                     ('X-Content-Type-Options','nosniff'),('Content-Security-Policy',"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; base-uri 'none'; frame-ancestors "+frame_ancestors+"; form-action 'self'")]:
                 self.send_header(key,value)
-            self.end_headers();self.wfile.write(raw);self.close_connection=True
+            self.end_headers()
+            if self.command!='HEAD':self.wfile.write(raw)
+            self.close_connection=True
         def do_POST(self):
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if (self.headers.get_all('Host') != [host] or

@@ -23,7 +23,7 @@ class CommunityAdminOwnerThreeAcceptance(unittest.TestCase):
 
     def test_reviewer_navigation_is_current_page_only_and_field_complete(self):
         script = (ROOT / "demos/community-stage/onboarding.js").read_text()
-        self.assertIn("['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','申请状态','微信进件','申请分账比例','操作']", script)
+        self.assertIn("['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','平台审核状态','微信支付审核阶段','申请分账比例','更新时间','操作']", script)
         self.assertIn("keyword.placeholder='申请编号、商家名称、门店名称、联系人、经营类目、申请状态'", script)
         self.assertIn("const groups=[['总览'", script)
         self.assertNotIn("['积分商城'", script)
