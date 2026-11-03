@@ -100,6 +100,12 @@ class RuntimeJourney(unittest.TestCase):
         self.api.simulate_from_operator(self.owner,'order1','event1','SUCCESS','tx1')
         self.now += 90000
         self.assertIsNone(self.call('receipt',{'reference':'order1'})['ads']['AD_SLOT_PAYMENT_SUCCESS'])
+    def test_ad_create_capability_also_updates_existing_draft(self):
+        created=self.call('ad_create',{'record':{'id':'owner-edit','slot':'AD_SLOT_PAYMENT_AMOUNT','starts_at':self.now,'ends_at':self.now+3600,'title':'原广告','target_url':'https://example.org/original','priority':1,'image_name':'old.png','image_data':'data:image/png;base64,AAAA'}},self.merchant)
+        updated=self.call('ad_create',{'campaign_id':'owner-edit','record':{'slot':'AD_SLOT_PAYMENT_SUCCESS','starts_at':self.now,'ends_at':self.now+7200,'title':'已调整广告','target_url':'https://example.org/updated','priority':2,'image_name':'new.png','image_data':'data:image/png;base64,BBBB'},'expected_version':created['result']['version']},self.merchant)
+        self.assertEqual(updated['result']['version'],2)
+        campaigns={row['id']:row for row in self.call('ads',principal=self.merchant)['campaigns']}
+        self.assertEqual(campaigns['owner-edit']['title'],'已调整广告')
     def test_ad_failure_does_not_break_receipt(self):
         self.checkout()
         self.api.simulate_from_operator(self.owner,'order1','event1','SUCCESS','tx1')
