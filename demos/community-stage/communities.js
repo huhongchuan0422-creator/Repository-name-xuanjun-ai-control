@@ -60,6 +60,7 @@
  for(const op of ['join','leave'])$(op).onclick=()=>action(t=>communityResult(t,op,{community_id:id(),kind:$('kind').value}));
  $('memberCommunityReference').oninput=()=>{$('reference').value=$('memberCommunityReference').value;$('reference').oninput();};
  $('queryMerchantMembers').onclick=()=>action(t=>list(t,'members',{community_id:id(),after_id:''},true));
+ window.communityQueryCurrentMerchantMembers=()=>action(async t=>{const mine=await call('mine',{},t);if(t!==epoch)return;if(!Array.isArray(mine.records)||mine.records.length!==1)throw Error('当前账号未找到唯一社区管理范围。');const communityId=mine.records[0].id;$('memberCommunityReference').value=communityId;$('reference').value=communityId;return list(t,'members',{community_id:communityId,after_id:''},true);},'商家列表已查询');
  $('members').onclick=()=>action(t=>list(t,'members',{community_id:id(),after_id:''}));
  window.communityReadReview=reference=>{if(busy)return;reviewSelection=reference;return action(t=>readCommunity(t,reference));};
  $('review').onclick=()=>action(t=>communityResult(t,'review',{community_id:id(),expected_version:version(),decision:$('decision').value,opinion:$('opinion').value}));
