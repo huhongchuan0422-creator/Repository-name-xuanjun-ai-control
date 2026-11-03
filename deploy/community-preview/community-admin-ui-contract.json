@@ -2,8 +2,8 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "b394e9f230307bca0f6ff3c536e1fab8fb6754d0",
-  "baseline_source_tree": "d89c1fde6e80acda1a866ede610b6d25b9cf7b85",
+  "baseline_source_commit": "53e35eeaee43e4f06e1a8e95fbdecf1f59db71c3",
+  "baseline_source_tree": "06ecc1c63bf2d6675cf6837b91266f12ec4e4923",
   "owner_amendment_id": "OWNER_ADMIN_25_REQUIREMENTS_18_PAGE_MODES_AND_MINI_6_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
@@ -73,8 +73,8 @@
   },
   "assets": {
     "demos/community-stage/admin-shell.css": "be9e00e0421172f23d895f7e64119624188625a420ebeeb5db444c89eb69e61f",
-    "demos/community-stage/admin-shell.js": "b3724ed1b00e07777f6e2a52e53fa51e3958d3a45140f775c46427851476c024",
-    "demos/community-stage/communities.js": "84df4a4e73a0666407e90953d5eb6c18ccb0f20ade93434fd7d216d9cfa7870a",
+    "demos/community-stage/admin-shell.js": "1f9781661ec985c3fb99b95a43c405e3367f2c5de20718d16d3cc10f27b198e0",
+    "demos/community-stage/communities.js": "cf5b8fa648e12d2798b6f9ad5902070c2767a983a8b3844bd60e76253bbc7851",
     "demos/community-stage/onboarding.css": "e7f72aeacbfc49435fdd0ed50c27f3847de1563f6dafa4f3d5c9fb344ec9240f",
     "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
     "demos/community-stage/onboarding.js": "fc07af27b2e9bdf84e806b9e07f5ca069c865d00c950cb86b5b1896d4c67711b",
