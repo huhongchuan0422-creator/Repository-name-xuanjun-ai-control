@@ -4,45 +4,51 @@ USER root
 COPY deploy/community-preview/successor-wheels /build/successor-wheels
 COPY deploy/community-preview/requirements-successor.lock /build/requirements-successor.lock
 RUN python -m pip install --no-index --no-deps --no-cache-dir --no-compile --require-hashes --find-links=/build/successor-wheels -r /build/requirements-successor.lock && rm -rf /build/successor-wheels /build/requirements-successor.lock
-RUN mkdir -p /app/clients/community-mini/pages/checkout
-RUN mkdir -p /app/clients/community-mini/pages/merchant-join
-COPY deploy/community-preview/community-admin-ui-contract.json /app/deploy/community-preview/community-admin-ui-contract.json
-COPY scripts/community_admin_ui_release_guard.py /app/scripts/community_admin_ui_release_guard.py
-COPY demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.css
-COPY demos/community-stage/admin-shell.js /app/demos/community-stage/admin-shell.js
-COPY demos/community-stage/communities.js /app/demos/community-stage/communities.js
-COPY demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.css
-COPY demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.html
-COPY demos/community-stage/onboarding.js /app/demos/community-stage/onboarding.js
-COPY demos/community-stage/workbench.html /app/demos/community-stage/workbench.html
-COPY demos/community-stage/workbench.css /app/demos/community-stage/workbench.css
-COPY demos/community-stage/workbench.js /app/demos/community-stage/workbench.js
-COPY demos/community-stage/web-session.js /app/demos/community-stage/web-session.js
-COPY scripts/community_web_entries.py /app/scripts/community_web_entries.py
-COPY scripts/community_web_session.py /app/scripts/community_web_session.py
-COPY scripts/community_mini_http.py /app/scripts/community_mini_http.py
-COPY scripts/community_admin_management.py /app/scripts/community_admin_management.py
-COPY scripts/community_admin_route_inventory.py /app/scripts/community_admin_route_inventory.py
-COPY scripts/community_center_operations.py /app/scripts/community_center_operations.py
-COPY scripts/community_local_admin.py /app/scripts/community_local_admin.py
-COPY scripts/community_registered_admin.py /app/scripts/community_registered_admin.py
-COPY scripts/community_stage_runtime.py /app/scripts/community_stage_runtime.py
-COPY scripts/community_member_merchant_projection.py /app/scripts/community_member_merchant_projection.py
-COPY scripts/community_platform_views.py /app/scripts/community_platform_views.py
-COPY scripts/community_public_directory.py /app/scripts/community_public_directory.py
-COPY scripts/community_split_returns.py /app/scripts/community_split_returns.py
-COPY scripts/community_wechat_sp_actions.py /app/scripts/community_wechat_sp_actions.py
-COPY scripts/community_merchant_onboarding.py /app/scripts/community_merchant_onboarding.py
-COPY scripts/community_wechat_applyment.py /app/scripts/community_wechat_applyment.py
-COPY scripts/community_mini_application.py /app/scripts/community_mini_application.py
-COPY scripts/community_wechat_payment_activation.py /app/scripts/community_wechat_payment_activation.py
-COPY scripts/community_split_rules.py /app/scripts/community_split_rules.py
-COPY scripts/community_reports.py /app/scripts/community_reports.py
-COPY scripts/community_merchant_points.py /app/scripts/community_merchant_points.py
-COPY scripts/community_ad_contract.py scripts/community_ad_store.py scripts/community_commerce.py scripts/community_merchant_store.py scripts/community_workbench.py scripts/community_stage_migration.py /app/scripts/
-COPY clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/checkout/index.js
-COPY clients/community-mini/pages/merchant-join/index.wxml /app/clients/community-mini/pages/merchant-join/index.wxml
-COPY deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA
+RUN --mount=type=bind,source=.,target=/src,readonly set -eu; \
+    for path in \
+      deploy/community-preview/community-admin-ui-contract.json \
+      scripts/community_admin_ui_release_guard.py \
+      demos/community-stage/admin-shell.css \
+      demos/community-stage/admin-shell.js \
+      demos/community-stage/communities.js \
+      demos/community-stage/onboarding.css \
+      demos/community-stage/onboarding.html \
+      demos/community-stage/onboarding.js \
+      demos/community-stage/workbench.html \
+      demos/community-stage/workbench.css \
+      demos/community-stage/workbench.js \
+      demos/community-stage/web-session.js \
+      scripts/community_web_entries.py \
+      scripts/community_web_session.py \
+      scripts/community_mini_http.py \
+      scripts/community_admin_management.py \
+      scripts/community_admin_route_inventory.py \
+      scripts/community_center_operations.py \
+      scripts/community_local_admin.py \
+      scripts/community_registered_admin.py \
+      scripts/community_stage_runtime.py \
+      scripts/community_member_merchant_projection.py \
+      scripts/community_platform_views.py \
+      scripts/community_public_directory.py \
+      scripts/community_split_returns.py \
+      scripts/community_wechat_sp_actions.py \
+      scripts/community_merchant_onboarding.py \
+      scripts/community_wechat_applyment.py \
+      scripts/community_mini_application.py \
+      scripts/community_wechat_payment_activation.py \
+      scripts/community_split_rules.py \
+      scripts/community_reports.py \
+      scripts/community_merchant_points.py \
+      scripts/community_ad_contract.py \
+      scripts/community_ad_store.py \
+      scripts/community_commerce.py \
+      scripts/community_merchant_store.py \
+      scripts/community_workbench.py \
+      scripts/community_stage_migration.py \
+      clients/community-mini/pages/checkout/index.js \
+      clients/community-mini/pages/merchant-join/index.wxml; \
+    do install -D -m 0644 "/src/$path" "/app/$path"; done; \
+    install -D -m 0644 /src/deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA
 RUN cd /app && python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
 RUN chmod 0444 /app/COMMUNITY_SOURCE_SHA /app/deploy/community-preview/community-admin-ui-contract.json /app/demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.js /app/demos/community-stage/communities.js /app/demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.js /app/demos/community-stage/workbench.html /app/demos/community-stage/workbench.css /app/demos/community-stage/workbench.js /app/demos/community-stage/web-session.js /app/scripts/community_admin_ui_release_guard.py /app/scripts/community_web_entries.py /app/scripts/community_web_session.py /app/scripts/community_mini_http.py /app/scripts/community_admin_management.py /app/scripts/community_admin_route_inventory.py /app/scripts/community_center_operations.py /app/scripts/community_local_admin.py /app/scripts/community_registered_admin.py /app/scripts/community_stage_runtime.py /app/scripts/community_member_merchant_projection.py /app/scripts/community_platform_views.py /app/scripts/community_public_directory.py /app/scripts/community_split_returns.py /app/scripts/community_wechat_sp_actions.py /app/scripts/community_merchant_onboarding.py /app/scripts/community_wechat_applyment.py /app/scripts/community_mini_application.py /app/scripts/community_wechat_payment_activation.py /app/scripts/community_split_rules.py /app/scripts/community_reports.py /app/scripts/community_merchant_points.py /app/scripts/community_ad_contract.py /app/scripts/community_ad_store.py /app/scripts/community_commerce.py /app/scripts/community_merchant_store.py /app/scripts/community_workbench.py /app/scripts/community_stage_migration.py /app/clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/merchant-join/index.wxml
 ENV COMMUNITY_SOURCE_SHA=9ca6179efa32e2e256542f1f5a61b4d07dbb66ca
