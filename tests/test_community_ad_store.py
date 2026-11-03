@@ -1,6 +1,6 @@
 """Offline integration checks; never perform real payment or network operations."""
 import unittest
-from scripts.community_ad_store import open_offline,create_campaign,list_campaigns,choose,record_metric,change_campaign_state,review_creative
+from scripts.community_ad_store import open_offline,create_campaign,update_campaign,list_campaigns,choose,record_metric,change_campaign_state,review_creative
 from scripts.community_ad_contract import AMOUNT,SUCCESS
 
 class OfflineAdStoreTests(unittest.TestCase):
@@ -27,6 +27,25 @@ class OfflineAdStoreTests(unittest.TestCase):
         self.assertEqual(listed["image_data"],"data:image/png;base64,AAAA")
         self.db.execute("UPDATE campaigns SET status='ACTIVE',moderation='APPROVED' WHERE campaign_id='campaign1'")
         self.assertEqual(choose(self.db,self.scope,AMOUNT,120)["image_data"],"data:image/png;base64,AAAA")
+    def test_editable_campaign_can_be_updated_and_returns_to_draft_review(self):
+        create_campaign(self.db,self.scope,dict(self.record,image_name="old.png",image_data="data:image/png;base64,AAAA"),self.actor,100)
+        record=dict(slot=SUCCESS,starts_at=110,ends_at=230,title="Updated ad",
+                    target_url="https://example.org/updated",priority=20,
+                    image_name="new.png",image_data="data:image/png;base64,BBBB")
+        result=update_campaign(self.db,self.scope,"campaign1",record,self.actor,120,1)
+        self.assertEqual(result,{"id":"campaign1","state":"DRAFT","moderation":"PENDING","version":2})
+        listed=list_campaigns(self.db,self.scope)["campaigns"][0]
+        self.assertEqual((listed["title"],listed["slot"],listed["image_name"],listed["version"]),
+                         ("Updated ad",SUCCESS,"new.png",2))
+        self.assertEqual(self.db.execute("SELECT action FROM audit_events ORDER BY happened_at,action").fetchall(),[("CREATE",),("UPDATE",)])
+    def test_live_campaign_cannot_be_edited(self):
+        create_campaign(self.db,self.scope,dict(self.record,image_name="old.png",image_data="data:image/png;base64,AAAA"),self.actor,100)
+        self.db.execute("UPDATE campaigns SET status='ACTIVE',moderation='APPROVED'")
+        record=dict(slot=SUCCESS,starts_at=110,ends_at=230,title="Updated ad",
+                    target_url="https://example.org/updated",priority=20,
+                    image_name="new.png",image_data="data:image/png;base64,BBBB")
+        with self.assertRaisesRegex(ValueError,"CAMPAIGN_NOT_EDITABLE"):
+            update_campaign(self.db,self.scope,"campaign1",record,self.actor,120,1)
     def test_cross_tenant_actor_rejected(self):
         with self.assertRaises(ValueError):
             create_campaign(self.db,self.scope,self.record,dict(self.actor,tenant_id="other"),100)

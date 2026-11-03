@@ -31,7 +31,7 @@ Page({
   },
 
   showProfile(){this.setData({pageMode:'profile-edit'});},
-  showNotices(){if(this.data.authenticated&&this.data.loaded){this.setData({pageMode:'notices'});}else{this.setData({status:'选择门店并验证本人身份后读取通知；未读取其他门店或他人的记录'});this.showProfile();}},
+  showNotices(){this.setData({pageMode:'notices'});if(this.data.authenticated&&this.data.loaded&&!this.data.noticesLoaded)this.loadNotices();},
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   showAccount(){this.setData({pageMode:'account'});},
@@ -43,15 +43,15 @@ Page({
     this.setData({privacyStatus:''});
     try{wx.openPrivacyContract({fail});}catch(_){fail();}
   },
-  data:{pageMode:'profile',privacyStatus:'',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'登录后核实本人入驻状态',status:'未连接业务后端',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
+  data:{pageMode:'profile',privacyStatus:'',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度',status:'',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
   async onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店',false);}if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this.sceneInvalid&&!this._sceneStale&&!this.sceneStale){await this.loginAndLoad({automatic:true});}if(this.data.authenticated&&!this.data.merchantEntryPending&&!this._sceneStale)this.loadMerchantEntry();},
-  async onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.clearPrivate('登录后可办理本人商家入驻。选择门店后再读取该门店下的个人资料。');this.setData({needsScene:true});if(!this.sceneInvalid&&getApp().globalData.baseUrl)await this.loginAndLoad({automatic:true});return;}this.setData({needsScene:false});await this.loginAndLoad({automatic:true});},
+  async onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.clearPrivate('');this.setData({needsScene:true});if(!this.sceneInvalid&&getApp().globalData.baseUrl)await this.loginAndLoad({automatic:true});return;}this.setData({needsScene:false});await this.loginAndLoad({automatic:true});},
   onUnload(){this._dead=true;this._noticeRequest=null;if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
   async loginAndLoad(options={}){
     if(this.data.pending)return;
     if(this.sceneInvalid){this.setData({status:'门店入口无效，请返回首页或重新扫描有效门店码'});return;}
     let attempt=this._loginAttempt=(this._loginAttempt||0)+1;let epoch=auth.current();this._authEpoch=epoch;
-    this._merchantRequest=null;this.setData({pending:true,status:'正在登录',authenticated:false,loaded:false,merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'正在核实本人商家资格'});
+    this._merchantRequest=null;this.setData({pending:true,status:'',authenticated:false,loaded:false,merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度'});
     try{
       const config=getApp().globalData;
       if(!config.baseUrl)throw Error('未配置业务后端，无法读取本人资料');
@@ -60,19 +60,26 @@ Page({
       await this.session.ensureLogin({automatic:options.automatic===true,prepared:true});
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){return;}
       this.setData({authenticated:true});
+      if(!this.scene)await this.resolveProfileScene(epoch,attempt);
       if(this.scene)await this.loadProfile(epoch,attempt);
-      else this.setData({status:'微信身份已验证，可办理本人商家入驻；未读取任何门店资料'});
       if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.loadMerchantEntry(epoch,attempt);
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else{this.session=null;this.clearPrivate(customerError(e));}}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },
-  clearPrivate(status){this._reviewerRequest=null;this.setData({reviewerDescription:null,reviewerChallenge:'',reviewerStatus:'',reviewerPending:false});this._merchantRequest=null;this._noticeRequest=null;this.setData({pageMode:'profile',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'登录后核实本人入驻状态',authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false,status});},
+  clearPrivate(status){this._reviewerRequest=null;this.setData({reviewerDescription:null,reviewerChallenge:'',reviewerStatus:'',reviewerPending:false});this._merchantRequest=null;this._noticeRequest=null;this.setData({pageMode:'profile',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度',authenticated:false,loaded:false,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false,status});},
+  async resolveProfileScene(epoch=this._authEpoch,attempt=this._loginAttempt){
+    if(!this.session||this.scene)return;
+    const r=await this.session.customer('contexts',{});
+    if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch))return;
+    if(!r||!Array.isArray(r.contexts)||r.contexts.some(c=>!c||typeof c.scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(c.scene)))throw Error('个人资料暂时无法加载');
+    if(r.contexts.length){this.scene=r.contexts[0].scene;this.setData({needsScene:false});}
+  },
   async loadMerchantEntry(epoch=this._authEpoch,attempt=this._loginAttempt){
     if(!this.session||!this.data.authenticated)return;
     const request={session:this.session,scene:this.scene||'',epoch,attempt};this._merchantRequest=request;
     // Empty-scene sessions are valid for onboarding, never a fabricated workspace.
     const valid=()=>!this._dead&&!this._sceneStale&&this._merchantRequest===request&&this.session===request.session&&(this.scene||'')===request.scene&&auth.active(epoch)&&attempt===this._loginAttempt;
-    this.setData({merchantEntry:'unknown',merchantEntryPending:true,merchantEntryLabel:'商家入驻',merchantEntryHint:'正在核实本人商家资格'});
+    this.setData({merchantEntry:'unknown',merchantEntryPending:true,merchantEntryLabel:'商家入驻',merchantEntryHint:'正在加载…'});
     try{
       if(request.scene){
         const workspace=await request.session.merchant(request.scene,'workspaces',{});
@@ -83,8 +90,8 @@ Page({
       const result=await request.session.merchant(request.scene,'onboarding',{operation:'mine',params:{}});
       if(!valid())return;
       if(!result||!Array.isArray(result.applications)||result.applications.some(a=>!a||typeof a.application!=='string'||typeof a.status!=='string'))throw Error('入驻申请返回未确认');
-      this.setData(result.applications.length?{merchantEntry:'progress',merchantEntryLabel:'入驻进度',merchantEntryHint:'查看原申请、审核意见与开通状态'}:{merchantEntry:'none',merchantEntryLabel:'申请入驻',merchantEntryHint:'开始办理商家入驻'});
-    }catch(e){if(valid())this.setData({merchantEntry:'unknown',merchantEntryLabel:'商家入驻',merchantEntryHint:'入驻状态暂未确认，请重试；未开放工作台'});}
+      this.setData(result.applications.length?{merchantEntry:'progress',merchantEntryLabel:'入驻进度',merchantEntryHint:'查看申请进度和审核意见'}:{merchantEntry:'none',merchantEntryLabel:'申请入驻',merchantEntryHint:'开始申请成为商家'});
+    }catch(e){if(valid())this.setData({merchantEntry:'unknown',merchantEntryLabel:'申请入驻',merchantEntryHint:'开始申请成为商家'});}
     finally{if(valid()){this._merchantRequest=null;this.setData({merchantEntryPending:false});}}
   },
   openMerchantEntry(){if(this.data.merchantEntryPending)return;return this.data.authenticated&&!this.data.pending&&this.data.merchantEntry==='ready'?this.openMerchant():this.openJoin();},
@@ -96,7 +103,7 @@ Page({
     if(!this.session||!this.scene)throw Error('SESSION_EXPIRED');
     const r=this.validateProfile(await this.session.commerce(this.scene,'profile_read',{}));
     if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch))return;
-    this.setData({loaded:true,version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'本人资料已读取'});
+    this.setData({loaded:true,version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:''});
     this.loadNotices(null,epoch,attempt,false);
   },
   noticeCurrent(request){return !this._dead&&request===this._noticeRequest&&request.attempt===this._loginAttempt&&request.epoch===this._authEpoch&&auth.active(request.epoch)&&this.data.authenticated&&this.session===request.session&&this.scene===request.scene;},
@@ -140,7 +147,7 @@ Page({
     try{
       const r=this.validateProfile(await session.commerce(this.scene,'profile_update',{nickname:this.data.nickname,contact:this.data.contact,expected_version:this.data.version}));
       if(!current())return;
-      this.setData({version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'本人资料已保存'});
+      this.setData({version:r.version,nickname:r.nickname,contact:r.contact,userId:r.user_id,customerId:r.project_customer_id,status:'已保存'});
     }catch(e){if(current()){if(e.code==='ACCESS_DENIED'||e.message==='SESSION_EXPIRED')auth.revokePages(typeof getCurrentPages==='function'?getCurrentPages():[this],'登录已失效，请重新登录');else this.setData({status:customerError(e)});}}
     finally{if(current())this.setData({pending:false});}
   },

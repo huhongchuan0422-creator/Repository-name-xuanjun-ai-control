@@ -5,7 +5,9 @@ Community administrator actions use the same cookie/session/CSRF and account
 store; consumers retain the original WeChat registration/login path.
 """
 import hashlib
+import hmac
 import re
+import secrets
 from pathlib import Path
 from scripts.pr122_customer_core import Center
 
@@ -71,6 +73,20 @@ class WebSession:
             values=headers.get_all('X-CSRF-Token',[])
             if len(values)!=1 or not values[0]:raise PermissionError('CSRF_REQUIRED')
             return dispatch(self.center,token(headers),values[0],body,self.operations),None
+        if path=='/community/session/password':
+            if set(body)!={'current_password','new_password'} or any(type(body[key]) is not str for key in body):
+                raise ValueError('EXACT_PASSWORD_CHANGE_FIELDS_REQUIRED')
+            session=token(headers);values=headers.get_all('X-CSRF-Token',[])
+            if len(values)!=1 or not values[0]:raise PermissionError('CSRF_REQUIRED')
+            uid=self.center.session(session,values[0]);account=self.center.db.execute('SELECT salt,password FROM accounts WHERE id=?',(uid,)).fetchone()
+            if account is None or not hmac.compare_digest(self.center.password(body['current_password'],account['salt']),account['password']):
+                raise PermissionError('CURRENT_PASSWORD_INVALID')
+            salt=secrets.token_bytes(16);password=self.center.password(body['new_password'],salt)
+            with self.center.tx():
+                self.center.db.execute('UPDATE accounts SET salt=?,password=?,epoch=epoch+1 WHERE id=?',(salt,password,uid))
+                self.center.db.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
+                self.center.audit('',uid,'PASSWORD_CHANGED',uid)
+            return {'changed':True},COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0'
         if body!={}:raise ValueError('EMPTY_SESSION_BODY_REQUIRED')
         session=token(headers)
         values=headers.get_all('X-CSRF-Token',[])

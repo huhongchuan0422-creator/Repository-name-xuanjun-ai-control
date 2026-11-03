@@ -4,7 +4,7 @@
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
   "baseline_source_commit": "3ffbe59a838019d14738ffcc75b09fbd900bec91",
   "baseline_source_tree": "1c9e16755ce7601f2f34be9874f1792046fcf0d3",
-  "owner_amendment_id": "PRODUCT_PRICE_STOCK_PAGE_RELEVANCE_AND_MULTI_KEYWORD_20261103",
+  "owner_amendment_id": "OWNER_ADMIN_17_REQUIREMENTS_18_PAGE_MODES_AND_MINI_6_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
     "developer_may_amend_contract": false,
@@ -43,11 +43,12 @@
     },
     "main_groups_in_order": [
       "总览",
-      "社区经营",
+      "社区收益",
+      "用户管理",
       "商家管理",
       "积分商城",
       "交易与分账",
-      "营销管理",
+      "广告管理",
       "平台管理",
       "系统设置"
     ],
@@ -71,16 +72,16 @@
     }
   },
   "assets": {
-    "demos/community-stage/admin-shell.css": "a2d7dd16f3242b7b9480e788de23f644a4c251b0445efdaf03023080257d61d5",
-    "demos/community-stage/admin-shell.js": "f7fb72ea6bfac1d2c4628de7ff5eeda948c0dcdef6341e1e05275f69ebad7ff2",
+    "demos/community-stage/admin-shell.css": "be9e00e0421172f23d895f7e64119624188625a420ebeeb5db444c89eb69e61f",
+    "demos/community-stage/admin-shell.js": "93d3a615c02c79b7be35ce6b083e83200bc4f98893f5a4279151c8ae92b687a9",
     "demos/community-stage/communities.js": "84df4a4e73a0666407e90953d5eb6c18ccb0f20ade93434fd7d216d9cfa7870a",
-    "demos/community-stage/onboarding.css": "2218ad6de66c61a410badd259030e9d077fb0352d6d9697a1c93faeac236fbc2",
+    "demos/community-stage/onboarding.css": "e7f72aeacbfc49435fdd0ed50c27f3847de1563f6dafa4f3d5c9fb344ec9240f",
     "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
-    "demos/community-stage/onboarding.js": "b095c7b0c751c1f682674a8f181891a3d24650162d74c2c61942d29dc5b7714a",
-    "demos/community-stage/web-session.js": "147e2d8970c46af5e1e3ff2562620a982194a2fe9f6e4325ed26bf22f19ab5e4",
-    "demos/community-stage/workbench.css": "2afa6830accb4c19e5a2b6180c209d4c1750fe45d5fc1045884ae39851a97b0b",
-    "demos/community-stage/workbench.html": "66ea09bff499378b976f805420c8ffbeeefd8bdf597855a50ee38fccf0572a07",
-    "demos/community-stage/workbench.js": "5e5bfa6456d967a44d3ab43de40eb01035eda06602e89e368cb7ccce7663cffb",
+    "demos/community-stage/onboarding.js": "fc07af27b2e9bdf84e806b9e07f5ca069c865d00c950cb86b5b1896d4c67711b",
+    "demos/community-stage/web-session.js": "b875b58651d99abcf080c19110d0fed944b107b2ef1304ddd02ac4259ca65cfd",
+    "demos/community-stage/workbench.css": "340c18ec3202e6a75d7fe3ca2ad744963fc36d1e491c91e98b8c6052e13015c7",
+    "demos/community-stage/workbench.html": "15b167d00048e35ae7802362fd3d8cd8affe0e56acdd0afd379782bbb7ba93be",
+    "demos/community-stage/workbench.js": "0540ba4e85b593b166c31dde74d2935b6cfa5610956b01b1341fa0b8a060df49",
     "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
   }
 }

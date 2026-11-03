@@ -130,7 +130,7 @@ class SourcePackage(unittest.TestCase):
                     cwd=tmp,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                     text=True,timeout=60,check=False)
                 self.assertEqual(customer.returncode,0,customer.stdout)
-                self.assertIn('# fail 0',customer.stdout)
+                self.assertRegex(customer.stdout,r'(?:#|ℹ) fail 0')
             # One named asset only: sibling binary files must not expand the package scope.
             with tempfile.TemporaryDirectory() as tmp:
                 archive.extractall(tmp)

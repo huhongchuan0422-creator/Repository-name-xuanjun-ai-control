@@ -7,7 +7,7 @@ WeChat session, customer identity, or production authentication.
 import hmac
 from scripts.community_merchant_contract import scope
 from scripts.community_merchant_store import upsert_profile,put_item
-from scripts.community_ad_store import create_campaign,change_campaign_state,review_creative
+from scripts.community_ad_store import create_campaign,update_campaign,change_campaign_state,review_creative
 
 class LocalAdminPolicy:
     def __init__(self, merchant_token, platform_token, merchant_scope):
@@ -74,6 +74,12 @@ def dispatch_local_admin(service,path,data,capability):
         result=change_campaign_state(service.ad_db,identity,
             operation["campaign_id"],operation["state"],actor,service.now,
             operation["expected_version"])
+    elif path=="/demo/admin/campaign/update":
+        if role!="merchant" or set(operation)!={"campaign_id","record","expected_version"}:
+            raise PermissionError("MERCHANT_EDITOR_REQUIRED")
+        if service.ad_db is None:raise ValueError("AD_STORE_UNAVAILABLE")
+        result=update_campaign(service.ad_db,identity,operation["campaign_id"],
+            operation["record"],actor,service.now,operation["expected_version"])
     elif path=="/demo/admin/campaign/review":
         if role!="platform" or set(operation)!={"campaign_id","approved","expected_version"}:
             raise PermissionError("PLATFORM_MODERATOR_REQUIRED")

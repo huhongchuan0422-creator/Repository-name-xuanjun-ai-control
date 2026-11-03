@@ -55,8 +55,10 @@
 <label>订单号<input id="orderKeyword" type="search" placeholder="订单号"></label>
 <label>状态<select id="orderStatus">
 <option value="ALL">全部状态</option>
-<option value="PENDING">待处理</option>
-<option value="SUCCESS">支付成功</option>
+<option value="PENDING">待付款</option>
+<option value="SUCCESS">待发货</option>
+<option value="SHIPPED">已发货</option>
+<option value="COMPLETED">已完成</option>
 <option value="FAILED">支付失败</option>
 <option value="CANCELLED">已取消</option>
 <option value="REFUNDED">已退款</option>
@@ -83,10 +85,10 @@
 <article id="ordersMainDetail" class="management-detail" hidden><h3>订单详情</h3><dl id="ordersMainDetailFields"></dl><button id="ordersMainDetailBack" type="button">返回订单列表</button></article>
 </section>
 <section id="mall-orders">
-<header class="management-page-heading"><div><h2>订单查询</h2></div><button id="loadMallOrders" class="primary-action">查询</button></header>
-<div class="management-toolbar compact-toolbar"><label>订单号<input id="mallOrderKeyword" type="search" placeholder="订单号"></label><label>状态<select id="mallOrderStatus"><option value="ALL">全部状态</option><option value="PENDING">待处理</option><option value="SUCCESS">支付成功</option><option value="FAILED">支付失败</option><option value="CANCELLED">已取消</option><option value="REFUNDED">已退款</option></select></label></div>
-<p id="mallOrderCoverage" class="management-summary">尚未读取订单</p>
-<div class="scroll"><table><thead><tr><th>订单号</th><th>金额</th><th>币种</th><th>状态</th><th>操作</th></tr></thead><tbody id="mallOrders"></tbody></table></div>
+<header class="management-page-heading"><div><h2>订单查询</h2></div></header>
+<div class="management-toolbar compact-toolbar"><label>订单号<input id="mallOrderKeyword" type="search" placeholder="输入订单号"></label><label>状态<select id="mallOrderStatus"><option value="ALL">全部状态</option><option value="PENDING">待付款</option><option value="SUCCESS">待发货</option><option value="SHIPPED">已发货</option><option value="COMPLETED">已完成</option><option value="FAILED">支付失败</option><option value="CANCELLED">已取消</option><option value="REFUNDED">已退款</option></select></label><button id="loadMallOrders" class="primary-action">查询</button></div>
+<p id="mallOrderCoverage" class="management-summary"></p>
+<div class="scroll"><table><thead><tr><th>订单号</th><th>用户 / 收货人</th><th>商品摘要</th><th>订单金额</th><th>支付状态</th><th>履约状态</th><th>下单时间</th><th>操作</th></tr></thead><tbody id="mallOrders"></tbody></table></div>
 <button id="moreMallOrders" hidden>加载更多订单</button>
 <article id="mallOrderDetail" class="management-detail" hidden><h3>订单详情</h3><dl id="mallOrderDetailFields"></dl><button id="mallOrderDetailBack" type="button">返回订单列表</button></article>
 </section>
@@ -118,6 +120,7 @@
 </textarea>
 </label>
 <button id="completeOrder">确认已付款订单履约完成</button>
+<div id="refundReviewPanel" hidden>
 <h3>消费者退款申请审核</h3>
 <p>分页读取原退款申请。审核决定不代表已退款；结果未知时先读取原申请核对。</p>
 <label class="technical-field">消费者申请编号<input id="refundApplicationId">
@@ -135,6 +138,7 @@
 </label>
 <button id="decideRefundApplication">保存审核决定</button>
 <div id="refundApplicationResult"></div>
+</div>
 <h3>退款预审</h3>
 <p>本页用于退款预审，不会直接发起退款。结果待确认时，请使用原请求编号核对。</p>
 <form id="refundForm">
@@ -271,6 +275,7 @@
 <option value="ACTIVE">销售中</option>
 <option value="HIDDEN">已隐藏</option>
 </select></label>
+<button id="catalogQuery" type="button" class="primary-action">查询</button>
 </div>
 <div id="items" class="catalog-list" aria-live="polite"></div>
 <button id="moreItems" class="catalog-more" hidden>加载更多商品</button>
@@ -308,16 +313,12 @@
 </div>
 </section>
 <section class="price-stock-page">
-<header class="management-page-heading"><div><small>积分商城</small><h2>价格与库存</h2></div><button id="readPrice" class="primary-action">查询当前价格库存</button></header>
-<div class="management-summary-grid">
-<article><span>当前商品</span><strong id="priceCurrentItem">尚未选择</strong></article>
-<article><span>当前售价</span><strong id="priceCurrentValue">待读取</strong></article>
-<article><span>可售库存</span><strong id="priceCurrentStock">待读取</strong></article>
-</div>
+<header class="management-page-heading"><div><small>积分商城</small><h2>价格与库存</h2></div><button id="readPrice" type="button" hidden>读取所选商品</button></header>
+<span id="priceCurrentItem" hidden></span><span id="priceCurrentValue" hidden></span><span id="priceCurrentStock" hidden></span>
 <div class="management-toolbar compact-toolbar"><label>商品关键词<input id="priceKeyword" type="search" placeholder="商品名称或编号"></label><label>销售状态<select id="priceStatusFilter"><option value="ALL">全部状态</option><option value="ACTIVE">销售中</option><option value="HIDDEN">已隐藏</option></select></label><button id="loadPriceCatalog" type="button">查询商品</button></div>
-<div id="priceCatalogList" class="management-record-list"><div class="management-record-header"><span>商品图片</span><span>商品编号</span><span>商品名称</span><span>销售状态</span><span>当前售价</span><span>可售库存</span><span>操作</span></div><p class="catalog-empty">暂无商品</p></div>
+<div id="priceCatalogList" class="management-record-list"><div class="management-record-header"><span>商品图片</span><span>商品编号</span><span>商品名称</span><span>销售状态</span><span>当前售价</span><span>可售库存</span><span>已售数量</span><span>操作</span></div><p class="catalog-empty">暂无商品</p></div>
 <article id="priceDetail" class="management-detail" hidden><h3>价格库存详情</h3><dl id="priceDetailFields"></dl><div class="management-detail-actions"><button id="priceDetailBack" type="button">返回价格库存列表</button><button id="priceOpenEditor" type="button">编辑价格库存</button></div></article>
-<details id="priceEditor" class="management-operation-group">
+<details id="priceEditor" class="management-operation-group" hidden>
 <summary>编辑价格与库存</summary>
 <form id="priceForm">
 <label>商品编号<input id="priceItem" required>
@@ -342,8 +343,8 @@
 </div>
 <button id="moreAds" hidden>下一页广告</button>
 <article id="adDetail" class="management-detail" hidden><h3>广告详情</h3><div id="adDetailImage" class="item-image-preview ad-image-preview"></div><dl id="adDetailFields"></dl><button id="adDetailBack" type="button">返回广告列表</button></article>
-<details class="management-operation-group">
-<summary>新建广告</summary>
+<div id="adCreatePanel" class="management-operation-group" hidden>
+<h3 id="adEditorTitle">新建广告</h3>
 <form id="adForm">
 <label>广告编号<input id="adId" pattern="[A-Za-z0-9_\-]{1,64}" required>
 </label>
@@ -365,9 +366,9 @@
 </label>
 <label>优先级<input id="adPriority" type="number" min="0" max="100000" value="0" required>
 </label>
-<button class="primary-action">保存广告草稿</button>
+<div class="management-detail-actions"><button id="saveAd" class="primary-action">保存广告草稿</button><button id="cancelAdEdit" type="button" hidden>取消编辑</button></div>
 </form>
-</details>
+</div>
 </section>
 <section id="advertising-report">
 <h2>广告报表</h2>
@@ -391,10 +392,10 @@
 <article><span>有效期</span><strong>1 年</strong></article>
 </div>
 <button id="loadMerchantPoints" type="button">刷新积分数据</button>
-<div class="management-toolbar compact-toolbar"><label>积分关键词<input id="pointsKeyword" type="search" placeholder="订单号或记录编号"></label><label>积分类型<select id="pointsTypeFilter"><option value="ALL">全部类型</option><option value="EARN">获得积分</option><option value="REDEEM">使用积分</option><option value="RETURN">退回积分</option><option value="EXPIRE">过期积分</option></select></label></div>
-<div id="pointsLedger" class="management-record-list"><div class="management-record-header points-record-grid"><span>记录编号</span><span>积分类型</span><span>积分数量</span><span>发生时间</span><span>操作</span></div><p class="catalog-empty">暂无积分流水</p></div>
+<div class="management-toolbar compact-toolbar"><label>积分关键词<input id="pointsKeyword" type="search" placeholder="订单号或记录编号"></label><label>积分类型<select id="pointsTypeFilter"><option value="ALL">全部类型</option><option value="EARN">获得积分</option><option value="REDEEM">使用积分</option><option value="RETURN">退回积分</option><option value="EXPIRE">过期积分</option></select></label><button id="queryMerchantPoints" type="button" class="primary-action">查询</button></div>
+<div id="pointsLedger" class="management-record-list"><div class="management-record-header points-record-grid"><span>记录编号</span><span>商家</span><span>关联订单</span><span>积分类型</span><span>积分数量</span><span>抵扣金额</span><span>状态</span><span>发生时间</span><span>到期时间</span><span>操作</span></div><p class="catalog-empty">暂无积分流水</p></div>
 <article id="pointsDetail" class="management-detail" hidden><h3>积分流水详情</h3><dl id="pointsDetailFields"></dl><button id="pointsDetailBack" type="button">返回积分流水</button></article>
-<details class="management-operation-group"><summary>积分抵扣设置</summary><form id="pointsSettingForm" class="points-setting">
+<div hidden><form id="pointsSettingForm" class="points-setting">
 <label>单笔消费抵扣比例
 <select id="pointsRedemptionPercent">
 <option value="0">0%（不参与）</option>
@@ -407,12 +408,18 @@
 <p>10 积分可抵扣 1 元，可用于积分商城兑换或联盟商家消费；新入驻商家的比例以审核通过的申请档位为准。</p>
 <button type="submit">保存积分规则</button>
 </form>
-</details>
+</div>
 <div id="pointsResult" role="status"></div>
 </section>
 <section id="split-settings">
 <header class="management-page-heading"><div><small>系统设置</small><h2>微信支付分账设置</h2><p>管理接收方、比例和不可变规则版本；打开页面不会自动发起分账。</p></div></header>
 <p id="splitSettingsStatus" class="ad-provider-note">正在核对微信分账设置。</p>
+<div class="split-mode-settings" id="splitModeSettings">
+<fieldset><legend>分账比例模式</legend><label><input type="radio" name="splitMode" value="FIXED" checked> 平台统一固定比例</label><label><input type="radio" name="splitMode" value="TIERS"> 商家申请时自愿选择档次</label></fieldset>
+<form id="fixedSplitForm"><label>固定分账比例（%）<input id="fixedSplitRate" type="number" min="0.01" max="100" step="0.01" required></label><button type="submit" class="primary-action">保存固定比例</button></form>
+<form id="tierSplitForm" hidden><div class="tier-setting-header"><strong>可选分账档次</strong><button id="addSplitTier" type="button">增加档次</button></div><div id="splitTierRows"></div><p>商家在入驻申请时自行选择一个档次，平台不会替商家统一切换。</p><button type="submit" class="primary-action">保存可选档次</button></form>
+</div>
+<div id="pointsTierSettings" class="points-tier-settings"><h3>积分抵扣档次</h3><p>平台只维护商家申请时可选择的抵扣档次，不替已入驻商家强制选择。</p><div id="pointsTierRows"></div><button id="addPointsTier" type="button">增加档次</button><button id="savePointsTiers" type="button" class="primary-action">保存抵扣档次</button></div>
 <div class="settings-action-grid"><button id="openSplitRules" type="button"><strong>分账规则设置</strong><span>维护接收方、比例与规则版本</span></button><button id="openSplitRecords" type="button"><strong>分账记录</strong><span>回读微信侧处理记录与当前状态</span></button></div>
 </section>
 <section>

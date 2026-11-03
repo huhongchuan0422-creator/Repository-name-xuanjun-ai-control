@@ -16,12 +16,13 @@ class MemberProjection(unittest.TestCase):
   self.directory.commerce=SimpleNamespace(operations=self.fx.fx.operations)
   self.community=dict(id='co_'+'1'*32,tenant='tenant1',owner=self.g['user_id'])
   self.member=dict(community_id=self.community['id'],tenant='tenant1',user_id=self.g['user_id'],kind='MERCHANT',updated_at=1)
-  self.fx.fx.db.execute("UPDATE merchant_profiles SET name='真实原表测试商家'");self.fx.fx.db.commit()
+  self.fx.fx.db.execute("UPDATE merchant_profiles SET name='真实原表测试商家',status='ACTIVE'");self.fx.fx.db.commit()
   self.fx.reader._fetch=Mock(side_effect=AssertionError('NO_PROVIDER_IO'))
  def call(self,member=None):return project_member(self.directory,self.g,self.community,self.member if member is None else member)
  def test_original_name_without_collecting_customer_private_fields(self):
   r=self.call();self.assertEqual(r['merchant_name'],'真实原表测试商家');self.assertEqual(r['merchant_name_status'],'MATCHED');self.assertEqual(r['wechat_status'],'UNKNOWN')
-  self.assertEqual(set(r)-set(self.member),{'merchant_name','merchant_names','merchant_name_status','wechat_status','wechat_status_source','wechat_observed_at'})
+  self.assertEqual(set(r)-set(self.member),{'merchant_name','merchant_names','merchant_name_status','merchant_store_names','business_status','completed_split_minor','last_split_at','wechat_status','wechat_status_source','wechat_observed_at'})
+  self.assertEqual(r['merchant_store_names'],['真实原表测试商家']);self.assertEqual(r['business_status'],'ACTIVE');self.assertEqual(r['completed_split_minor'],0);self.assertIsNone(r['last_split_at'])
   self.fx.reader._fetch.assert_not_called()
  def test_signed_observation_is_separate_from_membership(self):
   applyment=self.fx.applyment;application=self.fx.app['application'];record=applyment._read(application);record['provider_observed_at']=self.fx.center.now()

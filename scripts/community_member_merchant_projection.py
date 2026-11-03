@@ -66,9 +66,10 @@ def project_member(directory,grant,community,relation):
                     or grant['role'] in ('PLATFORM_OWNER','PLATFORM_REVIEWER'))):
         raise PermissionError('AUTHORIZED_CURRENT_COMMUNITY_MEMBER_REQUIRED')
     extra=dict(merchant_name=None,merchant_names=[],merchant_name_status='NO_ADMITTED_MAPPING',
+        merchant_store_names=[],business_status='UNKNOWN',completed_split_minor=0,last_split_at=None,
         wechat_status='UNKNOWN',wechat_status_source='NOT_AVAILABLE',wechat_observed_at=None)
     if directory.commerce is None:return dict(relation,**extra)
-    operations=directory.commerce.operations;names=set();observations=[];mapped=False;unavailable=False
+    operations=directory.commerce.operations;names=set();statuses=set();scopes=[];observations=[];mapped=False;unavailable=False
     for workspace,target in sorted(operations.grants.items()):
         if (target['user_id']!=relation['user_id'] or target['project']!=grant['project']
                 or target['tenant']!=grant['tenant'] or target['role']!='MERCHANT_ADMIN'):continue
@@ -81,15 +82,30 @@ def project_member(directory,grant,community,relation):
         except PermissionError:
             unavailable=True;continue
         mapped=True
-        scope=target['scope'];row=operations.runtime.demo.merchant_db.execute('SELECT name FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?',tuple(scope[k] for k in ('tenant_id','merchant_id','store_id'))).fetchone()
+        scope=target['scope'];scopes.append(scope);row=operations.runtime.demo.merchant_db.execute('SELECT name,status FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?',tuple(scope[k] for k in ('tenant_id','merchant_id','store_id'))).fetchone()
         if row is not None and type(row[0]) is str and row[0]:names.add(row[0])
+        if row is not None and row[1] in ('ACTIVE','PAUSED'):statuses.add(row[1])
         try:observations.append(_wechat(directory,workspace,target))
         except (PermissionError,ValueError,KeyError):observations.append(None)
     extra['merchant_names']=sorted(names)
+    extra['merchant_store_names']=sorted(names)
+    extra['business_status']=next(iter(statuses)) if len(statuses)==1 else 'MULTIPLE' if len(statuses)>1 else 'UNKNOWN'
     extra['merchant_name_status']='MAPPING_UNAVAILABLE' if unavailable else 'MATCHED' if len(names)==1 else 'MULTIPLE' if len(names)>1 else 'NO_PROFILE' if mapped else 'NO_ADMITTED_MAPPING'
     if not unavailable and len(names)==1:extra['merchant_name']=next(iter(names))
     # Do not collapse multiple merchant workspaces into one signing assertion.
     if not unavailable and len(observations)==1 and observations[0] is not None:
         extra.update(wechat_status=observations[0]['state'],wechat_status_source='SIGNED_PROVIDER_QUERY',wechat_observed_at=observations[0]['observed_at'])
     elif len(observations)>1:extra['wechat_status_source']='MULTIPLE_MERCHANT_WORKSPACES'
+    scope_values={hashlib.sha256(canonical(scope)).hexdigest():scope for scope in scopes}
+    for key,payload in directory.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_PROVIDER_ACTION' AND project=? AND active=1",(grant['project'],)):
+        value=json.loads(directory.center.decrypt(payload,'provider-action:'+key))
+        if type(value) is not dict or value.get('kind')!='SPLIT' or value.get('scope_hash') not in scope_values:continue
+        if value.get('scope')!=scope_values[value['scope_hash']]:continue
+        result=value.get('result')
+        if type(result) is not dict or result.get('status')!='FINISHED':continue
+        receivers=result.get('receivers')
+        if type(receivers) is not list:continue
+        amount=sum(item['amount_minor'] for item in receivers if type(item) is dict and item.get('result')=='SUCCESS' and type(item.get('amount_minor')) is int and item['amount_minor']>=0)
+        extra['completed_split_minor']+=amount
+        if type(value.get('at')) is int and (extra['last_split_at'] is None or value['at']>extra['last_split_at']):extra['last_split_at']=value['at']
     return dict(relation,**extra)

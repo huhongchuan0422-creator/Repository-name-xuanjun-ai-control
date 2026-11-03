@@ -50,7 +50,7 @@ const text=node=>walk(node).map(n=>n.textContent).join('\n');
  assert(text(nodes.historyRows).includes('original reason 1'));assert(text(nodes.historyMaterials).includes(material.version));assert(!text(nodes.historyRows).includes('CURRENT_NOTE_NOT_HISTORICAL'));
  // A legacy reason/time/material association is explicitly unknown.
  override={...page(app.application,50),records:[{...record(1),note:null,occurred_at:null,materials:null,evidence:'LEGACY_EVENT_ONLY'}]};
- nodes.loadHistory.click();await flush();assert(text(nodes.historyRows).includes('旧审核原因未完整留存'));assert(text(nodes.historyRows).includes('时间未能唯一关联'));assert(text(nodes.historyRows).includes('关联未留存'));
+ nodes.loadHistory.click();await flush();assert(text(nodes.historyRows).includes('旧审核原因未完整留存'));assert(text(nodes.historyRows).includes('时间未记录'));assert(text(nodes.historyRows).includes('关联未留存'));
  override=null;nodes.loadHistory.click();await flush();deny=true;nodes.moreHistory.click();await flush();assert.equal(nodes.historyRows.children.length,0);assert.equal(nodes.moreHistory.hidden,true);assert(!nodes.status.textContent.includes('MUST_NOT_PARSE'));
  deny=false;hold=true;nodes.loadHistory.click();await flush();const old=deferred.shift();app=makeApp('app2');await reload();assert.equal(nodes.historyRows.children.length,0);
  nodes.loadHistory.click();await flush();const fresh=deferred.shift();old(reply(page('app1',0)));await flush();assert.equal(nodes.historyRows.children.length,0);assert.equal(nodes.loadHistory.disabled,true);

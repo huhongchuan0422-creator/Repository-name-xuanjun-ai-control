@@ -156,6 +156,44 @@ def list_campaigns(db,scope,limit=50,after_id=""):
     return {"campaigns":[dict(zip(("id","title","target_url","slot","status","moderation","priority","starts_at","ends_at","version","image_name","image_data"),row)) for row in rows[:limit]],
             "has_more":len(rows)>limit,"next_cursor":rows[limit-1][0] if len(rows)>limit else None}
 
+def update_campaign(db,scope,campaign_id,record,actor,now,expected_version):
+    """Edit an existing non-live campaign and return it to draft review."""
+    t,m,s=_scope(scope);_now(now)
+    if (not isinstance(campaign_id,str) or not _ascii(campaign_id) or not 1<=len(campaign_id)<=100
+            or not campaign_id.replace("-","").replace("_","").isalnum()
+            or type(expected_version) is not int or expected_version<1):
+        raise ValueError("INVALID_CAMPAIGN_ID")
+    if (not isinstance(actor,dict) or actor.get("authenticated") is not True
+            or actor.get("role")!="MERCHANT_ADMIN" or not isinstance(actor.get("actor_id"),str)
+            or not actor["actor_id"] or (actor.get("tenant_id"),actor.get("merchant_id"))!=(t,m)):
+        raise ValueError("UNAUTHENTICATED_ACTOR")
+    expected={"slot","starts_at","ends_at","title","target_url","priority","image_name","image_data"}
+    if not isinstance(record,dict) or set(record)!=expected:
+        raise ValueError("INVALID_CAMPAIGN")
+    if record["slot"] not in SLOTS or type(record["priority"]) is not int or not 0<=record["priority"]<=100000:
+        raise ValueError("INVALID_CAMPAIGN_SETTINGS")
+    start,end=_now(record["starts_at"]),_now(record["ends_at"])
+    if (start>=end or not isinstance(record["title"],str) or not 1<=len(record["title"])<=160
+            or not safe_creative_url(record["target_url"])
+            or not isinstance(record["image_name"],str) or not 1<=len(record["image_name"])<=160
+            or not isinstance(record["image_data"],str) or len(record["image_data"])>750000
+            or not record["image_data"].startswith("data:image/") or ";base64," not in record["image_data"]):
+        raise ValueError("INVALID_CREATIVE")
+    with db:
+        row=db.execute("SELECT status,version FROM campaigns WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=?",
+                       (t,m,s,campaign_id)).fetchone()
+        if row is None: raise ValueError("UNKNOWN_CAMPAIGN")
+        if row[1]!=expected_version: raise ValueError("STALE_VERSION")
+        if row[0] not in ("DRAFT","REJECTED","PAUSED"): raise ValueError("CAMPAIGN_NOT_EDITABLE")
+        changed=db.execute("UPDATE campaigns SET slot=?,status='DRAFT',moderation='PENDING',priority=?,starts_at=?,ends_at=?,title=?,target_url=?,version=version+1 WHERE tenant_id=? AND merchant_id=? AND store_id=? AND campaign_id=? AND version=?",
+                           (record["slot"],record["priority"],start,end,record["title"],record["target_url"],t,m,s,campaign_id,expected_version))
+        if changed.rowcount!=1: raise ValueError("CONCURRENT_VERSION_CHANGE")
+        db.execute("INSERT INTO campaign_creatives VALUES(?,?,?,?,?,?) ON CONFLICT(tenant_id,merchant_id,store_id,campaign_id) DO UPDATE SET image_name=excluded.image_name,image_data=excluded.image_data",
+                   (t,m,s,campaign_id,record["image_name"],record["image_data"]))
+        db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                   (t,m,s,campaign_id,actor["actor_id"],"UPDATE",expected_version,expected_version+1,now))
+    return {"id":campaign_id,"state":"DRAFT","moderation":"PENDING","version":expected_version+1}
+
 def metric_report(db, scope, starts_at, ends_at, limit=50, after_id=""):
     """Read original events in a half-open UTC interval; never infer revenue."""
     t,m,s = _scope(scope)

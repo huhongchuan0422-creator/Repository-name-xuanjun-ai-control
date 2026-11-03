@@ -21,12 +21,12 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
 
     def test_role_navigation_uses_short_grouped_labels(self):
         shell = (ROOT / 'demos/community-stage/admin-shell.js').read_text()
-        for group in ('总览', '社区经营', '商家管理', '积分商城', '交易与分账', '营销管理', '平台管理', '系统设置'):
+        for group in ('总览', '社区收益', '用户管理', '商家管理', '积分商城', '交易与分账', '广告管理', '平台管理', '系统设置'):
             self.assertIn("navigationGroup", shell)
             self.assertIn("'" + group + "'", shell)
-        for label in ('首页', '社区资料', '社区开通', '社区推广', '商家审核', '社区商家', '订单与结算', '分账明细', '退款管理', '广告管理', '运营查询', '管理员设置', '分账配置'):
+        for label in ('首页', '用户列表', '个人资料', '商家审核', '社区商家', '分账金额列表', '订单与结算', '分账明细', '退款管理', '广告列表', '新建广告', '运营查询', '管理员设置', '分账配置'):
             self.assertIn(label, shell)
-        self.assertIn('adNav.hidden=!(rootAuthority()||communityManagerHome()||platformOwnerHome())', shell)
+        self.assertIn('adNav.hidden=adNewNav.hidden=!(rootAuthority()||communityManagerHome()||platformOwnerHome())', shell)
         self.assertIn("document.createElement('details')", shell)
         self.assertIn("openMerchantWorkbench('split-settings','分账配置')", shell)
         self.assertNotIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1#workbenchMain'", shell)
@@ -66,7 +66,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn('.admission-review.admin-logged-in #community-session form', styles)
         self.assertIn("keywordLabel.textContent='搜索'", script)
         self.assertIn("keywords.every(keyword=>text.includes(keyword))", script)
-        self.assertIn("for(const label of ['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','申请状态','微信进件','申请分账比例','操作'])", script)
+        self.assertIn("for(const label of ['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','平台审核状态','微信支付审核阶段','申请分账比例','更新时间','操作'])", script)
         self.assertIn("queueCount.id='reviewQueueCount'", script)
         self.assertIn("cell.className='review-empty-state'", script)
         self.assertIn('.admission-review.admin-logged-in #community-session>fieldset', styles)
@@ -237,7 +237,9 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn('<nav aria-label="商家功能">', html)
         self.assertIn('付款金额确认页', html)
         self.assertIn('支付完成页（核验成功后）', html)
-        self.assertIn('腾讯广告需由平台配置小程序广告位 ID，未配置时保持关闭', html)
+        self.assertNotIn('腾讯广告需由平台配置小程序广告位 ID，未配置时保持关闭', html)
+        self.assertIn('href="/merchant/workbench#advertising">广告管理</a>', html)
+        self.assertIn('id="adEditorTitle"', html)
         self.assertIn('<h3>积分商城</h3>', html)
         for target in ('catalog-management', 'price-stock', 'mall-orders', 'merchant-points'):
             self.assertIn('href="/merchant/workbench#' + target + '"', html)
@@ -259,7 +261,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         script = (ROOT / 'demos/community-stage/workbench.js').read_text()
         self.assertIn("splitRuleSettings.append(splitRuleHeading,$('ruleForm')", script)
         self.assertIn('splitRuleSettings.scrollIntoView', script)
-        for label in ('总览', '商家资料', '积分商城', '交易与分账', '营销管理', '设置'):
+        for label in ('总览', '商家资料', '积分商城', '交易与分账', '广告管理', '系统设置'):
             self.assertIn("['" + label + "'", script)
         self.assertNotIn("['商家管理','/community-preview/community/portal#merchant-management']", script)
         self.assertNotIn("'/community-preview/community/portal'", script)

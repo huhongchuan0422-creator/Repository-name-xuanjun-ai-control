@@ -102,7 +102,7 @@ class CenterOperations:
                 raise ValueError('INVALID_COMMUNITY_FIELDS')
             from scripts.community_workbench import merchant_settings
             result=merchant_settings(self.runtime.demo.merchant_db,grant['scope'],**body['params'])
-        elif body['operation'] in ('community.profile','community.item','community.ad_create','community.ad_state','community.ad_review'):
+        elif body['operation'] in ('community.profile','community.item','community.ad_create','community.ad_update','community.ad_state','community.ad_review'):
             from scripts.community_registered_admin import dispatch
             result=dispatch(self.runtime.demo,grant['scope'],grant['role'],uid,body['operation'],body['params'],self.center.now())
         else:result=self.runtime.dispatch(p,body['operation'],body['params'],None)

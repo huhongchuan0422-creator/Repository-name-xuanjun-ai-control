@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import secrets
+from io import BytesIO
 from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from scripts.pr122_customer_core import canonical,private_path
@@ -385,9 +386,9 @@ class WechatApplyment:
         c=self.center;uid=c.session(session,csrf);op,p=body['operation'],body['params']
         fields={'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
             'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
-            'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'}}
+            'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
         if type(op) is not str or op not in fields or set(p)!=fields[op]:raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
-        reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query')
+        reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
         if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
@@ -395,6 +396,18 @@ class WechatApplyment:
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
         if op=='wechat_media':return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
         record=self._read(application)
+        if op=='wechat_sign_qr':
+            proof=record.get('provider_sign_url_proof') if type(record) is dict else None
+            if (record is None or record.get('provider_state') not in ('APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED')
+                    or type(record.get('provider_sign_url')) is not str or type(proof) is not dict
+                    or proof.get('applyment_id')!=record.get('applyment_id')
+                    or proof.get('signed_at')!=record.get('provider_query_signed_at')
+                    or proof.get('signature_sha256')!=record.get('provider_query_signature_sha256')):raise PermissionError('VERIFIED_PROVIDER_SIGN_URL_REQUIRED')
+            official_signing_url(record['provider_sign_url'])
+            import qrcode
+            from qrcode.image.svg import SvgPathImage
+            image=qrcode.make(record['provider_sign_url'],image_factory=SvgPathImage,box_size=8,border=4);output=BytesIO();image.save(output)
+            svg=output.getvalue();return dict(application=application,applyment_id=record.get('applyment_id'),url_sha256=hashlib.sha256(record['provider_sign_url'].encode()).hexdigest(),svg_data='data:image/svg+xml;base64,'+base64.b64encode(svg).decode())
         if op in ('wechat_read','wechat_review_read'):return record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')
         if op=='wechat_query':
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')

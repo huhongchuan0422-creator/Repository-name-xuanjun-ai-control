@@ -49,8 +49,13 @@ class CommunityUiSuccessorPackage(unittest.TestCase):
         for source, _ in self.copies:
             if source == 'deploy/community-preview/COMMUNITY_SOURCE_SHA.successor':
                 continue
-            data = (ROOT / source).read_bytes()
-            rows.append(hashlib.sha256(data).hexdigest() + '  ' + source + '\n')
+            path = ROOT / source
+            if path.is_dir():
+                for child in sorted(item for item in path.rglob('*') if item.is_file()):
+                    relative = child.relative_to(ROOT).as_posix()
+                    rows.append(hashlib.sha256(child.read_bytes()).hexdigest() + '  ' + relative + '\n')
+            else:
+                rows.append(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + source + '\n')
         tree = hashlib.sha1(''.join(sorted(rows, key=lambda row: row.split('  ', 1)[1])).encode()).hexdigest()
         revision = hashlib.sha1(b'community-ui-successor-v1\0' + tree.encode()).hexdigest()
         return revision, tree

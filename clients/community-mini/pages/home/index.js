@@ -3,7 +3,7 @@ const auth=require('../../customer-auth');
 Page({
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
-  data:{scene:'',status:'未连接业务后端',authenticated:false,pending:false,activeSection:'home',needsScene:true,privacyStatus:''},
+  data:{scene:'',status:'',authenticated:false,pending:false,activeSection:'home',needsScene:true,privacyStatus:''},
   async onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店',false);}if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this.sceneInvalid&&!this._sceneStale&&!this.sceneStale){await this.login({automatic:true});}},
   async onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});getApp().globalData.scene=this.scene;this.setData({scene:this.scene,needsScene:false});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.setData({authenticated:false,needsScene:true,status:'未选择门店。可浏览公共页面、微信登录或直接办理商家入驻。'});if(!this.sceneInvalid&&getApp().globalData.baseUrl)await this.login({automatic:true});return;}await this.login({automatic:true});},
   onUnload(){this._dead=true;if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
@@ -19,7 +19,7 @@ Page({
       epoch=this._authEpoch=auth.current();attempt=this._loginAttempt=(this._loginAttempt||0)+1;this.setData({pending:true});
       await this.session.ensureLogin({automatic:options.automatic===true,prepared:true});
       if(this._dead||attempt!==this._loginAttempt||!auth.active(epoch)){return;}
-      this.setData({authenticated:true,status:this.scene?'客户身份已验证':'微信身份已验证，可办理本人商家入驻；尚未关联门店'});
+      this.setData({authenticated:true,status:''});
     }catch(e){if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch)){this.session=null;this.setData({authenticated:false,status:customerError(e)});}}
     finally{if(!this._dead&&attempt===this._loginAttempt&&auth.active(epoch))this.setData({pending:false});}
   },

@@ -53,7 +53,7 @@ const withdrawals=()=>calls.filter(c=>c.operation==='withdraw');
  nodes.withdrawConfirmed.checked=true;nodes.withdrawApplication.click();nodes.withdrawApplication.click();await flush();
  assert.equal(withdrawals().length,1);assert.equal(nodes.applicationState.textContent,'已撤回');assert.equal(nodes.withdrawActions.hidden,true);assert.equal(nodes.withdrawConfirmed.checked,false);
  assert.equal(nodes.saveDraft.disabled,true);assert.equal(nodes.store_name.disabled,true);assert.equal(nodes.wechatExecute.disabled,true);assert.equal(nodes.wechatRead.disabled,false);assert.equal(nodes.wechatQuery.disabled,false);
- assert(nodes.wechatProfile.querySelectorAll('input,select,button').every(e=>e.disabled));assert(nodes.withdrawalState.textContent.includes('不可编辑'));assert(nodes.withdrawalState.textContent.includes('独立查询'));
+ assert(nodes.wechatProfile.querySelectorAll('input,select,button').every(e=>e.disabled));assert(nodes.withdrawalState.textContent.includes('不可编辑'));assert(nodes.withdrawalState.textContent.includes('另建申请'));
  const before=calls.length;nodes.profile.listeners.submit({preventDefault(){}});await flush();nodes.wechatProfile.onsubmit({preventDefault(){}});await flush();nodes.submitApplication.click();await flush();assert.equal(calls.length,before);
  nodes.newApplication.click();await flush();assert.equal(nodes.detail.hidden,true);assert.equal(nodes.saveDraft.disabled,false);assert.equal(nodes.store_name.disabled,false);assert.equal(nodes.withdrawActions.hidden,true);assert.equal(nodes.withdrawConfirmed.checked,false);assert.equal(nodes.wechatExecute.disabled,false);
  for(const status of ['SUBMITTED','IN_REVIEW','APPROVED','REJECTED','WITHDRAWN']){

@@ -143,6 +143,11 @@
   if(!response.ok)throw Error(response.status===403?'登录已失效或没有权限，请重新登录。':'请求未确认，请检查状态后再操作。');
   return result.result;
  }
+ window.communityChangePassword=async(currentPassword,newPassword)=>{
+  if(active!==null||!csrf)throw Error('请先登录');const t=generation;active=t;controls();
+  try{await navigator.locks.request('community-original-session',async()=>{await call('password',{current_password:currentPassword,new_password:newPassword},t);});clear('密码已修改，请使用新密码重新登录。');return true;}
+  finally{if(active===t)active=null;controls();}
+ };
  // Role is navigation metadata from this session check, never a grant.
  const communityRoles=new Set(['CUSTOMER','COMMUNITY_ADMIN','MERCHANT_ADMIN','PLATFORM_REVIEWER','PLATFORM_OWNER']);
  function selectedContext(){
@@ -153,7 +158,7 @@
    const value=financeSelectors[name].selector.value,options=selected.finance_options?.[name];
    if(value&&Array.isArray(options)&&options.some(item=>item&&item.workspace===value))financial[key]=value;
   }
-  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null,reviewer:reviewerAccess}:reviewerPage&&reviewerAccess?{role:'PLATFORM_REVIEWER',reviewer:true}:{}),...financial};
+  return {csrf,...(selected?{workspace:selected.workspace}:{}),...(adminIdentity?{admin:{kind:adminIdentity.kind}}:{}),...(kind==='COMMUNITY'?{role:selected&&communityRoles.has(selected.role)?selected.role:null,reviewer:reviewerAccess}:reviewerPage&&reviewerAccess?{role:'PLATFORM_REVIEWER',reviewer:true}:{}),...financial};
  }
  function choose(){
   if(active!==null)return;
