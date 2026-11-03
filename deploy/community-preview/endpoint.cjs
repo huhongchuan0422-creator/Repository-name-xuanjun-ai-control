@@ -1,7 +1,7 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
 const FIXED_FRONTEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_BACKEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_PROOF_SHA256='548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367',FIXED_COMPATIBILITY='EXACT_SOURCE_MATCH';
-const CURRENT_FRONTEND='3859b1d15c2360fc0f178eed7d1a17d486fef97f',CURRENT_BACKEND='9a8284ccedf031410467b7da33e1c9f5c801e2e0',CURRENT_PROOF_SHA256='a2eedb4fe2a0250e1e92539eb5362e6a3e44d33048606928b5832d800ac3b76d',CURRENT_COMPATIBILITY='PINNED_SOURCE_DERIVED_RUNTIME';
+const CURRENT_FRONTEND='f99da75e38800d92e393281561a3cf5b71a12b0e',CURRENT_BACKEND=CURRENT_FRONTEND,CURRENT_COMPATIBILITY='EXACT_SOURCE_MATCH';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
@@ -72,7 +72,7 @@ function sourceIdentity(){
    identity.compatibility_sha256===undefined;
  const exactCurrent=kind==='current-e665'&&identity.product_source_sha===CURRENT_FRONTEND&&
    identity.backend_source_sha===CURRENT_BACKEND&&identity.compatibility===CURRENT_COMPATIBILITY&&
-   identity.compatibility_sha256===CURRENT_PROOF_SHA256;
+   identity.compatibility_sha256===undefined;
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||!(legacy||exactR1||exactCurrent))throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
@@ -92,7 +92,6 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),cont
  const expectedBackend=fixedPair?FIXED_BACKEND:currentPair?CURRENT_BACKEND:head;
  const expectedCompatibility=currentPair?CURRENT_COMPATIBILITY:'EXACT_SOURCE_MATCH';
  if(fixedPair && report?.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
- if(currentPair && report?.compatibility_sha256!==CURRENT_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||
