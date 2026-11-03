@@ -310,7 +310,10 @@ class CommunityAdminAllPages(unittest.TestCase):
         self.assertIn("reportQuery.className='management-filter-bar report-filter-bar'", shell)
         self.assertIn("reportSearch.textContent='查询'", shell)
         self.assertNotIn("reportReference", shell)
-        self.assertIn("reportRoute==='revenue'?'暂无分账记录':'暂无记录'", shell)
+        self.assertNotIn("暂无分账记录", shell)
+        self.assertIn("cell.textContent=message||'当前条件下无记录'", shell)
+        self.assertIn("memberQueryDisclosure.hidden=true", shell)
+        self.assertIn("orderQuery.hidden=users", shell)
 
 
 if __name__ == '__main__':
