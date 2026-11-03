@@ -482,7 +482,7 @@
   for(const button of workspaceRouteNavigation.values())button.removeAttribute('aria-current');
   if(index===null)homeButton.setAttribute('aria-current','page');else homeButton.removeAttribute('aria-current');
   const selectedNavigation=index===null?homeButton:buttons[index],selectedGroup=selectedNavigation?.closest?.('details');if(selectedGroup)selectedGroup.open=true;
-  snapshotNav.removeAttribute('aria-current');refundNav.removeAttribute('aria-current');
+  orderSettlementNav.removeAttribute('aria-current');snapshotNav.removeAttribute('aria-current');refundNav.removeAttribute('aria-current');
   if(persist){if(index===null)setWorkspaceRoute('');else if(navigationHashesByIndex.has(index))setWorkspaceRoute(navigationHashesByIndex.get(index));}
   if(navigationDisclosure&&window.matchMedia('(max-width:900px)').matches)navigationDisclosure.open=false;
   if(index===null&&typeof syncHomeTitle==='function')syncHomeTitle();
@@ -529,6 +529,7 @@
  function openMerchantReview(){if(!merchantReviewAllowed())return;if(!merchantReviewFrame.isConnected)merchantReviewPanel.append(merchantReviewFrame);if(merchantReviewFrame.getAttribute('src')!=='/community-preview/merchant/review?embedded=1')merchantReviewFrame.src='/community-preview/merchant/review?embedded=1';select(merchantReviewIndex);markWorkspaceNavigation('merchant-review');setWorkspaceRoute('merchant-review');if(pageTitle){pageTitle.hidden=false;pageTitle.textContent='商家审核';}}
  function openMerchantWorkbench(target,title){merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1&v=owner25-ad-route#'+target;select(merchantWorkbenchIndex);markWorkspaceNavigation('merchant-workbench='+target);setWorkspaceRoute('merchant-workbench='+encodeURIComponent(target));if(pageTitle){pageTitle.hidden=false;pageTitle.textContent=title;}}
  function applyWorkspaceRoute(){
+  if(!homeContext)return;
   if(location.hash==='#merchant-review'){openMerchantReview();return;}
   if(location.hash==='#orders-settlement'){orderSettlementNav.click();return;}
   if(location.hash==='#community-revenue'){buttons[reportIndex].click();return;}
