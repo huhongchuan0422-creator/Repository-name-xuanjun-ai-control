@@ -52,7 +52,7 @@ test('native bottom navigation is fixed, safe-area aware, and reserves content s
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
  assert.match(checkout,/disabled="{{pending\|\|!sessionReady}}"/);
  assert.match(checkout,/orderDetails&&!detailsCollapsed/);
- assert.match(checkout,/返回本人订单列表/);assert.match(checkout,/bindtap="backToOrderList"/);assert.match(checkout,/bindtap="selectOrder"/);assert.match(checkout,/orderDetails\.lines/);
+ assert.match(checkout,/返回订单列表/);assert.match(checkout,/bindtap="backToOrderList"/);assert.match(checkout,/bindtap="selectOrder"/);assert.match(checkout,/orderDetails\.lines/);
 });
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
   const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
@@ -63,6 +63,20 @@ test('app routes customer home/profile while preserving checkout route and check
   assert.match(script,/auth.navigate\(this,e.currentTarget.dataset.section/);
   assert.match(fs.readFileSync(__dirname+'/customer-auth.js','utf8'),/home:'\/pages\/home\/index'/);
   assert.match(fs.readFileSync(__dirname+'/app.js','utf8'),/baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false/);
+});
+
+test('owner customer-facing contract removes technical copy and keeps real onboarding route',()=>{
+  const home=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
+  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
+  const profile=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
+  const customerFacing=home+'\n'+checkout.split('<view wx:elif="{{viewMode===\'services\'')[0]+'\n'+profile;
+  for(const forbidden of ['扫一下','附近商家目录尚未接通','微信身份已验证','展示当前范围内已审核','筛选仅作用当前已读','未知状态保留','登录与账户状态','客服：当前项目'])assert.doesNotMatch(customerFacing,new RegExp(forbidden));
+  for(const required of ['搜一搜','餐饮','副食','待付款','待发货','已发货','个人资料','我的服务'])assert.match(customerFacing,new RegExp(required));
+  assert.match(fs.readFileSync(__dirname+'/pages/profile/index.js','utf8'),/申请入驻/);
+  const h=loadPage('pages/profile/index.js');h.page.openMerchantEntry();
+  assert.deepEqual(h.nav,['/pages/merchant-join/index']);
+  const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8'),joinScript=fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8');
+  assert.match(join,/\{\{steps\[step\]\}\}/);assert.match(joinScript,/主体与法人资料/);assert.match(join,/bindtap="connectApplicant"/);
 });
 
 test('missing backend is explicit and retry login uses existing session boundary',async()=>{
@@ -131,7 +145,7 @@ test('access denial during update clears private state and requires explicit rel
 test('missing scene permits explicit identity login and public navigation, never private data',async()=>{
   const h=loadPage('pages/home/index.js');await h.page.onLoad({});
   assert.equal(h.page.data.authenticated,true);assert.equal(h.calls.filter(x=>x.kind==='login').length,1);
-  assert.match(h.page.data.status,/微信身份已验证/);
+  assert.equal(h.page.data.status,'');
   await h.page.retryLogin();
   assert.equal(h.page.data.authenticated,true);
   assert.equal(h.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')&&!x.data.operation.startsWith('customer.')).length,0);
@@ -139,7 +153,7 @@ test('missing scene permits explicit identity login and public navigation, never
   assert.deepEqual(h.nav,['/pages/profile/index']);
   const p=loadPage('pages/profile/index.js');await p.page.onLoad({});await p.page.loginAndLoad();
   assert.equal(p.page.data.authenticated,true);assert.equal(p.page.data.loaded,false);
-  assert.equal(p.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')).length,0);
+  assert.equal(p.calls.filter(x=>x.url&&x.url.endsWith('/mini/api')&&!x.data.operation.startsWith('customer.')).length,0);
 });
 
 test('logout from profile revokes retained home and checkout page sessions and private state',async()=>{
@@ -231,7 +245,7 @@ test('late rejected old logout cannot clear a newer successful home login',async
   oldLogout.fail({errMsg:'synthetic old logout failure'});await old;
   assert.equal(home.data.authenticated,true);
   assert.equal(home.data.pending,false);
-  assert.equal(home.data.status,'客户身份已验证');
+  assert.equal(home.data.status,'');
 });
 
 test('old login finally cannot unlock a replacement login',async()=>{
@@ -276,7 +290,7 @@ test('late rejected profile save cannot revoke a newer successful login',async()
   assert.equal(h.page.data.loaded,true);
   assert.equal(h.page.data.nickname,'Fresh');
   assert.equal(h.page.data.pending,false);
-  assert.equal(h.page.data.status,'本人资料已读取');
+  assert.equal(h.page.data.status,'');
 });
 
 test('late profile save finally cannot release a newer save request lock',async()=>{
@@ -308,7 +322,7 @@ test('late profile save finally cannot release a newer save request lock',async(
   assert.equal(h.page.data.pending,false);
   assert.equal(h.page.data.nickname,'Newest');
   assert.equal(h.page.data.version,2);
-  assert.equal(h.page.data.status,'本人资料已保存');
+  assert.equal(h.page.data.status,'已保存');
 });
 
 test('unavailable login remains unauthenticated and renders a safe customer message',async()=>{
@@ -377,7 +391,7 @@ test('public navigation errors surface and caller can retry, arbitrary scan neve
 
 test('recommendations and orders admission buttons navigate without a scene; back helper is exported',async()=>{for(const view of ['recommendations','orders']){const f=loadPage('pages/checkout/index.js');await f.page.onLoad({view});f.page.openMerchantJoin();assert.equal(f.nav.at(-1),'/pages/merchant-join/index');f.page.openMerchant();assert.equal(f.nav.at(-1),'/pages/merchant/index');f.page.goBack();assert.equal(f.nav.at(-1),'/pages/home/index');assert.equal(f.calls.some(c=>c.url&&c.url.endsWith('/mini/api')&&!c.data.operation.startsWith('customer.')),false);}assert.equal(typeof authModule.back,'function');});
 
-test('original more-services entry uses authenticated context discovery, never scene-scoped private reads without selection',async()=>{const f=loadPage('pages/home/index.js');await f.page.onLoad({});f.page.navigateSection({currentTarget:{dataset:{section:'services'}}});assert.equal(f.nav.at(-1),'/pages/checkout/index?view=services');const c=loadPage('pages/checkout/index.js');await c.page.onLoad({view:'services'});assert.equal(c.page.data.viewMode,'services');assert.equal(c.page.data.sessionReady,true);assert.equal(c.calls.filter(r=>r.kind==='login').length,1);assert.equal(c.calls.some(r=>r.data&&r.data.operation&&r.data.operation.startsWith('commerce.')),false);const wxml=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(wxml,/viewMode==='services' && !needsScene && sessionReady/);assert.match(wxml,/绑定推荐人/);assert.match(wxml,/我的社区关系/);});
+test('original more-services entry uses authenticated context discovery, never scene-scoped private reads without selection',async()=>{const f=loadPage('pages/home/index.js');await f.page.onLoad({});f.page.navigateSection({currentTarget:{dataset:{section:'services'}}});assert.equal(f.nav.at(-1),'/pages/checkout/index?view=services');const c=loadPage('pages/checkout/index.js');await c.page.onLoad({view:'services'});assert.equal(c.page.data.viewMode,'services');assert.equal(c.page.data.sessionReady,true);assert.equal(c.calls.filter(r=>r.kind==='login').length,1);assert.equal(c.calls.some(r=>r.data&&r.data.operation&&r.data.operation.startsWith('commerce.')),false);const wxml=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');assert.match(wxml,/viewMode==='services' && !needsScene && sessionReady/);assert.match(wxml,/绑定推荐人/);assert.match(wxml,/我的社区/);assert.doesNotMatch(wxml,/当前门店与本人权限范围|此门店尚未接通对应业务/);});
 
 test('visible order list preserves original next-page action rather than stranding it in more services',()=>{const text=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8').split("viewMode==='orders'")[1].split("viewMode==='services'")[0];assert.match(text,/wx:if="{{ordersMore}}" bindtap="loadOrders" data-more="true"/);});
 

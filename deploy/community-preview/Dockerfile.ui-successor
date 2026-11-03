@@ -1,6 +1,9 @@
 FROM community-admin-base:003fb545
 ARG OWNER_UI_CONTRACT_SHA256
 USER root
+COPY deploy/community-preview/successor-wheels /build/successor-wheels
+COPY deploy/community-preview/requirements-successor.lock /build/requirements-successor.lock
+RUN python -m pip install --no-index --no-deps --no-cache-dir --no-compile --require-hashes --find-links=/build/successor-wheels -r /build/requirements-successor.lock && rm -rf /build/successor-wheels /build/requirements-successor.lock
 RUN mkdir -p /app/clients/community-mini/pages/checkout
 RUN mkdir -p /app/clients/community-mini/pages/merchant-join
 COPY deploy/community-preview/community-admin-ui-contract.json /app/deploy/community-preview/community-admin-ui-contract.json
@@ -16,10 +19,16 @@ COPY demos/community-stage/workbench.css /app/demos/community-stage/workbench.cs
 COPY demos/community-stage/workbench.js /app/demos/community-stage/workbench.js
 COPY demos/community-stage/web-session.js /app/demos/community-stage/web-session.js
 COPY scripts/community_web_entries.py /app/scripts/community_web_entries.py
+COPY scripts/community_web_session.py /app/scripts/community_web_session.py
 COPY scripts/community_mini_http.py /app/scripts/community_mini_http.py
 COPY scripts/community_admin_management.py /app/scripts/community_admin_management.py
 COPY scripts/community_admin_route_inventory.py /app/scripts/community_admin_route_inventory.py
 COPY scripts/community_center_operations.py /app/scripts/community_center_operations.py
+COPY scripts/community_local_admin.py /app/scripts/community_local_admin.py
+COPY scripts/community_registered_admin.py /app/scripts/community_registered_admin.py
+COPY scripts/community_stage_runtime.py /app/scripts/community_stage_runtime.py
+COPY scripts/community_member_merchant_projection.py /app/scripts/community_member_merchant_projection.py
+COPY scripts/community_platform_views.py /app/scripts/community_platform_views.py
 COPY scripts/community_public_directory.py /app/scripts/community_public_directory.py
 COPY scripts/community_split_returns.py /app/scripts/community_split_returns.py
 COPY scripts/community_wechat_sp_actions.py /app/scripts/community_wechat_sp_actions.py
@@ -35,7 +44,7 @@ COPY clients/community-mini/pages/checkout/index.js /app/clients/community-mini/
 COPY clients/community-mini/pages/merchant-join/index.wxml /app/clients/community-mini/pages/merchant-join/index.wxml
 COPY deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA
 RUN cd /app && python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
-RUN chmod 0444 /app/COMMUNITY_SOURCE_SHA /app/deploy/community-preview/community-admin-ui-contract.json /app/demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.js /app/demos/community-stage/communities.js /app/demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.js /app/demos/community-stage/workbench.html /app/demos/community-stage/workbench.css /app/demos/community-stage/workbench.js /app/demos/community-stage/web-session.js /app/scripts/community_admin_ui_release_guard.py /app/scripts/community_web_entries.py /app/scripts/community_mini_http.py /app/scripts/community_admin_management.py /app/scripts/community_admin_route_inventory.py /app/scripts/community_center_operations.py /app/scripts/community_public_directory.py /app/scripts/community_split_returns.py /app/scripts/community_wechat_sp_actions.py /app/scripts/community_merchant_onboarding.py /app/scripts/community_wechat_applyment.py /app/scripts/community_mini_application.py /app/scripts/community_wechat_payment_activation.py /app/scripts/community_split_rules.py /app/scripts/community_reports.py /app/scripts/community_merchant_points.py /app/scripts/community_ad_contract.py /app/scripts/community_ad_store.py /app/scripts/community_commerce.py /app/scripts/community_merchant_store.py /app/scripts/community_workbench.py /app/scripts/community_stage_migration.py /app/clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/merchant-join/index.wxml
+RUN chmod 0444 /app/COMMUNITY_SOURCE_SHA /app/deploy/community-preview/community-admin-ui-contract.json /app/demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.js /app/demos/community-stage/communities.js /app/demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.js /app/demos/community-stage/workbench.html /app/demos/community-stage/workbench.css /app/demos/community-stage/workbench.js /app/demos/community-stage/web-session.js /app/scripts/community_admin_ui_release_guard.py /app/scripts/community_web_entries.py /app/scripts/community_web_session.py /app/scripts/community_mini_http.py /app/scripts/community_admin_management.py /app/scripts/community_admin_route_inventory.py /app/scripts/community_center_operations.py /app/scripts/community_local_admin.py /app/scripts/community_registered_admin.py /app/scripts/community_stage_runtime.py /app/scripts/community_member_merchant_projection.py /app/scripts/community_platform_views.py /app/scripts/community_public_directory.py /app/scripts/community_split_returns.py /app/scripts/community_wechat_sp_actions.py /app/scripts/community_merchant_onboarding.py /app/scripts/community_wechat_applyment.py /app/scripts/community_mini_application.py /app/scripts/community_wechat_payment_activation.py /app/scripts/community_split_rules.py /app/scripts/community_reports.py /app/scripts/community_merchant_points.py /app/scripts/community_ad_contract.py /app/scripts/community_ad_store.py /app/scripts/community_commerce.py /app/scripts/community_merchant_store.py /app/scripts/community_workbench.py /app/scripts/community_stage_migration.py /app/clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/merchant-join/index.wxml
 ENV COMMUNITY_SOURCE_SHA=0a8ad525297a2275c2d8a6c845d56150f10dd7a5
 LABEL org.opencontainers.image.revision=0a8ad525297a2275c2d8a6c845d56150f10dd7a5 \
       community.source.tree=d37d77faf9c0c6e448067e86d17cd62960e91670

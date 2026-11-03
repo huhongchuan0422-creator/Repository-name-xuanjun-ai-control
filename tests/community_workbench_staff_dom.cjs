@@ -1,18 +1,18 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 class Element{
- constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
+ constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};this.nextElementSibling={hidden:false};}
  append(...n){this.children.push(...n);}replaceChildren(...n){this.children=n;this.textContent='';}
- addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
+ addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}closest(){return {hidden:false,firstChild:{},lastChild:{}};}
  reset(){} // Standalone controls are deliberately not reset by a form.
  set innerHTML(_){throw Error('unsafe DOM');}
 }
 const html=fs.readFileSync(process.argv[3],'utf8'),nodes=Object.fromEntries([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g)].map(m=>[m[2],new Element(m[1])]));
-const walk=n=>[n,...n.children.flatMap(walk)],document={getElementById:id=>{assert(nodes[id],id);return nodes[id];},createElement:tag=>new Element(tag),querySelectorAll:tag=>Object.values(nodes).flatMap(walk).filter(n=>n.tagName===tag)};
+const walk=n=>[n,...n.children.flatMap(walk)],document={body:{classList:{add(){}}},getElementById:id=>{assert(nodes[id],id);return nodes[id];},createElement:tag=>new Element(tag),querySelectorAll:tag=>Object.values(nodes).flatMap(walk).filter(n=>n.tagName===tag)};
 let requests=[],hold=null,fail=false,networkFailure=false;
 const response=result=>({ok:true,json:async()=>({result})}),cursor='staff_'+'0'.repeat(39)+'1';
 const record={workspace:'staff_'+'a'.repeat(40),user_id:'original_user',active:false,operations:['community.orders_page','community.summary']};
-const context={window:{},document,fetch:async(url,options)=>{const body=JSON.parse(options.body);requests.push({url,options,body});if(hold)return new Promise(resolve=>hold.resolve=resolve);if(networkFailure){networkFailure=false;throw Error("network result unknown");}if(fail){fail=false;return {ok:false,status:403,json:async()=>({})};}switch(body.operation){
+const context={window:{},document,location:{search:'?embedded=1',hash:''},URLSearchParams,fetch:async(url,options)=>{const body=JSON.parse(options.body);requests.push({url,options,body});if(hold)return new Promise(resolve=>hold.resolve=resolve);if(networkFailure){networkFailure=false;throw Error("network result unknown");}if(fail){fail=false;return {ok:false,status:403,json:async()=>({})};}switch(body.operation){
  case 'community.staff_list':return response(body.params.after_id?{records:[record],has_more:false,next_cursor:null}:{records:[],has_more:true,next_cursor:cursor});
  case 'community.staff_grant':record.active=true;return response({workspace:record.workspace,operations:body.params.operations});
  case 'community.staff_remove':record.active=false;return response({workspace:record.workspace,active:false});
@@ -36,7 +36,7 @@ const configure=context.window.configureCommunityWorkbench,flush=async()=>{for(l
   nodes.staffGrantForm.onsubmit({preventDefault(){}});await flush();assert.equal(requests.length,before+1);assert.equal(nodes.staffSelected.textContent,'');assert.equal(nodes.staffRecords.children.length,0);assert(nodes.staffResult.textContent.includes('待确认'));assert(!nodes.staffResult.textContent.includes('已记录'));assert(!nodes.staffResult.textContent.includes('有效'));
  }
 
- fail=true;nodes.staffList.click();await flush();assert(nodes.notice.textContent.includes('无此权限'));assert.equal(nodes.staffRecords.children.length,0);assert.equal(nodes.staffWorkspace.value,'');assert.equal(nodes.staffUser.value,'');assert(!nodes.staffSummary.checked);
+ fail=true;nodes.staffList.click();await flush();assert(nodes.notice.textContent.includes('当前操作不可用'));assert.equal(nodes.staffRecords.children.length,0);assert.equal(nodes.staffWorkspace.value,'');assert.equal(nodes.staffUser.value,'');assert(!nodes.staffSummary.checked);
  // Old-identity page cannot restore employee data or cursor after logout.
  hold={};nodes.staffList.click();await flush();const pending=hold;hold=null;configure(null);pending.resolve(response({records:[record],has_more:true,next_cursor:cursor}));await flush();assert.equal(nodes.staffRecords.children.length,0);assert.equal(nodes.staffSelected.textContent,'');assert(nodes.moreStaff.hidden);assert(nodes.staffList.disabled);assert.equal(nodes.staffWorkspace.value,'');
  for(const r of requests){assert.equal(r.options.credentials,'same-origin');assert.equal(r.options.headers['X-CSRF-Token'],'csrf-original');assert.equal(r.body.workspace,'merchant');assert.equal(r.url,'/community/operations');}

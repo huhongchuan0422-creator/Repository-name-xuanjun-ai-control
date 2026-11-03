@@ -47,8 +47,30 @@ class PlatformViews:
                 from scripts.community_consumer_communities import key
                 member_key=key([g['tenant'],'CUSTOMER:'+uid]);member=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_RELATION_V1' AND subject_idx=? AND user_id=? AND project=? AND active=1",(member_key,uid,g['project'])).fetchone()
                 community=json.loads(c.decrypt(member[0],'community-relation:'+member_key))['community_id'] if member else None
-                orders=c.db.execute("SELECT COUNT(*) FROM links WHERE channel='COMMUNITY_ORDER' AND user_id=? AND project=? AND active=1",(uid,g['project'])).fetchone()[0]
-                records.append(dict(user_id=uid,project_customer_id=project['customer'],project_role=role,membership_active=bool(active),verified=bool(verified),nickname=value.get('nickname',''),community_id=community,owned_order_count=orders))
+                owned=c.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_ORDER' AND user_id=? AND project=? AND active=1",(uid,g['project'])).fetchall();spend=0
+                for order_key,payload in owned:
+                    order=json.loads(c.decrypt(payload,'community-order:'+order_key));amount=order.get('amount_minor');scope=order.get('scope');reference=order.get('reference')
+                    if type(amount) is not int or amount<0 or type(scope) is not dict or type(reference) is not str:continue
+                    try:
+                        from scripts.community_order_store import state
+                        current=state(db,scope,reference)
+                    except (ValueError,KeyError):continue
+                    if current.get('state') in ('SUCCESS','REFUNDED') and provider_evidence(db,scope,reference) is not None:spend+=amount
+                merchant_scopes=[grant['scope'] for grant in ops.grants.values() if grant.get('user_id')==uid and grant.get('project')==g['project']]
+                points_balance=None
+                if merchant_scopes:
+                    from scripts.community_merchant_points import CHANNEL as POINTS_CHANNEL,MerchantPoints
+                    balances=[]
+                    for scope in merchant_scopes:
+                        import hashlib
+                        from scripts.pr122_customer_core import canonical
+                        point_key=hashlib.sha256(canonical(scope)).hexdigest();point_row=c.db.execute("SELECT payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1",(POINTS_CHANNEL,point_key,g['project'])).fetchone()
+                        if point_row:
+                            points=json.loads(c.decrypt(point_row[0],'merchant-points:'+point_key));balances.append(MerchantPoints._available(points,c.now()))
+                    points_balance=sum(balances)
+                referrer=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_CUSTOMER_REFERRER' AND subject_idx=? AND user_id=? AND project=? AND active=1",(idx,uid,g['project'])).fetchone()
+                referrer_user_id=json.loads(c.decrypt(referrer[0],'COMMUNITY_CUSTOMER_REFERRER:'+idx)).get('referrer_user_id') if referrer else None
+                records.append(dict(user_id=uid,user_type='SPLIT_MERCHANT' if merchant_scopes else 'ORDINARY_USER',project_customer_id=project['customer'],project_role=role,membership_active=bool(active),verified=bool(verified),nickname=value.get('nickname',''),community_id=community,owned_order_count=len(owned),consumption_minor=spend,points_balance=points_balance,referrer_user_id=referrer_user_id))
             result=dict(records=records,has_more=len(rows)>50,next_cursor=rows[49][0] if len(rows)>50 else None,coverage='ORIGINAL_PROJECT_MEMBERS_NOT_GLOBAL_ACCOUNTS')
         elif op=='platform_audit':
             if type(p['after_id']) is not int or not 0<=p['after_id']<=9223372036854775807:raise ValueError('INVALID_PLATFORM_AUDIT_CURSOR')
@@ -66,7 +88,9 @@ class PlatformViews:
                     if refunded>amount:raise ValueError('REFUND_TOTAL_EXCEEDS_PAYMENT')
                     verified_refunds+=refunded
                 elif status in ('SUCCESS','REFUNDED'):unverified_terminal+=1
-            result=dict(admitted_store_count=len(identities),order_counts=order_counts,signed_paid_order_count=verified_count,signed_gross_payment_minor=verified_minor,signed_refund_minor=verified_refunds,signed_net_payment_minor=verified_minor-verified_refunds,unverified_paid_state_count=unverified_terminal,currency='CNY',amount_basis='GROSS_ORIGINAL_PAYMENTS_BEFORE_REFUNDS',finance_status='UNCONFIRMED',coverage='ORIGINAL_PROJECT_ADMITTED_STORES')
+            project_user_count=c.db.execute('SELECT count(*) FROM members WHERE project=? AND active=1',(g['project'],)).fetchone()[0]
+            from scripts.community_admin_management import _daily_overview
+            result=dict(admitted_store_count=len(identities),project_user_count=project_user_count,order_counts=order_counts,signed_paid_order_count=verified_count,signed_gross_payment_minor=verified_minor,signed_refund_minor=verified_refunds,signed_net_payment_minor=verified_minor-verified_refunds,unverified_paid_state_count=unverified_terminal,currency='CNY',amount_basis='GROSS_ORIGINAL_PAYMENTS_BEFORE_REFUNDS',finance_status='UNCONFIRMED',coverage='ORIGINAL_PROJECT_ADMITTED_STORES',daily_overview=_daily_overview(c,g['project'],g['tenant'],ops))
         if op in ('platform_overview','platform_orders'):
             result.update(coverage_complete=not unavailable,unavailable_mapping_count=len(unavailable),
                 unavailable_mappings=unavailable[:50],unavailable_mappings_truncated=len(unavailable)>50,

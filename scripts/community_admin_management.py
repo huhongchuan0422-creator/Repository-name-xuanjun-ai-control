@@ -1,7 +1,9 @@
 """Administrator actions inside original community HTTP/session composition."""
 import json
 from scripts.community_admin_authority import CommunityAdminAuthority, CHANNEL
-from scripts.pr122_customer_core import Denied, identifier
+from scripts.pr122_customer_core import Denied, Conflict, canonical, digest, identifier
+
+SETTINGS_CHANNEL='COMMUNITY_ADMIN_BUSINESS_SETTINGS_V1'
 
 FIELDS={
  'self':set(),
@@ -10,6 +12,8 @@ FIELDS={
  'create':{'email','password','capabilities','workspace_scopes','request_id'},
  'grant':{'uid','capabilities','workspace_scopes','request_id','expected_revision'},
  'revoke':{'uid','expected_revision','request_id'},
+ 'business_settings_read':set(),
+ 'business_settings_save':{'mode','fixed_bps','split_tiers_bps','points_tiers','expected_revision','request_id'},
 }
 
 def _daily_overview(center,project,tenant,operations=None):
@@ -83,6 +87,23 @@ def dispatch(center,session,csrf,body,operations=None):
  if operation=='self':
   return {k:authority[k] for k in ('uid','project','tenant','kind','revision','capabilities','workspace_scopes')}
  if authority['kind']!='ROOT':raise Denied('ROOT_ADMIN_MANAGEMENT_REQUIRED')
+ if operation in ('business_settings_read','business_settings_save'):
+  key=center.idx('community-admin-business-settings:'+api.project)
+  row=center.db.execute('SELECT payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1',(SETTINGS_CHANNEL,key,api.project)).fetchone()
+  current=(json.loads(center.decrypt(row[0],SETTINGS_CHANNEL+':'+key)) if row else
+   dict(mode='FIXED',fixed_bps=100,split_tiers_bps=[100],points_tiers=[0,10,20,25,30],revision=0,updated_at=None))
+  if operation=='business_settings_read':return current
+  mode=params['mode'];fixed=params['fixed_bps'];split=params['split_tiers_bps'];points=params['points_tiers'];expected=params['expected_revision'];identifier(params['request_id'])
+  if mode not in ('FIXED','TIERS') or type(fixed) is not int or not 1<=fixed<=10000 or type(split) is not list or not 1<=len(split)<=20 or any(type(v) is not int or not 1<=v<=10000 for v in split) or split!=sorted(set(split)) or type(points) is not list or not 1<=len(points)<=20 or any(type(v) is not int or not 0<=v<=100 for v in points) or points!=sorted(set(points)):
+   raise ValueError('INVALID_BUSINESS_SETTINGS')
+  with center.tx():
+   row=center.db.execute('SELECT payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND active=1',(SETTINGS_CHANNEL,key,api.project)).fetchone()
+   fresh=(json.loads(center.decrypt(row[0],SETTINGS_CHANNEL+':'+key)) if row else dict(revision=0))
+   if type(expected) is not int or expected!=fresh['revision']:raise Conflict('BUSINESS_SETTINGS_REVISION_CHANGED')
+   saved=dict(mode=mode,fixed_bps=fixed,split_tiers_bps=split,points_tiers=points,revision=expected+1,updated_at=center.now())
+   center.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload,user_id=excluded.user_id,active=1',(SETTINGS_CHANNEL,key,uid,api.project,center.encrypt(canonical(saved),SETTINGS_CHANNEL+':'+key)))
+   center.audit(api.project,uid,'COMMUNITY_BUSINESS_SETTINGS_SAVED',digest(canonical(saved)))
+  return saved
  api.authorize(session,csrf,'/community/admin',operation)
  if operation=='catalog':
   return dict(capabilities=sorted(api.capabilities),workspace_scopes=sorted(api.workspace_scopes),manifest_sha=api.manifest_sha)
