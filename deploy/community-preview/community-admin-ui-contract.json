@@ -2,9 +2,9 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "c4aecf7be96572a9849f10038d678ba13e330515",
-  "baseline_source_tree": "ddea82998730b64fd9de004c9c8486b68e0e75fc",
-  "owner_amendment_id": "OWNER_ADMIN_25_REQUIREMENTS_18_PAGE_MODES_AND_MINI_6_20261103",
+  "baseline_source_commit": "aa5abf3667ec129ea0ca57b97d57655e1d48d46b",
+  "baseline_source_tree": "9e6269864160845d42ad6456c0796147b17c74a1",
+  "owner_amendment_id": "OWNER_ADMIN_25_PLUS_LIVE_DEVICE_CORRECTIONS_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
     "developer_may_amend_contract": false,
@@ -72,16 +72,16 @@
     }
   },
   "assets": {
-    "demos/community-stage/admin-shell.css": "91c590c1596de68868cd024b157f9e28e909a0b84dc7ff6457abdd18664298c8",
-    "demos/community-stage/admin-shell.js": "9bbeeee095b41faa9534f82c8565461144b46bc006560257a12cb9607a17b927",
+    "demos/community-stage/admin-shell.css": "6eebd258eee46ab2177cabed21a7fa06d40d0dd7ef18bbf1fca53dbd4600e9ef",
+    "demos/community-stage/admin-shell.js": "1be1979de5e882078fb20ee195aa86d8e38cca8bec7930f662430bc639e60518",
     "demos/community-stage/communities.js": "58dda8189e853494bc76d452e22c60e6684be603aa31ca8791b42e12041d5c48",
     "demos/community-stage/onboarding.css": "e7f72aeacbfc49435fdd0ed50c27f3847de1563f6dafa4f3d5c9fb344ec9240f",
     "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
     "demos/community-stage/onboarding.js": "fc07af27b2e9bdf84e806b9e07f5ca069c865d00c950cb86b5b1896d4c67711b",
     "demos/community-stage/web-session.js": "b875b58651d99abcf080c19110d0fed944b107b2ef1304ddd02ac4259ca65cfd",
-    "demos/community-stage/workbench.css": "464b40f91ac2935c72be007c31b17af8be211109639400bd13850650f4285599",
+    "demos/community-stage/workbench.css": "a81035cddfa613d9c2db898acc533094329a2908abda4067f8c98bf81a8fddc1",
     "demos/community-stage/workbench.html": "2927775db007eb5535f32160a189db1fd9f5af1d555b225df6c81285e15f0966",
-    "demos/community-stage/workbench.js": "5fb1a8028b231f39d8e5ca7f739ede35fa81e71400915d8d5a2286a3ea2e2f11",
+    "demos/community-stage/workbench.js": "baf3f2bb33d0b9074fb351102e9a5fb40bf10fc9f0ea44f9f398c5d981490ac0",
     "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
   }
 }
