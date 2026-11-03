@@ -1,25 +1,49 @@
 FROM community-admin-ui:f99da75e-owner-requirements
 ARG OWNER_UI_CONTRACT_SHA256
 USER root
-RUN --mount=type=bind,source=.,target=/src,readonly set -eu; \
-    for path in \
-      deploy/community-preview/community-admin-ui-contract.json \
-      scripts/community_admin_ui_release_guard.py \
-      demos/community-stage/admin-shell.css \
-      demos/community-stage/admin-shell.js \
-      demos/community-stage/communities.js \
-      demos/community-stage/workbench.html \
-      demos/community-stage/workbench.css \
-      demos/community-stage/workbench.js \
-      scripts/community_platform_views.py \
-      ; \
-    do install -D -m 0444 "/src/$path" "/app/$path"; done; \
-    install -D -m 0444 /src/deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA; \
-    cd /app; \
-    python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
-ENV COMMUNITY_SOURCE_SHA=c4aecf7be96572a9849f10038d678ba13e330515
-LABEL org.opencontainers.image.revision=c4aecf7be96572a9849f10038d678ba13e330515 \
-      community.source.tree=ddea82998730b64fd9de004c9c8486b68e0e75fc \
+RUN mkdir -p /app/clients/community-mini/pages/checkout /app/clients/community-mini/pages/merchant-join
+COPY deploy/community-preview/community-admin-ui-contract.json /app/deploy/community-preview/community-admin-ui-contract.json
+COPY scripts/community_admin_ui_release_guard.py /app/scripts/community_admin_ui_release_guard.py
+COPY demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.css
+COPY demos/community-stage/admin-shell.js /app/demos/community-stage/admin-shell.js
+COPY demos/community-stage/communities.js /app/demos/community-stage/communities.js
+COPY demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.css
+COPY demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.html
+COPY demos/community-stage/onboarding.js /app/demos/community-stage/onboarding.js
+COPY demos/community-stage/workbench.html /app/demos/community-stage/workbench.html
+COPY demos/community-stage/workbench.css /app/demos/community-stage/workbench.css
+COPY demos/community-stage/workbench.js /app/demos/community-stage/workbench.js
+COPY demos/community-stage/web-session.js /app/demos/community-stage/web-session.js
+COPY scripts/community_web_entries.py /app/scripts/community_web_entries.py
+COPY scripts/community_admin_management.py /app/scripts/community_admin_management.py
+COPY scripts/community_admin_route_inventory.py /app/scripts/community_admin_route_inventory.py
+COPY scripts/community_center_operations.py /app/scripts/community_center_operations.py
+COPY scripts/community_public_directory.py /app/scripts/community_public_directory.py
+COPY scripts/community_split_returns.py /app/scripts/community_split_returns.py
+COPY scripts/community_wechat_sp_actions.py /app/scripts/community_wechat_sp_actions.py
+COPY scripts/community_merchant_onboarding.py /app/scripts/community_merchant_onboarding.py
+COPY scripts/community_wechat_applyment.py /app/scripts/community_wechat_applyment.py
+COPY scripts/community_mini_application.py /app/scripts/community_mini_application.py
+COPY scripts/community_mini_http.py /app/scripts/community_mini_http.py
+COPY scripts/community_wechat_payment_activation.py /app/scripts/community_wechat_payment_activation.py
+COPY scripts/community_split_rules.py /app/scripts/community_split_rules.py
+COPY scripts/community_reports.py /app/scripts/community_reports.py
+COPY scripts/community_merchant_points.py /app/scripts/community_merchant_points.py
+COPY scripts/community_ad_contract.py /app/scripts/community_ad_contract.py
+COPY scripts/community_ad_store.py /app/scripts/community_ad_store.py
+COPY scripts/community_commerce.py /app/scripts/community_commerce.py
+COPY scripts/community_merchant_store.py /app/scripts/community_merchant_store.py
+COPY scripts/community_workbench.py /app/scripts/community_workbench.py
+COPY scripts/community_stage_migration.py /app/scripts/community_stage_migration.py
+COPY scripts/community_platform_views.py /app/scripts/community_platform_views.py
+COPY clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/checkout/index.js
+COPY clients/community-mini/pages/merchant-join/index.wxml /app/clients/community-mini/pages/merchant-join/index.wxml
+COPY deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA
+RUN cd /app && python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
+RUN chmod 0444 /app/COMMUNITY_SOURCE_SHA /app/deploy/community-preview/community-admin-ui-contract.json /app/scripts/community_admin_ui_release_guard.py /app/demos/community-stage/admin-shell.css /app/demos/community-stage/admin-shell.js /app/demos/community-stage/communities.js /app/demos/community-stage/onboarding.css /app/demos/community-stage/onboarding.html /app/demos/community-stage/onboarding.js /app/demos/community-stage/workbench.html /app/demos/community-stage/workbench.css /app/demos/community-stage/workbench.js /app/demos/community-stage/web-session.js /app/scripts/community_web_entries.py /app/scripts/community_admin_management.py /app/scripts/community_admin_route_inventory.py /app/scripts/community_center_operations.py /app/scripts/community_public_directory.py /app/scripts/community_split_returns.py /app/scripts/community_wechat_sp_actions.py /app/scripts/community_merchant_onboarding.py /app/scripts/community_wechat_applyment.py /app/scripts/community_mini_application.py /app/scripts/community_mini_http.py /app/scripts/community_wechat_payment_activation.py /app/scripts/community_split_rules.py /app/scripts/community_reports.py /app/scripts/community_merchant_points.py /app/scripts/community_ad_contract.py /app/scripts/community_ad_store.py /app/scripts/community_commerce.py /app/scripts/community_merchant_store.py /app/scripts/community_workbench.py /app/scripts/community_stage_migration.py /app/scripts/community_platform_views.py /app/clients/community-mini/pages/checkout/index.js /app/clients/community-mini/pages/merchant-join/index.wxml
+ENV COMMUNITY_SOURCE_SHA=0000000000000000000000000000000000000000
+LABEL org.opencontainers.image.revision=0000000000000000000000000000000000000000 \
+      community.source.tree=0000000000000000000000000000000000000000 \
       com.xuanjun.parent-image=sha256:861161c201bdab8d2586bf32a746ca1f8b0e5998381a653568b557cf144540fb \
       com.xuanjun.change-scope=community-admin-owner-25-requirements
 USER 10001:1008
