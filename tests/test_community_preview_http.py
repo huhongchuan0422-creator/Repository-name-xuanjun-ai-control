@@ -83,6 +83,15 @@ class IsolatedPreviewHttpJourney(unittest.TestCase):
         result=json.loads(payload)['result']
         self.assertEqual(result['finance_status'],'UNCONFIRMED')
 
+    def test_head_probe_for_portal_matches_get_without_body(self):
+        get_status,get_headers,get_body=request(self.sock,'GET','/community/portal')
+        head_status,head_headers,head_body=request(self.sock,'HEAD','/community/portal')
+        self.assertEqual((get_status,head_status),(200,200))
+        self.assertTrue(get_body)
+        self.assertEqual(head_body,b'')
+        self.assertEqual(head_headers['content-type'],get_headers['content-type'])
+        self.assertEqual(head_headers['content-length'],get_headers['content-length'])
+
     def test_production_cookie_and_duplicate_private_ip_are_rejected(self):
         status,h,_=request(self.sock,'GET','/merchant')
         cookie=h['set-cookie'][0].split(';',1)[0]
