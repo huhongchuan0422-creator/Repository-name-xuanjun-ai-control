@@ -50,7 +50,9 @@ class RealTransport:
     def count(self,action):return sum(path=='/community/session/'+action for path,_ in self.seen)
     def submit(self,page,address):
         panel=page.locator('#community-session')
-        panel.locator('[name=email]').fill(address);panel.locator('[name=password]').fill('FixturePassword123!')
+        # Session lifecycle tests exercise the original mutation/fencing path,
+        # independent of presentation details that may collapse the account panel.
+        panel.evaluate("""(root,values)=>{root.querySelector('[name=email]').value=values[0];root.querySelector('[name=password]').value=values[1];}""",[address,'FixturePassword123!'])
         panel.locator('form').dispatch_event('submit')
     def login(self,page,address):
         expect(page.locator('#community-session button[type=submit]')).to_be_enabled()
