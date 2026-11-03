@@ -142,7 +142,7 @@ class CommunityAdminAllPages(unittest.TestCase):
         for phrase in (
             "loadValidatedImage(file,{width:800,height:800,label:'商品图片'})",
             "loadValidatedImage(file,{width:1200,height:400,label:'广告图片'})",
-            "if(!itemEditorImageData)throw Error('请上传商品图片')",
+            "if(embeddedMode&&!itemEditorImageData)throw Error('请上传商品图片')",
             "if(!adEditorImageData)throw Error('请上传广告图片')",
             "['商品图片','商品编号','商品名称','商品描述','状态','售价 / 库存','操作']",
             "yuanToMinor($('itemPrice').value,'单价')",

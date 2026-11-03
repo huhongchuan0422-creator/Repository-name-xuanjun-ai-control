@@ -1,7 +1,6 @@
 'use strict';
 (() => {
   const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review',embeddedReview=reviewMode&&typeof URLSearchParams==='function'&&new URLSearchParams(location.search||'').get('embedded')==='1';
-  if(reviewMode&&!embeddedReview&&typeof location.replace==='function'){location.replace('/community-preview/community/portal#merchant-review');return;}
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过',WITHDRAWN:'已撤回'};
   let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null,reviewQueueRevision=0,reviewLayout=null;
   let historyGeneration=0,historyCursor=null,historyRequest=null;

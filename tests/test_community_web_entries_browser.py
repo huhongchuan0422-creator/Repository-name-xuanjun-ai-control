@@ -25,7 +25,7 @@ class BrowserEntries(unittest.TestCase):
                 for title,path in [('社区管理','/community/portal'),('平台入驻审核','/merchant/review'),('商家入驻','/merchant/join'),('商家工作台','/merchant/workbench')]:
                     page.get_by_role('navigation',name='角色入口',exact=True).get_by_role('link',name=title,exact=True).click()
                     self.assertEqual(page.url,'https://uk.wenwenwenyiyiyi.work'+PREFIX+path)
-                    self.assertTrue(page.locator('h1').is_visible())
+                    self.assertTrue(page.locator('h1:visible,h2:visible').first.is_visible())
                 self.assertEqual(errors,[])
                 self.assertTrue(all(path.startswith(PREFIX+'/') for path in requests))
                 self.assertFalse(any(path.endswith('/operations') for path in requests))

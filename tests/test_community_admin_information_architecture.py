@@ -32,8 +32,8 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertNotIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1#workbenchMain'", shell)
         self.assertIn("merchantWorkbenchFrame.loading='lazy'", shell)
         self.assertIn("merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1&v=owner25-ad-route#'+target", shell)
-        self.assertIn("location.replace('/community-preview/community/portal#merchant-workbench='", (ROOT / 'demos/community-stage/workbench.js').read_text())
-        self.assertIn("location.replace('/community-preview/community/portal#merchant-review')", (ROOT / 'demos/community-stage/onboarding.js').read_text())
+        self.assertNotIn("location.replace('/community-preview/community/portal#merchant-workbench='", (ROOT / 'demos/community-stage/workbench.js').read_text())
+        self.assertNotIn("location.replace('/community-preview/community/portal#merchant-review')", (ROOT / 'demos/community-stage/onboarding.js').read_text())
         self.assertIn("window.addEventListener('hashchange',applyWorkspaceRoute)", shell)
         self.assertNotIn("href='/community-preview/merchant/workbench", shell)
         self.assertNotIn('/community-preview/merchant/workbench#split-config', shell)
@@ -62,7 +62,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn("button.className=filter==='ACTIVE'?'active':''", script)
         self.assertIn('.review-admin-sidebar', styles)
         self.assertIn('.review-admin-sidebar nav a.active,.review-admin-sidebar nav button.active', styles)
-        self.assertIn('.admission-review>nav[aria-label="角色入口"]{display:none}', styles)
+        self.assertIn('.admission-review.embedded-review>nav[aria-label="角色入口"],.admission-review.admin-logged-in>nav[aria-label="角色入口"]{display:none}', styles)
         self.assertIn('.admission-review.embedded-review #community-session{display:none!important}', styles)
         self.assertIn('.admission-review.admin-logged-in #community-session form', styles)
         self.assertIn("keywordLabel.textContent='搜索'", script)
@@ -284,7 +284,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn("currentHash==='#split-records'", script)
         self.assertIn("['分账明细','#split-records']", script)
         self.assertIn("$('providerActions').hidden=!focused", script)
-        self.assertIn("$('billSection').hidden=focused||!config", script)
+        self.assertIn("$('billSection').hidden=focused||!allowed", script)
         self.assertIn("$('financeNavigation').hidden=true", script)
 
     def test_mini_program_keeps_two_distinct_ad_surfaces(self):

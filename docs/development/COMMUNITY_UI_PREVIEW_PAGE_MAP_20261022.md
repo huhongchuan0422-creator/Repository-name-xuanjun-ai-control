@@ -4,20 +4,24 @@
 
 |角色|页面|点击路径|原字段来源|
 |---|---|---|---|
-|商家小程序|订单|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|订单详情、退款与分账|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|消费者退款申请审核|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|退款预审|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|分账方案计算|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|门店资料|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|订单管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|订单查询|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|退款管理 · 查询订单|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|退款管理 · 提交退款预审|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|退款管理 · 计算分账方案|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|商家管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|多门店管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|门店员工与权限 · 生成原客户中心邀请|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|门店员工与权限 · 保存门店员工权限|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|商品管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|商品定价与库存|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|广告管理与审核|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|广告事件报表|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
-|商家小程序|模拟对账|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|成员权限 · 生成原客户中心邀请|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|成员权限 · 保存门店员工权限|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|商品管理 · 表单 1|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|商品管理 · 表单 2|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|价格与库存|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|广告管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|广告报表|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|商家积分|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|分账配置 · 保存|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|分账配置 · 增加档次|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
+|商家小程序|对账管理|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|财务记录 · 提交微信退款|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|财务记录 · 提交分账回退|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
 |商家小程序|财务记录 · 保存不可变规则版本|原后台源码保留；不作为小程序手机菜单或本轮小程序覆盖证明|workbench.html|
@@ -42,6 +46,7 @@
 |商家小程序|收款码与保存手机|`#/merchant/merchant-native-collection/list` → `detail` → `edit` → 只读操作说明后返回列表，不新增业务记录|clients/community-mini/pages/merchant/index.wxml|
 |商家入驻（同一小程序）|经营信息 1|`#/admission/admission-basic-0/edit` → 演示保存返回 `admission-start`；仅适用分支可见|onboarding.html|
 |商家入驻（同一小程序）|资料清单与版本|`#/admission/admission-materials/edit` → 演示保存返回 `admission-settlement`；仅适用分支可见|onboarding.html|
+|商家入驻（同一小程序）|经营信息 2|`#/admission/admission-basic-1/edit` → 演示保存返回 `admission-start`；仅适用分支可见|onboarding.html|
 |商家入驻（同一小程序）|管理员|`#/admission/admission-contact_info-/edit` → 演示保存返回 `admission-business`；仅适用分支可见|onboarding.js|
 |商家入驻（同一小程序）|经营主体|`#/admission/admission-subject_info-business_license_info-/edit` → 演示保存返回 `admission-start`；仅适用分支可见|onboarding.js|
 |商家入驻（同一小程序）|法人身份证|`#/admission/admission-subject_info-identity_info-id_card_info-/edit` → 演示保存返回 `admission-start`；仅适用分支可见|onboarding.js|
