@@ -2,8 +2,8 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "1671309f49d9742b6ecd3c8ad7ec0ce8d22dc0fa",
-  "baseline_source_tree": "3b4b2f49486af2da534422ae7fde7766992b65a4",
+  "baseline_source_commit": "a469ef6efd971348b5e8773947170513a19c6d4c",
+  "baseline_source_tree": "805052c255edd1d5a84f57ca9c692d5a2e9f7b39",
   "owner_amendment_id": "OWNER_ADMIN_25_PLUS_LIVE_DEVICE_CORRECTIONS_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
@@ -73,7 +73,7 @@
   },
   "assets": {
     "demos/community-stage/admin-shell.css": "6eebd258eee46ab2177cabed21a7fa06d40d0dd7ef18bbf1fca53dbd4600e9ef",
-    "demos/community-stage/admin-shell.js": "76e2f8fdbb46f29ca8dad243f2794b51113a0185b0b78a45c7b31e5e10d3ffd9",
+    "demos/community-stage/admin-shell.js": "5bc47dc30d726d590a1ba4ef684b6756797e3ea23ee981a8145557a9a2e13391",
     "demos/community-stage/communities.js": "58dda8189e853494bc76d452e22c60e6684be603aa31ca8791b42e12041d5c48",
     "demos/community-stage/onboarding.css": "e7f72aeacbfc49435fdd0ed50c27f3847de1563f6dafa4f3d5c9fb344ec9240f",
     "demos/community-stage/onboarding.html": "d189d55f4a669d1f625eb0e55ecf1aa129c739fa8326c3bd92d6572ce66ede0b",
@@ -81,7 +81,7 @@
     "demos/community-stage/web-session.js": "b875b58651d99abcf080c19110d0fed944b107b2ef1304ddd02ac4259ca65cfd",
     "demos/community-stage/workbench.css": "a81035cddfa613d9c2db898acc533094329a2908abda4067f8c98bf81a8fddc1",
     "demos/community-stage/workbench.html": "554795277da8ac64af00a8b6ed3c44943df3d9255fe2716794785e8c51db1bee",
-    "demos/community-stage/workbench.js": "b3646d268a8419ff1634efa5166672afcae28dcf693568de7c4fe1ca718ac524",
+    "demos/community-stage/workbench.js": "1cded6dcda5df8dc8e46ca9d656d0c1677ecacea2753bc210a4151c0cc931fb4",
     "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
   }
 }
