@@ -566,7 +566,7 @@
  const homeHero=document.createElement('header'),homeEyebrow=document.createElement('p'),homeHeroTitle=document.createElement('h2'),homeHeroActions=document.createElement('div');
  homeHero.className='admin-home-hero';homeEyebrow.className='admin-home-eyebrow';homeHeroActions.className='admin-home-hero-actions';homeHero.append(homeEyebrow,homeHeroTitle,intro,homeHeroActions);home.insertBefore(homeHero,cards);
  let homeContext=null,homeRevision=0,homeMetricNodes=new Map(),homeTrendNodes=[];
- function merchantReviewAllowed(){return !!homeContext?.reviewer;}
+ function merchantReviewAllowed(){return !!homeContext?.reviewer||platformOwnerHome()||rootAuthority();}
  const platformHome=()=>!!homeContext&&['PLATFORM_OWNER','PLATFORM_REVIEWER'].includes(homeContext.role);
  const platformOwnerHome=()=>!!homeContext&&homeContext.role==='PLATFORM_OWNER';
  const platformReviewerHome=()=>!!homeContext&&homeContext.role==='PLATFORM_REVIEWER';
