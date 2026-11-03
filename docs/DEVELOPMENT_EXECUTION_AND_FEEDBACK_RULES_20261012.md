@@ -53,6 +53,12 @@ Work 在活跃执行回合内必须读取回执、定位入口或依赖失败，
 不能以不断增加计划、监控草案或审查描述替代当前关键路径交付。P2 优先交付完整、可审核的一体安装与回滚包，然后实际安装验收；P3 用真实任务验证。
 节点完成必须产生可读取终态；未完成须产生具体 blocker、保留断点和可执行下一动作。没有证据不能称 PASS；写入本规则不代表相关运行能力已实现。
 
+### 条件触发验收（2026-11-03 Owner批准）
+
+当单项验收依赖尚未自然出现、无法安全人为制造的真实第三方业务状态时，不得伪造数据宣称通过，也不得让与该条件无关且已验收的交付无限等待。仅在 Owner 明确批准，且该项不属于 P0/P1、资金安全、权限隔离或当前上线即必用核心功能时，可标记为 `CONDITIONAL_PASS`，父任务进入 `DELIVERABLE_WITH_CONDITIONAL_RECHECK`。
+
+任务中心须在原任务下保存：`CONDITIONAL_ITEM_ID / VERIFIED_SCOPE / UNVERIFIED_SCOPE / TRIGGER_CONDITION / TRIGGER_SOURCE / RESPONSIBLE_ROLE / RECHECK_ACCEPTANCE / ARTIFACT_HASH / OWNER_APPROVAL_RECEIPT / FAILURE_TRANSITION / NEXT_ACTION`。触发条件出现后唤醒同一补验任务，只验证未验范围及直接受影响范围；制品未变化时不得推翻或重复执行已通过项目。补验通过转 `PASS`；补验失败转 `FAIL/HOLD_AFFECTED_FEATURE` 并创建限定修复任务。条件通过不得对外描述成真实链路已经验收，条件项若修改源码或制品，必须重新验证受影响范围并更新摘要。
+
 ## 当前执行能力边界
 
 2026年10月12日，PR21 已把回执告警工作流部署到 main。真实 run 38196915641 证明 SUBMITTED 触发、138秒产生 RECEIVE_TIMEOUT_2M、COMPLETE 后成功退出。
