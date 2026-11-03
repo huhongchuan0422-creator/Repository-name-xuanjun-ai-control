@@ -13,9 +13,10 @@ FIXED_FRONTEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_BACKEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_PROOF_SHA256 = '548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'
 FIXED_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
-CURRENT_FRONTEND = 'f99da75e38800d92e393281561a3cf5b71a12b0e'
-CURRENT_BACKEND = CURRENT_FRONTEND
-CURRENT_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
+CURRENT_FRONTEND = 'e8007c2a2f55280c662bc619ff2ebc7388b198c1'
+CURRENT_BACKEND = 'f99da75e38800d92e393281561a3cf5b71a12b0e'
+CURRENT_PROOF_SHA256 = '42260301247c7ff3daa71f0d443fac60f9188e7bf92bc4f03276ec4ba7b57458'
+CURRENT_COMPATIBILITY = 'PINNED_SOURCE_DERIVED_RUNTIME'
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):return None
@@ -56,11 +57,12 @@ def check(open_url=None, profile=None, product_identity=None):
             current = (head == CURRENT_FRONTEND
                        and product_identity.get('backend_source_sha') == CURRENT_BACKEND
                        and product_identity.get('compatibility') == CURRENT_COMPATIBILITY
-                       and 'compatibility_sha256' not in product_identity)
+                       and product_identity.get('compatibility_sha256') == CURRENT_PROOF_SHA256)
             if not (legacy or exact_source or current):return report
             expected_backend=product_identity['backend_source_sha']
             compatibility=CURRENT_COMPATIBILITY if current else 'EXACT_SOURCE_MATCH'
             if legacy:report['compatibility_sha256']=FIXED_PROOF_SHA256
+            if current:report['compatibility_sha256']=CURRENT_PROOF_SHA256
         if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:

@@ -1,7 +1,7 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
 const FIXED_FRONTEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_BACKEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_PROOF_SHA256='548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367',FIXED_COMPATIBILITY='EXACT_SOURCE_MATCH';
-const CURRENT_FRONTEND='f99da75e38800d92e393281561a3cf5b71a12b0e',CURRENT_BACKEND=CURRENT_FRONTEND,CURRENT_COMPATIBILITY='EXACT_SOURCE_MATCH';
+const CURRENT_FRONTEND='e8007c2a2f55280c662bc619ff2ebc7388b198c1',CURRENT_BACKEND='f99da75e38800d92e393281561a3cf5b71a12b0e',CURRENT_PROOF_SHA256='42260301247c7ff3daa71f0d443fac60f9188e7bf92bc4f03276ec4ba7b57458',CURRENT_COMPATIBILITY='PINNED_SOURCE_DERIVED_RUNTIME';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
@@ -72,7 +72,7 @@ function sourceIdentity(){
    identity.compatibility_sha256===undefined;
  const exactCurrent=kind==='current-e665'&&identity.product_source_sha===CURRENT_FRONTEND&&
    identity.backend_source_sha===CURRENT_BACKEND&&identity.compatibility===CURRENT_COMPATIBILITY&&
-   identity.compatibility_sha256===undefined;
+   identity.compatibility_sha256===CURRENT_PROOF_SHA256;
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||!(legacy||exactR1||exactCurrent))throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
  return identity;
 }
@@ -92,6 +92,7 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),cont
  const expectedBackend=fixedPair?FIXED_BACKEND:currentPair?CURRENT_BACKEND:head;
  const expectedCompatibility=currentPair?CURRENT_COMPATIBILITY:'EXACT_SOURCE_MATCH';
  if(fixedPair && report?.compatibility_sha256!==FIXED_PROOF_SHA256)throw Error('FIXED_COMPATIBILITY_PROOF_REQUIRED');
+ if(currentPair && report?.compatibility_sha256!==CURRENT_PROOF_SHA256)throw Error('CURRENT_COMPATIBILITY_PROOF_REQUIRED');
  if(!report||report.status!=='BACKEND_HEALTH_VERIFIED'||report.http_status!==200||
     report.profile!==target.profile||report.baseUrl!==target.baseUrl||
     report.origin!==target.origin||report.health_url!==target.health_url||
