@@ -5,6 +5,7 @@ RUN --mount=type=bind,source=.,target=/src,readonly set -eu; \
     for path in \
       deploy/community-preview/community-admin-ui-contract.json \
       scripts/community_admin_ui_release_guard.py \
+      demos/community-stage/admin-shell.css \
       demos/community-stage/admin-shell.js \
       demos/community-stage/communities.js \
       demos/community-stage/workbench.html \
