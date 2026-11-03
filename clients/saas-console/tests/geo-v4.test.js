@@ -51,7 +51,7 @@ test('GEO service errors do not create fake metrics or execution readiness',asyn
 
 class E{
  constructor(text=''){this.textContent=text;this.value='';this.disabled=false;this.style={};this.attrs={};this.children={};this.childNodes=[];this.innerHTML=''}
- querySelector(s){return this.children[s]||null}querySelectorAll(s){return this.children[s+'[]']||[]}setAttribute(k,v){this.attrs[k]=v}removeAttribute(k){delete this.attrs[k]}remove(){this.removed=true}
+ querySelector(s){return this.children[s]||null}querySelectorAll(s){return this.children[s+'[]']||[]}replaceChildren(...x){this.childNodes=[...x];this.textContent=''}setAttribute(k,v){this.attrs[k]=v}removeAttribute(k){delete this.attrs[k]}remove(){this.removed=true}
 }
 function fakeDoc(){
  const d=new E(),body=new E();d.body=body;const map=new Map,arr=new Map;
