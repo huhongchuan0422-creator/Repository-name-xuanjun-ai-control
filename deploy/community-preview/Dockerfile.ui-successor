@@ -16,9 +16,9 @@ RUN --mount=type=bind,source=.,target=/src,readonly set -eu; \
     install -D -m 0444 /src/deploy/community-preview/COMMUNITY_SOURCE_SHA.successor /app/COMMUNITY_SOURCE_SHA; \
     cd /app; \
     python scripts/community_admin_ui_release_guard.py --contract /app/deploy/community-preview/community-admin-ui-contract.json --expected-owner-contract-sha256 "$OWNER_UI_CONTRACT_SHA256"
-ENV COMMUNITY_SOURCE_SHA=cf0fb3f86c8c95702ec25aa103718d70172a4d14
-LABEL org.opencontainers.image.revision=cf0fb3f86c8c95702ec25aa103718d70172a4d14 \
-      community.source.tree=21558b8acf8cb02fccd5b38d407ee3c3a0b1925e \
+ENV COMMUNITY_SOURCE_SHA=4a53773b94c3fe4dade753ba74a463613312d209
+LABEL org.opencontainers.image.revision=4a53773b94c3fe4dade753ba74a463613312d209 \
+      community.source.tree=b7153ce30d3a8ac4a599aed77d6013dc25ab1dbf \
       com.xuanjun.parent-image=sha256:861161c201bdab8d2586bf32a746ca1f8b0e5998381a653568b557cf144540fb \
       com.xuanjun.change-scope=community-admin-owner-25-requirements
 USER 10001:1008
