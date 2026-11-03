@@ -21,7 +21,7 @@ test('native home/recommendations/profile tabs and entry navigation stay in the 
  const home=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
  const profile=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
- for(const label of ['查看当前门店介绍','浏览推荐与门店入口'])assert.ok(home.includes(label),label);
+ for(const label of ['搜索附近好店','继续查看门店'])assert.ok(home.includes(label),label);
  assert.ok(checkout.includes('发现邻里好店')&&checkout.includes('industry-tabs')&&checkout.includes('返回店铺列表'));
  const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(join.includes('wx:for="{{group.fields}}"'));assert.equal(join.includes('index===fieldCursor'),false,'original final design requires grouped fields, not a single-field carousel');
  assert.ok(profile.includes('我的订单'));assert.match(profile,/merchantEntryLabel/);const entryScript=fs.readFileSync(__dirname+'/pages/profile/index.js','utf8');for(const label of ['申请入驻','入驻进度','商家工作台'])assert.ok(entryScript.includes(label),label);

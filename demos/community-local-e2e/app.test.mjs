@@ -129,8 +129,8 @@ test('same order: earlier simulation success cannot resurrect after later query'
  assert.equal(ui.els.successAd.hidden,true);
 });
 
-const scopedStorefront={merchant:{name:"Shop A",description:"Intro",contact:"tel"},products:[{id:"p1",name:"Item A",sort:1}],
- ads:{AD_SLOT_PAYMENT_AMOUNT:{id:"ad1",title:"Approved A",url:"https://example.org/ad",slot:"AD_SLOT_PAYMENT_AMOUNT"},AD_SLOT_PAYMENT_SUCCESS:null},
+const scopedStorefront={merchant:{name:"Shop A",description:"Intro",contact:"tel"},products:[{id:"p1",name:"Item A",sort:1,description:"",image_name:"",image_data:""}],
+ ads:{AD_SLOT_PAYMENT_AMOUNT:{id:"ad1",title:"Approved A",url:"https://example.org/ad",slot:"AD_SLOT_PAYMENT_AMOUNT",image_data:""},AD_SLOT_PAYMENT_SUCCESS:null},
  simulation_only:true,provider_settlement_verified:false,escape_text_required:true};
 test('storefront load presents approved amount creative as text, never success ad',async()=>{
  const ui=setup(async(path)=>{assert.equal(path,"/demo/storefront");return ok(scopedStorefront);});

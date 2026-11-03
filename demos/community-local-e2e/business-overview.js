@@ -35,12 +35,15 @@
       ads.simulation_only!==true||ads.write_permissions!==false||typeof ads.has_more!=="boolean"||
       !Array.isArray(ads.campaigns)||ads.campaigns.length>50)throw Error("概览数据不可信");
    for(const campaign of ads.campaigns){
-    if(!keys(campaign,["id","slot","status","moderation","priority","version"])||
+    if(!keys(campaign,["id","title","target_url","slot","status","moderation","priority","starts_at","ends_at","version","image_name","image_data"])||
        typeof campaign.id!=="string"||! /^[A-Za-z0-9_-]{1,100}$/.test(campaign.id)||
+       typeof campaign.title!=="string"||typeof campaign.target_url!=="string"||
        !["AD_SLOT_PAYMENT_AMOUNT","AD_SLOT_PAYMENT_SUCCESS"].includes(campaign.slot)||
        !["DRAFT","REVIEW","APPROVED","ACTIVE","PAUSED","REJECTED","ARCHIVED"].includes(campaign.status)||
        !["PENDING","APPROVED","REJECTED"].includes(campaign.moderation)||
-       !Number.isSafeInteger(campaign.priority)||!Number.isSafeInteger(campaign.version))throw Error("广告数据不可信");
+       !Number.isSafeInteger(campaign.priority)||!Number.isSafeInteger(campaign.starts_at)||
+       !Number.isSafeInteger(campaign.ends_at)||!Number.isSafeInteger(campaign.version)||
+       typeof campaign.image_name!=="string"||typeof campaign.image_data!=="string")throw Error("广告数据不可信");
    }
    el("overviewOrders").textContent=states.map(k=>k+" "+orders.counts[k]).join(" · ");
    el("overviewRevenue").textContent="模拟订单合计 "+orders.order_total_minor+" 分；真实收入：未知";

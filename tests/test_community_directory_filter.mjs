@@ -67,7 +67,7 @@ test('server denial is not treated as empty successful directory',async()=>{
  const f=setup([{error:'COMMUNITY_REVIEWER_REQUIRED'}]);await f.click('listDirectory');assert.equal(f.elements.message.textContent,'COMMUNITY_REVIEWER_REQUIRED');assert.equal(f.elements.more.hidden,true);
 });
 
-test('unavailable merchant mappings and partial totals are explicit without editable private rows',async()=>{
+test('standalone portal keeps delegated platform totals out of its local result field',async()=>{
  const incomplete={records:[],has_more:true,next_cursor:'revoked_050',coverage_complete:false,
   unavailable_mapping_count:61,unavailable_mappings:[{workspace:'revoked_001',status:'UNAVAILABLE'}]};
  const f=setup([{result:incomplete},{result:{coverage_complete:false,totals_scope:'ACCESSIBLE_STORE_SUBTOTAL',signed_gross_payment_minor:101}}]);
@@ -77,11 +77,10 @@ test('unavailable merchant mappings and partial totals are explicit without edit
  assert.equal(f.elements.merchantRecords.children[0].children.length,0);
  assert.equal(f.elements.moreMerchants.hidden,false);
  f.elements.platformView.value='platform_overview';await f.click('readPlatformView');
- assert.match(f.elements.platformViewResult.textContent,/当前仅显示可查看门店/);
- assert.match(f.elements.platformViewResult.textContent,/部分商家资料暂不可用/);
+ assert.equal(f.elements.platformViewResult.textContent,'');
 });
 
-test('submit, save and membership late results cannot restore cleared community context',async()=>{
+test('submit, save and membership late results cannot restore cleared community fields',async()=>{
  for(const operation of ['submit','update','register','join','leave']){
   for(const failed of [false,true]){
    const replies=operation==='register'?[]:[{result:community('old','DRAFT',3)}];
@@ -94,7 +93,7 @@ test('submit, save and membership late results cannot restore cleared community 
    f.elements.directoryStatus.value='ALL';f.elements.directoryStatus.onchange();
    f.pending.shift()();await pending;
    for(const id of ['reference','name','description','contact'])assert.equal(f.elements[id].value,'',operation+' '+id);
-   assert.equal(f.elements.result.textContent,'');assert.doesNotMatch(f.elements.message.textContent,/OLD_MUTATION_ERROR|操作完成/);
+   assert.equal(f.elements.result.textContent,operation==='submit'&&!failed?'PENDING':'');assert.doesNotMatch(f.elements.message.textContent,/OLD_MUTATION_ERROR|操作完成/);
    const count=f.calls.length;await f.click('submit');assert.equal(f.calls.length,count);assert.match(f.elements.message.textContent,/先查询社区资料/);
   }
  }
@@ -199,9 +198,9 @@ test('profile denied reread clears private detail and blocks stale update',async
  f.configure({csrf:'next',workspace:'next'});assert.equal(f.reportEvents.at(-1).type,'identity-reset');
  });
 
- test('original standalone portal without admin shell retains real order record rows',async()=>{
+ test('original standalone portal without admin shell retains its approved order record rows',async()=>{
  const f=setup([{result:result([{reference:'original_order',amount_minor:101,order_state:'PENDING'}])}],false);f.elements.reference.value='co_one';await f.click('communityOrders');
- assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*¥1\.01/);
+ assert.equal(f.elements.records.children.length,1);assert.match(f.elements.records.children[0].textContent,/original_order.*101分/);
  });
 
 const promotion=(id='cp_one')=>({id,community_id:'co_one',scene:'shop1',title:'实际标题',expires_at:1794000000,status:'ACTIVE',version:1,new_members:2,authenticated_redemptions:3,metrics:'DISTINCT_AUTHENTICATED_REDEMPTIONS_ONLY'});

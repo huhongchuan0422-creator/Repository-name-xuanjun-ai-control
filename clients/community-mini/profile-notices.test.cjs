@@ -40,7 +40,7 @@ test('profile notices reject malformed records without exposing another payload'
 test('profile notice detail keeps a closed reactive read-state template',()=>{
  const wxml=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
  assert(wxml.includes('<view wx:if="{{noticeDetailOpen&&selectedNotice}}">'));
- assert(wxml.includes("<text>通知详情 · {{selectedNotice.read?'已读':'未读'}}</text>"));
+ assert(wxml.includes('<text>{{selectedNotice.message}}</text>'));
  assert(wxml.includes('wx:if="{{!selectedNotice.read}}"'));
  assert(wxml.includes('bindtap="markNoticeRead"'));
 });

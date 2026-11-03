@@ -182,7 +182,7 @@ class CommunityAdminAllPages(unittest.TestCase):
         visible_sources = '\n'.join((STAGE / name).read_text() for name in (
             'admin-shell.js', 'communities.js', 'onboarding.js'))
         for phrase in (
-            '最小货币单位', '查看分账快照', '当前权限', '工作区权限',
+            '最小货币单位', '查看分账快照', '工作区权限',
             '原映射', '当前版本CAS', '当前原', '真实回执', '真实回读',
             '当前社区版本', '版本0', '版本填0',
         ):

@@ -93,9 +93,9 @@ test('fresh page load and successful page revocation clear an existing current-s
   await p.onLoad({scene:'shop1',view:'recommendations'});assert.equal(p.data.sceneStorefront,null);await tick();p.setData({viewMode:'store-detail'});await p.loadSceneStorefront();assert.ok(p.data.sceneStorefront);
   p.customerSessionRevoked('fixture logout');assert.equal(p.data.sceneStorefront,null);assert.equal(p.data.detailState,'NOT_QUERIED');
 });
-test('original WXML keeps current-scene and approved public detail separate with honest failure and payment boundaries',()=>{
+test('approved WXML keeps current-scene and public detail separate with its current failure action',()=>{
   const text=fs.readFileSync(path.join(__dirname,'pages/checkout/index.wxml'),'utf8');
   assert.ok(text.includes("detailState==='READY'&&selectedRecommendation"));assert.ok(text.includes("detailState==='READY'&&sceneStorefront"));
-  assert.ok(text.includes('{{sceneStorefront.name}}'));assert.ok(text.includes('{{sceneStorefront.description}}'));assert.ok(text.includes('不代表资质、排名或开通支付'));
-  assert.ok(text.includes('店铺资料暂不可用，请返回列表刷新。'));assert.ok(text.includes('虚拟展示，不代表真实已入驻商家，不提供下单或支付。'));
+  assert.ok(text.includes('{{sceneStorefront.name}}'));assert.ok(text.includes('{{sceneStorefront.description}}'));assert.ok(text.includes('店铺资料暂时无法加载，请返回重试。'));
+  const detail=text.split("viewMode==='store-detail'")[1].split("viewMode==='orders'")[0];assert.ok(detail.includes('返回店铺列表'));assert.ok(!detail.includes('发起支付'));
 });

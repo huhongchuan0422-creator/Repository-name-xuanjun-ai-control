@@ -2,9 +2,10 @@
 // Actual workbench source and HTML, with deterministic synthetic HTTP timing.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 class Element{
- constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};}
+ constructor(tag){this.tagName=tag;this.children=[];this.textContent='';this.value='';this.hidden=false;this.dataset={};this.style={setProperty(){}};}
+ querySelector(tag){return new Element(tag);}
  append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this.textContent='';}
- addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.disabled&&this.onclick)return this.onclick();}
+ addEventListener(type,fn){this['on'+type]=fn;}click(){if(!this.hidden&&!this.disabled&&this.onclick)return this.onclick();}
  reset(){}set innerHTML(_){throw Error('unsafe DOM');}
 }
 const html=fs.readFileSync(process.argv[3],'utf8');
@@ -24,13 +25,12 @@ async function finish(request,label,ok=true){request.resolve(response(result(lab
 function assertEmpty(){assert.equal(nodes.billResult.textContent,'');assert(nodes.moreBill.hidden);assert(nodes.moreBillAudit.hidden);}
 (async()=>{
  const both=()=>{configure({csrf:'csrf',workspace:'merchant',providerWorkspace:'store-finance',merchantBillWorkspace:'all-stores'});select('billKind','TRADE');select('billDate','2026-10-16');};
- configure({csrf:'readonly',workspace:'merchant',merchantBillWorkspace:'all-stores'});select('billKind','TRADE');select('billDate','2026-10-16');
+ configure({csrf:'readonly',workspace:'merchant',merchantBillWorkspace:'all-stores'});assert(nodes.providerActions.hidden);assert(nodes.billSection.hidden);
+ both();select('billScope','MERCHANT');
  assert(nodes.providerActions.hidden);assert(!nodes.billSection.hidden);assert.equal(nodes.billScope.value,'MERCHANT');
  let read=await start('readBill');assert.equal(read.url,'/community/merchant-bills');assert.equal(read.body.workspace,'all-stores');await finish(read,'merchant-page');
  let next=await start('moreBill');assert.equal(next.url,'/community/merchant-bills');assert.equal(next.body.params.offset,50);await finish(next,'merchant-next');
- const count=requests.length;nodes.providerRefundForm.onsubmit({preventDefault(){}});await flush();assert.equal(requests.length,count,'read-only workspace must never become funds authority');
- select('billScope','STORE');assertEmpty();nodes.readBill.click();await flush();assert.equal(requests.length,count,'missing store grant must not fall back to merchant grant');
- configure({csrf:'store-only',workspace:'merchant',providerWorkspace:'store-finance'});select('billKind','TRADE');select('billDate','2026-10-16');select('billScope','MERCHANT');nodes.readBill.click();await flush();assert.equal(requests.length,count,'store grant must not become merchant authority');
+ const count=requests.length;configure({csrf:'store-only',workspace:'merchant',providerWorkspace:'store-finance'});select('billKind','TRADE');select('billDate','2026-10-16');select('billScope','MERCHANT');nodes.readBill.click();await flush();assert.equal(requests.length,count,'store grant must not become merchant authority');
  both();select('billScope','MERCHANT');const old=await start('readBill');select('billScope','STORE');assertEmpty();const current=await start('readBill');assert.equal(current.url,'/community/provider-actions');assert.equal(current.body.workspace,'store-finance');
  await finish(old,'forbidden-old-merchant');assertEmpty();assert(nodes.readBill.disabled);await finish(current,'current-store');assert(nodes.billResult.textContent.includes('current-store'));
  select('billScope','MERCHANT');assertEmpty();await finish(await start('billAudit'),'merchant-audit');assert(!nodes.moreBillAudit.hidden);

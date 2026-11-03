@@ -92,15 +92,16 @@ function validStorefront(data){
     !exact(data.merchant,["name","description","contact"])||
     Object.values(data.merchant).some(x=>typeof x!=="string"||x.length>2048)||
     !Array.isArray(data.products)||data.products.length>100||
-    data.products.some(x=>!x||typeof x!=="object"||Array.isArray(x)||!exact(x,["id","name","sort"])||
-      typeof x.id!=="string"||typeof x.name!=="string"||!Number.isInteger(x.sort))||
+    data.products.some(x=>!x||typeof x!=="object"||Array.isArray(x)||!exact(x,["id","name","sort","description","image_name","image_data"])||
+      typeof x.id!=="string"||typeof x.name!=="string"||!Number.isInteger(x.sort)||
+      typeof x.description!=="string"||typeof x.image_name!=="string"||typeof x.image_data!=="string")||
     !data.ads||typeof data.ads!=="object"||Array.isArray(data.ads)||!exact(data.ads,slots)||
     data.ads[slots[1]]!==null)throw Error("门店返回数据不可信");
  const ad=data.ads[slots[0]];
  if(ad!==null && (!ad||typeof ad!=="object"||Array.isArray(ad)||
-    !exact(ad,["id","title","url","slot"])||
+    !exact(ad,["id","title","url","slot","image_data"])||
     ad.slot!==slots[0]||typeof ad.title!=="string"||typeof ad.id!=="string"||
-    typeof ad.url!=="string"||ad.url.includes("\\")||/\s/.test(ad.url)||!/^https:\/\/[A-Za-z0-9.-]+(?:[:]\d+)?(?:\/[^\s]*)?$/.test(ad.url)))
+    typeof ad.image_data!=="string"||typeof ad.url!=="string"||ad.url.includes("\\")||/\s/.test(ad.url)||!/^https:\/\/[A-Za-z0-9.-]+(?:[:]\d+)?(?:\/[^\s]*)?$/.test(ad.url)))
     throw Error("广告返回数据不可信");
  return ad;
 }
