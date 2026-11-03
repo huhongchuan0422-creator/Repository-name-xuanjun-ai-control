@@ -2,8 +2,8 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "3ffbe59a838019d14738ffcc75b09fbd900bec91",
-  "baseline_source_tree": "1c9e16755ce7601f2f34be9874f1792046fcf0d3",
+  "baseline_source_commit": "69ca2ddb1a45d0e734dcde309981a841197ab9f4",
+  "baseline_source_tree": "b56d098310f92f3022294281aba07c61bb56c5af",
   "owner_amendment_id": "OWNER_ADMIN_17_REQUIREMENTS_18_PAGE_MODES_AND_MINI_6_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
