@@ -2,8 +2,8 @@
   "schema_version": 2,
   "project": "社区分账管理后台",
   "baseline_kind": "OWNER_REQUIRED_UI_BASELINE",
-  "baseline_source_commit": "69ca2ddb1a45d0e734dcde309981a841197ab9f4",
-  "baseline_source_tree": "b56d098310f92f3022294281aba07c61bb56c5af",
+  "baseline_source_commit": "f99da75e38800d92e393281561a3cf5b71a12b0e",
+  "baseline_source_tree": "e471aec819c149692270674ed3a43ab04a97f125",
   "owner_amendment_id": "OWNER_ADMIN_17_REQUIREMENTS_18_PAGE_MODES_AND_MINI_6_20261103",
   "change_policy": {
     "presentation_only_may_change_inventory": false,
@@ -81,7 +81,7 @@
     "demos/community-stage/web-session.js": "b875b58651d99abcf080c19110d0fed944b107b2ef1304ddd02ac4259ca65cfd",
     "demos/community-stage/workbench.css": "340c18ec3202e6a75d7fe3ca2ad744963fc36d1e491c91e98b8c6052e13015c7",
     "demos/community-stage/workbench.html": "15b167d00048e35ae7802362fd3d8cd8affe0e56acdd0afd379782bbb7ba93be",
-    "demos/community-stage/workbench.js": "0540ba4e85b593b166c31dde74d2935b6cfa5610956b01b1341fa0b8a060df49",
+    "demos/community-stage/workbench.js": "8fcca95d9ce4765a1988cd95a3f86592c18ca49ef6c73a735cc1ec23aad0fb0f",
     "scripts/community_web_entries.py": "964cf11e41997e19f217202094b3d87ee498fd0b51c9bcf37fe7e32d04db7702"
   }
 }
