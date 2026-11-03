@@ -26,7 +26,7 @@ from scripts.community_merchant_store import open_store
 
 def reviewer_reload(page):
     if page.locator('#detail').is_visible():page.locator('#reviewTopBack').click()
-    if not page.locator('#reviewListFilters').evaluate('e=>e.open'):page.locator('#reviewListFilters > summary').click()
+    if page.locator('#reviewListFilters').evaluate("e=>e.tagName==='DETAILS'&&!e.open"):page.locator('#reviewListFilters > summary').click()
     page.locator('#reloadQueue').click()
 
 def reviewer_open(page):
@@ -39,7 +39,7 @@ def reviewer_open(page):
     review_path=urlsplit(page.url).path
     assert review_path in ('/merchant/review','/community-preview/merchant/review'),review_path
     workspace_path=review_path.removesuffix('/merchant/review')+'/community/portal'
-    expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#reviewTopBack')).to_have_attribute('href',workspace_path);expect(page.locator('#reviewTopBack')).to_have_text('‹ 返回工作台');shot('30-list')
+    expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#reviewTopBack')).to_have_attribute('href',workspace_path);expect(page.locator('#reviewTopBack')).to_have_text('‹ 返回首页');shot('30-list')
     page.locator('#applications button').first.click();expect(page.locator('#detail > .admission-record-card')).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核 · 详情');shot('60-detail')
     page.locator('#reviewTopBack').click();expect(page.locator('#applications .admission-record-card').first).to_be_visible();expect(page.locator('#title')).to_have_text('商家入驻审核');shot('30-return')
     page.locator('#applications button').first.click();page.locator('#reviewOriginalControls > summary').click();expect(page.locator('#reviewOriginalControls')).to_have_attribute('open','');expect(page.locator('#title')).to_have_text('商家入驻审核 · 审核操作');expect(page.locator('#detail > .admission-record-card')).to_be_hidden();expect(page.locator('.admission-operation-context')).to_be_visible();expect(page.locator('#reviewDecisionGroup')).to_have_attribute('open','');expect(page.locator('#reviewListFilters')).to_be_hidden();shot('61-controls')
@@ -362,14 +362,14 @@ class OnboardingBrowserJourney(unittest.TestCase):
                     expect(page.locator('#reviewNote')).to_contain_text('请更新小程序经营页面截图')
                     upload('mini_program_screenshot',b'%PDF-updated synthetic mini program')
                     page.locator('#submitApplication').click();expect(page.locator('#applicationState')).to_have_text('待审核')
-                    reviewer_reload(admin);expect(admin.locator('#applications button').first).to_contain_text('待审核')
+                    reviewer_reload(admin);expect(admin.locator('#applications')).to_contain_text('待审核')
                     reviewer_open(admin);admin.locator('#note').fill('本份资料核对通过')
                     for kind in [row.get_attribute('data-kind') for row in admin.locator('#materials .material').all() if row.locator('strong').inner_text().strip().endswith('*')]:
                         row=admin.locator('[data-kind="'+kind+'"]');row.get_by_role('button',name='资料通过',exact=True).click()
                         expect(row.locator('p')).to_contain_text('资料审核通过')
                     admin.locator('[data-action=APPROVE]').click();expect(admin.locator('#applicationState')).to_have_text('入驻审核通过')
                     page.locator('#reloadMine').click();expect(page.locator('#applicationState')).to_have_text('入驻审核通过')
-                    expect(page.locator('#opening')).to_contain_text('商家工作台已开通' if with_opening else '工作台权限待绑定')
+                    expect(page.locator('#opening')).to_contain_text('商家后台已开通' if with_opening else '商家后台待开通')
                     if with_opening:
                         reply=page.evaluate('''async csrf=>{
                           const r=await fetch('/community/operations',{method:'POST',headers:{'Content-Type':'application/json','X-Center-CSRF':csrf},

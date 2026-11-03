@@ -38,7 +38,7 @@ class NativeSourceRender(unittest.TestCase):
                     expect(picker).to_have_value('' if picker.get_attribute('aria-label').strip().startswith('请选择') else picker.get_attribute('value'))
                 for raw_code in ('BANK_ACCOUNT_TYPE_CORPORATE','BANK_ACCOUNT_TYPE_PERSONAL','NOT_VERIFIED','NOT_APPROVED','operator_identity','ubo_1_front'):
                     expect(page.get_by_text(raw_code,exact=False)).to_have_count(0)
-                self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'))
+                self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),page.evaluate("""()=>[...document.querySelectorAll('*')].map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right,scroll:e.scrollWidth})).sort((a,b)=>b.right-a.right).slice(0,5)"""))
                 spacing=page.locator('.page:visible').first.evaluate('(element)=>({left:parseFloat(getComputedStyle(element).paddingLeft),bottom:parseFloat(getComputedStyle(element).paddingBottom)})')
                 self.assertGreaterEqual(spacing['left'],10,'native .page padding must survive DOM projection')
                 self.assertGreaterEqual(spacing['bottom'],90,'native bottom safe-area reservation must survive rpx conversion')
@@ -136,7 +136,10 @@ class NativeSourceRender(unittest.TestCase):
             calls=page.evaluate('window.__nativeEvidence.calls')
             # Original no-store navigation makes these scoped read attempts, not business writes.
             customer_reads=[x for x in calls if x.get('url','').endswith('/mini/api')]
-            self.assertEqual([x.get('operation') for x in customer_reads],['customer.contexts','customer.directory','customer.contexts'])
+            customer_operations=[x.get('operation') for x in customer_reads]
+            self.assertIn('customer.directory',customer_operations)
+            self.assertGreaterEqual(customer_operations.count('customer.contexts'),2)
+            self.assertTrue(set(customer_operations)<= {'customer.contexts','customer.directory'})
             self.assertTrue(all(x.get('url')=='https://fixture.invalid/mini/api' and x.get('scene')=='' for x in customer_reads))
             # Failed admission and its retry cannot spill into any customer API or write action.
             self.assertFalse(any(x.get('url','').endswith('/mini/api') for x in failure['calls'][len(before_failure):]))

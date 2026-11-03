@@ -174,7 +174,8 @@ class Contracts(unittest.TestCase):
         self.assertEqual(sdk,preview)
         base=dict(github=dict(event_name='workflow_dispatch',sha=CONTROL,ref='refs/heads/'+p.BRANCH,
            event={'head_commit':{'message':''}}),inputs=dict(preview_enabled=True,backend_image_enabled=False,
-           preview_source_sha=CONTROL,preview_evidence_run_id=str(p.PRODUCT_RUN),preview_target=p.PROFILE))
+           preview_source_sha=CONTROL,preview_evidence_run_id=str(p.PRODUCT_RUN),preview_target=p.PROFILE,
+           preview_product='legacy-4f'))
         cases=[dict(expected=True,**copy.deepcopy(base))]
         for key,value in [('preview_enabled',False),('backend_image_enabled',True),('preview_source_sha',p.PRODUCT_SHA),
                           ('preview_evidence_run_id','123'),('preview_target','legacy')]:

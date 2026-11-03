@@ -1,5 +1,5 @@
 /* Native projection of the original community UI palette, cards and line navigation. */
-page { background:#f4f7f5; color:#18382e; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; font-size:28rpx; line-height:1.6; }
+page { max-width:100%; overflow-x:hidden; background:#f4f7f5; color:#18382e; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; font-size:28rpx; line-height:1.6; }
 view,button,input,picker { box-sizing:border-box; }
 .page { padding:32rpx 28rpx calc(150rpx + env(safe-area-inset-bottom)); max-width:960rpx; margin:0 auto; }
 .brand { display:flex; justify-content:space-between; align-items:center; color:#1e6248; font-size:27rpx; font-weight:700; }

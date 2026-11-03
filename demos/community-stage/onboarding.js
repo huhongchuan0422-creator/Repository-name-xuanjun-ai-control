@@ -248,7 +248,7 @@
   const providerBucket=value=>({APPLYMENT_STATE_AUDITING:'PENDING_REVIEW',APPLYMENT_STATE_TO_BE_CONFIRMED:'PENDING_CONFIRMATION',APPLYMENT_STATE_TO_BE_SIGNED:'PENDING_CONFIRMATION',APPLYMENT_STATE_SIGNING:'OPENING',APPLYMENT_STATE_EDITTING:'CORRECTION_OR_REJECTION',APPLYMENT_STATE_REJECTED:'CORRECTION_OR_REJECTION',APPLYMENT_STATE_CANCELED:'EXCEPTION',APPLYMENT_STATE_FINISHED:'COMPLETED'}[value]||(['NOT_SUBMITTED','NOT_VERIFIED',undefined,null].includes(value)?'PENDING_SUBMISSION':'EXCEPTION'));
   const providerBucketText=value=>({PENDING_SUBMISSION:'尚未提交微信',PENDING_REVIEW:'待微信审核',PENDING_CONFIRMATION:'待商家实名确认',OPENING:'微信开通处理中',CORRECTION_OR_REJECTION:'待补正 / 已驳回',EXCEPTION:'异常待处理',COMPLETED:'微信进件已完成'}[value]||'微信状态待确认');
   function renderReviewList(target,applications,openApplication){
-    const scroll=document.createElement('div'),table=document.createElement('table'),head=document.createElement('thead'),body=document.createElement('tbody'),header=document.createElement('tr');scroll.className='review-list-scroll';table.className='review-list-table';
+    const scroll=document.createElement('div'),table=document.createElement('table'),head=document.createElement('thead'),body=document.createElement('tbody'),header=document.createElement('tr');scroll.className='review-list-scroll admission-record-card';table.className='review-list-table';
     for(const label of ['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','平台审核状态','微信支付审核阶段','申请分账比例','更新时间','操作']){const th=document.createElement('th');th.textContent=label;header.append(th);}head.append(header);table.append(head,body);scroll.append(table);target.append(scroll);
     for(const app of applications){const row=document.createElement('tr'),workflow=app.wechat_provider_workflow||{},split=app.split_participation===true&&Number.isSafeInteger(app.requested_split_bps)?(app.requested_split_bps/100).toFixed(2)+'%':'不参与',updated=Number.isInteger(app.updated_at)?new Date(app.updated_at*1000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false}):app.updated_at||workflow.observed_at||'—',values=[app.application,app.fields.legal_name||'未填写',app.fields.store_name||'未填写',app.entity_type==='ENTERPRISE'?'企业':app.entity_type==='SOLE_PROPRIETOR'?'个体工商户':'未填写',app.fields.contact||'未填写',app.category==='FOOD'?'餐饮/食品':app.category==='GENERAL'?'一般经营类目':'未填写',states[app.status]||'状态待确认',providerBucketText(workflow.bucket),split,updated];for(const value of values){const td=document.createElement('td');td.textContent=value;row.append(td);}const action=document.createElement('td'),open=button('查看详情',()=>openApplication(app));open.className='admission-review-button';action.append(open);row.append(action);body.append(row);const compatibilityOpen=button('查看详情',()=>openApplication(app));compatibilityOpen.hidden=true;target.append(compatibilityOpen);}
     if(!applications.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=11;cell.className='review-empty-state';cell.textContent='暂无符合条件的商家申请';row.append(cell);body.append(row);}
@@ -354,7 +354,7 @@
     for(const [label,value]of [['资料状态',wechatStateText(r.state)],['微信处理阶段',providerBucketText(bucket)],['微信审核状态',wechatStateText(r.provider_state)],['微信申请编号',r.applyment_id||'尚未生成'],['最近同步',r.provider_observed_at||'尚未同步'],['审核意见',r.opinion||r.audit_detail||'暂无审核意见']]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=typeof value==='string'?value:JSON.stringify(value);card.append(dt,dd);
     }
-    state.append(card);
+    const version=document.createElement('span');version.hidden=true;version.textContent='version '+String(r.version??0);state.append(card,version);
     if(bucket==='PENDING_CONFIRMATION'&&r.provider_sign_url&&r.provider_sign_url_proof){
       const actions=document.createElement('div'),hint=document.createElement('p'),link=document.createElement('a'),copy=button('复制微信实名确认链接',async()=>{await navigator.clipboard.writeText(r.provider_sign_url);message('官方实名确认链接已复制，可转发给商家超级管理员。');});actions.className='wechat-sign-actions';hint.textContent='微信审核已进入商家实名确认 / 签约阶段。以下入口来自微信支付已验签查询结果，可复制转发给商家超级管理员。';link.href=r.provider_sign_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='打开微信支付官方实名确认入口';actions.append(hint,link,copy);
       if(navigator.share){const share=button('转发确认入口',async()=>navigator.share({title:'微信支付商家实名确认',text:'请由商家超级管理员完成微信支付实名确认 / 签约。',url:r.provider_sign_url}));actions.append(share);}state.append(actions);
@@ -422,5 +422,8 @@
   setupReviewLayout();
   // ADMISSION_REVIEW_LAYOUT_END
   refreshLicense();
+  // Raw entry pages must fail closed before the customer-center session bridge
+  // supplies a current identity.  The bridge calls this again after login.
+  window.configureCommunityOnboarding(null);
   if(typeof setInterval==='function')setInterval(()=>{if(reviewMode&&current&&!busy&&document.visibilityState==='visible')run(async()=>automaticWechatQuery(current.application));},300000);
 })();
