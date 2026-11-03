@@ -8,6 +8,7 @@
  }
  const $=id=>document.getElementById(id);let epoch=0,config=null,busy=false,profileVersion=null,merchantProfile=null,orderCursor=null,orderAfter='',mallOrderCursor=null,mallOrderRows=[],reportCursor=null,reportWindow=null,adCursor=null,adCampaigns=[],adEditorImageData='',adEditorImageName='',adEditingCampaign=null,itemCursor=null,catalogItems=[],itemEditorImageData='',itemEditorImageName='',priceRecords=new Map(),pointsRevision=0,pointsControls=null,pointsLocked=false;
  document.body.classList.add('embedded-workbench');
+ const embeddedNotice=document.getElementById('notice');if(embeddedNotice)embeddedNotice.hidden=true;
  function installLocalLifeNavigation(){
   if(typeof document.querySelector!=='function'||typeof document.querySelectorAll!=='function')return;
   const sections=new Map();for(const section of document.querySelectorAll('#workbenchOriginalSections>section')){const title=section.querySelector('h2')?.textContent;if(title)sections.set(title,section);}
@@ -41,7 +42,7 @@
  $('fixedSplitForm').onsubmit=event=>{event.preventDefault();action(()=>saveBusinessSettings({mode:'FIXED',fixed_bps:Math.round(Number($('fixedSplitRate').value)*100)}));};
  $('tierSplitForm').onsubmit=event=>{event.preventDefault();action(()=>saveBusinessSettings({mode:'TIERS',split_tiers_bps:tierValues($('splitTierRows'))}));};
  $('savePointsTiers').onclick=()=>action(()=>saveBusinessSettings({points_tiers:tierValues($('pointsTierRows')).map(value=>value/100)}));
- const status=message=>{$('notice').textContent=message;};
+ const status=message=>{const notice=$('notice');if(embeddedMode&&message==='当前操作不可用，请联系管理员核对账号权限。'){notice.textContent='';notice.hidden=true;return;}notice.textContent=message;notice.hidden=!message;};
  window.configureCommunityWorkbench=value=>{pointsLocked=false;
   epoch++;config=value&&typeof value.csrf==='string'&&value.csrf&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{csrf:value.csrf,workspace:value.workspace,adminRoot:value.admin?.kind==='ROOT',providerWorkspace:typeof value.providerWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.providerWorkspace)?value.providerWorkspace:null,merchantBillWorkspace:typeof value.merchantBillWorkspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.merchantBillWorkspace)?value.merchantBillWorkspace:null}:null;
   clear();clearObservation();$('providerActions').hidden=true;$('billSection').hidden=true;$('financeNavigation').hidden=true;$('billScope').value=config?.providerWorkspace?'STORE':'MERCHANT';busy=false;financialMode='WORKBENCH';renderFinancialMode();window.syncCommunityWorkbenchView?.();for(const b of document.querySelectorAll('button'))b.disabled=!config;
