@@ -31,6 +31,6 @@ const configure=context.window.configureCommunityWorkbench,settingsCalls=()=>cal
  assert.equal(nodes.items.children.length,2);assert(!nodes.items.children.some(node=>String(node.textContent).includes('Private')));assert(nodes.moreItems.hidden);assert(nodes.loadSettings.disabled);
  for(const call of calls){assert.equal(call.body.workspace,'merchant');assert.equal(call.options.headers['X-CSRF-Token'],'original-csrf');assert.equal(call.options.credentials,'same-origin');}
  const source=fs.readFileSync(process.argv[2],'utf8');
- assert(source.includes("history.replaceState(null,'','#advertising');selectWorkbenchView();if(window.parent!==window)window.parent.location.hash='merchant-workbench=advertising'"),'successful ad save must return the embedded and parent shells to the ad list');
+ assert(source.includes("history.replaceState(null,'','#advertising');window.syncCommunityWorkbenchView?.();if(window.parent!==window)window.parent.location.hash='merchant-workbench=advertising'"),'successful ad save must return the embedded and parent shells to the ad list');
  assert(!source.match(/innerHTML|localStorage|sessionStorage/));console.log('Workbench original catalog pagination DOM: PASS');
 })().catch(error=>{console.error(error);process.exitCode=1;});
