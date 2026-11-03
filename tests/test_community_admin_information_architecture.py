@@ -209,7 +209,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn("merchantReviewNav.textContent='商家审核'", shell)
         self.assertIn("merchantReviewNav.addEventListener('click',openMerchantReview)", shell)
         self.assertIn("merchantReviewFrame.src='/community-preview/merchant/review?embedded=1'", shell)
-        self.assertIn("function merchantReviewAllowed(){return !!homeContext?.reviewer;}", shell)
+        self.assertIn("function merchantReviewAllowed(){return !!homeContext?.reviewer||platformOwnerHome()||rootAuthority();}", shell)
         self.assertIn("function openMerchantReview(){if(!merchantReviewAllowed())return", shell)
         self.assertIn("merchantReviewNav.hidden=!merchantReviewAllowed()", shell)
         self.assertIn("if(!merchantReviewFrame.isConnected)merchantReviewPanel.append(merchantReviewFrame)", shell)
