@@ -105,7 +105,7 @@ class CenterCommunities:
 
     @community_route('/community/directory')
     def dispatch(self, session, csrf, body):
-        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('platform_overview','platform_orders','platform_customers','platform_audit'):
+        if type(body) is dict and set(body)=={'workspace','operation','params'} and type(body['operation']) is str and body['operation'] in ('platform_overview','platform_orders','platform_customers','platform_customer_update','platform_audit'):
             if self.commerce is None:raise PermissionError('ORIGINAL_COMMUNITY_COMMERCE_REQUIRED')
             from scripts.community_platform_views import PlatformViews
             return PlatformViews(self).dispatch(session,csrf,body)

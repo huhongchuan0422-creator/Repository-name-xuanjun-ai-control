@@ -412,12 +412,12 @@
 <div id="pointsResult" role="status"></div>
 </section>
 <section id="split-settings">
-<header class="management-page-heading"><div><small>系统设置</small><h2>微信支付分账设置</h2><p>管理接收方、比例和不可变规则版本；打开页面不会自动发起分账。</p></div></header>
-<p id="splitSettingsStatus" class="ad-provider-note">正在核对微信分账设置。</p>
+<header class="management-page-heading"><div><h2>分账配置</h2><p>选择平台统一比例，或维护商家入驻时可自愿选择的比例档次。</p></div></header>
+<p id="splitSettingsStatus" class="settings-save-status" role="status"></p>
 <div class="split-mode-settings" id="splitModeSettings">
-<fieldset><legend>分账比例模式</legend><label><input type="radio" name="splitMode" value="FIXED" checked> 平台统一固定比例</label><label><input type="radio" name="splitMode" value="TIERS"> 商家申请时自愿选择档次</label></fieldset>
-<form id="fixedSplitForm"><label>固定分账比例（%）<input id="fixedSplitRate" type="number" min="0.01" max="100" step="0.01" required></label><button type="submit" class="primary-action">保存固定比例</button></form>
-<form id="tierSplitForm" hidden><div class="tier-setting-header"><strong>可选分账档次</strong><button id="addSplitTier" type="button">增加档次</button></div><div id="splitTierRows"></div><p>商家在入驻申请时自行选择一个档次，平台不会替商家统一切换。</p><button type="submit" class="primary-action">保存可选档次</button></form>
+<fieldset class="split-mode-cards"><legend>选择分账模式</legend><label class="split-mode-card"><input type="radio" name="splitMode" value="FIXED" checked><span><strong>平台统一固定比例</strong><small>所有新分账规则使用同一个平台比例</small></span></label><label class="split-mode-card"><input type="radio" name="splitMode" value="TIERS"><span><strong>商家自愿选择档次</strong><small>商家在入驻申请时自行选择可用档次</small></span></label></fieldset>
+<form id="fixedSplitForm" class="split-mode-panel"><div><strong>固定分账比例</strong><p>填写平台统一执行的比例。</p></div><label>比例（%）<input id="fixedSplitRate" type="number" min="0.01" max="100" step="0.01" required></label><button type="submit" class="primary-action">保存</button></form>
+<form id="tierSplitForm" class="split-mode-panel split-tier-panel" hidden><div class="tier-setting-header"><div><strong>可选分账档次</strong><p>商家入驻时自行选择，平台不会批量改写已生效档次。</p></div><button id="addSplitTier" type="button">增加档次</button></div><div id="splitTierRows" class="split-tier-list"></div><button type="submit" class="primary-action">保存档次</button></form>
 </div>
 <div id="pointsTierSettings" class="points-tier-settings"><h3>积分抵扣档次</h3><p>平台只维护商家申请时可选择的抵扣档次，不替已入驻商家强制选择。</p><div id="pointsTierRows"></div><button id="addPointsTier" type="button">增加档次</button><button id="savePointsTiers" type="button" class="primary-action">保存抵扣档次</button></div>
 <div class="settings-action-grid"><button id="openSplitRules" type="button"><strong>分账规则设置</strong><span>维护接收方、比例与规则版本</span></button><button id="openSplitRecords" type="button"><strong>分账记录</strong><span>回读微信侧处理记录与当前状态</span></button></div>

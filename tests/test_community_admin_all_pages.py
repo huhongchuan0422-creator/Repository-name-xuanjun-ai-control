@@ -294,6 +294,24 @@ class CommunityAdminAllPages(unittest.TestCase):
         self.assertNotIn("'待查询'", workbench)
         self.assertNotIn("'账号、门店与业务范围'", workbench)
 
+    def test_owner_user_list_and_revenue_amendments_are_real_wired_pages(self):
+        shell = (STAGE / 'admin-shell.js').read_text()
+        directory = (ROOT / 'scripts' / 'community_center_communities.py').read_text()
+        views = (ROOT / 'scripts' / 'community_platform_views.py').read_text()
+        inventory = (ROOT / 'scripts' / 'community_admin_route_inventory.py').read_text()
+        for label in ('用户编号','用户名称','用户类型','消费金额','积分余额','关联订单','推荐人','状态','操作'):
+            self.assertIn(label, shell)
+        self.assertIn("open.textContent='查看';edit.textContent='编辑'", shell)
+        self.assertIn("operation:'platform_customer_update'", shell)
+        self.assertIn("用户资料已保存并回读。", shell)
+        self.assertIn("'platform_customer_update'", directory)
+        self.assertIn("elif op=='platform_customer_update'", views)
+        self.assertIn("'platform_customer_update'", inventory)
+        self.assertIn("reportQuery.className='management-filter-bar report-filter-bar'", shell)
+        self.assertIn("reportSearch.textContent='查询'", shell)
+        self.assertNotIn("reportReference", shell)
+        self.assertIn("reportRoute==='revenue'?'暂无分账记录':'暂无记录'", shell)
+
 
 if __name__ == '__main__':
     unittest.main()

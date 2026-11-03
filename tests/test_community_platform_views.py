@@ -40,14 +40,26 @@ class PlatformViewJourney(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'UNREADABLE_ORDER_EVIDENCE_RECONCILIATION_DENIED'):
             self.call('platform_overview',{})
 
-    def test_project_users_no_credentials_contact_or_global_search(self):
+    def test_project_users_have_editable_profile_without_credentials_or_global_search(self):
         fx=self.fx.fx
         other,_=fx.account('unrelated@example.org')
         result=self.call('platform_customers',dict(after_id=''))
         self.assertEqual({r['user_id'] for r in result['records']},{fx.uid1,fx.uid2});self.assertNotIn(other,{r['user_id'] for r in result['records']})
         for row in result['records']:
-            for field in ('email','password','openid','contact','salt'):self.assertNotIn(field,row)
+            for field in ('email','password','openid','salt'):self.assertNotIn(field,row)
+            self.assertIn('contact',row);self.assertIn('profile_version',row)
         with self.assertRaises(PermissionError):self.call('platform_customers',dict(after_id=''),workspace='customer')
+    def test_platform_owner_updates_user_profile_with_versioned_readback(self):
+        before=self.call('platform_customers',dict(after_id=''))
+        row=next(item for item in before['records'] if item['user_id']==self.fx.fx.uid1)
+        saved=self.call('platform_customer_update',dict(user_id=row['user_id'],nickname='社区用户一',contact='13800000000',expected_version=row['profile_version']))
+        self.assertEqual(saved['version'],row['profile_version']+1)
+        readback=next(item for item in self.call('platform_customers',dict(after_id=''))['records'] if item['user_id']==row['user_id'])
+        self.assertEqual((readback['nickname'],readback['contact'],readback['profile_version']),('社区用户一','13800000000',saved['version']))
+        with self.assertRaisesRegex(ValueError,'VERSION_CHANGED'):
+            self.call('platform_customer_update',dict(user_id=row['user_id'],nickname='stale',contact='',expected_version=row['profile_version']))
+        with self.assertRaises(PermissionError):
+            self.fx.call('platform_customer_update',dict(user_id=self.fx.fx.uid2,nickname='denied',contact='',expected_version=0),workspace='reviewer',web=self.fx.reviewer)
     def test_audit_page_authorization_and_cursor_validation(self):
         self.call('platform_overview',{})
         logs=self.call('platform_audit',dict(after_id=0))
