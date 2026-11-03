@@ -191,6 +191,13 @@
    platformPage=r.has_more?{operation,params:{...params,after_id:r.next_cursor}}:null;$('morePlatformView').hidden=!platformPage;
   }catch(error){if(current())clearPlatformView();throw error;}
  }
+ window.communityUpdatePlatformCustomer=async params=>{
+  if(!auth)throw Error('需要客户中心登录');
+  if(busy)throw Error('正在处理上一项操作，请稍后重试。');
+  const t=epoch,selection=platformSelection,key=platformSelectionKey();busy=true;
+  try{const result=await call('platform_customers',params,t);if(t!==epoch||selection!==platformSelection||key!==platformSelectionKey())throw Error('页面范围已变化，请重新查询后编辑。');return result;}
+  finally{if(t===epoch)busy=false;}
+ };
  $('readPlatformView').onclick=()=>action(t=>{const op=$('platformView').value;const params=op==='platform_overview'?{}:op==='platform_orders'?{after_id:0,status:$('platformOrderStatus').value}:{after_id:op==='platform_audit'?0:''};return platformView(t,op,params);});
  $('morePlatformView').onclick=()=>action(t=>platformPage&&platformView(t,platformPage.operation,platformPage.params));
  window.configureCommunityPortal(null);
