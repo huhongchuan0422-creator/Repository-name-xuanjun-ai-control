@@ -26,6 +26,12 @@ test('native home/recommendations/profile tabs and entry navigation stay in the 
  const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(join.includes('wx:for="{{group.fields}}"'));assert.equal(join.includes('index===fieldCursor'),false,'original final design requires grouped fields, not a single-field carousel');
  assert.ok(profile.includes('我的订单'));assert.match(profile,/merchantEntryLabel/);const entryScript=fs.readFileSync(__dirname+'/pages/profile/index.js','utf8');for(const label of ['申请入驻','入驻进度','商家工作台'])assert.ok(entryScript.includes(label),label);
 });
+test('merchant admission bootstrap stays compatible with real-device WeChat runtimes',()=>{
+ const script=fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8');
+ const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.doesNotMatch(script,/\?\.|\.flatMap\(|Object\.fromEntries\(/);
+ for(const percent of [10,20,25,30])assert.ok(markup.includes('application&&application.redemption_percent==='+percent));
+});
 test('dirty admission draft requires explicit save-or-stay before navigation',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  f.page.input({currentTarget:{dataset:{path:'business_info.merchant_shortname'}},detail:{value:'Unsaved Shop'}});
