@@ -294,6 +294,29 @@ class CommunityAdminAllPages(unittest.TestCase):
         self.assertNotIn("'待查询'", workbench)
         self.assertNotIn("'账号、门店与业务范围'", workbench)
 
+    def test_owner_user_list_and_revenue_amendments_are_real_wired_pages(self):
+        shell = (STAGE / 'admin-shell.js').read_text()
+        portal = (STAGE / 'communities.js').read_text()
+        directory = (ROOT / 'scripts' / 'community_center_communities.py').read_text()
+        views = (ROOT / 'scripts' / 'community_platform_views.py').read_text()
+        inventory = (ROOT / 'scripts' / 'community_admin_route_inventory.py').read_text()
+        for label in ('用户编号','用户名称','用户类型','消费金额','积分余额','关联订单','推荐人','状态','操作'):
+            self.assertIn(label, shell)
+        self.assertIn("open.textContent='查看';edit.textContent='编辑'", shell)
+        self.assertIn("communityUpdatePlatformCustomer({user_id:record.user_id", shell)
+        self.assertIn("window.communityUpdatePlatformCustomer=async params=>", portal)
+        self.assertIn("用户资料已保存并回读。", shell)
+        self.assertIn("'platform_customers'", directory)
+        self.assertIn("elif customer_update", views)
+        self.assertNotIn("'platform_customer_update'", inventory)
+        self.assertIn("reportQuery.className='management-filter-bar report-filter-bar'", shell)
+        self.assertIn("reportSearch.textContent='查询'", shell)
+        self.assertNotIn("reportReference", shell)
+        self.assertNotIn("暂无分账记录", shell)
+        self.assertIn("cell.textContent=message||'当前条件下无记录'", shell)
+        self.assertIn("memberQueryDisclosure.hidden=true", shell)
+        self.assertIn("orderQuery.hidden=users", shell)
+
 
 if __name__ == '__main__':
     unittest.main()

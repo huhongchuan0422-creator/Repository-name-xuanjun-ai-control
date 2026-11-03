@@ -60,6 +60,7 @@
  for(const op of ['join','leave'])$(op).onclick=()=>action(t=>communityResult(t,op,{community_id:id(),kind:$('kind').value}));
  $('memberCommunityReference').oninput=()=>{$('reference').value=$('memberCommunityReference').value;$('reference').oninput();};
  $('queryMerchantMembers').onclick=()=>action(t=>list(t,'members',{community_id:id(),after_id:''},true));
+ window.communityQueryCurrentMerchantMembers=()=>action(async t=>{const mine=await call('mine',{},t);if(t!==epoch)return;if(!Array.isArray(mine.records)||mine.records.length!==1)throw Error('当前账号未找到唯一社区管理范围。');const communityId=mine.records[0].id;$('memberCommunityReference').value=communityId;$('reference').value=communityId;return list(t,'members',{community_id:communityId,after_id:''},true);},'商家列表已查询');
  $('members').onclick=()=>action(t=>list(t,'members',{community_id:id(),after_id:''}));
  window.communityReadReview=reference=>{if(busy)return;reviewSelection=reference;return action(t=>readCommunity(t,reference));};
  $('review').onclick=()=>action(t=>communityResult(t,'review',{community_id:id(),expected_version:version(),decision:$('decision').value,opinion:$('opinion').value}));
@@ -191,6 +192,13 @@
    platformPage=r.has_more?{operation,params:{...params,after_id:r.next_cursor}}:null;$('morePlatformView').hidden=!platformPage;
   }catch(error){if(current())clearPlatformView();throw error;}
  }
+ window.communityUpdatePlatformCustomer=async params=>{
+  if(!auth)throw Error('需要客户中心登录');
+  if(busy)throw Error('正在处理上一项操作，请稍后重试。');
+  const t=epoch,selection=platformSelection,key=platformSelectionKey();busy=true;
+  try{const result=await call('platform_customers',params,t);if(t!==epoch||selection!==platformSelection||key!==platformSelectionKey())throw Error('页面范围已变化，请重新查询后编辑。');return result;}
+  finally{if(t===epoch)busy=false;}
+ };
  $('readPlatformView').onclick=()=>action(t=>{const op=$('platformView').value;const params=op==='platform_overview'?{}:op==='platform_orders'?{after_id:0,status:$('platformOrderStatus').value}:{after_id:op==='platform_audit'?0:''};return platformView(t,op,params);});
  $('morePlatformView').onclick=()=>action(t=>platformPage&&platformView(t,platformPage.operation,platformPage.params));
  window.configureCommunityPortal(null);
