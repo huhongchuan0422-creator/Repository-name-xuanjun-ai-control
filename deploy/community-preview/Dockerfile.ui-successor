@@ -1,4 +1,4 @@
-FROM community-admin-base:003fb545
+FROM community-admin-base:8adb58be
 ARG OWNER_UI_CONTRACT_SHA256
 USER root
 COPY deploy/community-preview/successor-wheels /build/successor-wheels
