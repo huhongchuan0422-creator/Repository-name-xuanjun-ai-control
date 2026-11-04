@@ -28,8 +28,7 @@ class BrowserEntries(unittest.TestCase):
                 self.assertEqual(errors,[])
                 self.assertTrue(all(path.startswith(PREFIX+'/') for path in requests))
                 self.assertFalse(any(path.endswith('/operations') for path in requests))
-                self.assertTrue(operations)
-                self.assertTrue(all(operation=='catalog' for operation in operations))
+                self.assertEqual(operations,[])
                 self.assertEqual(page.evaluate('typeof window.configureCommunityWorkbench'),'function')
             finally:browser.close()
 
