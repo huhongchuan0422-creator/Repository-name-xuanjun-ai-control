@@ -1,0 +1,62 @@
+name: P3 exact carrier publication and gates
+
+on:
+  push:
+    branches:
+      - bootstrap/p3-exact-831174-publish-20261104
+
+permissions:
+  contents: write
+
+jobs:
+  publish-and-test-exact-carrier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TARGET_SHA: 831174b4def3bf3c7dd712552ef006f1a932d5a3
+      TARGET_TREE: 2135841d5c2aee75d02a07788cb476b148cbaf80
+      TARGET_REF: refs/heads/feature/p3-lifecycle-fixed-carrier-831174b-20261104
+      BUNDLE_SHA256: 97beccf57c8681e0938d724a1564318548054cd2fccea8f530a3bcf9543f16ad
+      MANIFEST_SHA256: 4c3d36b6fba8f16cb00840df7d342f787ad792a46589521d35b006608d0bc661
+      ARCHIVE_SHA256: 76e85d98608d9113bc563a50ea09848772f9a6b8e3f52dd2abaf17354aaedea5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify exact reviewed bundle and materialize carrier
+        run: |
+          set -euo pipefail
+          bundle="$GITHUB_WORKSPACE/deliveries/p3-exact-831174b/p3-successor-831174b.bundle"
+          test "$(sha256sum "$bundle" | cut -d' ' -f1)" = "$BUNDLE_SHA256"
+          root="$RUNNER_TEMP/p3-carrier"
+          git clone -q "$bundle" "$root"
+          test "$(git -C "$root" rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(git -C "$root" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+          test "$(sha256sum "$root/CARRIER_MANIFEST.json" | cut -d' ' -f1)" = "$MANIFEST_SHA256"
+          echo "P3_ROOT=$root" >> "$GITHUB_ENV"
+      - name: Run exact carrier gates
+        run: |
+          set -euo pipefail
+          cd "$P3_ROOT"
+          git diff --check HEAD^ HEAD
+          sha256sum -c SHA256SUMS
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Publish exact immutable commit object once
+        run: |
+          set -euo pipefail
+          cd "$P3_ROOT"
+          git remote set-url origin "https://github.com/$GITHUB_REPOSITORY"
+          git config --local http.https://github.com/.extraheader "$(git -C "$GITHUB_WORKSPACE" config --local --get http.https://github.com/.extraheader)"
+          current="$(git ls-remote --heads origin "$TARGET_REF" | awk '{print $1}')"
+          if test -n "$current"; then
+            test "$current" = "$TARGET_SHA"
+          else
+            git push origin "$TARGET_SHA:$TARGET_REF"
+          fi
+          test "$(git ls-remote --heads origin "$TARGET_REF" | awk '{print $1}')" = "$TARGET_SHA"
+          {
+            echo "P3 exact carrier published and tested"
+            echo "- commit: `$TARGET_SHA`"
+            echo "- tree: `$TARGET_TREE`"
+            echo "- ref: `$TARGET_REF`"
+            echo "- manifest sha256: `$MANIFEST_SHA256`"
+            echo "- archive sha256: `$ARCHIVE_SHA256`"
+          } >> "$GITHUB_STEP_SUMMARY"
