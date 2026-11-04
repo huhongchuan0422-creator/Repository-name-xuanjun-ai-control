@@ -35,7 +35,7 @@ test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainer
 test "$(docker image inspect --format '{{.Config.User}}' "$candidate_image")" = 10001:1008
 
 rollback_install(){
-  rc=$?
+  rc=${1:-1}
   set +e
   if [ "$renamed" = 1 ]; then
     rollback_ok=1
@@ -62,7 +62,9 @@ rollback_install(){
   fi
   exit "$rc"
 }
-trap rollback_install ERR INT TERM
+trap 'rollback_install $?' ERR
+trap 'rollback_install 130' INT
+trap 'rollback_install 143' TERM
 
 docker rename "$target" "$rollback"
 renamed=1

@@ -48,11 +48,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify fixed installer
         run: |
-          test "$(sha256sum delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh | awk '{print $1}')" = 8f1f974bf0340fdd98b4299add1e34928f5efce5d1dfd6d0a55edccb9c76f155
+          test "$(sha256sum delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh | awk '{print $1}')" = 1df8323aafd759cb318fe975cc418f057c72f07fbf8fc4b278c86c1ad930a895
           bash -n delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
+          grep -Fqx "trap 'rollback_install \$?' ERR" delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
+          grep -Fqx "trap 'rollback_install 130' INT" delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
+          grep -Fqx "trap 'rollback_install 143' TERM" delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: reviewed-community-f66ae300-installer-8f1f974b
+          name: reviewed-community-f66ae300-installer-1df8323a
           path: delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
           if-no-files-found: error
           retention-days: 3
