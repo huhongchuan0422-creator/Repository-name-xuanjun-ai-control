@@ -229,7 +229,7 @@ def identity(env):
             'CURRENT_PRODUCT_SOURCE_CHANGED')
     prepared = {name: digest for name, digest in actual.items() if not name.endswith('.test.cjs')}
     prepared['app.js'] = value['connected_app_sha256']
-    require(len(prepared) == 36, 'CURRENT_PREPARED_SOURCE_SET_REQUIRED')
+    require(len(prepared) == 40, 'CURRENT_PREPARED_SOURCE_SET_REQUIRED')
     return {'product_source_sha': PRODUCT_SOURCE_SHA, 'control_source_sha': value['control_source_sha'],
             'source_root': str(destination), 'prepared_files': prepared, 'fixed_product': True,
             'backend_source_sha': BACKEND_SOURCE_SHA, 'compatibility': COMPATIBILITY}
