@@ -66,6 +66,6 @@ const save=async()=>{nodes.wechatProfile.onsubmit({preventDefault(){}});await fl
  const sync=nodes.wechatMedia.children.find(e=>e.textContent==='同步已上传的经营者证件正面');sync.click();await flush();edit('subject_info.identity_info.id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');pending(reply({media_id:'stale-media'}));await flush();assert.equal(control('subject_info.identity_info.id_card_info.id_card_copy').value,'');await save();assert(!JSON.stringify(profile).includes('stale-media'));
  // Legal contact clears obsolete operator references; passport clears reverse reference only.
  profile={contact_info:{contact_type:'SUPER',contact_id_doc_type:'IDENTIFICATION_TYPE_IDCARD',contact_id_doc_copy:'front',contact_id_doc_copy_back:'back'},subject_info:{}};await read();edit('contact_info.contact_type','LEGAL');await save();assert(!profile.contact_info.contact_id_doc_copy);assert(app.materials.ubo_1_back);
- denied=true;nodes.wechatRead.click();await flush();assert(nodes.status.textContent.includes('请先登录客户中心'));
+ denied=true;nodes.wechatRead.click();await flush();assert(nodes.status.textContent.includes('当前账号暂无商家审核权限'));
  console.log('conditional materials DOM PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});
