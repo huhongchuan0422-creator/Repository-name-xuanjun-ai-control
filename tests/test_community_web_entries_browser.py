@@ -25,11 +25,12 @@ class BrowserEntries(unittest.TestCase):
                     page.goto('https://uk.wenwenwenyiyiyi.work'+PREFIX+path)
                     self.assertEqual(page.get_by_role('navigation',name='角色入口',exact=True).count(),0)
                     self.assertTrue(page.locator('h1:visible,h2:visible').first.is_visible())
+                    if path=='/merchant/workbench':
+                        self.assertEqual(page.evaluate('typeof window.configureCommunityWorkbench'),'function')
                 self.assertEqual(errors,[])
                 self.assertTrue(all(path.startswith(PREFIX+'/') for path in requests))
                 self.assertFalse(any(path.endswith('/operations') for path in requests))
                 self.assertEqual(operations,[])
-                self.assertEqual(page.evaluate('typeof window.configureCommunityWorkbench'),'function')
             finally:browser.close()
 
 if __name__=='__main__':unittest.main()
