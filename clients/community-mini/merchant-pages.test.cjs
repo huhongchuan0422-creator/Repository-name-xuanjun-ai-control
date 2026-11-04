@@ -32,6 +32,15 @@ test('merchant admission bootstrap stays compatible with real-device WeChat runt
  assert.doesNotMatch(script,/\?\.|\.flatMap\(|Object\.fromEntries\(/);
  for(const percent of [10,20,25,30])assert.ok(markup.includes('application&&application.redemption_percent==='+percent));
 });
+test('merchant admission registers a visible page before loading optional form dependencies',async()=>{
+ const script=fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8');let definition;
+ vm.runInNewContext(script,{Page:value=>definition=value,require:path=>{if(path==='../../session')return {parseScene(){},getSharedSession(){},customerError(){}};if(path==='../../customer-auth')return {current:()=>1};throw Error('synthetic dependency load failure');}});
+ assert.ok(definition&&definition.data&&definition.data.steps.length===4);
+ const page={...definition,data:structuredClone(definition.data),setData(value){Object.assign(this.data,value);}};
+ await page.onLoad({});
+ assert.match(page.data.status,/页面组件加载失败/);
+ assert.equal(page.data.pending,false);
+});
 test('dirty admission draft requires explicit save-or-stay before navigation',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  f.page.input({currentTarget:{dataset:{path:'business_info.merchant_shortname'}},detail:{value:'Unsaved Shop'}});
