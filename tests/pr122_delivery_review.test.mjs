@@ -36,3 +36,27 @@ test('delivery requires acceptance and real release, public cases additionally r
  assert.equal(projectProjection({projects:[{...p,showcase:null}]}).cases.length,0);
  assert.equal(projectProjection({projects:[{...p,delivery:{...p.delivery,release_ref:''}}]}).developing.length,1);
 });
+
+test('dynamic directory reads fresh managed links and preserves actual stage source',async()=>{
+ const {loadPublicDirectory}=await import('../demos/pr122-delivery-review/project-projection.mjs');
+ const requests=[];const directory=await loadPublicDirectory(async(path,options)=>{
+  requests.push([path,options]);return response(path.includes('/delivery/')?{schema:1,source:'SHOWCASE_CONTROLLED_DISPLAY_METADATA',revision:2,projects:[{id:'shiliu-media',title:'拾陆传媒',listed:true,public_consent_ref:'owner-fixture',source_project_id:'original-project',preview_url:'https://example.com/new',content_kind:'SAMPLE_DATA_PROTOTYPE',preview_access:'UNVERIFIED'}]}:{schema:1,projects:[{project_id:'original-project',visibility:'PUBLIC',state:'DEVELOPING'}]});
+ });
+ assert.equal(directory.projects[0].phase,'DEVELOPING');assert.equal(directory.projects[0].preview_url,'https://example.com/new');
+ assert.ok(requests.every(([,o])=>o.credentials==='omit'&&o.cache==='no-store'));
+});
+test('dynamic source never includes private projects and explicit unlisting wins',async()=>{
+ const {loadPublicDirectory}=await import('../demos/pr122-delivery-review/project-projection.mjs');
+ const directory=await loadPublicDirectory(async path=>response(path.includes('/delivery/')?{schema:1,source:'SHOWCASE_CONTROLLED_DISPLAY_METADATA',projects:[],unlisted_project_ids:['public-project']}:{schema:1,projects:[{project_id:'private-project',visibility:'PRIVATE',pages:[{href:'/private/',visibility:'PUBLIC'}]},{project_id:'public-project',visibility:'PUBLIC',pages:[{href:'/old-preview/',visibility:'PUBLIC'}]}]}));
+ assert.deepEqual(directory.projects,[]);
+});
+test('dynamic link is a normal public preview, not a template allowlist or login bypass',async()=>{
+ const {previewUrl,loadPublicDirectory}=await import('../demos/pr122-delivery-review/project-projection.mjs');
+ assert.equal(previewUrl('https://another-client.example/review'),'https://another-client.example/review');
+ for(const value of ['javascript:alert(1)','//other.example','https://u:p@example.org','http://example.org'])assert.equal(previewUrl(value),null);
+ await assert.rejects(loadPublicDirectory(async()=>({ok:false,status:503})),/尚未接通/);
+});
+test('unavailable management source cannot resurrect a previously unlisted project',async()=>{
+ const {loadPublicDirectory}=await import('../demos/pr122-delivery-review/project-projection.mjs');
+ await assert.rejects(loadPublicDirectory(async path=>path.includes('/delivery/')?{ok:false,status:503}:response({schema:1,projects:[{project_id:'old',visibility:'PUBLIC',pages:[{href:'/old/',visibility:'PUBLIC'}]}]})),/未回退/);
+});

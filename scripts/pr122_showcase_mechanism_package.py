@@ -24,8 +24,8 @@ def code_files():
     return sorted(seen)
 
 def build(output,commit):
-    names=code_files()+['deploy/pr122-showcase/'+name for name in ('locations.conf','xuanjun-showcase-publish.service','xuanjun-showcase-publish.timer','xuanjun-showcase-build.service','build-channel','build-sudoers','policy.example.json')]
-    names+=['.github/workflows/pr122-showcase-protected-builder.yml','.github/workflows/pr122-site-hub-preflight.yml','.github/workflows/pr122-showcase-review-event.yml','docs/development/PR122_DYNAMIC_SHOWCASE_PROTOCOL_20261016.md','docs/development/PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md']
+    names=code_files()+['deploy/pr122-showcase/'+name for name in ('locations.conf','xuanjun-showcase-publish.service','xuanjun-showcase-publish.timer','xuanjun-showcase-build.service','build-channel','build-sudoers','policy.example.json','shiliu-display-proposed.json')]
+    names+=['.github/workflows/pr122-showcase-protected-builder.yml','.github/workflows/pr122-site-hub-preflight.yml','.github/workflows/pr122-showcase-review-event.yml','docs/development/PR122_DYNAMIC_SHOWCASE_PROTOCOL_20261016.md','docs/development/PR122_DELIVERY_DISPLAY_MANAGEMENT_20261104.md','docs/development/PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md']
     names+=[p.relative_to(ROOT).as_posix() for p in (ROOT/'showcase').rglob('*') if p.is_file()]
     files={name:(ROOT/name).read_bytes() for name in names}
     manifest={'schema':1,'source_commit':commit,'state':'REVIEW_ONLY_NOT_INSTALLED','files':[{'path':name,'size':len(raw),'sha256':sha(raw)} for name,raw in sorted(files.items())]}

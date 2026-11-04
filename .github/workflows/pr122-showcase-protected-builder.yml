@@ -6,6 +6,11 @@ on:
       - 'scripts/pr122_showcase*.py'
       - 'tests/test_pr122_showcase*.py'
       - 'deploy/pr122-showcase/**'
+      - 'demos/pr122-delivery-review/**'
+      - 'scripts/pr122_delivery_host.py'
+      - 'tests/test_pr122_delivery_host.py'
+      - 'tests/pr122_delivery_review.test.mjs'
+      - 'docs/development/PR122_DELIVERY_DISPLAY_MANAGEMENT_20261104.md'
       - 'docs/development/PR122_DYNAMIC_SHOWCASE_PROTOCOL_20261016.md'
       - '.github/workflows/pr122-showcase-protected-builder.yml'
 permissions:
@@ -32,6 +37,12 @@ jobs:
           assert re.search(r'Ran 75 tests in ',text) and re.search(r'^OK$',text,re.M)
           assert not re.search(r'FAILED|ERROR:|FAIL:|skipped=',text)
           PY
+      - name: Dynamic display controlled writes and original delivery host
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_pr122_showcase_display tests.test_pr122_delivery_host -v 2>&1 | tee /tmp/pr122-protected-builder/DISPLAY_TEST_LOG.txt
+          node --test tests/pr122_delivery_review.test.mjs > /tmp/pr122-protected-builder/DISPLAY_NODE_LOG.txt
       - name: Real Hosted systemd sandbox probe; not domestic acceptance
         shell: bash
         run: |

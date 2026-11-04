@@ -54,6 +54,8 @@ def integrate(root, public):
         path.write_text(text)
     return {'template_commit':'60f1dcd2dd1313fe91919ae1b75b21feb9693916',
             'frozen_files':FROZEN,'host_files':list(HOST_FILES),'navigation_pages':len(patches),
-            'scope':'SYNTHETIC_REVIEW_ONLY','customer_identity_connected':False,
+            'scope':'SYNTHETIC_REVIEW_ONLY',
+            'public_directory':{'url':'/showcase/delivery/catalog.json','stage_source':'/showcase/catalog.json','kind':'CONTROLLED_DISPLAY_METADATA_NOT_TASK_STATE'},
+            'customer_identity_connected':False,
             'persistent_feedback_connected':False,'task_source_connected':False,
             'public_case_authorizations_present':False}

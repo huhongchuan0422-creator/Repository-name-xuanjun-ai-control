@@ -36,6 +36,10 @@ def register(args):
     return {'state':'REGISTERED_PENDING_REVIEW','object_sha256':sha(canonical(item)),'path':str(target),'production_changes':0}
 
 if __name__=='__main__':
+    import sys
+    if len(sys.argv)>1 and sys.argv[1]=='display':
+        from scripts.pr122_showcase_display import main
+        main(sys.argv[2:]);sys.exit(0)
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('kind',choices=('project','page','module'));p.add_argument('--registry',type=Path,default=Path('showcase'))
     for name in ('project-id','id','title-zh','title-en','summary-zh','summary-en'):p.add_argument('--'+name,required=True)
     p.add_argument('--version',type=int,required=True);p.add_argument('--public',type=Path);p.add_argument('--scenario-zh');p.add_argument('--scenario-en');p.add_argument('--milestone',action='append')
