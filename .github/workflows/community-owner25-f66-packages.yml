@@ -1,0 +1,58 @@
+name: Community Owner 25 f66 packages
+
+on:
+  push:
+    paths:
+      - 'delivery/community-owner25-f66ae300/**'
+      - '.github/workflows/community-owner25-f66-packages.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  image-metadata:
+    if: contains(github.event.head_commit.message, '[community-f66-image-metadata]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fixed image metadata
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          path=pathlib.Path('delivery/community-owner25-f66ae300/image-package-metadata.json')
+          raw=path.read_bytes(); value=json.loads(raw)
+          assert hashlib.sha256(raw).hexdigest()=='aa4d51f088ab560c10031bc50fa3108e767e3c172510685468ac3c3c89fe0441'
+          assert value['project']=='community-preview'
+          assert value['source_id']=='original-github-actions'
+          assert value['version']=='f66ae300-backend-image-41717043079'
+          assert value['object_spec']['artifact_id']==13269633748
+          assert value['object_spec']['run_id']==41717043079
+          assert value['object_spec']['head_sha']=='f66ae300a1fc66bbde80d0b9bbbd8a3f9738aae9'
+          assert value['object_spec']['sha256']=='c19d4c58b1fa9126d5c616af6b2d65c6b52e75e85e1039f6353fdc3530c58cb9'
+          member=value['object_spec']['package']['members'][0]
+          assert member=={'bytes':534421107,'name':'community-backend-image.tar.gz','role':'payload','sha256':'eac38c0fac13482c23f38a20f795928a8da9ec1213bcb4bd536688cd2f7775ce'}
+          assert sum(c['bytes'] for c in value['artifact']['chunks'])==value['artifact']['bytes']==532583083
+          assert all(c['offset']==i*262144 for i,c in enumerate(value['artifact']['chunks']))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-f66ae300-image-metadata
+          path: delivery/community-owner25-f66ae300/image-package-metadata.json
+          if-no-files-found: error
+          retention-days: 3
+
+  installer:
+    if: contains(github.event.head_commit.message, '[community-f66-installer]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fixed installer
+        run: |
+          test "$(sha256sum delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh | awk '{print $1}')" = 8f1f974bf0340fdd98b4299add1e34928f5efce5d1dfd6d0a55edccb9c76f155
+          bash -n delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-f66ae300-installer-8f1f974b
+          path: delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
+          if-no-files-found: error
+          retention-days: 3
