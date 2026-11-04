@@ -19,12 +19,12 @@ from pathlib import Path, PurePosixPath
 
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
-PRODUCT_SOURCE_SHA = '1b4b6f5b2dad2e239db8adb919ef9859198f7291'
-MINI_TREE = '0583dc22ef830aa7f9833c859a971c52cc21a59a'
-MANIFEST_SHA256 = 'd58c9e41cd14752f64d232e21a43da629ed262fd54f19a416ae68f7f2a212aa2'
-BINDING_ID = 'community-mini-merchant-entry-fix-development-upload-20261104'
+PRODUCT_SOURCE_SHA = 'f66dda13f5e9434228bff0a84dee572f6f8dc3ce'
+MINI_TREE = 'f6d408c6470548284eb66081e8571a93873186c3'
+MANIFEST_SHA256 = 'a59af8ea94d2d4a522d88d7b9769ca22438db1b2d860649ea6ee9f19db4c1958'
+BINDING_ID = 'community-mini-merchant-entry-runtime-json-fix-development-upload-20261104'
 BACKEND_SOURCE_SHA = '1b4b6f5b2dad2e239db8adb919ef9859198f7291'
-COMPATIBILITY = 'EXACT_SOURCE_MATCH'
+COMPATIBILITY = 'BACKEND_COMPATIBLE_UI_ONLY'
 PREFIX = 'community-mini-current/clients/community-mini/'
 APPID = 'wx1d5f8873eaea5392'
 PROFILE = 'uk-path-candidate'
@@ -79,7 +79,7 @@ def source_files():
         require(len(raw) <= MAX_BYTES, 'CURRENT_MINI_FILE_SIZE_REQUIRED')
         files[relative] = (raw, hashlib.sha256(raw).hexdigest())
     hashes = {name: value[1] for name, value in files.items()}
-    require(len(files) == 66 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(len(files) == 70 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_MANIFEST_REQUIRED')
     return files
 
@@ -161,7 +161,7 @@ def verify_receipt(value, raw, env):
             and value.get('public_release') is False,
             'CURRENT_MINI_RECEIPT_REQUIRED')
     hashes = value.get('source_files')
-    require(type(hashes) is dict and len(hashes) == 66 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(type(hashes) is dict and len(hashes) == 70 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_RECEIPT_FILES_REQUIRED')
     return hashes
 
@@ -187,7 +187,7 @@ def stage(env):
         mini = temp / 'clients/community-mini'
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             names = archive.namelist()
-            require(len(names) == 66 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
+            require(len(names) == 70 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
             for name in names:
                 pure = PurePosixPath(name)
                 require(not pure.is_absolute() and '..' not in pure.parts and name.startswith(PREFIX),

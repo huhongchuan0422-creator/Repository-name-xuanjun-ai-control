@@ -67,14 +67,21 @@ async function main(){
  catch(e){receipt.status=/^UPLOAD_KEY_[A-Z_]+$/.test(e.message)?e.message:'UPLOAD_KEY_PARSE_FAILED';save();console.log('MINI_PREVIEW_STATUS='+receipt.status);process.exitCode=2;return;}
  const ci=require(path.join(process.env.COMMUNITY_MINI_CI_MODULE_ROOT,'node_modules/miniprogram-ci'));
  const log=console.log,error=console.error,warn=console.warn;
- const stdout=process.stdout.write,stderr=process.stderr.write;
- try{
+	 const stdout=process.stdout.write,stderr=process.stderr.write;
+	 let uploadStarted=false;
+	 try{
   console.log=console.error=console.warn=()=>{};
   process.stdout.write=process.stderr.write=()=>true;
-  const project=new ci.Project({appid,type:'miniProgram',projectPath,privateKey:key,
-    ignores:['**/*.test.cjs','node_modules/**/*']});
-  if(operation==='upload'){
-   await ci.upload({project,version,desc:description,setting:{es6:true,es7:true,minify:true},robot:1,threads:1,onProgressUpdate:()=>{}});
+	  const project=new ci.Project({appid,type:'miniProgram',projectPath,privateKey:key,
+	    ignores:['**/*.test.cjs','node_modules/**/*']});
+	  if(operation==='upload'){
+	   const compiled=await ci.getCompiledResult({project,setting:{es6:true,es7:true,minify:true},threads:1,onProgressUpdate:()=>{}});
+	   const required=['pages/merchant-join/index.js','merchant-fields-data.js','merchant-official-areas-data.js','merchant-official-industries-data.js','merchant-platform-reference-data.js'];
+	   if(required.some(file=>!Object.prototype.hasOwnProperty.call(compiled,file)))throw Error('MERCHANT_RUNTIME_MODULE_MISSING');
+	   if(Object.keys(compiled).filter(file=>file.endsWith('.js')).some(file=>/require\s*\([^)]*\.json/.test(String(compiled[file]))))throw Error('RUNTIME_JSON_REQUIRE_REMAINS');
+	   receipt.compiled_runtime_check='PASS';
+	   uploadStarted=true;
+	   await ci.upload({project,version,desc:description,setting:{es6:true,es7:true,minify:true},robot:1,threads:1,onProgressUpdate:()=>{}});
    receipt.status='DEVELOPMENT_VERSION_UPLOADED';
   }else{
    await ci.preview({project,desc:description,
@@ -86,7 +93,7 @@ async function main(){
   }
  }catch(e){
   const message=String(e&&(e.errMsg||e.message)||'');
-  receipt.status=operation==='upload'?'DEVELOPMENT_UPLOAD_FAILED_OR_UNKNOWN':'PREVIEW_FAILED_OR_UNKNOWN';
+	  receipt.status=operation==='upload'?(uploadStarted?'DEVELOPMENT_UPLOAD_FAILED_OR_UNKNOWN':'COMPILED_RUNTIME_INVALID'):'PREVIEW_FAILED_OR_UNKNOWN';
   const code=e&&(e.errCode||e.code);if(Number.isSafeInteger(code))receipt.provider_error_code=code;
   process.exitCode=3;
  }finally{
