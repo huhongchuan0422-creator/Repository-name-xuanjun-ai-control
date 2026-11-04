@@ -1,0 +1,47 @@
+name: MCP exact Git object publication
+
+on:
+  push:
+    branches:
+      - bootstrap/mcp-exact-4044-publish-20261104
+
+permissions:
+  contents: write
+
+jobs:
+  publish-exact-object:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_SHA: 4044f9fef0835ee36409b4d2732d1fc57a4273e6
+      TARGET_TREE: d1e8dc27e55b7463e1a569e5e1e237c076b53646
+      TARGET_REF: refs/heads/feature/mcp-pr17-gateway-successor-race-fix-20261101
+      BUNDLE_SHA256: 061298f72b2228ae9808952d53d1dd02bb94ad9152794b6f9c12e4ad9c25e6a6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Reassemble and verify exact reviewed bundle
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/mcp-exact-4044.bundle"
+          cat deliveries/mcp-exact-4044/chunk-* > "$bundle"
+          test "$(sha256sum "$bundle" | cut -d' ' -f1)" = "$BUNDLE_SHA256"
+          git fetch "$bundle" "refs/heads/feature/mcp-pr17-gateway-successor-race-fix-20261101:refs/remotes/bundle/imported"
+          test "$(git rev-parse refs/remotes/bundle/imported)" = "$TARGET_SHA"
+          test "$(git rev-parse refs/remotes/bundle/imported^{tree})" = "$TARGET_TREE"
+      - name: Publish exact immutable commit object once
+        run: |
+          set -euo pipefail
+          current="$(git ls-remote --heads origin "$TARGET_REF" | awk '{print $1}')"
+          if test -n "$current"; then
+            test "$current" = "$TARGET_SHA"
+          else
+            git push origin "$TARGET_SHA:$TARGET_REF"
+          fi
+          test "$(git ls-remote --heads origin "$TARGET_REF" | awk '{print $1}')" = "$TARGET_SHA"
+          {
+            echo "MCP exact commit published"
+            echo "- commit: `$TARGET_SHA`"
+            echo "- tree: `$TARGET_TREE`"
+            echo "- ref: `$TARGET_REF`"
+            echo "- bundle sha256: `$BUNDLE_SHA256`"
+          } >> "$GITHUB_STEP_SUMMARY"
