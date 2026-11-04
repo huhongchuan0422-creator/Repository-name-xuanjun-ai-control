@@ -17,6 +17,7 @@ on:
       - tests/test_community_wechat_sp_mock_checkout_view.py
       - tests/test_community_wechat_sp_split_projection.py
       - deploy/community-preview/install-stopped-v1.sh
+      - deploy/community-preview/endpoint.cjs
       - governance/features.json
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
