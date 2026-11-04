@@ -16,6 +16,7 @@ class RoleEntries(unittest.TestCase):
         self.assertTrue(all('REQUIRED' in r['authorization'] for r in roles))
         self.assertNotIn('token',repr(value));self.assertNotIn('csrf',repr(value))
     def test_original_pages_assets_close_under_exact_prefix_without_login_role_links(self):
+        self.assertEqual(PAGES['/merchant/review'][1], '商家审核')
         for path in PAGES:
             raw,mime=asset(path);text=raw.decode()
             self.assertIn('text/html',mime)
