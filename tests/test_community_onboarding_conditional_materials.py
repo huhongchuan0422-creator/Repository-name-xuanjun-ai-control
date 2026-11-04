@@ -8,7 +8,8 @@ ROOT=Path(__file__).resolve().parents[1]
 
 class ConditionalMaterialsDOM(unittest.TestCase):
     def test_applicant_conditions_history_and_stale_responses(self):
-        subprocess.run(['node',str(ROOT/'tests/community_onboarding_conditional_dom.cjs'),str(ROOT/'demos/community-stage/onboarding.js')],check=True,capture_output=True,text=True)
+        result=subprocess.run(['node',str(ROOT/'tests/community_onboarding_conditional_dom.cjs'),str(ROOT/'demos/community-stage/onboarding.js')],check=True,capture_output=True,text=True)
+        self.assertIn('conditional materials DOM PASS',result.stdout)
     def test_reviewer_can_review_historical_optional_materials(self):
         subprocess.run(['node',str(ROOT/'tests/community_onboarding_conditional_dom.cjs'),str(ROOT/'demos/community-stage/onboarding.js'),'/merchant/review'],check=True,capture_output=True,text=True)
 
