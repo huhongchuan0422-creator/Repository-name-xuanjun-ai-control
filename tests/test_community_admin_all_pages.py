@@ -114,8 +114,9 @@ class CommunityAdminAllPages(unittest.TestCase):
         self.assertIn("$('ruleId').closest('label').hidden=true", script)
         self.assertIn("$('ruleVersion').closest('label').hidden=true", script)
         self.assertIn("$('ruleRevision').closest('label').hidden=true", script)
-        for phrase in ('reviewMerchantKeyword', '申请编号、商家名称、门店名称、联系人、经营类目、申请状态', '商家审核列表'):
+        for phrase in ('reviewMerchantKeyword', '申请编号、商家名称、门店名称、联系人、经营类目、申请状态', 'reviewQueueCount'):
             self.assertIn(phrase, review)
+        self.assertNotIn('商家审核列表', review)
         for phrase in ('memberKeyword', 'memberState', 'operationKeyword', 'operationType'):
             self.assertIn(phrase, shell)
 
