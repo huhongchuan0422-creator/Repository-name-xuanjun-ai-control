@@ -20,7 +20,7 @@ FIELDS = {'id','title','summary','preview_url','content_kind','public_consent_re
 
 
 def validate(record):
-    need(type(record) is dict and set(record)==FIELDS, 'DISPLAY_FIELDS')
+    need(type(record) is dict and FIELDS<=set(record)<=FIELDS|{'case_assets','case_snapshot_sha256'}, 'DISPLAY_FIELDS')
     need(type(record['id']) is str and ID.fullmatch(record['id']), 'DISPLAY_ID')
     for name in ('title','summary','source_ref','public_consent_ref'):
         need(type(record[name]) is str and record[name].strip(), 'DISPLAY_TEXT:'+name)
@@ -35,6 +35,16 @@ def validate(record):
     need(not parsed.username and not parsed.password, 'DISPLAY_URL_CREDENTIALS')
     need((parsed.scheme=='https' and bool(parsed.hostname)) or
          (url.startswith('/') and not url.startswith('//') and not parsed.scheme and not parsed.netloc), 'DISPLAY_PREVIEW_URL')
+    assets=record.get('case_assets',[])
+    if assets:
+        import re
+        need(type(record.get('case_snapshot_sha256')) is str and re.fullmatch('[a-f0-9]{64}',record['case_snapshot_sha256']), 'DISPLAY_CASE_SNAPSHOT')
+    need(type(assets) is list, 'DISPLAY_CASE_ASSETS')
+    for asset in assets:
+        need(type(asset) is dict and set(asset)=={'kind','value','public_consent_ref'} and asset['kind'] in ('image','video','description','link'), 'DISPLAY_CASE_ASSET')
+        need(type(asset['public_consent_ref']) is str and asset['public_consent_ref'].strip() and type(asset['value']) is str and asset['value'].strip(), 'DISPLAY_CASE_ASSET_CONSENT')
+        if asset['kind']!='description':
+            validate({**{key:record[key] for key in FIELDS},'preview_url':asset['value']})
     return record
 
 

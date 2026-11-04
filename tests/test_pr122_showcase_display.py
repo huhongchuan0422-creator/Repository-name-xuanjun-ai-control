@@ -80,3 +80,51 @@ class DisplayTests(unittest.TestCase):
         path=self.base/'catalog.json';path.write_text('unknown successor draft')
         with self.assertRaisesRegex(ValueError,'UNKNOWN_EXISTING_CATALOG'):display.manage('sync',1)
         self.assertEqual(path.read_text(),'unknown successor draft')
+
+    def test_case_assets_require_exact_snapshot_and_separate_consent(self):
+        asset={'kind':'description','value':'已确认精选说明','public_consent_ref':'owner-material-consent'}
+        record={**RECORD,'case_assets':[asset],'case_snapshot_sha256':'a'*64}
+        display.manage('put',0,record)
+        self.assertEqual(display.manage('read')['records'][RECORD['id']]['case_assets'],[asset])
+        with self.assertRaisesRegex(ValueError,'CASE_SNAPSHOT'):display.validate({**record,'case_snapshot_sha256':''})
+        with self.assertRaisesRegex(ValueError,'ASSET_CONSENT'):display.validate({**record,'case_assets':[{**asset,'public_consent_ref':''}]})
+
+    def test_mechanism_contains_exact_host_and_compiler_inputs(self):
+        import tarfile,hashlib,contextlib,io
+        from scripts import pr122_showcase_mechanism_package as package
+        from scripts.pr122_delivery_host import HOST_FILES,FROZEN
+        out=self.root/'package'
+        with contextlib.redirect_stdout(io.StringIO()):package.build(out,'fixture-commit')
+        with tarfile.open(out/'SHOWCASE_MECHANISM_REVIEW_ONLY.tar.gz') as archive:
+            manifest=json.load(archive.extractfile('showcase-mechanism/MECHANISM_MANIFEST.json'))
+            rows={row['path']:row for row in manifest['files']}
+            for name in ['scripts/pr122_delivery_host.py',*['demos/pr122-delivery-review/'+name for name in HOST_FILES],*['demos/pr122-delivery-review/community-next/'+name for name in FROZEN]]:
+                raw=archive.extractfile('showcase-mechanism/'+name).read()
+                self.assertEqual(raw,(package.ROOT/name).read_bytes());self.assertEqual(rows[name]['sha256'],hashlib.sha256(raw).hexdigest())
+
+    def test_original_compiler_accepted_and_historical_case_projection(self):
+        import subprocess
+        from tests.test_pr122_showcase import project,page,milestone,obj,approvals,published
+        from scripts import pr122_showcase as s
+        items=[project(),page(),milestone('checkout'),milestone('merchant')]
+        first=s.compile_catalog(items,approvals(items),published_pages=published(items))
+        items.append(obj('acceptance','accepted',project_version=1,snapshot_sha256=first['projects'][0]['snapshot_sha256'],members=first['projects'][0]['snapshot_members'],evidence_url='https://github.com/example/repo/issues/2'))
+        catalog=s.compile_catalog(items,approvals(items),published_pages=published(items))
+        fixture=self.root/'catalog.json';fixture.write_text(json.dumps(catalog))
+        module=(Path(__file__).resolve().parents[1]/'demos/pr122-delivery-review/project-projection.mjs').as_uri()
+        code="""
+import {readFileSync} from 'node:fs';import assert from 'node:assert/strict';
+const {loadPublicDirectory,projectProjection}=await import(process.argv[1]);
+const source=JSON.parse(readFileSync(process.argv[2]));const accepted=source.projects[0];
+const item={id:'example',title:'已验收项目',listed:true,public_consent_ref:'public-demo-consent',source_project_id:accepted.project_id,preview_url:'https://example.com',case_snapshot_sha256:accepted.snapshot_sha256,case_assets:[{kind:'description',value:'获准精选说明',public_consent_ref:'selected-material-consent'}]};
+let managed=item;const fetcher=async path=>({ok:true,json:async()=>path.includes('/delivery/')?{schema:1,source:'SHOWCASE_CONTROLLED_DISPLAY_METADATA',projects:[managed]}:source});
+let result=projectProjection(await loadPublicDirectory(fetcher));assert.equal(result.developing.length,0);assert.equal(result.cases.length,1);
+managed={...item,case_assets:[]};result=projectProjection(await loadPublicDirectory(fetcher));assert.equal(result.developing.length,0);assert.equal(result.cases.length,0);
+managed={...item,case_snapshot_sha256:'0'.repeat(64)};assert.equal(projectProjection(await loadPublicDirectory(fetcher)).cases.length,0);
+managed=item;const old=source.projects[0];source.projects=[{...old,state:'DEVELOPING',version:2,snapshot_sha256:'b'.repeat(64),acceptance:null}];
+result=projectProjection(await loadPublicDirectory(fetcher));assert.equal(result.developing.length,1);assert.equal(result.cases.length,1);
+source.cases=[{...old,acceptance:null}];source.projects=[old];result=projectProjection(await loadPublicDirectory(fetcher));assert.equal(result.developing.length,0);assert.equal(result.cases.length,0);
+console.log('ORIGINAL_COMPILER_ACCEPTED_AND_HISTORICAL_CASE_PASS');
+"""
+        result=subprocess.run(['node','--input-type=module','-e',code,module,str(fixture)],text=True,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)

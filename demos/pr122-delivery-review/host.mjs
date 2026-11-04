@@ -1,5 +1,5 @@
 import {FeedbackClient} from './feedback-client.mjs';
-import {projectProjection,loadPublicDirectory,previewUrl} from './project-projection.mjs';
+import {projectProjection,loadPublicDirectory,previewUrl,renderCaseCards} from './project-projection.mjs';
 const $=id=>document.getElementById(id),client=new FeedbackClient();let generation=0,bindings=null,current=null;
 let templatePath='community-next/index.html',templateGeneration=0;
 async function loadTemplate(path,hash){
@@ -68,21 +68,14 @@ export async function connectReviewHost({snapshotProvider,bindingProvider}) {
       const href=previewUrl(p.preview_url);if(href){const link=node('a','打开项目预览 →');link.className='btn';link.href=href;link.target='_blank';link.rel='noopener noreferrer';a.append(link);}
       if(p.preview_access!=='AVAILABLE')a.append(node('p',p.preview_access==='RESTRICTED'?'预览访问受限，正在核对。':'预览访问状态待核实。'));
       return a;}));
-    $('case-cards').replaceChildren(...data.cases.map(p=>{const a=node('article');a.className='card';a.append(node('h3',p.title));for(const item of p.assets){
-      if(item.kind==='description'){a.append(node('p',item.value));continue;}
-      // The source must supply explicitly public same-origin assets; private
-      // account/project routes are never republished as case media.
-      if(!/^\/showcase\/public\/[A-Za-z0-9/_\-.]+$/.test(item.value)||item.value.includes('..'))continue;
-      const media=node(item.kind==='video'?'video':'img');media.src=item.value;if(item.kind==='video')media.controls=true;else media.alt=p.title;a.append(media);
-    }return a;}));
-    if(!data.cases.length)$('case-cards').append(node('p','暂无获准公开的精选案例。'));
+    renderCaseCards($('case-cards'),data.cases);
   }catch(e){$('source-status').textContent='项目阶段暂未核实，未使用演示状态代替实际进度。';}
 }
 if(location.hash==='#review')openDemo();
 
 // Bootstrap the existing host from public projections; no login module changes.
 let directoryRequest=0;
-async function refreshDirectory(){const request=++directoryRequest;try{const snapshot=await loadPublicDirectory();if(request!==directoryRequest)return;await connectReviewHost({snapshotProvider:async()=>snapshot});$('source-status').textContent=(snapshot.display_connected?'已读取受控展示目录。':'展示管理来源未接通；显示原已公开目录。')+(snapshot.stage_connected?' 已读取原项目阶段来源。':' 原项目阶段尚未接通。');if(!snapshot.projects.length)$('source-status').textContent+=' 暂无已上架的公开项目。';}catch(e){if(request!==directoryRequest)return;$('project-cards').replaceChildren();$('source-status').textContent='项目目录尚未接通：'+e.message;}}
+async function refreshDirectory(){const request=++directoryRequest;try{const snapshot=await loadPublicDirectory();if(request!==directoryRequest)return;await connectReviewHost({snapshotProvider:async()=>snapshot});$('source-status').textContent=(snapshot.display_connected?'已读取受控展示目录。':'展示管理来源未接通；显示原已公开目录。')+(snapshot.stage_connected?' 已读取原项目阶段来源。':' 原项目阶段尚未接通。');if(!snapshot.projects.length)$('source-status').textContent+=' 暂无已上架的公开项目。';}catch(e){if(request!==directoryRequest)return;$('project-cards').replaceChildren();$('case-cards').replaceChildren();$('source-status').textContent='项目目录尚未接通：'+e.message;}}
 const refresh=node('button','刷新项目');refresh.type='button';refresh.onclick=refreshDirectory;$('source-status').after(refresh);
 refreshDirectory();
 addEventListener('focus',refreshDirectory);

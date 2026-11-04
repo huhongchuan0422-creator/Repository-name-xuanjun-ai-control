@@ -39,3 +39,14 @@ python -m scripts.pr122_showcase_register display unlist --expected-revision 1 -
 | 真实交付记录、精选页面/视频/说明公开素材授权 | 原项目Owner/交付责任方；未提供不冒完成案例 |
 
 测试是隔离数据与原回归，不能代替生产目录、客户访问或业务验收。源码commit、同版制品与实际测试以本次交付回执为准。完整原交付目标、125成员客户中心合同和后继成果保留。
+
+
+## 本次缺口修正与同版安装前置
+
+此前机制包未收host.mjs、project-projection.mjs和pr122_delivery_host.py属实；现在机制Manifest同时收全6个宿主文件、9个冻结原件与适配器脚本，逐件绑定源码字节。它与原生官网候选是不同载荷：机制包用于源码/依赖交接，官网候选须由原发布器验证并交装，不可仅安装Python脚本就声称页面已更新。
+
+原目录编译器输出的ACCEPTED不等于新适配器旧式delivery字段。本次读取原cases中的acceptance、snapshot_sha256、project_version及已发布页面制品引用；ACCEPTED不再被归为开发中。缺失验收绑定的ACCEPTED保留待核，不伪造交付。历史已验收快照和当前开发新版本可以各自保留。
+
+独立`/delivery/cases.html`与宿主共享同一目录读取、投影和卡片渲染。公开演示链接许可与精选素材许可分开：受控record可选case_assets（kind/value/public_consent_ref），并用case_snapshot_sha256绑定准确原验收快照。素材种类description/image/video/link；不是默认公开全部页面。无精选素材授权或快照不符时，项目不会被重新塞回开发中，也不会生成公开案例。原记录不含这些可选字段仍可读写，历史保留。示例项目拾陆未提供实际验收和精选素材，不补造。
+
+安装前由玄钧AI新核：现场HEAD/未知修改与lease/attempt；已安装showcase及nginx真实状态；原发布器准确源码/制品/Manifest/现行许可绑定；静态官网路由同版替换及外置目录GET读回。原showcase安装器是首次安装入口，会拒绝既有安装对象，不能拿本包盲目重跑；已有安装须沿原获准更新路径核差异。此处不签发许可、不新增安装通道，不替现场确认SENT/ACK。受控管理仍需原有操作员；本版没有客户登录或匿名管理写入。
