@@ -10,6 +10,7 @@
 .onboarding-page .upload-slot{margin:18rpx 0}.onboarding-page .upload-choice{display:block;text-align:left;white-space:normal;line-height:1.6;background:#f4faf6;color:#226644;border:3rpx solid #79a78b;border-radius:13rpx;padding:19rpx 17rpx;min-height:152rpx;margin:0}
 .upload-choice text{display:block}.upload-choice .upload-title{font-weight:700;margin-bottom:13rpx}.upload-choice .upload-help{font-size:20rpx;color:#63796b}
 .onboarding-page .material-state,.onboarding-page .hint{display:block;font-size:22rpx;color:#63796b;line-height:1.65;margin-top:18rpx}
+.onboarding-page .material-preview{display:block;width:100%;height:360rpx;margin-top:16rpx;border-radius:18rpx;background:#f1f5f2}
 .onboarding-page .text-link,.onboarding-page .back-link{background:transparent;color:#337250;text-align:left;padding:10rpx 0;margin:8rpx 0;min-height:50rpx;font-size:24rpx;font-weight:400}
 .onboarding-page .back-link{color:#68967c}.onboarding-page .primary{background:#1d7653;color:white;border-radius:11rpx;font-size:27rpx;font-weight:700}
 .onboarding-page .save-next{margin:28rpx 0}.status-notice{font-size:23rpx;padding:16rpx 20rpx;border-left:5rpx solid #8da891;background:#edf3f0;margin:20rpx 0;color:#526e5a}.group-recognition{border-bottom:1rpx solid #dce6df;padding-bottom:12rpx}.field-error{color:#b42318;font-size:23rpx}
