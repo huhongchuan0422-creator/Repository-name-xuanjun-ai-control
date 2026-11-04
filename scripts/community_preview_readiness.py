@@ -13,7 +13,7 @@ FIXED_FRONTEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_BACKEND = '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5'
 FIXED_PROOF_SHA256 = '548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367'
 FIXED_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
-CURRENT_FRONTEND = 'f99da75e38800d92e393281561a3cf5b71a12b0e'
+CURRENT_FRONTEND = 'f66ae300a1fc66bbde80d0b9bbbd8a3f9738aae9'
 CURRENT_BACKEND = CURRENT_FRONTEND
 CURRENT_COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 
@@ -96,9 +96,9 @@ if __name__=='__main__':
     # -I keeps imports isolated; load only our checked-out adjacent control helper.
     import importlib.util
     kind=os.environ.get('COMMUNITY_FIXED_PRODUCT_KIND','legacy-4f')
-    if kind not in ('legacy-4f','r1-7ca1ac2a','current-e665'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
+    if kind not in ('legacy-4f','r1-7ca1ac2a','current-f66'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
     helper=('community_mini_r1_input.py' if kind=='r1-7ca1ac2a' else
-            'community_mini_current_input.py' if kind=='current-e665' else
+            'community_mini_current_input.py' if kind=='current-f66' else
             'community_preview_fixed_product.py')
     spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name(helper))
     helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper)

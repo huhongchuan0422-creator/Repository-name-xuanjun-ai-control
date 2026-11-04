@@ -358,7 +358,7 @@ jobs:
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
         env:
           PREVIEW_CONTROL_SHA: ${{ github.sha }}
-          PREVIEW_SOURCE_SHA: f99da75e38800d92e393281561a3cf5b71a12b0e
+          PREVIEW_SOURCE_SHA: f66ae300a1fc66bbde80d0b9bbbd8a3f9738aae9
           PREVIEW_TARGET: uk-path-candidate
           PREVIEW_ENABLED: 'true'
           IMAGE_BUILD_ENABLED: 'false'
@@ -1345,9 +1345,9 @@ jobs:
     env:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
       COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
-      COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'current-e665' || inputs.preview_product }}
+      COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'current-f66' || inputs.preview_product }}
       PREVIEW_CONTROL_SHA: ${{ github.event_name == 'push' && github.sha || inputs.preview_source_sha }}
-      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'f99da75e38800d92e393281561a3cf5b71a12b0e' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
+      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'f66ae300a1fc66bbde80d0b9bbbd8a3f9738aae9' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
       PREVIEW_PRODUCT_TREE: ${{ inputs.preview_product_tree }}
       PREVIEW_PRODUCT_ZIP_SHA256: ${{ inputs.preview_product_zip_sha256 }}
       PREVIEW_BINDING_ID: ${{ inputs.preview_binding_id }}
@@ -1460,13 +1460,13 @@ jobs:
           set -euo pipefail
           /usr/bin/python3 -I -B scripts/community_mini_r1_input.py stage
           printf 'COMMUNITY_PREVIEW_PRODUCT_CONTEXT=%s/community-mini-product-context-%s-%s.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
-      - name: Receive current e665-compatible mini input
+      - name: Receive current f66-compatible mini input
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
         uses: actions/download-artifact@v4
         with:
           name: community-mini-current-input
           path: ${{ runner.temp }}/community-mini-current-input-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Bind current e665-compatible mini tree
+      - name: Bind current f66-compatible mini tree
         if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash

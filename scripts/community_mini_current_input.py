@@ -19,10 +19,10 @@ from pathlib import Path, PurePosixPath
 
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
-PRODUCT_SOURCE_SHA = 'f99da75e38800d92e393281561a3cf5b71a12b0e'
-MINI_TREE = '506e01e40fa0ef378e28141e9a5bd4a060d484c6'
-MANIFEST_SHA256 = '937f4ef8810af326adc0f7eda31c8a841a111f3f2cb2927c2883cb61c1385b5e'
-BINDING_ID = 'community-mini-image-money-development-upload-20261103'
+PRODUCT_SOURCE_SHA = 'f66ae300a1fc66bbde80d0b9bbbd8a3f9738aae9'
+MINI_TREE = '5de25a19422960fbb40666f6691b830cb84633ce'
+MANIFEST_SHA256 = 'e8900083dd00f64280155a1911d96654cbdb285dc3e1c45d5540c8b6d614a5f1'
+BINDING_ID = 'community-mini-f66ae300-development-upload-20261104'
 BACKEND_SOURCE_SHA = PRODUCT_SOURCE_SHA
 COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 PREFIX = 'community-mini-current/clients/community-mini/'
