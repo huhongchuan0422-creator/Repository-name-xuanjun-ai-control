@@ -15,11 +15,11 @@ class RoleEntries(unittest.TestCase):
         self.assertEqual(roles[-1]['scope'],'MERCHANT_ADMISSION_REVIEW')
         self.assertTrue(all('REQUIRED' in r['authorization'] for r in roles))
         self.assertNotIn('token',repr(value));self.assertNotIn('csrf',repr(value))
-    def test_original_pages_assets_and_role_links_close_under_exact_prefix(self):
+    def test_original_pages_assets_close_under_exact_prefix_without_login_role_links(self):
         for path in PAGES:
             raw,mime=asset(path);text=raw.decode()
             self.assertIn('text/html',mime)
-            self.assertIn('aria-label="角色入口"',text)
+            self.assertNotIn('aria-label="角色入口"',text)
             for link in re.findall(r'(?:href|src)=["\']([^"\']+)',text):
                 self.assertTrue(link.startswith(PREFIX+'/'),link)
                 path=link.split('#',1)[0]

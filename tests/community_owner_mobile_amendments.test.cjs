@@ -34,7 +34,9 @@ test('owner list filters and embedded pages have delivery-grade shells',()=>{
  const shell=fs.readFileSync(path.join(root,'demos/community-stage/admin-shell.js'),'utf8');
  const workbench=fs.readFileSync(path.join(root,'demos/community-stage/workbench.js'),'utf8');
  const workbenchCss=fs.readFileSync(path.join(root,'demos/community-stage/workbench.css'),'utf8');
- assert.match(shell,/reportQuery\.append\(reportKeywordLabel,reportStatusLabel,reportStartLabel,reportEndLabel,reportSearch,\.\.\.originalReportActions\)/);
+ assert.match(shell,/reportQuery\.append\(reportKeywordLabel,reportStatusLabel,reportStartLabel,reportEndLabel,reportSearch,readRefundObservations,\.\.\.originalReportActions\)/);
+ assert.match(shell,/reportDetail\.append\(reportControls,reportRows,reportBack\)/);
+ assert.doesNotMatch(shell,/正在加载用户列表/);
  assert.doesNotMatch(shell,/reportReset/);
  assert.match(shell,/operationFilterButton\.textContent='查询'/);
  for(const label of ['用户编号','用户名称','用户类型','消费金额','积分余额','关联订单','推荐人','状态','操作'])assert.match(shell,new RegExp("'"+label+"'"));

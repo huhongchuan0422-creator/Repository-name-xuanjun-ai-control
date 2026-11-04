@@ -23,7 +23,7 @@ class CommunityAdminOwnerThreeAcceptance(unittest.TestCase):
 
     def test_reviewer_navigation_is_current_page_only_and_field_complete(self):
         script = (ROOT / "demos/community-stage/onboarding.js").read_text()
-        self.assertIn("['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','平台审核状态','微信支付审核阶段','申请分账比例','更新时间','操作']", script)
+        self.assertIn("['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','商家审核状态','微信审核状态','申请分账比例','更新时间','操作']", script)
         self.assertIn("keyword.placeholder='申请编号、商家名称、门店名称、联系人、经营类目、申请状态'", script)
         self.assertIn("const groups=[['总览'", script)
         self.assertNotIn("['积分商城'", script)
@@ -35,6 +35,9 @@ class CommunityAdminOwnerThreeAcceptance(unittest.TestCase):
         styles = (ROOT / "demos/community-stage/onboarding.css").read_text()
         self.assertIn("$('detail').hidden=true", script)
         self.assertIn("renderReviewList($('applications'),[],async()=>{})", script)
+        self.assertIn("for(const app of applications)", script)
+        for state in ('尚未提交微信','待微信审核','待商家实名确认','微信开通处理中','待补正 / 已驳回','异常待处理','微信进件已完成'):
+            self.assertIn(state, script)
         self.assertIn(".review-list-table", styles)
         self.assertIn("#status:empty", styles)
         self.assertNotIn("localPage.append(localHeading,localStatus,", script)

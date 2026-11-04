@@ -67,7 +67,7 @@ class CommunityAdminInformationArchitecture(unittest.TestCase):
         self.assertIn('.admission-review.admin-logged-in #community-session form', styles)
         self.assertIn("keywordLabel.textContent='搜索'", script)
         self.assertIn("keywords.every(keyword=>text.includes(keyword))", script)
-        self.assertIn("for(const label of ['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','平台审核状态','微信支付审核阶段','申请分账比例','更新时间','操作'])", script)
+        self.assertIn("for(const label of ['申请编号','商家名称','门店名称','主体类型','联系人','经营类目','商家审核状态','微信审核状态','申请分账比例','更新时间','操作'])", script)
         self.assertIn("queueCount.id='reviewQueueCount'", script)
         self.assertIn("cell.className='review-empty-state'", script)
         self.assertIn('.admission-review.admin-logged-in #community-session>fieldset', styles)
