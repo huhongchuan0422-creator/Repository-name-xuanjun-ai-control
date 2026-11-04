@@ -56,3 +56,31 @@ jobs:
           path: delivery/community-owner25-f66ae300/INSTALL_FIXED_F66AE300.sh
           if-no-files-found: error
           retention-days: 3
+
+  installer-metadata:
+    if: contains(github.event.head_commit.message, '[community-f66-installer-metadata]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fixed installer metadata
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          path=pathlib.Path('delivery/community-owner25-f66ae300/installer-package-metadata.json')
+          raw=path.read_bytes(); value=json.loads(raw)
+          assert hashlib.sha256(raw).hexdigest()=='d2789d5649a6a6f0db0bc0fcdaf08a9638dcdda1da780237f72522f1a6158207'
+          assert value['project']=='community-preview'
+          assert value['source_id']=='original-github-actions'
+          assert value['version']=='f66ae300-fixed-installer-v1-8f1f974b'
+          assert value['object_spec']['artifact_id']==13287625096
+          assert value['object_spec']['run_id']==41753210093
+          assert value['object_spec']['head_sha']=='db18240e38400aa688d97f4eec9b03de02fb1ab0'
+          assert value['object_spec']['sha256']=='4b84c7c6ec8150820a3954e8aadfc07653af205ba611fa44f827c48d52ec3fff'
+          assert value['object_spec']['package']['members']==[{'bytes':4911,'name':'INSTALL_FIXED_F66AE300.sh','role':'payload','sha256':'8f1f974bf0340fdd98b4299add1e34928f5efce5d1dfd6d0a55edccb9c76f155'}]
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-community-f66ae300-installer-metadata-8f1f974b
+          path: delivery/community-owner25-f66ae300/installer-package-metadata.json
+          if-no-files-found: error
+          retention-days: 3
