@@ -479,7 +479,7 @@
   home.hidden=index!==null;back.hidden=index===null;
   panels.forEach((panel,i)=>{panel.hidden=i!==index;});
   // Preserve the original result DOM and business handlers without cloning or rebinding.
-  if(result)result.hidden=index===customerIndex||index===merchantIndex||index===panels.indexOf(platformPanel)||index===reviewIndex||index===receiverIndex||index===merchantReviewIndex||index===merchantWorkbenchIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
+  if(result)result.hidden=index===customerIndex||index===merchantIndex||index===panels.indexOf(platformPanel)||index===reviewIndex||index===receiverIndex||index===merchantWorkbenchIndex||index===null||(index===profileIndex&&!detail.hidden)||(index===openIndex&&!openMembers);
   buttons.forEach((button,i)=>{if(i===index)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   for(const button of workspaceRouteNavigation.values())button.removeAttribute('aria-current');
   if(index===null)homeButton.setAttribute('aria-current','page');else homeButton.removeAttribute('aria-current');
@@ -522,13 +522,11 @@
   const button=document.createElement('button');button.type='button';button.textContent=compactNavigation[title]||title;button.addEventListener('click',()=>select(index));navigationGroupFor(title).items.append(button);buttons.push(button);
 
  });
- const merchantReviewPanel=document.createElement('section'),merchantReviewPanelHeading=document.createElement('h2'),merchantReviewFrame=document.createElement('iframe');
- merchantReviewPanel.className='embedded-workspace-panel';merchantReviewPanel.hidden=true;merchantReviewPanelHeading.textContent='商家审核';merchantReviewPanelHeading.className='visually-hidden';merchantReviewFrame.title='商家入驻审核';merchantReviewFrame.loading='lazy';merchantReviewPanel.append(merchantReviewPanelHeading);main.append(merchantReviewPanel);panels.push(merchantReviewPanel);const merchantReviewIndex=panels.indexOf(merchantReviewPanel);
  const merchantWorkbenchPanel=document.createElement('section'),merchantWorkbenchHeading=document.createElement('h2'),merchantWorkbenchFrame=document.createElement('iframe');
  merchantWorkbenchPanel.className='embedded-workspace-panel';merchantWorkbenchPanel.hidden=true;merchantWorkbenchHeading.textContent='商家管理';merchantWorkbenchHeading.hidden=true;merchantWorkbenchHeading.setAttribute('aria-hidden','true');merchantWorkbenchFrame.title='商家管理';merchantWorkbenchFrame.loading='lazy';merchantWorkbenchPanel.append(merchantWorkbenchHeading,merchantWorkbenchFrame);main.append(merchantWorkbenchPanel);panels.push(merchantWorkbenchPanel);const merchantWorkbenchIndex=panels.indexOf(merchantWorkbenchPanel);
  function setWorkspaceRoute(value){const next=location.pathname+location.search+(value?'#'+value:'');if(location.pathname+location.search+location.hash!==next)history.replaceState(null,'',next);}
  function markWorkspaceNavigation(target){const button=workspaceRouteNavigation.get(target);if(!button)return;button.setAttribute('aria-current','page');const group=button.closest?.('details');if(group)group.open=true;}
- function openMerchantReview(){if(!merchantReviewAllowed())return;if(!merchantReviewFrame.isConnected)merchantReviewPanel.append(merchantReviewFrame);if(merchantReviewFrame.getAttribute('src')!=='/community-preview/merchant/review?embedded=1')merchantReviewFrame.src='/community-preview/merchant/review?embedded=1';select(merchantReviewIndex);markWorkspaceNavigation('merchant-review');setWorkspaceRoute('merchant-review');if(pageTitle){pageTitle.hidden=false;pageTitle.textContent='商家审核';}}
+ function openMerchantReview(){if(!merchantReviewAllowed())return;location.assign('/community-preview/merchant/review');}
  function openMerchantWorkbench(target,title){merchantWorkbenchFrame.src='/community-preview/merchant/workbench?embedded=1&v=owner25-ad-route#'+target;select(merchantWorkbenchIndex);markWorkspaceNavigation('merchant-workbench='+target);setWorkspaceRoute('merchant-workbench='+encodeURIComponent(target));if(pageTitle){pageTitle.hidden=false;pageTitle.textContent=title;}}
  function applyWorkspaceRoute(){
   if(!homeContext)return;
@@ -596,7 +594,6 @@
   for(const index of [profileIndex,openIndex,promotionIndex])buttons[index].hidden=true;
   buttons[customerIndex].hidden=!(customerHome()||communityManagerHome()||authorityHome());
   userListNav.hidden=!(platformOwnerHome()||rootAuthority());
-  if(!merchantReviewAllowed()&&typeof merchantReviewFrame!=='undefined'&&merchantReviewFrame.isConnected){merchantReviewFrame.removeAttribute('src');merchantReviewFrame.remove();if(activeIndex===merchantReviewIndex)select(null);}
   refreshNavigationGroups();
  }
  function syncHomeTitle(){if(activeIndex!==null)return;heading.textContent='总览';heading.hidden=!!pageTitle;homeHeroTitle.textContent='';homeHeroTitle.hidden=true;if(pageTitle){pageTitle.textContent='总览';pageTitle.hidden=false;}if(platformBrandText)platformBrandText.textContent=platformBrandOriginal;if(platformBrandSubtitle)platformBrandSubtitle.textContent=platformHome()?'平台管理者后台':communityHome()?'社区管理者后台':platformBrandSubtitleOriginal;}

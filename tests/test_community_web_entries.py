@@ -45,7 +45,7 @@ class RoleEntries(unittest.TestCase):
                 self.assertIn("location.pathname==='"+prefix+"/merchant/review'",text)
                 self.assertIn("fetch('"+prefix+"/merchant/onboarding'",text)
                 self.assertIn("link.href='"+prefix+"/merchant/workbench'",text)
-                self.assertIn("r.top.href=selected?'#admission-list':'"+prefix+"/community/portal'",text)
+                self.assertIn("r.top.href='#admission-list'",text)
                 self.assertIn('/community/portal',PAGES)
                 with tempfile.NamedTemporaryFile(suffix='.js') as f:
                     f.write(source);f.flush()

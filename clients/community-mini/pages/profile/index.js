@@ -79,7 +79,7 @@ Page({
     const request={session:this.session,scene:this.scene||'',epoch,attempt};this._merchantRequest=request;
     // Empty-scene sessions are valid for onboarding, never a fabricated workspace.
     const valid=()=>!this._dead&&!this._sceneStale&&this._merchantRequest===request&&this.session===request.session&&(this.scene||'')===request.scene&&auth.active(epoch)&&attempt===this._loginAttempt;
-    this.setData({merchantEntry:'unknown',merchantEntryPending:true,merchantEntryLabel:'商家入驻',merchantEntryHint:'正在加载…'});
+    this.setData({merchantEntry:'unknown',merchantEntryPending:true,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度'});
     try{
       if(request.scene){
         const workspace=await request.session.merchant(request.scene,'workspaces',{});
@@ -94,7 +94,7 @@ Page({
     }catch(e){if(valid())this.setData({merchantEntry:'unknown',merchantEntryLabel:'申请入驻',merchantEntryHint:'开始申请成为商家'});}
     finally{if(valid()){this._merchantRequest=null;this.setData({merchantEntryPending:false});}}
   },
-  openMerchantEntry(){if(this.data.merchantEntryPending)return;return this.data.authenticated&&!this.data.pending&&this.data.merchantEntry==='ready'?this.openMerchant():this.openJoin();},
+  openMerchantEntry(){return this.data.authenticated&&!this.data.pending&&this.data.merchantEntry==='ready'?this.openMerchant():this.openJoin();},
   validateProfile(r){
     if(!r||typeof r.user_id!=='string'||typeof r.project_customer_id!=='string'||typeof r.nickname!=='string'||typeof r.contact!=='string'||!Number.isSafeInteger(r.version)||r.version<0)throw Error('本人资料返回无效');
     return r;

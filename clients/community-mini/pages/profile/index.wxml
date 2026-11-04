@@ -12,7 +12,7 @@
       <button class="service-link" bindtap="openOrders"><text class="entry-icon">▤</text><view><text class="entry-title">我的订单</text><text class="entry-hint">查看订单进度与售后</text></view><text class="entry-chevron">›</text></button>
       <button class="service-link" bindtap="showNotices"><text class="entry-icon">◉</text><view><text class="entry-title">我的通知</text><text class="entry-hint">查看最新消息</text></view><text class="entry-chevron">›</text></button>
     </view>
-    <view class="card merchant-entry-card"><button class="service-link highlighted-link" bindtap="openMerchantEntry" loading="{{merchantEntryPending}}" disabled="{{merchantEntryPending}}"><text class="entry-icon">⌂</text><view><text class="entry-title">{{merchantEntryLabel}}</text><text class="entry-hint">{{merchantEntryHint}}</text></view><text class="entry-chevron">›</text></button></view>
+    <view class="card merchant-entry-card"><button class="service-link highlighted-link" bindtap="openMerchantEntry"><text class="entry-icon">⌂</text><view><text class="entry-title">{{merchantEntryLabel}}</text><text class="entry-hint">{{merchantEntryHint}}</text></view><text class="entry-chevron">›</text></button></view>
     <view class="card entry-group"><button class="service-link" data-section="services" bindtap="navigateSection"><text class="entry-icon">◇</text><view><text class="entry-title">我的服务</text><text class="entry-hint">社区归属、推荐关系与售后服务</text></view><text class="entry-chevron">›</text></button></view>
   </view>
   <view wx:else>

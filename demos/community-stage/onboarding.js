@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review',embeddedReview=reviewMode&&typeof URLSearchParams==='function'&&new URLSearchParams(location.search||'').get('embedded')==='1';
+  const $=id=>document.getElementById(id),reviewMode=location.pathname==='/merchant/review';
   const states={DRAFT:'草稿',SUBMITTED:'待审核',IN_REVIEW:'审核中',CORRECTION_REQUIRED:'待补件',REJECTED:'已驳回',APPROVED:'入驻审核通过',WITHDRAWN:'已撤回'};
   let current=null,catalog=null,csrf='',busy=false,generation=0,cursor=null,wechatRecord=null,reviewQueueRevision=0,reviewLayout=null;
   let historyGeneration=0,historyCursor=null,historyRequest=null;
@@ -46,7 +46,7 @@
     const response=await fetch('/merchant/onboarding',{method:'POST',credentials:'same-origin',
       headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({operation,params})});
     if(version!==generation)throw Error('登录状态已变化，请重新读取。');
-    if(response.status===403)throw Error('请先登录客户中心，或联系管理员开通此功能。');
+    if(response.status===403)throw Error('当前账号暂无商家审核权限。');
     if(!response.ok)throw Error(response.status===400?'资料、状态或版本不符合要求，请刷新后检查。':'服务暂不可用，结果可能尚未确认，请先刷新状态。');
     const reply=await response.json();
     if(version!==generation)throw Error('登录状态已变化，请重新读取。');
@@ -391,8 +391,8 @@
     if(!reviewLayout)return;const r=reviewLayout,selected=!!r.app,operations=selected&&r.controls.open;
     $('queue').hidden=selected;$('moreApplications').hidden=selected||!cursor;r.filters.hidden=selected;
     r.card.hidden=operations;r.back.hidden=operations;r.operationContext.hidden=!operations;r.operationBack.hidden=!operations;
-    r.top.textContent=selected?'‹ 返回商家审核列表':'‹ 返回首页';r.top.href=selected?'#admission-list':'/community/portal';
-    $('title').textContent=operations?'商家入驻审核 · 审核操作':selected?'商家入驻审核 · 详情':'商家入驻审核';
+    r.top.hidden=!selected;r.top.textContent='‹ 返回商家审核';r.top.href='#admission-list';
+    $('title').textContent=operations?'商家审核 · 审核操作':selected?'商家审核 · 详情':'商家审核';
     r.controlsSummary.textContent=operations?'收起审核操作，返回申请详情':'进入审核操作';
     (operations?r.operationContext:r.card).append(r.stateRow);
   }
@@ -407,14 +407,14 @@
     disclosure.append(navigationSummary,backdrop,nav);aside.append(disclosure);document.body.insertBefore(aside,main);
     const syncNavigation=()=>document.body.classList.toggle('review-navigation-open',disclosure.open);disclosure.open=false;disclosure.addEventListener('toggle',syncNavigation);backdrop.addEventListener('click',()=>{disclosure.open=false;});syncNavigation();
   }
-  function setupReviewLayout(){if(!reviewMode||!document.body)return;document.body.classList.add('admission-review');if(typeof URLSearchParams==='function'&&new URLSearchParams(location.search||'').get('embedded')==='1')document.body.classList.add('embedded-review');const header=document.querySelector('header > span');if(header)header.textContent='社区服务 · 平台';const intro=document.querySelector('.intro');if(intro)for(const node of intro.children)if(node!==$('title'))node.hidden=true;const queueHeading=$('queue').querySelector('h2');if(queueHeading){queueHeading.hidden=false;queueHeading.textContent='商家审核列表';}
+  function setupReviewLayout(){if(!reviewMode||!document.body)return;document.body.classList.add('admission-review');const header=document.querySelector('header > span');if(header)header.textContent='社区服务 · 平台';const intro=document.querySelector('.intro');if(intro)for(const node of intro.children)if(node!==$('title'))node.hidden=true;const queueHeading=$('queue').querySelector('h2');if(queueHeading){queueHeading.hidden=true;queueHeading.textContent='';}
     const card=document.createElement('article'),h=document.createElement('h3'),controls=document.createElement('details'),summary=document.createElement('summary'),back=button('返回入驻审核列表',async()=>returnReviewList());card.className='admission-record-card';h.textContent='记录详情';card.append(h);controls.id='reviewOriginalControls';summary.textContent='进入审核操作';controls.append(summary);back.className='admission-review-button';
     const operationContext=document.createElement('article'),contextTitle=document.createElement('h3'),contextFields=document.createElement('dl'),operationBack=button('返回申请详情',async()=>{controls.open=false;applyReviewStage();});operationContext.className='admission-operation-context';contextTitle.textContent='当前申请';operationContext.append(contextTitle,contextFields);operationBack.className='admission-review-secondary';
     function group(id,label){const d=document.createElement('details'),title=document.createElement('summary');d.id=id;d.className='admission-operation-group';title.textContent=label;d.append(title);return d;}
     const materials=group('reviewMaterialsGroup','申请资质与逐份材料核对'),decisions=group('reviewDecisionGroup','入驻审核、补件与工作台开通'),history=group('reviewHistoryGroup','申请版本、审核历史与通知'),wechat=group('reviewWechatGroup','微信进件资料、审核与签约状态');decisions.open=true;
     let stateRow=null;for(const node of [...$('detail').children]){if(node.contains($('applicationTitle'))){stateRow=node;card.append(node);}else if(['applicationVersion','summary','reviewNote'].includes(node.id))card.append(node);else if(['reviewActions','opening','openingActions'].includes(node.id))decisions.append(node);else if(['applicationHistory','applicationNotices'].includes(node.id))history.append(node);else materials.append(node);}
     wechat.append($('wechatApplication'));controls.append(operationContext,decisions,materials,wechat,history,operationBack);$('detail').append(card,back,controls);
-    const filters=document.createElement('div'),filterLabel=$('statusFilter').closest('label'),keywordLabel=document.createElement('label'),keyword=document.createElement('input'),wechatLabel=document.createElement('label'),wechatFilter=document.createElement('select'),queueMeta=document.createElement('div'),queueCount=document.createElement('span');filters.id='reviewListFilters';filters.className='review-filter-panel';keyword.id='reviewMerchantKeyword';keyword.type='search';keyword.placeholder='申请编号、商家名称、门店名称、联系人、经营类目、申请状态';keywordLabel.textContent='搜索';keywordLabel.append(keyword);keyword.addEventListener('change',()=>run(list));wechatFilter.id='wechatTaskFilter';for(const [value,label]of [['ACTIVE','待处理'],['COMPLETED','已完成'],['ALL','全部']]){const option=document.createElement('option');option.value=value;option.textContent=label;wechatFilter.append(option);}wechatLabel.textContent='微信进件';wechatLabel.append(wechatFilter);wechatFilter.addEventListener('change',()=>run(list));queueMeta.className='review-queue-heading';queueCount.id='reviewQueueCount';queueCount.textContent='正在加载';queueMeta.append(queueHeading,queueCount);$('reloadQueue').textContent='查询';filters.append(keywordLabel,filterLabel,wechatLabel,$('reloadQueue'));$('queue').prepend(queueMeta,filters);
+    const filters=document.createElement('div'),filterLabel=$('statusFilter').closest('label'),keywordLabel=document.createElement('label'),keyword=document.createElement('input'),wechatLabel=document.createElement('label'),wechatFilter=document.createElement('select'),queueMeta=document.createElement('div'),queueCount=document.createElement('span');filters.id='reviewListFilters';filters.className='review-filter-panel';keyword.id='reviewMerchantKeyword';keyword.type='search';keyword.placeholder='申请编号、商家名称、门店名称、联系人、经营类目、申请状态';keywordLabel.textContent='搜索';keywordLabel.append(keyword);keyword.addEventListener('change',()=>run(list));wechatFilter.id='wechatTaskFilter';for(const [value,label]of [['ACTIVE','待处理'],['COMPLETED','已完成'],['ALL','全部']]){const option=document.createElement('option');option.value=value;option.textContent=label;wechatFilter.append(option);}wechatLabel.textContent='微信进件';wechatLabel.append(wechatFilter);wechatFilter.addEventListener('change',()=>run(list));queueMeta.className='review-queue-heading';queueCount.id='reviewQueueCount';queueCount.textContent='正在加载';queueMeta.append(queueCount);$('reloadQueue').textContent='查询';filters.append(keywordLabel,filterLabel,wechatLabel,$('reloadQueue'));$('queue').prepend(queueMeta,filters);
     $('moreApplications').textContent='下一页';
     const top=document.createElement('a');top.id='reviewTopBack';top.className='admission-top-back';intro.prepend(top);top.addEventListener('click',event=>{if(reviewLayout.app){event.preventDefault();run(async()=>returnReviewList());}});
     reviewLayout={controls,controlsSummary:summary,card,back,filters,top,operationContext,contextFields,operationBack,stateRow,app:null};controls.addEventListener('toggle',applyReviewStage);installReviewAdminShell();syncReviewLayout(null);
