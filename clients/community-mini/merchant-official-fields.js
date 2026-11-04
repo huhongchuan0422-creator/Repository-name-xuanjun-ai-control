@@ -1,5 +1,5 @@
 'use strict';
-const areas=require('./merchant-official-areas.json'),industries=require('./merchant-official-industries.json');
+const areas=require('./merchant-official-areas-data'),industries=require('./merchant-official-industries-data');
 function industriesFor(entity){return industries.rows.filter(x=>x.subject===entity);}
 function selectedIndustry(entity,profile){const info=profile&&profile.settlement_info||{};return industriesFor(entity).find(x=>x.settlement_id===info.settlement_id&&x.qualification_type===info.qualification_type)||null;}
 function regionColumns(indices=[0,0,0]){

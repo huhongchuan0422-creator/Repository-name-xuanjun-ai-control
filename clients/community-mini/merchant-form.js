@@ -1,5 +1,5 @@
 'use strict';
-const definitions=require('./merchant-fields.json');
+const definitions=require('./merchant-fields-data');
 const choiceText={LEGAL:'法人 / 经营者本人',SUPER:'授权经办人',BANK_ACCOUNT_TYPE_CORPORATE:'对公银行账户',BANK_ACCOUNT_TYPE_PERSONAL:'经营者个人银行账户'};
 const docs=['IDENTIFICATION_TYPE_IDCARD','IDENTIFICATION_TYPE_OVERSEA_PASSPORT','IDENTIFICATION_TYPE_HONGKONG_PASSPORT','IDENTIFICATION_TYPE_MACAO_PASSPORT','IDENTIFICATION_TYPE_TAIWAN_PASSPORT','IDENTIFICATION_TYPE_FOREIGN_RESIDENT','IDENTIFICATION_TYPE_HONGKONG_MACAO_RESIDENT','IDENTIFICATION_TYPE_TAIWAN_RESIDENT'];
 function get(o,path){return path.split('.').reduce((v,k)=>v&&v[k],o);}

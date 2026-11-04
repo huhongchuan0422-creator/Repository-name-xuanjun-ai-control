@@ -7,7 +7,7 @@ function loadMerchantDependencies(){
  form=require('../../merchant-form');
  submitSharedReview=require('../../merchant-submit').submitSharedReview;
  officialFields=require('../../merchant-official-fields');
- platformReference=require('../../merchant-platform-reference.json');
+ platformReference=require('../../merchant-platform-reference-data');
 }
 try{loadMerchantDependencies();}catch(error){merchantDependencyError=error;}
 const flatten=lists=>[].concat.apply([],lists);
