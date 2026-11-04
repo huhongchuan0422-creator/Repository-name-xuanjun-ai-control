@@ -62,9 +62,9 @@ Page({
  removeScenePhoto(e){if(this.data.pending||!this.data.canEditWechat)return;const kind=e.currentTarget.dataset.kind;if(!['storefront_photo','interior_photo'].includes(kind))return;const path=this.materialProfilePath(kind);if(!path)return;form.put(this.profile,path,[]);this.setData({dirty:true,status:'本地微信草稿关联已移除；原申请已上传文件保留，保存同一申请草稿后生效'});this.syncLeaveGuard();this.refresh();},
  submitWechatReview(){if(!this.data.application)return;return this.run(async()=>{await this.request('wechat_submit_review',{application:this.data.application.application,expected_version:this.version});await this.load(this.data.application.application);});},
  async upload(e){if(this.data.pending)return;const kind=e.currentTarget.dataset.kind;await this.run(async()=>{
-  const chosen=await new Promise((resolve,reject)=>wx.chooseMessageFile({count:1,type:'file',extension:['pdf','png','jpg','jpeg'],success:resolve,fail:reject}));
-  const f=chosen.tempFiles&&chosen.tempFiles[0];if(!f||f.size<1||f.size>5000000)throw Error('FILE_LIMIT');
-  const content=await new Promise((resolve,reject)=>wx.getFileSystemManager().readFile({filePath:f.path,encoding:'base64',success:r=>resolve(r.data),fail:reject}));
+  const chosen=await new Promise((resolve,reject)=>{const options={count:1,sourceType:['album','camera'],success:resolve,fail:reject};if(typeof wx.chooseMedia==='function')wx.chooseMedia({...options,mediaType:['image'],sizeType:['original','compressed']});else wx.chooseImage({...options,sizeType:['original','compressed']});});
+  const f=chosen.tempFiles&&chosen.tempFiles[0],path=f&&(f.tempFilePath||f.path)||(chosen.tempFilePaths&&chosen.tempFilePaths[0]);if(!f||!path||f.size<1||f.size>5000000)throw Error('FILE_LIMIT');
+  const content=await new Promise((resolve,reject)=>wx.getFileSystemManager().readFile({filePath:path,encoding:'base64',success:r=>resolve(r.data),fail:reject}));
   if(!this.current())return;if(!this.data.application||kind==='cashier_photo'&&this.data.dirty)await this.saveDraft();if(!this.current()||!this.data.application)return;const app=this.data.application;const result=await this.request('upload',{application:app.application,revision:app.revision,kind,content_base64:content,expires_at:null});
   if(this.current()){this.setData({application:result});if(kind==='cashier_photo'){const step=this.data.step;await this.load(app.application);if(this.current())this.setData({step,status:'收银台照已保存到原申请；微信关联需单独办理，不代表微信进件成功'});}this.refresh();}
  });},
