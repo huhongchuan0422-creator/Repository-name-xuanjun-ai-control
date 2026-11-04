@@ -1,6 +1,6 @@
 const {makeClient} = require('../../client');
 const {createPaymentFlow}=require('../../payment');
-const {parseScene,getSharedSession} = require('../../session');
+const {parseScene,getSharedSession,customerError} = require('../../session');
 const auth=require('../../customer-auth');
 // Purpose-made non-sensitive local artwork only; root must bind this exact bundled asset.
 const DEMO_PHOTO_ASSET='/assets/community-demo-storefront-v1.jpg';
@@ -197,8 +197,8 @@ Page({
     this.client.storefront().then(s=>current()&&this.setData({merchant:s.merchant.name,
       beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : '',
       beforeAdImage:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.image_data||'' : ''}))
-      .catch(e=>{if(current())this.setData({status:e.message});});
-    } catch(e) {if(current())this.setData({status:e.message});}
+      .catch(e=>{if(current())this.setData({status:customerError(e)});});
+    } catch(e) {if(current())this.setData({status:customerError(e)});}
   },
   onUnload() {this._detailRequest=null;this.setData({sessionReady:false,sceneStorefront:null,detailState:'NOT_QUERIED'});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
   customerSessionRevoked(status='登录已退出，请重新登录',revokeIdentity=true){
