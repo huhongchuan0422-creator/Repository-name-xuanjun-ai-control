@@ -24,7 +24,7 @@ class DisplayTests(unittest.TestCase):
             def trusted(path,**kwargs):
                 info=path.lstat()
                 if path.is_relative_to(self.root):
-                    self.assertFalse(path.is_symlink());self.assertEqual(info.st_uid,sandbox_uid);self.assertFalse(info.st_mode&0o022)
+                    display.need(not path.is_symlink() and info.st_uid==sandbox_uid and not info.st_mode&0o022, 'DISPLAY_PATH_CUSTODY')
                     if not kwargs.get('directory'):self.assertEqual(info.st_nlink,1)
                     return info
                 return real(path,**kwargs)
