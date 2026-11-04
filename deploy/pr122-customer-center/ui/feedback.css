@@ -1,0 +1,7 @@
+[data-project-feedback]{box-sizing:border-box;max-width:780px;margin:32px auto;padding:20px;border:1px solid #d2d2d7;border-radius:16px;background:#fff;color:#1d1d1f;font:16px/1.6 system-ui,sans-serif;overflow-wrap:anywhere}
+[data-project-feedback] form,[data-project-feedback] label{display:grid;gap:10px}
+[data-project-feedback] textarea,[data-project-feedback] select{box-sizing:border-box;max-width:100%;width:100%;padding:10px;font:inherit;border:1px solid #86868b;border-radius:8px}
+[data-project-feedback] textarea{min-height:90px}
+[data-project-feedback] button{margin:8px 8px 8px 0;padding:10px 16px;border:0;border-radius:20px;background:#0066cc;color:white;font:inherit;cursor:pointer}
+[data-project-feedback] button:disabled{background:#777;cursor:default}
+[data-project-feedback] details{margin:12px 0}[data-project-feedback] :focus-visible{outline:3px solid #0071e3;outline-offset:3px}

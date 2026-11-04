@@ -1,0 +1,20 @@
+[Unit]
+Description=Xuanjun PR17 protected-inbox Gateway consumer
+After=network.target
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@SOURCE_ROOT@
+Environment=XJ_CANONICAL_LEDGER_PATH=@CANONICAL_LEDGER@
+Environment=XJ_CANDIDATE_ROOT=@CANDIDATE_ROOT@
+Environment=XJ_PR17_INBOX=@INBOX@
+Environment=XJ_PR17_OUTBOX=@OUTBOX@
+Environment=XJ_PR17_CONSUMED=@CONSUMED@
+ExecStart=@PYTHON@ -I -B @SOURCE_ROOT@/scripts/pr17_gateway_bridge.py consume
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@INBOX@ @OUTBOX@ @CONSUMED@ @CANONICAL_LEDGER@ @CANONICAL_LEDGER_DIR@

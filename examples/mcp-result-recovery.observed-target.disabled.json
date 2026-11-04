@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "bindings": [],
+  "recovery_bindings": [
+    {
+      "tenant_id": "tenant-task-center-test",
+      "principal_id": "owner-ops",
+      "project_id": "project-mcp",
+      "task_id": "mcp-5801d831db422d9ecc3ec6da",
+      "attempt_id": "attempt-5801d831db422d9ecc3ec6da",
+      "request_id": "0fca39b4f04fa0ae5c80cd706bb78797c81d4f4d267853c530c435d1c33a3af4",
+      "result_sha256": "e03b6584eab74f3b6cdcac1bc15479ddb8170944dbffbf98ff1d77666bc21baf",
+      "phase": "CONTROLLER",
+      "role_id": "mcp-text-executor",
+      "role_version": "v1",
+      "review_kind": null,
+      "actions": ["task_result_recovery_status", "task_prepare_result_recovery"]
+    }
+  ]
+}

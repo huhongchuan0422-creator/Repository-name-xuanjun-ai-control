@@ -1,0 +1,7 @@
+{
+  "browser_e2e": "BROWSER_UNVERIFIED",
+  "reason": "No approved Playwright/Chromium executable was available in the execution environment; no software was installed and no restriction was bypassed.",
+  "http_integration": "PASS",
+  "node_logic_test": "PASS_NOT_BROWSER_E2E",
+  "screenshots": "NOT_CREATED"
+}

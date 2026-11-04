@@ -1,0 +1,113 @@
+test_api_key_is_encrypted_masked_and_destination_bound (tests.test_connection_management.ConnectionManagementTests) ... ok
+test_oauth_pkce_success_replay_refresh_and_revoke (tests.test_connection_management.ConnectionManagementTests) ... ok
+test_oauth_state_issuer_redirect_expiry_and_refresh_conflict (tests.test_connection_management.ConnectionManagementTests) ... ok
+test_tenant_isolation_and_scope_expansion_require_new_authorization (tests.test_connection_management.ConnectionManagementTests) ... ok
+test_unrecognized_connection_purpose_is_rejected (tests.test_connection_management.ConnectionManagementTests) ... ok
+test_429_is_bounded_retry_and_disable_cancels_queue (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_benchmark_calls_share_persistent_provider_rate_limit (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cancel_before_call_and_cost_unknown_are_truthful (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cancel_during_429_never_enters_retry_wait (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cancel_during_success_cannot_advance_request (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_candidate_hash_identity_and_current_attempt_are_enforced (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_circuit_breaker_opens_after_three_real_failures (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_connection_purpose_mismatch_never_queues (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_cross_task_idempotency_conflict_and_late_worker_result_rejected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_destination_change_invalidates_old_provider_secret (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_expired_worker_lease_converges_unknown_without_retry (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_fair_queue_skips_open_provider_and_runs_healthy_provider (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_free_capable_first_and_self_review_forbidden (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_free_provider_cannot_become_paid_while_free_model_remains (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_frozen_task_spec_change_invalidates_later_review (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_incomplete_or_unexecuted_checklist_cannot_freeze_candidate (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_independent_review_rework_and_acceptance_gates (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_master_key_file_requires_0600 (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_model_insert_and_provider_price_change_are_transactional (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_older_review_passed_candidate_cannot_supersede_new_submission (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_paid_model_is_held_before_send_under_zero_new_spend_policy (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_paid_model_requires_explicit_unit_costs (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_paid_provider_cannot_disguise_model_as_free_without_costs (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_persistent_queue_idempotency_success_usage_and_restart (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_provider_and_model_price_transitions_are_transactional (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_provider_url_rejects_private_https_userinfo_and_query (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_queued_request_rechecks_provider_config_before_send (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_quota_unknown_or_exhausted_holds_before_adapter_call (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_rate_and_concurrency_limits_leave_request_queued (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_real_http_adapters_parse_success_auth_rate_and_timeout (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_review_kind_requires_matching_versioned_role_mandate (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_same_principal_cannot_hold_executor_and_acceptor_roles (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_scheduler_runtime_once_continues_without_browser (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_secret_encrypted_masked_and_never_audited_or_projected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_sent_500_is_unknown_and_usage_is_not_zero_cost (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_skill_binding_requires_review (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_skill_revocation_and_module_disable_block_new_execution (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_stale_attempt_or_revoked_writer_never_calls_provider (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_ten_provider_limit_and_tenant_isolation (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_timeout_is_unknown_not_blind_retry (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unknown_price_is_held_before_call_not_recorded_as_zero (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unknown_price_not_treated_free_and_paid_requires_authority (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_unqualified_writer_model_is_rejected (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_writer_permission_and_writer_snapshot_are_enforced (tests.test_model_orchestration.ModelOrchestrationTests) ... ok
+test_app_server_receipt_and_event_idempotency (tests.test_codex_execution_adapter.CodexExecutionAdapterTests) ... ok
+test_non_writer_cannot_cancel_codex_intent (tests.test_codex_execution_adapter.CodexExecutionAdapterTests) ... ok
+test_persistent_intent_duplicate_send_and_restart_unknown (tests.test_codex_execution_adapter.CodexExecutionAdapterTests) ... ok
+test_timeout_cancel_and_late_old_attempt_never_advance (tests.test_codex_execution_adapter.CodexExecutionAdapterTests) ... ok
+test_initialize_list_and_duplicate_progress_map_to_existing_api (tests.test_task_center_mcp.TaskCenterMCPTests) ... ok
+test_read_is_task_scoped_and_writes_use_server_bound_actor (tests.test_task_center_mcp.TaskCenterMCPTests) ... ok
+test_tool_schema_has_no_identity_shell_sql_or_path (tests.test_task_center_mcp.TaskCenterMCPTests) ... ok
+test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+ok
+test_model_admin_api_is_server_backed_masked_and_authorized (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "GET /api/admin/model-control HTTP/1.1" 403 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /admin.html HTTP/1.1" 200 -
+ok
+test_mutation_and_path_escape_are_rejected (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "POST /api/projection HTTP/1.1" 405 -
+task-center-app: "GET /../../etc/passwd HTTP/1.1" 404 -
+ok
+test_non_loopback_bind_is_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_get_is_read_only_with_active_wal (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "GET /api/projection HTTP/1.1" 200 -
+ok
+test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "GET /api/projection HTTP/1.1" 200 -
+task-center-app: "GET / HTTP/1.1" 200 -
+ok
+test_projection_rejects_existing_database_with_missing_schema (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: "GET /api/projection HTTP/1.1" 500 -
+ok
+test_project_to_model_to_independent_review_acceptance (tests.test_task_center_full_journey.FullJourneyTests) ... task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/projection HTTP/1.1" 200 -
+ok
+
+----------------------------------------------------------------------
+Ran 64 tests in 32.857s
+
+OK

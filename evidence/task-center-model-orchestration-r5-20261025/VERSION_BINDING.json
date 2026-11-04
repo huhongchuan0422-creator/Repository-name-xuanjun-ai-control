@@ -1,0 +1,17 @@
+{
+  "schema": "xuanjun.task-center.r5.delivery-binding.v1",
+  "baseline_commit": "9cf3ee929a3ac4b34dd61d4ed3ac867a2bfaa98e",
+  "source_commit": "998566d52634ff3cb5b3bd2d68df8cad5f2966a7",
+  "source_tree": "1b4783e64f36172825d534855c2ff3c28888c989",
+  "source_status": "SCOPED_STATIC_PASS",
+  "independent_qa": "PASS",
+  "independent_security": "PASS",
+  "scoped_executions": 232,
+  "distinct_test_ids": 187,
+  "legacy_migration_tests_not_executed": 3,
+  "browser_e2e": "BROWSER_UNVERIFIED",
+  "real_provider_calls": "NOT_EXECUTED",
+  "paid_calls": "NOT_EXECUTED",
+  "production_deployment": "NOT_EXECUTED",
+  "production_status": "NOT_IMPLEMENTED"
+}
