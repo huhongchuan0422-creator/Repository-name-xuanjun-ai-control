@@ -40,7 +40,7 @@ QUOTA_VERIFICATION_MAX_AGE_SECONDS = 3600
 PROVIDER_RECEIPT_KEYS = frozenset((
     'schema','kind','tenant_id','request_id','task_id','attempt_id',
     'provider_id','provider_config_version','connection_id',
-    'connection_config_version','model_id','payload_sha256',
+    'connection_config_version','credential_identity','model_id','payload_sha256',
     'provider_request_id','authority_id','observed_at','expires_at','result'))
 
 
@@ -64,7 +64,7 @@ def issue_provider_reconciliation_receipt(master_key, body):
             any(not isinstance(body[key],str) or not body[key]
                 for key in ('tenant_id','request_id','task_id','attempt_id',
                 'provider_id','model_id','payload_sha256',
-                'provider_request_id','authority_id')) or
+                'provider_request_id','authority_id','credential_identity')) or
             body['provider_request_id']==UNKNOWN):
         raise ValueError('VALID_PROVIDER_RECONCILIATION_RECEIPT_REQUIRED')
     _sha(body['payload_sha256'],'payload_sha256')
@@ -1324,20 +1324,92 @@ class ModelControl(object):
         if (not isinstance(authority_id,str) or not authority_id or
                 len(authority_id)>128):
             raise ValueError('PROVIDER_QUERY_AUTHORITY_ID_REQUIRED')
-        row=self.db.execute('''SELECT r.*,b.provider_config_version,
-          b.connection_id,b.connection_config_version,p.base_url FROM
-          model_requests r JOIN model_request_bindings b ON
-          b.tenant_id=r.tenant_id AND b.request_id=r.request_id JOIN
-          model_providers p ON p.tenant_id=r.tenant_id AND
-          p.provider_id=r.provider_id WHERE r.tenant_id=? AND r.request_id=?''',
-          (self.tenant_id,request_id)).fetchone()
-        if row is None:raise KeyError(request_id)
+        def read_binding():
+            return self.db.execute('''SELECT r.*,b.provider_config_version,
+              b.connection_id,b.connection_config_version,p.base_url,
+              p.config_version AS current_provider_config_version,
+              p.enabled AS provider_enabled FROM model_requests r JOIN
+              model_request_bindings b ON b.tenant_id=r.tenant_id AND
+              b.request_id=r.request_id LEFT JOIN model_providers p ON
+              p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id WHERE
+              r.tenant_id=? AND r.request_id=?''',
+              (self.tenant_id,request_id)).fetchone()
+        def binding_identity(row):
+            if (row['current_provider_config_version'] is None or
+                    not row['provider_enabled'] or
+                    row['current_provider_config_version']!=
+                    row['provider_config_version']):
+                return None
+            if row['connection_id']:
+                connection=self.db.execute('''SELECT provider_id,purpose,status,
+                  config_version,destination_origin FROM service_connections
+                  WHERE tenant_id=? AND connection_id=?''',(self.tenant_id,
+                  row['connection_id'])).fetchone()
+                if (connection is None or connection['provider_id']!=
+                        row['provider_id'] or
+                        connection['purpose']!='MODEL_INFERENCE' or
+                        connection['status']!='ACTIVE' or
+                        connection['config_version']!=
+                        row['connection_config_version'] or
+                        connection['destination_origin']!=
+                        self._origin(row['base_url'])):
+                    return None
+                return 'connection:{}:config:{}'.format(
+                  row['connection_id'],row['connection_config_version'])
+            if row['connection_config_version'] is not None:return None
+            return 'provider:{}:config:{}'.format(
+              row['provider_id'],row['provider_config_version'])
+        def hold_changed(row):
+            self.db.execute('''UPDATE model_requests SET state='HOLD',
+              error_kind='PROVIDER_CONFIG_CHANGED_HOLD',lease_owner=NULL,
+              lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=?
+              AND state IN ('FAILED','UNKNOWN','RETRY_WAIT')''',(now,
+              self.tenant_id,request_id))
+            self._audit(self._principal(),'PROVIDER_CONFIG_CHANGED_HOLD',
+              request_id,{'frozen_provider_config_version':
+              row['provider_config_version'],'current_provider_config_version':
+              row['current_provider_config_version'],'connection_id':
+              row['connection_id'],'frozen_connection_config_version':
+              row['connection_config_version']},now)
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=read_binding()
+            if row is None:raise KeyError(request_id)
+            required_state=('FAILED' if kind=='PROVIDER_QUOTA_AVAILABILITY'
+                            else UNKNOWN)
+            if row['state']!=required_state:
+                raise ValueError('PROVIDER_RECONCILIATION_QUERY_STATE_REQUIRED')
+            credential_identity=binding_identity(row)
+            if credential_identity is None:
+                hold_changed(row);self.db.commit()
+                raise ValueError('PROVIDER_CONFIG_CHANGED_HOLD')
+            query_snapshot=(row['provider_config_version'],row['base_url'],
+              row['connection_id'],row['connection_config_version'],
+              credential_identity)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         if row['connection_id']:
-            secret,version=ConnectionManager(self.gateway,self.context,
-              self.master_key).credential(row['connection_id'],row['base_url'],
-                                           'MODEL_INFERENCE',now)
-            if version!=row['connection_config_version']:
-                raise ValueError('PROVIDER_QUERY_CONNECTION_CHANGED')
+            try:
+                secret,version=ConnectionManager(self.gateway,self.context,
+                  self.master_key).credential(row['connection_id'],row['base_url'],
+                                               'MODEL_INFERENCE',now)
+                if version!=row['connection_config_version']:
+                    raise ValueError('PROVIDER_QUERY_CONNECTION_CHANGED')
+            except ValueError:
+                self.db.execute('BEGIN IMMEDIATE')
+                changed=read_binding()
+                changed_identity=(binding_identity(changed)
+                                  if changed is not None else None)
+                changed_snapshot=((changed['provider_config_version'],
+                  changed['base_url'],changed['connection_id'],
+                  changed['connection_config_version'],changed_identity)
+                  if changed is not None else None)
+                if changed_snapshot!=query_snapshot:
+                    if changed is not None:hold_changed(changed)
+                    self.db.commit()
+                    raise ValueError('PROVIDER_CONFIG_CHANGED_HOLD')
+                self.db.rollback();raise
         else:
             secret=self.provider_secret(row['provider_id'])
         query=query_adapter.query_request({'base_url':row['base_url'],
@@ -1356,24 +1428,38 @@ class ModelControl(object):
             raise ValueError('AVAILABILITY_QUERY_HAS_NO_RESULT')
         if kind=='PROVIDER_RESULT_QUERY' and query['result'] is None:
             raise ValueError('RESULT_QUERY_RESULT_REQUIRED')
-        body={'schema':1,'kind':kind,'tenant_id':self.tenant_id,
-          'request_id':request_id,'task_id':row['task_id'],
-          'attempt_id':row['attempt_id'],'provider_id':row['provider_id'],
-          'provider_config_version':row['provider_config_version'],
-          'connection_id':row['connection_id'],
-          'connection_config_version':row['connection_config_version'],
-          'model_id':row['model_id'],'payload_sha256':row['payload_sha256'],
-          'provider_request_id':query['provider_request_id'],
-          'authority_id':authority_id,
-          'observed_at':now,'expires_at':now+600,'result':query['result']}
-        token=issue_provider_reconciliation_receipt(self.master_key,body)
-        self._audit(self._principal(),'PROVIDER_RECONCILIATION_QUERY',
-          request_id,{'kind':kind,'provider_id':row['provider_id'],
-          'provider_config_version':row['provider_config_version'],
-          'authority_id':authority_id,
-          'provider_receipt_sha256':hashlib.sha256(
-            token.encode('utf-8')).hexdigest()},now)
-        self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=read_binding()
+            current_identity=binding_identity(row) if row is not None else None
+            current_snapshot=(row['provider_config_version'],row['base_url'],
+              row['connection_id'],row['connection_config_version'],
+              current_identity) if row is not None else None
+            if current_snapshot!=query_snapshot:
+                if row is not None:hold_changed(row)
+                self.db.commit()
+                raise ValueError('PROVIDER_CONFIG_CHANGED_HOLD')
+            body={'schema':1,'kind':kind,'tenant_id':self.tenant_id,
+              'request_id':request_id,'task_id':row['task_id'],
+              'attempt_id':row['attempt_id'],'provider_id':row['provider_id'],
+              'provider_config_version':row['provider_config_version'],
+              'connection_id':row['connection_id'],
+              'connection_config_version':row['connection_config_version'],
+              'credential_identity':current_identity,
+              'model_id':row['model_id'],'payload_sha256':row['payload_sha256'],
+              'provider_request_id':query['provider_request_id'],
+              'authority_id':authority_id,
+              'observed_at':now,'expires_at':now+600,'result':query['result']}
+            token=issue_provider_reconciliation_receipt(self.master_key,body)
+            self._audit(self._principal(),'PROVIDER_RECONCILIATION_QUERY',
+              request_id,{'kind':kind,'provider_id':row['provider_id'],
+              'provider_config_version':row['provider_config_version'],
+              'authority_id':authority_id,
+              'provider_receipt_sha256':hashlib.sha256(
+                token.encode('utf-8')).hexdigest()},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
         return token
 
     def reconcile_request(self, request_id, provider_receipt, now=None,
@@ -1389,9 +1475,13 @@ class ModelControl(object):
         try:
             row=self.db.execute('''SELECT r.*,b.provider_config_version,
               b.connection_id,b.connection_config_version,b.writer_principal,
-              b.writer_fence,b.writer_epoch FROM model_requests r JOIN
+              b.writer_fence,b.writer_epoch,p.config_version AS
+              current_provider_config_version,p.base_url,p.enabled AS
+              provider_enabled FROM model_requests r JOIN
               model_request_bindings b ON b.tenant_id=r.tenant_id AND
-              b.request_id=r.request_id WHERE r.tenant_id=? AND
+              b.request_id=r.request_id LEFT JOIN model_providers p ON
+              p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id WHERE
+              r.tenant_id=? AND
               r.request_id=?''',(self.tenant_id,request_id)).fetchone()
             if row is None:raise KeyError(request_id)
             if expected_task_id is not None:
@@ -1406,6 +1496,10 @@ class ModelControl(object):
               'provider_config_version':row['provider_config_version'],
               'connection_id':row['connection_id'],
               'connection_config_version':row['connection_config_version'],
+              'credential_identity':('connection:{}:config:{}'.format(
+                row['connection_id'],row['connection_config_version']) if
+                row['connection_id'] else 'provider:{}:config:{}'.format(
+                row['provider_id'],row['provider_config_version'])),
               'model_id':row['model_id'],
               'payload_sha256':row['payload_sha256']}
             if any(receipt[key]!=value for key,value in expected.items()):
@@ -1446,6 +1540,35 @@ class ModelControl(object):
                 return {'request_id':request_id,'state':row['state'],
                         'outcome':outcome,'duplicate':True,
                         'attempt_number':row['attempts']}
+            connection_current=True
+            if row['connection_id'] and row['base_url'] is not None:
+                connection=self.db.execute('''SELECT provider_id,purpose,status,
+                  config_version,destination_origin FROM service_connections
+                  WHERE tenant_id=? AND connection_id=?''',(self.tenant_id,
+                  row['connection_id'])).fetchone()
+                connection_current=(connection is not None and
+                  connection['provider_id']==row['provider_id'] and
+                  connection['purpose']=='MODEL_INFERENCE' and
+                  connection['status']=='ACTIVE' and
+                  connection['config_version']==row['connection_config_version'] and
+                  connection['destination_origin']==self._origin(row['base_url']))
+            if (row['current_provider_config_version'] is None or
+                    not row['provider_enabled'] or
+                    row['current_provider_config_version']!=
+                    row['provider_config_version'] or not connection_current):
+                self.db.execute('''UPDATE model_requests SET state='HOLD',
+                  error_kind='PROVIDER_CONFIG_CHANGED_HOLD',lease_owner=NULL,
+                  lease_until=NULL,updated_at=? WHERE tenant_id=? AND
+                  request_id=? AND state IN ('FAILED','UNKNOWN','RETRY_WAIT')''',
+                  (now,self.tenant_id,request_id))
+                self._audit(principal,'PROVIDER_CONFIG_CHANGED_HOLD',request_id,
+                  {'frozen_provider_config_version':row['provider_config_version'],
+                   'current_provider_config_version':
+                   row['current_provider_config_version'],'connection_id':
+                   row['connection_id'],'frozen_connection_config_version':
+                   row['connection_config_version']},now)
+                self.db.commit()
+                raise ValueError('PROVIDER_CONFIG_CHANGED_HOLD')
             if receipt['observed_at']<=row['updated_at']:
                 raise ValueError('POST_FAILURE_PROVIDER_RECEIPT_REQUIRED')
             task=self.gateway.supervisor._task(row['task_id'])
@@ -1462,12 +1585,6 @@ class ModelControl(object):
                         row['error_kind'] not in ('AUTH','BILLING') or
                         recovered_result is not None):
                     raise ValueError('PROVEN_NO_SIDE_EFFECT_FAILURE_REQUIRED')
-                provider=self.db.execute('''SELECT config_version FROM
-                  model_providers WHERE tenant_id=? AND provider_id=? AND
-                  enabled=1''',(self.tenant_id,row['provider_id'])).fetchone()
-                if (provider is None or provider['config_version']!=
-                        row['provider_config_version']):
-                    raise ValueError('SAME_PROVIDER_CONFIGURATION_REQUIRED')
                 state='RETRY_WAIT';error='RECONCILED_NO_SIDE_EFFECT'
                 next_attempt_at=now
             else:

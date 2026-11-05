@@ -531,6 +531,55 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assertEqual(json.loads(row['result_json']),recovered)
         self.assertEqual(row['attempts'],1)
 
+    def test_provider_config_drift_blocks_availability_query_before_adapter(self):
+        self.assigned(model='billing')
+        queued=self.control.queue_request('demo-b','developer',[],
+          'billing-config-drift')
+        now=time.time()
+        self.assertEqual(ModelScheduler(self.control).run_once(now=now)['state'],
+          'FAILED')
+        self.provider(secret='replacement-secret')
+        calls=[]
+        class ProviderQuery(object):
+            authority_id='fixture-provider-query-v1'
+            def query_request(inner,binding):
+                calls.append(binding)
+                return {'provider_request_id':'must-not-query',
+                  'available':True,'result':None}
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CONFIG_CHANGED_HOLD'):
+            self.control.query_provider_reconciliation(queued['request_id'],
+              'PROVIDER_QUOTA_AVAILABILITY',ProviderQuery(),now=now+1)
+        self.assertEqual(calls,[])
+        row=self.supervisor.db.execute('''SELECT state,error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CONFIG_CHANGED_HOLD'))
+
+    def test_provider_config_drift_blocks_signed_result_consumption(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'result-config-drift')
+        class UnknownProvider(object):
+            def invoke(self,*args):
+                raise ProviderError('TRANSPORT_UNKNOWN','connection-reset')
+        now=time.time()
+        self.assertEqual(ModelScheduler(self.control,{
+          'openai-compatible':UnknownProvider(),
+          'siliconflow':UnknownProvider()}).run_once(now=now)['state'],'UNKNOWN')
+        recovered={'content':'old-provider-result',
+          'usage':{'input_tokens':1,'output_tokens':1,'total_tokens':2},
+          'provider_request_id':'old-provider-request'}
+        receipt=self.provider_receipt(queued['request_id'],
+          'PROVIDER_RESULT_QUERY',now+1,recovered)
+        self.provider(secret='replacement-secret')
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CONFIG_CHANGED_HOLD'):
+            self.control.reconcile_request(queued['request_id'],receipt,
+              now=now+1)
+        row=self.supervisor.db.execute('''SELECT state,error_kind,result_json
+          FROM model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CONFIG_CHANGED_HOLD',None))
+        instance=self.supervisor.db.execute('''SELECT current_request_id FROM
+          role_instances WHERE instance_id='developer-1' ''').fetchone()
+        self.assertEqual(instance['current_request_id'],queued['request_id'])
+
     def test_qualification_unknown_after_queue_holds_before_adapter_call(self):
         self.assigned();queued=self.control.queue_request('demo-b','developer',[],
           'qualification-revoked')
