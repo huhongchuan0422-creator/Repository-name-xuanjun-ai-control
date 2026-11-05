@@ -117,6 +117,16 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.provider(pid);self.model(pid,model);self.role();self.qualify(pid,model)
         return self.control.assign('demo-b','developer','v1','developer-1')
 
+    def provider_receipt(self,request_id,kind,observed_at,result=None):
+        class ProviderQuery(object):
+            authority_id='fixture-provider-query-v1'
+            def query_request(inner,binding):
+                return {'provider_request_id':('availability-query' if
+                  result is None else result['provider_request_id']),
+                  'available':True,'result':result}
+        return self.control.query_provider_reconciliation(
+          request_id,kind,ProviderQuery(),now=observed_at)
+
     def checklist_sha(self):
         return self.control.register_checklist('demo-b',[{'id':'tests pass',
           'required':True,'result':'PASS','evidence':'test-log'}],
@@ -437,17 +447,36 @@ class ModelOrchestrationTests(unittest.TestCase):
           'billing-resume')
         now=time.time();failed=ModelScheduler(self.control).run_once(now=now)
         self.assertEqual(failed['state'],'FAILED')
-        with self.assertRaisesRegex(ValueError,'FRESH_SAME_PROVIDER'):
+        instance=self.supervisor.db.execute('''SELECT current_request_id FROM
+          role_instances WHERE instance_id='developer-1' ''').fetchone()
+        self.assertEqual(instance['current_request_id'],queued['request_id'])
+        with self.assertRaisesRegex(ValueError,'RECEIPT_INVALID'):
             self.control.reconcile_request(queued['request_id'],
-              'NO_SIDE_EFFECT','provider://billing-rejected',now=now+1)
+              'UNVERIFIED_ADMIN_STRING',now=now+1)
         self.control.set_quota_status('free','AVAILABLE',
-          'PROVIDER_BILLING_PORTAL_READBACK',now+2,None)
+          'UNVERIFIED_ADMIN_STRING',now+1,None)
+        receipt=self.provider_receipt(queued['request_id'],
+          'PROVIDER_QUOTA_AVAILABILITY',now+2)
+        self.supervisor.db.execute('''UPDATE role_instances SET state='RUNNING',
+          current_request_id='new-request' WHERE instance_id='developer-1' ''')
+        self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'INSTANCE_BINDING_CHANGED'):
+            self.control.reconcile_request(queued['request_id'],receipt,now=now+2)
+        unchanged=self.supervisor.db.execute('''SELECT state,current_request_id
+          FROM role_instances WHERE instance_id='developer-1' ''').fetchone()
+        self.assertEqual(tuple(unchanged),('RUNNING','new-request'))
+        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()[0],
+          'FAILED')
+        self.supervisor.db.execute('''UPDATE role_instances SET state='IDLE',
+          current_request_id=? WHERE instance_id='developer-1' ''',
+          (queued['request_id'],));self.supervisor.db.commit()
         resumed=self.control.reconcile_request(queued['request_id'],
-          'NO_SIDE_EFFECT','provider://billing-rejected',now=now+2)
+          receipt,now=now+2)
         self.assertEqual(resumed['state'],'RETRY_WAIT')
         self.assertEqual(resumed['request_id'],queued['request_id'])
         duplicate=self.control.reconcile_request(queued['request_id'],
-          'NO_SIDE_EFFECT','provider://billing-rejected',now=now+3)
+          receipt,now=now+3)
         self.assertTrue(duplicate['duplicate'])
         calls=[]
         class RecoveredProvider(object):
@@ -479,10 +508,22 @@ class ModelOrchestrationTests(unittest.TestCase):
         recovered={'content':'durable result',
           'usage':{'input_tokens':2,'output_tokens':2,'total_tokens':4},
           'provider_request_id':'provider-existing-result'}
-        receipt=self.control.reconcile_request(queued['request_id'],
-          'RESULT_RECOVERED','provider://request/provider-existing-result',
-          recovered,now=now+1)
-        self.assertEqual(receipt['state'],'SUCCEEDED')
+        with self.assertRaisesRegex(ValueError,'RECEIPT_INVALID'):
+            self.control.reconcile_request(queued['request_id'],
+              json.dumps(recovered),now=now+1)
+        receipt=self.provider_receipt(queued['request_id'],
+          'PROVIDER_RESULT_QUERY',now+1,recovered)
+        other=self.control.queue_request('demo-b','developer',[],
+          'different-payload')
+        with self.assertRaisesRegex(ValueError,'BINDING_MISMATCH'):
+            self.control.reconcile_request(other['request_id'],receipt,now=now+1)
+        self.control.request_cancel(other['request_id'],now=now+1)
+        forged=receipt[:-1]+('0' if receipt[-1]!='0' else '1')
+        with self.assertRaisesRegex(ValueError,'RECEIPT_INVALID'):
+            self.control.reconcile_request(queued['request_id'],forged,now=now+1)
+        reconciled=self.control.reconcile_request(queued['request_id'],
+          receipt,now=now+1)
+        self.assertEqual(reconciled['state'],'SUCCEEDED')
         self.assertEqual(ModelScheduler(self.control).run_once(now=now+2)['state'],
           'IDLE')
         row=self.supervisor.db.execute('''SELECT result_json,attempts FROM

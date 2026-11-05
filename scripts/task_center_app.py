@@ -931,8 +931,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=control.request_cancel(value['request_id'])
                     elif action=='RECONCILE_REQUEST':
                         result=control.reconcile_request(
-                          value['request_id'],value['outcome'],
-                          value['evidence_ref'],value.get('recovered_result'),
+                          value['request_id'],value['provider_receipt'],
                           expected_task_id=value['task_id'],
                           expected_attempt_id=value['attempt_id'],
                           expected_project_id=value['project_id'])
