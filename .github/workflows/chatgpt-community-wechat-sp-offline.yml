@@ -78,6 +78,8 @@ on:
         description: 'Legacy 4f successful push evidence only: 41101879920'
         type: string
         default: ''
+env:
+  COMMUNITY_CURRENT_PRODUCT_PUSH: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || 'false' }}
 permissions:
   contents: read
   actions: read
@@ -356,8 +358,8 @@ jobs:
           PYTHONPATH=.:tests python -B -m unittest test_community_mini_r1_input -v 2>&1 | tee community-tests.log
           node --test tests/community_mini_development_operation.test.cjs 2>&1 | tee -a community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
-      - name: Freeze current WeChat-status-compatible mini input for explicit development upload
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
+      - name: Freeze current WeChat-status-compatible mini input for explicit development operation
+        if: env.COMMUNITY_CURRENT_PRODUCT_PUSH == 'true'
         env:
           PREVIEW_CONTROL_SHA: ${{ github.sha }}
           PREVIEW_SOURCE_SHA: 28ca2f0c66305a2bca4fa6e27cf27427f36aaefd
@@ -371,7 +373,7 @@ jobs:
           node tests/community_points_mini_upload_dom.cjs 2>&1 | tee -a community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
       - name: Preserve current WeChat-status-compatible mini input
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
+        if: env.COMMUNITY_CURRENT_PRODUCT_PUSH == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: community-mini-current-input
@@ -1346,10 +1348,10 @@ jobs:
     timeout-minutes: 12
     env:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
-      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
-      COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'current-48df' || inputs.preview_product }}
+      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
+      COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'current-48df' || inputs.preview_product }}
       PREVIEW_CONTROL_SHA: ${{ github.event_name == 'push' && github.sha || inputs.preview_source_sha }}
-      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && '28ca2f0c66305a2bca4fa6e27cf27427f36aaefd' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
+      PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && '28ca2f0c66305a2bca4fa6e27cf27427f36aaefd' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
       PREVIEW_PRODUCT_TREE: ${{ inputs.preview_product_tree }}
       PREVIEW_PRODUCT_ZIP_SHA256: ${{ inputs.preview_product_zip_sha256 }}
       PREVIEW_BINDING_ID: ${{ inputs.preview_binding_id }}
@@ -1462,14 +1464,14 @@ jobs:
           set -euo pipefail
           /usr/bin/python3 -I -B scripts/community_mini_r1_input.py stage
           printf 'COMMUNITY_PREVIEW_PRODUCT_CONTEXT=%s/community-mini-product-context-%s-%s.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
-      - name: Receive current f66-compatible mini input
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
+      - name: Receive current 48df-compatible mini input
+        if: env.COMMUNITY_CURRENT_PRODUCT_PUSH == 'true'
         uses: actions/download-artifact@v4
         with:
           name: community-mini-current-input
           path: ${{ runner.temp }}/community-mini-current-input-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Bind current f66-compatible mini tree
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]')
+      - name: Bind current 48df-compatible mini tree
+        if: env.COMMUNITY_CURRENT_PRODUCT_PUSH == 'true'
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash
         run: |
