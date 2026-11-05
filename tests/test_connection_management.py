@@ -110,6 +110,25 @@ class ConnectionManagementTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'ACTIVE_CONNECTION'):
             self.manager.credential('oauth',self.base,'MODEL_INFERENCE',now=1003)
 
+    def test_refresh_only_rotation_advances_generation_across_restart(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],
+          'one-time-code',self.base,self.base+'/callback',now=1001)
+        self.assertEqual(self.manager.projection()[0]['credential_generation'],1)
+        class RefreshOnly(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-rotated','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.refresh('oauth',RefreshOnly(),now=1002)
+        self.assertEqual(self.manager.projection()[0]['credential_generation'],2)
+        self.supervisor.close();self.supervisor=Supervisor(self.db)
+        self.gateway=GatewayKernel(self.supervisor,self.authority)
+        self.manager=ConnectionManager(self.gateway,self.context,self.master,
+          clock=lambda:1003)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['config_version'],row['credential_generation']),(1,2))
+
     def test_oauth_state_issuer_redirect_expiry_and_refresh_conflict(self):
         self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
         for state,issuer,redirect,error in (

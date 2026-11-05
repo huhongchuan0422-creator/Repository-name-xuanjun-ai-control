@@ -40,7 +40,8 @@ QUOTA_VERIFICATION_MAX_AGE_SECONDS = 3600
 PROVIDER_RECEIPT_KEYS = frozenset((
     'schema','kind','tenant_id','request_id','task_id','attempt_id',
     'provider_id','provider_config_version','connection_id',
-    'connection_config_version','credential_identity','model_id','payload_sha256',
+    'connection_config_version','credential_generation','credential_identity',
+    'model_id','payload_sha256',
     'provider_request_id','authority_id','observed_at','expires_at','result'))
 
 
@@ -58,6 +59,8 @@ def issue_provider_reconciliation_receipt(master_key, body):
             type(body['provider_config_version']) is not int or
             (body['connection_config_version'] is not None and
              type(body['connection_config_version']) is not int) or
+            type(body['credential_generation']) is not int or
+            body['credential_generation']<0 or
             type(body['observed_at']) not in (int,float) or
             type(body['expires_at']) not in (int,float) or
             body['expires_at']!=body['observed_at']+600 or
@@ -476,7 +479,7 @@ class ModelControl(object):
               tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
               provider_config_version INTEGER NOT NULL,
               connection_id TEXT,connection_config_version INTEGER,
-              credential_fingerprint TEXT,
+              credential_generation INTEGER,credential_fingerprint TEXT,
               expected_input_tokens INTEGER NOT NULL,
               max_output_tokens INTEGER NOT NULL,allow_paid INTEGER NOT NULL,
               writer_principal TEXT,writer_fence INTEGER,writer_epoch INTEGER,
@@ -549,6 +552,9 @@ class ModelControl(object):
             if 'credential_fingerprint' not in binding_columns:
                 self.db.execute('''ALTER TABLE model_request_bindings ADD COLUMN
                   credential_fingerprint TEXT''')
+            if 'credential_generation' not in binding_columns:
+                self.db.execute('''ALTER TABLE model_request_bindings ADD COLUMN
+                  credential_generation INTEGER''')
             evaluation_columns={x['name'] for x in self.db.execute(
               'PRAGMA table_info(model_evaluations)')}
             for name in ('input_usage_state','output_usage_state'):
@@ -949,9 +955,13 @@ class ModelControl(object):
             except InvalidToken:
                 raise ValueError('CONNECTION_CREDENTIAL_DECRYPT_FAILED')
             version=row['config_version']
+            generation=row['credential_generation']
         else:
             secret=self.provider_secret(provider_id);version=None
-        return secret,version,self._credential_fingerprint(
+            generation=self.db.execute('''SELECT config_version FROM
+              model_providers WHERE tenant_id=? AND provider_id=?''',(
+              self.tenant_id,provider_id)).fetchone()['config_version']
+        return secret,version,generation,self._credential_fingerprint(
           provider_id,connection_id,secret)
 
     def upsert_model(self, value):
@@ -1257,7 +1267,8 @@ class ModelControl(object):
                     fresh_provider['config_version']!=provider['config_version'] or
                     fresh_provider['base_url']!=provider['base_url']):
                 raise ValueError('PROVIDER_CHANGED_BEFORE_QUEUE_COMMIT')
-            _credential,credential_version,credential_fingerprint=(
+            (_credential,credential_version,credential_generation,
+             credential_fingerprint)=(
               self._binding_credential(assignment['provider_id'],connection_id,
                 fresh_provider['base_url'],now))
             if connection_id and credential_version!=connection_version:
@@ -1291,14 +1302,15 @@ class ModelControl(object):
               digest,0,now,None,None,None,None,None,checkpoint,0,now,now))
             self.db.execute('''INSERT INTO model_request_bindings(
               tenant_id,request_id,provider_config_version,connection_id,
-              connection_config_version,credential_fingerprint,
+              connection_config_version,credential_generation,
+              credential_fingerprint,
               expected_input_tokens,max_output_tokens,
               allow_paid,writer_principal,writer_fence,writer_epoch,
               writer_valid_until,skill_snapshot_sha256,work_spec_sha256,
-              module_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+              module_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
               self.tenant_id,request_id,
               provider['config_version'],connection_id,connection_version,
-              credential_fingerprint,expected_input,
+              credential_generation,credential_fingerprint,expected_input,
               max_output_tokens,int(assignment['reason']!='QUALIFIED_FREE_FINAL_COST'),
               task_state['authority_caller_id'],task_state['fence'],task_state['epoch'],
               task_state['authority_valid_until'],skill_sha,spec_sha,
@@ -1374,7 +1386,7 @@ class ModelControl(object):
         def read_binding():
             return self.db.execute('''SELECT r.*,b.provider_config_version,
               b.connection_id,b.connection_config_version,
-              b.credential_fingerprint,p.base_url,
+              b.credential_generation,b.credential_fingerprint,p.base_url,
               p.config_version AS current_provider_config_version,
               p.enabled AS provider_enabled FROM model_requests r JOIN
               model_request_bindings b ON b.tenant_id=r.tenant_id AND
@@ -1389,13 +1401,14 @@ class ModelControl(object):
                     row['provider_config_version']):
                 return None
             try:
-                _secret,version,fingerprint=self._binding_credential(
+                _secret,version,generation,fingerprint=self._binding_credential(
                   row['provider_id'],row['connection_id'],row['base_url'],now)
             except ValueError:return None
             if ((row['connection_id'] and version!=
                     row['connection_config_version']) or
                     (not row['connection_id'] and
                      row['connection_config_version'] is not None) or
+                    generation!=row['credential_generation'] or
                     fingerprint!=row['credential_fingerprint']):
                 return None
             return fingerprint
@@ -1432,14 +1445,17 @@ class ModelControl(object):
                 raise ValueError(reason)
             query_snapshot=(row['provider_config_version'],row['base_url'],
               row['connection_id'],row['connection_config_version'],
-              credential_identity)
+              row['credential_generation'],credential_identity)
             self.db.commit()
         except Exception:
             self.db.rollback();raise
         try:
-            secret,version,actual_identity=self._binding_credential(
+            secret,version,actual_generation,actual_identity=(
+              self._binding_credential(
               row['provider_id'],row['connection_id'],row['base_url'],now)
-            if (actual_identity!=credential_identity or
+            )
+            if (actual_generation!=row['credential_generation'] or
+                    actual_identity!=credential_identity or
                     (row['connection_id'] and
                      version!=row['connection_config_version'])):
                 raise ValueError('PROVIDER_QUERY_CREDENTIAL_CHANGED')
@@ -1450,7 +1466,8 @@ class ModelControl(object):
                               if changed is not None else None)
             changed_snapshot=((changed['provider_config_version'],
               changed['base_url'],changed['connection_id'],
-              changed['connection_config_version'],changed_identity)
+              changed['connection_config_version'],
+              changed['credential_generation'],changed_identity)
               if changed is not None else None)
             if changed_snapshot!=query_snapshot:
                 reason=(hold_changed(changed) if changed is not None else
@@ -1480,7 +1497,7 @@ class ModelControl(object):
             current_identity=binding_identity(row) if row is not None else None
             current_snapshot=(row['provider_config_version'],row['base_url'],
               row['connection_id'],row['connection_config_version'],
-              current_identity) if row is not None else None
+              row['credential_generation'],current_identity) if row is not None else None
             if current_snapshot!=query_snapshot:
                 reason=(hold_changed(row) if row is not None else
                         'PROVIDER_CONFIG_CHANGED_HOLD')
@@ -1492,6 +1509,7 @@ class ModelControl(object):
               'provider_config_version':row['provider_config_version'],
               'connection_id':row['connection_id'],
               'connection_config_version':row['connection_config_version'],
+              'credential_generation':row['credential_generation'],
               'credential_identity':current_identity,
               'model_id':row['model_id'],'payload_sha256':row['payload_sha256'],
               'provider_request_id':query['provider_request_id'],
@@ -1522,7 +1540,7 @@ class ModelControl(object):
         try:
             row=self.db.execute('''SELECT r.*,b.provider_config_version,
               b.connection_id,b.connection_config_version,
-              b.credential_fingerprint,b.writer_principal,
+              b.credential_generation,b.credential_fingerprint,b.writer_principal,
               b.writer_fence,b.writer_epoch,p.config_version AS
               current_provider_config_version,p.base_url,p.enabled AS
               provider_enabled FROM model_requests r JOIN
@@ -1544,6 +1562,7 @@ class ModelControl(object):
               'provider_config_version':row['provider_config_version'],
               'connection_id':row['connection_id'],
               'connection_config_version':row['connection_config_version'],
+              'credential_generation':row['credential_generation'],
               'credential_identity':row['credential_fingerprint'],
               'model_id':row['model_id'],
               'payload_sha256':row['payload_sha256']}
@@ -1587,10 +1606,13 @@ class ModelControl(object):
                         'attempt_number':row['attempts']}
             credential_current=False
             try:
-                _secret,version,current_fingerprint=self._binding_credential(
+                (_secret,version,current_generation,current_fingerprint)=(
+                  self._binding_credential(
                   row['provider_id'],row['connection_id'],row['base_url'],now)
+                )
                 credential_current=(current_fingerprint==
                   row['credential_fingerprint'] and
+                  current_generation==row['credential_generation'] and
                   (not row['connection_id'] or version==
                    row['connection_config_version']))
             except ValueError:pass
@@ -2487,7 +2509,7 @@ class ModelScheduler(object):
           r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
           r.next_attempt_at<=?) SELECT r.*,b.provider_config_version,
           b.connection_id,b.connection_config_version,b.credential_fingerprint,
-          b.expected_input_tokens,
+          b.credential_generation,b.expected_input_tokens,
           b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
           b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
           b.module_version,p.adapter_type,p.base_url,p.timeout_seconds,
@@ -2589,10 +2611,11 @@ class ModelScheduler(object):
                 if fresh is None or fresh['state'] not in ('QUEUED','RETRY_WAIT'):
                     raise ValueError('LOST_RACE')
                 if fresh['cancel_requested']:raise ValueError('CANCELLED_BEFORE_CALL')
-                _secret,_version,current_fingerprint=(
+                _secret,_version,current_generation,current_fingerprint=(
                   self.control._binding_credential(candidate['provider_id'],
                     candidate['connection_id'],candidate['base_url'],now))
                 if (current_fingerprint!=candidate['credential_fingerprint'] or
+                        current_generation!=candidate['credential_generation'] or
                         (candidate['connection_id'] and _version!=
                          candidate['connection_config_version'])):
                     raise ValueError('PROVIDER_CREDENTIAL_CHANGED_HOLD')

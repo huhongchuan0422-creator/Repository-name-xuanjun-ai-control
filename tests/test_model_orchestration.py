@@ -148,10 +148,11 @@ class ModelOrchestrationTests(unittest.TestCase):
         return manager,now
 
     @staticmethod
-    def refreshed_oauth_adapter():
+    def refreshed_oauth_adapter(same_access=False):
         class RefreshExchange(object):
             def exchange(inner,*_args):
-                return {'access_token':'access-new-credential',
+                return {'access_token':('access-old-credential' if same_access else
+                  'access-new-credential'),
                   'refresh_token':'refresh-new-credential','token_type':'Bearer',
                   'expires_in':3600,'scope':'models.run'}
         return RefreshExchange()
@@ -643,7 +644,7 @@ class ModelOrchestrationTests(unittest.TestCase):
           'openai-compatible':UnknownProvider(),
           'siliconflow':UnknownProvider()}).run_once(now=started+3)['state'],
           'UNKNOWN')
-        control=self.control;refresh=self.refreshed_oauth_adapter()
+        control=self.control;refresh=self.refreshed_oauth_adapter(True)
         class RefreshDuringQuery(object):
             authority_id='fixture-provider-query-v1'
             def query_request(inner,binding):
@@ -662,6 +663,26 @@ class ModelOrchestrationTests(unittest.TestCase):
           role_instances WHERE instance_id='developer-1' ''').fetchone()
         self.assertEqual(instance['current_request_id'],queued['request_id'])
 
+    def test_refresh_only_rotation_during_availability_query_prevents_receipt(self):
+        self.assigned(model='billing');manager,started=self.oauth_connection()
+        queued=self.control.queue_request('demo-b','developer',[],
+          'oauth-refresh-availability',connection_id='oauth-model',now=started+2)
+        self.assertEqual(ModelScheduler(self.control).run_once(now=started+3)['state'],
+          'FAILED')
+        refresh=self.refreshed_oauth_adapter(True)
+        class RefreshDuringQuery(object):
+            authority_id='fixture-provider-query-v1'
+            def query_request(inner,binding):
+                manager.refresh('oauth-model',refresh,now=started+4)
+                return {'provider_request_id':'quota-available','available':True,
+                  'result':None}
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CREDENTIAL_CHANGED_HOLD'):
+            self.control.query_provider_reconciliation(queued['request_id'],
+              'PROVIDER_QUOTA_AVAILABILITY',RefreshDuringQuery(),now=started+4)
+        row=self.supervisor.db.execute('''SELECT state,error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CREDENTIAL_CHANGED_HOLD'))
+
     def test_oauth_refresh_after_receipt_blocks_result_consumption(self):
         self.assigned();manager,started=self.oauth_connection()
         queued=self.control.queue_request('demo-b','developer',[],
@@ -678,7 +699,13 @@ class ModelOrchestrationTests(unittest.TestCase):
           'provider_request_id':'old-provider-result-id'}
         receipt=self.provider_receipt(queued['request_id'],
           'PROVIDER_RESULT_QUERY',started+4,recovered)
-        manager.refresh('oauth-model',self.refreshed_oauth_adapter(),now=started+5)
+        before=manager.projection()[0]['credential_generation']
+        manager.refresh('oauth-model',self.refreshed_oauth_adapter(True),now=started+5)
+        after=manager.projection()[0]
+        self.assertEqual((before,after['credential_generation'],
+          after['config_version']),(1,2,1))
+        reopened=ConnectionManager(self.gateway,self.context,self.master)
+        self.assertEqual(reopened.projection()[0]['credential_generation'],2)
         with self.assertRaisesRegex(ValueError,'PROVIDER_CREDENTIAL_CHANGED_HOLD'):
             self.control.reconcile_request(queued['request_id'],receipt,
               now=started+5)
