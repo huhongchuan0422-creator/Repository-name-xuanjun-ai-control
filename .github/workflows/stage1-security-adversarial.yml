@@ -1,0 +1,46 @@
+name: Stage1 Security and Adversarial Checks
+on:
+  pull_request:
+    paths:
+      - 'stage1/**'
+      - '.github/workflows/stage1-security-adversarial.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  concurrency-restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax and adversarial tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q stage1
+          cd stage1
+          python -m unittest -v test_stage1_queue test_adversarial
+  static-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install scanners
+        run: python -m pip install 'bandit==1.8.6' 'pip-audit==2.9.0'
+      - name: Bandit high severity/high confidence
+        run: bandit -r stage1 -x stage1/test_stage1_queue.py,stage1/test_adversarial.py -ll -ii
+      - name: Dependency vulnerability baseline
+        run: python -m pip_audit --disable-pip --no-deps -r stage1/requirements.txt
+      - name: Secret pattern check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nIE '(-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{30,}|sk-[A-Za-z0-9]{32,})' -- stage1; then
+            echo 'POTENTIAL_SECRET_FOUND=FAIL'
+            exit 1
+          fi

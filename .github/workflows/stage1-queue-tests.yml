@@ -1,0 +1,23 @@
+name: Stage1 Queue Unit Tests
+on:
+  pull_request:
+    paths:
+      - 'stage1/**'
+      - '.github/workflows/stage1-queue-tests.yml'
+permissions:
+  contents: read
+jobs:
+  queue-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile stage1/stage1_queue.py stage1/test_stage1_queue.py
+          cd stage1
+          python -m unittest -v test_stage1_queue
