@@ -1,7 +1,7 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
 const FIXED_FRONTEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_BACKEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_PROOF_SHA256='548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367',FIXED_COMPATIBILITY='EXACT_SOURCE_MATCH';
-const CURRENT_FRONTEND='55911235d4c8a7162bb5a993296e333dfd9e9ff3',CURRENT_BACKEND='1b4b6f5b2dad2e239db8adb919ef9859198f7291',CURRENT_COMPATIBILITY='BACKEND_COMPATIBLE_UI_ONLY';
+const CURRENT_FRONTEND='48df407f30f512b1456270c8faba22f095404b9f',CURRENT_BACKEND='48df407f30f512b1456270c8faba22f095404b9f',CURRENT_COMPATIBILITY='EXACT_SOURCE_MATCH';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
@@ -53,8 +53,8 @@ function sourceIdentity(){
   return {product_source_sha:env.GITHUB_SHA||null,control_source_sha:env.GITHUB_SHA||null,source_root:null,fixed_product:false};
  }
  const kind=env.COMMUNITY_FIXED_PRODUCT_KIND||'legacy-4f';
- if(!['legacy-4f','r1-7ca1ac2a','current-5591'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
- const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-5591'?'community_mini_current_input.py':'community_preview_fixed_product.py';
+ if(!['legacy-4f','r1-7ca1ac2a','current-48df'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
+ const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-48df'?'community_mini_current_input.py':'community_preview_fixed_product.py';
  const keys=['PATH','GITHUB_SHA','GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT',
   'PREVIEW_CONTROL_SHA','PREVIEW_SOURCE_SHA','PREVIEW_TARGET','PREVIEW_EVIDENCE_RUN_ID','PREVIEW_ENABLED',
   'PREVIEW_PRODUCT_TREE','PREVIEW_PRODUCT_ZIP_SHA256','PREVIEW_BINDING_ID','IMAGE_BUILD_ENABLED','RUNNER_TEMP',
@@ -70,7 +70,7 @@ function sourceIdentity(){
  const exactR1=kind==='r1-7ca1ac2a'&&identity.product_source_sha==='7ca1ac2a4e5a68704bb0cebe1c33049713070859'&&
    identity.backend_source_sha===identity.product_source_sha&&identity.compatibility==='EXACT_SOURCE_MATCH'&&
    identity.compatibility_sha256===undefined;
- const exactCurrent=kind==='current-5591'&&identity.product_source_sha===CURRENT_FRONTEND&&
+ const exactCurrent=kind==='current-48df'&&identity.product_source_sha===CURRENT_FRONTEND&&
    identity.backend_source_sha===CURRENT_BACKEND&&identity.compatibility===CURRENT_COMPATIBILITY&&
    identity.compatibility_sha256===undefined;
  if(identity.fixed_product!==true||identity.control_source_sha!==env.GITHUB_SHA||!(legacy||exactR1||exactCurrent))throw Error('FIXED_PRODUCT_IDENTITY_REQUIRED');
