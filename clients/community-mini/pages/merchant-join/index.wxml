@@ -3,7 +3,9 @@
 <button class="back-link" bindtap="goBack">‹ 返回同一申请</button><view class="onboarding-stages"><text wx:for="{{steps}}" wx:key="*this" class="stage-item {{index===step?'active':''}}">{{index+1}} {{item}}</text></view>
 <text class="title">{{steps[step]}}</text><text class="subtitle">{{step===0?'先选类型 → 上传材料 → 核对识别结果':step===1?'确认实际经营 → 选择材料 → 填写经营资料':step===2?'原结算规则 → 核对账户资料':'分别核对上传、平台审核与微信进度'}}</text>
 <view class="status-notice" wx:if="{{status}}" aria-live="polite">{{status}}</view>
-<view wx:if="{{!ready}}" class="card"><text class="section-title">微信登录后开始办理</text><text class="hint">无需已有门店账号。仅保存本人的申请，不自动关联门店、赋予商家权限或开通支付。</text><button class="primary" bindtap="connectApplicant" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在验证身份':'微信登录 / 注册并开始入驻'}}</button></view>
+<view wx:if="{{!authenticated}}" class="card"><text class="section-title">微信登录后开始办理</text><text class="hint">无需已有门店账号。仅保存本人的申请，不自动关联门店、赋予商家权限或开通支付。</text><button class="primary" bindtap="connectApplicant" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在验证身份':'微信登录 / 注册并开始入驻'}}</button></view>
+<view wx:if="{{authenticated&&!ready&&readState==='LOADING'}}" class="card"><text class="section-title">正在读取入驻资料</text><text class="hint">微信身份已验证，正在读取材料清单和本人申请，请稍候。</text></view>
+<view wx:if="{{authenticated&&!ready&&readState==='FAILED'}}" class="card"><text class="section-title">入驻资料暂未读取完成</text><text class="hint">{{readError}}</text><button class="primary" bindtap="retryApplicantRead" loading="{{pending}}" disabled="{{pending}}">{{pending?'正在重新读取':'重新读取资料'}}</button></view>
 <view wx:if="{{leavePrompt}}" class="card"><text>当前有未保存修改。</text><button class="primary" bindtap="saveAndLeave" disabled="{{pending}}">保存并离开</button><button bindtap="cancelLeave" disabled="{{pending}}">继续填写</button></view>
 <view class="card" wx:if="{{!application && applications.length}}"><text class="section-title">继续本人的原申请</text><button wx:for="{{applications}}" wx:key="application" data-application="{{item.application}}" bindtap="select">{{item.fields.store_name||'未填写商户名称'}} · {{stateLabels[item.status]||'状态待核对'}}</button></view>
 <block wx:if="{{ready||status&&!pending}}">
