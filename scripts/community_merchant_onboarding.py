@@ -401,6 +401,9 @@ class MerchantOnboarding:
                 if mime is None:raise ValueError('PDF_PNG_JPEG_ONLY')
                 safe_text(raw.decode('latin1'),5_000_000)
                 if c.scanner is None:raise RuntimeError('EXISTING_SCANNER_REQUIRED')
+                if hasattr(c.scanner,'sanitize'):
+                    raw=c.scanner.sanitize(raw)
+                    mime='image/jpeg'
                 if c.scanner(raw) is not True:raise PermissionError('SCAN_NOT_CLEAN')
                 count,size=c.db.execute('SELECT count(*),coalesce(sum(size),0) FROM objects WHERE project=?',(application,)).fetchone()
                 if count>=100 or size+len(raw)>50_000_000 or shutil.disk_usage(c.root).free<max(50_000_000,3*len(raw)):raise RuntimeError('MATERIAL_STORAGE_LIMIT')

@@ -2,8 +2,10 @@
 import base64
 import concurrent.futures
 import json
+import io
 import unittest
 import urllib.request
+from PIL import Image, PngImagePlugin
 from scripts.community_merchant_onboarding import MerchantOnboarding,BASE
 from scripts.community_mini_http import serve
 import test_community_mini_center_identity as center_fixture
@@ -88,6 +90,15 @@ class MerchantAdmissionJourney(unittest.TestCase):
         for path in self.fx.center.objects.iterdir():self.assertNotIn(b'fixture private document',path.read_bytes())
         result=self.call('download',{'application':app['application'],'kind':'business_license'})
         self.assertEqual(base64.b64decode(result['content_base64']),b'%PDF-fixture private document')
+    def test_configured_image_scanner_rewrites_and_persists_bounded_clean_jpeg(self):
+        from scripts.community_uploaded_image_scanner import UploadedImageScanner
+        output=io.BytesIO();meta=PngImagePlugin.PngInfo();meta.add_text('private-note','removed')
+        Image.new('RGB',(640,480),(245,245,245)).save(output,format='PNG',pnginfo=meta)
+        self.fx.center.scanner=UploadedImageScanner()
+        app=self.upload(self.draft(),'business_license',output.getvalue()+b'trailing-bytes')
+        stored=base64.b64decode(self.call('download',{'application':app['application'],'kind':'business_license'})['content_base64'])
+        self.assertTrue(stored.startswith(b'\xff\xd8\xff') and stored.endswith(b'\xff\xd9'))
+        self.assertNotIn(b'private-note',stored);self.assertNotIn(b'trailing-bytes',stored)
     def test_other_account_cannot_edit_read_or_claim_application(self):
         app=self.draft();web=self.reviewer
         body={'operation':'save','params':{'application':app['application'],'revision':app['revision'],
