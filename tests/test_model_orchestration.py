@@ -20,6 +20,7 @@ sys.path.insert(0,os.path.join(ROOT,'scripts'))
 from model_orchestration import (ModelControl, ModelScheduler,
     OpenAICompatibleAdapter, ProviderError, SiliconFlowAdapter,
     load_master_key)
+from connection_management import ConnectionManager
 from reusable_scheduler_cli import demo_graph
 from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
     TestTenantAuthority)
@@ -126,6 +127,34 @@ class ModelOrchestrationTests(unittest.TestCase):
                   'available':True,'result':result}
         return self.control.query_provider_reconciliation(
           request_id,kind,ProviderQuery(),now=observed_at)
+
+    def oauth_connection(self,connection_id='oauth-model'):
+        manager=ConnectionManager(self.gateway,self.context,self.master)
+        manager.upsert({'connection_id':connection_id,'provider_id':'free',
+          'purpose':'MODEL_INFERENCE','auth_type':'OAUTH2_AUTH_CODE_PKCE',
+          'destination_origin':self.url,'issuer':self.url,
+          'authorization_endpoint':self.url+'/authorize',
+          'token_endpoint':self.url+'/token','revocation_endpoint':self.url+'/revoke',
+          'redirect_uri':self.url+'/callback','client_id':'model-client',
+          'scopes':['models.run'],'supports_refresh':True})
+        now=time.time();flow=manager.begin_oauth(connection_id,now=now)
+        class InitialExchange(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-old-credential',
+                  'refresh_token':'refresh-old-credential','token_type':'Bearer',
+                  'expires_in':3600,'scope':'models.run'}
+        manager.complete_oauth(connection_id,flow['flow_id'],flow['state'],
+          'one-time-code',self.url,self.url+'/callback',InitialExchange(),now+1)
+        return manager,now
+
+    @staticmethod
+    def refreshed_oauth_adapter():
+        class RefreshExchange(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-new-credential',
+                  'refresh_token':'refresh-new-credential','token_type':'Bearer',
+                  'expires_in':3600,'scope':'models.run'}
+        return RefreshExchange()
 
     def checklist_sha(self):
         return self.control.register_checklist('demo-b',[{'id':'tests pass',
@@ -576,6 +605,86 @@ class ModelOrchestrationTests(unittest.TestCase):
         row=self.supervisor.db.execute('''SELECT state,error_kind,result_json
           FROM model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
         self.assertEqual(tuple(row),('HOLD','PROVIDER_CONFIG_CHANGED_HOLD',None))
+        instance=self.supervisor.db.execute('''SELECT current_request_id FROM
+          role_instances WHERE instance_id='developer-1' ''').fetchone()
+        self.assertEqual(instance['current_request_id'],queued['request_id'])
+
+    def test_same_config_secret_change_blocks_availability_query(self):
+        self.assigned(model='billing')
+        queued=self.control.queue_request('demo-b','developer',[],
+          'same-config-secret-drift')
+        now=time.time()
+        self.assertEqual(ModelScheduler(self.control).run_once(now=now)['state'],
+          'FAILED')
+        self.supervisor.db.execute('''UPDATE model_providers SET secret_cipher=?,
+          secret_mask=? WHERE tenant_id='tenant-a' AND provider_id='free' ''',(
+          self.control.fernet.encrypt(b'changed-without-config-version'),
+          'masked'))
+        self.supervisor.db.commit();calls=[]
+        class ProviderQuery(object):
+            authority_id='fixture-provider-query-v1'
+            def query_request(inner,binding):calls.append(binding);raise AssertionError()
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CREDENTIAL_CHANGED_HOLD'):
+            self.control.query_provider_reconciliation(queued['request_id'],
+              'PROVIDER_QUOTA_AVAILABILITY',ProviderQuery(),now=now+1)
+        self.assertEqual(calls,[])
+        row=self.supervisor.db.execute('''SELECT state,error_kind FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CREDENTIAL_CHANGED_HOLD'))
+
+    def test_oauth_refresh_during_result_query_prevents_receipt(self):
+        self.assigned();manager,started=self.oauth_connection()
+        queued=self.control.queue_request('demo-b','developer',[],
+          'oauth-refresh-during-query',connection_id='oauth-model',now=started+2)
+        class UnknownProvider(object):
+            def invoke(inner,*_args):
+                raise ProviderError('TRANSPORT_UNKNOWN','connection-reset')
+        self.assertEqual(ModelScheduler(self.control,{
+          'openai-compatible':UnknownProvider(),
+          'siliconflow':UnknownProvider()}).run_once(now=started+3)['state'],
+          'UNKNOWN')
+        control=self.control;refresh=self.refreshed_oauth_adapter()
+        class RefreshDuringQuery(object):
+            authority_id='fixture-provider-query-v1'
+            def query_request(inner,binding):
+                manager.refresh('oauth-model',refresh,now=started+4)
+                return {'provider_request_id':'old-result','available':True,
+                  'result':{'content':'must-not-consume','usage':{
+                    'input_tokens':1,'output_tokens':1,'total_tokens':2},
+                    'provider_request_id':'old-result'}}
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CREDENTIAL_CHANGED_HOLD'):
+            control.query_provider_reconciliation(queued['request_id'],
+              'PROVIDER_RESULT_QUERY',RefreshDuringQuery(),now=started+4)
+        row=self.supervisor.db.execute('''SELECT state,error_kind,result_json FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CREDENTIAL_CHANGED_HOLD',None))
+        instance=self.supervisor.db.execute('''SELECT current_request_id FROM
+          role_instances WHERE instance_id='developer-1' ''').fetchone()
+        self.assertEqual(instance['current_request_id'],queued['request_id'])
+
+    def test_oauth_refresh_after_receipt_blocks_result_consumption(self):
+        self.assigned();manager,started=self.oauth_connection()
+        queued=self.control.queue_request('demo-b','developer',[],
+          'oauth-refresh-after-sign',connection_id='oauth-model',now=started+2)
+        class UnknownProvider(object):
+            def invoke(inner,*_args):
+                raise ProviderError('TRANSPORT_UNKNOWN','connection-reset')
+        self.assertEqual(ModelScheduler(self.control,{
+          'openai-compatible':UnknownProvider(),
+          'siliconflow':UnknownProvider()}).run_once(now=started+3)['state'],
+          'UNKNOWN')
+        recovered={'content':'old-provider-result','usage':{
+          'input_tokens':1,'output_tokens':1,'total_tokens':2},
+          'provider_request_id':'old-provider-result-id'}
+        receipt=self.provider_receipt(queued['request_id'],
+          'PROVIDER_RESULT_QUERY',started+4,recovered)
+        manager.refresh('oauth-model',self.refreshed_oauth_adapter(),now=started+5)
+        with self.assertRaisesRegex(ValueError,'PROVIDER_CREDENTIAL_CHANGED_HOLD'):
+            self.control.reconcile_request(queued['request_id'],receipt,
+              now=started+5)
+        row=self.supervisor.db.execute('''SELECT state,error_kind,result_json FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(tuple(row),('HOLD','PROVIDER_CREDENTIAL_CHANGED_HOLD',None))
         instance=self.supervisor.db.execute('''SELECT current_request_id FROM
           role_instances WHERE instance_id='developer-1' ''').fetchone()
         self.assertEqual(instance['current_request_id'],queued['request_id'])
