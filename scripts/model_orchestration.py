@@ -143,8 +143,10 @@ class OpenAICompatibleAdapter(object):
         try:
             if self.opener is None:
                 connection,response=self._pinned_open(parsed,body,headers,timeout)
-                if response.status in (401,429) or response.status>=300:
-                    kind='AUTH' if response.status==401 else ('RATE_LIMIT' if response.status==429 else 'HTTP')
+                if response.status in (401,402,429) or response.status>=300:
+                    kind=('AUTH' if response.status==401 else
+                          'BILLING' if response.status==402 else
+                          'RATE_LIMIT' if response.status==429 else 'HTTP')
                     raise ProviderError(kind,'HTTP_%d'%response.status,response.status==429 or response.status>=500)
             else:response = self.opener(request, timeout=timeout)
             raw = response.read(2 * 1024 * 1024 + 1)
@@ -154,6 +156,8 @@ class OpenAICompatibleAdapter(object):
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
                 raise ProviderError('AUTH', 'HTTP_401')
+            if exc.code == 402:
+                raise ProviderError('BILLING', 'HTTP_402')
             if exc.code == 429:
                 raise ProviderError('RATE_LIMIT', 'HTTP_429', True)
             raise ProviderError('HTTP', 'HTTP_%d' % exc.code,
@@ -414,6 +418,14 @@ class ModelControl(object):
               writer_valid_until REAL,skill_snapshot_sha256 TEXT,
               work_spec_sha256 TEXT,module_version TEXT,
               PRIMARY KEY(tenant_id,request_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_request_reconciliations(
+              tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
+              attempt_number INTEGER NOT NULL,outcome TEXT NOT NULL,
+              evidence_ref TEXT NOT NULL,result_sha256 TEXT,
+              observed_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,request_id,attempt_number),
+              FOREIGN KEY(tenant_id,request_id) REFERENCES
+              model_requests(tenant_id,request_id))''',
             '''CREATE TABLE IF NOT EXISTS model_call_reservations(
               tenant_id TEXT NOT NULL,reservation_id TEXT NOT NULL,
               request_id TEXT NOT NULL,attempt_number INTEGER NOT NULL,
@@ -1230,6 +1242,156 @@ class ModelControl(object):
         return {'request_id':request_id,'state':state,
                 'cancel_requested':True}
 
+    def reconcile_request(self, request_id, outcome, evidence_ref,
+                          recovered_result=None, now=None,
+                          expected_task_id=None, expected_attempt_id=None,
+                          expected_project_id=None):
+        """Resume or recover one terminal call without a second request.
+
+        Reconciliation is attempt-bound and immutable.  A duplicate receipt is
+        read back; a conflicting receipt is rejected.  NO_SIDE_EFFECT can only
+        resume provider responses that prove inference never started, and only
+        after fresh availability is recorded for the same provider.
+        """
+        principal=self._admin();now=self.clock() if now is None else now
+        if outcome not in ('NO_SIDE_EFFECT','RESULT_RECOVERED','UNKNOWN'):
+            raise ValueError('REQUEST_RECONCILIATION_OUTCOME_REQUIRED')
+        if (not isinstance(evidence_ref,str) or not evidence_ref.strip() or
+                len(evidence_ref.encode('utf-8'))>2048):
+            raise ValueError('BOUNDED_RECONCILIATION_EVIDENCE_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('''SELECT r.*,b.provider_config_version,
+              b.writer_principal,b.writer_fence,b.writer_epoch FROM
+              model_requests r JOIN model_request_bindings b ON
+              b.tenant_id=r.tenant_id AND b.request_id=r.request_id WHERE
+              r.tenant_id=? AND r.request_id=?''',
+              (self.tenant_id,request_id)).fetchone()
+            if row is None:raise KeyError(request_id)
+            if expected_task_id is not None:
+                self._assert_expected_project(expected_task_id,
+                                              expected_project_id)
+                if (row['task_id']!=expected_task_id or
+                        row['attempt_id']!=expected_attempt_id):
+                    raise ValueError('REQUEST_RECONCILIATION_BINDING_MISMATCH')
+            result_json=None;result_sha=None
+            if recovered_result is not None:
+                if (not isinstance(recovered_result,dict) or
+                        set(recovered_result)!=
+                        {'content','usage','provider_request_id'} or
+                        not isinstance(recovered_result['content'],str) or
+                        not recovered_result['content'] or
+                        not isinstance(recovered_result['provider_request_id'],str)
+                        or not recovered_result['provider_request_id']):
+                    raise ValueError('EXACT_RECOVERED_RESULT_REQUIRED')
+                usage=recovered_result['usage']
+                if (not isinstance(usage,dict) or set(usage)!=
+                        {'input_tokens','output_tokens','total_tokens'} or
+                        any(type(usage[key]) is not int or usage[key]<0
+                            for key in usage) or
+                        usage['total_tokens']!=usage['input_tokens']+
+                        usage['output_tokens']):
+                    raise ValueError('EXACT_RECOVERED_USAGE_REQUIRED')
+                result_json=canonical(recovered_result)
+                result_sha=hashlib.sha256(
+                    result_json.encode('utf-8')).hexdigest()
+            prior=self.db.execute('''SELECT * FROM
+              model_request_reconciliations WHERE tenant_id=? AND request_id=?
+              AND attempt_number=?''',(self.tenant_id,request_id,
+              row['attempts'])).fetchone()
+            if prior is not None:
+                if (prior['outcome']!=outcome or
+                        prior['evidence_ref']!=evidence_ref or
+                        prior['result_sha256']!=result_sha):
+                    raise ValueError('REQUEST_RECONCILIATION_CONFLICT')
+                self.db.rollback()
+                return {'request_id':request_id,'state':row['state'],
+                        'outcome':outcome,'duplicate':True,
+                        'attempt_number':row['attempts']}
+            task=self.gateway.supervisor._task(row['task_id'])
+            if (task['attempt_id']!=row['attempt_id'] or
+                    task['authority_state']!='VALID' or
+                    task['authority_valid_until'] is None or
+                    not now<task['authority_valid_until'] or
+                    task['authority_caller_id']!=row['writer_principal'] or
+                    task['fence']!=row['writer_fence'] or
+                    task['epoch']!=row['writer_epoch']):
+                raise ValueError('CURRENT_REQUEST_AUTHORITY_REQUIRED')
+            if outcome=='NO_SIDE_EFFECT':
+                if (row['state']!='FAILED' or
+                        row['error_kind'] not in ('AUTH','BILLING') or
+                        recovered_result is not None):
+                    raise ValueError('PROVEN_NO_SIDE_EFFECT_FAILURE_REQUIRED')
+                provider=self.db.execute('''SELECT config_version FROM
+                  model_providers WHERE tenant_id=? AND provider_id=? AND
+                  enabled=1''',(self.tenant_id,row['provider_id'])).fetchone()
+                if (provider is None or provider['config_version']!=
+                        row['provider_config_version']):
+                    raise ValueError('SAME_PROVIDER_CONFIGURATION_REQUIRED')
+                quota=self.db.execute('''SELECT quota_state,quota_source,
+                  verified_at FROM model_quota_status WHERE tenant_id=? AND
+                  provider_id=?''',(self.tenant_id,row['provider_id'])).fetchone()
+                if (quota is None or quota['quota_state']!='AVAILABLE' or
+                        quota['quota_source'] in ('',UNKNOWN) or
+                        quota['verified_at'] is None or
+                        quota['verified_at']<row['updated_at'] or
+                        quota['verified_at']>now+5 or
+                        now-quota['verified_at']>
+                        QUOTA_VERIFICATION_MAX_AGE_SECONDS):
+                    raise ValueError(
+                        'FRESH_SAME_PROVIDER_AVAILABILITY_REQUIRED')
+                state='RETRY_WAIT';error='RECONCILED_NO_SIDE_EFFECT'
+                next_attempt_at=now
+            elif outcome=='RESULT_RECOVERED':
+                if row['state']!=UNKNOWN or result_json is None:
+                    raise ValueError('UNKNOWN_REQUEST_AND_RESULT_REQUIRED')
+                state='SUCCEEDED';error='RECOVERED_PROVIDER_RESULT'
+                next_attempt_at=row['next_attempt_at']
+            else:
+                if row['state'] not in ('FAILED',UNKNOWN):
+                    raise ValueError('TERMINAL_REQUEST_REQUIRED')
+                if recovered_result is not None:
+                    raise ValueError('UNKNOWN_OUTCOME_HAS_NO_RESULT')
+                state='HOLD';error='RECONCILIATION_EFFECT_UNKNOWN'
+                next_attempt_at=row['next_attempt_at']
+            self.db.execute('''INSERT INTO model_request_reconciliations
+              VALUES (?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
+              row['attempts'],outcome,evidence_ref,result_sha,now))
+            changed=self.db.execute('''UPDATE model_requests SET state=?,
+              result_json=?,error_kind=?,next_attempt_at=?,lease_owner=NULL,
+              lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=?
+              AND state=? AND attempts=?''',(state,result_json,error,
+              next_attempt_at,now,self.tenant_id,request_id,row['state'],
+              row['attempts'])).rowcount
+            if changed!=1:raise ValueError('REQUEST_RECONCILIATION_CAS_FAILED')
+            if outcome=='RESULT_RECOVERED':
+                usage=recovered_result['usage']
+                self.db.execute('''UPDATE model_usage_attempts SET
+                  input_tokens=?,output_tokens=?,cost_state=?,cost_value=NULL,
+                  outcome='RECOVERED_RESULT',observed_at=? WHERE tenant_id=?
+                  AND request_id=? AND attempt_number=?''',(
+                  usage['input_tokens'],usage['output_tokens'],UNKNOWN,now,
+                  self.tenant_id,request_id,row['attempts']))
+            checkpoint=canonical({'state':state,'request_id':request_id,
+              'reconciliation':outcome,
+              'checkpoint':'SAME_REQUEST_SAME_ATTEMPT'})
+            self.db.execute('''UPDATE role_instances SET state=CASE WHEN
+              desired_state='STOPPED' THEN 'STOPPED' ELSE 'IDLE' END,
+              current_request_id=NULL,last_checkpoint_json=?,updated_at=? WHERE
+              tenant_id=? AND instance_id=(SELECT principal_id FROM
+              model_assignments WHERE tenant_id=? AND task_id=? AND
+              attempt_id=? AND role_id=?)''',(checkpoint,now,self.tenant_id,
+              self.tenant_id,row['task_id'],row['attempt_id'],row['role_id']))
+            self._audit(principal,'REQUEST_RECONCILE',request_id,
+                        {'attempt_number':row['attempts'],'outcome':outcome,
+                         'evidence_ref':evidence_ref,
+                         'result_sha256':result_sha},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        return {'request_id':request_id,'state':state,'outcome':outcome,
+                'duplicate':False,'attempt_number':row['attempts']}
+
     def _reserve_call_locked(self,provider_id,model_id,request_id,task_id,
                              attempt_number,input_tokens,output_tokens,
                              allow_paid,config_version,now,
@@ -1942,6 +2104,10 @@ class ModelControl(object):
           last_heartbeat,checkpoint_json,cancel_requested,created_at,updated_at
           FROM model_requests WHERE tenant_id=?
           ORDER BY created_at,request_id''',(self.tenant_id,))],
+          'request_reconciliations':[dict(x) for x in self.db.execute('''SELECT
+          request_id,attempt_number,outcome,evidence_ref,result_sha256,
+          observed_at FROM model_request_reconciliations WHERE tenant_id=?
+          ORDER BY observed_at,request_id,attempt_number''',(self.tenant_id,))],
           'assignments':[dict(x) for x in self.db.execute('''SELECT task_id,
           attempt_id,role_id,role_version,principal_id,provider_id,model_id,
           state,reason,created_at FROM model_assignments WHERE tenant_id=?

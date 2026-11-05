@@ -41,6 +41,7 @@ class ProviderHandler(BaseHTTPRequestHandler):
         n=int(self.headers.get('Content-Length','0'))
         value=json.loads(self.rfile.read(n).decode('utf-8'));model=value['model']
         if model=='auth':self.send_response(401);self.end_headers();return
+        if model=='billing':self.send_response(402);self.end_headers();return
         if model=='rate':self.send_response(429);self.end_headers();return
         if model=='redirect':
             self.send_response(302);self.send_header('Location',
@@ -407,6 +408,7 @@ class ModelOrchestrationTests(unittest.TestCase):
             self.assertEqual(unknown['usage'],{'input_tokens':None,
               'output_tokens':None,'total_tokens':None})
             with self.assertRaisesRegex(ProviderError,'AUTH'):adapter.invoke(self.url,SECRET,'auth',[],1)
+            with self.assertRaisesRegex(ProviderError,'BILLING'):adapter.invoke(self.url,SECRET,'billing',[],1)
             with self.assertRaisesRegex(ProviderError,'RATE_LIMIT'):adapter.invoke(self.url,SECRET,'rate',[],1)
             with self.assertRaisesRegex(ProviderError,'TIMEOUT_UNKNOWN'):adapter.invoke(self.url,SECRET,'slow',[],.05)
             with self.assertRaisesRegex(ProviderError,'HTTP'):
@@ -428,6 +430,65 @@ class ModelOrchestrationTests(unittest.TestCase):
         self.assigned(model='slow');self.control.queue_request('demo-b','developer',[],'slow-1')
         result=ModelScheduler(self.control).run_once();self.assertEqual(result['state'],'UNKNOWN')
         self.assertEqual(ModelScheduler(self.control).run_once()['state'],'IDLE')
+
+    def test_billing_failure_resumes_same_request_only_after_reconciliation(self):
+        self.assigned(model='billing')
+        queued=self.control.queue_request('demo-b','developer',[],
+          'billing-resume')
+        now=time.time();failed=ModelScheduler(self.control).run_once(now=now)
+        self.assertEqual(failed['state'],'FAILED')
+        with self.assertRaisesRegex(ValueError,'FRESH_SAME_PROVIDER'):
+            self.control.reconcile_request(queued['request_id'],
+              'NO_SIDE_EFFECT','provider://billing-rejected',now=now+1)
+        self.control.set_quota_status('free','AVAILABLE',
+          'PROVIDER_BILLING_PORTAL_READBACK',now+2,None)
+        resumed=self.control.reconcile_request(queued['request_id'],
+          'NO_SIDE_EFFECT','provider://billing-rejected',now=now+2)
+        self.assertEqual(resumed['state'],'RETRY_WAIT')
+        self.assertEqual(resumed['request_id'],queued['request_id'])
+        duplicate=self.control.reconcile_request(queued['request_id'],
+          'NO_SIDE_EFFECT','provider://billing-rejected',now=now+3)
+        self.assertTrue(duplicate['duplicate'])
+        calls=[]
+        class RecoveredProvider(object):
+            def invoke(inner,*args):
+                calls.append(args);return {'content':'continued',
+                  'usage':{'input_tokens':2,'output_tokens':1,'total_tokens':3},
+                  'provider_request_id':'same-provider-result'}
+        result=ModelScheduler(self.control,{
+          'openai-compatible':RecoveredProvider(),
+          'siliconflow':RecoveredProvider()}).run_once(now=now+4)
+        self.assertEqual(result['state'],'SUCCEEDED')
+        self.assertEqual(result['request_id'],queued['request_id'])
+        self.assertEqual(len(calls),1)
+        rows=self.supervisor.db.execute('''SELECT COUNT(*) FROM
+          model_request_reconciliations WHERE request_id=?''',
+          (queued['request_id'],)).fetchone()[0]
+        self.assertEqual(rows,1)
+
+    def test_unknown_call_recovers_result_without_replaying_provider(self):
+        self.assigned();queued=self.control.queue_request('demo-b','developer',[],
+          'recover-result')
+        class UnknownProvider(object):
+            def invoke(self,*args):
+                raise ProviderError('TRANSPORT_UNKNOWN','connection-reset')
+        now=time.time();first=ModelScheduler(self.control,{
+          'openai-compatible':UnknownProvider(),
+          'siliconflow':UnknownProvider()}).run_once(now=now)
+        self.assertEqual(first['state'],'UNKNOWN')
+        recovered={'content':'durable result',
+          'usage':{'input_tokens':2,'output_tokens':2,'total_tokens':4},
+          'provider_request_id':'provider-existing-result'}
+        receipt=self.control.reconcile_request(queued['request_id'],
+          'RESULT_RECOVERED','provider://request/provider-existing-result',
+          recovered,now=now+1)
+        self.assertEqual(receipt['state'],'SUCCEEDED')
+        self.assertEqual(ModelScheduler(self.control).run_once(now=now+2)['state'],
+          'IDLE')
+        row=self.supervisor.db.execute('''SELECT result_json,attempts FROM
+          model_requests WHERE request_id=?''',(queued['request_id'],)).fetchone()
+        self.assertEqual(json.loads(row['result_json']),recovered)
+        self.assertEqual(row['attempts'],1)
 
     def test_qualification_unknown_after_queue_holds_before_adapter_call(self):
         self.assigned();queued=self.control.queue_request('demo-b','developer',[],

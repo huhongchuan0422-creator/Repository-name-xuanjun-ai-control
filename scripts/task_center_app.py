@@ -101,7 +101,8 @@ MODEL_TABLES = frozenset((
     'model_usage_events', 'model_evaluations', 'delivery_candidates',
     'candidate_reviews', 'module_settings', 'task_work_specs',
     'model_call_attempts','model_request_bindings','model_call_reservations',
-    'model_usage_attempts','model_runtime_limits','approved_skills',
+    'model_request_reconciliations','model_usage_attempts',
+    'model_runtime_limits','approved_skills',
     'role_instances','acceptance_checklists','model_quota_status',
     'codex_execution_intents','codex_execution_events',
     'provider_onboarding_configs'))
@@ -928,6 +929,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                                 value['task_id']))
                     elif action=='CANCEL_REQUEST':
                         result=control.request_cancel(value['request_id'])
+                    elif action=='RECONCILE_REQUEST':
+                        result=control.reconcile_request(
+                          value['request_id'],value['outcome'],
+                          value['evidence_ref'],value.get('recovered_result'),
+                          expected_task_id=value['task_id'],
+                          expected_attempt_id=value['attempt_id'],
+                          expected_project_id=value['project_id'])
                     elif action=='REGISTER_BENCHMARK':
                         result=control.register_benchmark_suite(
                           value['suite_version'],value['cases'])
