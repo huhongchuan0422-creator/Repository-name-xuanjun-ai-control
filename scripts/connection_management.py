@@ -432,6 +432,11 @@ class ConnectionManager(object):
             connection=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,connection_id)).fetchone()
             if flow is None or connection is None:raise ValueError('OAUTH_FLOW_REQUIRED')
+            if (connection['status']=='REFRESHING' and
+                    connection['refresh_lease'] is not None and
+                    connection['refresh_lease_until'] is not None and
+                    connection['refresh_lease_until']>now):
+                raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
             if flow['status']!='PENDING':raise ValueError('OAUTH_STATE_REPLAY')
             if now>=flow['expires_at']:raise ValueError('OAUTH_FLOW_EXPIRED')
             if hashlib.sha256(_text(state,'state').encode()).hexdigest()!=flow['state_sha256']:
@@ -497,7 +502,8 @@ class ConnectionManager(object):
               status='ACTIVE',credential_generation=?,updated_at=? WHERE
               tenant_id=? AND connection_id=?
               AND config_version=? AND credential_generation=? AND
-              status!='REVOKED' AND EXISTS(SELECT 1 FROM
+              status!='REVOKED' AND status!='REFRESHING' AND
+              refresh_lease IS NULL AND EXISTS(SELECT 1 FROM
               oauth_flows f WHERE f.tenant_id=service_connections.tenant_id AND
               f.flow_id=? AND f.connection_id=service_connections.connection_id
               AND f.status='EXCHANGING')''',(new_secret_cipher,
@@ -550,11 +556,16 @@ class ConnectionManager(object):
         try:value=adapter.exchange(row['token_endpoint'],{'grant_type':'refresh_token',
           'refresh_token':refresh,'client_id':row['client_id']})
         except Exception:
-            self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
+            self.db.execute('''BEGIN IMMEDIATE''')
+            changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
               refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
               credential_generation=credential_generation+1 WHERE tenant_id=? AND
-              connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
-              lease));self.db.commit();raise
+              connection_id=? AND status='REFRESHING' AND
+              credential_generation=? AND refresh_lease=?''',(
+              self.tenant_id,connection_id,row['credential_generation'],
+              lease)).rowcount;self.db.commit()
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            raise
         try:
             access=_text(value.get('access_token'),'access_token')
             if str(value.get('token_type','Bearer')).lower()!='bearer':
@@ -568,11 +579,16 @@ class ConnectionManager(object):
                 raise ValueError('OAUTH_EXPIRY_REQUIRED')
             new_refresh=value.get('refresh_token') or refresh
         except Exception:
-            self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
+            self.db.execute('BEGIN IMMEDIATE')
+            changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
               refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
               credential_generation=credential_generation+1 WHERE tenant_id=? AND
-              connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
-              lease));self.db.commit();raise
+              connection_id=? AND status='REFRESHING' AND
+              credential_generation=? AND refresh_lease=?''',(
+              self.tenant_id,connection_id,row['credential_generation'],
+              lease)).rowcount;self.db.commit()
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            raise
         old_access=self.fernet.decrypt(row['secret_cipher']).decode()
         credential_changed=(old_access!=access or refresh!=new_refresh)
         generation=row['credential_generation']+int(credential_changed)
@@ -580,16 +596,28 @@ class ConnectionManager(object):
           credential_changed else row['secret_cipher'])
         new_refresh_cipher=(self.fernet.encrypt(new_refresh.encode()) if
           credential_changed else row['refresh_cipher'])
-        changed=self.db.execute('''UPDATE service_connections SET secret_cipher=?,
-          secret_mask=?,refresh_cipher=?,access_expires_at=?,status='ACTIVE',
-          refresh_lease=NULL,refresh_lease_until=NULL,credential_generation=?,
-          updated_at=? WHERE tenant_id=?
-          AND connection_id=? AND refresh_lease=?''',(new_secret_cipher,
-          '••••'+access[-4:],new_refresh_cipher,now+expires,
-          generation,now,self.tenant_id,connection_id,lease)).rowcount;self.db.commit()
-        if changed!=1:raise ValueError('OAUTH_REFRESH_LEASE_LOST')
-        self._audit('OAUTH_REFRESHED',connection_id,
-          {'credential_generation':generation},now);self.db.commit()
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            current=self.db.execute('''SELECT status,credential_generation,
+              refresh_lease FROM service_connections WHERE tenant_id=? AND
+              connection_id=?''',(self.tenant_id,connection_id)).fetchone()
+            if (current is None or current['status']!='REFRESHING' or
+                    current['refresh_lease']!=lease or
+                    current['credential_generation']!=row['credential_generation']):
+                raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            changed=self.db.execute('''UPDATE service_connections SET
+              secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
+              status='ACTIVE',refresh_lease=NULL,refresh_lease_until=NULL,
+              credential_generation=?,updated_at=? WHERE tenant_id=? AND
+              connection_id=? AND status='REFRESHING' AND refresh_lease=? AND
+              credential_generation=?''',(new_secret_cipher,
+              '••••'+access[-4:],new_refresh_cipher,now+expires,generation,now,
+              self.tenant_id,connection_id,lease,
+              row['credential_generation'])).rowcount
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            self._audit('OAUTH_REFRESHED',connection_id,
+              {'credential_generation':generation},now);self.db.commit()
+        except Exception:self.db.rollback();raise
         return {'connection_id':connection_id,'status':'ACTIVE',
           'credential_generation':generation,'expires_at':now+expires}
 
