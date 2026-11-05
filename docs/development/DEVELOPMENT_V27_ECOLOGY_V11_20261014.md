@@ -1443,6 +1443,12 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 
 ### 8.2.7 可视化反馈多渠道统一客户身份与证据留存（强制）
 
+**国内客服飞书身份边界（Owner 于 2026-10-20 明确）：** 本任务对象为国内客服飞书，复用已有应用 `XuanjunAICustomerService`，App ID `cli_aa4dc861c0385cbd`，对应国内服务器 `iZvt5t8tlrm8oiZ`（`47.101.152.210`）。用途是替代企业微信承接客户咨询，复用统一 CRM、客户/租户/项目身份及网页 AI，不另建客服系统、CRM 或权威状态。此身份定义同时约束第8.2.3–8.2.8节涉及的选购预览、统一可视化中心、多角色页面、自有域名预览、跨渠道反馈及主机分工；各处飞书客户入口均应引用本定义。
+
+**先核实再续接：** 必须先核对上述已有应用、租户/授权范围、国内运行配置、SecretRef、回调/事件入口、统一客户绑定及历史消息/处理记录，然后在原应用、原配置与原历史上继续。不得因缺少当前证据而重建应用、覆盖配置、清空历史或重新初始化客户身份。韩国币安飞书、开发控制飞书、认证通知飞书是独立保留身份，严禁混淆、替代或借用其应用、凭据、回调、会话及历史。
+
+**事实与状态分开：** 上述应用及服务器是 Owner 指定的任务身份，不是生产接线成功证明。本次仅补充文档；当前应用/租户映射、国内部署与回调、收发消息、既有历史接续和网页 AI 联调状态均须取得真实证据，未核实项保持 `UNKNOWN`。既有准入/上线门禁保持 `HOLD`；不得写成 `CONNECTED`、已部署或已验收。运行事实仍写回原 Canonical State、原任务及原证据记录，不在本文另建状态账本。
+
 规则编号 `VISUAL_FEEDBACK_OMNICHANNEL_IDENTITY_EVIDENCE_V1`。玄钧自有域名的可视化预览须支持三个客户联系入口：①网页内嵌 AI 对话窗口；②Telegram 官方客服机器人；③飞书（Feishu/Lark，待实际连接授权）。**三条渠道都必须归属同一权威客户/租户/项目身份**，不因渠道平台的昵称、展示名称、头像或浏览器自报客户ID而自行合并；不得让客户在不同渠道产生无法归集的孤立反馈工单。
 
 统一身份层复用 Tenant/Customer/Project/RBAC 和既有 CRM/Common Brain。数据关系由服务端维护：`customer_id / tenant_id / project_id / channel / external_subject_id / link_status / verified_at / link_proof / consent_scope`，渠道绑定唯一且可撤销；Telegram以真实 bot webhook 取得的发送者平台ID为准，飞书以经签名/授权核验的开放ID/用户ID为准，网页AI以玄钧站内有效登录/邀请会话为准。首次跨渠道关联必须由同一已认证客户执行一次性、短有效期、一次使用的受控绑定挑战（例如站内授权后跳转机器人携带随机绑定码），验证成功才建立关系；禁止仅凭用户发送文字“我是某某”、邮箱、手机号或昵称进行自动关联。错绑、重复绑定、跨租户、过期、撤销、账号更换和非法代理均应拒绝或由受控申诉流程处理。
@@ -1466,6 +1472,8 @@ PRODUCT_DEMO_ASSET字段包含product_id、module_version、demo_version、recor
 统一网站目标路径优先采用 `/` 官网、`/visual/` SaaS可视化中心、`/visual/community-payment/` 多角色社区分账演示、现有SaaS商品/报价入口复用、`/customer/projects/<project>/preview/` 私有客户预览。以上仅目标路由，未经受控部署并外网HTTPS回验不得对客户宣传为现成访问地址。根域路径不要求新增DNS记录，先核对旧站`/zh-cn`、`/en`与深层URL，不破坏既有语言及导航。公开预览可匿名查看演示，但私有定制、反馈、网页AI和Telegram/飞书身份归属必须经过可信认证及留证，不依赖ChatGPT登录。
 
 **迁移与发布顺序是强制门禁：** (1) Cloudflare只读导出完整RR及优先级；(2) 国内/英国/东京受控Runner或主机进行只读DNS、Nginx、root/upstream、TLS、旧站路由和回调核查；(3) 完成发布/制品SHA/备份及受控回滚；(4) 先在国内隔离环境进行官网和预览全链路测试，覆盖手机/PC、所有角色跳转、原官网、多语言和已授权反馈；(5) 经独立审核/Owner和现有Release Gate放行后才发布及切换根域DNS；(6) 全球解析、HTTPS、应用回调、订单/支付隔离、Web/CRM/Telegram/企微链路实测且稳定后，另行批准东京停机。**不能先改DNS、不能先撤东京、不能覆盖冻结PR118或更改PR17/P2门禁。**
+
+国内客服飞书按第8.2.7节固定到已有 `XuanjunAICustomerService` 与国内 `iZvt5t8tlrm8oiZ`（`47.101.152.210`）；英国开发控制、韩国币安及认证通知飞书不得因网站迁移被混为客服入口。替代企业微信是本任务方向，不表示旧企微/`wecom` 回调已经停用或可删除；既有依赖须逐项核实并按原门禁处置。
 
 详细DNS逐项台账、服务器事实与未知项、部署验收、回滚、Work/Dots协作锚点统一放在 `plans/XUANJUN_DOMAIN_DNS_UK_DOMESTIC_MIGRATION_MASTER_20261015.md`。本次工具容器和公共网页没有获得主域实际站点响应，`WEBSITE_ACTUAL_HOST=UNKNOWN`，`FIRST_PARTY_CUSTOMER_PREVIEW_GATE=HOLD`，不得宣称已完成部署。所有任务写回原PR/Issue与资产复用台账，不新建平行产品和生产写入者。
 
