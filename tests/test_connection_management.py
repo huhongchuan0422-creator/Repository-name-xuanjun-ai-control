@@ -240,6 +240,85 @@ class ConnectionManagementTests(unittest.TestCase):
         self.assertEqual(tuple(row),('OAUTH2_AUTH_CODE_PKCE','REVOKED',2,0,3,
           None,None))
 
+    def test_expired_complete_claim_recovers_after_restart_and_refreshes(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        abandoned=self.manager.begin_oauth('oauth',now=1002)
+        class WorkerExit(object):
+            def exchange(inner,*_args):raise SystemExit('worker-exit')
+        with self.assertRaises(SystemExit):
+            self.manager.complete_oauth('oauth',abandoned['flow_id'],
+              abandoned['state'],'code',self.base,self.base+'/callback',
+              WorkerExit(),now=1003)
+        self.assertEqual(self.manager.projection()[0]['status'],'CREDENTIAL_WRITING')
+        self.supervisor.close();self.supervisor=Supervisor(self.db)
+        self.gateway=GatewayKernel(self.supervisor,self.authority)
+        self.manager=ConnectionManager(self.gateway,self.context,self.master,
+          clock=lambda:1040)
+        class SameCredential(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-one','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.refresh('oauth',SameCredential(),now=1040)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['status'],row['credential_generation'],
+          row['connection_mutation_epoch']),('ACTIVE',1,5))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,1)
+
+    def test_stale_takeover_failures_restore_only_stable_state(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        def strand(now):
+            self.supervisor.db.execute('''UPDATE service_connections SET
+              status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+              refresh_lease='dead-writer',refresh_lease_until=?,
+              connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+              connection_id='oauth' ''',(now-1,));self.supervisor.db.commit()
+        class Malformed(object):
+            def exchange(inner,*_args):return {'token_type':'Bearer'}
+        class AdapterFailure(object):
+            def exchange(inner,*_args):raise RuntimeError('adapter-failure')
+        for offset,kind in enumerate(('malformed','adapter','verifier'),start=10):
+            now=1000+offset;flow=self.manager.begin_oauth('oauth',now=now-1)
+            if kind=='verifier':
+                self.supervisor.db.execute('''UPDATE oauth_flows SET
+                  verifier_cipher=? WHERE flow_id=?''',(b'not-fernet',
+                  flow['flow_id']));self.supervisor.db.commit()
+            strand(now)
+            call=(Malformed() if kind=='malformed' else AdapterFailure())
+            with self.assertRaises(Exception):
+                self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],
+                  'code',self.base,self.base+'/callback',call,now=now)
+            row=self.manager.projection()[0]
+            self.assertEqual(row['status'],'ACTIVE')
+            stored=self.supervisor.db.execute('''SELECT refresh_lease,
+              refresh_lease_until,stable_prior_status FROM service_connections
+              WHERE connection_id='oauth' ''').fetchone()
+            self.assertEqual(tuple(stored),(None,None,'ACTIVE'))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,3)
+
+    def test_ownerless_transient_recovery_is_idempotent_before_upsert(self):
+        self.manager.upsert(self.api_config(),credential='api-key-123456')
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+          refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='key' ''');self.supervisor.db.commit()
+        self.manager.upsert(self.api_config(),credential='api-key-123456',now=1001)
+        self.manager.upsert(self.api_config(),credential='api-key-123456',now=1002)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['status'],row['credential_generation']),('ACTIVE',1))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,1)
+
     def test_oauth_state_issuer_redirect_expiry_and_refresh_conflict(self):
         self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
         for state,issuer,redirect,error in (

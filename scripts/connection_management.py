@@ -199,6 +199,7 @@ class ConnectionManager(object):
               refresh_cipher BLOB,access_expires_at REAL,refresh_lease TEXT,
               refresh_lease_until REAL,credential_generation INTEGER NOT NULL DEFAULT 0,
               connection_mutation_epoch INTEGER NOT NULL DEFAULT 0,
+              stable_prior_status TEXT NOT NULL DEFAULT 'CONFIGURED',
               created_at REAL NOT NULL,updated_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,connection_id))''')
             self.db.execute('''CREATE TABLE IF NOT EXISTS oauth_flows(
@@ -225,6 +226,14 @@ class ConnectionManager(object):
             if 'connection_mutation_epoch' not in columns:
                 self.db.execute('''ALTER TABLE service_connections ADD COLUMN
                   connection_mutation_epoch INTEGER NOT NULL DEFAULT 0''')
+            if 'stable_prior_status' not in columns:
+                self.db.execute('''ALTER TABLE service_connections ADD COLUMN
+                  stable_prior_status TEXT NOT NULL DEFAULT 'CONFIGURED' ''')
+                self.db.execute('''UPDATE service_connections SET
+                  stable_prior_status=CASE WHEN status IN
+                  ('ACTIVE','CONFIGURED','REAUTH_REQUIRED','REVOKED') THEN status
+                  WHEN secret_cipher IS NOT NULL THEN 'ACTIVE' ELSE
+                  'REAUTH_REQUIRED' END''')
             self.db.commit()
         except Exception:self.db.rollback();raise
 
@@ -242,6 +251,34 @@ class ConnectionManager(object):
         self.db.execute('INSERT INTO connection_audit VALUES (?,?,?,?,?,?,?)',(
           hashlib.sha256(seed.encode()).hexdigest(),self.tenant_id,principal,
           action,target,canonical(safe),now))
+
+    def _reconcile_stale_credential_writer_locked(self,row,now):
+        if row is None or row['status'] not in ('REFRESHING','CREDENTIAL_WRITING'):
+            return row
+        if (row['refresh_lease'] is not None and
+                row['refresh_lease_until'] is not None and
+                row['refresh_lease_until']>now):
+            return row
+        stable=row['stable_prior_status']
+        if stable not in ('ACTIVE','CONFIGURED','REAUTH_REQUIRED','REVOKED'):
+            stable='REAUTH_REQUIRED'
+        if stable=='ACTIVE' and row['secret_cipher'] is None:
+            stable='REAUTH_REQUIRED'
+        changed=self.db.execute('''UPDATE service_connections SET status=?,
+          stable_prior_status=?,refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1,updated_at=?
+          WHERE tenant_id=? AND connection_id=? AND status=? AND
+          connection_mutation_epoch=?''',(stable,stable,now,self.tenant_id,
+          row['connection_id'],row['status'],
+          row['connection_mutation_epoch'])).rowcount
+        if changed!=1:raise ValueError('STALE_CREDENTIAL_WRITER_CAS_FAILED')
+        self._audit('STALE_CREDENTIAL_WRITER_RECOVERED',row['connection_id'],{
+          'prior_transient_status':row['status'],'stable_status':stable,
+          'expired_writer_epoch':row['connection_mutation_epoch'],
+          'recovered_writer_epoch':row['connection_mutation_epoch']+1},now)
+        return self.db.execute('''SELECT * FROM service_connections WHERE
+          tenant_id=? AND connection_id=?''',(self.tenant_id,
+          row['connection_id'])).fetchone()
 
     def upsert(self,config,credential=None,now=None):
         principal=self._admin();now=self.clock() if now is None else now
@@ -273,6 +310,7 @@ class ConnectionManager(object):
             existing=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,
               config['connection_id'])).fetchone()
+            existing=self._reconcile_stale_credential_writer_locked(existing,now)
             if (existing and existing['status'] in
                     ('REFRESHING','CREDENTIAL_WRITING') and
                     existing['refresh_lease_until'] is not None and
@@ -328,15 +366,15 @@ class ConnectionManager(object):
               supports_refresh,status,config_version,secret_cipher,secret_mask,
               refresh_cipher,access_expires_at,refresh_lease,refresh_lease_until,
               credential_generation,connection_mutation_epoch,created_at,
-              updated_at) VALUES
-              (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+              stable_prior_status,updated_at) VALUES
+              (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
               self.tenant_id,config['connection_id'],config['provider_id'],
               config['purpose'],config['auth_type'],destination,config['issuer'],
               config['authorization_endpoint'],config['token_endpoint'],
               config['revocation_endpoint'],config['redirect_uri'],config['client_id'],
               canonical(scopes),int(bool(config['supports_refresh'])),status,version,
               secret_cipher,secret_mask,refresh_cipher,expires,None,None,
-              generation,mutation_epoch,created,now))
+              generation,mutation_epoch,created,status,now))
             self._audit('CONNECTION_UPSERT',config['connection_id'],{
               'config_version':version,'auth_type':config['auth_type'],
               'credential_replaced':credential is not None,
@@ -442,6 +480,8 @@ class ConnectionManager(object):
               connection_id)).fetchone()
             connection=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,connection_id)).fetchone()
+            connection=self._reconcile_stale_credential_writer_locked(
+              connection,now)
             if flow is None or connection is None:raise ValueError('OAUTH_FLOW_REQUIRED')
             if (connection['status'] in ('REFRESHING','CREDENTIAL_WRITING') and
                     connection['refresh_lease'] is not None and
@@ -462,10 +502,12 @@ class ConnectionManager(object):
             writer_epoch=connection['connection_mutation_epoch']+1
             claimed=self.db.execute('''UPDATE service_connections SET
               status='CREDENTIAL_WRITING',refresh_lease=?,refresh_lease_until=?,
-              connection_mutation_epoch=?,updated_at=? WHERE tenant_id=? AND
+              stable_prior_status=?,connection_mutation_epoch=?,updated_at=?
+              WHERE tenant_id=? AND
               connection_id=? AND auth_type='OAUTH2_AUTH_CODE_PKCE' AND
               status=? AND connection_mutation_epoch=? AND config_version=? AND
-              credential_generation=?''',(writer,now+30,writer_epoch,now,
+              credential_generation=?''',(writer,now+30,prior_status,
+              writer_epoch,now,
               self.tenant_id,connection_id,prior_status,
               connection['connection_mutation_epoch'],connection['config_version'],
               connection['credential_generation'])).rowcount
@@ -483,12 +525,14 @@ class ConnectionManager(object):
                   tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
                   self.tenant_id,flow_id))
                 self.db.execute('''UPDATE service_connections SET status=?,
-                  refresh_lease=NULL,refresh_lease_until=NULL,updated_at=? WHERE
+                  stable_prior_status=?,refresh_lease=NULL,
+                  refresh_lease_until=NULL,updated_at=? WHERE
                   tenant_id=? AND connection_id=? AND
                   auth_type='OAUTH2_AUTH_CODE_PKCE' AND
                   status='CREDENTIAL_WRITING' AND refresh_lease=? AND
                   connection_mutation_epoch=? AND config_version=? AND
-                  credential_generation=?''',(prior_status,now,self.tenant_id,
+                  credential_generation=?''',(prior_status,prior_status,now,
+                  self.tenant_id,
                   connection_id,writer,writer_epoch,connection['config_version'],
                   connection['credential_generation']))
                 self.db.commit()
@@ -533,7 +577,8 @@ class ConnectionManager(object):
         try:
             changed=self.db.execute('''UPDATE service_connections SET
               secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
-              status='ACTIVE',credential_generation=?,refresh_lease=NULL,
+              status='ACTIVE',stable_prior_status='ACTIVE',
+              credential_generation=?,refresh_lease=NULL,
               refresh_lease_until=NULL,updated_at=? WHERE
               tenant_id=? AND connection_id=?
               AND config_version=? AND credential_generation=? AND
@@ -568,6 +613,7 @@ class ConnectionManager(object):
         try:
             row=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,connection_id)).fetchone()
+            row=self._reconcile_stale_credential_writer_locked(row,now)
             if row is None or row['auth_type']!='OAUTH2_AUTH_CODE_PKCE':
                 raise ValueError('OAUTH_CONNECTION_REQUIRED')
             if not row['supports_refresh']:raise ValueError('OAUTH_REFRESH_NOT_SUPPORTED')
@@ -582,6 +628,7 @@ class ConnectionManager(object):
                 self.db.execute('''UPDATE service_connections SET
                   status='REAUTH_REQUIRED',refresh_cipher=NULL,refresh_lease=NULL,
                   refresh_lease_until=NULL,
+                  stable_prior_status='REAUTH_REQUIRED',
                   credential_generation=credential_generation+1,
                   connection_mutation_epoch=connection_mutation_epoch+1,
                   updated_at=?
@@ -592,7 +639,8 @@ class ConnectionManager(object):
             writer_epoch=row['connection_mutation_epoch']+1
             changed=self.db.execute('''UPDATE service_connections SET
               status='REFRESHING',refresh_lease=?,refresh_lease_until=?,
-              connection_mutation_epoch=?,updated_at=? WHERE tenant_id=? AND
+              stable_prior_status='ACTIVE',connection_mutation_epoch=?,
+              updated_at=? WHERE tenant_id=? AND
               connection_id=? AND status='ACTIVE' AND
               connection_mutation_epoch=? AND credential_generation=?''',(
               lease,now+30,writer_epoch,now,self.tenant_id,connection_id,
@@ -608,6 +656,7 @@ class ConnectionManager(object):
             self.db.execute('''BEGIN IMMEDIATE''')
             changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
               refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+              stable_prior_status='REAUTH_REQUIRED',
               credential_generation=credential_generation+1 WHERE tenant_id=? AND
               connection_id=? AND status='REFRESHING' AND
               credential_generation=? AND connection_mutation_epoch=? AND
@@ -632,6 +681,7 @@ class ConnectionManager(object):
             self.db.execute('BEGIN IMMEDIATE')
             changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
               refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+              stable_prior_status='REAUTH_REQUIRED',
               credential_generation=credential_generation+1 WHERE tenant_id=? AND
               connection_id=? AND status='REFRESHING' AND
               credential_generation=? AND connection_mutation_epoch=? AND
@@ -659,7 +709,8 @@ class ConnectionManager(object):
                 raise ValueError('OAUTH_REFRESH_SUPERSEDED')
             changed=self.db.execute('''UPDATE service_connections SET
               secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
-              status='ACTIVE',refresh_lease=NULL,refresh_lease_until=NULL,
+              status='ACTIVE',stable_prior_status='ACTIVE',refresh_lease=NULL,
+              refresh_lease_until=NULL,
               credential_generation=?,updated_at=? WHERE tenant_id=? AND
               connection_id=? AND status='REFRESHING' AND refresh_lease=? AND
               credential_generation=? AND connection_mutation_epoch=?''',(
@@ -680,7 +731,13 @@ class ConnectionManager(object):
         self._admin();now=self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            current=self.db.execute('''SELECT * FROM service_connections WHERE
+              tenant_id=? AND connection_id=?''',(self.tenant_id,
+              connection_id)).fetchone()
+            current=self._reconcile_stale_credential_writer_locked(current,now)
+            if current is None:raise KeyError(connection_id)
             changed=self.db.execute('''UPDATE service_connections SET status='REVOKED',
+              stable_prior_status='REVOKED',
               secret_cipher=NULL,secret_mask=NULL,refresh_cipher=NULL,
               access_expires_at=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
               config_version=config_version+1,
