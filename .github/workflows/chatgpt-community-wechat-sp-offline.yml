@@ -1,4 +1,5 @@
 name: Community WeChat SP Offline Gate
+# OCR identity successor: run full regression before image and resource acceptance.
 # A fresh authorized mini upload regenerates its exact-run receipt in the original pipeline.
 # Existing preview channel; manual upload stays opt-in and exact-head/target bound.
 on:
