@@ -158,6 +158,13 @@ class RealBlackboxTest(unittest.TestCase):
         self.assertFalse(projection['community_template'][
                          'mini_program_task_created'])
 
+    def test_legacy_blackbox_pass_still_cannot_release(self):
+        plan, plan_id = self.register(legacy='LEGACY_NOT_RETROFITTED')
+        self.record(self.make_run(plan, plan_id, 'PRODUCT_ACCEPTANCE_AI',
+                                  'PASS', 'legacy-blackbox-pass'))
+        with self.assertRaisesRegex(ValueError, 'INTEGRATION_GATE_NOT_PASS'):
+            self.gate.release_gate(plan_id)
+
     def test_old_records_without_plan_remain_readable_and_not_upgraded(self):
         result = self.gate.require_task_release('historical-task')
         self.assertEqual(result['state'],

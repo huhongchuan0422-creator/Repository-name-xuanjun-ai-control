@@ -301,6 +301,8 @@ class RealAcceptanceGateway(object):
 
     def release_gate(self, plan_id):
         integration = self.require_integration(plan_id)
+        if integration['pass'] is not True:
+            raise ValueError('INTEGRATION_GATE_NOT_PASS')
         blackbox = self._latest(plan_id, 'PRODUCT_ACCEPTANCE_AI')
         if blackbox is None or blackbox['status'] != 'PASS':
             raise ValueError('REAL_BLACKBOX_GATE_NOT_PASS')
