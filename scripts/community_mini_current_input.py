@@ -19,11 +19,11 @@ from pathlib import Path, PurePosixPath
 
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
-PRODUCT_SOURCE_SHA = '4fbe51b0f33f3c214bd43465841d5996f1b06a02'
-MINI_TREE = '83d530b32d7f48440e3b168e43d8b66bb1a2bace'
-MANIFEST_SHA256 = 'ea28a00ce1ab171571695d2c96c844ef912342e7802c66fcb97c85af7eed5765'
-BINDING_ID = 'community-mini-v9-4fbe51-upload-20261106'
-BACKEND_SOURCE_SHA = '4fbe51b0f33f3c214bd43465841d5996f1b06a02'
+PRODUCT_SOURCE_SHA = '553575e7f8447cf8b97806d2095210ccd6ca4434'
+MINI_TREE = 'ec79944a6859dda06d7d791d753ddea99e16a2ac'
+MANIFEST_SHA256 = '02648ef4333485496fe18051b36a38363d26b1ecd14c64b0f5b66ed08a8835d1'
+BINDING_ID = 'community-mini-v9-553575-upload-20261106'
+BACKEND_SOURCE_SHA = '553575e7f8447cf8b97806d2095210ccd6ca4434'
 COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 PREFIX = 'community-mini-current/clients/community-mini/'
 APPID = 'wx1d5f8873eaea5392'
@@ -79,7 +79,7 @@ def source_files():
         require(len(raw) <= MAX_BYTES, 'CURRENT_MINI_FILE_SIZE_REQUIRED')
         files[relative] = (raw, hashlib.sha256(raw).hexdigest())
     hashes = {name: value[1] for name, value in files.items()}
-    require(len(files) == 76 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(len(files) == 77 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_MANIFEST_REQUIRED')
     return files
 
@@ -161,7 +161,7 @@ def verify_receipt(value, raw, env):
             and value.get('public_release') is False,
             'CURRENT_MINI_RECEIPT_REQUIRED')
     hashes = value.get('source_files')
-    require(type(hashes) is dict and len(hashes) == 76 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(type(hashes) is dict and len(hashes) == 77 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_RECEIPT_FILES_REQUIRED')
     return hashes
 
@@ -187,7 +187,7 @@ def stage(env):
         mini = temp / 'clients/community-mini'
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             names = archive.namelist()
-            require(len(names) == 76 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
+            require(len(names) == 77 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
             for name in names:
                 pure = PurePosixPath(name)
                 require(not pure.is_absolute() and '..' not in pure.parts and name.startswith(PREFIX),
