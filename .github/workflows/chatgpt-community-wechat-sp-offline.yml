@@ -89,7 +89,7 @@ jobs:
     outputs:
       source_sha256: ${{ steps.source_package.outputs.sha256 }}
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -638,8 +638,9 @@ jobs:
         if:  "env.COMMUNITY_CURRENT_PRODUCT_PUSH != 'true' && steps.scope.outputs.superadmin_repair_only != 'true' && (!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]'))"
         run: |
           git fetch --no-tags origin 90aca1cfca1ec2a354950c394a4b0c2689b37d13
-          python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32
+          python -m pip install playwright==1.55.0 cryptography==50.0.2 fastapi==0.162.0 httpx==0.28.1 python-multipart==0.0.32 Pillow==12.1.1
           python -m playwright install --with-deps chromium
+          PYTHONPATH=.:tests python -B -m unittest test_community_uploaded_image_scanner test_community_platform_host.FormalHost.test_applicant_image_scanner_uses_real_decoder_and_preserves_optin_gate test_community_platform_host.FormalHost.test_actual_nonroot_cli_image_scanner_unix_health_sigterm_and_restart -v
       - name: Complete Phase1 and Phase2 source regression
         if: "env.COMMUNITY_CURRENT_PRODUCT_PUSH != 'true' && steps.scope.outputs.superadmin_repair_only != 'true' && ((!contains(github.event.head_commit.message, '[preview-preupdate-observation-scope]') && (steps.scope.outputs.handoff_only != 'true') && ((steps.scope.outputs.resume_only == 'false' && steps.scope.outputs.handoff_only != 'true') && steps.scope.outputs.handoff_only != 'true' || (!(github.event_name == 'workflow_dispatch' && inputs.preview_enabled) && !(github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled) && !contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]') && !contains(github.event.head_commit.message, '[preview-stopped-handoff-scope]') && !contains(github.event.head_commit.message, '[preview-site-steps-scope]') && steps.scope.outputs.resume_only != 'true' && !contains(github.event.head_commit.message, '[preview-b-resume-scope]') && !contains(github.event.head_commit.message, '[preview-entry-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-endpoint-scope]') && !contains(github.event.head_commit.message, '[host-config-scope]') && !contains(github.event.head_commit.message, '[community-connection-scope]') && !contains(github.event.head_commit.message, '[persistent-runtime-scope]') && !contains(github.event.head_commit.message, '[platform-host-scope]') && !contains(github.event.head_commit.message, '[wechat-registration-scope]') && !contains(github.event.head_commit.message, '[formal-package-scope]') && !contains(github.event.head_commit.message, '[web-session-browser-scope]') && !contains(github.event.head_commit.message, '[web-session-race-scope]') && !contains(github.event.head_commit.message, '[preview-upgrade-scope]') && !contains(github.event.head_commit.message, '[web-session-tabs-scope]'))) && !contains(github.event.head_commit.message, '[fixed-product-preview-scope]')) && !(steps.scope.outputs.capture_only == 'true' && contains(github.event.head_commit.message, '[web-session-browser-scope]')))"
         run: |
@@ -712,7 +713,7 @@ jobs:
           NODE_OPTIONS: --test-reporter=tap
         run: |
           set -o pipefail
-          python -m pip install cryptography==50.0.2
+          python -m pip install cryptography==50.0.2 Pillow==12.1.1
           python -B -m unittest discover -s tests -p 'test_community_platform_host.py' -v 2>&1 | tee community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_mini_proxy.py' -v 2>&1 | tee -a community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_web_entries.py' -v 2>&1 | tee -a community-tests.log
@@ -729,7 +730,7 @@ jobs:
           NODE_OPTIONS: --test-reporter=tap
         run: |
           set -o pipefail
-          python -m pip install cryptography==50.0.2
+          python -m pip install cryptography==50.0.2 Pillow==12.1.1
           python -B -m unittest discover -s tests -p 'test_community_wechat_registration.py' -v 2>&1 | tee community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_first_install.py' -v 2>&1 | tee -a community-tests.log
           python -B -m unittest discover -s tests -p 'test_community_center_operations.py' -v 2>&1 | tee -a community-tests.log
