@@ -1,4 +1,11 @@
 'use strict';
+function safeOcrDiagnostic(value) {
+  if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1||
+     !["ADMISSION", "QUEUE", "AUTHENTICATION", "APPLICATION_AUTHORIZATION", "SOURCE_BINDING", "EXECUTION", "RESULT_READ", "CONFIRMATION", "WRITEBACK"].includes(value.stage)||!["HOST_NOT_READY", "REQUEST_IN_PROGRESS", "ANOTHER_REQUEST_IN_PROGRESS", "OWNER_QUEUE_FULL", "OWNER_WAIT_TIMEOUT", "HOST_STOPPED", "OWNER_THREAD_REQUIRED", "AUTHENTICATION_FAILED", "APPLICATION_ACCESS_DENIED", "SOURCE_BINDING_CHANGED", "APPLICATION_REVISION_CHANGED", "PROVIDER_VERSION_CHANGED", "ATTACHMENT_CHANGED", "SOURCE_EXPIRED", "JOB_NOT_FOUND", "IDEMPOTENCY_CONFLICT", "RATE_LIMITED", "IMAGE_INVALID", "MODEL_UNAVAILABLE", "MODEL_PIN_MISMATCH", "INFERENCE_FAILED", "RESULT_READ_FAILED", "CONFIRMATION_FAILED", "WRITEBACK_FAILED", "UNEXPECTED_FAILURE"].includes(value.reason)||
+     typeof value.diagnostic_id!=='string'||!/^[0-9a-f]{32}$/.test(value.diagnostic_id)||
+     typeof value.retryable!=='boolean'||typeof value.request_retained!=='boolean')return null;
+  return {version:1,diagnostic_id:value.diagnostic_id,stage:value.stage,reason:value.reason,retryable:value.retryable,request_retained:value.request_retained};
+}
 function customerError(error) {
   const code=error&&error.message;
   if(error&&error.regionReason==='DIRECTORY_MISMATCH')return '营业执照地址与当前地区目录无法精确匹配；地址正确时请联系平台核对目录，不要改成旧地名';
@@ -38,6 +45,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
+        if(path==='/mini/merchant'&&data.operation==='ocr')error.ocrDiagnostic=safeOcrDiagnostic(r.data&&r.data.ocr_diagnostic);
         // Gateway/server failures cannot prove whether this upload was persisted.
         // Keep it failed and require an original-application read before any retry.
         if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'&&[408,502,503,504].includes(r.statusCode))error.uploadResultUnknown=true;
@@ -291,4 +299,4 @@ function getSharedSession(wx, config, now, page) {
   sharedSessions.set(config,{baseUrl:config.baseUrl,wx,session,pages});
   return session;
 }
-module.exports={parseScene,createSession,getSharedSession,customerError};
+module.exports={parseScene,createSession,getSharedSession,customerError,safeOcrDiagnostic};

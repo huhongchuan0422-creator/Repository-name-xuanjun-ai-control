@@ -41,3 +41,9 @@
 .onboarding-page .edit-group[disabled]{background:#eef1ef;color:#737e77;border-color:#c7d0ca}
 
 .onboarding-page .redemption-picker{margin:12rpx 0;padding:16rpx 20rpx;border:2rpx solid #a7c5b5;border-radius:12rpx;font-size:28rpx;color:#125c43;background:#f2f8f4}
+
+/* Upload feedback stays centered on its own image, independent of OCR/pending. */
+.onboarding-page .material-preview-frame{position:relative;margin-top:16rpx;border-radius:18rpx;overflow:hidden}
+.onboarding-page .material-preview-frame .material-preview{margin-top:0}
+.material-upload-overlay{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(25,46,48,.30);padding:24rpx;box-sizing:border-box}
+.material-upload-label{display:block;max-width:100%;padding:18rpx 24rpx;border-radius:16rpx;background:rgba(25,46,48,.90);color:#fff;font-size:30rpx;font-weight:600;line-height:1.6;text-align:center;word-break:break-word}

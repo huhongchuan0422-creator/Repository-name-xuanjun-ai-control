@@ -18,7 +18,10 @@
  <text wx:if="{{group.materialWarning}}" class="field-error">{{group.materialWarning}}</text>
  <text wx:if="{{!ready&&group.materials.length}}" class="hint">登录后读取材料清单</text><view wx:for="{{group.materials}}" wx:if="{{!group.optional||showOptionalMaterials}}" wx:key="id" class="upload-slot">
   <button class="upload-choice" data-kind="{{item.id}}" bindtap="upload" disabled="{{pending||!canEditPlatform||!item.connected}}"><text class="upload-title">＋ {{item.title}} {{item.required?'*':''}}</text><text>{{item.uploaded?'重新拍照 / 从相册更换':'拍照 / 从相册选择'}}</text><text class="upload-help">{{group.photos?'本框1张，可更换；不做文字识别':'请上传清晰完整的证照照片'}}</text></button>
-  <image wx:if="{{materialPreviews[item.id]}}" class="material-preview" src="{{materialPreviews[item.id]}}" mode="aspectFit" />
+  <view wx:if="{{materialPreviews[item.id]}}" class="material-preview-frame">
+   <image class="material-preview" src="{{materialPreviews[item.id]}}" mode="aspectFit" />
+   <view wx:if="{{uploadFeedback&&uploadFeedback.kind===item.id}}" class="material-upload-overlay" aria-live="polite"><text class="material-upload-label">{{uploadFeedback.label}}</text></view>
+  </view>
   <text wx:if="{{step!==1||item.uploaded||item.synced}}" class="material-state">{{item.uploaded?'原申请已上传':'未选择材料'}} · {{item.synced?'已关联微信草稿':'未关联微信草稿'}}{{item.uploaded?' · 审核：'+(stateLabels[item.review]||'状态待核对'):''}}</text>
   <button wx:if="{{item.uploaded}}" class="text-link" data-kind="{{item.id}}" bindtap="syncMaterial" disabled="{{pending||!canEditWechat}}">{{item.synced?'重新关联当前材料':'关联当前微信资料草稿'}}</button>
   <button wx:if="{{group.photos&&item.synced&&item.id!=='cashier_photo'}}" class="text-link" data-kind="{{item.id}}" bindtap="removeScenePhoto" disabled="{{pending||!canEditWechat}}">移除草稿关联（原上传保留）</button>
