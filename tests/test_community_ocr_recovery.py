@@ -54,6 +54,11 @@ class DurableRecovery(unittest.TestCase):
   for name,digest_expected in lock['files'].items():
    source=os.environ.get('COMMUNITY_TEST_PINNED_OCR_DIR')
    data=(Path(source)/name).read_bytes() if source else subprocess.check_output(['git','show',lock['source_sha']+':services/ocr_engine/'+name])
+   self.assertEqual(hashlib.sha256(data).hexdigest(),lock.get('upstream_files',lock['files'])[name])
+   successor=lock.get('local_successor',{})
+   if name in successor.get('source_files',{}):
+    self.assertEqual(hashlib.sha256(Path(successor['patch_path']).read_bytes()).hexdigest(),successor['patch_sha256'])
+    data=Path(successor['source_files'][name]).read_bytes()
    self.assertEqual(hashlib.sha256(data).hexdigest(),digest_expected);(root/name).write_bytes(data)
   (root/'__init__.py').write_text('')
   name='ocr_recovery_pinned_'+str(id(self))
