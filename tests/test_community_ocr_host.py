@@ -100,12 +100,15 @@ class HostComposition(unittest.TestCase):
         with self.assertRaises(PermissionError):service.owner(lambda:True)
 
     def test_mini_source_submit_uses_host_and_remains_403(self):
-        from unittest.mock import Mock
+        from unittest.mock import Mock, patch
         import base64
         app=self.host.application
         app.gateway.provider.exchange=Mock(return_value={'appid':app.identity.appid,'openid':'openid1'})
         token=app.gateway.login({'code':'ocr-mini-source'})['session_token']
-        service=self.service();merchant=service.merchant
+        with patch('scripts.community_license_inference.run_license_layout_ocr',
+                   side_effect=AssertionError('DENIED_OCR_MUST_NOT_INFER')) as inference:
+            service=self.service()
+        merchant=service.merchant
         draft=merchant.dispatch(token,'shop1',{'operation':'onboarding','params':{'operation':'save','params':dict(application=None,revision=0,entity_type='ENTERPRISE',category='GENERAL',delegated=False,fields=dict(legal_name='SYNTHETIC',store_name='SYNTHETIC',address='SYNTHETIC',contact='SYNTHETIC'))}})
         self.host.center.scanner=lambda raw:True
         uploaded=merchant.dispatch(token,'shop1',{'operation':'onboarding','params':{'operation':'upload','params':dict(application=draft['application'],revision=draft['revision'],kind='business_license',expires_at=None,content_base64=base64.b64encode(b'\x89PNG\r\n\x1a\nSYNTHETIC ONLY').decode())}})
@@ -124,5 +127,19 @@ class HostComposition(unittest.TestCase):
             with concurrent.futures.ThreadPoolExecutor(1) as worker:
                 future=worker.submit(call);server.handle_request();status,body=future.result()
             self.assertEqual(status,403)
-            self.assertEqual(body,{'error':'OCR_AUTH_DENIED'})
+            self.assertEqual(set(body),{'error','ocr_diagnostic'})
+            self.assertEqual(body['error'],'OCR_AUTH_DENIED')
+            diagnostic=body['ocr_diagnostic']
+            self.assertIs(type(diagnostic),dict)
+            self.assertEqual(set(diagnostic),{'version','diagnostic_id','stage','reason',
+                                             'retryable','request_retained'})
+            self.assertIs(type(diagnostic['version']),int)
+            self.assertEqual(diagnostic['version'],1)
+            self.assertIs(type(diagnostic['diagnostic_id']),str)
+            self.assertRegex(diagnostic['diagnostic_id'],r'\A[0-9a-f]{32}\Z')
+            self.assertEqual(diagnostic['stage'],'QUEUE')
+            self.assertEqual(diagnostic['reason'],'AUTHENTICATION_FAILED')
+            self.assertIs(diagnostic['retryable'],False)
+            self.assertIs(diagnostic['request_retained'],False)
+            inference.assert_not_called()
         finally:server.server_close()
