@@ -54,12 +54,67 @@ class SplitOptIn(unittest.TestCase):
         app=self.draft(True,1200)
         approved=self.approve(self.submit(app))
         self.assertEqual((approved['requested_split_bps'],approved['provider_max_split_bps'],approved['effective_split_bps']),(1200,1200,1200))
+        with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):
+            self.draft(True,1201)
+        # A later configuration reduction still exercises the final approval gate.
+        self.service.provider_actions=_ProtectedPolicies(self.scope,1201)
         excessive=self.submit(self.draft(True,1201))
+        self.service.provider_actions=_ProtectedPolicies(self.scope,1200)
         for kind in excessive['required_materials']:
             excessive=self.call('review_material',{'application':excessive['application'],'revision':excessive['revision'],'kind':kind,
                 'decision':'ACCEPTED','note':'checked'},True)
         with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):
             self.call('review',{'application':excessive['application'],'revision':excessive['revision'],'action':'APPROVE','note':'approved'},True)
+
+    def edit(self,app,**changes):
+        params=dict(application=app['application'],revision=app['revision'],fields=self.fields,entity_type='ENTERPRISE',category='GENERAL',delegated=False)
+        params.update(changes)
+        return self.call('save',params)
+
+    def test_known_cap_rejects_explicit_edit_without_mutating_original(self):
+        app=self.draft(True,50)
+        with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):
+            self.edit(app,split_participation=True,requested_split_bps=1201)
+        after=self.call('read',dict(application=app['application']))
+        self.assertEqual(after['revision'],app['revision']);self.assertEqual(after['requested_split_bps'],50)
+        with self.assertRaises(ValueError):self.edit(app,revision=app['revision']-1,split_participation=True,requested_split_bps=60)
+        self.assertEqual(self.call('read',dict(application=app['application']))['requested_split_bps'],50)
+        saved=self.edit(app,split_participation=False,requested_split_bps=0)
+        self.assertEqual(saved['requested_split_bps'],0);self.assertFalse(saved['split_participation'])
+
+    def test_submit_rechecks_lowered_cap_and_keeps_draft(self):
+        app=self.draft(True,50)
+        self.service.provider_actions=_ProtectedPolicies(self.scope,49)
+        with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):
+            self.call('submit',dict(application=app['application'],revision=app['revision']))
+        after=self.call('read',dict(application=app['application']))
+        self.assertEqual(after['status'],'DRAFT');self.assertEqual(after['revision'],app['revision'])
+        self.assertEqual(after['requested_split_bps'],50)
+
+    def test_unknown_cap_keeps_draft_but_cannot_be_approved(self):
+        self.service.provider_actions=None
+        app=self.draft(True,50)
+        self.assertIsNone(app['provider_max_split_bps']);self.assertEqual(app['requested_split_bps'],50)
+        submitted=self.submit(app)
+        with self.assertRaisesRegex(ValueError,'WECHAT_SPLIT_MAXIMUM_NOT_VERIFIED'):
+            self.approve(submitted)
+        current=self.call('read',dict(application=app['application']))
+        self.assertNotEqual(current['status'],'APPROVED');self.assertEqual(current['effective_split_bps'],0)
+
+    def test_old_ratio_read_and_unrelated_save_do_not_migrate_or_default(self):
+        app=self.draft(True,50)
+        self.service.provider_actions=_ProtectedPolicies(self.scope,40)
+        self.assertEqual(self.call('read',dict(application=app['application']))['requested_split_bps'],50)
+        saved=self.edit(app,redemption_percent=10)
+        self.assertEqual(saved['requested_split_bps'],50);self.assertEqual(saved['redemption_percent'],10)
+        with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):
+            self.edit(saved,split_participation=True,requested_split_bps=50)
+        zero=self.draft(False,0);self.assertEqual(zero['requested_split_bps'],0)
+
+    def test_profit_sharing_disabled_is_known_zero_not_an_invented_default(self):
+        policy=next(iter(self.service.provider_actions.bindings.values()));policy['profit_sharing']=False
+        with self.assertRaisesRegex(ValueError,'SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM'):self.draft(True,1)
+        self.assertEqual(self.draft(False,0)['provider_max_split_bps'],0)
 
     def test_provider_split_gate_denies_nonparticipant(self):
         actions=ProviderActions.__new__(ProviderActions)

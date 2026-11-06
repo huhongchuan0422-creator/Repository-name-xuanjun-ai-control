@@ -3,8 +3,9 @@
 Applicant operations are owner-only. Merchant reads still require original,
 live workspace grants and matching scene/store; consumers never inherit them.
 """
+import re
 from scripts.community_mini_center_identity import CenterIdentity
-from scripts.community_merchant_onboarding import MerchantOnboarding
+from scripts.community_merchant_onboarding import MerchantOnboarding,validate_mini_license_region
 
 APPLICANT={'catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
            'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link'}
@@ -43,12 +44,13 @@ class MiniMerchant:
         if scene == '':
             # Missing store context is allowed ONLY for this owner's application.
             # A supplied invalid/revoked scene never falls back to this branch.
-            _,csrf=self.identity.applicant_context(token)
+            uid,csrf=self.identity.applicant_context(token)
             if op=='ocr':return self._dispatch_ocr(token,scene,p)
             if (op!='onboarding' or set(p)!={'operation','params'}
                     or type(p['operation']) is not str or p['operation'] not in APPLICANT):
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
-            return self.onboarding.dispatch(token,csrf,p,source_origin=None)
+            self._validate_contact_for_submit(uid,p)
+            return self.onboarding.dispatch(token,csrf,p,source_origin=None,_mini_submission=True)
         uid,pid,csrf,principal=self.context(token,scene)
         if op=='ocr':return self._dispatch_ocr(token,scene,p)
         if op=='collection_code':
@@ -73,7 +75,8 @@ class MiniMerchant:
         if op=='onboarding':
             if set(p)!={'operation','params'} or type(p['operation']) is not str or p['operation'] not in APPLICANT:
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
-            return self.onboarding.dispatch(token,csrf,p,source_origin=self._ocr_origin(scene,pid,principal))
+            self._validate_contact_for_submit(uid,p)
+            return self.onboarding.dispatch(token,csrf,p,source_origin=self._ocr_origin(scene,pid,principal),_mini_submission=True)
         if op in ('read','write'):
             if set(p)!={'workspace','operation','params'} or type(p['operation']) is not str or p['operation'] not in (READS if op=='read' else WRITES) or type(p['workspace']) is not str:
                 raise PermissionError('MERCHANT_READ_OPERATION_REQUIRED')
@@ -81,6 +84,37 @@ class MiniMerchant:
             if op=='write' and grant['role']!='MERCHANT_ADMIN':raise PermissionError('MERCHANT_ADMIN_REQUIRED')
             return self.operations.dispatch(token,csrf,p)
         raise PermissionError('MINI_MERCHANT_OPERATION_DENIED')
+
+    def _validate_contact_for_submit(self,uid,body):
+        """Mini admission only: preserve incomplete drafts and the Web contract.
+
+        Validate the phone in the same original record whose revision/version
+        guards this submission. Platform and provider reviews remain independent:
+        a provider draft may change or omit its mobile without changing the
+        platform revision. Never substitute a phone from the other record.
+        """
+        op=body['operation']
+        if op not in ('submit','wechat_submit_review'):return
+        params=body['params']
+        version_key='revision' if op=='submit' else 'expected_version'
+        if type(params) is not dict or set(params)!={'application',version_key}:
+            raise ValueError('INVALID_MINI_SUBMIT_FIELDS')
+        _,meta,platform=self.onboarding._load(params['application'],uid)
+        if op=='submit':
+            version=platform['revision']
+            mobile=platform['fields'].get('contact')
+        else:
+            service=self.onboarding.wechat_applyment
+            record=service._read(params['application']) if service is not None else None
+            version=record['version'] if record else 0
+            profile=record.get('profile') if record is not None else None
+            contact=profile.get('contact_info') if type(profile) is dict else None
+            mobile=contact.get('mobile_phone') if type(contact) is dict else None
+        if type(params[version_key]) is not int or params[version_key]!=version:
+            raise ValueError('MINI_SUBMIT_VERSION_CONFLICT')
+        if type(mobile) is not str or not re.fullmatch(r'[0-9]{11}',mobile):
+            raise ValueError('INVALID_MINI_CONTACT_MOBILE')
+        if op=='wechat_submit_review':validate_mini_license_region(meta,profile)
 
     def _dispatch_ocr(self,token,scene,p):
         from scripts.community_ocr_host import HostOcr, OcrPublicError

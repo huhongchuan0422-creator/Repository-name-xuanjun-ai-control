@@ -1,6 +1,9 @@
 'use strict';
 function customerError(error) {
   const code=error&&error.message;
+  if(error&&error.regionReason==='DIRECTORY_MISMATCH')return '营业执照地址与当前地区目录无法精确匹配；地址正确时请联系平台核对目录，不要改成旧地名';
+  if(error&&error.regionReason==='AMBIGUOUS_ADDRESS')return '营业执照地址包含不同地区，请返回第一步核对，已填写的资料会保留';
+  if(error&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(error.regionReason))return '地区与营业执照地址尚未匹配，请返回第一步核对，已填写的资料会保留';
   if(error&&error.networkKind==='DOMAIN')return '小程序服务域名校验未通过（NET_DOMAIN），请联系项目负责人';
   if(error&&error.networkKind==='TLS')return '安全连接未建立（NET_TLS），请联系项目负责人';
   if(error&&error.uploadResultUnknown===true)return '上传结果暂未确认，请先重新读取原申请，勿重复上传';
@@ -41,6 +44,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
         if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
+        if(r.statusCode===400&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&['submit','wechat_submit_review'].includes(data.params.operation)&&r.data&&r.data.error==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(r.data.reason))error.regionReason=r.data.reason;
         // Preserve a credential only for exact, typed capability-unavailable replies.
         // The operation still fails; generic access denial and every 401 clear it.
         if(r.statusCode===403&&path==='/mini/merchant'){

@@ -54,6 +54,12 @@ class SourcePackage(unittest.TestCase):
                 'deploy/community-preview/nginx-uk-path-candidate.conf',
                 'scripts/community_platform_host.py',
                 'scripts/community_uploaded_image_scanner.py',
+                'scripts/community_license_region.py',
+                'scripts/community_license_region_areas.json',
+                'tests/test_community_license_region.py',
+                'tests/test_community_mini_region_validation.py',
+                'tests/fixtures/community_license_region.json',
+                'clients/community-mini/merchant-license-region.js',
                 'tests/test_community_uploaded_image_scanner.py',
                 'tests/community_platform_image_startup.py',
                 'scripts/community_web_entries.py',
@@ -117,7 +123,7 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),40)
+                self.assertEqual(len(receipt['prepared_files']),41)
                 for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
                              'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
                     source='clients/community-mini/'+name

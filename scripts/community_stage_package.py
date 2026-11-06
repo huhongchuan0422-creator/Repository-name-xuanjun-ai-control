@@ -8,7 +8,7 @@ from pathlib import Path
 
 def build(root):
     root = Path(root)
-    patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
+    patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_license_region_areas.json', 'tests/fixtures/community_license_region.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
                 'tests/test_community_*.mjs', 'tests/community_*.cjs',
                 'tests/community_platform_image_startup.py',
                 'tests/test_stage5_*.py', 'demos/community-local-e2e/*',
@@ -58,6 +58,12 @@ def build(root):
                 'scripts/community_mini_host_config.py',
                 'scripts/community_platform_host.py',
                 'scripts/community_uploaded_image_scanner.py',
+                'scripts/community_license_region.py',
+                'scripts/community_license_region_areas.json',
+                'tests/test_community_license_region.py',
+                'tests/test_community_mini_region_validation.py',
+                'tests/fixtures/community_license_region.json',
+                'clients/community-mini/merchant-license-region.js',
                 'tests/test_community_uploaded_image_scanner.py',
                 'tests/community_platform_image_startup.py',
                 'scripts/community_web_entries.py',

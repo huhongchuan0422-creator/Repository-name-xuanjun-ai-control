@@ -38,7 +38,7 @@ class IntegratedReview(unittest.TestCase):
   with urllib.request.urlopen(self.url+'/review/sources') as response:payload=json.load(response)
   self.assertIs(payload['isolated'],True)
   for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
-               'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
+               'merchant-official-industries-data.js','merchant-platform-reference-data.js','merchant-license-region.js'):
    self.assertEqual(payload['sources'][name],(ROOT/'clients/community-mini'/name).read_text())
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
   page=self.page();errors=[];requests=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:requests.append(r.url))
@@ -55,10 +55,13 @@ class IntegratedReview(unittest.TestCase):
   page.get_by_role('button',name='保存草稿并继续下一项',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 1')
   page.locator('#native [data-key="scene"] select').select_option('2')
   self.visible_field(page,'input[data-path="business_info.merchant_shortname"]','stage1 merchant_shortname').fill('同版本测试门店')
+  page.locator('#native input[placeholder="请填写爱心捐赠比例"]').fill('2.75')
   page.get_by_role('button',name='保存草稿并继续下一项',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 2')
+  self.assertIs(page.evaluate('window.reviewPage.data.application.split_participation'),True)
+  self.assertEqual(page.evaluate('window.reviewPage.data.application.requested_split_bps'),275)
   application=page.evaluate('window.reviewPage.data.application.application')
-  page.get_by_role('button',name='‹ 上一阶段',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 1')
-  page.get_by_role('button',name='‹ 上一阶段',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 0')
+  page.get_by_role('button',name='返回上一步',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 1')
+  page.get_by_role('button',name='返回上一步',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 0')
   mobile_after_back=self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','stage2 back to stage0 mobile_phone')
   expect(mobile_after_back).to_have_value('13800000000')
   page.reload()
@@ -68,6 +71,9 @@ class IntegratedReview(unittest.TestCase):
   expect(self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','reload original merchant_name')).to_have_value('同版本测试主体')
   expect(self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','reload original mobile_phone')).to_have_value('13800000000')
   self.assertEqual(page.evaluate('window.reviewPage.profile.business_info.merchant_shortname'),'同版本测试门店')
+  self.assertIs(page.evaluate('window.reviewPage.data.application.split_participation'),True)
+  self.assertEqual(page.evaluate('window.reviewPage.data.application.requested_split_bps'),275)
+  self.assertEqual(page.evaluate('window.reviewPage.data.requestedSplitLabel'),'2.75%')
   self.assertEqual(page.evaluate('window.reviewPage.data.applications.length'),1)
   self.assertEqual(page.evaluate('window.reviewPage.data.application.application'),application)
   self.assertEqual(page.evaluate('window.reviewPage.data.application.status'),'DRAFT')

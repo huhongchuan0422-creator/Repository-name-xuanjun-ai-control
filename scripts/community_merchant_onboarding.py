@@ -84,6 +84,27 @@ def profile_scenes(profile):
     return None if scenes is None else checked_scenes(scenes)
 
 
+def validate_mini_license_region(meta,profile):
+    """Mini's retained license address only; Web's operating address is unchanged.
+
+    This is not a draft-save or history-read gate. Platform submission calls it
+    under its existing BEGIN IMMEDIATE lock; provider submission binds the
+    checked profile to the existing expected_version and transactional compare.
+    """
+    profile=profile if type(profile) is dict else {}
+    scenes=profile_scenes(profile) or meta.get('sales_scenes_type',[STORE_SCENE])
+    if STORE_SCENE not in scenes:return
+    def retained(*keys):
+        value=profile
+        for key in keys:
+            if type(value) is not dict:return None
+            value=value.get(key)
+        return value
+    from scripts.community_license_region import validate
+    return validate(retained('subject_info','business_license_info','license_address'),
+                    retained('business_info','sales_info','biz_store_info','biz_address_code'))
+
+
 def shared_application_fields(profile,fields):
     """Project platform fields from this same application's WeChat profile.
 
@@ -265,7 +286,8 @@ class MerchantOnboarding:
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',
             wechat_provider_workflow=provider_workflow_view(wechat_record),payment_enabled=False)
     @community_route('/merchant/onboarding')
-    def dispatch(self,session,csrf,body,*,source_origin=None):
+    def dispatch(self,session,csrf,body,*,source_origin=None,_mini_submission=False):
+        if type(_mini_submission) is not bool:raise ValueError("INVALID_INTERNAL_MINI_SUBMISSION")
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
             raise ValueError('INVALID_ONBOARDING_REQUEST')
         op,params=body['operation'],body['params'];c=self.center
@@ -381,6 +403,11 @@ class MerchantOnboarding:
                     meta['redemption_percent']=checked_redemption_percent(params['redemption_percent'])
                 if 'split_participation' in params or 'requested_split_bps' in params:
                     participates,requested=checked_split_choice(params.get('split_participation',meta.get('split_participation',False)),params.get('requested_split_bps',meta.get('requested_split_bps',0)))
+                    # Only an explicit ratio choice is checked on draft edits. Old
+                    # records are not migrated or changed by reads/unrelated saves.
+                    provider_max=self._split_policy(meta,owner)
+                    if participates and provider_max is not None and requested>provider_max:
+                        raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM')
                     meta.update(split_participation=participates,requested_split_bps=requested,effective_split_bps=0)
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
@@ -450,7 +477,16 @@ class MerchantOnboarding:
                 workflow._append(c.db,owner,application,revision,uid,'REVIEW_MATERIAL',{'kind':kind,'decision':decision,'note_sha256':hashlib.sha256(note.encode()).hexdigest()})
                 self._meta(application,owner,meta)
             else:
-                if op=='submit':require_confirmed_declarations(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
+                if op=='submit':
+                    if _mini_submission:
+                        validate_mini_license_region(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
+                    participates,requested=checked_split_choice(meta.get('split_participation',False),meta.get('requested_split_bps',0))
+                    provider_max=self._split_policy(meta,owner)
+                    if participates and provider_max is not None and requested>provider_max:
+                        raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM')
+                    # Unknown configuration may reach internal review; the original
+                    # APPROVE check below still requires a verified configured cap.
+                    require_confirmed_declarations(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
                 action='SUBMIT' if op=='submit' else 'WITHDRAW' if op=='withdraw' else params['action']
                 if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
                 if action in ('SUBMIT','APPROVE'):self._check_materials(application,meta)

@@ -49,6 +49,10 @@ class SameMiniMerchant(unittest.TestCase):
         c.db.execute("UPDATE links SET payload=? WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=?",(c.encrypt(canonical(meta),'wechat-mini-session'),row['subject_idx']))
         with self.assertRaisesRegex(PermissionError,'RELOGIN'):self.call('workspaces',token=token)
     def test_native_controllers_use_actual_http_and_same_original_record(self):
+        self._native_controllers()
+    def test_native_reused_fields_use_actual_http_and_preserve_historical_conflict(self):
+        self._native_controllers(reuse=True)
+    def _native_controllers(self,reuse=False):
         from scripts.community_wechat_sp_readonly import PartnerOrderReader
         from scripts.community_wechat_applyment import WechatApplyment
         from scripts.community_mini_http import serve
@@ -60,7 +64,7 @@ class SameMiniMerchant(unittest.TestCase):
         server.timeout=.1
         log=open('/tmp/community-native-http-controller.log','w+')
         child=subprocess.Popen(['node','tests/community_mini_merchant_http.cjs'],cwd=Path(__file__).resolve().parents[1],
-            env=dict(os.environ,COMMUNITY_TEST_ORIGIN='http://127.0.0.1:'+str(server.server_port)),stdout=log,stderr=log)
+            env=dict(os.environ,COMMUNITY_TEST_REUSE='true' if reuse else 'false',COMMUNITY_TEST_ORIGIN='http://127.0.0.1:'+str(server.server_port)),stdout=log,stderr=log)
         import time
         deadline=time.monotonic()+15
         try:

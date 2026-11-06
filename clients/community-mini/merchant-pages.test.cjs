@@ -1,12 +1,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const form=require('./merchant-form');const auth=require('./customer-auth');
-function fixture(name,options={}){let authenticated=false;let definition,calls=[],pending=null,failure=null,storedProfile={},cashierMediaId='',ocrStatus='needs_review',ocrConfirmedFields=null,ocrConfirmationRevision=0;const app={application:'ma_'+ '1'.repeat(32),revision:1,status:'DRAFT',fields:{store_name:'Fixture Shop',address:'Fixture Address'},entity_type:'ENTERPRISE',delegated:false,identity_type:'IDENTIFICATION_TYPE_IDCARD',sales_scenes_type:['SALES_SCENES_MINI_PROGRAM'],required_materials:['business_license'],materials:{},wechat_submerchant_state:'NOT_VERIFIED',opening_state:'NOT_APPROVED'};
+function fixture(name,options={}){let authenticated=false;let definition,calls=[],scrolls=[],pending=null,failure=null,storedProfile={},cashierMediaId='',ocrStatus='needs_review',ocrConfirmedFields=null,ocrConfirmationRevision=0;const app={application:'ma_'+ '1'.repeat(32),revision:1,status:'DRAFT',fields:{store_name:'Fixture Shop',address:'Fixture Address'},entity_type:'ENTERPRISE',delegated:false,identity_type:'IDENTIFICATION_TYPE_IDCARD',sales_scenes_type:['SALES_SCENES_MINI_PROGRAM'],required_materials:['business_license'],materials:{},wechat_submerchant_state:'NOT_VERIFIED',opening_state:'NOT_APPROVED'};
 const session={clear(){authenticated=false;},login:async()=>{authenticated=true;},async merchant(scene,op,p){if(options.beforeOperation)await options.beforeOperation(op,p);calls.push({scene,op,p:structuredClone(p)});if(failure&&failure.operation===p.operation){const e=failure.error;failure=null;throw e;}if(pending)return pending;
  if(op==='ocr'){if(p.action==='submit')return {result:{job_id:'synthetic-ocr'}};if(p.action==='read')return {result:{job_id:p.job_id,application_revision:String(app.revision),provider_version:1,status:ocrStatus,document_type:'business_license',...(ocrStatus==='confirmed'?{confirmed_fields:structuredClone(ocrConfirmedFields),confirmation_revision:ocrConfirmationRevision}:{fields:{company_name:{value:'Fixture Company'},registered_address:{value:'OCR Address'}}})}};if(p.action==='confirm'){ocrStatus='confirmed';ocrConfirmedFields=structuredClone(p.fields);ocrConfirmationRevision=p.revision;return {result:{job_id:p.job_id,status:'confirmed',revision:p.revision,recorded:true,application_revision:p.application_revision,provider_version:p.provider_version}};}}
  if(op==='workspaces')return {workspaces:['merchant']};if(op==='read')return p.operation==='community.orders'?{orders:[]}:{counts:{},order_total_minor:0};
- if(p.operation==='mine')return {applications:options.duplicateApplications?[structuredClone(app),{...structuredClone(app),application:'ma_'+ '2'.repeat(32),status:'APPROVED'}]:[]};if(p.operation==='catalog')return {materials:[{id:'business_license',title:'营业执照'}]};if(p.operation==='save'){if(Number.isInteger(p.params.redemption_percent))app.redemption_percent=p.params.redemption_percent;if(p.params.declarations)app.declarations=structuredClone(p.params.declarations);if(p.params.sales_scenes_type)app.sales_scenes_type=structuredClone(p.params.sales_scenes_type);app.entity_type=p.params.entity_type;app.delegated=p.params.delegated;app.identity_type=p.params.identity_type;return structuredClone(app);}if(p.operation==='read'){if(p.params.application!==app.application)return {...structuredClone(app),application:p.params.application,status:'APPROVED'};return structuredClone(app);}if(p.operation==='upload'){app.materials[p.params.kind]={uploaded:true,review:'PENDING'};app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='remove_material'){delete app.materials.cashier_photo;app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='wechat_media')return {media_id:'synthetic-admitted-media'};if(p.operation==='wechat_cashier_link'){cashierMediaId=p.params.media_id;return {version:2};}if(p.operation==='wechat_read')return {version:1,profile:structuredClone(storedProfile),cashier_media_id:cashierMediaId};if(p.operation==='wechat_save'){storedProfile=structuredClone(p.params.profile);return {version:2,profile:structuredClone(storedProfile)};}throw Error('unplanned');}};
- vm.runInNewContext(fs.readFileSync(__dirname+'/pages/'+name+'/index.js','utf8'),{Page:p=>definition=p,wx:{navigateTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},redirectTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},chooseMedia(o){if(options.chooseMedia)return options.chooseMedia(o);calls.push({p:{operation:'media_choice'},mediaChoice:{sourceType:o.sourceType,mediaType:o.mediaType,sizeType:o.sizeType}});o.success({tempFiles:[{tempFilePath:'synthetic-cashier.png',size:options.largeMedia?6000000:32}]});},compressImage(o){if(options.compressImage)return options.compressImage(o);calls.push({compress:{src:o.src,quality:o.quality}});o.success({tempFilePath:'synthetic-compressed.png'});},getFileSystemManager(){return {stat(o){o.success({stats:{size:options.largeMedia&&o.path==='synthetic-cashier.png'?6000000:17}});},readFile(o){calls.push({p:{operation:'read_file'},readFile:o.filePath});o.success({data:options.largeMedia&&o.filePath==='synthetic-cashier.png'?'A'.repeat(6666672):'iVBORw0KGgpzeW50aGV0aWM='});}}}},getApp:()=>({globalData:{baseUrl:'https://fixture.invalid'}}),require:p=>{if(p.endsWith('.json'))throw Error('WECHAT_JSON_MODULE_UNAVAILABLE');return p==='../../session'?{parseScene:()=> 'shop1',getSharedSession:()=>({...session,ensureLogin:session.login,isAuthenticated:()=>authenticated}),customerError:options.customerError||(()=> 'error')}:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:p==='../../merchant-submit'?require('./merchant-submit'):p==='../../merchant-official-fields'?require('./merchant-official-fields'):p==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):require(p);},encodeURIComponent});
-const page={...definition,data:structuredClone(definition.data),setData(p){Object.assign(this.data,p);}};return {page,calls,app,hold(p){pending=p;},failNext(operation,error){failure={operation,error};},get storedProfile(){return storedProfile;}};}
+ if(p.operation==='mine')return {applications:options.duplicateApplications?[structuredClone(app),{...structuredClone(app),application:'ma_'+ '2'.repeat(32),status:'APPROVED'}]:[]};if(p.operation==='catalog')return {materials:[{id:'business_license',title:'营业执照'}]};if(p.operation==='save'){if(typeof p.params.split_participation==='boolean'){app.split_participation=p.params.split_participation;app.requested_split_bps=p.params.requested_split_bps;app.effective_split_bps=0;}if(Number.isInteger(p.params.redemption_percent))app.redemption_percent=p.params.redemption_percent;if(p.params.declarations)app.declarations=structuredClone(p.params.declarations);if(p.params.sales_scenes_type)app.sales_scenes_type=structuredClone(p.params.sales_scenes_type);app.entity_type=p.params.entity_type;app.category=p.params.category;app.delegated=p.params.delegated;app.identity_type=p.params.identity_type;return structuredClone(app);}if(p.operation==='read'){if(p.params.application!==app.application)return {...structuredClone(app),application:p.params.application,status:'APPROVED'};return structuredClone(app);}if(p.operation==='upload'){app.materials[p.params.kind]={uploaded:true,review:'PENDING'};app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='remove_material'){delete app.materials.cashier_photo;app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='wechat_media')return {media_id:'synthetic-admitted-media'};if(p.operation==='wechat_cashier_link'){cashierMediaId=p.params.media_id;return {version:2};}if(p.operation==='wechat_read')return {version:1,profile:structuredClone(storedProfile),cashier_media_id:cashierMediaId};if(p.operation==='wechat_save'){storedProfile=structuredClone(p.params.profile);return {version:2,profile:structuredClone(storedProfile)};}throw Error('unplanned');}};
+ vm.runInNewContext(fs.readFileSync(__dirname+'/pages/'+name+'/index.js','utf8'),{Page:p=>definition=p,wx:{pageScrollTo(o){scrolls.push({...o,step:page.data.step});},navigateTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},redirectTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},chooseMedia(o){if(options.chooseMedia)return options.chooseMedia(o);calls.push({p:{operation:'media_choice'},mediaChoice:{sourceType:o.sourceType,mediaType:o.mediaType,sizeType:o.sizeType}});o.success({tempFiles:[{tempFilePath:'synthetic-cashier.png',size:options.largeMedia?6000000:32}]});},compressImage(o){if(options.compressImage)return options.compressImage(o);calls.push({compress:{src:o.src,quality:o.quality}});o.success({tempFilePath:'synthetic-compressed.png'});},getFileSystemManager(){return {stat(o){o.success({stats:{size:options.largeMedia&&o.path==='synthetic-cashier.png'?6000000:17}});},readFile(o){calls.push({p:{operation:'read_file'},readFile:o.filePath});o.success({data:options.largeMedia&&o.filePath==='synthetic-cashier.png'?'A'.repeat(6666672):'iVBORw0KGgpzeW50aGV0aWM='});}}}},getApp:()=>({globalData:{baseUrl:'https://fixture.invalid'}}),require:p=>{if(p.endsWith('.json'))throw Error('WECHAT_JSON_MODULE_UNAVAILABLE');return p==='../../session'?{parseScene:()=> 'shop1',getSharedSession:()=>({...session,ensureLogin:session.login,isAuthenticated:()=>authenticated}),customerError:options.customerError||(()=> 'error')}:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:p==='../../merchant-submit'?require('./merchant-submit'):p==='../../merchant-official-fields'?require('./merchant-official-fields'):p==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):require(p);},encodeURIComponent});
+const page={...definition,data:structuredClone(definition.data),setData(p,afterRender){Object.assign(this.data,p);if(afterRender)afterRender();}};return {page,calls,scrolls,app,hold(p){pending=p;},failNext(operation,error){failure={operation,error};},get storedProfile(){return storedProfile;}};}
 test('new admission defaults to LEGAL and places business-license fields and upload on the first screen',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  assert.equal(f.page.data.options.contact,'LEGAL');
@@ -75,17 +75,17 @@ test('revocation clears private application, fields and material metadata',async
 test('merchant admin mobile keeps exact string, provider mapping and service phone separation',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:1,options:{...f.page.data.options,contact:'LEGAL'}});f.page.refresh();
  const path='contact_info.mobile_phone';
- for(const value of ['12345','0012345678','+44-123456789']){
+ for(const value of ['13800138000','00123456789','19912345678']){
   f.page.input({currentTarget:{dataset:{path}},detail:{value}});
   assert.equal(form.get(f.page.profile,path),value);assert.equal(typeof form.get(f.page.profile,path),'string');
   assert.equal(f.page.data.mobilePhoneError,'');
  }
- assert.equal(form.platformFields(f.page.profile,f.page.data.base).contact,'+44-123456789');
- form.put(f.page.profile,'business_info.service_phone','555-0100');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'555-0100');assert.equal(form.get(f.page.profile,path),'+44-123456789');
+ assert.equal(form.platformFields(f.page.profile,f.page.data.base).contact,'19912345678');
+ form.put(f.page.profile,'business_info.service_phone','555-0100');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'555-0100');assert.equal(form.get(f.page.profile,path),'19912345678');
  await f.page.save();
- assert.equal(form.get(f.storedProfile,path),'+44-123456789');
+ assert.equal(form.get(f.storedProfile,path),'19912345678');
  assert.equal(typeof form.get(f.storedProfile,path),'string');
- assert.equal(f.calls.find(c=>c.p.operation==='wechat_save').p.params.profile.contact_info.mobile_phone,'+44-123456789');
+ assert.equal(f.calls.find(c=>c.p.operation==='wechat_save').p.params.profile.contact_info.mobile_phone,'19912345678');
 });
 test('reverse navigation from account number returns to the two-field bank branch group',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
@@ -141,23 +141,23 @@ test('merchant mobile rejects malformed values locally, preserves legacy overlen
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.profile={contact_info:{mobile_phone:'123456789012345678901'}};
  f.page.setData({step:0});f.page.refresh();
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'123456789012345678901');
- assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,21);
+ assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,-1);
  assert.notEqual(f.page.data.mobilePhoneError,'');
- for(const value of ['1234','abcde','123 45','12345\n','１２３４５']){
+ for(const value of ['1234','1234567890','123456789012','abcde','123 45','13800138000\n','１３８００１３８０００','+13800138000']){
   f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value}});
   assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),value);
   assert.notEqual(f.page.data.mobilePhoneError,'',JSON.stringify(value));
  }
- f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'0012345678'}});
+ f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'00123456789'}});
  assert.equal(f.page.data.mobilePhoneError,'');
- assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,20);
+ assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,-1);
  f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'12345678901234567890'}});
- assert.equal(f.page.data.mobilePhoneError,'');
+ assert.notEqual(f.page.data.mobilePhoneError,'');
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'12345678901234567890');
 });
 test('empty mobile is an empty string after save and reread, no stale fallback',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:1});
- f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'0012345678'}});
+ f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'00123456789'}});
  f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:''}});
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'');
  assert.notEqual(f.page.data.mobilePhoneError,'');
@@ -177,21 +177,21 @@ test('server rejection preserves raw mobile input and never reports saved succes
 });
 test('LEGAL and SUPER use one mobile field and keep identity/contact fields across stages',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
- const path='contact_info.mobile_phone';f.page.input({currentTarget:{dataset:{path}},detail:{value:'0012345678'}});
+ const path='contact_info.mobile_phone';f.page.input({currentTarget:{dataset:{path}},detail:{value:'00123456789'}});
  for(const contact of ['LEGAL','SUPER']){
   f.page.setData({options:{...f.page.data.options,contact},step:0});f.page.refresh();
   assert.equal(f.page.data.fields.filter(x=>x.path===path).length,1);
-  assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_name'));
+  assert.equal(f.page.data.fields.some(x=>x.path==='contact_info.contact_name'),contact==='SUPER');
   assert.ok(f.page.data.fields.some(x=>x.path==='contact_info.contact_email'));
   f.page.setData({step:0});f.page.refresh();f.page.setData({step:1});f.page.refresh();
-  assert.equal(form.get(f.page.profile,path),'0012345678');
+  assert.equal(form.get(f.page.profile,path),'00123456789');
  }
  const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
  assert.ok(wxml.includes('type="text"'),'mobile phone field must use text input');assert.ok(wxml.includes('data-path="{{item.path}}"'),'mobile phone field must bind the exact field path');
  assert.ok(wxml.includes("maxlength=\"{{item.path===\'contact_info.mobile_phone\'?item.maxlength:512}}\""),'mobile_phone input must use the exact path-specific maxlength ternary');
  assert.ok(wxml.includes('bindblur="blur"'),'mobile phone field must bind blur validation');
- assert.ok(wxml.includes('5–20位，可含数字、+或-，不含空格'),'complete mobile format hint must be present verbatim');
- assert.equal(form.get(f.page.profile,'business_info.service_phone'),undefined);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'0012345678');
+ assert.ok(wxml.includes('11位数字联系电话，不含空格、+或-'),'complete mobile format hint must be present verbatim');
+ assert.equal(form.get(f.page.profile,'business_info.service_phone'),'00123456789');assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'00123456789');
 });
 test('approved platform application can continue original WeChat draft without resubmitting platform',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.app.status='APPROVED';await f.page.select({currentTarget:{dataset:{application:f.app.application}}});f.calls.length=0;form.put(f.page.profile,'contact_info.mobile_phone','13800000000');await f.page.save();assert.ok(!f.calls.some(c=>c.p.operation==='save'));assert.ok(f.calls.some(c=>c.p.operation==='wechat_save'));});
 
@@ -225,7 +225,7 @@ test('scene photographs require no OCR while business license keeps its distinct
 
 test('confirmed scene photo cards keep two required frames and retain uploaded cashier history',()=>{const css=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxss','utf8');const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(css,/\.onboarding-page \.upload-choice\{[^}]*border:/);assert.match(wxml,/wx:for="{{group.materials}}"[^>]*class="upload-slot"/);const groups=form.materialGroups({}, {entity:'ENTERPRISE',contact:'LEGAL',doc:form.docs[0],scene:'both',ubos:'unknown'},[],1);assert.deepEqual(groups.find(g=>g.id==='store').materials.map(x=>x.id),['storefront_photo','interior_photo']);const history=form.materialGroups({}, {entity:'ENTERPRISE',contact:'LEGAL',doc:form.docs[0],scene:'both',ubos:'unknown'},[{id:'cashier_photo',uploaded:true}],1);assert.deepEqual(history.find(g=>g.id==='store').materials.map(x=>x.id),['storefront_photo','interior_photo','cashier_photo']);});
 
-test('scene photos appear beside chosen actual store scene and not in mini-only scene',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.equal(wxml.includes('bindinput="baseInput"'),false);f.page.setData({step:1,options:{...f.page.data.options,scene:'both'},catalog:[...f.page.data.catalog,...['storefront_photo','interior_photo','mini_program_screenshot'].map(id=>({id,title:id}))]});f.page.refresh();const groups=f.page.data.materialGroups;assert.equal(groups[0].id,'scene');assert.ok(groups.find(g=>g.id==='store').fields.some(x=>x.path.endsWith('biz_store_address')));assert.deepEqual(Array.from(f.page.data.scenePhotoCards,x=>x.connected),[true,true,false]);assert.equal(f.page.materialProfilePath('storefront_photo'),'business_info.sales_info.biz_store_info.store_entrance_pic');assert.equal(f.page.materialProfilePath('interior_photo'),'business_info.sales_info.biz_store_info.indoor_pic');assert.equal(f.page.materialProfilePath('mini_program_screenshot'),'business_info.sales_info.mini_program_info.mini_program_pics');f.page.setData({options:{...f.page.data.options,scene:'mini'}});f.page.refresh();assert.equal(f.page.data.scenePhotoCards.length,0);assert.equal(f.page.data.materialGroups.some(g=>g.id==='store'),false);});
+test('scene photos appear beside chosen actual store scene and not in mini-only scene',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.equal(wxml.includes('bindinput="baseInput"'),false);f.page.setData({step:1,options:{...f.page.data.options,scene:'both'},catalog:[...f.page.data.catalog,...['storefront_photo','interior_photo','mini_program_screenshot'].map(id=>({id,title:id}))]});f.page.refresh();const groups=f.page.data.materialGroups;assert.equal(groups[0].id,'scene');assert.ok(!groups.find(g=>g.id==='store').fields.some(x=>x.path.endsWith('biz_store_address')));assert.match(groups.find(g=>g.id==='store').reuseHint,/返回第一步/);assert.deepEqual(Array.from(f.page.data.scenePhotoCards,x=>x.connected),[true,true,false]);assert.equal(f.page.materialProfilePath('storefront_photo'),'business_info.sales_info.biz_store_info.store_entrance_pic');assert.equal(f.page.materialProfilePath('interior_photo'),'business_info.sales_info.biz_store_info.indoor_pic');assert.equal(f.page.materialProfilePath('mini_program_screenshot'),'business_info.sales_info.mini_program_info.mini_program_pics');f.page.setData({options:{...f.page.data.options,scene:'mini'}});f.page.refresh();assert.equal(f.page.data.scenePhotoCards.length,0);assert.equal(f.page.data.materialGroups.some(g=>g.id==='store'),false);});
 
 test('UBO passport hides only current beneficiaries back material',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({catalog:[...f.page.data.catalog,...['ubo_1_front','ubo_1_back','ubo_2_front','ubo_2_back'].map(id=>({id,title:id}))],options:{...f.page.data.options,entity:'ENTERPRISE',ubos:2,uboIndex:0}});form.put(f.page.profile,'subject_info.ubo_info_list.0.ubo_id_doc_type','IDENTIFICATION_TYPE_OVERSEA_PASSPORT');form.put(f.page.profile,'subject_info.ubo_info_list.1.ubo_id_doc_type','IDENTIFICATION_TYPE_IDCARD');f.page.refresh();assert.deepEqual(Array.from(f.page.data.adjacentMaterials,x=>x.id),['ubo_1_front']);f.page.setData({options:{...f.page.data.options,uboIndex:1}});f.page.refresh();assert.deepEqual(Array.from(f.page.data.adjacentMaterials,x=>x.id),['ubo_2_front','ubo_2_back']);});
 test('selection immediately reveals document uploads above editable text and requires explicit OCR and human checking',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.ok(wxml.indexOf('wx:for="{{group.materials}}"')<wxml.indexOf('wx:for="{{group.fields}}"'));assert.ok(wxml.indexOf('识别本组已上传证照')<wxml.indexOf('wx:for="{{group.fields}}"'));assert.match(wxml,/识别结果需人工核对/);f.page.setData({options:{...f.page.data.options,entity:'SOLE_PROPRIETOR',contact:'SUPER'},catalog:[...f.page.data.catalog,...['identity_front','identity_back','operator_identity','operator_identity_back'].map(id=>({id,title:id}))]});f.page.refresh();assert.equal(f.page.data.materialGroups[0].id,'license');assert.ok(f.page.data.materialGroups.find(g=>g.id==='legal'));assert.ok(f.page.data.materialGroups.find(g=>g.id==='operator'));assert.equal(f.page.data.materialGroups.filter(g=>g.id==='contact').length,1);f.page.selectDocumentType({currentTarget:{dataset:{path:'subject_info.identity_info.id_doc_type'}},detail:{value:1}});assert.deepEqual(Array.from(f.page.data.materialGroups.find(g=>g.id==='legal').materials,m=>m.id),['identity_front']);assert.equal(f.calls.some(c=>/ocr|wechat_execute/.test(c.p.operation)),false);});
@@ -301,9 +301,9 @@ test('progress returns to exact original material group without new request or i
 test('reopened individual declaration switches back to unknown enterprise rather than not_applicable',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.condition({currentTarget:{dataset:{key:'entity'}},detail:{value:1}});await f.page.save();assert.equal(f.page.data.options.entity,'SOLE_PROPRIETOR');assert.equal(f.page.data.options.ubos,'not_applicable');f.page.condition({currentTarget:{dataset:{key:'entity'}},detail:{value:0}});assert.equal(f.page.data.options.entity,'ENTERPRISE');assert.equal(f.page.data.options.ubos,'unknown');const g=f.page.data.materialGroups.find(g=>g.id==='beneficiaries');assert.equal(g.conditionValue,0);await f.page.save();assert.equal(f.page.data.application.declarations.ubos,'unknown');assert.equal(f.page.data.application.entity_type,'ENTERPRISE');});
 
 test('native DOM projection changes tag selectors without corrupting CSS properties or class names',()=>{const {nativeCss}=require('../../tests/community_mini_native_render.cjs');const css='page{color:red} .text-link, view > text{ text-align:left; text-decoration:none } picker:hover{color:green}';const out=nativeCss(css);assert.match(out,/body\{/);assert.match(out,/\.text-link, div > span/);assert.match(out,/text-align:left/);assert.match(out,/text-decoration:none/);assert.match(out,/select:hover/);assert.ok(!out.includes('span-align'));});
-test('original FOOD material rule and optional supplements are reachable without new mandatory documents',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2,catalog:[...f.page.data.catalog,...['industry_permit','settlement_proof','operator_authorization'].map(id=>({id,title:id}))]});f.page.refresh();assert.equal(f.page.data.materialGroups.find(g=>g.id==='qualification').materials.length,0);f.page.condition({currentTarget:{dataset:{key:'category'}},detail:{value:1}});assert.equal(f.page.data.options.category,'FOOD');assert.equal(f.page.data.materialGroups.find(g=>g.id==='qualification').materials[0].id,'industry_permit');assert.equal(f.page.data.materialGroups.some(g=>g.id==='optional'),false);const historical=form.materialGroups(f.page.profile,f.page.data.options,[{id:'settlement_proof',uploaded:true,required:false}],2).find(g=>g.id==='optional');assert.equal(historical.optional,true);assert.ok(historical.materials.every(m=>!m.required));assert.equal(f.page.data.showOptionalMaterials,false);f.page.toggleOptional();assert.equal(f.page.data.showOptionalMaterials,true);await f.page.save();assert.equal(f.calls.find(c=>c.p.operation==='save').p.params.category,'FOOD');});
+test('original FOOD material rule and optional supplements are reachable without new mandatory documents',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2,catalog:[...f.page.data.catalog,...['industry_permit','settlement_proof','operator_authorization'].map(id=>({id,title:id}))]});f.page.refresh();assert.equal(f.page.data.materialGroups.some(g=>g.id==='qualification'),false);f.page.condition({currentTarget:{dataset:{key:'category'}},detail:{value:1}});assert.equal(f.page.data.options.category,'FOOD');assert.equal(f.page.data.materialGroups.find(g=>g.id==='qualification').materials[0].id,'industry_permit');assert.equal(f.page.data.materialGroups.some(g=>g.id==='optional'),false);const historical=form.materialGroups(f.page.profile,f.page.data.options,[{id:'settlement_proof',uploaded:true,required:false}],2).find(g=>g.id==='optional');assert.equal(historical.optional,true);assert.ok(historical.materials.every(m=>!m.required));assert.equal(f.page.data.showOptionalMaterials,false);f.page.toggleOptional();assert.equal(f.page.data.showOptionalMaterials,true);await f.page.save();assert.equal(f.calls.find(c=>c.p.operation==='save').p.params.category,'FOOD');});
 
-test('bank account choices display Chinese while retaining original submitted enum',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2});f.page.refresh();const bank=f.page.data.materialGroups.find(g=>g.id==='bank').fields.find(x=>x.path==='bank_account_info.bank_account_type');assert.equal(bank.label,'账户类型');assert.deepEqual(bank.choices,['BANK_ACCOUNT_TYPE_CORPORATE']);assert.deepEqual(bank.choiceLabels,['对公银行账户']);assert.equal(bank.choiceLabel,'请选择');f.page.choice({currentTarget:{dataset:{index:bank.index}},detail:{value:'0'}});assert.equal(form.get(f.page.profile,bank.path),'BANK_ACCOUNT_TYPE_CORPORATE');assert.equal(f.page.data.materialGroups.find(g=>g.id==='bank').fields.find(x=>x.path===bank.path).choiceLabel,'对公银行账户');});
+test('bank account choices display Chinese while retaining original submitted enum',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:2});f.page.refresh();const bank=f.page.data.materialGroups.find(g=>g.id==='bank').fields.find(x=>x.path==='bank_account_info.bank_account_type');assert.equal(bank.label,'账户类型');assert.deepEqual(bank.choices,['BANK_ACCOUNT_TYPE_CORPORATE','BANK_ACCOUNT_TYPE_PERSONAL']);assert.deepEqual(bank.choiceLabels,['对公账户','对私账户（经营者本人）']);assert.equal(bank.choiceLabel,'请选择');f.page.choice({currentTarget:{dataset:{index:bank.index}},detail:{value:'0'}});assert.equal(form.get(f.page.profile,bank.path),'BANK_ACCOUNT_TYPE_CORPORATE');assert.equal(f.page.data.materialGroups.find(g=>g.id==='bank').fields.find(x=>x.path===bank.path).choiceLabel,'对公账户');});
 test('material-group return waits for render completion before exact scroll',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});let completion;const original=f.page.setData;f.page.setData=function(p,afterRender){original.call(this,p);if(afterRender)completion=afterRender;};f.page.setData({step:3});f.page.refresh();f.page.returnMaterial({currentTarget:{dataset:{step:0,group:'legal'}}});assert.equal(typeof completion,'function');assert.equal(f.page.data.step,0);assert.ok(f.page.data.materialGroups.find(g=>g.id==='legal'));completion();});
 test('original status meanings and recommendation header are display-only',()=>{const f=fixture('merchant-join');assert.equal(f.page.data.stateLabels.DRAFT,'草稿未提交');assert.equal(f.page.data.stateLabels.NOT_VERIFIED,'尚未核验');assert.equal(f.page.data.stateLabels.NOT_APPROVED,'尚未开通');assert.equal(f.page.data.stateLabels.APPROVED,'平台审核通过');const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(wxml,/stateLabels\[platformState\]/);assert.match(wxml,/class="progress-state"/);assert.match(fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8'),/recommendations-page/);assert.match(fs.readFileSync(__dirname+'/pages/checkout/index.wxss','utf8'),/background:#f5f8f7/);});
 test('confirmed UI shows field values before editing and collapses without clearing actual draft',async()=>{
@@ -362,3 +362,318 @@ test('redemption exact original options select save and reread; readonly and inv
 test('new application defaults to10 but existing explicit0 remains0; picker selection follows original array',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});assert.equal(f.page.data.application,null);assert.equal(f.page.data.pendingRedemptionPercent,10);await f.page.save();assert.equal(f.app.redemption_percent,10);f.page.chooseRedemption({currentTarget:{dataset:{}},detail:{value:'0'}});await f.page.save();assert.equal(f.app.redemption_percent,0);f.page.setData({pendingRedemptionPercent:30});await f.page.load(f.app.application);assert.equal(f.page.data.pendingRedemptionPercent,0);assert.equal(f.page.data.redemptionIndex,0);f.page.chooseRedemption({currentTarget:{dataset:{}},detail:{value:'3'}});assert.equal(f.page.data.pendingRedemptionPercent,25);});
 
 test('OCR suggestions never gate manual license or identity validity dates and save retains all four',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({ocrKind:'business_license',ocrRows:[{key:'company_name',value:'SYNTHETIC'}]});f.page.refresh();const paths=['subject_info.business_license_info.period_begin','subject_info.business_license_info.period_end','subject_info.identity_info.id_card_info.card_period_begin','subject_info.identity_info.id_card_info.card_period_end'];for(const [index,path] of paths.entries()){const field=f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===path);assert.ok(field,path);assert.equal(field.ocrResultPresent,false,path);f.page.input({currentTarget:{dataset:{path}},detail:{value:index%2?'2030-01-01':'2020-01-01'}});}await f.page.save();for(const [index,path] of paths.entries())assert.equal(form.get(f.storedProfile,path),index%2?'2030-01-01':'2020-01-01');});
+
+
+test('only a new mini application defaults donation to50bps independently from points10',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ assert.equal(f.page.data.splitInput,'0.5');assert.equal(f.page.data.splitChoiceEdited,false);assert.equal(f.page.data.splitDefaultPending,true);
+ await f.page.save();const save=f.calls.find(x=>x.p.operation==='save').p.params;
+ assert.equal(save.split_participation,true);assert.equal(save.requested_split_bps,50);assert.equal(f.page.data.splitInput,'0.5');assert.equal(f.page.data.splitDefaultPending,false);
+ assert.equal(save.redemption_percent,10,'the independently approved new-application points default stays unchanged');
+});
+test('explicit split percentage persists exact integer basis points and reloads separately from points',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.inputSplitPercent({detail:{value:'2.75'}});await f.page.save();
+ const save=f.calls.find(x=>x.p.operation==='save').p.params;
+ assert.equal(save.split_participation,true);assert.equal(save.requested_split_bps,275);assert.equal(save.redemption_percent,10);
+ assert.equal(f.page.data.splitInput,'2.75');assert.equal(f.page.data.requestedSplitLabel,'2.75%');assert.equal(f.page.data.effectiveSplitLabel,'尚未生效');
+ assert.equal(f.page.data.splitChoiceEdited,false);assert.equal(f.page.data.dirty,false);
+ await f.page.load(f.app.application);assert.equal(f.page.data.splitInput,'2.75');
+ assert.ok(f.calls.every(x=>!['wechat_execute','split','rule_create','community_receiver_bind'].includes(x.p.operation)));
+});
+test('explicit zero opts out while an untouched legacy positive choice is not silently reset',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ Object.assign(f.app,{split_participation:true,requested_split_bps:130,redemption_percent:0});await f.page.load(f.app.application);
+ await f.page.save();let saves=f.calls.filter(x=>x.p.operation==='save');assert.equal(saves.at(-1).p.params.split_participation,undefined);assert.equal(f.app.requested_split_bps,130);assert.equal(f.page.data.pendingRedemptionPercent,0);
+ f.page.inputSplitPercent({detail:{value:'0'}});await f.page.save();saves=f.calls.filter(x=>x.p.operation==='save');assert.equal(saves.at(-1).p.params.split_participation,false);assert.equal(saves.at(-1).p.params.requested_split_bps,0);assert.equal(f.page.data.requestedSplitLabel,'不参与（0%）');
+});
+test('split input rejects blank, extra precision, negative and excessive rates before transport',async()=>{
+ for(const value of ['', ' ', '-1', '100.01', '101', '1e1', '0.001', '1.234', 'NaN', 'Infinity']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.inputSplitPercent({detail:{value}});await f.page.save();
+  assert.equal(f.calls.filter(x=>x.p.operation==='save').length,0,value);assert.equal(f.page.data.splitSaveUnknown,false,value);
+ }
+});
+test('split percentages preserve exact lower and upper basis-point boundaries',async()=>{
+ for(const [value,bps]of [['0.01',1],['1.2',120],['100',10000]]){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.inputSplitPercent({detail:{value}});await f.page.save();assert.equal(f.app.requested_split_bps,bps,value);
+ }
+});
+test('approved application ratio is read-only with requested effective and provider maximum distinct',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});Object.assign(f.app,{status:'APPROVED',split_participation:true,requested_split_bps:250,effective_split_bps:250,provider_max_split_bps:1200});await f.page.load(f.app.application);
+ assert.equal(f.page.data.requestedSplitLabel,'2.5%');assert.equal(f.page.data.effectiveSplitLabel,'2.5%');assert.equal(f.page.data.providerSplitLabel,'12%');
+ f.page.inputSplitPercent({detail:{value:'5'}});assert.equal(f.page.data.splitInput,'2.5');assert.equal(f.page.data.splitChoiceEdited,false);
+});
+test('unknown split save is not retried and requires original application readback',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});await f.page.load(f.app.application);
+ f.page.inputSplitPercent({detail:{value:'3'}});f.failNext('save',new Error('RESPONSE_UNKNOWN'));await f.page.save();
+ assert.equal(f.page.data.splitSaveUnknown,true);const count=f.calls.filter(x=>x.p.operation==='save').length;
+ f.page.inputSplitPercent({detail:{value:'9'}});assert.equal(f.page.data.splitInput,'3');await f.page.save();assert.equal(f.calls.filter(x=>x.p.operation==='save').length,count);
+ // Synthetic lost reply: the authoritative original application can contain the accepted choice.
+ Object.assign(f.app,{split_participation:true,requested_split_bps:300,effective_split_bps:0});await f.page.reloadSplitChoice();
+ assert.equal(f.page.data.splitSaveUnknown,false);assert.equal(f.page.data.splitInput,'3');assert.equal(f.page.data.splitChoiceEdited,false);assert.equal(f.calls.filter(x=>x.p.operation==='save').length,count);
+});
+test('split UI contains no counterparty account field and does not promise admission or transfer',()=>{
+ const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.match(markup,/bindinput="inputSplitPercent"/);assert.match(markup,/爱心捐赠比例/);assert.match(markup,/爱心积分抵扣收款金额比例/);assert.doesNotMatch(markup,/新申请默认10%|申请分账比例|以上为申请及配置状态/);
+ assert.doesNotMatch(markup,/(?:bindinput|data-path)="(?:receiver_account|receiver_id|community_account|receiverAccount)"/);
+});
+
+test('LEGAL contact name is hidden and derives from the retained legal document on save, including non-ID cards',async()=>{
+ for(const doc of [form.docs[0],form.docs[1]]){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+  f.page.data.options.doc=doc;
+  const path='subject_info.identity_info.'+(doc===form.docs[0]?'id_card_info.id_card_name':'id_doc_info.id_doc_name');
+  f.page.input({currentTarget:{dataset:{path}},detail:{value:'CONFIRMED LEGAL NAME'}});
+  f.page.refresh();assert.equal(f.page.data.materialGroups.find(g=>g.id==='contact').fields.length,2);
+  assert.ok(!f.page.data.fields.some(x=>x.path==='contact_info.contact_name'));
+  await f.page.save();assert.equal(form.get(f.storedProfile,'contact_info.contact_name'),'CONFIRMED LEGAL NAME');
+  await f.page.load(f.app.application);assert.equal(form.get(f.page.profile,'contact_info.contact_name'),'CONFIRMED LEGAL NAME');
+ }
+});
+test('SUPER operator name stays independent across role switches and same-application save/reopen',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','LEGAL PERSON');
+ const choose=value=>f.page.condition({currentTarget:{dataset:{key:'contact'}},detail:{value}});
+ choose(1);assert.equal(form.get(f.page.profile,'contact_info.contact_name'),'');
+ f.page.input({currentTarget:{dataset:{path:'contact_info.contact_name'}},detail:{value:'INDEPENDENT OPERATOR'}});
+ await f.page.save();assert.equal(form.get(f.storedProfile,'contact_info.contact_name'),'INDEPENDENT OPERATOR');
+ assert.ok(f.page.data.materialGroups.find(g=>g.id==='operator').fields.some(x=>x.path==='contact_info.contact_name'));
+ choose(0);await f.page.save();assert.equal(form.get(f.storedProfile,'contact_info.contact_name'),'LEGAL PERSON');
+ choose(1);assert.equal(form.get(f.page.profile,'contact_info.contact_name'),'INDEPENDENT OPERATOR');
+ await f.page.save();await f.page.load(f.app.application);assert.equal(form.get(f.page.profile,'contact_info.contact_name'),'INDEPENDENT OPERATOR');
+ f.page.customerSessionRevoked();assert.equal(f.page.operatorContactName,'');
+});
+test('unconfirmed OCR identity suggestions never become the hidden LEGAL contact name',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.setData({ocrConfirmed:false,ocrKind:'id_front',ocrRows:[{key:'id_name',value:'UNCONFIRMED'}]});
+ await f.page.save();assert.equal(form.get(f.storedProfile,'contact_info.contact_name'),undefined);
+});
+test('eleven-digit rule is identical on input blur and both submit routes; malformed drafts survive save/reopen',async()=>{
+ for(const value of ['1234567890','123456789012','+13800138000','13800138x00','13800138000\n','１３８００１３８０００','']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+  f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value}});
+  assert.ok(f.page.data.mobilePhoneError);const message=f.page.data.mobilePhoneError;
+  f.page.blur({currentTarget:{dataset:{path:'contact_info.mobile_phone'}}});assert.equal(f.page.data.mobilePhoneError,message);
+  await f.page.save();assert.equal(form.get(f.storedProfile,'contact_info.mobile_phone'),value);
+  await f.page.load(f.app.application);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),value);
+  const before=f.calls.length;await f.page.submit();assert.equal(f.calls.length,before);
+  await f.page.submitAllReview();assert.equal(f.calls.length,before);assert.ok(f.page.data.mobilePhoneError);
+ }
+});
+test('preexisting overlong phone is never truncated by render save or reread and a corrected value can submit',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ const value='123456789012345678901';form.put(f.page.profile,'contact_info.mobile_phone',value);f.page.refresh();
+ assert.equal(f.page.data.fields.find(x=>x.path==='contact_info.mobile_phone').maxlength,-1);
+ assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),value);
+ await f.page.save();await f.page.load(f.app.application);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),value);
+ f.page.input({currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'00123456789'}});
+ assert.equal(f.page.data.mobilePhoneError,'');await f.page.save();
+ let submissions=0;f.page.session.merchant=async(scene,op,p)=>{assert.equal(p.operation,'submit');submissions++;return {...f.app,status:'SUBMITTED'};};
+ await f.page.submit();assert.equal(submissions,1);assert.equal(f.page.data.platformState,'SUBMITTED');
+});
+test('latest reread mobile is checked at submit transport boundary, not only before the shared flow',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ form.put(f.page.profile,'contact_info.mobile_phone','123456789012');await f.page.save();
+ form.put(f.page.profile,'contact_info.mobile_phone','13800138000');f.page.data.dirty=false;
+ const before=f.calls.length;await f.page.submitAllReview();
+ assert.ok(f.calls.length>before,'shared flow rereads the authoritative draft');
+ assert.ok(!f.calls.slice(before).some(c=>['submit','wechat_submit_review'].includes(c.p.operation)));
+ assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'123456789012');
+});
+test('second stage hides duplicate name address and service phone, retains shorthand, and has one correction entry',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.scene='both';f.page.data.step=1;f.page.refresh();
+ for(const path of ['business_info.sales_info.biz_store_info.biz_store_name','business_info.sales_info.biz_store_info.biz_store_address','business_info.service_phone'])assert.ok(!f.page.data.fields.some(x=>x.path===path),path);
+ assert.ok(f.page.data.fields.some(x=>x.path==='business_info.merchant_shortname'));
+ assert.equal(f.page.data.materialGroups.filter(g=>g.reuseHint).length,1);
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.doesNotMatch(wxml,/资料直接填写|核对资料[、，]可修改|经营资料自行填写，可修改/);
+ assert.match(wxml,/wx:if="{{group.hasOcrFields}}" class="fields-heading"/);
+ assert.match(wxml,/'收起修改':'点击修改'/);assert.match(wxml,/>修改资料<\/button>/);
+ assert.match(wxml,/'修改本组资料':'查看本组资料（当前只读）'/);
+ assert.equal((wxml.match(/>返回第一步完善<\/button>/g)||[]).length,1);
+ f.page.returnMaterial({currentTarget:{dataset:{step:0,group:'license'}}});assert.equal(f.page.data.step,0);
+});
+test('manual first-step name address and current operator mobile reuse into original fields and survive save/reopen',async()=>{
+ for(const contact of ['LEGAL','SUPER']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options={...f.page.data.options,contact,scene:'both'};
+  for(const [path,value] of [['subject_info.business_license_info.merchant_name','DISTINCT SHOP NAME'],['subject_info.business_license_info.license_address','DISTINCT STREET ADDRESS'],['contact_info.mobile_phone','13800138000'],['business_info.merchant_shortname','SHORT MANUAL']])f.page.input({currentTarget:{dataset:{path}},detail:{value}});
+  await f.page.save();await f.page.load(f.app.application);
+  assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_name'),'DISTINCT SHOP NAME');
+  assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address'),'DISTINCT STREET ADDRESS');
+  assert.equal(form.get(f.page.profile,'business_info.service_phone'),'13800138000');
+  assert.equal(form.get(f.page.profile,'business_info.merchant_shortname'),'SHORT MANUAL');
+  assert.equal(f.page.data.options.contact,contact);
+ }
+});
+test('unconfirmed OCR name/address suggestions and invalid phone never fill hidden business fields',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.scene='both';
+ f.page.setData({ocrConfirmed:false,ocrKind:'business_license',ocrRows:[{key:'company_name',value:'SUGGESTION NAME'},{key:'registered_address',value:'SUGGESTION ADDRESS'}]});
+ form.put(f.page.profile,'contact_info.mobile_phone','12345');await f.page.save();
+ for(const path of ['business_info.sales_info.biz_store_info.biz_store_name','business_info.sales_info.biz_store_info.biz_store_address','business_info.service_phone'])assert.equal(form.get(f.storedProfile,path),undefined);
+});
+test('different historical store and service fields stay unchanged with one conflict hint and no empty overwrite',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.scene='both';
+ for(const [path,value] of [['subject_info.business_license_info.merchant_name','NEW NAME'],['subject_info.business_license_info.license_address','NEW ADDRESS'],['contact_info.mobile_phone','13800138000'],['business_info.sales_info.biz_store_info.biz_store_name','OLD NAME'],['business_info.sales_info.biz_store_info.biz_store_address','OLD ADDRESS'],['business_info.service_phone','555-0100']])form.put(f.page.profile,path,value);
+ await f.page.save();await f.page.load(f.app.application);f.page.data.step=1;f.page.refresh();
+ assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_name'),'OLD NAME');assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address'),'OLD ADDRESS');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'555-0100');
+ assert.equal(f.page.data.materialGroups.filter(g=>g.reuseHint).length,1);assert.match(f.page.data.materialGroups.find(g=>g.id==='store').reuseHint,/不同，已保留原值/);
+ form.put(f.page.profile,'subject_info.business_license_info.license_address','');form.put(f.page.profile,'contact_info.mobile_phone','');await f.page.save();
+ assert.equal(form.get(f.storedProfile,'business_info.sales_info.biz_store_info.biz_store_address'),'OLD ADDRESS');assert.equal(form.get(f.storedProfile,'business_info.service_phone'),'555-0100');
+});
+test('source edits sync only linked business fields and restore matching links after reload',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.scene='both';
+ const input=(path,value)=>f.page.input({currentTarget:{dataset:{path}},detail:{value}});
+ const name='subject_info.business_license_info.merchant_name',address='subject_info.business_license_info.license_address',phone='contact_info.mobile_phone';
+ input(name,'FIRST NAME');input(address,'FIRST ADDRESS');input(phone,'13800138000');await f.page.save();await f.page.load(f.app.application);
+ input(name,'SECOND NAME');input(address,'SECOND ADDRESS');input(phone,'13800138001');await f.page.save();
+ assert.equal(form.get(f.storedProfile,'business_info.sales_info.biz_store_info.biz_store_name'),'SECOND NAME');assert.equal(form.get(f.storedProfile,'business_info.sales_info.biz_store_info.biz_store_address'),'SECOND ADDRESS');assert.equal(form.get(f.storedProfile,'business_info.service_phone'),'13800138001');
+ input(phone,'1');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'13800138001');input(phone,'13800138002');assert.equal(form.get(f.page.profile,'business_info.service_phone'),'13800138002');
+ form.put(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address','HISTORICAL DIFFERENT');input(address,'THIRD ADDRESS');assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address'),'HISTORICAL DIFFERENT');
+});
+test('industry controls and explanatory prose stay hidden without inventing settlement defaults or removing required materials',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.step=2;f.page.refresh();
+ assert.ok(!f.page.data.materialGroups.some(g=>g.id==='industry'));assert.ok(!f.page.data.fields.some(x=>x.path.startsWith('settlement_info.')));assert.equal(form.get(f.page.profile,'settlement_info.settlement_id'),undefined);
+ const options={...f.page.data.options,category:'GENERAL'};assert.ok(form.materialGroups({},options,[{id:'industry_permit',required:true,connected:true}],2).find(g=>g.id==='qualification').materials.some(m=>m.id==='industry_permit'));
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(wxml,/\{\{group.note\}\}|行业资质材料适用情况|资料未齐可先保存草稿|本页不自动提交微信/);assert.match(wxml,/<button class="primary bank-ocr-entry" disabled="{{true}}">银行卡识别<\/button>/);assert.match(wxml,/识别功能尚未接通/);
+});
+test('both account choices remain visible and enterprise private status is honest without an added front-end gate',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.step=2;f.page.refresh();
+ const field=f.page.data.fields.find(x=>x.path==='bank_account_info.bank_account_type');assert.deepEqual(field.choices,['BANK_ACCOUNT_TYPE_CORPORATE','BANK_ACCOUNT_TYPE_PERSONAL']);
+ f.page.choice({currentTarget:{dataset:{index:f.page.data.fields.indexOf(field)}},detail:{value:'1'}});await f.page.save();
+ assert.equal(form.get(f.storedProfile,'bank_account_info.bank_account_type'),'BANK_ACCOUNT_TYPE_PERSONAL');assert.equal(f.page.data.materialGroups.find(g=>g.id==='bank').accountTypePending,true);assert.equal(f.page.assertAccountType,undefined);
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(wxml,/企业法人个人账户支持条件核实中，当前提交尚未接通/);assert.doesNotMatch(wxml,/当前微信进件渠道不支持企业对私账户/);
+});
+test('personal holder uses legal identity or legal license name, never company or SUPER operator names',async()=>{
+ for(const mode of ['identity','license','matching','conflicting','missing']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.contact='SUPER';
+  form.put(f.page.profile,'subject_info.business_license_info.merchant_name','COMPANY NOT A PERSON');form.put(f.page.profile,'contact_info.contact_name','OPERATOR NOT THE HOLDER');
+  if(['identity','matching','conflicting'].includes(mode))form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','LEGAL PERSON');
+  if(['license','matching','conflicting'].includes(mode))form.put(f.page.profile,'subject_info.business_license_info.legal_person',mode==='conflicting'?'OTHER LEGAL':'LEGAL PERSON');
+  f.page.data.step=2;f.page.refresh();const index=f.page.data.fields.findIndex(x=>x.path==='bank_account_info.bank_account_type');f.page.choice({currentTarget:{dataset:{index}},detail:{value:'1'}});await f.page.save();await f.page.load(f.app.application);
+  assert.ok(!f.page.data.fields.some(x=>x.path==='bank_account_info.account_name'));
+  assert.equal(form.get(f.storedProfile,'bank_account_info.account_name'),['conflicting','missing'].includes(mode)?undefined:'LEGAL PERSON');
+  assert.equal(form.get(f.storedProfile,'contact_info.contact_name'),'OPERATOR NOT THE HOLDER');
+  if(mode==='conflicting')assert.match(f.page.data.materialGroups.find(g=>g.id==='bank').reuseHint,/姓名不一致/);
+  if(mode==='missing')assert.match(f.page.data.materialGroups.find(g=>g.id==='bank').reuseHint,/返回第一步/);
+ }
+});
+test('personal holder restores linked reuse after save/reopen while different historical holder remains untouched',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ const id='subject_info.identity_info.id_card_info.id_card_name',legal='subject_info.business_license_info.legal_person',holder='bank_account_info.account_name';
+ const edit=(path,value)=>f.page.input({currentTarget:{dataset:{path}},detail:{value}});
+ edit(id,'FIRST PERSON');edit(legal,'FIRST PERSON');form.put(f.page.profile,'bank_account_info.bank_account_type','BANK_ACCOUNT_TYPE_PERSONAL');await f.page.save();await f.page.load(f.app.application);
+ edit(id,'SECOND PERSON');assert.equal(form.get(f.page.profile,holder),'FIRST PERSON');edit(legal,'SECOND PERSON');assert.equal(form.get(f.page.profile,holder),'SECOND PERSON');await f.page.save();
+ form.put(f.page.profile,holder,'HISTORICAL HOLDER');await f.page.save();await f.page.load(f.app.application);edit(id,'THIRD PERSON');edit(legal,'THIRD PERSON');await f.page.save();
+ assert.equal(form.get(f.storedProfile,holder),'HISTORICAL HOLDER');f.page.data.step=2;f.page.refresh();assert.match(f.page.data.materialGroups.find(g=>g.id==='bank').reuseHint,/保留原值/);
+});
+test('switching private and corporate accounts preserves the chosen enum and never silently overwrites a historical holder',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','LEGAL PERSON');form.put(f.page.profile,'bank_account_info.account_name','HISTORICAL COMPANY');f.page.data.step=2;f.page.refresh();
+ const choose=value=>f.page.choice({currentTarget:{dataset:{index:f.page.data.fields.findIndex(x=>x.path==='bank_account_info.bank_account_type')}},detail:{value}});
+ choose('1');assert.ok(!f.page.data.fields.some(x=>x.path==='bank_account_info.account_name'));assert.equal(form.get(f.page.profile,'bank_account_info.account_name'),'HISTORICAL COMPANY');assert.match(f.page.data.materialGroups.find(g=>g.id==='bank').reuseHint,/保留原值/);
+ choose('0');assert.ok(f.page.data.fields.some(x=>x.path==='bank_account_info.account_name'));assert.equal(form.get(f.page.profile,'bank_account_info.account_name'),'HISTORICAL COMPANY');
+});
+test('hidden industry selector preserves FOOD required upload and original category across save/reopen',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.condition({currentTarget:{dataset:{key:'category'}},detail:{value:1}});
+ await f.page.save();assert.equal(f.page.data.options.category,'FOOD');f.app.required_materials.push('industry_permit');
+ f.page.data.catalog.push({id:'industry_permit',title:'原行业资质'});f.page.data.step=2;await f.page.load(f.app.application);
+ let group=f.page.data.materialGroups.find(g=>g.id==='qualification');assert.ok(group);assert.equal(group.materialWarning,'');assert.equal(group.materials[0].required,true);assert.equal(group.materials[0].connected,true);
+ await f.page.upload({currentTarget:{dataset:{kind:'industry_permit'}}});await f.page.load(f.app.application);
+ group=f.page.data.materialGroups.find(g=>g.id==='qualification');assert.equal(group.materials[0].uploaded,true);assert.ok(f.calls.some(c=>c.p&&c.p.operation==='upload'&&c.p.params.kind==='industry_permit'));assert.equal(f.page.data.options.category,'FOOD');
+ assert.ok(f.calls.filter(c=>c.p&&c.p.operation==='save').every(c=>c.p.params.category==='FOOD'));
+ const missing=form.materialGroups({}, {...f.page.data.options,category:'FOOD'},[],2).find(g=>g.id==='qualification');assert.equal(missing.materials[0].connected,false);assert.match(missing.materialWarning,/入口尚未配置/);assert.match(missing.materialWarning,/不能视为免交/);
+});
+function conflictEvent(page,target){const field=form.reusedFields(page.profile,page.data.options).find(f=>f.targetPath===target);return {currentTarget:{dataset:{target,source:field.sourceValue,previous:form.get(page.profile,target)}}};}
+async function conflictFixture(){const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.options.scene='both';for(const [path,value] of [['subject_info.business_license_info.merchant_name','SOURCE COMPANY'],['subject_info.business_license_info.license_address','SOURCE ADDRESS'],['subject_info.business_license_info.legal_person','SOURCE PERSON'],['subject_info.identity_info.id_card_info.id_card_name','SOURCE PERSON'],['contact_info.mobile_phone','13800138000'],['contact_info.contact_name','HISTORICAL CONTACT'],['business_info.sales_info.biz_store_info.biz_store_name','HISTORICAL COMPANY'],['business_info.sales_info.biz_store_info.biz_store_address','HISTORICAL ADDRESS'],['business_info.service_phone','555-0100'],['bank_account_info.bank_account_type','BANK_ACCOUNT_TYPE_PERSONAL'],['bank_account_info.account_name','HISTORICAL HOLDER']])form.put(f.page.profile,path,value);await f.page.save();await f.page.load(f.app.application);return f;}
+test('all hidden historical conflicts remain unchanged on ordinary load and cancel; explicit adoption changes only local draft until save',async()=>{
+ for(const target of ['contact_info.contact_name','business_info.sales_info.biz_store_info.biz_store_name','business_info.sales_info.biz_store_info.biz_store_address','business_info.service_phone','bank_account_info.account_name']){
+  const f=await conflictFixture(),old=form.get(f.page.profile,target),event=conflictEvent(f.page,target),before=JSON.stringify(f.page.profile),calls=f.calls.length;
+  assert.ok(old.startsWith('HISTORICAL')||old==='555-0100');assert.equal(f.page.reusedFieldLinks[target],undefined);
+  f.page.startReuseConfirmation(event);assert.ok(f.page.data.reuseConfirmation);assert.equal(JSON.stringify(f.page.profile),before);f.page.cancelReuse();assert.equal(f.page.data.reuseConfirmation,null);assert.equal(JSON.stringify(f.page.profile),before);assert.equal(f.page.data.dirty,false);
+  f.page.startReuseConfirmation(event);f.page.confirmReuse();assert.equal(form.get(f.page.profile,target),event.currentTarget.dataset.source);assert.equal(f.page.data.dirty,true);assert.equal(f.calls.length,calls);assert.equal(form.get(f.storedProfile,target),old);
+  await f.page.save();await f.page.load(f.app.application);assert.equal(form.get(f.page.profile,target),event.currentTarget.dataset.source);assert.equal(f.page.reusedFieldLinks[target],event.currentTarget.dataset.source);
+ }
+});
+test('conflict confirmation refuses changed source target application session and read-only or pending states',async()=>{
+ for(const mutation of ['source','target','application','session','readonly','pending']){
+  const f=await conflictFixture(),target='bank_account_info.account_name',event=conflictEvent(f.page,target),old=form.get(f.page.profile,target);
+  f.page.startReuseConfirmation(event);
+  if(mutation==='source'){form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','NEW PERSON');form.put(f.page.profile,'subject_info.business_license_info.legal_person','NEW PERSON');}
+  if(mutation==='target')form.put(f.page.profile,target,'NEW TARGET');
+  if(mutation==='application')f.page.data.application={...f.page.data.application,application:'other-application'};
+  if(mutation==='session')f.page.session={};
+  if(mutation==='readonly')f.page.data.canEditWechat=false;
+  if(mutation==='pending')f.page.data.pending=true;
+  const before=f.calls.length;f.page.confirmReuse();assert.equal(form.get(f.page.profile,target),mutation==='target'?'NEW TARGET':old);assert.equal(f.calls.length,before);
+ }
+});
+test('ambiguous legal sources cannot open a personal-holder replacement and stale displayed conflict cannot start confirmation',async()=>{
+ const f=await conflictFixture(),target='bank_account_info.account_name',event=conflictEvent(f.page,target);
+ form.put(f.page.profile,'subject_info.business_license_info.legal_person','DIFFERENT PERSON');f.page.startReuseConfirmation(event);assert.equal(f.page.data.reuseConfirmation,null);assert.equal(form.get(f.page.profile,target),'HISTORICAL HOLDER');
+ const contact=conflictEvent(f.page,'contact_info.contact_name');form.put(f.page.profile,'contact_info.contact_name','NEW HISTORICAL');f.page.startReuseConfirmation(contact);assert.equal(f.page.data.reuseConfirmation,null);assert.equal(form.get(f.page.profile,'contact_info.contact_name'),'NEW HISTORICAL');
+});
+test('equal saved source/target values restore value links without inventing OCR confirmation; different values do not',()=>{
+ const options={entity:'ENTERPRISE',contact:'LEGAL',doc:form.docs[0],scene:'both'},profile={subject_info:{business_license_info:{merchant_name:'SAME COMPANY',license_address:'SAME ADDRESS',legal_person:'SAME PERSON'},identity_info:{id_card_info:{id_card_name:'SAME PERSON'}}},contact_info:{contact_name:'SAME PERSON',mobile_phone:'13800138000'},business_info:{service_phone:'13800138000',sales_info:{biz_store_info:{biz_store_name:'SAME COMPANY',biz_store_address:'DIFFERENT ADDRESS'}}},bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_name:'DIFFERENT HOLDER'}};
+ const links=form.reusedFieldLinks(profile,options);assert.equal(links['contact_info.contact_name'],'SAME PERSON');assert.equal(links['business_info.service_phone'],'13800138000');assert.equal(links['business_info.sales_info.biz_store_info.biz_store_address'],undefined);assert.equal(links['bank_account_info.account_name'],undefined);assert.equal(profile.ocrConfirmed,undefined);
+});
+
+
+test('existing unset donation and explicit zero never inherit the new fifty basis-point default',async()=>{
+ for(const choice of [undefined,0]){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+  if(choice===0)Object.assign(f.app,{split_participation:false,requested_split_bps:0});
+  await f.page.load(f.app.application);assert.equal(f.page.data.splitInput,'0');assert.equal(f.page.data.splitDefaultPending,false);
+  await f.page.save();const saved=f.calls.filter(x=>x.p.operation==='save').at(-1).p.params;
+  assert.equal(saved.split_participation,undefined);assert.equal(saved.requested_split_bps,undefined);
+ }
+});
+test('known provider configuration caps edited donation but unknown configuration is not invented',async()=>{
+ for(const maximum of [0,40,50,null]){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});Object.assign(f.app,{provider_max_split_bps:maximum,requested_split_bps:0,split_participation:false});await f.page.load(f.app.application);
+  f.page.inputSplitPercent({detail:{value:'0.5'}});await f.page.save();
+  if(maximum===0||maximum===40){assert.equal(f.calls.filter(x=>x.p.operation==='save').length,0);assert.match(f.page.data.status,/渠道配置上限/);assert.equal(f.page.data.splitSaveUnknown,false);}
+  else assert.equal(f.calls.find(x=>x.p.operation==='save').p.params.requested_split_bps,50);
+ }
+});
+test('new default donation unknown save cannot repeat a creation without authoritative readback',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.failNext('save',new Error('UNKNOWN'));await f.page.save();
+ assert.equal(f.page.data.splitSaveUnknown,true);const count=f.calls.filter(x=>x.p.operation==='save').length;await f.page.save();assert.equal(f.calls.filter(x=>x.p.operation==='save').length,count);
+});
+test('personal holder is visible read-only and the unavailable bank OCR follows account type',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','SYNTHETIC LEGAL');form.put(f.page.profile,'bank_account_info.bank_account_type','BANK_ACCOUNT_TYPE_PERSONAL');await f.page.save();f.page.setData({step:2});f.page.refresh();
+ const bank=f.page.data.materialGroups.find(g=>g.id==='bank');assert.equal(bank.personalAccount,true);assert.equal(bank.personalAccountName,'SYNTHETIC LEGAL');assert.ok(!bank.fields.some(x=>x.path==='bank_account_info.account_name'));
+ const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(w,/class="readonly-account-name" style="color:#83958b">{{group.personalAccountName}}/);assert.match(w,/返回第一步修改户名/);assert.match(w,/item.path==='bank_account_info.bank_account_type'[\s\S]*?class="primary bank-ocr-entry" disabled="{{true}}">银行卡识别/);
+ const bankEntry=w.match(/<button class="primary bank-ocr-entry"[^>]*>/)[0];assert.doesNotMatch(bankEntry,/bindtap|chooseMedia|upload/);
+});
+
+
+test('next and back scroll only after rendered step transition; failed save preserves the step and draft',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});let afterRender;const original=f.page.setData;f.page.setData=function(p,done){original.call(this,p);if(done)afterRender=done;};
+ await f.page.next();assert.equal(f.page.data.step,1);assert.equal(f.scrolls.length,0);assert.equal(typeof afterRender,'function');afterRender();assert.equal(f.scrolls.at(-1).scrollTop,0);assert.equal(f.scrolls.at(-1).step,1);
+ f.page.back();assert.equal(f.page.data.step,0);assert.equal(f.scrolls.length,1);afterRender();assert.equal(f.scrolls.at(-1).step,0);
+ const before=JSON.stringify(f.page.profile),count=f.scrolls.length;f.failNext('save',new Error('SAVE_FAILED'));await f.page.next();assert.equal(f.page.data.step,0);assert.equal(JSON.stringify(f.page.profile),before);assert.equal(f.scrolls.length,count);
+});
+test('targeted material return still waits for render and locates the requested original group',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.setData({step:3});f.page.returnMaterial({currentTarget:{dataset:{step:0,group:'legal'}}});assert.equal(f.page.data.step,0);assert.equal(f.scrolls.at(-1).selector,'#material-legal');
+});
+
+test('all three successful next and back transitions request top after render, retaining targeted return',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ for(let step=1;step<=3;step++){await f.page.next();assert.equal(f.page.data.step,step);assert.deepEqual(f.scrolls.at(-1),{scrollTop:0,duration:0,step});}
+ for(let step=2;step>=0;step--){f.page.back();assert.equal(f.page.data.step,step);assert.deepEqual(f.scrolls.at(-1),{scrollTop:0,duration:0,step});}
+ const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(w,/只整理微信支付进件所需资料|mode="multiSelector"/);assert.match(w,/wx:if="{{step===0}}"[^>]*>返回第一步完善/);assert.match(w,/返回第一步修改户名/);
+});
+
+test('retained license address resolves original code on save and invalidates only its linked automatic code',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const source='subject_info.business_license_info.license_address',target='business_info.sales_info.biz_store_info.biz_address_code';
+ f.page.input({currentTarget:{dataset:{path:source}},detail:{value:'深圳市南山区科技园1号'}});assert.equal(form.get(f.page.profile,target),'440305');await f.page.save();assert.equal(form.get(f.storedProfile,target),'440305');await f.page.load(f.app.application);assert.equal(f.page.data.regionResolved,true);
+ f.page.input({currentTarget:{dataset:{path:source}},detail:{value:'南山区'}});assert.equal(form.get(f.page.profile,target),undefined);await f.page.save();assert.equal(form.get(f.storedProfile,target),undefined);
+ f.page.input({currentTarget:{dataset:{path:source}},detail:{value:'北京市东城区1号'}});await f.page.save();assert.equal(form.get(f.storedProfile,target),'110101');
+});
+test('region historical different code stays until explicit confirmation and unconfirmed OCR never supplies address',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});const source='subject_info.business_license_info.license_address',target='business_info.sales_info.biz_store_info.biz_address_code';
+ f.page.setData({ocrRows:[{key:'registered_address',value:'深圳市南山区1号'}]});await f.page.save();assert.equal(form.get(f.storedProfile,target),undefined);
+ form.put(f.page.profile,source,'深圳市南山区1号');form.put(f.page.profile,target,'110101');f.page.reusedFieldLinks={};await f.page.save();assert.equal(form.get(f.storedProfile,target),'110101');f.page.setData({step:1});f.page.refresh();assert.equal(f.page.data.regionResolved,false);
+ const field=form.reusedFields(f.page.profile,f.page.data.options).find(x=>x.targetPath===target);f.page.startReuseConfirmation({currentTarget:{dataset:{target,source:field.sourceValue,previous:field.value}}});f.page.cancelReuse();assert.equal(form.get(f.page.profile,target),'110101');
+ f.page.startReuseConfirmation({currentTarget:{dataset:{target,source:field.sourceValue,previous:field.value}}});f.page.confirmReuse();await f.page.save();assert.equal(form.get(f.storedProfile,target),'440305');assert.equal(f.page.data.regionResolved,true);
+});

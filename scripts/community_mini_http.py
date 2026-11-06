@@ -13,6 +13,7 @@ import time
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from scripts.community_demo_api import _HeaderDeadlineReader
 from scripts.community_mini_login import LoginUnavailable
+from scripts.community_license_region import RegionValidationError
 
 def runtime_version():
     """Image-build stamp, never a request header or the preview caller's SHA.
@@ -349,6 +350,8 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 from scripts.community_ocr_host import OcrPublicError
                 from scripts.community_wechat_applyment import WechatMediaUnavailable
                 return self.answer(403,{'error':error.code if type(error) is OcrPublicError else 'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
+            except RegionValidationError as error:
+                return self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})
             except (ValueError,TypeError,KeyError):return self.answer(400,{'error':'INVALID_REQUEST'})
             except (socket.timeout,TimeoutError):return self.answer(408,{'error':'REQUEST_TIMEOUT'})
             except Exception:return self.answer(503,{'error':'SERVICE_UNAVAILABLE'})
