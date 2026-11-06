@@ -5,9 +5,9 @@ const {createSession}=require('../clients/community-mini/session.js');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
-test('current product identity admits only the exact 553575e frontend and backend pair',()=>{
+test('current product identity admits only the exact b024a90 frontend and backend pair',()=>{
  const endpointPath=path.resolve(__dirname,'../deploy/community-preview/endpoint.cjs');
- const frontend='553575e7f8447cf8b97806d2095210ccd6ca4434',backend='553575e7f8447cf8b97806d2095210ccd6ca4434',control='c'.repeat(40);
+ const frontend='b024a90465205e18dedf3f7296a470ae7035c30a',backend='b024a90465205e18dedf3f7296a470ae7035c30a',control='c'.repeat(40);
  const child=`const cp=require('node:child_process'),backend=process.argv[1];
 cp.execFileSync=()=>JSON.stringify({product_source_sha:process.argv[3],backend_source_sha:backend,control_source_sha:'${control}',fixed_product:true,compatibility:'EXACT_SOURCE_MATCH'});
 try{process.stdout.write(JSON.stringify(require(process.argv[2]).sourceIdentity()));}catch(error){process.stderr.write(error.message);process.exit(1);}`;
@@ -18,6 +18,8 @@ try{process.stdout.write(JSON.stringify(require(process.argv[2]).sourceIdentity(
  assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
  const oldCurrent=run('4fbe51b0f33f3c214bd43465841d5996f1b06a02','4fbe51b0f33f3c214bd43465841d5996f1b06a02');
  assert.notEqual(oldCurrent.status,0);assert.match(oldCurrent.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
+ const oldSource553575e=run('553575e7f8447cf8b97806d2095210ccd6ca4434','553575e7f8447cf8b97806d2095210ccd6ca4434');
+ assert.notEqual(oldSource553575e.status,0);assert.match(oldSource553575e.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
  const previous=run('809bfd5c97b760a7091f548a1d22f54f5570fff1','809bfd5c97b760a7091f548a1d22f54f5570fff1');
  assert.notEqual(previous.status,0);assert.match(previous.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
  const oldPair=run('48df407f30f512b1456270c8faba22f095404b9f','44e7344b9a0b00b3999e64eaf90c243d98f7c001');
