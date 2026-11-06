@@ -1,7 +1,7 @@
 'use strict';
 const profiles=require('./endpoint-profiles.json');
 const FIXED_FRONTEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_BACKEND='4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5',FIXED_PROOF_SHA256='548d9cd1c92d14ad848cb83205338333ecda0dd45718f0df7de4831063d61367',FIXED_COMPATIBILITY='EXACT_SOURCE_MATCH';
-const CURRENT_FRONTEND='28ca2f0c66305a2bca4fa6e27cf27427f36aaefd',CURRENT_BACKEND='48df407f30f512b1456270c8faba22f095404b9f',CURRENT_COMPATIBILITY='EXACT_SOURCE_MATCH';
+const CURRENT_FRONTEND='44e7344b9a0b00b3999e64eaf90c243d98f7c001',CURRENT_BACKEND='48df407f30f512b1456270c8faba22f095404b9f',CURRENT_COMPATIBILITY='EXACT_SOURCE_MATCH';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function sourceManifest(root){
  const result=Object.create(null);let count=0,total=0;
