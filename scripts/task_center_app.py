@@ -46,6 +46,8 @@ from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
                                      recover_incomplete_mcp_starts)
 from digital_twin_projection import build_projection as build_twin_projection
 from unified_admin_projection import build_projection as build_admin_projection
+from task_center_real_blackbox import (RealAcceptanceGateway,
+                                       ensure_schema as ensure_real_acceptance_schema)
 
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -104,7 +106,8 @@ MODEL_TABLES = frozenset((
     'model_usage_attempts','model_runtime_limits','approved_skills',
     'role_instances','acceptance_checklists','model_quota_status',
     'codex_execution_intents','codex_execution_events',
-    'provider_onboarding_configs'))
+    'provider_onboarding_configs','real_acceptance_enforcement','real_acceptance_plans',
+    'real_acceptance_runs'))
 
 TWIN_MODEL_TABLES = frozenset((
     'role_instances', 'model_requests', 'model_assignments',
@@ -118,8 +121,10 @@ ROLE_ACTION_ROLES = {
     'REPORT_TEST_ONLY_PROGRESS': 'TASK_EXECUTOR',
     'SAVE_TEST_ONLY_CHECKPOINT': 'TASK_EXECUTOR',
     'REVIEW_CANDIDATE': 'TASK_REVIEWER',
+    'RECORD_REAL_INTEGRATION_RUN': 'TASK_REVIEWER',
     'REVIEW_SCOPE_CHANGE': 'TASK_REVIEWER',
     'ACCEPT_CANDIDATE': 'TASK_ACCEPTOR',
+    'RECORD_REAL_BLACKBOX_RUN': 'TASK_ACCEPTOR',
     'PREPARE_RESULT_RECOVERY': 'TASK_CENTER_ADMIN',
     'REVIEW_RESULT_RECOVERY': 'TASK_REVIEWER',
     'ACCEPT_RESULT_RECOVERY': 'TASK_ACCEPTOR',
@@ -196,6 +201,11 @@ def read_only_model_projection(db_path, authority_key, tenant_id,
         result['codex_executions']=codex.projection()
         result['provider_presets']=public_presets()
         result['provider_onboarding']=onboarding_projection(connection,tenant_id)
+        result['real_acceptance']=RealAcceptanceGateway.__new__(
+          RealAcceptanceGateway)
+        real=result.pop('real_acceptance')
+        real.db=connection;real.tenant_id=tenant_id
+        result['real_acceptance']=real.projection()
         actual = {row[0] for row in connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
         if {'execution_units','asset_preflight_checks',
@@ -877,6 +887,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         policy=ExecutionPolicyGateway(control.gateway,
                           control.context)
                         policy.record_unit(unit)
+                        RealAcceptanceGateway(supervisor.db,tenant_id,
+                          actor or control.context['principal_id']).mark_task_required(
+                          fields['task_id'])
                         result['graph_id']=graph['graph_id']
                     elif action=='START_TEST_ONLY_TASK':
                         ExecutionPolicyGateway(control.gateway,
@@ -985,6 +998,21 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='REGISTER_CHECKLIST':
                         result=control.register_checklist(value['task_id'],
                           value['items'],actor or control.context['principal_id'])
+                    elif action=='REGISTER_REAL_ACCEPTANCE_PLAN':
+                        result=RealAcceptanceGateway(supervisor.db,tenant_id,
+                          actor or control.context['principal_id']).register_plan(
+                          value['plan'])
+                    elif action=='RECORD_REAL_INTEGRATION_RUN':
+                        result=RealAcceptanceGateway(supervisor.db,tenant_id,
+                          actor or control.context['principal_id']).record_run(
+                          value['run'])
+                    elif action=='RECORD_REAL_BLACKBOX_RUN':
+                        result=RealAcceptanceGateway(supervisor.db,tenant_id,
+                          actor).record_run(value['run'])
+                    elif action=='CHECK_REAL_RELEASE_GATE':
+                        result=RealAcceptanceGateway(supervisor.db,tenant_id,
+                          actor or control.context['principal_id']).release_gate(
+                          value['plan_id'])
                     elif action=='REVIEW_CANDIDATE':
                         if value['reviewer']!=actor:
                             raise ValueError('AUTHENTICATED_REVIEWER_REQUIRED')
@@ -996,6 +1024,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
                         candidate=control.validate_accept_candidate(
                           value['candidate_id'],value['acceptor'])
+                        release_gate=RealAcceptanceGateway(supervisor.db,
+                          tenant_id,value['acceptor']).require_task_release(
+                          candidate['task_id'])
                         fence=Fence(supervisor,db_path+'.test-only-locks')
                         try:
                             task=supervisor._task(candidate['task_id'])
@@ -1012,6 +1043,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         result=control.accept_candidate(value['candidate_id'],
                           value['acceptor'])
                         result['canonical_task_state']=terminal['state']
+                        result['real_release_gate']=release_gate
                     elif action=='SET_MODULE':
                         result=control.set_module(value['module_id'],
                           value['version'],bool(value['enabled']))
@@ -1298,6 +1330,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
               'admin:'+principal_id),model_master_key)
             CodexExecutionControl(gateway,authority.issue(tenant_id,
               'admin:'+principal_id))
+            ensure_real_acceptance_schema(supervisor.db)
         finally:supervisor.close()
     mcp_auth_store=None;mcp_service_lease=None;server=None
     if mcp_enabled:
