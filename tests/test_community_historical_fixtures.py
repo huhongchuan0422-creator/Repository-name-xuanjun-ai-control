@@ -259,9 +259,15 @@ class HistoricalFixtureContract(unittest.TestCase):
     def test_workflow_preflight_covers_full_and_existing_historical_consumers(self):
         workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         def condition(name):return workflow.split('      - name: '+name+'\n',1)[1].splitlines()[0].split('if:',1)[1].strip().strip('"')
-        prep=condition('Verify original historical inputs for source tests')
-        full=condition('Complete Phase1 and Phase2 source regression')
-        self.assertEqual(prep,condition('Retrieve and verify immutable nested 1d and 005c carrier fixtures'))
+        image_push = "github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]')"
+        def original_condition(name):
+            value=condition(name);prefix='('+image_push+') || ('
+            self.assertTrue(value.startswith(prefix) and value.endswith(')'))
+            return value[len(prefix):-1]
+        prep=original_condition('Verify original historical inputs for source tests')
+        full=original_condition('Complete Phase1 and Phase2 source regression')
+        self.assertEqual(prep,original_condition('Retrieve and verify immutable nested 1d and 005c carrier fixtures'))
+        original_condition('Install exact browser test runner')
         # Preflight remains the original superset; only full regression excludes
         # the narrowly classified screenshot capture test with its explicit tag.
         capture_guard = " && !(steps.scope.outputs.capture_only == 'true' && contains(github.event.head_commit.message, '[web-session-browser-scope]'))"
@@ -277,6 +283,172 @@ class HistoricalFixtureContract(unittest.TestCase):
         block=workflow.split('      - name: Verify original historical inputs for source tests\n',1)[1].split('      - name:',1)[0]
         for commit in HISTORY_PINS:self.assertIn(commit,block)
         self.assertIn('python3 -B tests/test_community_historical_fixtures.py --verify-inputs',block)
+
+
+class ImagePushFullRegression(unittest.TestCase):
+    """Execute the source classifier and evaluate its original GitHub predicates."""
+    IMAGE_PUSH = "github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]')"
+    FULL_STEPS = ('Retrieve and verify immutable nested 1d and 005c carrier fixtures',
+                  'Verify original historical inputs for source tests',
+                  'Install exact browser test runner',
+                  'Complete Phase1 and Phase2 source regression')
+    def setUp(self):
+        self.workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
+    def step(self,name):
+        return self.workflow.split('      - name: '+name+'\n',1)[1].split('      - name:',1)[0]
+    def condition(self,name):
+        return self.step(name).splitlines()[0].split('if:',1)[1].strip().strip('"')
+    def context(self,message='',event='push',ref=None,**extra):
+        result={'github.event_name':event,
+                'github.ref':ref or 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017',
+                'github.event.head_commit.message':message,
+                'github.sha':'809bfd5c97b760a7091f548a1d22f54f5570fff1',
+                'env.COMMUNITY_CURRENT_PRODUCT_PUSH':'false'}
+        result.update(extra);return result
+    def evaluate(self,expression,context):
+        # Limited, strict parser for these GitHub conditions; no eval or shell.
+        import re
+        tokens=[];pos=0
+        pattern=re.compile(r"\s*(==|!=|&&|\|\||[!(),]|'[^']*'|[A-Za-z_][A-Za-z0-9_.]*)")
+        expression=expression.strip()
+        while pos<len(expression):
+            match=pattern.match(expression,pos)
+            self.assertIsNotNone(match,expression[pos:])
+            tokens.append(match[1]);pos=match.end()
+        cursor=0
+        def accept(value):
+            nonlocal cursor
+            if cursor<len(tokens) and tokens[cursor]==value:cursor+=1;return True
+            return False
+        def atom():
+            nonlocal cursor
+            if accept('!'):return not bool(atom())
+            if accept('('):
+                value=disjunction();self.assertTrue(accept(')'));return value
+            token=tokens[cursor];cursor+=1
+            if token=='contains':
+                self.assertTrue(accept('('));left=disjunction();self.assertTrue(accept(','))
+                right=disjunction();self.assertTrue(accept(')'))
+                return str(right).lower() in str(left).lower()
+            if token.startswith("'"):return token[1:-1]
+            if token in ('true','false'):return token=='true'
+            return context.get(token,'')
+        def equality():
+            value=atom()
+            while cursor<len(tokens) and tokens[cursor] in ('==','!='):
+                operator=tokens[cursor];accept(operator);right=atom()
+                same=(value.lower()==right.lower()) if isinstance(value,str) and isinstance(right,str) else value==right
+                value=same if operator=='==' else not same
+            return value
+        def conjunction():
+            value=equality()
+            while accept('&&'):
+                right=equality();value=bool(value) and bool(right)
+            return value
+        def disjunction():
+            value=conjunction()
+            while accept('||'):
+                right=conjunction();value=bool(value) or bool(right)
+            return value
+        value=disjunction();self.assertEqual(cursor,len(tokens));return bool(value)
+    def classify(self,paths,context,raw=None):
+        import sys
+        block=self.step('Classify pushed changes')
+        binding=block.split('FORCE_FULL_REGRESSION: ${{ ',1)[1].split(' }}',1)[0]
+        self.assertEqual(binding,self.IMAGE_PUSH)
+        program=block.split("          python3 - <<'CHECK'\n",1)[1].split('          CHECK',1)[0]
+        program='\n'.join(line[10:] for line in program.splitlines())+'\n'
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);output=root/'output'
+            (root/'push-files.nul').write_bytes(raw if raw is not None else b'\0'.join(p.encode() for p in paths)+b'\0')
+            env=dict(os.environ,RUNNER_TEMP=temp,GITHUB_OUTPUT=str(output),
+                     FORCE_FULL_REGRESSION=str(self.evaluate(binding,context)).lower())
+            result=subprocess.run([sys.executable,'-B','-c',program],env=env,
+                                  text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+            if raw is not None:return result,output.exists()
+            self.assertEqual(result.returncode,0,result.stderr)
+            return dict(line.split('=',1) for line in output.read_text().splitlines())
+    def test_exact_image_push_only_forces_classifier_without_changing_legacy_scopes(self):
+        workflow='.github/workflows/chatgpt-community-wechat-sp-offline.yml'
+        cases=[([workflow],(False,False,True,True,False)),
+               (['tests/test_community_web_session_browser.py',workflow],(False,True,False,False,False)),
+               (['scripts/community_admin_policy.py',workflow],(True,False,False,False,False)),
+               (['scripts/community_preview_stopped_handoff.py',workflow],(False,False,True,False,False)),
+               (['scripts/community_preview_carrier_handoff_call.py',workflow],(False,False,False,True,True)),
+               (['scripts/community_uploaded_image_scanner.py'],(False,False,False,False,False))]
+        names=('superadmin_repair_only','capture_only','resume_only','handoff_only','handoff_touched')
+        for paths,values in cases:
+            expected=dict(zip(names,(str(v).lower() for v in values)))
+            for context,force in [(self.context(),False),(self.context('[community-image]'),True),
+                    (self.context('[community-image]',event='workflow_dispatch'),False),
+                    (self.context('[community-image]',ref='refs/heads/other'),False)]:
+                with self.subTest(paths=paths,context=context):
+                    actual=self.classify(paths,context)
+                    self.assertEqual(actual,{k:('false' if force and k!='handoff_touched' else v) for k,v in expected.items()})
+    def test_image_marker_never_bypasses_unknown_or_malformed_push_delta(self):
+        for raw in (b'',b'no-nul',b'bad\npath\0',b'\0'):
+            with self.subTest(raw=raw):
+                result,output_exists=self.classify([],self.context('[community-image]'),raw=raw)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('PUSH_DELTA_UNKNOWN',result.stderr)
+                self.assertFalse(output_exists)
+    def test_every_mixed_scope_still_runs_full_and_both_historical_prerequisites(self):
+        import re
+        tags=sorted(set(re.findall(r"\[[a-z0-9-]+\]",self.workflow)))
+        outputs=self.classify(['.github/workflows/chatgpt-community-wechat-sp-offline.yml'],self.context('[community-image]'))
+        for tag in ['']+tags:
+            context=self.context('[community-image] '+tag,**{'steps.scope.outputs.'+k:v for k,v in outputs.items()})
+            # Even current mini-product selectors cannot short-circuit an image push.
+            for product in ('true','false'):
+                context['env.COMMUNITY_CURRENT_PRODUCT_PUSH']=product
+                for name in self.FULL_STEPS:
+                    with self.subTest(tag=tag,product=product,step=name):
+                        self.assertTrue(self.evaluate(self.condition(name),context))
+    def test_nonimage_and_manual_conditions_keep_the_original_branch(self):
+        prefix='('+self.IMAGE_PUSH+') || ('
+        paths=['.github/workflows/chatgpt-community-wechat-sp-offline.yml']
+        for event in ('push','workflow_dispatch'):
+            for message in ('','[preview-b-resume-scope]','[web-session-browser-scope]','[platform-host-scope]'):
+                context=self.context(message,event=event)
+                context.update({'steps.scope.outputs.'+k:v for k,v in self.classify(paths,context).items()})
+                for name in self.FULL_STEPS:
+                    value=self.condition(name)
+                    self.assertTrue(value.startswith(prefix) and value.endswith(')'))
+                    self.assertFalse(self.evaluate(self.IMAGE_PUSH,context))
+                    self.assertEqual(self.evaluate(value,context),self.evaluate(value[len(prefix):-1],context))
+        legacy=self.context(**{'steps.scope.outputs.resume_only':'true','steps.scope.outputs.handoff_only':'true'})
+        self.assertFalse(self.evaluate(self.condition('Complete Phase1 and Phase2 source regression'),legacy))
+    def test_image_build_requires_same_test_job_and_full_regression_success(self):
+        job=self.workflow.split('  community-backend-image:\n',1)[1].split('\n  mini-',1)[0]
+        condition=job.splitlines()[0].split('if:',1)[1].strip()
+        self.assertIn('\n    needs: test\n',job)
+        self.assertNotIn('always()',condition)
+        self.assertIn("needs.test.result == 'success'",condition)
+        self.assertIn("needs.test.outputs.full_regression_outcome == 'success'",condition)
+        for result in ('success','failure','cancelled','skipped'):
+            for outcome in ('success','failure','cancelled','skipped',''):
+                context=self.context('[community-image]',**{'needs.test.result':result,'needs.test.outputs.full_regression_outcome':outcome})
+                self.assertEqual(self.evaluate(condition,context),result=='success' and outcome=='success')
+        manual=self.context(event='workflow_dispatch',**{'inputs.backend_image_enabled':True,
+             'inputs.preview_enabled':False,'inputs.backend_image_source_sha':'809bfd5c97b760a7091f548a1d22f54f5570fff1',
+             'needs.test.result':'success','needs.test.outputs.full_regression_outcome':'skipped'})
+        self.assertTrue(self.evaluate(condition,manual))
+        manual.update({'inputs.backend_image_source_sha':'4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5','inputs.backend_image_evidence_run_id':'41101879920'})
+        self.assertTrue(self.evaluate(condition,manual))
+    def test_full_result_is_published_without_softening_the_original_suite(self):
+        self.assertIn('      full_regression_outcome: ${{ steps.full_regression.outcome }}\n',self.workflow)
+        block=self.step('Complete Phase1 and Phase2 source regression')
+        self.assertIn('        id: full_regression\n',block)
+        self.assertNotIn('continue-on-error',block)
+        commands=block.split('        run: |\n',1)[1]
+        self.assertEqual(commands,"""          set -o pipefail
+          python3 -B -m unittest discover -s tests -p 'test_community_*.py' -v 2>&1 | tee community-tests.log
+          python3 -B -m unittest discover -s tests -p 'test_stage5_*.py' -v 2>&1 | tee stage5-tests.log
+          node --test clients/community-mini/*.test.cjs scripts/community_mini_key.test.cjs tests/community_mini_development_operation.test.cjs
+          node --test demos/community-local-e2e/*.test.mjs
+          node --test demos/community-payment/demo.test.mjs
+          node --test demos/community-admin/admin.test.mjs
+""")
 
 if __name__=='__main__':
     import sys

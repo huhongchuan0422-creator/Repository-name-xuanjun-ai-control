@@ -59,7 +59,8 @@ class HostedImageEntry(unittest.TestCase):
         v={'github.event_name':'workflow_dispatch','github.ref':BRANCH,'github.sha':HEAD,
            'inputs.backend_image_enabled':True,'inputs.preview_enabled':False,'inputs.backend_image_source_sha':HEAD,
            'inputs.preview_source_sha':HEAD,'inputs.preview_target':'uk-path-candidate',
-           'github.event.head_commit.message':''}
+           'github.event.head_commit.message':'','needs.test.result':'success',
+           'needs.test.outputs.full_regression_outcome':'success'}
         v.update(changes);expr=self.job(name).split('    if: ',1)[1].splitlines()[0]
         return condition(expr,v)
     def test_explicit_image_context_accepts_only_its_own_exact_inputs(self):
@@ -118,7 +119,7 @@ class HostedImageEntry(unittest.TestCase):
     def test_image_dispatch_cannot_repeat_complete_old_regression_or_browser_install(self):
         for name in ('Complete Phase1 and Phase2 source regression','Install exact browser test runner'):
             step=self.workflow.split('      - name: '+name+'\n',1)[1].split('        run:',1)[0]
-            expr=step.split('        if: ',1)[1].strip().strip('"')
+            expr=step.split('        if: ',1)[1].splitlines()[0].strip().strip('"')
             self.assertFalse(condition(expr,{'github.event_name':'workflow_dispatch','inputs.backend_image_enabled':True,'inputs.preview_enabled':False}))
         gate=self.workflow.split('      - name: Reuse exact successful push Hosted evidence before preview\n',1)[1].split('        env:',1)[0]
         self.assertIn('inputs.backend_image_enabled',gate)
