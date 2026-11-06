@@ -54,3 +54,35 @@ No secret, new credential, server access, production deployment, new billing sys
 ## Visual verification limit
 
 The frozen source is byte-identical to V4 and live.html adds only the runtime module. A new browser screenshot comparison is not claimed in this environment because Chromium navigation remains administratively blocked by ERR_BLOCKED_BY_ADMINISTRATOR and no bypass is used. Source/hash parity is verified; browser visual E2E remains NOT_VERIFIED.
+
+
+## 2026-11-05催办核查
+
+当前客户侧分支 HEAD 在本轮开工前仍为 `1d016ea3872b5e12cc60bd90730344fb2c585f11`，未发现 GEO 后继提交、GEO PR 或同一客户侧 Writer 接管记录。
+
+仓库内已核到但**不能作为生产 GEO 客户接口**的现有能力：
+- `scripts/community_saas_modules.py`：Stage5 离线模块目录/价格/权益模型；文件自身明确 OFFLINE product/contract model。
+- `scripts/community_saas_phase2_http.py`：仅 127.0.0.1 的 offline/loopback HTTP。
+- `scripts/task_supervisor_runtime.py`：任务监督运行时；明确不授予 authority、不创建 worker，也不是客户 GEO API。
+
+因此当前真实后台合同仍未交付。客户侧所需最小权威合同已固化为：
+`GEO_BACKEND_CONTRACT_REQUIRED.json`。
+
+该契约要求统一后台/统一 SaaS 服务提供：
+1. entitlement：模块是否启用、套餐、有效期；
+2. Billing/Usage：额度、已用/剩余、权威来源；
+3. diagnosis：诊断项、证据、来源与观察时间；
+4. task：任务状态、步骤、UNKNOWN/重试语义；
+5. versions：当前版本、评论与确认状态；
+6. results：可比范围、指标、样本量及提升/持平/下降/数据不足；
+7. next_round：继续优化资格、来源结果与新任务创建状态。
+
+客户侧继续复用现有 `/customer/center/api/me` 身份/租户，不另建身份、计费、任务系统。后端/后台具体聊天窗口链接在当前仓库和本窗口可用上下文中仍无可核实记录，状态保持 `UNKNOWN`，不编造链接。
+
+## V4视觉对照
+
+冻结 V4 四文件仍按 SHA256 锁定；`live.html` 与冻结 `index.html` 的非业务差异仍只允许：
+- fail-closed 首屏 guard；
+- `geo-v4-runtime.js` 模块加载。
+
+新回归 `geo-contract.test.js` 会再次锁定四文件 SHA 和 live/frozen 差异。真实浏览器截图对照仍受既有 `ERR_BLOCKED_BY_ADMINISTRATOR` 限制，不采用绕行手段，因此 Browser visual E2E 仍为 `NOT_VERIFIED`。

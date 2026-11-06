@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "state": "REQUIRED_NOT_CONNECTED",
+  "authority": "GEO_BACKEND_OR_UNIFIED_SAAS_BACKEND",
+  "customer_writer_must_not_implement_backend": true,
+  "identity_source": "existing /customer/center/api/me",
+  "required_service": {
+    "read": "snapshot",
+    "write": "command",
+    "snapshot_request": [
+      "project_id",
+      "tenant_id",
+      "customer_id"
+    ],
+    "snapshot_response_required": [
+      "tenant_id",
+      "connection",
+      "entitlement",
+      "actions"
+    ],
+    "snapshot_optional_sections": [
+      "identity",
+      "brand",
+      "usage",
+      "scope",
+      "metrics",
+      "diagnosis",
+      "task",
+      "versions",
+      "results"
+    ],
+    "section_rule": "Every optional section must carry status=READY before customer runtime renders it as real data.",
+    "command_request": [
+      "type",
+      "project_id",
+      "tenant_id"
+    ],
+    "command_optional": [
+      "args",
+      "form",
+      "comment"
+    ],
+    "unknown_rule": "If command result is uncertain, customer runtime queries snapshot and never blindly retries.",
+    "tenant_rule": "snapshot.tenant_id must equal current /me project tenant.",
+    "action_rule": "Each write action requires snapshot.actions[type]===true plus existing OWNER/EDITOR role.",
+    "approval_rule": "Backend must expose the authoritative approval state for any action that requires approval; frontend must not invent approval."
+  },
+  "required_domains": {
+    "entitlement": [
+      "enabled",
+      "plan",
+      "valid_until"
+    ],
+    "billing_usage": [
+      "quota",
+      "remaining_or_used",
+      "billing_or_usage_source"
+    ],
+    "diagnosis": [
+      "items",
+      "evidence",
+      "source",
+      "observed_at"
+    ],
+    "task": [
+      "state",
+      "steps",
+      "retryable_or_query_state",
+      "updated_at"
+    ],
+    "versions": [
+      "current_version",
+      "comments",
+      "confirmation_state"
+    ],
+    "results": [
+      "comparison_scope",
+      "metrics",
+      "sample_size",
+      "result_state"
+    ],
+    "next_round": [
+      "eligibility",
+      "source_result",
+      "task_creation_state"
+    ]
+  },
+  "known_non_authoritative_sources": [
+    "scripts/community_saas_modules.py (offline model)",
+    "scripts/community_saas_phase2_http.py (loopback/offline)",
+    "scripts/task_supervisor_runtime.py (supervision runtime, no customer GEO authority)"
+  ]
+}
