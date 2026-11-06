@@ -72,7 +72,7 @@ class ApplicantOcr(unittest.TestCase):
   create=self.api.create_app
   def test_app(**kw):
    from scripts.community_license_inference import run_license_layout_ocr
-   self.assertIs(kw.pop('infer'),run_license_layout_ocr)
+   self.assertIs(kw.pop('infer').__wrapped__,run_license_layout_ocr)
    return create(**kw,infer=synthetic_inference)
   with patch.object(self.api,'create_app',side_effect=test_app):host=HostOcr(self.fx.service,'',self.api,self.store,applicant_mode=True)
   self.fx.service.ocr=host
@@ -96,7 +96,7 @@ class ApplicantOcr(unittest.TestCase):
   create=self.api.create_app
   def test_app(**kw):
    from scripts.community_license_inference import run_license_layout_ocr
-   self.assertIs(kw.pop('infer'),run_license_layout_ocr)
+   self.assertIs(kw.pop('infer').__wrapped__,run_license_layout_ocr)
    return create(**kw,infer=synthetic_inference)
   with patch.object(self.api,'create_app',side_effect=test_app):host=HostOcr(self.fx.service,'',self.api,self.store,applicant_mode=True)
   self.fx.fx.gateway.ocr=host

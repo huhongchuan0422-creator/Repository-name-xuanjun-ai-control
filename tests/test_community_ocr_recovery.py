@@ -125,4 +125,151 @@ class DurableRecovery(unittest.TestCase):
   self.assertLess(source.index('fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)'),source.index('store.recover_interrupted()'))
   self.assertLess(source.index('store.recover_interrupted()'),source.index("self.configure_ocr('',api,store,applicant_mode=True)"))
 
+
+class SafeReadDiagnostics(unittest.TestCase):
+ def test_payload_and_log_are_allowlisted_and_share_random_id(self):
+  import json
+  from scripts.community_ocr_host import _RequestDiagnostic,_attach_failure,OcrPublicError
+  context=_RequestDiagnostic('read');context.phase('RESULT_READ')
+  with self.assertLogs('community.ocr.diagnostic',level='WARNING') as logs:
+   error=_attach_failure(RuntimeError('SYNTHETIC_SECRET_AND_CUSTOMER_DATA'),context)
+   payload=OcrPublicError('OCR_UNAVAILABLE',error.ocr_diagnostic).public_payload()
+   _attach_failure(PermissionError('OCR_OWNER_TIMEOUT'),context)
+  diagnostic=payload['ocr_diagnostic']
+  self.assertEqual(len(logs.output),1)
+  self.assertEqual(diagnostic['reason'],'RESULT_READ_FAILED')
+  self.assertRegex(diagnostic['diagnostic_id'],'^[a-f0-9]{32}$')
+  self.assertIn(diagnostic['diagnostic_id'],logs.output[0])
+  self.assertNotIn('SYNTHETIC_SECRET',str(payload)+str(logs.output))
+  self.assertEqual(set(diagnostic),{'version','diagnostic_id','stage','reason','retryable','request_retained'})
+  self.assertNotEqual(diagnostic['diagnostic_id'],_RequestDiagnostic('read').diagnostic_id)
+ def test_invalid_external_metadata_never_echoed(self):
+  from scripts.community_ocr_host import safe_diagnostic,OcrPublicError
+  self.assertIsNone(safe_diagnostic({'version':1,'reason':'SYNTHETIC_SECRET'}))
+  diagnostic=OcrPublicError('OCR_UNAVAILABLE').ocr_diagnostic
+  self.assertNotIn('secret',safe_diagnostic(dict(diagnostic,secret='must-not-return')))
+  self.assertIsNone(safe_diagnostic(dict(diagnostic,diagnostic_id='private-value')))
+  self.assertEqual(OcrPublicError('PRIVATE_ERROR_BODY',diagnostic).code,'OCR_UNAVAILABLE')
+ def test_pending_distinguishes_retained_request_and_other_busy_request(self):
+  from scripts.community_ocr_host import _RequestDiagnostic,_pending
+  ctx=_RequestDiagnostic('read');ctx.phase('RESULT_READ')
+  same=_pending(ctx,retained=True).ocr_diagnostic
+  other=_pending(_RequestDiagnostic('submit'),retained=False,reason='ANOTHER_REQUEST_IN_PROGRESS').ocr_diagnostic
+  self.assertTrue(same['retryable']);self.assertTrue(same['request_retained'])
+  self.assertFalse(other['request_retained']);self.assertNotEqual(same['diagnostic_id'],other['diagnostic_id'])
+ def test_idle_pump_preserves_original_worker_context_and_owner_thread(self):
+  from scripts.community_ocr_host import _RequestDiagnostic,_CURRENT_DIAGNOSTIC,current_diagnostic
+  from scripts.community_ocr_bridge import on_owner
+  owner=OwnerCalls(timeout=1);expected=_RequestDiagnostic('read');seen=[]
+  class Bridge:
+   owner_thread=threading.get_ident();owner_call=owner
+   @on_owner
+   def authenticate(self, token):
+    seen.append((threading.get_ident(),current_diagnostic().diagnostic_id,current_diagnostic().stage))
+    raise ValueError('SYNTHETIC_SECRET')
+  def work():
+   reset=_CURRENT_DIAGNOSTIC.set(expected)
+   try:return Bridge().authenticate('SYNTHETIC_TOKEN')
+   finally:_CURRENT_DIAGNOSTIC.reset(reset)
+  with concurrent.futures.ThreadPoolExecutor(1) as pool:
+   f=pool.submit(work)
+   deadline=time.monotonic()+2
+   while owner.pending.empty() and time.monotonic()<deadline:time.sleep(.001)
+   self.assertFalse(owner.pending.empty());owner.pump()
+   with self.assertRaises(ValueError) as caught:f.result()
+  self.assertEqual(seen,[(threading.get_ident(),expected.diagnostic_id,'AUTHENTICATION')])
+  self.assertEqual(caught.exception.ocr_diagnostic['reason'],'AUTHENTICATION_FAILED')
+  self.assertEqual(caught.exception.ocr_diagnostic['diagnostic_id'],expected.diagnostic_id)
+  self.assertIsNone(current_diagnostic());owner.close()
+ def test_queued_owner_timeout_is_bounded_and_never_executes_late(self):
+  from scripts.community_ocr_host import _RequestDiagnostic
+  owner=OwnerCalls(timeout=.03);called=[];ctx=_RequestDiagnostic('read')
+  def operation():called.append(1)
+  operation.ocr_context=ctx;operation.ocr_stage='SOURCE_BINDING'
+  with concurrent.futures.ThreadPoolExecutor(1) as pool:
+   f=pool.submit(owner,operation)
+   with self.assertRaisesRegex(PermissionError,'OCR_OWNER_TIMEOUT') as caught:f.result(timeout=1)
+  self.assertEqual(caught.exception.ocr_diagnostic['reason'],'OWNER_WAIT_TIMEOUT')
+  self.assertEqual(caught.exception.ocr_diagnostic['stage'],'SOURCE_BINDING')
+  owner.pump();owner.close();self.assertEqual(called,[])
+ def test_running_owner_callback_keeps_original_timeout_without_unbounded_wait(self):
+  owner=OwnerCalls(timeout=.03);returned=[]
+  def operation():time.sleep(.07);returned.append(True)
+  with concurrent.futures.ThreadPoolExecutor(1) as pool:
+   f=pool.submit(owner,operation)
+   while owner.pending.empty():time.sleep(.001)
+   owner.pump()
+   with self.assertRaisesRegex(PermissionError,'OCR_OWNER_TIMEOUT'):f.result()
+  self.assertEqual(returned,[True]);owner.close()
+ def test_public_gateway_preserves_infrastructure_reason_swallowed_by_api(self):
+  from scripts.community_ocr_host import _RequestDiagnostic,OcrPublicError
+  from scripts.community_mini_merchant import MiniMerchant
+  h=HostOcr.__new__(HostOcr);identity=object();onboarding=object()
+  h.merchant=SimpleNamespace(identity=identity,onboarding=onboarding)
+  context=_RequestDiagnostic('read');context.phase('SOURCE_BINDING')
+  error=PermissionError('ATTACHMENT_AUTHORIZATION_REVOKED')
+  error.ocr_diagnostic=context.fail(reason='OWNER_WAIT_TIMEOUT')
+  def dispatch(*args):raise error
+  h.dispatch=dispatch
+  gateway=SimpleNamespace(ocr=h,identity=identity,onboarding=onboarding)
+  with self.assertRaises(OcrPublicError) as caught:MiniMerchant._dispatch_ocr(gateway,'synthetic','',{})
+  self.assertEqual(caught.exception.code,'OCR_UNAVAILABLE')
+  self.assertEqual(caught.exception.ocr_diagnostic['diagnostic_id'],context.diagnostic_id)
+  self.assertEqual(caught.exception.ocr_diagnostic['reason'],'OWNER_WAIT_TIMEOUT')
+ def test_serial_platform_serve_composes_existing_housekeeping_and_owner_pump(self):
+  from scripts.community_platform_host import PlatformHost
+  calls=[];owner_thread=threading.get_ident()
+  class Server:
+   def service_actions(self):calls.append(('original',threading.get_ident()))
+   def serve_forever(self,*,poll_interval):
+    self.poll_interval=poll_interval
+    self.service_actions()
+  server=Server();h=PlatformHost.__new__(PlatformHost)
+  h.application=SimpleNamespace(listen_proxy=lambda *a:server)
+  h.plan=dict(socket_path='synthetic',https_origin='synthetic',nginx_uid=1,nginx_gid=1)
+  h.ocr=SimpleNamespace(service_actions=lambda:calls.append(('ocr',threading.get_ident())))
+  h.close=lambda:calls.append(('close',threading.get_ident()))
+  h.serve()
+  self.assertEqual(server.poll_interval,.25)
+  self.assertEqual(calls,[('original',owner_thread),('ocr',owner_thread),('close',owner_thread)])
+
+
+class LateReadBinding(unittest.TestCase):
+ def service(self, action, change=None):
+  import httpx
+  from scripts.community_ocr_host import _RequestDiagnostic
+  h=HostOcr.__new__(HostOcr);h.owner=OwnerCalls();h.scene='';h.applicant_mode=True;h.busy=False
+  job=dict(job_id='11111111-1111-1111-1111-111111111111',subject='synthetic-owner',tenant_id='synthetic-tenant',onboarding_application_id='synthetic-application',document_type='business_license',application_revision='1',provider_version=1,attachment_id='synthetic-attachment',document_sha256='a'*64,status='needs_review')
+  source=dict(data=b'SYNTHETIC',mime='image/png',document_type=job['document_type'],application_revision='1',wechat_version=1,attachment_id=job['attachment_id'],document_sha256=job['document_sha256'])
+  if change:source.update(change)
+  h.bridge=SimpleNamespace(authenticate=lambda token:SimpleNamespace(subject=job['subject'],tenant_id=job['tenant_id']),authorize_application=lambda *a:True,source=lambda *a:dict(source),store=SimpleNamespace(get=lambda *a:dict(job)))
+  params=dict(action=action,application=job['onboarding_application_id'],job_id=job['job_id'])
+  if action=='confirm':params.update(revision=1,fields={'company_name':'SYNTHETIC CONFIRMED'},idempotency_key='synthetic-confirm-001',application_revision='1',provider_version=1)
+  h.inflight=concurrent.futures.Future();h.inflight.set_result(httpx.Response(200,json={'job_id':job['job_id'],'status':job['status'],'fields':{'company_name':{'value':'SYNTHETIC OLD VALUE'}}}))
+  h.inflight_key=('synthetic-token','',repr(sorted(params.items())));h.inflight_source=None;h.inflight_diagnostic=_RequestDiagnostic(action)
+  # No worker/app exists: dispatch must consume only the original completed future.
+  return h,params,job
+ def assert_changed(self, change, reason):
+  for action in ('read','confirm'):
+   with self.subTest(action=action):
+    h,params,before=self.service(action,change)
+    with self.assertRaisesRegex(PermissionError,'OCR_SOURCE_CHANGED') as caught:h.dispatch('synthetic-token','',params)
+    diagnostic=caught.exception.ocr_diagnostic
+    self.assertEqual(diagnostic['stage'],'SOURCE_BINDING');self.assertEqual(diagnostic['reason'],reason)
+    self.assertTrue(diagnostic['request_retained'])
+    self.assertEqual(h.bridge.store.get(before['job_id'],before['tenant_id']),before)
+    h.owner.close()
+ def test_completed_read_and_confirm_recheck_revision(self):
+  self.assert_changed({'application_revision':'2'},'APPLICATION_REVISION_CHANGED')
+ def test_completed_read_and_confirm_recheck_attachment_and_content(self):
+  for change in ({'attachment_id':'synthetic-replacement'},{'document_sha256':'b'*64}):self.assert_changed(change,'ATTACHMENT_CHANGED')
+ def test_completed_read_and_confirm_recheck_provider_value_and_type(self):
+  for value in (2,True,None):self.assert_changed({'wechat_version':value},'PROVIDER_VERSION_CHANGED')
+ def test_unchanged_completed_read_and_confirm_release_same_future_without_worker(self):
+  for action in ('read','confirm'):
+   h,params,before=self.service(action)
+   result=h.dispatch('synthetic-token','',params)
+   self.assertEqual(result['status_code'],200);self.assertEqual(result['result']['job_id'],before['job_id'])
+   self.assertIsNone(h.inflight);h.owner.close()
+
 if __name__=='__main__':unittest.main()

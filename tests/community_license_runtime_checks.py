@@ -120,7 +120,7 @@ class ApiContract(unittest.TestCase):
         with patch.dict(sys.modules, {'scripts.community_ocr_bridge':fake}):
             host=HostOcr(object(),'synthetic-scene',api,object())
             try:
-                self.assertIs(compose.call_args.kwargs['infer'],run_license_layout_ocr)
+                self.assertIs(compose.call_args.kwargs['infer'].__wrapped__,run_license_layout_ocr)
             finally:host.close()
     def test_source_pin_mismatch_fails_before_inference(self):
         original=Path.read_bytes

@@ -121,14 +121,18 @@ class MiniMerchant:
         if type(self.ocr) is not HostOcr or self.ocr.merchant.identity is not self.identity or self.ocr.merchant.onboarding is not self.onboarding:
             raise OcrPublicError('OCR_UNAVAILABLE')
         try:return self.ocr.dispatch(token,scene,p)
-        except PermissionError as error:
-            from scripts.community_ocr_host import OcrPublicError
+        except Exception as error:
+            from scripts.community_ocr_host import OcrPublicError, safe_diagnostic, _attach_failure
+            if type(error) is OcrPublicError:raise
+            diagnostic=safe_diagnostic(getattr(error,'ocr_diagnostic',None))
+            if diagnostic is None:diagnostic=_attach_failure(error).ocr_diagnostic
             code=str(error)
-            if code=='OCR_REQUEST_PENDING':public='OCR_REQUEST_PENDING'
+            if diagnostic['reason'] in ('OWNER_WAIT_TIMEOUT','OWNER_QUEUE_FULL','HOST_STOPPED','OWNER_THREAD_REQUIRED'):public='OCR_UNAVAILABLE'
+            elif code=='OCR_REQUEST_PENDING':public='OCR_REQUEST_PENDING'
             elif any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
             elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
             else:public='OCR_UNAVAILABLE'
-            raise OcrPublicError(public) from None
+            raise OcrPublicError(public,diagnostic) from None
 
     def _ocr_origin(self,scene,project,principal):
         return {'project':project,'scene':scene,'scope':dict(self.identity.runtime.bindings[principal])}

@@ -26,11 +26,23 @@ def application_revision(value):
 
 def on_owner(method):
     def invoke(self, *args, **kwargs):
+        from scripts.community_ocr_host import current_diagnostic, _attach_failure, _CURRENT_DIAGNOSTIC
+        context=current_diagnostic()
+        stage={'authenticate':'AUTHENTICATION','authorize_application':'APPLICATION_AUTHORIZATION',
+               'source':'SOURCE_BINDING','authorize_attachment':'SOURCE_BINDING','apply_confirmed':'WRITEBACK'}.get(method.__name__,'ADMISSION')
         def execute():
             import threading
+            if context:context.phase(stage)
             if threading.get_ident() != self.owner_thread:
                 raise PermissionError('OCR_CENTER_OWNER_THREAD_REQUIRED')
-            return method(self, *args, **kwargs)
+            reset=_CURRENT_DIAGNOSTIC.set(context)
+            try:return method(self, *args, **kwargs)
+            except BaseException as error:
+                _attach_failure(error,context,stage=stage);raise
+            finally:
+                if context:context.phase({'submit':'QUEUE','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK'}.get(context.action,'ADMISSION'))
+                _CURRENT_DIAGNOSTIC.reset(reset)
+        execute.ocr_context=context;execute.ocr_stage=stage
         return self.owner_call(execute)
     return invoke
 
@@ -103,7 +115,18 @@ class CommunityOcrBridge:
                 or source['document_type'] != document_type
                 or expected_revision is not None and (type(expected_revision) is not str
                     or expected_revision != source['application_revision'])):
+            from scripts.community_ocr_host import current_diagnostic
+            context=current_diagnostic()
+            if context:context.fail(reason='APPLICATION_REVISION_CHANGED' if expected_revision is not None and
+                (type(expected_revision) is not str or expected_revision != source['application_revision']) else 'ATTACHMENT_CHANGED',stage='SOURCE_BINDING')
             raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
+        # Observe (do not bypass or change) the API's subsequent provider-version
+        # comparison, so a swallowed callback error cannot erase its safe cause.
+        from scripts.community_ocr_host import current_diagnostic
+        context=current_diagnostic()
+        if (context and context.has_expected_binding and context.expected_provider_version is not None
+                and source.get('wechat_version') != context.expected_provider_version):
+            context.fail(reason='PROVIDER_VERSION_CHANGED',stage='SOURCE_BINDING')
         result = {'authorized': True, 'content_sha256': source['document_sha256'],
                   'document_type': document_type, 'application_revision': source['application_revision']}
         if 'wechat_version' in source:

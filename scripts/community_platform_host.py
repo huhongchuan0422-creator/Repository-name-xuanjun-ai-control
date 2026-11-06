@@ -364,6 +364,14 @@ class PlatformHost:
         p = self.plan
         server = self.application.listen_proxy(p['socket_path'],p['https_origin'],p['nginx_uid'],p['nginx_gid'])
         # Original serial UnixStreamServer keeps SQLite ownership in this thread.
+        # Pump late authorization callbacks even between HTTP polls. Preserve any
+        # original server housekeeping and the existing 0.25-second cadence.
+        if self.ocr is not None:
+            original_service_actions=server.service_actions
+            def service_actions():
+                original_service_actions()
+                if self.ocr is not None:self.ocr.service_actions()
+            server.service_actions=service_actions
         try:
             server.serve_forever(poll_interval=0.25)
         finally:

@@ -349,7 +349,8 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             except PermissionError as error:
                 from scripts.community_ocr_host import OcrPublicError
                 from scripts.community_wechat_applyment import WechatMediaUnavailable
-                return self.answer(403,{'error':error.code if type(error) is OcrPublicError else 'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
+                if type(error) is OcrPublicError:return self.answer(403,error.public_payload())
+                return self.answer(403,{'error':'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except RegionValidationError as error:
                 return self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})
             except (ValueError,TypeError,KeyError):return self.answer(400,{'error':'INVALID_REQUEST'})
