@@ -204,8 +204,8 @@ class MiniMerchant:
         owner,meta,data=self.onboarding._load(application,uid)
         if applicant is not True and meta.get('ocr_origin')!=origin:
             raise PermissionError('OCR_APPLICATION_ORIGIN_UNVERIFIED')
-        hints={'business_license':'business_license','identity_front':'id_front'}
-        if kind not in hints or (kind=='identity_front' and meta.get('identity_type')!='IDENTIFICATION_TYPE_IDCARD'):
+        hints={'business_license':'business_license','identity_front':'id_front','identity_back':'id_back'}
+        if kind not in hints or (kind in ('identity_front','identity_back') and meta.get('identity_type')!='IDENTIFICATION_TYPE_IDCARD'):
             raise PermissionError('OCR_DOCUMENT_NOT_SUPPORTED')
         material=meta['materials'].get(kind)
         if material is None:raise PermissionError('OCR_ATTACHMENT_REQUIRED')

@@ -60,7 +60,7 @@ class ApplicantOcr(unittest.TestCase):
   path=self.job();self.fx.applicant('upload',dict(application=self.app['application'],revision=self.app['revision'],kind='business_license',content_base64=base64.b64encode(self.raw+b'new').decode(),expires_at=None))
   self.assertEqual(self.client.get(path,headers=self.headers).status_code,403)
  def test_scene_photos_and_unknown_document_never_inferred(self):
-  for kind in ('storefront_photo','interior_photo','cashier_photo','passport','id_back'):
+  for kind in ('storefront_photo','interior_photo','cashier_photo','passport','identity_back'):
    with self.subTest(kind=kind),self.assertRaises(PermissionError):self.bridge.source(self.principal,self.app['application'],kind)
  def test_expiry_and_unclean_scanned_attachment_denied(self):
   c=self.fx.fx.center;c.db.execute("UPDATE objects SET scan='UNKNOWN' WHERE id=?",(self.source['attachment_id'],))

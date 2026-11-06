@@ -34,13 +34,22 @@ def prepare(bundle,destination):
         for name,digest in required.items():
             if hashlib.sha256(t.extractfile(name).read()).hexdigest()!=digest:raise ValueError('OCR_INNER_SHA_MISMATCH')
         lock=json.loads(Path(__file__).with_name('community_ocr_dependency.json').read_text())
-        for name,digest in lock['files'].items():
+        for name,digest in lock.get('upstream_files',lock['files']).items():
             if required['services/ocr_engine/'+name]!=digest:raise ValueError('OCR_COMMUNITY_PIN_MISMATCH')
         destination.mkdir(mode=0o700)
         selected=('services/','models/','wheelhouse/','system-debs/')
         for m in members:
             if not m.name.startswith(selected) and m.name not in ('LICENSE-2.0.txt','NOTICE.md','offline-bundle-manifest.json','requirements-lock.json','system-deb-lock.json'):continue
             out=destination/m.name;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(t.extractfile(m).read());out.chmod(0o644)
+        successor=lock.get('local_successor',{})
+        root=Path(__file__).resolve().parents[1]
+        if successor:
+            if hashlib.sha256((root/successor['patch_path']).read_bytes()).hexdigest()!=successor['patch_sha256']:
+                raise ValueError('OCR_SUCCESSOR_PATCH_HASH_MISMATCH')
+            for name,relative in successor['source_files'].items():
+                raw=(root/relative).read_bytes()
+                if hashlib.sha256(raw).hexdigest()!=lock['files'][name]:raise ValueError('OCR_SUCCESSOR_SOURCE_HASH_MISMATCH')
+                (destination/'services/ocr_engine'/name).write_bytes(raw)
         # Keep original community crypto/cffi/pycparser byte pins. The original
         # crypto METADATA accepts cffi>=2.0.0; no resolver or package downgrade.
         lines=[]

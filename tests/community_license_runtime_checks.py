@@ -31,15 +31,20 @@ class ApiContract(unittest.TestCase):
                 job=received.json();self.assertEqual(job['fields'],result['fields'])
                 self.assertEqual(job['fields']['legal_representative']['value'],'')
                 self.assertEqual(len(job['fields']['legal_representative']['candidates']),2)
-                self.assertEqual(job['warnings'],[])  # Original API drops top-level warnings.
+                self.assertEqual(job['warnings'],result.get('warnings', []))
                 self.assertTrue(job['requires_human_confirmation'])
                 self.assertNotIn('confirmed_fields',job)
-    def test_id_front_explicitly_delegates_original_callback(self):
-        expected={'document_type':'id_front','fields':{},'requires_human_confirmation':True}
-        with patch.object(ocr_core,'run_local_ocr',return_value=expected) as original:
-            self.assertIs(run_license_layout_ocr(b'synthetic','id_front',max_bytes=123,max_pixels=456),expected)
-            original.assert_called_once_with(b'synthetic','id_front',max_bytes=123,max_pixels=456)
-    def test_license_calls_original_models_once_with_unchanged_parameters(self):
+    def test_id_front_uses_geometry_not_the_old_nextline_callback(self):
+        import cv2, rapidocr, numpy as np
+        from unittest.mock import Mock
+        raw={'txts':['合成甲','姓名','性别 男'],'scores':[.99]*3,
+             'boxes':[[[140,0],[240,0],[240,20],[140,20]],[[0,0],[100,0],[100,20],[0,20]],[[0,40],[100,40],[100,60],[0,60]]]}
+        engine=Mock(return_value=raw)
+        with patch.object(ocr_core,'run_local_ocr',side_effect=AssertionError('OLD_NEXTLINE_CALLBACK_FORBIDDEN')) as old, patch.object(ocr_core,'_verified_model_paths',return_value={'det':'x','cls':'x','rec':'x'}), patch.object(cv2,'imdecode',return_value=np.zeros((80,250,3),dtype=np.uint8)), patch.object(rapidocr,'RapidOCR',return_value=engine):
+            result=run_license_layout_ocr(b'\xff\xd8\xffsynthetic','id_front')
+            self.assertEqual(result['fields']['id_name']['value'],'合成甲')
+            self.assertEqual(engine.call_count,4);old.assert_not_called()
+    def test_license_uses_four_directions_one_original_engine_with_unchanged_parameters(self):
         import cv2
         import rapidocr
         import numpy as np
@@ -50,31 +55,36 @@ class ApiContract(unittest.TestCase):
         with patch.object(ocr_core,'_verified_model_paths',return_value=models), patch.object(cv2,'imdecode',return_value=np.zeros((50,200,3),dtype=np.uint8)), patch.object(rapidocr,'RapidOCR',return_value=engine) as factory:
             result=run_license_layout_ocr(b'\xff\xd8\xffsynthetic','business_license')
             factory.assert_called_once_with(params={'Det.model_path':models['det'],'Cls.model_path':models['cls'],'Rec.model_path':models['rec']})
-            engine.assert_called_once()
+            self.assertEqual(engine.call_count,4)
             self.assertEqual(result['fields']['legal_representative']['value'],'合成甲')
 
-    def test_inference_references_released_before_geometry_mapping(self):
+    def test_raw_output_released_each_direction_and_single_engine_reused(self):
         import cv2, rapidocr, numpy as np, weakref
         from scripts import community_license_inference as adapter
         from scripts.community_license_layout import extract_license_fields
-        refs=[]
+        refs=[];mapped_calls=[]
         class Output:
             txts=['法定代表人 合成甲'];scores=[.99];boxes=[[[0,0],[200,0],[200,20],[0,20]]]
         class Engine:
-            def __init__(self,params):refs.append(weakref.ref(self))
+            def __init__(self,params):refs.append(('engine',weakref.ref(self)))
             def __call__(self,decoded):
-                raw=Output();raw.img=decoded;refs.append(weakref.ref(raw));return raw
+                raw=Output();raw.img=decoded;refs.append(('raw',weakref.ref(raw)));return raw
         def decode(*args):
-            decoded=np.zeros((50,200,3),dtype=np.uint8);refs.append(weakref.ref(decoded));return decoded
-        def mapped(rows):
-            self.assertEqual(len(refs),3)
-            self.assertTrue(all(ref() is None for ref in refs))
-            return extract_license_fields(rows)
+            decoded=np.zeros((50,200,3),dtype=np.uint8);refs.append(('decoded',weakref.ref(decoded)));return decoded
+        def mapped(rows,coordinate_turns):
+            mapped_calls.append(1)
+            self.assertEqual(coordinate_turns,(0,))
+            self.assertTrue(all(ref() is None for kind,ref in refs if kind=='raw'))
+            self.assertTrue(all(ref() is not None for kind,ref in refs if kind in ('engine','decoded')))
+            self.assertEqual(sum(kind=='engine' for kind,ref in refs),1)
+            return extract_license_fields(rows,coordinate_turns)
         with patch.object(ocr_core,'_verified_model_paths',return_value={'det':'x','cls':'x','rec':'x'}), patch.object(cv2,'imdecode',side_effect=decode), patch.object(rapidocr,'RapidOCR',Engine), patch.object(adapter,'extract_license_fields',side_effect=mapped):
             result=run_license_layout_ocr(b'\xff\xd8\xffsynthetic','business_license')
             self.assertEqual(result['fields']['legal_representative']['value'],'合成甲')
+        self.assertEqual(len(mapped_calls),4)
+        self.assertTrue(all(ref() is None for kind,ref in refs))
 
-    def test_real_pinned_models_single_call_on_embedded_synthetic_image(self):
+    def test_real_pinned_models_four_calls_on_embedded_synthetic_image(self):
         import base64,hashlib,json,sys,socket
         from scripts.community_uploaded_image_scanner import UploadedImageScanner
         fixture=json.loads((Path(__file__).parent/'fixtures/community_license_columns90_image.json').read_text())
@@ -91,8 +101,10 @@ class ApiContract(unittest.TestCase):
             with patch.object(socket,'socket',side_effect=AssertionError('SYNTHETIC_NETWORK_FORBIDDEN')), patch.object(socket,'getaddrinfo',side_effect=AssertionError('SYNTHETIC_NETWORK_FORBIDDEN')):
                 result=run_license_layout_ocr(cleaned,'business_license')
         finally:sys.setprofile(previous)
-        self.assertEqual(len(calls),1)
+        self.assertEqual(len(calls),4)
+        self.assertNotIn('business_scope',result['fields'])
         for key,value in fixture['expected'].items():
+            if key=='business_scope':continue
             self.assertEqual(result['fields'][key]['value'],value)
             self.assertTrue(result['fields'][key]['requires_review'])
         self.assertTrue(result['requires_human_confirmation'])

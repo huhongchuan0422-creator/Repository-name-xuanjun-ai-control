@@ -171,6 +171,13 @@ class WechatApplyment:
             expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
             confirmed_fields=confirmed_fields,source_check=source_check)
 
+    def fill_confirmed_identity_back_draft(self, session, csrf, application, *,
+                                     expected_application_revision, expected_wechat_version,
+                                     confirmed_fields, source_check=None):
+        return self._fill_confirmed_document_draft(session,csrf,application,document_type='id_back',
+            expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
+            confirmed_fields=confirmed_fields,source_check=source_check)
+
     def _fill_confirmed_document_draft(self, session, csrf, application, *,document_type,
                                      expected_application_revision, expected_wechat_version,
                                      confirmed_fields, source_check=None):
@@ -192,8 +199,8 @@ class WechatApplyment:
                 or type(expected_wechat_version) is not int or expected_wechat_version<0):
             raise ValueError('EXPLICIT_DUAL_VERSIONS_REQUIRED')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-        if document_type not in ('business_license','id_front'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
-        allowed={'company_name','registered_address'} if document_type=='business_license' else {'id_name','id_number','registered_address'}
+        if document_type not in ('business_license','id_front','id_back'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
+        allowed={'business_license':{'company_name','registered_address'},'id_front':{'id_name','id_number','registered_address'},'id_back':{'valid_from','valid_to'}}[document_type]
         if (type(confirmed_fields) is not dict or not confirmed_fields
                 or not set(confirmed_fields)<=allowed):
             raise ValueError('CONFIRMED_LICENSE_FIELDS_ONLY')
@@ -254,7 +261,8 @@ class WechatApplyment:
                     raise ValueError('ORIGINAL_IDCARD_TYPE_SELECTION_REQUIRED')
                 card=identity.get('id_card_info',{})
                 if type(card) is not dict:raise ValueError('ORIGINAL_IDCARD_PROFILE_REQUIRED')
-                mapping={'id_name':'id_card_name','id_number':'id_card_number','registered_address':'id_card_address'}
+                mapping=({'id_name':'id_card_name','id_number':'id_card_number','registered_address':'id_card_address'}
+                         if document_type=='id_front' else {'valid_from':'card_period_begin','valid_to':'card_period_end'})
                 for key,target in mapping.items():
                     if key not in confirmed_fields:continue
                     existing=card.get(target,'')

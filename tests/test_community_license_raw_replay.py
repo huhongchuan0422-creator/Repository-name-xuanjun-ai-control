@@ -13,7 +13,10 @@ class RawReplay(unittest.TestCase):
         for case in cases:
             with self.subTest(case=case['case']):
                 result=extract_license_fields(normalize_layout(case['raw']))
-                self.assertEqual({k:v['value'] for k,v in result['fields'].items()},case['expected'])
+                self.assertNotIn('business_scope',result['fields'])
+                # Retain original fixtures as historical input, not current scope requirements.
+                expected={k:v for k,v in case['expected'].items() if k!='business_scope'}
+                self.assertEqual({k:v['value'] for k,v in result['fields'].items()},expected)
 
     def test_eight_real_model_synthetic_outputs(self):
         files=sorted((Path(__file__).parent/'fixtures/community_license_layout').glob('*.json'))
@@ -22,7 +25,9 @@ class RawReplay(unittest.TestCase):
             with self.subTest(path=path.name):
                 data=json.loads(path.read_text());self.assertTrue(data['synthetic_only'])
                 result=extract_license_fields(normalize_layout(data['raw_capture']))
+                self.assertNotIn('business_scope',result['fields'])
                 for key,value in data['expected'].items():
+                    if key=='business_scope':continue
                     self.assertEqual(result['fields'][key]['value'],value)
                     self.assertTrue(result['fields'][key]['requires_review'])
                 # Deliberately invalid synthetic credit code must not be invented.

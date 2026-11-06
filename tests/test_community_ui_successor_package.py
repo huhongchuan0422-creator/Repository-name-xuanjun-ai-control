@@ -8,6 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / 'deploy' / 'community-preview' / 'Dockerfile.ui-successor'
 STAMP = ROOT / 'deploy' / 'community-preview' / 'COMMUNITY_SOURCE_SHA.successor'
 RUNTIME_CHANGED = {
+    'demos/community-stage/ui-preview/sources.js',
+    'services/ocr_engine/api.py',
+    'scripts/community_ocr_dependency.json',
+    'scripts/community_ocr_bridge.py',
+    'scripts/community_identity_layout.py',
     'scripts/community_ocr_host.py',
     'scripts/community_license_layout.py',
     'scripts/community_license_inference.py',

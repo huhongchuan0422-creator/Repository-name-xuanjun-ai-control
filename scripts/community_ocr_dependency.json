@@ -2,8 +2,23 @@
   "source_sha": "90aca1cfca1ec2a354950c394a4b0c2689b37d13",
   "source_tree": "cdb3918520b176286af570101c75885bcf07cde4",
   "files": {
+    "api.py": "32cf647f56f9f1fbed9d0c7d15bb50a0f60a9cd5124bd5ff835129196766636e",
+    "secure_store.py": "c0191b6766fc884fc4e5f32e9b6492daa5bf0d90527ab77ed2feb5bd03a05696",
+    "ocr_core.py": "bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308"
+  },
+  "upstream_files": {
     "api.py": "0aa40ec64550b64c33bec4902d83155bcd19ab97cae7ea2b28874b28c222621c",
     "secure_store.py": "c0191b6766fc884fc4e5f32e9b6492daa5bf0d90527ab77ed2feb5bd03a05696",
     "ocr_core.py": "bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308"
-  }
+  },
+  "local_successor": {
+    "status": "UNPUBLISHED_LOCAL_CANDIDATE",
+    "patch_path": "deploy/community-preview/ocr-id-back-api.patch",
+    "patch_sha256": "96e72e250a1288a48a69039c5fce5bd2505e120de2e9509e333a1ff1c7da796d",
+    "source_files": {
+      "api.py": "services/ocr_engine/api.py"
+    },
+    "scope": "add id_back document type and confirmation fields; preserve allowlisted orientation/geometry metadata; existing authorization, quotas, core, secure store and models unchanged"
+  },
+  "source_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
 }

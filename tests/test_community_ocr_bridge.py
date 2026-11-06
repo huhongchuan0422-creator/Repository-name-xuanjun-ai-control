@@ -28,6 +28,13 @@ def load_pinned():
         # Same hash-pinned original bytes may come from the approved offline artifact.
         original = __import__('os').environ.get('COMMUNITY_TEST_PINNED_OCR_DIR')
         raw = (Path(original)/name).read_bytes() if original else subprocess.check_output(['git','show',lock['source_sha']+':services/ocr_engine/'+name])
+        if hashlib.sha256(raw).hexdigest() != lock.get('upstream_files',lock['files'])[name]:
+            raise AssertionError('PINNED_OCR_UPSTREAM_HASH_MISMATCH')
+        successor=lock.get('local_successor',{})
+        if name in successor.get('source_files',{}):
+            if hashlib.sha256(Path(successor['patch_path']).read_bytes()).hexdigest()!=successor['patch_sha256']:
+                raise AssertionError('PINNED_OCR_PATCH_HASH_MISMATCH')
+            raw=Path(successor['source_files'][name]).read_bytes()
         if hashlib.sha256(raw).hexdigest() != digest:
             raise AssertionError('PINNED_OCR_HASH_MISMATCH')
         (root/name).write_bytes(raw)

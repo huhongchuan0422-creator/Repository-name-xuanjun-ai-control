@@ -1,0 +1,32 @@
+--- a/services/ocr_engine/api.py
++++ b/services/ocr_engine/api.py
+@@ -18,10 +18,11 @@
+     from secure_store import SecureSQLiteJobStore
+ 
+ MAX_BYTES = 8 * 1024 * 1024
+-ALLOWED_HINTS = {"business_license", "id_front"}
++ALLOWED_HINTS = {"business_license", "id_front", "id_back"}
+ CONFIRM_KEYS = {
+     "business_license": {"company_name", "credit_code", "legal_representative", "registered_address", "business_scope"},
+     "id_front": {"id_name", "id_number", "registered_address"},
++    "id_back": {"issuing_authority", "valid_from", "valid_to"},
+ }
+ class Principal(BaseModel):
+     subject: str
+@@ -237,8 +238,15 @@
+             jobs.update(job["job_id"], status="processing")
+         try:
+             result = infer(data, document_type, max_bytes=MAX_BYTES)
++            # Preserve only documented geometry/orientation evidence from the trusted
++            # local infer callback. No image, text dump or caller-provided metadata.
++            evidence = {key: result[key] for key in (
++                "orientation", "correction_counterclockwise_degrees", "input_dimensions",
++                "source_coordinate_space", "extraction_after_pixel_rotation",
++                "unresolved_validity_candidates") if key in result}
+             jobs.update(job["job_id"], status="needs_review", fields=result["fields"],
+-                        warnings=[], engine="RapidOCR", model_version="runtime-configured")
++                        warnings=result.get("warnings", []), engine="RapidOCR", model_version="runtime-configured",
++                        **evidence)
+         except Exception as exc:
+             code = "OCR_INFERENCE_FAILED"
+             jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code])

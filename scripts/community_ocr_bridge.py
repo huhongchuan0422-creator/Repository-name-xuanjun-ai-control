@@ -1,4 +1,4 @@
-"""Community source callbacks for pinned OCR 90aca1cf; no network or new grant.
+"""Community source callbacks for pinned OCR 90aca1cf plus explicit API schema successor.
 
 Legacy scene permission admission remains closed. The separately protected
 applicant opt-in admits only the verified mini account's own application, not
@@ -8,7 +8,12 @@ from scripts.community_mini_merchant import MiniMerchant
 
 OCR_SOURCE_SHA = '90aca1cfca1ec2a354950c394a4b0c2689b37d13'
 OCR_SOURCE_TREE = 'cdb3918520b176286af570101c75885bcf07cde4'
-KINDS = {'business_license': 'business_license', 'id_front': 'identity_front'}
+KINDS = {'business_license': 'business_license', 'id_front': 'identity_front', 'id_back': 'identity_back'}
+CONFIRMED_KEYS = {
+    'business_license': {'company_name','credit_code','legal_representative','registered_address','business_scope'},
+    'id_front': {'id_name','id_number','registered_address'},
+    'id_back': {'issuing_authority','valid_from','valid_to'},
+}
 
 
 def application_revision(value):
@@ -130,8 +135,7 @@ class CommunityOcrBridge:
         if (type(revision) is not str or not __import__('re').fullmatch('[1-9][0-9]*', revision)):
             raise PermissionError('OCR_APPLICATION_REVISION_INVALID')
         fields = job.get('confirmed_fields')
-        allowed = ({'company_name','credit_code','legal_representative','registered_address','business_scope'}
-                   if job['document_type'] == 'business_license' else {'id_name','id_number','registered_address'})
+        allowed = CONFIRMED_KEYS.get(job['document_type'],set())
         if (type(fields) is not dict or not fields or not set(fields)<=allowed
                 or any(type(value) is not str for value in fields.values())):
             raise PermissionError('OCR_CONFIRMED_FIELDS_INVALID')
@@ -154,7 +158,9 @@ class CommunityOcrBridge:
                 raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
             if source['wechat_version'] != version:
                 raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            allowed_fill=('company_name','registered_address') if job['document_type']=='business_license' else ('id_name','id_number','registered_address')
+            allowed_fill={'business_license':('company_name','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to')}[job['document_type']]
+            # The official provider schema has no issuing-authority field. It is
+            # retained in the encrypted OCR confirmation, never sent as a made-up field.
             confirmed = {key:value for key,value in fields.items() if key in allowed_fill and value.strip()}
             if not confirmed:
                 return {'written':False,'revision':int(revision)}
@@ -177,7 +183,7 @@ class CommunityOcrBridge:
                 current_version = 0 if provider is None else provider['version']
                 if type(current_version) is not int or current_version != provider_version:
                     raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            fill=service.fill_confirmed_license_draft if job['document_type']=='business_license' else service.fill_confirmed_identity_draft
+            fill={'business_license':service.fill_confirmed_license_draft,'id_front':service.fill_confirmed_identity_draft,'id_back':service.fill_confirmed_identity_back_draft}[job['document_type']]
             return fill(p._community_token,csrf,job['onboarding_application_id'],
                 expected_application_revision=int(revision),expected_wechat_version=version,
                 confirmed_fields=confirmed,source_check=check)
@@ -207,7 +213,7 @@ class CommunityOcrBridge:
 def compose(merchant, scene, ocr_api, store, owner_call, infer=None, *, applicant_mode=False):
     """Explicit host composition; default scene admission still denies ocr:use.
 
-    Caller provides the pinned, unmodified OCR module and encrypted store. No
+    Caller provides the exactly pinned API successor and original encrypted store. No
     importing a second engine tree from request data, no engine source writes.
     """
     import hashlib

@@ -85,10 +85,14 @@ def run_case(case, *, enforce_limits=True):
     if case=='maximum_20mp':assert image['width']*image['height']==20_000_000
     # No PIL/image generation here: creation happens before the constrained
     # container, while original upload/scanner/decode are included below.
-    expected=fixture['expected'];del fixture
+    # Historical image fixtures retain their original scope text. It is no
+    # longer an OCR business target; keep all other expected fields unchanged.
+    expected={name:value for name,value in fixture['expected'].items() if name!='business_scope'};del fixture
     engine_calls=[]
+    engine_initializations=[]
     def profile(frame,event,arg):
         if event=='call' and frame.f_code.co_name=='__call__' and frame.f_globals.get('__name__')=='rapidocr.main':engine_calls.append(1)
+        if event=='call' and frame.f_code.co_name=='__init__' and frame.f_globals.get('__name__')=='rapidocr.main':engine_initializations.append(1)
     previous_profile=threading.getprofile()
     threading.setprofile(profile)
     fx=host_fixture.FormalHost();fx.setUp()
@@ -154,6 +158,7 @@ def run_case(case, *, enforce_limits=True):
             job_id=result['result']['job_id']
             read=merchant.dispatch(token,'',{'operation':'ocr','params':{'action':'read','application':application,'job_id':job_id}})['result']
             assert read['status']=='needs_review',read.get('error_code','OCR_NOT_REVIEWABLE')
+            assert 'business_scope' not in read['fields'],'REMOVED_SCOPE_TARGET_RETURNED'
             for name,value in expected.items():
                 assert read['fields'][name]['value']==value,'SYNTHETIC_FIELD_MISMATCH_'+name
                 assert read['fields'][name]['requires_review'] is True
@@ -161,10 +166,13 @@ def run_case(case, *, enforce_limits=True):
             assert not read.get('confirmed_fields'),'UNREQUESTED_CONFIRMATION'
             after=onboarding('read',{'application':application})
             assert after['revision']==draft['revision'],'UNREQUESTED_APPLICATION_WRITEBACK'
-            assert len(engine_calls)==1,'DUPLICATE_MODEL_INFERENCE'
+            # One business job evaluates four real pixel orientations using
+            # one engine. This is not four submissions or an automatic retry.
+            assert len(engine_calls)==4,'FOUR_ORIENTATION_INFERENCES_REQUIRED'
+            assert len(engine_initializations)==1,'ONE_SHARED_ORIENTATION_ENGINE_REQUIRED'
             with sqlite3.connect(str(db_path)) as database:
                 assert database.execute('SELECT count(*) FROM ocr_jobs').fetchone()[0]==1,'DUPLICATE_OCR_JOB'
-            record('ocr_read_verified',actual_model_calls=len(engine_calls),pending_resumes=pending,submit_dispatch_calls=submits,
+            record('ocr_read_verified',actual_model_calls=len(engine_calls),engine_initializations=len(engine_initializations),pending_resumes=pending,submit_dispatch_calls=submits,
                 matching_expected_fields=len(expected),manual_confirmation_preserved=True)
         record('host_closed')
     finally:
