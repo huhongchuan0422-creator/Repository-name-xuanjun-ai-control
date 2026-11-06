@@ -61,7 +61,14 @@ class IntegratedReview(unittest.TestCase):
   page.get_by_role('button',name='‹ 上一阶段',exact=True).click();page.wait_for_function('window.reviewPage.data.step === 0')
   mobile_after_back=self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','stage2 back to stage0 mobile_phone')
   expect(mobile_after_back).to_have_value('13800000000')
-  page.reload();page.get_by_role('button',name='同版本测试门店 · 草稿未提交',exact=True).click();expect(self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','reload original merchant_name')).to_have_value('同版本测试主体')
+  page.reload()
+  # Re-entry automatically reads the applicant's single original application.
+  # Its manual selector is hidden once that application has been loaded.
+  page.wait_for_function('(application) => window.reviewPage?.data.ready === true && window.reviewPage?.data.pending === false && window.reviewPage?.data.application?.application === application',arg=application)
+  expect(self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','reload original merchant_name')).to_have_value('同版本测试主体')
+  expect(self.visible_field(page,'input[data-path="contact_info.mobile_phone"]','reload original mobile_phone')).to_have_value('13800000000')
+  self.assertEqual(page.evaluate('window.reviewPage.profile.business_info.merchant_shortname'),'同版本测试门店')
+  self.assertEqual(page.evaluate('window.reviewPage.data.applications.length'),1)
   self.assertEqual(page.evaluate('window.reviewPage.data.application.application'),application)
   self.assertEqual(page.evaluate('window.reviewPage.data.application.status'),'DRAFT')
   page.screenshot(path=str(self.out/'native-same-application.png'),full_page=True)
