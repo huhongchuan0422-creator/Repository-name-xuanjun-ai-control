@@ -3,7 +3,9 @@ function customerError(error) {
   const code=error&&error.message;
   if(error&&error.networkKind==='DOMAIN')return '小程序服务域名校验未通过（NET_DOMAIN），请联系项目负责人';
   if(error&&error.networkKind==='TLS')return '安全连接未建立（NET_TLS），请联系项目负责人';
+  if(error&&error.networkKind==='TIMEOUT'&&error.uploadResultUnknown===true)return '上传结果暂未确认，请先重新读取原申请，勿重复上传';
   if(error&&error.networkKind==='TIMEOUT')return '登录连接超时（NET_TIMEOUT），请点击重新登录；不会自动重复请求';
+  if(error&&error.mediaCode==='WECHAT_MEDIA_UNAVAILABLE')return '照片已保存在原申请；微信材料关联服务尚未开放，未关联或提交微信，可继续保存资料';
   if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
   if(code==='SERVICE_RESULT_UNKNOWN')return '暂时无法连接服务，请检查网络后重试；若仍失败，请联系项目负责人';
   if(code==='SERVICE_UNAVAILABLE')return '服务暂不可用，请稍后重试';
@@ -28,14 +30,22 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview')throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
-    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
+    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'?30000:path==='/mini/merchant'&&data.operation==='ocr'?15000:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
-        if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
+        if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
+        // Preserve a credential only for exact, typed capability-unavailable replies.
+        // The operation still fails; generic access denial and every 401 clear it.
+        if(r.statusCode===403&&path==='/mini/merchant'){
+          if(data.operation==='ocr'&&['OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(error.ocrCode))error.sessionPreserved=true;
+          if(data.operation==='onboarding'&&data.params&&data.params.operation==='wechat_media'&&r.data&&r.data.error==='WECHAT_MEDIA_UNAVAILABLE'){
+            error.mediaCode='WECHAT_MEDIA_UNAVAILABLE';error.sessionPreserved=true;
+          }
+        }
         reject(error);
       },
       fail:detail=>{
@@ -45,6 +55,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         if(/not in domain list|url not in domain|合法域名/.test(message))error.networkKind='DOMAIN';
         else if(/ssl|tls|certificate|cert authority/.test(message))error.networkKind='TLS';
         else if(/timeout|timed out/.test(message))error.networkKind='TIMEOUT';
+        if(error.networkKind==='TIMEOUT'&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload')error.uploadResultUnknown=true;
         reject(error);
       }});
   });
@@ -244,7 +255,7 @@ function getSharedSession(wx, config, now, page) {
       const version=session.getGeneration(),requestEpoch=epoch;
       try{const result=await original(...args);if(!auth.active(requestEpoch)||version!==session.getGeneration())throw Error('STALE_SESSION');return result;}catch(error){
         if(!auth.active(requestEpoch)||version!==session.getGeneration())throw Error('STALE_SESSION');
-        if(error.code==='ACCESS_DENIED'&&version===session.getGeneration()&&requestEpoch===epoch)session.clear();
+        if(error.code==='ACCESS_DENIED'&&error.sessionPreserved!==true&&version===session.getGeneration()&&requestEpoch===epoch)session.clear();
         throw error;
       }
     };

@@ -15,6 +15,10 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from scripts.pr122_customer_core import canonical,private_path
 from scripts.community_provider_transport import request
 
+class WechatMediaUnavailable(PermissionError):
+    """Explicitly disabled provider capability, never an authentication result."""
+
+
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
 
 PROVIDER_WORKFLOW={
@@ -652,7 +656,7 @@ class WechatApplyment:
             self._save(application,owner,result)
             c.audit(application,owner,'WECHAT_CASHIER_UNLINKED',str(result['version']))
     def media(self,uid,owner,application,meta,kind,reauthorize):
-        if not self.enabled:raise PermissionError('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
+        if not self.enabled:raise WechatMediaUnavailable('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
         if type(kind) is not str or kind not in meta['materials']:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_REQUIRED')
         material=meta['materials'][kind];c=self.center
         if material['expires_at'] is not None and material['expires_at']<=c.now():raise ValueError('EXPIRED_PRIVATE_MATERIAL')

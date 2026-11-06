@@ -265,7 +265,9 @@ class HistoricalFixtureContract(unittest.TestCase):
         # Preflight remains the original superset; only full regression excludes
         # the narrowly classified screenshot capture test with its explicit tag.
         capture_guard = " && !(steps.scope.outputs.capture_only == 'true' && contains(github.event.head_commit.message, '[web-session-browser-scope]'))"
-        full_prefix = "!contains(github.event.head_commit.message, '[mini-upload]') && steps.scope.outputs.superadmin_repair_only != 'true' && ("
+        product_gate = "  COMMUNITY_CURRENT_PRODUCT_PUSH: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || 'false' }}"
+        self.assertIn(product_gate,workflow)
+        full_prefix = "env.COMMUNITY_CURRENT_PRODUCT_PUSH != 'true' && steps.scope.outputs.superadmin_repair_only != 'true' && ("
         self.assertTrue(full.startswith(full_prefix) and full.endswith(capture_guard+')'))
         full_core = full[len(full_prefix):-len(capture_guard+')')]
         self.assertEqual(full, full_prefix+full_core+capture_guard+')')

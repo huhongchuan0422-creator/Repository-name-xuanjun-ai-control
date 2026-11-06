@@ -16,3 +16,24 @@ test('late profile403 after explicit account switch cannot revoke new shared ide
 test('cold runtime restores identity with fresh wx code, logout stores only boolean preference and survives reopen',async()=>{const f=fixture(),storage=new Map();f.wx.getStorageSync=k=>storage.get(k);f.wx.setStorageSync=(k,v)=>storage.set(k,v);const p=page('home',f);await p.onLoad({});assert.equal(p.data.authenticated,true);assert.equal(f.logins,1);p.onUnload();f.app.globalData={baseUrl:'https://fixture.invalid'};sessions.getSharedSession(f.wx,f.app.globalData,()=>1000);const reopened=page('home',f);await reopened.onLoad({});assert.equal(reopened.data.authenticated,true);assert.equal(f.logins,2);await reopened.logout();assert.ok([...storage.values()].every(x=>typeof x==='boolean'));f.app.globalData={baseUrl:'https://fixture.invalid'};sessions.getSharedSession(f.wx,f.app.globalData,()=>1000);const loggedOut=page('home',f);await loggedOut.onLoad({});assert.equal(loggedOut.data.authenticated,false);assert.equal(f.logins,2);await loggedOut.retryLogin();assert.equal(loggedOut.data.authenticated,true);assert.equal(f.logins,3);assert.ok([...storage.values()].every(x=>x===false));});
 test('expiry background return clears prior identity before silently obtaining a fresh real session',async()=>{const f=fixture(),p=page('profile',f);await p.onLoad({scene:'shop1'});await flush();p.data.nickname='old private';f.advance();await p.onShow();await flush();assert.equal(f.logins,2);assert.equal(p.data.authenticated,true);assert.equal(p.data.nickname,'');assert.equal(p.session.isAuthenticated(),true);});
 test('expiry direct ensure clears every old bound page before a new identity can act',async()=>{const f=fixture(),p=page('profile',f);await p.onLoad({scene:'shop1'});await flush();p.data.nickname='old';f.advance();await f.session.ensureLogin({automatic:true});assert.equal(p.data.nickname,'');assert.equal(p.session,null);assert.equal(p.data.authenticated,false);await p.save();assert.equal(f.calls.some(x=>x.data.operation==='commerce.profile_update'),false);});
+
+for(const [status,operation,params,code,preserved] of [
+ [403,'ocr',{action:'submit'},'OCR_UNAVAILABLE',true],
+ [403,'ocr',{action:'submit'},'OCR_REQUEST_PENDING',true],
+ [401,'ocr',{action:'submit'},'OCR_REQUEST_PENDING',false],
+ [403,'onboarding',{operation:'wechat_media',params:{}},'OCR_REQUEST_PENDING',false],
+ [403,'onboarding',{operation:'wechat_media',params:{}},'WECHAT_MEDIA_UNAVAILABLE',true],
+ [401,'ocr',{action:'submit'},'OCR_UNAVAILABLE',false],
+ [401,'onboarding',{operation:'wechat_media',params:{}},'WECHAT_MEDIA_UNAVAILABLE',false],
+ [403,'ocr',{action:'submit'},'OCR_AUTH_DENIED',false],
+ [403,'ocr',{action:'submit'},'OCR_SOURCE_CHANGED',false],
+ [403,'onboarding',{operation:'wechat_media',params:{}},'ACCESS_DENIED',false],
+ [403,'onboarding',{operation:'save',params:{}},'WECHAT_MEDIA_UNAVAILABLE',false],
+ [403,'onboarding',{operation:'wechat_media',params:{}},'OCR_UNAVAILABLE',false],
+ [403,'ocr',{action:'submit'},'WECHAT_MEDIA_UNAVAILABLE',false]
+])test(`typed capability failure ${status}/${operation}/${params.operation||code} preserves only exact unavailable credential=${preserved}`,async()=>{
+ const calls=[],wx={login:o=>o.success({code:'synthetic'}),request(o){calls.push(o);o.success(o.url.endsWith('/mini/login')?{statusCode:200,data:{payment_enabled:false,result:{provider:'WECHAT_MINIPROGRAM',session_token:'S'.repeat(32),expires_at:1100,payment_enabled:false}}}:{statusCode:status,data:{error:code}});}};
+ const s=sessions.getSharedSession(wx,{baseUrl:'https://fixture.invalid'},()=>1000);await s.ensureLogin();
+ await assert.rejects(s.merchant('',operation,params),e=>e.code==='ACCESS_DENIED'&&(e.sessionPreserved===true)===preserved);
+ assert.equal(s.isAuthenticated(),preserved);assert.equal(calls.length,2,'failed capability is never retried or represented as success');
+});

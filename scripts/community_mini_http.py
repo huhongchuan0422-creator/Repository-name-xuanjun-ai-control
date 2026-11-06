@@ -347,7 +347,8 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             except LoginUnavailable:return self.answer(503,{'error':'LOGIN_UNKNOWN_OR_REJECTED'})
             except PermissionError as error:
                 from scripts.community_ocr_host import OcrPublicError
-                return self.answer(403,{'error':error.code if type(error) is OcrPublicError else 'ACCESS_DENIED'})
+                from scripts.community_wechat_applyment import WechatMediaUnavailable
+                return self.answer(403,{'error':error.code if type(error) is OcrPublicError else 'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except (ValueError,TypeError,KeyError):return self.answer(400,{'error':'INVALID_REQUEST'})
             except (socket.timeout,TimeoutError):return self.answer(408,{'error':'REQUEST_TIMEOUT'})
             except Exception:return self.answer(503,{'error':'SERVICE_UNAVAILABLE'})

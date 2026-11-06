@@ -90,7 +90,8 @@ class MiniMerchant:
         except PermissionError as error:
             from scripts.community_ocr_host import OcrPublicError
             code=str(error)
-            if any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
+            if code=='OCR_REQUEST_PENDING':public='OCR_REQUEST_PENDING'
+            elif any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
             elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
             else:public='OCR_UNAVAILABLE'
             raise OcrPublicError(public) from None

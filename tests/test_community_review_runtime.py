@@ -34,6 +34,12 @@ class IntegratedReview(unittest.TestCase):
    page.locator('#native button.edit-group[data-group="'+group+'"]').click()
   expect(target).to_be_visible()
   return target
+ def test_review_sources_include_exact_native_data_modules(self):
+  with urllib.request.urlopen(self.url+'/review/sources') as response:payload=json.load(response)
+  self.assertIs(payload['isolated'],True)
+  for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
+               'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
+   self.assertEqual(payload['sources'][name],(ROOT/'clients/community-mini'/name).read_text())
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
   page=self.page();errors=[];requests=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:requests.append(r.url))
   self.ready(page);page.locator('#apply').click();page.wait_for_function('window.reviewPage?.data.ready === true')

@@ -342,11 +342,21 @@ class PlatformHost:
             # _file above requires this exact DB already exists. Constructor
             # may maintain original tables; this is activation, NOT a probe.
             store=api.SecureSQLiteJobStore(str(db_path),material['ocr_encryption_key'].encode('ascii'))
+            # Exclusive store lifecycle lock is held; no OCR worker exists yet.
+            store.recover_interrupted()
             result=self.configure_ocr('',api,store,applicant_mode=True)
             self.ocr_lock=lock
             return result
         except BaseException:
             os.close(lock);raise
+
+    def configure_applicant_image_scanner(self):
+        """Opt in to the bundled image-only decode/sanitize/scan boundary."""
+        if self.application is None or self.application.server is not None or self.center.scanner is not None:
+            raise PermissionError('IMAGE_SCANNER_HOST_CONFIGURATION_DENIED')
+        from scripts.community_uploaded_image_scanner import UploadedImageScanner
+        self.center.scanner=UploadedImageScanner()
+        return 'APPLICANT_IMAGE_SCANNER_CONFIGURED'
 
     def serve(self):
         if self.application is None:
@@ -404,6 +414,7 @@ def main(argv=None):
     parser.add_argument('--check-applicant-ocr-plan', action='store_true')
     parser.add_argument('--applicant-ocr-key-reference')
     parser.add_argument('--applicant-ocr-store-reference')
+    parser.add_argument('--applicant-image-scanner',action='store_true')
     args = parser.parse_args(argv)
     if bool(args.applicant_ocr_key_reference)!=bool(args.applicant_ocr_store_reference):
         parser.error('Both existing applicant OCR references are required')
@@ -417,6 +428,8 @@ def main(argv=None):
                 print(result, flush=True)
                 return 0
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
+            if args.applicant_image_scanner:
+                host.configure_applicant_image_scanner()
             if args.applicant_ocr_key_reference:
                 host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference)
             host.serve()

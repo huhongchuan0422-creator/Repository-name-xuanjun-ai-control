@@ -114,7 +114,12 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),36)
+                self.assertEqual(len(receipt['prepared_files']),40)
+                for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
+                             'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
+                    source='clients/community-mini/'+name
+                    self.assertEqual((output/name).read_bytes(),archive.read(source))
+                    self.assertEqual(receipt['prepared_files'][name],manifest['files'][source])
                 prepared_names={p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file()}
                 self.assertEqual(prepared_names,set(receipt['prepared_files'])|{'CONNECTED_PREVIEW_RECEIPT.json'})
                 isolated=subprocess.run(

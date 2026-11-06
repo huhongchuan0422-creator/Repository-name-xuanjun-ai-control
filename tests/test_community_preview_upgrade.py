@@ -61,8 +61,11 @@ class UpgradeBoundary(unittest.TestCase):
                                                    b'session/(login|check|logout|wechat)',1)
         self.assertEqual(hashlib.sha256(wechat_projection).hexdigest(),'a5ccafb9421929a1e5076b41af7a3c08542458aeec24274587dffee4bd6eca9d')
         self.assertEqual(wechat_projection.count(b'|entrypoints|operations|'),1)
-        self.assertEqual(current,wechat_projection.replace(b'|entrypoints|operations|',b'|entrypoints|admin|operations|',1))
-        self.assertEqual(hashlib.sha256(current).hexdigest(),'46a6e0b0676522079245a4337e756b80981b943ff18855c69db9e102d52ed2b5')
+        prior=wechat_projection.replace(b'|entrypoints|operations|',b'|entrypoints|admin|operations|',1)
+        upload_location=b'location = /community-preview/mini/merchant {\n    client_max_body_size 7m;\n    rewrite ^/community-preview(/mini/merchant)$ $1 break;\n    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;\n    proxy_http_version 1.1;\n    proxy_set_header Host uk.wenwenwenyiyiyi.work;\n    proxy_set_header X-Forwarded-Proto https;\n    proxy_set_header X-Xuanjun-Client-IP "";\n    proxy_set_header X-Xuanjun-Client-IP $remote_addr;\n    proxy_set_header X-Forwarded-For "";\n    proxy_set_header Forwarded "";\n}\n'
+        self.assertEqual(current.count(upload_location),1)
+        self.assertEqual(current,prior.replace(b'location ^~ /community-preview/mini/ {',upload_location+b'location ^~ /community-preview/mini/ {',1)+b'\n')
+        self.assertEqual(hashlib.sha256(current).hexdigest(),'db17a1899bccefb609c86c6148cc75143d01334af90af18bb533ad8ab36f1002')
         self.assertEqual(set(u.ASSET_HASHES),{'/merchant/workbench','/merchant/review','/merchant/join','/community/portal','/community/web-session.js'})
         for path,digest in u.ASSET_HASHES.items():
             raw=(legacy_onboarding_asset() if path in ('/merchant/review','/merchant/join') else

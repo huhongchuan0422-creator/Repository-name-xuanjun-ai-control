@@ -7,7 +7,7 @@ import time
 
 class OcrPublicError(PermissionError):
     def __init__(self, code):
-        if code not in ('OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE'):code='OCR_UNAVAILABLE'
+        if code not in ('OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'):code='OCR_UNAVAILABLE'
         self.code=code
         super().__init__(code)
 
@@ -28,7 +28,8 @@ class OwnerCalls:
             except queue.Full:raise PermissionError('OCR_OWNER_QUEUE_FULL') from None
         try:return future.result(timeout=self.timeout)
         except concurrent.futures.TimeoutError:
-            future.cancel();raise PermissionError('OCR_OWNER_TIMEOUT') from None
+            with self.lock:future.cancel()
+            raise PermissionError('OCR_OWNER_TIMEOUT') from None
     def pump(self):
         self.check()
         try:deadline,operation,future=self.pending.get_nowait()
@@ -53,7 +54,7 @@ class HostOcr:
         self.owner=OwnerCalls();self.merchant=merchant;self.scene=scene;self.applicant_mode=applicant_mode
         self.bridge,self.app=compose(merchant,scene,api,store,self.owner,applicant_mode=applicant_mode)
         self.worker=concurrent.futures.ThreadPoolExecutor(max_workers=1,thread_name_prefix='community-ocr')
-        self.busy=False
+        self.busy=False;self.inflight=None;self.inflight_key=None;self.inflight_source=None
     def dispatch(self, token, scene, params):
         self.owner.check()
         if self.busy:raise PermissionError('OCR_REQUEST_PENDING')
@@ -69,9 +70,11 @@ class HostOcr:
         if action not in extras or set(params)!=base|extras[action]:raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         p=self.bridge.authenticate(token)
         if not self.bridge.authorize_application(p,params['application']):raise PermissionError('OCR_APPLICATION_DENIED')
+        key=(token,scene,repr(sorted(params.items())))
         headers={'Authorization':'Bearer '+token}
         if action=='submit':
             source=self.bridge.source(p,params['application'],params['document_type'])
+            snapshot={k:v for k,v in source.items() if k!='data'}
             method='POST';path='/api/v1/ocr/jobs'
             headers['Idempotency-Key']=params['idempotency_key']
             options={'data':dict(document_type=source['document_type'],onboarding_application_id=params['application'],attachment_id=source['attachment_id']),
@@ -101,13 +104,34 @@ class HostOcr:
             return asyncio.run(request())
         self.busy=True
         try:
-            future=self.worker.submit(run);deadline=time.monotonic()+self.owner.timeout
+            if self.inflight is not None and self.inflight_key!=key:
+                if not self.inflight.done():raise PermissionError('OCR_REQUEST_PENDING')
+                # Completed unrelated response is not returned to this caller.
+                self.inflight=None;self.inflight_key=None;self.inflight_source=None
+            if self.inflight is None:
+                self.inflight=self.worker.submit(run);self.inflight_key=key
+                self.inflight_source=snapshot if action=='submit' else None
+            elif action=='submit' and snapshot!=self.inflight_source:
+                raise PermissionError('OCR_SOURCE_CHANGED')
+            future=self.inflight;deadline=time.monotonic()+self.owner.timeout
             while not future.done():
                 self.owner.check()
                 if time.monotonic()>=deadline:
-                    self.close();raise PermissionError('OCR_REQUEST_TIMEOUT')
+                    # Retain the original future. A retry of this exact request
+                    # resumes it; never enqueue duplicate inference or close the host.
+                    raise PermissionError('OCR_REQUEST_PENDING')
                 self.owner.pump();time.sleep(.002)
-            response=future.result()
+            try:response=future.result()
+            finally:
+                self.inflight=None;self.inflight_key=None;self.inflight_source=None
+            # Never release a late result across session/source/revision changes.
+            current=self.bridge.authenticate(token)
+            if not self.bridge.authorize_application(current,params['application']):
+                raise PermissionError('OCR_APPLICATION_DENIED')
+            if action=='submit':
+                latest=self.bridge.source(current,params['application'],params['document_type'])
+                if {k:v for k,v in latest.items() if k!='data'}!=snapshot:
+                    raise PermissionError('OCR_SOURCE_CHANGED')
             if response.status_code>=400:
                 detail=response.json().get('detail','OCR_REQUEST_REJECTED')
                 # Static API error codes only; no exception/body or identity echo.
