@@ -70,7 +70,10 @@ class ApplicantOcr(unittest.TestCase):
   with self.assertRaises(PermissionError):self.bridge.source(self.principal,self.app['application'],'business_license')
  def test_current_original_gateway_path_and_invalid_nonempty_scene(self):
   create=self.api.create_app
-  def test_app(**kw):return create(**kw,infer=synthetic_inference)
+  def test_app(**kw):
+   from scripts.community_license_inference import run_license_layout_ocr
+   self.assertIs(kw.pop('infer'),run_license_layout_ocr)
+   return create(**kw,infer=synthetic_inference)
   with patch.object(self.api,'create_app',side_effect=test_app):host=HostOcr(self.fx.service,'',self.api,self.store,applicant_mode=True)
   self.fx.service.ocr=host
   try:
@@ -91,7 +94,10 @@ class ApplicantOcr(unittest.TestCase):
   import concurrent.futures,json,urllib.request
   from scripts.community_mini_http import serve
   create=self.api.create_app
-  def test_app(**kw):return create(**kw,infer=synthetic_inference)
+  def test_app(**kw):
+   from scripts.community_license_inference import run_license_layout_ocr
+   self.assertIs(kw.pop('infer'),run_license_layout_ocr)
+   return create(**kw,infer=synthetic_inference)
   with patch.object(self.api,'create_app',side_effect=test_app):host=HostOcr(self.fx.service,'',self.api,self.store,applicant_mode=True)
   self.fx.fx.gateway.ocr=host
   server=serve(self.fx.fx.gateway,onboarding=self.fx.onboarding,operations=self.fx.operations)
