@@ -72,10 +72,32 @@ class NativeSourceRender(unittest.TestCase):
             expect(page.locator('[data-handler="selectDocumentType"]').first).to_be_enabled();snapshot('03-admission-ready')
             page.locator('[data-handler="selectDocumentType"]').first.select_option('1');page.wait_for_timeout(80)
             self.assertEqual(page.evaluate('window.__nativeEvidence.state.options.doc'),'IDENTIFICATION_TYPE_OVERSEA_PASSPORT');snapshot('04-admission-passport')
+            expect(page.locator('[data-handler="toggleMaterialEdit"]')).to_have_count(0)
+            expect(page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')).to_be_visible()
+            # Inject only synthetic suggestion state into original source renderer.
+            page.evaluate('window.fixtureOcrSuggestions()')
+            for path in ('subject_info.business_license_info.period_begin','subject_info.business_license_info.period_end','subject_info.business_license_info.license_number'):
+                expect(page.locator('input[data-path="'+path+'"]')).to_be_visible()
+            expect(page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')).to_have_count(0)
+            # Every existing material-group edit entrance is a real, sized button.
+            for edit in page.locator('[data-handler="toggleMaterialEdit"]').all():
+                self.assertEqual(edit.evaluate('(e)=>e.tagName'),'BUTTON')
+                metrics=edit.evaluate('(e)=>({height:e.getBoundingClientRect().height,size:parseFloat(getComputedStyle(e).fontSize),weight:parseFloat(getComputedStyle(e).fontWeight),border:parseFloat(getComputedStyle(e).borderTopWidth)})')
+                self.assertGreaterEqual(metrics['height'],44)
+                self.assertGreaterEqual(metrics['size'],15)
+                self.assertGreaterEqual(metrics['weight'],600)
+                self.assertGreater(metrics['border'],0)
+            snapshot('24-all-material-edit-buttons')
             click('toggleMaterialEdit','[data-group="license"]')
             page.locator('input[data-path="subject_info.business_license_info.merchant_name"]').fill('隔离测试主体');page.wait_for_timeout(80)
-            click('toggleMaterialEdit','[data-group="contact"]')
             page.locator('input[data-path="contact_info.mobile_phone"]').fill('+44-123456789');page.wait_for_timeout(80)
+            expect(page.locator('input[data-path="contact_info.mobile_phone"]')).to_have_attribute('aria-label','法人/经营者联系电话')
+            expect(page.locator('input[data-path="contact_info.mobile_phone"]')).to_have_attribute('inputmode','tel')
+            snapshot('25-contact-edit-open')
+            expect(page.locator('#material-contact [data-handler="toggleMaterialEdit"]')).to_have_count(0)
+            expect(page.locator('input[data-path="contact_info.mobile_phone"]')).to_have_value('+44-123456789')
+            self.assertTrue(page.evaluate('window.__nativeEvidence.state.dirty'))
+            snapshot('26-contact-direct-input-unsaved')
             # Same Page conditions, not DOM-only artwork or a second draft.
             page.locator('[data-handler="condition"][data-key="contact"]').select_option('1');page.wait_for_timeout(80)
             self.assertTrue(page.locator('#material-legal').is_visible());self.assertTrue(page.locator('#material-operator').is_visible());snapshot('18-super-both-identities')
@@ -85,8 +107,26 @@ class NativeSourceRender(unittest.TestCase):
             application=page.evaluate('window.__nativeEvidence.state.application.application')
             for n,title in [(1,'06-admission-operation'),(2,'07-admission-settlement'),(3,'08-admission-progress')]:
                 click('next');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),n)
+                expect(page.locator('[data-handler="back"]')).to_be_visible()
+                expect(page.locator('[data-handler="back"]')).to_contain_text('上一步')
+                before_back=page.evaluate('({materials:window.__nativeEvidence.state.application.materials,application:window.__nativeEvidence.state.application.application,calls:window.__nativeEvidence.calls.length})')
+                click('back');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),n-1)
+                self.assertEqual(page.evaluate('window.__nativeEvidence.calls.length'),before_back['calls'])
+                self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.materials'),before_back['materials'])
+                self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.application'),before_back['application'])
+                snapshot('27-back-from-step-'+str(n+1))
+                click('next');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),n)
+
                 if n==1:
                     self.assertEqual(page.evaluate('window.__nativeEvidence.state.options.scene'),'unknown');snapshot('20-unknown-actual-scene')
+                    redemption=page.locator('[data-handler="chooseRedemption"]')
+                    expect(redemption).to_have_value('1')
+                    redemption.select_option('0');page.wait_for_timeout(80)
+                    self.assertEqual(page.evaluate('window.__nativeEvidence.state.pendingRedemptionPercent'),0)
+                    snapshot('31-redemption-compact-explicit-zero')
+                    click('save')
+                    self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.redemption_percent'),0)
+                    expect(page.locator('[data-handler="chooseRedemption"]')).to_have_value('0')
                     page.locator('[data-handler="condition"][data-key="scene"]').select_option('3');page.wait_for_timeout(80)
                     self.assertEqual(page.locator('#material-store .upload-slot').count(),2);snapshot('21-both-scene-photographs')
                     picker=page.locator('[data-native-picker="multiSelector"]');expect(picker).to_be_visible()
@@ -97,6 +137,17 @@ class NativeSourceRender(unittest.TestCase):
                     click('chooseRegion','[data-picker-confirm="multiSelector"]')
                     self.assertNotEqual(page.evaluate('window.__nativeEvidence.state.regionLabel'),'请选择实际经营地区');snapshot('23-region-picker-fixture')
                 self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.application'),application);snapshot(title)
+                if n==3:
+                    link=page.locator('[data-handler="returnMaterial"][data-group="contact"]')
+                    expect(link).to_be_visible();expect(link).to_contain_text('修改本组资料')
+                    snapshot('28-final-explicit-edit-links')
+                    click('returnMaterial','[data-group="contact"]')
+                    expect(page.locator('input[data-path="contact_info.mobile_phone"]')).to_have_value('+44-123456789')
+                    self.assertEqual(page.evaluate('window.__nativeEvidence.state.application.application'),application)
+                    snapshot('29-final-return-contact')
+                    for expected_step in (1,2,3):
+                        click('next');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),expected_step)
+
             # Synthetic submit is strictly visual/handler evidence. Real material and submit guards run in HTTP tests.
             click('returnMaterial','[data-group="legal"]');self.assertEqual(page.evaluate('window.__nativeEvidence.state.step'),0);self.assertGreaterEqual(page.locator('#material-legal').evaluate('(e)=>e.getBoundingClientRect().top'),-2);self.assertLess(page.locator('#material-legal').evaluate('(e)=>e.getBoundingClientRect().top'),100);snapshot('22-return-legal-group')
             for _ in range(3):click('next')
@@ -106,6 +157,12 @@ class NativeSourceRender(unittest.TestCase):
             review_calls=page.evaluate('window.__nativeEvidence.calls')
             self.assertEqual(sum(x.get('suboperation')=='submit' for x in review_calls),1)
             self.assertEqual(sum(x.get('suboperation')=='wechat_submit_review' for x in review_calls),1)
+            for state,opening,visible in [('DRAFT','NOT_APPROVED',False),('REJECTED','NOT_APPROVED',False),('CORRECTION_REQUIRED','NOT_APPROVED',False),('APPROVED','AWAITING_CRM_BINDING',False),('APPROVED','OPENED',True)]:
+                # Render-only state fixture, not a grant of original server permission.
+                page.evaluate('([state,opening])=>window.fixtureApprovalView(state,opening)',[state,opening])
+                expect(page.locator('[data-handler="workbench"]')).to_have_count(1 if visible else 0)
+                expect(page.locator('[data-handler="back"]')).to_have_text('返回上一步')
+                snapshot('30-final-state-'+state+'-'+opening)
             click('workbench');snapshot('14-workbench-no-store');self.assertEqual(page.evaluate('window.__nativeEvidence.state.workspace'),'')
             expect(page.locator('[data-handler="showCollection"]')).to_have_count(0)
             expect(page.locator('.merchant-hero')).to_have_count(0)
