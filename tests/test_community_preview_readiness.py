@@ -58,8 +58,8 @@ class HealthGate(unittest.TestCase):
   self.assertEqual(report['status'],'BACKEND_NOT_READY')
   self.assertNotIn('sensitive',json.dumps(report))
 
- def test_current_28ca_product_accepts_only_ready_48df_backend(self):
-  frontend='28ca2f0c66305a2bca4fa6e27cf27427f36aaefd';backend='48df407f30f512b1456270c8faba22f095404b9f'
+ def test_current_44e_product_accepts_only_ready_48df_backend(self):
+  frontend='44e7344b9a0b00b3999e64eaf90c243d98f7c001';backend='48df407f30f512b1456270c8faba22f095404b9f'
   identity=dict(product_source_sha=frontend,control_source_sha='c'*40,fixed_product=True,
       backend_source_sha=backend,compatibility='EXACT_SOURCE_MATCH')
   health=dict(status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
@@ -71,5 +71,8 @@ class HealthGate(unittest.TestCase):
   wrong=check(lambda *a,**k:self.response(body=dict(health,runtime_source_sha='b'*40),url=url),
       profile='uk-path-candidate',product_identity=identity)
   self.assertEqual(wrong['status'],'BACKEND_NOT_READY')
+  stale=check(lambda *a,**k:self.response(body=health,url=url),profile='uk-path-candidate',
+      product_identity=dict(identity,product_source_sha='28ca2f0c66305a2bca4fa6e27cf27427f36aaefd'))
+  self.assertEqual(stale['status'],'BACKEND_NOT_READY')
 
 if __name__=='__main__':unittest.main()

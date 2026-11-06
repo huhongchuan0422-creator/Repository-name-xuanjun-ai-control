@@ -5,17 +5,19 @@ const {createSession}=require('../clients/community-mini/session.js');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
-test('current-48df identity admits only the exact 28ca product and 48df backend pair',()=>{
+test('current-48df identity admits only the exact 44e product and 48df backend pair',()=>{
  const endpointPath=path.resolve(__dirname,'../deploy/community-preview/endpoint.cjs');
- const frontend='28ca2f0c66305a2bca4fa6e27cf27427f36aaefd',backend='48df407f30f512b1456270c8faba22f095404b9f',control='c'.repeat(40);
+ const frontend='44e7344b9a0b00b3999e64eaf90c243d98f7c001',backend='48df407f30f512b1456270c8faba22f095404b9f',control='c'.repeat(40);
  const child=`const cp=require('node:child_process'),backend=process.argv[1];
-cp.execFileSync=()=>JSON.stringify({product_source_sha:'${frontend}',backend_source_sha:backend,control_source_sha:'${control}',fixed_product:true,compatibility:'EXACT_SOURCE_MATCH'});
+cp.execFileSync=()=>JSON.stringify({product_source_sha:process.argv[3],backend_source_sha:backend,control_source_sha:'${control}',fixed_product:true,compatibility:'EXACT_SOURCE_MATCH'});
 try{process.stdout.write(JSON.stringify(require(process.argv[2]).sourceIdentity()));}catch(error){process.stderr.write(error.message);process.exit(1);}`;
- const run=value=>spawnSync(process.execPath,['-e',child,value,endpointPath],{encoding:'utf8',env:{...process.env,GITHUB_SHA:control,COMMUNITY_FIXED_PRODUCT_PREVIEW:'true',COMMUNITY_FIXED_PRODUCT_KIND:'current-48df'}});
+ const run=(value,product=frontend)=>spawnSync(process.execPath,['-e',child,value,endpointPath,product],{encoding:'utf8',env:{...process.env,GITHUB_SHA:control,COMMUNITY_FIXED_PRODUCT_PREVIEW:'true',COMMUNITY_FIXED_PRODUCT_KIND:'current-48df'}});
  const accepted=run(backend);
  assert.equal(accepted.status,0,accepted.stderr);assert.equal(JSON.parse(accepted.stdout).backend_source_sha,backend);
  const rejected=run('b'.repeat(40));
  assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
+ const stale=run(backend,'28ca2f0c66305a2bca4fa6e27cf27427f36aaefd');
+ assert.notEqual(stale.status,0);assert.match(stale.stderr,/FIXED_PRODUCT_IDENTITY_REQUIRED/);
 });
 test('full prepared manifest detects non-app edits, additions, removals and links',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'mini-source-manifest-'));
