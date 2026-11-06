@@ -146,8 +146,33 @@ class EndpointContract(unittest.TestCase):
         self.assertIn('location ^~ /community-preview/mini/',candidate)
         self.assertIn('location = /community-preview/community/health',candidate)
         self.assertNotIn('location / {',candidate)
-        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP "";'),3)
-        self.assertEqual(candidate.count('proxy_set_header X-Xuanjun-Client-IP $remote_addr;'),3)
+        import re
+        # Validate every exact current location independently. A global count
+        # could hide one unsafe route compensated by duplicate headers elsewhere.
+        expected=[
+            '= /community-preview/mini/merchant',
+            '^~ /community-preview/mini/',
+            '= /community-preview/community/health',
+            r'~ ^/community-preview/(merchant/(join|review|workbench(\.js|\.css)?|onboarding(\.js|\.css)?)|community/(portal(\.js|\.css)?|admin-shell\.(css|js)|web-session\.js|session/(login|check|logout|wechat)|entrypoints|admin|operations|directory|commerce|provider-actions|merchant-bills))$']
+        headers=('X-Xuanjun-Client-IP ""','X-Xuanjun-Client-IP $remote_addr',
+                 'X-Forwarded-For ""','Forwarded ""')
+        def verify(raw):
+            blocks=re.findall(r'(?m)^location\s+([^{}]+)\{([^{}]*)\}',raw)
+            self.assertEqual([selector.strip() for selector,_ in blocks],expected)
+            for selector,body in blocks:
+                actual=re.findall(r'(?m)^\s*proxy_set_header\s+([^;]+);',body)
+                for header in headers:self.assertEqual(actual.count(header),1,(selector,header))
+                self.assertLess(actual.index(headers[0]),actual.index(headers[1]))
+                self.assertEqual(actual.count('Host uk.wenwenwenyiyiyi.work'),1)
+                self.assertEqual(actual.count('X-Forwarded-Proto https'),1)
+                self.assertIn('proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;',body)
+            return blocks
+        blocks=verify(candidate)
+        for selector,body in blocks:
+            for header in headers:
+                missing=body.replace('proxy_set_header '+header+';','',1)
+                with self.subTest(route=selector,missing=header),self.assertRaises(AssertionError):
+                    verify(candidate.replace(body,missing,1))
 
     def test_helpers_are_required_zip_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -181,13 +206,17 @@ class EndpointContract(unittest.TestCase):
         self.assertEqual(sdk,preview)
         branch='refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017'
         contexts=[]
-        def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message=''):
+        def case(expected,event='workflow_dispatch',enabled=False,sha=HEAD,target='uk-path-candidate',ref=branch,message='',product='legacy-4f',evidence='41101879920',image=False):
             contexts.append(dict(expected=expected,github=dict(event_name=event,sha=HEAD,ref=ref,
                 event=dict(head_commit=dict(message=message))),inputs=dict(preview_enabled=enabled,
-                preview_source_sha=sha,preview_target=target,preview_evidence_run_id='41101879920')))
+                preview_source_sha=sha,preview_target=target,preview_product=product,preview_evidence_run_id=evidence,backend_image_enabled=image)))
         case(False);case(False,enabled=True,sha='b'*40)
         case(False,enabled=True,target='legacy');case(False,enabled=True,ref='refs/heads/main')
         case(True,enabled=True);case(False,event='push')
+        case(False,enabled=True,product='');case(False,enabled=True,product='unapproved')
+        case(False,enabled=True,product='r1-7ca1ac2a')  # Missing exact R1 pins cannot fall back.
+        case(False,enabled=True,evidence='foreign-run');case(False,enabled=True,image=True)
+        case(False,enabled=True);contexts[-1]['inputs'].pop('preview_product')
         case(True,event='push',message='original [mini-preview] request')
         # Evaluate the actual job expression offline, not a copied policy helper.
         program="""const p=JSON.parse(process.argv[1]);
@@ -285,7 +314,7 @@ class HostedEvidence(unittest.TestCase):
         self.assertEqual(self.validate()['test_job_id'],202)
         self.assertFalse(self.validate()['artifact_bytes_reverified'])
 
-    def test_accepted_names_are_exactly_the_four_original_scopes_plus_ocr_host(self):
+    def test_accepted_names_are_exactly_the_existing_six_scopes(self):
         import ast,textwrap
         source=textwrap.dedent(self.workflow.split("python - <<'EVIDENCE'\n",1)[1].split('          EVIDENCE',1)[0])
         assignments=[node for node in ast.walk(ast.parse(source)) if isinstance(node,ast.Assign)
@@ -296,7 +325,30 @@ class HostedEvidence(unittest.TestCase):
             'Preview version and entry affected scope (no provider or host I/O)',
             'Preview entry evidence affected scope (offline only)',
             'UK read-only inspection candidate affected scope (no site execution)',
-            'Original host OCR lifecycle and Mini feedback affected scope'})
+            'Original host OCR lifecycle and Mini feedback affected scope',
+            'Community superadmin affected recovery and browser regression'})
+
+    def test_exact_superadmin_scope_retains_all_original_success_and_binding_gates(self):
+        import copy
+        name='Community superadmin affected recovery and browser regression'
+        step=self.workflow.split('      - name: '+name+'\n',1)[1].split('        run:',1)[0]
+        self.assertIn("github.event_name == 'push' && steps.scope.outputs.superadmin_repair_only == 'true'",step)
+        self.jobs['jobs'][0]['steps'][0]['name']=name
+        self.assertEqual(self.validate()['test_job_id'],202)
+        self.assertFalse(self.validate()['artifact_bytes_reverified'])
+        for patch in ({'name':name+' '},{'name':'prefix '+name},{'name':name.lower()},
+                      {'conclusion':'failure'},{'conclusion':'cancelled'},{'conclusion':'skipped'},
+                      {'conclusion':None},{'status':'in_progress'},{'status':'queued'}):
+            data=copy.deepcopy(self.jobs);data['jobs'][0]['steps'][0].update(patch)
+            with self.subTest(step=patch),self.assertRaisesRegex(ValueError,'SUCCESSFUL_TEST_GATE_REQUIRED'):
+                self.validate(jobs=data)
+        for patch in ({'name':'other-job'},{'status':'in_progress'},{'conclusion':'failure'}):
+            data=copy.deepcopy(self.jobs);data['jobs'][0].update(patch)
+            with self.subTest(job=patch),self.assertRaises(ValueError):self.validate(jobs=data)
+        self.test_wrong_sha_branch_workflow_event_repo_or_incomplete_run_denied()
+        self.test_artifact_expiry_digest_missing_or_foreign_binding_denied()
+        self.test_current_run_duplicate_artifact_and_pagination_unknown_denied()
+
 
     def test_ocr_host_near_names_and_arbitrary_success_are_not_admitted(self):
         import copy

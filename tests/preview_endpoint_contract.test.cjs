@@ -5,9 +5,9 @@ const {createSession}=require('../clients/community-mini/session.js');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
-test('current product identity admits only the exact d8b frontend and backend pair',()=>{
+test('current product identity admits only the exact 4fbe frontend and backend pair',()=>{
  const endpointPath=path.resolve(__dirname,'../deploy/community-preview/endpoint.cjs');
- const frontend='d8b65bf3aa022c5f184b6307fb40a84acfcd2b11',backend='d8b65bf3aa022c5f184b6307fb40a84acfcd2b11',control='c'.repeat(40);
+ const frontend='4fbe51b0f33f3c214bd43465841d5996f1b06a02',backend='4fbe51b0f33f3c214bd43465841d5996f1b06a02',control='c'.repeat(40);
  const child=`const cp=require('node:child_process'),backend=process.argv[1];
 cp.execFileSync=()=>JSON.stringify({product_source_sha:process.argv[3],backend_source_sha:backend,control_source_sha:'${control}',fixed_product:true,compatibility:'EXACT_SOURCE_MATCH'});
 try{process.stdout.write(JSON.stringify(require(process.argv[2]).sourceIdentity()));}catch(error){process.stderr.write(error.message);process.exit(1);}`;

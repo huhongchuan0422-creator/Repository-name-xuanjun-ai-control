@@ -58,8 +58,8 @@ class HealthGate(unittest.TestCase):
   self.assertEqual(report['status'],'BACKEND_NOT_READY')
   self.assertNotIn('sensitive',json.dumps(report))
 
- def test_current_d8b_product_accepts_only_ready_d8b_backend(self):
-  frontend='d8b65bf3aa022c5f184b6307fb40a84acfcd2b11';backend='d8b65bf3aa022c5f184b6307fb40a84acfcd2b11'
+ def test_current_4fbe_product_accepts_only_ready_4fbe_backend(self):
+  frontend='4fbe51b0f33f3c214bd43465841d5996f1b06a02';backend='4fbe51b0f33f3c214bd43465841d5996f1b06a02'
   identity=dict(product_source_sha=frontend,control_source_sha='c'*40,fixed_product=True,
       backend_source_sha=backend,compatibility='EXACT_SOURCE_MATCH')
   health=dict(status='READY',scope='PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance=False,
@@ -71,6 +71,10 @@ class HealthGate(unittest.TestCase):
   wrong=check(lambda *a,**k:self.response(body=dict(health,runtime_source_sha='b'*40),url=url),
       profile='uk-path-candidate',product_identity=identity)
   self.assertEqual(wrong['status'],'BACKEND_NOT_READY')
+  for old_backend in ('139b1031e5ae9c6050cbf9bf84d758e9b0b6742e','d8b65bf3aa022c5f184b6307fb40a84acfcd2b11','ffab23506996717b81c68fd062f9693a66299953'):
+   with self.subTest(old_backend=old_backend):
+    rejected=check(lambda *a,**k:self.response(body=dict(health,runtime_source_sha=old_backend),url=url),profile='uk-path-candidate',product_identity=identity)
+    self.assertEqual(rejected['status'],'BACKEND_NOT_READY')
   oldpair=check(lambda *a,**k:self.response(body=dict(health,runtime_source_sha='48df407f30f512b1456270c8faba22f095404b9f'),url=url),profile='uk-path-candidate',product_identity=dict(identity,product_source_sha='44e7344b9a0b00b3999e64eaf90c243d98f7c001',backend_source_sha='48df407f30f512b1456270c8faba22f095404b9f'))
   self.assertEqual(oldpair['status'],'BACKEND_NOT_READY')
   stale=check(lambda *a,**k:self.response(body=health,url=url),profile='uk-path-candidate',

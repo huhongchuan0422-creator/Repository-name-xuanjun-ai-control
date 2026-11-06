@@ -19,11 +19,11 @@ from pathlib import Path, PurePosixPath
 
 REPO = 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 BRANCH = 'feature/chatgpt-community-wechat-sp-offline-20261017'
-PRODUCT_SOURCE_SHA = 'd8b65bf3aa022c5f184b6307fb40a84acfcd2b11'
-MINI_TREE = '7222e25a7ce5cba0b62e280d6c7d8373359a2f98'
-MANIFEST_SHA256 = '71d84e035c06d960a3bfcbaa71c87c062e92dce466fede2737c707fd0fa657c1'
-BINDING_ID = 'community-mini-ocr-session-recovery-d8b65b-upload-20261106'
-BACKEND_SOURCE_SHA = 'd8b65bf3aa022c5f184b6307fb40a84acfcd2b11'
+PRODUCT_SOURCE_SHA = '4fbe51b0f33f3c214bd43465841d5996f1b06a02'
+MINI_TREE = '83d530b32d7f48440e3b168e43d8b66bb1a2bace'
+MANIFEST_SHA256 = 'ea28a00ce1ab171571695d2c96c844ef912342e7802c66fcb97c85af7eed5765'
+BINDING_ID = 'community-mini-v9-4fbe51-upload-20261106'
+BACKEND_SOURCE_SHA = '4fbe51b0f33f3c214bd43465841d5996f1b06a02'
 COMPATIBILITY = 'EXACT_SOURCE_MATCH'
 PREFIX = 'community-mini-current/clients/community-mini/'
 APPID = 'wx1d5f8873eaea5392'
@@ -79,7 +79,7 @@ def source_files():
         require(len(raw) <= MAX_BYTES, 'CURRENT_MINI_FILE_SIZE_REQUIRED')
         files[relative] = (raw, hashlib.sha256(raw).hexdigest())
     hashes = {name: value[1] for name, value in files.items()}
-    require(len(files) == 72 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(len(files) == 76 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_MANIFEST_REQUIRED')
     return files
 
@@ -161,7 +161,7 @@ def verify_receipt(value, raw, env):
             and value.get('public_release') is False,
             'CURRENT_MINI_RECEIPT_REQUIRED')
     hashes = value.get('source_files')
-    require(type(hashes) is dict and len(hashes) == 72 and canonical_manifest(hashes) == MANIFEST_SHA256,
+    require(type(hashes) is dict and len(hashes) == 76 and canonical_manifest(hashes) == MANIFEST_SHA256,
             'CURRENT_MINI_RECEIPT_FILES_REQUIRED')
     return hashes
 
@@ -187,7 +187,7 @@ def stage(env):
         mini = temp / 'clients/community-mini'
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             names = archive.namelist()
-            require(len(names) == 72 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
+            require(len(names) == 76 and len(names) == len(set(names)), 'CURRENT_MINI_ARCHIVE_SET_REQUIRED')
             for name in names:
                 pure = PurePosixPath(name)
                 require(not pure.is_absolute() and '..' not in pure.parts and name.startswith(PREFIX),
@@ -229,7 +229,7 @@ def identity(env):
             'CURRENT_PRODUCT_SOURCE_CHANGED')
     prepared = {name: digest for name, digest in actual.items() if not name.endswith('.test.cjs')}
     prepared['app.js'] = value['connected_app_sha256']
-    require(len(prepared) == 40, 'CURRENT_PREPARED_SOURCE_SET_REQUIRED')
+    require(len(prepared) == 41, 'CURRENT_PREPARED_SOURCE_SET_REQUIRED')
     return {'product_source_sha': PRODUCT_SOURCE_SHA, 'control_source_sha': value['control_source_sha'],
             'source_root': str(destination), 'prepared_files': prepared, 'fixed_product': True,
             'backend_source_sha': BACKEND_SOURCE_SHA, 'compatibility': COMPATIBILITY}
