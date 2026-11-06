@@ -54,6 +54,30 @@ class MiniContactValidation(unittest.TestCase):
         status,read=self.http('read',dict(application=app['application']),scene);self.assertEqual(status,200,read)
         return read['result'],result['result'],profile
 
+    def test_real_http_split_omission_null_and_explicit_zero_have_distinct_semantics(self):
+        app,_,_=self.draft('13800138000')
+        def edit(current,**choice):
+            return self.http('save',dict(application=current['application'],revision=current['revision'],fields=current['fields'],entity_type='ENTERPRISE',category='GENERAL',delegated=False,**choice))
+        self.assertEqual((app['split_participation'],app['requested_split_bps']),(False,0))
+        status,result=edit(app,split_participation=True,requested_split_bps=275)
+        self.assertEqual(status,200,result);app=result['result']
+        status,result=edit(app)
+        self.assertEqual(status,200,result);app=result['result']
+        self.assertEqual((app['split_participation'],app['requested_split_bps']),(True,275))
+        for null_choice in ({'split_participation':None},{'requested_split_bps':None},{'split_participation':None,'requested_split_bps':None}):
+            status,result=edit(app,**null_choice)
+            self.assertEqual(status,400,result);self.assertEqual(result['error'],'INVALID_REQUEST')
+            status,result=self.http('read',dict(application=app['application']))
+            self.assertEqual(status,200,result);self.assertEqual(result['result'],app)
+        status,result=edit(app,split_participation=False,requested_split_bps=0)
+        self.assertEqual(status,200,result);app=result['result']
+        status,result=edit(app)
+        self.assertEqual(status,200,result);app=result['result']
+        status,result=self.http('read',dict(application=app['application']))
+        self.assertEqual(status,200,result);self.assertEqual(result['result'],app)
+        self.assertEqual((app['split_participation'],app['requested_split_bps']),(False,0))
+
+
     def invalid_case(self,value,scene='shop1'):
         app,record,profile=self.draft(value,scene)
         status,read=self.http('wechat_read',dict(application=app['application']),scene)
