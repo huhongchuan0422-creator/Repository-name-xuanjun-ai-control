@@ -10,6 +10,7 @@ def build(root):
     root = Path(root)
     patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
                 'tests/test_community_*.mjs', 'tests/community_*.cjs',
+                'tests/community_platform_image_startup.py',
                 'tests/test_stage5_*.py', 'demos/community-local-e2e/*',
                 'demos/community-stage/*', 'demos/community-stage/ui-preview/*', 'demos/community-payment/*',
                 'demos/community-admin/*', 'clients/community-mini/*.js',
@@ -56,6 +57,9 @@ def build(root):
                 'scripts/community_preview_readiness.py',
                 'scripts/community_mini_host_config.py',
                 'scripts/community_platform_host.py',
+                'scripts/community_uploaded_image_scanner.py',
+                'tests/test_community_uploaded_image_scanner.py',
+                'tests/community_platform_image_startup.py',
                 'scripts/community_web_entries.py',
                 'scripts/community_web_session.py',
                 'scripts/community_reviewer_web_bridge.py',

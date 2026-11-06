@@ -22,7 +22,9 @@ USER 10001:1008
 FROM runtime AS verify
 COPY tests/ /app/tests/
 RUN python -B -m scripts.community_ocr_smoke
+RUN python -B -m unittest discover -s tests -p 'test_community_uploaded_image_scanner.py' -v
 RUN python -B -m unittest discover -s tests -p 'test_community_first_install.py' -v && python -B -m unittest discover -s tests -p 'test_community_platform_host.py' -v && python -B -m unittest discover -s tests -p 'test_community_wechat_registration.py' -v
+RUN PYTHONPATH=/app:/app/tests python -B -m unittest community_platform_image_startup -v
 
 RUN PYTHONPATH=/app:/app/tests python -B -m unittest test_community_reviewer_admission.Admission test_community_reviewer_maintenance.Maintenance test_community_reviewer_bridge.BridgeTests test_community_reviewer_bridge_handler.OriginalHandlerTests test_community_reviewer_composition.Composition -v
 

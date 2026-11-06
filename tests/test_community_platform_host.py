@@ -304,6 +304,66 @@ class FormalHost(unittest.TestCase):
             with self.assertRaises(BlockingIOError):self.open()
             self.assertEqual(host.center.db.execute('SELECT count(*) FROM accounts').fetchone()[0],2)
         with self.open():pass
+    def test_applicant_image_scanner_uses_real_decoder_and_preserves_optin_gate(self):
+        from io import BytesIO
+        from PIL import Image
+        from scripts.community_uploaded_image_scanner import UploadedImageScanner
+        with self.open() as host:
+            self.assertIsNone(host.center.scanner)
+            self.assertEqual(host.configure_applicant_image_scanner(),'APPLICANT_IMAGE_SCANNER_CONFIGURED')
+            self.assertIsInstance(host.center.scanner,UploadedImageScanner)
+            raw=BytesIO();Image.new('RGB',(64,48),'white').save(raw,format='PNG')
+            sanitized=host.center.scanner.sanitize(raw.getvalue())
+            self.assertTrue(host.center.scanner(sanitized))
+            with self.assertRaises(ValueError):host.center.scanner.sanitize(b'%PDF-synthetic')
+            with self.assertRaisesRegex(PermissionError,'IMAGE_SCANNER_HOST_CONFIGURATION_DENIED'):
+                host.configure_applicant_image_scanner()
+            self.assertFalse(host.application.onboarding.wechat_applyment.enabled)
+            self.assertIsNone(getattr(host.application.gateway,'payments',None))
+
+    @unittest.skipIf(os.geteuid()==0,'Actual nonroot host CLI runs on Hosted and image verify')
+    def test_missing_image_scanner_in_copied_runtime_fails_real_host_and_cli(self):
+        self._assert_missing_image_scanner_in_copied_runtime_fails_real_host_and_cli()
+
+    def _assert_missing_image_scanner_in_copied_runtime_fails_real_host_and_cli(self,ocr_references=None):
+        import shutil
+        source=Path(__file__).resolve().parents[1]
+        runtime=self.root/'missing-scanner-runtime'
+        shutil.copytree(source/'scripts',runtime/'scripts',
+                        ignore=shutil.ignore_patterns('community_uploaded_image_scanner.py','__pycache__','*.pyc'))
+        env=dict(os.environ);env.pop('PYTHONPATH',None)
+        # First prove this exact temporary runtime can open the real host and
+        # fails specifically at the missing scanner, before any socket/provider IO.
+        probe="""import importlib.util, pathlib, sys
+from scripts.community_platform_host import PlatformHost
+assert importlib.util.find_spec('scripts.community_uploaded_image_scanner') is None
+with PlatformHost.open(*sys.argv[1:]) as host:
+    assert host.center.scanner is None
+    try:
+        host.configure_applicant_image_scanner()
+    except ModuleNotFoundError as error:
+        assert error.name == 'scripts.community_uploaded_image_scanner', error.name
+        print('EXACT_MISSING_SCANNER_REJECTED')
+    else:
+        raise AssertionError('MISSING_SCANNER_ACCEPTED')
+"""
+        opened=subprocess.run([sys.executable,'-B','-c',probe,str(self.plan_path),
+                str(self.keys_path),str(self.wechat_path)],cwd=runtime,env=env,
+                stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15)
+        self.assertEqual(opened.returncode,0,opened.stderr)
+        self.assertEqual(opened.stdout,'EXACT_MISSING_SCANNER_REJECTED\n')
+        args=[sys.executable,'-B','-m','scripts.community_platform_host',
+              '--plan',str(self.plan_path),'--center-keys',str(self.keys_path),
+              '--wechat-secret',str(self.wechat_path),'--applicant-image-scanner']
+        if ocr_references:
+            args.extend(['--applicant-ocr-key-reference',str(ocr_references[0]),
+                         '--applicant-ocr-store-reference',str(ocr_references[1])])
+        failed=subprocess.run(args,cwd=runtime,env=env,stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,text=True,timeout=15)
+        self.assertEqual(failed.returncode,2,failed.stderr)
+        self.assertEqual(failed.stdout,'BACKEND_NOT_READY\n')
+        self.assertFalse(Path(self.plan['socket_path']).exists())
+
     def test_serve_uses_exact_proxy_arguments_and_always_closes(self):
         host=self.open();server=Mock();server.serve_forever.side_effect=KeyboardInterrupt()
         with patch.object(host.application,'listen_proxy',return_value=server) as listen:
@@ -320,8 +380,19 @@ class FormalHost(unittest.TestCase):
         self.assertEqual(signal.getsignal(signal.SIGTERM),before)
     @unittest.skipIf(os.geteuid()==0,'Actual nonroot CLI/Unix socket runs on Hosted')
     def test_actual_nonroot_cli_unix_health_sigterm_and_restart(self):
+        self._assert_actual_nonroot_cli_unix_health_sigterm_and_restart()
+
+    @unittest.skipIf(os.geteuid()==0,'Actual nonroot CLI/Unix socket runs on Hosted and image verify')
+    def test_actual_nonroot_cli_image_scanner_unix_health_sigterm_and_restart(self):
+        self._assert_actual_nonroot_cli_unix_health_sigterm_and_restart(image_scanner=True)
+
+    def _assert_actual_nonroot_cli_unix_health_sigterm_and_restart(self,image_scanner=False,ocr_references=None):
         args=[sys.executable,'-B','-m','scripts.community_platform_host','--plan',str(self.plan_path),
               '--center-keys',str(self.keys_path),'--wechat-secret',str(self.wechat_path)]
+        if image_scanner:args.append('--applicant-image-scanner')
+        if ocr_references:
+            args.extend(['--applicant-ocr-key-reference',str(ocr_references[0]),
+                         '--applicant-ocr-store-reference',str(ocr_references[1])])
         for attempt in range(2):
             process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
             try:
