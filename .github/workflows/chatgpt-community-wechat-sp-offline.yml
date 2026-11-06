@@ -1071,7 +1071,7 @@ jobs:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]') && needs.test.result == 'success' && needs.test.outputs.full_regression_outcome == 'success') || (github.event_name == 'workflow_dispatch' && inputs.backend_image_enabled == true && inputs.preview_enabled != true && (inputs.backend_image_source_sha == github.sha || (inputs.backend_image_source_sha == '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' && inputs.backend_image_evidence_run_id == '41101879920')) && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017')
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       COMMUNITY_IMAGE_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.backend_image_source_sha || github.sha }}
     steps:
@@ -1135,9 +1135,10 @@ jobs:
           set -euo pipefail
           docker build --network=none --target verify --build-arg SOURCE_SHA="$COMMUNITY_IMAGE_SOURCE_SHA" -f community-image-context/deploy/community-preview/Dockerfile community-image-context 2>&1 | tee community-image-tests.log
           docker build --network=none --target release --build-arg SOURCE_SHA="$COMMUNITY_IMAGE_SOURCE_SHA" -t "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" -f community-image-context/deploy/community-preview/Dockerfile community-image-context
-          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" --help
-          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" -B -c 'import os,sys,cryptography,cffi,pycparser; assert os.geteuid()==10001; assert os.getegid()==1008; assert sys.version_info[:2]==(3,11); assert (cryptography.__version__,cffi.__version__,pycparser.__version__)==("46.0.3","2.0.0","2.23"); print("NONROOT_READONLY_IMAGE_IMPORT=PASS")'
-          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=512m --cpus=0.5 --entrypoint python "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" -B -m scripts.community_ocr_smoke
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=4g --memory-swap=4g --cpus=0.5 "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" --help
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=4g --memory-swap=4g --cpus=0.5 --entrypoint python "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" -B -c 'import os,sys,cryptography,cffi,pycparser; assert os.geteuid()==10001; assert os.getegid()==1008; assert sys.version_info[:2]==(3,11); assert (cryptography.__version__,cffi.__version__,pycparser.__version__)==("46.0.3","2.0.0","2.23"); print("NONROOT_READONLY_IMAGE_IMPORT=PASS")'
+          docker run --rm --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=64 --memory=4g --memory-swap=4g --cpus=0.5 --entrypoint python "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" -B -m scripts.community_ocr_smoke
+          bash community-image-context/scripts/community_ocr_resource_acceptance.sh 2>&1 | tee -a community-image-tests.log
           docker image inspect --format '{{.Id}}' "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" > community-image-id.txt
           docker image save "community-preview:$COMMUNITY_IMAGE_SOURCE_SHA" | gzip -n > community-backend-image.tar.gz
           sha256sum community-backend-image.tar.gz > community-backend-image.sha256
@@ -1150,6 +1151,7 @@ jobs:
             community-image-id.txt
             community-backend-image.tar.gz
             community-backend-image.sha256
+            community-ocr-resource-evidence/
           retention-days: 3
 
   mini-python-runtime:

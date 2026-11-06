@@ -52,7 +52,9 @@ class HostOcr:
     def __init__(self, merchant, scene, api, store, *, applicant_mode=False):
         from scripts.community_ocr_bridge import compose
         self.owner=OwnerCalls();self.merchant=merchant;self.scene=scene;self.applicant_mode=applicant_mode
-        self.bridge,self.app=compose(merchant,scene,api,store,self.owner,applicant_mode=applicant_mode)
+        from scripts.community_license_inference import run_license_layout_ocr
+        self.bridge,self.app=compose(merchant,scene,api,store,self.owner,
+            infer=run_license_layout_ocr,applicant_mode=applicant_mode)
         self.worker=concurrent.futures.ThreadPoolExecutor(max_workers=1,thread_name_prefix='community-ocr')
         self.busy=False;self.inflight=None;self.inflight_key=None;self.inflight_source=None
     def dispatch(self, token, scene, params):

@@ -21,6 +21,7 @@ USER 10001:1008
 # Only CI runs this target; no real identities, secrets, network or UK host.
 FROM runtime AS verify
 COPY tests/ /app/tests/
+RUN python -B -m unittest discover -s tests -p 'test_community_license_layout.py' -v && python -B -m unittest discover -s tests -p 'test_community_license_raw_replay.py' -v && PYTHONPATH=/app:/app/tests python -B -m unittest community_license_runtime_checks -v
 RUN python -B -m scripts.community_ocr_smoke
 RUN python -B -m unittest discover -s tests -p 'test_community_uploaded_image_scanner.py' -v
 RUN python -B -m unittest discover -s tests -p 'test_community_license_region.py' -v

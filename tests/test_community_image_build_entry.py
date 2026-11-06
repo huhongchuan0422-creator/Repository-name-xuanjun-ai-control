@@ -107,7 +107,22 @@ class HostedImageEntry(unittest.TestCase):
                        {'inputs.preview_enabled':True},{'github.event_name':'pull_request'}):
             with self.subTest(change=change):self.assertFalse(self.enabled('community-backend-image',**change))
         header=self.job('community-backend-image');self.assertIn('needs: test',header)
-        self.assertIn('runs-on: ubuntu-latest',header);self.assertIn('timeout-minutes: 12',header)
+        self.assertIn('runs-on: ubuntu-latest',header);self.assertIn('timeout-minutes: 20',header)  # Two bounded full-host resource cases plus image builds.
+    def test_full_host_resource_acceptance_precedes_image_export(self):
+        job=self.workflow.split('  community-backend-image:\n',1)[1].split('\n  mini-python-runtime:',1)[0]
+        gate='bash community-image-context/scripts/community_ocr_resource_acceptance.sh'
+        self.assertEqual(job.count(gate),1)
+        self.assertLess(job.index(gate),job.index('docker image save'))
+        self.assertIn('set -euo pipefail',job)
+        self.assertIn('if: always()',job)
+        self.assertIn('community-ocr-resource-evidence/',job)
+        script=(ROOT/'scripts/community_ocr_resource_acceptance.sh').read_text()
+        for required in ('--memory=4g --memory-swap=4g --cpus=0.5', '--pids-limit=64',
+                         'for case in clear maximum_20mp', 'trap cleanup_container EXIT',
+                         "config['Memory']==config['MemorySwap']==4294967296",
+                         "state['ExitCode']==0 and not state['OOMKilled']", 'exit "$failed"'):
+            self.assertIn(required,script)
+
     def test_original_push_build_retained_without_dummy_push_requirement(self):
         self.assertTrue(self.enabled('community-backend-image',**{'github.event_name':'push','github.event.head_commit.message':'real change [community-image]'}))
         self.assertFalse(self.enabled('community-backend-image',**{'github.event_name':'push'}))

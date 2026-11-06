@@ -1,0 +1,96 @@
+{
+  "scope": "SYNTHETIC_ONLY_FULL_HOST_RESOURCE_CASES",
+  "expected": {
+    "company_name": "合成社区测试商店",
+    "legal_representative": "合成甲",
+    "registered_address": "合成测试区示例路一号",
+    "business_scope": "仅用于合成识别测试"
+  },
+  "cases": {
+    "clear": {
+      "width": 1200,
+      "height": 1600,
+      "sha256": "8b8118143a9482f514ba89f5f3a10a01be7023fbda8baa36fc6c09f018d43ab2",
+      "bytes": 123388,
+      "base64_fixture": "community_license_columns90_image.json"
+    },
+    "maximum_20mp": {
+      "width": 4000,
+      "height": 5000,
+      "sha256": "0fdc8fbb20aadbef29fa2b158d0a2bd7b6223dacabe1d44c1373e1cc3ff68497",
+      "bytes": 944336,
+      "base64_parts": [
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.000.b64",
+          "bytes": 96000,
+          "sha256": "67d406419d8a7f84fc47921e475cc599e121c01440311a32d42bf8af8c9be2be"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.001.b64",
+          "bytes": 96000,
+          "sha256": "d2e01a6031434a174259433e8a95059d27e096e04af338689419622e3a70ce74"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.002.b64",
+          "bytes": 96000,
+          "sha256": "8575f10097dd775e83d658f724ee79c58a48ebcf39a8c7dd1ae934ca5ae19563"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.003.b64",
+          "bytes": 96000,
+          "sha256": "595e9d3e602b02494cc0e72e8b572e765e4076687d63d625b6fef85aac5e9f30"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.004.b64",
+          "bytes": 96000,
+          "sha256": "96788aaad784efbb1eb2f93fb2ec442e2b2bc0026a6499da82270342b9ef7680"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.005.b64",
+          "bytes": 96000,
+          "sha256": "b0d854aa50f1865edba1a4bceae5a78f753cf3a3c55e8ace49e57efb4cb462eb"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.006.b64",
+          "bytes": 96000,
+          "sha256": "3bf175602ae138321fd62817edcdfe02191b7a843d59fa57bb5c650516d9d095"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.007.b64",
+          "bytes": 96000,
+          "sha256": "f45d4f782e2ce028c1b55e2aa497b3f851d57066ffea955e4010d626c368ba0a"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.008.b64",
+          "bytes": 96000,
+          "sha256": "af632c7aba1aa430a636bd08ef805d632677f0c6a278c62ad9f1835adc3d217f"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.009.b64",
+          "bytes": 96000,
+          "sha256": "30589f2e8728cb7ebd2834fb581c1504f2e672dd5cc9c6773923dbb81895a7e9"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.010.b64",
+          "bytes": 96000,
+          "sha256": "9091303b304cae5ab35d64bdeb336f087072cbc208c8be89bb83941c3ba698a2"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.011.b64",
+          "bytes": 96000,
+          "sha256": "fd765cdc9d88ba394042d6704d7c3aa81873123c25eaaad78f327e751731e9a3"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.012.b64",
+          "bytes": 96000,
+          "sha256": "1d2808deed7148ebb0759421b25d945c0052d40730f27ca1f7a6e67c95273501"
+        },
+        {
+          "file": "community_ocr_resource_parts/maximum_20mp.013.b64",
+          "bytes": 11116,
+          "sha256": "d72b46f479e0d574f3563707ff8dfee02214986970ad5eb64a303f382066f46e"
+        }
+      ]
+    }
+  }
+}
