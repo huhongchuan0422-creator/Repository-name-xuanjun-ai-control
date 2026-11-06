@@ -3,7 +3,7 @@ function customerError(error) {
   const code=error&&error.message;
   if(error&&error.networkKind==='DOMAIN')return '小程序服务域名校验未通过（NET_DOMAIN），请联系项目负责人';
   if(error&&error.networkKind==='TLS')return '安全连接未建立（NET_TLS），请联系项目负责人';
-  if(error&&error.networkKind==='TIMEOUT'&&error.uploadResultUnknown===true)return '上传结果暂未确认，请先重新读取原申请，勿重复上传';
+  if(error&&error.uploadResultUnknown===true)return '上传结果暂未确认，请先重新读取原申请，勿重复上传';
   if(error&&error.networkKind==='TIMEOUT')return '登录连接超时（NET_TIMEOUT），请点击重新登录；不会自动重复请求';
   if(error&&error.mediaCode==='WECHAT_MEDIA_UNAVAILABLE')return '照片已保存在原申请；微信材料关联服务尚未开放，未关联或提交微信，可继续保存资料';
   if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
@@ -35,6 +35,9 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
+        // Gateway/server failures cannot prove whether this upload was persisted.
+        // Keep it failed and require an original-application read before any retry.
+        if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'&&[408,502,503,504].includes(r.statusCode))error.uploadResultUnknown=true;
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
         if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;

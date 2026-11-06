@@ -99,3 +99,14 @@ test('mini reviewer bypass cannot use a customer mini bearer session',async()=>{
 });
 test('only photo upload waits30s while OCR transport15s and ordinary requests5s',async()=>{const f=fixture();await f.session.login();for(const [op,p,timeout] of [['onboarding',{operation:'upload',params:{}},30000],['onboarding',{operation:'read',params:{}},5000],['ocr',{action:'read',application:'synthetic',job_id:'job'},15000],['collection_code',{workspace:'shop'},15000]]){await f.session.merchant('shop1',op,p);assert.equal(f.calls.at(-1).timeout,timeout);}});
 test('photo upload timeout reports uncertain upload not failed login and never retries',async()=>{let count=0;const wx={login:o=>o.success({code:'code'}),request:o=>{count++;if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{session_token:'s'.repeat(32),expires_at:200,provider:'WECHAT_MINIPROGRAM',payment_enabled:false}}});else o.fail({errMsg:'request:fail timeout'});}};const session=createSession(wx,'https://example.org',()=>100);await session.login();await assert.rejects(session.merchant('shop1','onboarding',{operation:'upload',params:{}}),e=>{assert.equal(e.uploadResultUnknown,true);assert.match(customerError(e),/上传结果暂未确认.*重新读取原申请.*勿重复上传/);assert.doesNotMatch(customerError(e),/重新登录/);return true;});assert.equal(count,2);assert.equal(session.isAuthenticated(),true);await assert.rejects(session.merchant('shop1','onboarding',{operation:'read',params:{}}),e=>{assert.equal(e.uploadResultUnknown,undefined);assert.match(customerError(e),/登录连接超时/);return true;});});
+
+for(const status of [408,502,503,504,400,401,403])for(const operation of ['upload','read'])test(`HTTP ${status} ${operation} preserves exact upload uncertainty and authentication rules`,async()=>{
+ const {getSharedSession}=require('./session');const calls=[];
+ const wx={login:o=>o.success({code:'synthetic'}),request(o){calls.push(o);o.success(o.url.endsWith('/mini/login')?{statusCode:200,data:{payment_enabled:false,result:{provider:'WECHAT_MINIPROGRAM',session_token:'S'.repeat(32),expires_at:200,payment_enabled:false}}}:{statusCode:status,data:{error:'synthetic failure'}});}};
+ const session=getSharedSession(wx,{baseUrl:'https://example.org'},()=>100);await session.ensureLogin();let error;
+ try{await session.merchant('shop1','onboarding',{operation,params:{}});}catch(e){error=e;}
+ assert.ok(error);const unknown=operation==='upload'&&[408,502,503,504].includes(status);
+ assert.equal(error.uploadResultUnknown===true,unknown);assert.equal(session.isAuthenticated(),![401,403].includes(status));assert.equal(calls.length,2);
+ if(unknown){assert.match(customerError(error),/上传结果暂未确认.*重新读取原申请.*勿重复上传/);assert.doesNotMatch(customerError(error),/登录/);}
+ else assert.notEqual(error.uploadResultUnknown,true);
+});
