@@ -1,0 +1,52 @@
+name: Domestic Resource Read-Only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: domestic-resource-readonly
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    steps:
+      - name: Read fixed non-sensitive system facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "iZvt5t8tlrm8oiZ" || { echo 'STOP=WRONG_HOST'; exit 2; }
+          test "$(id -un)" = "githubrunner" || { echo 'STOP=WRONG_USER'; exit 2; }
+          python3 -B - <<'PY'
+          import datetime, json, os, platform, shutil, subprocess
+          def command(args):
+              p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+              return p.stdout.decode("utf-8", "replace").strip()
+          mem = {}
+          with open("/proc/meminfo") as f:
+              for line in f:
+                  k, v = line.split(":", 1)
+                  if k in ("MemTotal", "MemAvailable"):
+                      mem[k + "_bytes"] = int(v.split()[0]) * 1024
+          distro = {}
+          with open("/etc/os-release") as f:
+              for line in f:
+                  k, sep, v = line.strip().partition("=")
+                  if k in ("ID", "VERSION_ID"):
+                      distro[k] = v.strip('"')
+          fs = os.statvfs("/")
+          gui = ["Xorg", "Xwayland", "weston", "gnome-shell", "startxfce4", "startplasma-x11", "startplasma-wayland"]
+          print("RESOURCE_JSON=" + json.dumps({
+              "utc": datetime.datetime.utcnow().isoformat() + "Z",
+              "target_match": True,
+              "architecture": platform.machine(),
+              "cpu_available": command(["nproc"]),
+              "os": distro,
+              "memory": mem,
+              "root_disk_bytes": {"total": fs.f_blocks * fs.f_frsize, "free": fs.f_bfree * fs.f_frsize, "available": fs.f_bavail * fs.f_frsize},
+              "gui_binaries_found": {x: bool(shutil.which(x)) for x in gui},
+              "display_manager_state": command(["systemctl", "is-active", "display-manager.service"]),
+              "graphical_target_state": command(["systemctl", "is-active", "graphical.target"]),
+              "sudo_used": False,
+              "server_configuration_changed": False
+          }, sort_keys=True))
+          PY
