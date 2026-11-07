@@ -92,6 +92,13 @@ class CommunityUiSuccessorPackage(unittest.TestCase):
             self.assertEqual(copied[source], target)
             self.assertIn(target, read_only)
 
+    def test_partial_label_regression_is_run_by_both_image_gates(self):
+        self.assertIn(('tests/test_community_license_partial_label.py', '/tmp/community-layout-tests/test_community_license_partial_label.py'), self.copies)
+        self.assertIn('python -B -m unittest discover -s /tmp/community-layout-tests -v', self.docker)
+        base = (ROOT / 'deploy/community-preview/Dockerfile').read_text()
+        self.assertIn('COPY tests/ /app/tests/', base)
+        self.assertIn("python -B -m unittest discover -s tests -p 'test_community_license_partial_label.py' -v", base)
+
     def test_stamp_env_oci_and_tree_bind_the_exact_copied_runtime_sources(self):
         revision, tree = self.frozen_runtime_binding()
         stamp = STAMP.read_text().strip()

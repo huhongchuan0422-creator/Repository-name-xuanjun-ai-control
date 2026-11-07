@@ -8,7 +8,7 @@ import math
 from bisect import bisect_left
 import re
 
-VERSION = 'community.license-layout.v4-target-row-boundaries'
+VERSION = 'community.license-layout.v5-supported-label-fragments'
 LABELS = {
     'company_name': ('个体工商户名称', '企业名称', '名称'),
     'credit_code': ('统一社会信用代码', '社会信用代码'),
@@ -201,6 +201,59 @@ def _recover_target_rows(nodes, aliases, pattern):
         node['parts'] = [(key, tail)]
 
 
+
+def _recover_fragment_labels(nodes, aliases):
+    """Recover a decorated partial printed label, never missing business text.
+
+    A unique target-name fragment alone is insufficient: two distinct complete
+    labels must establish its right-aligned label column, including a target
+    label, and a separate same-row value must precede any intervening label.
+    All evidence comes from this page. No template coordinates or value words.
+    """
+    if aliases != ALIASES:
+        return
+    established = {key for n in nodes for key, value in n['parts'] if key is not None}
+    anchors = [(n, _label_fragment(n['text'])) for n in nodes
+               if n['parts'] and n['b'] is not None and _label_fragment(n['text']) in aliases]
+    for node in nodes:
+        if node['parts'] or node['b'] is None:
+            continue
+        fragment = _label_fragment(node['text'])
+        # A plain character/name is not a damaged printed label. Decorations
+        # are only the existing explicit symbol allowlist, never Chinese words.
+        if not fragment or fragment == re.sub(r'\s+', '', node['text']):
+            continue
+        matches = {key for label, key in aliases.items()
+                   if label.startswith(fragment) or label.endswith(fragment)}
+        if len(matches) != 1 or None in matches:
+            continue
+        key = next(iter(matches))
+        if key in established:
+            continue
+        height = _h(node)
+        if node['b'][2]-node['b'][0] < height*.8:
+            continue
+        # Reuse the mapper's existing row/column geometry tolerances. These are
+        # association evidence, not an upload, value-length or acceptance gate.
+        support = [(n, label) for n, label in anchors
+                   if abs(n['b'][2]-node['b'][2]) <= min(_h(n),height)*.5
+                   and max(_h(n),height)*.65 < abs(_cy(n)-_cy(node))
+                   <= min(_h(n),height)*12]
+        if len({label for n, label in support}) < 2 or not any(aliases[label] is not None for n,label in support):
+            continue
+        same = [n for n in nodes if n is not node and not n['parts'] and n['b'] is not None
+                and n['b'][0] >= node['b'][2]-height*.15
+                and abs(_cy(n)-_cy(node)) <= max(height,_h(n))*.65]
+        if not any(_candidate(key,[n]) and not any(
+                z['parts'] and z['b'] is not None
+                and abs(_cy(z)-_cy(node)) <= max(height,_h(z))*.65
+                and node['b'][2]-height*.1 <= z['b'][0] < n['b'][0]
+                for z in nodes) for n in same):
+            continue
+        node['parts'] = [(key,'')]
+        node['recovered_label_fragment'] = True
+
+
 def _label_nodes(rows, turn, aliases, pattern):
     nodes = [dict(n, b=_bounds(n['box'], turn) if n['box'] is not None else None,
                   parts=_parts(n['text'], aliases, pattern)) for n in rows]
@@ -271,6 +324,7 @@ def _label_nodes(rows, turn, aliases, pattern):
                 node['parts'] = [(None, '')]
                 break
     _recover_target_rows(nodes, aliases, pattern)
+    _recover_fragment_labels(nodes, aliases)
     return nodes
 
 
@@ -365,6 +419,8 @@ def _hypothesis(rows, turn, aliases=None, pattern=None, candidate_fn=None,
                     selected.append(n); selected_indices.add(n['source_index']); last=n['b'][3]; last_cy=_cy(n); extended = True
             item = candidate_fn(key, [label]+selected, _join_texts(n['text'] for n in selected))
             if item:
+                if label.get('recovered_label_fragment'):
+                    item['warnings'] = ['PARTIAL_LABEL_RECOVERED']
                 item['value_source_lines'] = sorted({i for n in selected for i in n.get('source_indices', [n['source_index']])})
                 item['value_boxes'] = [n['box'] for n in selected if n['box'] is not None]
                 candidates[key].append(item)
@@ -392,6 +448,7 @@ def _extract_fields(rows, document_type, aliases, pattern, candidate_fn, multili
         items = sorted(by_value.values(), key=lambda c:c['value'])
         warning = 'LAYOUT_VALUE_MISSING' if not items else 'CONFLICTING_CANDIDATES' if len(items)>1 else None
         warnings = [warning] if warning else []
+        warnings.extend(w for item in items for w in item.get('warnings',[]) if w not in warnings)
         if any(n['box'] is None and any(k == key for k, unused in _parts(n['text'], aliases, pattern)) for n in rows):
             warnings.append('LAYOUT_GEOMETRY_UNAVAILABLE')
         fields[key] = {'value': items[0]['value'] if len(items)==1 else '',
