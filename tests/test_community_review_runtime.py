@@ -38,8 +38,17 @@ class IntegratedReview(unittest.TestCase):
   with urllib.request.urlopen(self.url+'/review/sources') as response:payload=json.load(response)
   self.assertIs(payload['isolated'],True)
   for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
-               'merchant-official-industries-data.js','merchant-platform-reference-data.js','merchant-license-region.js'):
+               'merchant-official-industries-data.js','merchant-platform-reference-data.js','merchant-license-region.js',
+               'material-private-preview.js'):
    self.assertEqual(payload['sources'][name],(ROOT/'clients/community-mini'/name).read_text())
+  # Every literal local require in the real Page/module sources must be supplied.
+  import posixpath,re
+  for name,source in payload['sources'].items():
+   if not name.endswith('.js'):continue
+   for relative in re.findall(r"require\(['\"](\.[^'\"]+)['\"]\)",source):
+    target=posixpath.normpath(posixpath.join(posixpath.dirname(name),relative))
+    if not target.endswith(('.js','.json')):target+='.js'
+    self.assertIn(target,payload['sources'],name+' requires '+target)
  def test_native_saved_application_is_read_by_original_platform_reviewer(self):
   page=self.page();errors=[];requests=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:requests.append(r.url))
   self.ready(page);page.locator('#apply').click();page.wait_for_function('window.reviewPage?.data.ready === true')
