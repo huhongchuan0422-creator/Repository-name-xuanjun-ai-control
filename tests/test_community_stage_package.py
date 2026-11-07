@@ -47,6 +47,8 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
+                'tests/test_community_license_address_boundary.py',
+                'tests/fixtures/license_address_stop_rows.json',
                 'clients/community-mini/app.wxss',
                 'clients/community-mini/assets/community-demo-storefront-v1.jpg',
                 'deploy/community-preview/Dockerfile',

@@ -8,7 +8,7 @@ import math
 from bisect import bisect_left
 import re
 
-VERSION = 'community.license-layout.v2-no-scope-candidate'
+VERSION = 'community.license-layout.v3-stop-row-boundaries'
 LABELS = {
     'company_name': ('个体工商户名称', '企业名称', '名称'),
     'credit_code': ('统一社会信用代码', '社会信用代码'),
@@ -170,7 +170,40 @@ def _label_nodes(rows, turn, aliases, pattern):
                     confidence=min(n['confidence'] for n in chain),
                     source_indices=[n['source_index'] for n in chain],
                     source_boxes=[(n['source_index'],n['box']) for n in chain]))
-    return [n for n in nodes if n['source_index'] not in used] + combined
+    nodes = [n for n in nodes if n['source_index'] not in used] + combined
+    # OCR can remove the printed space between a stop label and its value.
+    # Do not relax _parts globally: keywords in names/addresses remain values.
+    # Treat a delimiterless prefix as a barrier only when another distinct stop
+    # row with an explicit delimiter or a date/duration value corroborates its
+    # label column. Keyword-only address rows stay untouched.
+    # Geometry-only evidence cannot resolve every semantic ambiguity; this is
+    # a layout heuristic and all returned values still require human review.
+    possible = []
+    for node in nodes:
+        if node['parts'] or node['b'] is None or node['b'][2]-node['b'][0] < _h(node)*.8:
+            continue
+        match = pattern.match(node['text'])
+        if match:
+            name = re.sub(r'\s+', '', match.group())
+            if name in STOP_LABELS and name in aliases and aliases[name] is None:
+                tail = node['text'][match.end():].strip(' ：:')
+                typed = (name in ('成立日期', '发照日期', '营业期限') and
+                         bool(re.match(r'^(?:\d{4}年\d{1,2}月\d{1,2}日|\d{4}[-./]\d{1,2}[-./]\d{1,2})(?:$|[\s至到—–-])', tail)))
+                typed = typed or (name == '营业期限' and tail in ('长期', '永久'))
+                possible.append((node, name, typed))
+    stop_rows = [(n, None, True) for n in nodes if n['b'] is not None and n['parts']
+                 and all(key is None for key, value in n['parts'])] + possible
+    for node, name, typed in possible:
+        for other, other_name, other_typed in stop_rows:
+            if other is node or other_name == name or not (typed or other_typed):
+                continue
+            height = min(_h(node), _h(other))
+            gap = abs(_cy(node)-_cy(other))
+            if (height*.8 < gap <= height*3 and
+                    abs(node['b'][0]-other['b'][0]) <= height*.5):
+                node['parts'] = [(None, '')]
+                break
+    return nodes
 
 
 def _hypothesis(rows, turn, aliases=None, pattern=None, candidate_fn=None,

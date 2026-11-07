@@ -23,6 +23,7 @@ USER 10001:1008
 FROM runtime AS verify
 COPY tests/ /app/tests/
 RUN python -B -m unittest discover -s tests -p 'test_community_identity_layout.py' -v && python -B -m unittest discover -s tests -p 'test_community_document_orientation.py' -v
+RUN PYTHONPATH=/app:/app/tests python -B -m unittest test_community_license_address_boundary -v
 RUN python -B -m unittest discover -s tests -p 'test_community_license_layout.py' -v && python -B -m unittest discover -s tests -p 'test_community_license_raw_replay.py' -v && PYTHONPATH=/app:/app/tests python -B -m unittest community_license_runtime_checks -v
 RUN PYTHONPATH=/app:/app/tests python -B -m unittest community_identity_api_runtime_checks -v
 RUN python -B -m scripts.community_ocr_smoke
