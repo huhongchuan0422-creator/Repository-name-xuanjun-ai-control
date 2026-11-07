@@ -213,6 +213,8 @@ class PlatformHost:
             # Original business lock is held before any Center constructor IO.
             owner.persistence = PersistentRuntime.open(plan['runtime_directory'],bindings,clock=lambda:owner.center.now())
             owner.center = Center(center_root, keys, key_material['active_key'])
+            from scripts.community_mail_delivery import install as install_mail
+            install_mail(owner.center)
             owner.application = MiniApplication.from_existing_runtime(owner.center,
                 owner.persistence.runtime, principals, config, wechat['app_secret'])
             if 'community_admin_authority' in plan:

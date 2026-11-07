@@ -52,6 +52,8 @@ class FirstInstallation:
         owner=cls()
         try:
             owner.center=Center(path/'identity',keys,active_key,clock=clock)
+            from scripts.community_mail_delivery import install as install_mail
+            install_mail(owner.center)
             owner.persistence=PersistentRuntime.initialize(str(path/'runtime'),bindings,clock=owner.center.now)
             payload=dict(kind='COMMUNITY_PLATFORM_REALM',title=realm['title'],requirements=[],
                 source='OWNER_APPROVED_FIRST_INSTALL',authority_ref=realm['authority_ref'])
