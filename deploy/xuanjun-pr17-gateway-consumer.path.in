@@ -1,0 +1,9 @@
+[Unit]
+Description=Wake the existing Gateway for PR17 protected inbox records
+
+[Path]
+DirectoryNotEmpty=@INBOX@
+Unit=xuanjun-pr17-gateway-consumer.service
+
+[Install]
+WantedBy=multi-user.target

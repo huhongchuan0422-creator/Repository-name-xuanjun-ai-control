@@ -1,0 +1,9 @@
+[Unit]
+Description=Wake the PR17 publisher for durable Gateway results
+
+[Path]
+DirectoryNotEmpty=@OUTBOX@
+Unit=xuanjun-pr17-gateway-publisher.service
+
+[Install]
+WantedBy=multi-user.target

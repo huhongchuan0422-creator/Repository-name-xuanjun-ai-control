@@ -1,0 +1,20 @@
+[Unit]
+Description=Xuanjun PR17 public-comment protected inbox intake
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@SOURCE_ROOT@
+Environment=XJ_PR17_REPOSITORY=@REPOSITORY@
+Environment=XJ_PR17_OWNER=@OWNER@
+Environment=XJ_PR17_INBOX=@INBOX@
+Environment=XJ_PR17_RECEIVED=@RECEIVED@
+ExecStart=@PYTHON@ -I -B @SOURCE_ROOT@/scripts/pr17_gateway_bridge.py pull
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@INBOX@ @RECEIVED@

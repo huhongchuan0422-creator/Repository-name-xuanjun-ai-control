@@ -1,0 +1,55 @@
+name: MCP current successor gates
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/development_review_continuation.py
+      - scripts/gateway_multifile_candidate.py
+      - scripts/github_runtime_ci.py
+      - scripts/original_gateway_readback.py
+      - scripts/original_gateway_transport.py
+      - scripts/pr17_gateway_bridge.py
+      - scripts/reusable_task_gateway.py
+      - scripts/task_center_mcp_development.py
+      - scripts/task_skill_admission.py
+      - scripts/task_supervisor.py
+      - tests/test_mcp_development_bridge.py
+      - tests/test_pr17_gateway_bridge.py
+      - tests/test_reusable_task_gateway.py
+      - deploy/xuanjun-pr17-gateway-*.in
+      - .github/workflows/mcp-current-successor-gates.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  affected-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate exact current successor
+        run: |
+          python3 -m py_compile \
+            scripts/development_review_continuation.py \
+            scripts/gateway_multifile_candidate.py \
+            scripts/github_runtime_ci.py \
+            scripts/original_gateway_readback.py \
+            scripts/original_gateway_transport.py \
+            scripts/pr17_gateway_bridge.py \
+            scripts/task_center_mcp_development.py \
+            scripts/task_skill_admission.py \
+            scripts/task_supervisor.py \
+            tests/test_mcp_development_bridge.py \
+            tests/test_pr17_gateway_bridge.py
+          python3 -m unittest \
+            tests.test_pr17_gateway_bridge \
+            tests.test_mcp_development_bridge \
+            tests.test_task_supervisor \
+            tests.test_entry_review_gate \
+            tests.test_development_entry_intake \
+            tests.test_reusable_task_gateway \
+            tests.test_registered_dispatch

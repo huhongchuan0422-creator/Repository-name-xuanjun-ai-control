@@ -601,7 +601,7 @@ class Supervisor(object):
     def bind_local_development_candidate(self, receipt, files, admission_check=None):
         # Local provenance must not invent a GitHub source_comment_id.
         if (not isinstance(files, dict) or len(files) != 1 or
-                any(not isinstance(path,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',path)
+                any(not isinstance(path,str) or not re.fullmatch(r'(?:[A-Za-z0-9_-]+/){0,4}[A-Za-z][A-Za-z0-9_]*\.py',path)
                     for path in files) or
                 any(type(raw) is not bytes or len(raw)>131072 for raw in files.values())):
             raise ValueError('BOUNDED_LOCAL_SOURCE_REQUIRED')
@@ -688,6 +688,10 @@ class Supervisor(object):
                 path=next(iter(local_files))
                 tree_bytes=b'100644 '+path.encode()+b'\0'+bytes.fromhex(blob)
                 tree=hashlib.sha1(('tree %d\0'%len(tree_bytes)).encode()+tree_bytes).hexdigest()
+                if 'tree_proof' in receipt:
+                    from local_development_executor import verify_scoped_tree_proof
+                    tree=verify_scoped_tree_proof(receipt['tree_proof'],operation['expected_before']['tree'],path,
+                        operation['expected_before']['blob'],blob)
                 if (operation['operation_kind']!='GIT_CAS' or
                         observed.get('observed_revision')!=receipt['code_commit'] or
                         operation['expected_before'].get('repo')!=contract['target_repository'] or
@@ -753,14 +757,78 @@ class Supervisor(object):
             raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
         return json.loads(row['payload_json'])
 
-    @staticmethod
-    def _require_development_execution_ready(candidate):
-        # Local source-write receipts and Writer revocation are not runtime proof.
-        # No trusted sandbox execution evidence format is implemented yet: fail
-        # closed in canonical APIs, including historical reviewed-event replay.
+    def record_development_ci(self, task_id, candidate_event_id, run_id, admission_check):
+        # Existing authenticated host action supplies identity, never evidence JSON.
+        # This is not a GitHub webhook and does not fabricate a PR17 comment.
+        if not callable(admission_check):
+            raise ValueError('AUTHENTICATED_DEVELOPMENT_ADMISSION_REQUIRED')
+        admission_check()
+        candidate=self.development_candidate(task_id,candidate_event_id)
+        if candidate.get('source_kind')!='LOCAL_ONLY_CONFIRMED_OPERATION':
+            raise ValueError('FIXED_RUNTIME_LOCAL_CANDIDATE_REQUIRED')
+        from github_runtime_ci import GitHubRuntimeCI, REPO
+        if candidate['target_repository']!=REPO:
+            raise ValueError('FIXED_RUNTIME_LOCAL_CANDIDATE_REQUIRED')
+        task=dict(self._task(task_id))
+        op=self.db.execute("SELECT payload_json FROM writer_operations WHERE operation_id=? AND state='CONFIRMED'",
+            (candidate['source_operation_id'],)).fetchone()
+        if op is None:raise ValueError('CONFIRMED_LOCAL_OPERATION_REQUIRED')
+        operation=json.loads(op[0]);branch=operation['requested_after']['branch']
+        proof=GitHubRuntimeCI().verify(candidate['code_commit'],branch,candidate['files'],run_id)
+        if proof['tree']!=operation['requested_after']['tree']:
+            raise ValueError('CI_OPERATION_TREE_MISMATCH')
+        self.db.execute('BEGIN IMMEDIATE')
+        with self.db:
+            admission_check()
+            current=dict(self._task(task_id))
+            if current!=task or self.development_candidate(task_id,candidate_event_id)!=candidate:
+                raise ValueError('CI_CANONICAL_SNAPSHOT_CHANGED')
+            ticket=self._authority_ticket(current)
+            caller={k:current['authority_'+k] for k in ('caller_id','run_id','session_id','gateway_id')}
+            _,now=self._validate_writer_locked(ticket,caller,current['authority_lock_provider_id'])
+            if current['state'] not in ACTIVE:raise ValueError('CI_ACTIVE_TASK_REQUIRED')
+            payload={'schema':1,'candidate_event_id':candidate_event_id,
+                'candidate_sha256':hashlib.sha256(canonical(candidate).encode()).hexdigest(),
+                'source_kind':'AUTHENTICATED_MCP_FIXED_PUBLIC_CI_VERIFICATION','proof':proof}
+            body=canonical(payload);evidence=hashlib.sha256(body.encode()).hexdigest()
+            event_id='development-ci:'+payload['candidate_sha256']
+            old=self.db.execute('SELECT kind,payload_json,evidence_ref FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                (task_id,current['attempt_id'],event_id)).fetchone()
+            if old:
+                if tuple(old)!=('DEVELOPMENT_CI_VERIFIED',body,evidence):raise ValueError('CI_EVIDENCE_CONFLICT')
+            else:
+                self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                    (task_id,current['attempt_id'],event_id,'DEVELOPMENT_CI_VERIFIED',now,'TEST_RUN',evidence,body))
+            return {'duplicate':old is not None,'event_id':event_id,'execution_state':'TESTS_PASSED_EXACT_TREE',
+                    'canonical_task_state':current['state'],'review_or_approval_generated':False}
+
+    def _require_development_execution_ready(self, candidate):
         if (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
                 or 'source_operation_id' in candidate):
-            raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+            expected=hashlib.sha256(canonical(candidate).encode()).hexdigest()
+            row=self.db.execute('SELECT * FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                (candidate['task_id'],candidate['attempt_id'],'development-ci:'+expected)).fetchone()
+            if row is None:
+                if candidate.get('source_kind')=='ORIGINAL_GATEWAY_MULTIFILE_PENDING_EFFECT':
+                    raise ValueError('HOLD_GATEWAY_SOURCE_EFFECT_AND_TEST_BINDING')
+                raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+            value=json.loads(row['payload_json']);proof=value.get('proof',{})
+            if (row['kind']!='DEVELOPMENT_CI_VERIFIED' or row['evidence_ref']!=hashlib.sha256(row['payload_json'].encode()).hexdigest()
+                    or value.get('candidate_sha256')!=expected
+                    or value.get('source_kind') not in
+                       ('AUTHENTICATED_MCP_FIXED_PUBLIC_CI_VERIFICATION',
+                        'ORIGINAL_GATEWAY_TRUSTED_TOOL_RECEIPT')
+                    or proof.get('state')!='TESTS_PASSED_EXACT_TREE'
+                    or proof.get('code_commit')!=candidate['code_commit']
+                    or (candidate.get('tree') is not None and
+                        proof.get('tree')!=candidate['tree'])
+                    or proof.get('files')!=candidate['files']):
+                raise ValueError('CI_CANONICAL_EVIDENCE_INVALID')
+            if candidate.get('source_kind')=='ORIGINAL_GATEWAY_MULTIFILE_PENDING_EFFECT':
+                op=self.db.execute('SELECT state FROM writer_operations WHERE operation_id=?',
+                    (candidate['source_operation_id'],)).fetchone()
+                if op is None or op['state']!='CONFIRMED':
+                    raise ValueError('HOLD_GATEWAY_SOURCE_EFFECT_AND_TEST_BINDING')
 
     def record_development_review(self, task_id, candidate_event_id, files,
                                   bundle_sha256, review_record_ids,
@@ -1378,6 +1446,24 @@ class Supervisor(object):
             raise ValueError('OPERATION_NOT_INFLIGHT')
         return task, row, now
 
+    def _assert_no_pending_gateway_effect_locked(self, operation):
+        """Called inside original BEGIN IMMEDIATE; no separate state or lease.
+
+        The whole Gateway turn may mutate its source resource. A different key,
+        attempt or task cannot supersede unresolved effects on that resource.
+        Other original operation types retain their semantics unless competing
+        with a pending Gateway turn. Final reconciliation uses the original API.
+        """
+        rows = self.db.execute("""SELECT operation_id,payload_json
+          FROM writer_operations WHERE resource_key=? AND operation_id<>?
+          AND state IN ('PREPARED','DISPATCHING','UNKNOWN')""",
+          (operation['resource_key'], operation['operation_id'])).fetchall()
+        for other in rows:
+            if (operation.get('operation_kind') == 'OPENCLAW_DEVELOPMENT_TURN'
+                    or json.loads(other['payload_json']).get('operation_kind')
+                    == 'OPENCLAW_DEVELOPMENT_TURN'):
+                raise ValueError('PENDING_SOURCE_EFFECT_REQUIRES_RECONCILIATION')
+
     def prepare_operation(self, ticket, caller, operation, lock_provider_id):
         required = {'operation_id', 'event_id', 'resource_key',
                     'operation_kind', 'expected_before', 'requested_after',
@@ -1409,6 +1495,7 @@ class Supervisor(object):
                         and existing[0]['caller_sha256'] == caller_sha):
                     return {'duplicate': True, 'state': existing[0]['state']}
                 raise ValueError('OPERATION_IDENTITY_CONFLICT')
+            self._assert_no_pending_gateway_effect_locked(operation)
             self.db.execute('''INSERT INTO writer_operations
               VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
               (operation['operation_id'], task['task_id'], task['attempt_id'],
@@ -1427,6 +1514,8 @@ class Supervisor(object):
             if (row is None or row['task_id'] != task['task_id']
                     or row['attempt_id'] != task['attempt_id']):
                 raise ValueError('OPERATION_IDENTITY_MISMATCH')
+            self._assert_no_pending_gateway_effect_locked(
+                json.loads(row['payload_json']))
             self.db.execute("""UPDATE writer_operations SET state='DISPATCHING',
               updated_at=? WHERE operation_id=? AND state='PREPARED'""",
               (now, operation_id))
@@ -1443,9 +1532,13 @@ class Supervisor(object):
         operation = json.loads(row['payload_json'])
         attribution = receipt.get('attribution')
         git_operation = operation.get('operation_kind') == 'GIT_CAS'
+        source_operation = (operation.get('operation_kind') ==
+                            'OPENCLAW_DEVELOPMENT_TURN')
         required = set(base_required)
         if git_operation:
             required.add('observed_revision')
+        if source_operation and outcome == 'CONFIRMED':
+            required.add('source_snapshot')
         if set(receipt) != required or receipt.get('schema') != 1:
             raise ValueError('FINAL_RECEIPT_SCHEMA_REQUIRED')
         if (receipt['outcome'] != outcome
@@ -1457,12 +1550,17 @@ class Supervisor(object):
                 or set(attribution) != {'kind','before','after'}):
             raise ValueError('FINAL_RECEIPT_ATTRIBUTION_REQUIRED')
         if outcome == 'CONFIRMED':
-            if (attribution['kind'] not in ('FAKE_TXN','GIT_CAS')
+            if (attribution['kind'] not in
+                    ('FAKE_TXN','GIT_CAS','SOURCE_READBACK')
                     or attribution['before'] != operation['expected_before']
                     or attribution['after'] != operation['requested_after']):
                 raise ValueError('CONFIRMED_ATTRIBUTION_REQUIRED')
             if git_operation and attribution['kind'] != 'GIT_CAS':
                 raise ValueError('GIT_CONFIRMED_ATTRIBUTION_REQUIRED')
+            if source_operation and attribution['kind'] != 'SOURCE_READBACK':
+                raise ValueError('SOURCE_CONFIRMED_ATTRIBUTION_REQUIRED')
+            if not source_operation and attribution['kind'] == 'SOURCE_READBACK':
+                raise ValueError('UNEXPECTED_SOURCE_READBACK_ATTRIBUTION')
             if not git_operation and 'observed_revision' in receipt:
                 raise ValueError('UNEXPECTED_OBSERVED_REVISION')
         elif outcome == 'NOT_APPLIED':
@@ -1484,6 +1582,30 @@ class Supervisor(object):
                         r'[0-9a-f]{40}(?:[0-9a-f]{24})?', observed)
                        is None):
                 raise ValueError('GIT_OBSERVED_REVISION_REQUIRED')
+        if source_operation and outcome == 'CONFIRMED':
+            snapshot = receipt.get('source_snapshot')
+            expected = {'repository','branch','base_sha','code_commit','tree',
+                        'files','candidate_sha256','test_plan_sha256'}
+            if (not isinstance(snapshot, dict) or set(snapshot) != expected
+                    or snapshot.get('repository') !=
+                       operation['expected_before'].get('repo')
+                    or snapshot.get('branch') !=
+                       operation['expected_before'].get('branch')
+                    or snapshot.get('base_sha') !=
+                       operation['expected_before'].get('head')
+                    or re.fullmatch(r'[0-9a-f]{40}',
+                                    snapshot.get('code_commit','')) is None
+                    or re.fullmatch(r'[0-9a-f]{40}',
+                                    snapshot.get('tree','')) is None
+                    or re.fullmatch(r'[0-9a-f]{64}',
+                                    snapshot.get('candidate_sha256','')) is None
+                    or re.fullmatch(r'[0-9a-f]{64}',
+                                    snapshot.get('test_plan_sha256','')) is None
+                    or not isinstance(snapshot.get('files'), dict)
+                    or not snapshot['files']
+                    or any(re.fullmatch(r'[0-9a-f]{64}', value) is None
+                           for value in snapshot['files'].values())):
+                raise ValueError('EXACT_SOURCE_READBACK_RECEIPT_REQUIRED')
         return receipt
 
     def _append_receipt_locked(self, row, outcome, receipt, now):

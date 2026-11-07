@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile missed PR17 result publication
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+Unit=xuanjun-pr17-gateway-publisher.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
