@@ -14,10 +14,13 @@ from pathlib import Path
 from scripts.pr122_customer_core import Center,canonical,secure_write,private_path,safe_text
 from scripts import community_onboarding_offline as workflow
 
+class MaterialPreviewUnavailable(ValueError):
+    """Safe static non-auth preview state; never carries private contents."""
+
 MATERIALS={
     'business_license':'营业执照', 'identity_front':'经营者/法定代表人证件正面',
     'identity_back':'经营者/法定代表人证件反面', 'storefront_photo':'门店门头照片',
-    'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'settlement_proof':'结算账户证明',
+    'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'bank_card':'银行卡照片', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人证件正面',
     'industry_permit':'行业经营许可（按经营类目）',
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
@@ -285,6 +288,43 @@ class MerchantOnboarding:
             opening_workspaces=workspaces,
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',
             wechat_provider_workflow=provider_workflow_view(wechat_record),payment_enabled=False)
+    def _material_preview(self,session,csrf,uid,params):
+        """Current owner's exact retained image only; never the reviewer download path."""
+        c=self.center
+        kind=params['kind'];application=params['application'];revision=params['revision']
+        if type(kind) is not str or kind not in ('business_license','identity_front','identity_back','bank_card','settlement_proof'):
+            raise ValueError('MATERIAL_PREVIEW_KIND_DENIED')
+        if type(revision) is not int or revision<0:raise ValueError('INVALID_REVISION')
+        # The original generic settlement proof has no trusted bank-card type.
+        # Do not treat arbitrary account documents as a previously retained card.
+        def current():
+            if c.session(session,csrf)!=uid:raise PermissionError('APPLICATION_ACCESS_DENIED')
+            owner,meta,data=self._load(application,uid,False)
+            if data['revision']!=revision:raise MaterialPreviewUnavailable('MATERIAL_PREVIEW_SOURCE_CHANGED')
+            if kind=='settlement_proof':raise MaterialPreviewUnavailable('BANK_CARD_BINDING_UNAVAILABLE')
+            material=meta['materials'].get(kind)
+            if not material:raise MaterialPreviewUnavailable('MATERIAL_NOT_FOUND')
+            if kind=='bank_card' and material.get('purpose')!='BANK_CARD':raise MaterialPreviewUnavailable('BANK_CARD_BINDING_UNAVAILABLE')
+            expires=material.get('expires_at')
+            if expires is not None and (type(expires) is not int or expires<=c.now()):raise MaterialPreviewUnavailable('MATERIAL_PREVIEW_EXPIRED')
+            oid=material.get('object_id');digest=material.get('sha256')
+            if type(oid) is not str or not re.fullmatch(r'o_[0-9a-f]{32}',oid) or type(digest) is not str or not re.fullmatch(r'[0-9a-f]{64}',digest):raise MaterialPreviewUnavailable('MATERIAL_INTEGRITY')
+            row=c.db.execute('SELECT mime,sha,size,scan FROM objects WHERE id=? AND project=?',(oid,application)).fetchone()
+            if row is None or row['scan']!='CLEAN' or row['sha']!=digest:raise MaterialPreviewUnavailable('MATERIAL_INTEGRITY')
+            if row['mime'] not in ('image/jpeg','image/png'):raise MaterialPreviewUnavailable('MATERIAL_PREVIEW_IMAGE_REQUIRED')
+            if type(row['size']) is not int or not 1<=row['size']<=5_000_000:raise MaterialPreviewUnavailable('MATERIAL_INTEGRITY')
+            return (oid,digest,row['mime'],row['size'],expires)
+        before=current()
+        raw=c.decrypt(private_path(c.objects/before[0]).read_bytes(),'object:'+application+':'+before[0])
+        if len(raw)!=before[3] or hashlib.sha256(raw).hexdigest()!=before[1]:raise MaterialPreviewUnavailable('MATERIAL_INTEGRITY')
+        content_mime='image/png' if raw.startswith(b'\x89PNG\r\n\x1a\n') else 'image/jpeg' if raw.startswith(b'\xff\xd8\xff') else None
+        if content_mime!=before[2]:raise MaterialPreviewUnavailable('MATERIAL_INTEGRITY')
+        if current()!=before:raise MaterialPreviewUnavailable('MATERIAL_PREVIEW_SOURCE_CHANGED')
+        # Recheck immediately before return; no object contents enter logs/audit.
+        return {'application':application,'revision':revision,'kind':kind,'object_id':before[0],
+                'sha256':before[1],'mime':before[2],'size':before[3],
+                'content_base64':base64.b64encode(raw).decode(),'cache':'PRIVATE_TEMPORARY_ONLY'}
+
     @community_route('/merchant/onboarding')
     def dispatch(self,session,csrf,body,*,source_origin=None,_mini_submission=False):
         if type(_mini_submission) is not bool:raise ValueError("INVALID_INTERNAL_MINI_SUBMISSION")
@@ -297,7 +337,7 @@ class MerchantOnboarding:
             return self.wechat_applyment.dispatch(session,csrf,body)
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         uid=c.session(session,csrf)
-        schemas={'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
+        schemas={'material_preview':{'application','revision','kind'},'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'remove_material':{'application','revision','kind','expected_wechat_version'},
                  'submit':{'application','revision'},'withdraw':{'application','revision'},'review_list':set(),
@@ -312,6 +352,9 @@ class MerchantOnboarding:
                 (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations','redemption_percent','split_participation','requested_split_bps'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
+        if op=='material_preview':
+            try:return self._material_preview(session,csrf,uid,params)
+            except MaterialPreviewUnavailable as error:return {'status':'UNAVAILABLE','reason':str(error)}
         if op=='open_workbench':
             from scripts.community_merchant_opening import open_workbench
             open_workbench(self,self.operations,uid,params['application'],params['workspace'],params['revision'])
@@ -359,6 +402,7 @@ class MerchantOnboarding:
             data=None
         else:owner,meta,data=self._load(application,uid,op in ('review','review_material') or op=='download' and uid in self.reviewers)
         if op=='download':
+            if params['kind']=='bank_card':raise PermissionError('BANK_CARD_PRIVATE_PREVIEW_ONLY')
             material=meta['materials'].get(params['kind'])
             if material is None:raise ValueError('MATERIAL_NOT_FOUND')
             row=c.db.execute('SELECT mime,sha,size,scan FROM objects WHERE id=? AND project=?',(material['object_id'],application)).fetchone()
@@ -426,6 +470,7 @@ class MerchantOnboarding:
                 if not 1<=len(raw)<=5_000_000:raise ValueError('FILE_LIMIT')
                 mime='application/pdf' if raw.startswith(b'%PDF-') else 'image/png' if raw.startswith(b'\x89PNG\r\n\x1a\n') else 'image/jpeg' if raw.startswith(b'\xff\xd8\xff') else None
                 if mime is None:raise ValueError('PDF_PNG_JPEG_ONLY')
+                if kind=='bank_card' and mime not in ('image/png','image/jpeg'):raise ValueError('BANK_CARD_IMAGE_REQUIRED')
                 safe_text(raw.decode('latin1'),5_000_000)
                 if c.scanner is None:raise RuntimeError('EXISTING_SCANNER_REQUIRED')
                 if hasattr(c.scanner,'sanitize'):
@@ -444,6 +489,7 @@ class MerchantOnboarding:
                 sha=hashlib.sha256(raw).hexdigest()
                 c.db.execute('INSERT INTO objects VALUES(?,?,?,?,?,?,?,?)',(oid,version,application,mime,len(raw),sha,'CLEAN',c.key_id))
                 meta['materials'][kind]={'object_id':oid,'sha256':sha,'expires_at':expires}
+                if kind=='bank_card':meta['materials'][kind]['purpose']='BANK_CARD'
                 meta.setdefault('reviews',{}).pop(kind,None)
                 revision=data['revision']+1
                 c.db.execute("UPDATE onboarding SET revision=?,status='DRAFT' WHERE tenant=? AND application=?",(revision,uid,application))

@@ -712,6 +712,7 @@ class WechatApplyment:
             self._save(application,owner,result)
             c.audit(application,owner,'WECHAT_CASHIER_UNLINKED',str(result['version']))
     def media(self,uid,owner,application,meta,kind,reauthorize):
+        if kind=='bank_card':raise PermissionError('BANK_CARD_PRIVATE_PREVIEW_ONLY')
         if not self.enabled:raise WechatMediaUnavailable('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
         if type(kind) is not str or kind not in meta['materials']:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_REQUIRED')
         material=meta['materials'][kind];c=self.center

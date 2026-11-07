@@ -128,8 +128,8 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),41)
-                for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
+                self.assertEqual(len(receipt['prepared_files']),42)
+                for name in ('material-private-preview.js','merchant-fields-data.js','merchant-official-areas-data.js',
                              'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
                     source='clients/community-mini/'+name
                     self.assertEqual((output/name).read_bytes(),archive.read(source))
