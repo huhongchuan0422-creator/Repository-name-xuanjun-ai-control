@@ -8,7 +8,8 @@ from pathlib import Path
 
 def build(root):
     root = Path(root)
-    patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'services/ocr_engine/api.py', 'deploy/community-preview/ocr-id-back-api.patch', 'scripts/community_license_region_areas.json', 'tests/fixtures/community_license_region.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
+    patterns = ('docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'docs/development/COMMUNITY_OCR_HOST_UI_HANDOFF_20261024.md', 'docs/development/COMMUNITY_OCR_SOURCE_CONTRACT_20261024.md', 'scripts/community_ocr_dependency.json', 'services/ocr_engine/api.py', 'services/ocr_engine/secure_store.py',
+                'deploy/community-preview/ocr-recovery-api-store.patch', 'deploy/community-preview/ocr-id-back-api.patch', 'scripts/community_license_region_areas.json', 'tests/fixtures/community_license_region.json', 'scripts/community_*.py', 'scripts/community_*.cjs', 'tests/test_community_*.py',
                 'tests/test_community_*.mjs', 'tests/community_*.cjs',
                 'tests/community_platform_image_startup.py',
                 'tests/community_license_runtime_checks.py',
@@ -93,7 +94,8 @@ def build(root):
     required = {'tests/test_community_license_address_boundary.py',
                 'tests/fixtures/license_address_stop_rows.json',
     'tests/fixtures/license_target_no_separator_rows.json',
-                'services/ocr_engine/api.py', 'deploy/community-preview/ocr-id-back-api.patch',
+                'services/ocr_engine/api.py', 'services/ocr_engine/secure_store.py',
+                'deploy/community-preview/ocr-recovery-api-store.patch', 'deploy/community-preview/ocr-id-back-api.patch',
                 'scripts/community_identity_layout.py', 'tests/test_community_identity_layout.py', 'tests/test_community_document_orientation.py',
                 'tests/test_community_id_back_contract.py','docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'scripts/community_preview_fixed_product.py', 'scripts/community_mini_r1_input.py', 'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
                 'scripts/community_preview_readiness.py',
@@ -206,6 +208,20 @@ def build(root):
                 'demos/community-stage/review-native.js'}
     if not required.issubset(files):
         raise ValueError('REQUIRED_SOURCE_MISSING')
+    # Preserve the exact approved successor pair and its upstream patch evidence.
+    # A complete ZIP must be usable by the original offline image-input preparer.
+    lock = json.loads(files['scripts/community_ocr_dependency.json'])
+    successor = lock.get('local_successor', {})
+    sources = {'api.py':'services/ocr_engine/api.py',
+               'secure_store.py':'services/ocr_engine/secure_store.py'}
+    patch = 'deploy/community-preview/ocr-recovery-api-store.patch'
+    if successor.get('source_files') != sources or successor.get('patch_path') != patch:
+        raise ValueError('OCR_SUCCESSOR_PACKAGE_BINDING_MISMATCH')
+    for name, relative in sources.items():
+        if hashlib.sha256(files[relative]).hexdigest() != lock.get('files', {}).get(name):
+            raise ValueError('OCR_SUCCESSOR_SOURCE_HASH_MISMATCH')
+    if hashlib.sha256(files[patch]).hexdigest() != successor.get('patch_sha256'):
+        raise ValueError('OCR_SUCCESSOR_PATCH_HASH_MISMATCH')
     manifest = {'format': 1, 'purpose':'OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE',
                 'production_payment':'HOLD', 'production_deployment':'HOLD',
                 'files':{name:hashlib.sha256(data).hexdigest() for name,data in files.items()}}

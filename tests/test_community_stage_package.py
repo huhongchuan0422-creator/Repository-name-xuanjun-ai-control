@@ -47,6 +47,8 @@ class SourcePackage(unittest.TestCase):
             self.assertEqual(manifest['files'][bill],hashlib.sha256(bill_raw).hexdigest())
             self.assertIn('tests/test_community_bill_contract_evidence.py',manifest['files'])
             required_pages=(
+                'services/ocr_engine/secure_store.py',
+                'deploy/community-preview/ocr-recovery-api-store.patch',
                 'tests/test_community_license_address_boundary.py',
                 'tests/fixtures/license_address_stop_rows.json',
                 'tests/fixtures/license_target_no_separator_rows.json',
@@ -165,5 +167,29 @@ class SourcePackage(unittest.TestCase):
                     (Path(tmp)/missing).unlink()
                     with self.assertRaisesRegex(ValueError,'REQUIRED_SOURCE_MISSING'):
                         build(Path(tmp))
+
+    def test_ocr_successor_package_is_exact_and_tampering_is_rejected(self):
+        data,_=build(Path(__file__).resolve().parents[1])
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            lock=json.loads(archive.read('scripts/community_ocr_dependency.json'))
+            self.assertEqual(lock['local_successor']['source_files'],{
+                'api.py':'services/ocr_engine/api.py','secure_store.py':'services/ocr_engine/secure_store.py'})
+            patch='deploy/community-preview/ocr-recovery-api-store.patch'
+            self.assertEqual(lock['local_successor']['patch_path'],patch)
+            for name,relative in lock['local_successor']['source_files'].items():
+                self.assertEqual(hashlib.sha256(archive.read(relative)).hexdigest(),lock['files'][name])
+            self.assertEqual(hashlib.sha256(archive.read(patch)).hexdigest(),lock['local_successor']['patch_sha256'])
+            for relative,error in [('services/ocr_engine/secure_store.py','OCR_SUCCESSOR_SOURCE_HASH_MISMATCH'),
+                                   ('services/ocr_engine/api.py','OCR_SUCCESSOR_SOURCE_HASH_MISMATCH'),
+                                   (patch,'OCR_SUCCESSOR_PATCH_HASH_MISMATCH')]:
+                with self.subTest(relative=relative),tempfile.TemporaryDirectory() as tmp:
+                    archive.extractall(tmp);target=Path(tmp)/relative
+                    target.write_bytes(target.read_bytes()+b'\n# synthetic tamper\n')
+                    with self.assertRaisesRegex(ValueError,error):build(tmp)
+            with tempfile.TemporaryDirectory() as tmp:
+                archive.extractall(tmp);target=Path(tmp)/'scripts/community_ocr_dependency.json'
+                changed=json.loads(target.read_text());changed['local_successor']['source_files']['secure_store.py']='services/ocr_engine/unapproved.py'
+                target.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError,'OCR_SUCCESSOR_PACKAGE_BINDING_MISMATCH'):build(tmp)
 
 if __name__=='__main__':unittest.main()
