@@ -49,6 +49,7 @@ class SourcePackage(unittest.TestCase):
             required_pages=(
                 'tests/test_community_license_address_boundary.py',
                 'tests/fixtures/license_address_stop_rows.json',
+                'tests/fixtures/license_target_no_separator_rows.json',
                 'clients/community-mini/app.wxss',
                 'clients/community-mini/assets/community-demo-storefront-v1.jpg',
                 'deploy/community-preview/Dockerfile',

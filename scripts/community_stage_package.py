@@ -19,6 +19,7 @@ def build(root):
                 'tests/fixtures/community_license_label_noise_geometry.json',
                 'tests/fixtures/community_license_layout_heldout.json',
                 'tests/fixtures/license_address_stop_rows.json',
+    'tests/fixtures/license_target_no_separator_rows.json',
                 'scripts/community_ocr_resource_acceptance.sh',
                 'tests/fixtures/community_ocr_resource_images.json',
                 'tests/fixtures/community_license_layout/columns-0.json',
@@ -91,6 +92,7 @@ def build(root):
         files[path.relative_to(root).as_posix()] = path.read_bytes()
     required = {'tests/test_community_license_address_boundary.py',
                 'tests/fixtures/license_address_stop_rows.json',
+    'tests/fixtures/license_target_no_separator_rows.json',
                 'services/ocr_engine/api.py', 'deploy/community-preview/ocr-id-back-api.patch',
                 'scripts/community_identity_layout.py', 'tests/test_community_identity_layout.py', 'tests/test_community_document_orientation.py',
                 'tests/test_community_id_back_contract.py','docs/development/COMMUNITY_FIXED_PRODUCT_PREVIEW_20261028.md', 'scripts/community_preview_fixed_product.py', 'scripts/community_mini_r1_input.py', 'scripts/community_stage_local.py', 'scripts/community_stage_runtime.py',
@@ -114,6 +116,7 @@ def build(root):
                 'tests/fixtures/community_license_label_noise_geometry.json',
                 'tests/fixtures/community_license_layout_heldout.json',
                 'tests/fixtures/license_address_stop_rows.json',
+    'tests/fixtures/license_target_no_separator_rows.json',
                 'scripts/community_ocr_resource_acceptance.sh',
                 'tests/fixtures/community_ocr_resource_images.json',
                 'tests/fixtures/community_license_layout/columns-0.json',

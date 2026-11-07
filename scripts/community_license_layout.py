@@ -8,7 +8,7 @@ import math
 from bisect import bisect_left
 import re
 
-VERSION = 'community.license-layout.v3-stop-row-boundaries'
+VERSION = 'community.license-layout.v4-target-row-boundaries'
 LABELS = {
     'company_name': ('个体工商户名称', '企业名称', '名称'),
     'credit_code': ('统一社会信用代码', '社会信用代码'),
@@ -134,6 +134,73 @@ def _label_fragment(text):
     return re.sub(r'\s+', '', text).strip(LABEL_DECORATIONS)
 
 
+def _recover_target_rows(nodes, aliases, pattern):
+    """Recover OCR-lost label separators using independent field-column evidence.
+
+    Never search inside a value, infer missing text, or apply this business-license
+    fallback to the shared identity-document mapper. Strict parsing stays intact.
+    """
+    if aliases != ALIASES:
+        return
+    # Explicit labels own their fields; a keyword-only row must not override
+    # that established ownership. Recovery never supplies its own strict evidence.
+    strict_nodes = {id(n) for n in nodes if n['parts']}
+    established = {k for n in nodes for k,v in n['parts'] if k is not None}
+    prefixes = []
+    for node in nodes:
+        if node['b'] is None or node['b'][2]-node['b'][0] < _h(node):
+            continue
+        match = pattern.match(node['text'])
+        if not match:
+            # OCR can render the horizontal stroke in 统一 as a dash. Keep this
+            # narrowly contextual: an exact remaining credit-label suffix and
+            # complete existing credit format are required; no value is edited.
+            dash = re.match(r'^统\s*[-—–－]\s*', node['text'])
+            match = pattern.match(node['text'], dash.end()) if dash else None
+            if (not match or re.sub(r'\s+', '', match.group()) != '社会信用代码' or
+                    not CREDIT.fullmatch(node['text'][match.end():].strip(' ：:').upper().replace(' ', ''))):
+                continue
+        key = aliases[re.sub(r'\s+', '', match.group())]
+        tail = node['text'][match.end():].lstrip(' ：:')
+        if key is not None and tail:
+            prefixes.append((node, key, tail))
+    # Process visual order, never OCR array order, so a newly recovered address
+    # owns its continuation rows before their prefixes can become false fields.
+    for node, key, tail in sorted(prefixes, key=lambda item: (_cy(item[0]), item[0]['b'][0])):
+        if node['parts'] or key in established:
+            continue
+        column = [(n,k,v) for n,k,v in prefixes if
+            abs(n['b'][0]-node['b'][0]) <= min(_h(n),_h(node))*.5 and
+            abs(_cy(n)-_cy(node)) <= min(_h(n),_h(node))*12]
+        # A complete credit-code row plus two other distinct target labels is
+        # strong form evidence even when all printed separators disappeared.
+        # Alternatively two independently strict target rows corroborate it.
+        keys = {k for n,k,v in column}
+        code = any(k == 'credit_code' and CREDIT.fullmatch(v.upper().replace(' ', '')) for n,k,v in column)
+        strict = {k for n,k,v in column if n is not node and id(n) in strict_nodes}
+        if not ((code and len(keys) >= 3) or len(strict-{key}) >= 2):
+            continue
+        # A prefixed name below its explicit label, or a prefixed road name
+        # continuing an address, is still a value. Do not strip it a second time.
+        cursor = node
+        prior = None
+        seen = {id(node)}
+        while True:
+            above = [n for n in nodes if id(n) not in seen and n['b'] is not None and
+                0 < _cy(cursor)-_cy(n) <= max(_h(cursor),_h(n))*2.8 and
+                n['b'][0]-_h(n)*.5 <= cursor['b'][0] <= n['b'][2]+_h(n)]
+            if not above:
+                break
+            cursor = max(above, key=_cy)
+            seen.add(id(cursor))
+            if cursor['parts']:
+                prior = cursor
+                break
+        if prior and any(k == 'registered_address' or (k == key and not v) for k,v in prior['parts']):
+            continue
+        node['parts'] = [(key, tail)]
+
+
 def _label_nodes(rows, turn, aliases, pattern):
     nodes = [dict(n, b=_bounds(n['box'], turn) if n['box'] is not None else None,
                   parts=_parts(n['text'], aliases, pattern)) for n in rows]
@@ -203,6 +270,7 @@ def _label_nodes(rows, turn, aliases, pattern):
                     abs(node['b'][0]-other['b'][0]) <= height*.5):
                 node['parts'] = [(None, '')]
                 break
+    _recover_target_rows(nodes, aliases, pattern)
     return nodes
 
 
