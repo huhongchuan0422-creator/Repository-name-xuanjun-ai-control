@@ -2,7 +2,7 @@
 import hashlib,json,multiprocessing,os,sqlite3,tempfile,unittest
 from email.message import Message
 from scripts.pr122_customer_core import Center,Unavailable
-from scripts.community_mail_delivery import (MailDelivery,ProviderBinding,ProviderHTTPTransport,ProviderSMTPTransport,RESEND_CEILINGS,_NoRedirect,build_mail_configuration,install,optional_mail_configuration)
+from scripts.community_mail_delivery import (MailDelivery,ProviderBinding,ProviderHTTPTransport,ProviderSMTPTransport,RESEND_CEILINGS,_NoRedirect,_PinnedHTTPSConnection,build_mail_configuration,install,optional_mail_configuration)
 from scripts.community_web_session import WebSession
 from unittest.mock import patch
 _original_connect=sqlite3.connect
@@ -46,7 +46,7 @@ class Contract(unittest.TestCase):
         self.c.mail_ready=True;self.c.register('legacy@example.org','InitialPassword123!');row,payload=self.outbox('VERIFY');self.c.verify(payload['token'],'InitialPassword123!');uid=self.c.login('legacy@example.org','InitialPassword123!')['user_id'];d=install(self.c);self.assertFalse(d.ready);self.assertEqual(set(d.provider_state.values()),{'NOT_CONFIGURED'});self.assertFalse(self.c.mail_ready);self.assertEqual(self.c.login('legacy@example.org','InitialPassword123!')['user_id'],uid)
         with self.assertRaisesRegex(Unavailable,'VERIFICATION_CHANNEL_PENDING'):self.c.register('none@example.org','InitialPassword123!')
     def test_v1_reservations_migrate_into_account_and_shared_pool_events(self):
-        self.c.db.executescript("CREATE TABLE mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);CREATE TABLE mail_reservations(attempt_id TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,window_name TEXT NOT NULL,window_start INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,window_name,window_start));");self.c.db.execute("INSERT INTO mail_provider_attempts VALUES('old','old-message','Resend','resend-account','ACCEPTED','old-ref','legacy',?,?)",(self.now,self.now));self.c.db.execute("INSERT INTO mail_reservations VALUES('old','Resend','resend-account','daily',?,'COUNTED')",(self.now,));install(self.c,[binding('Resend',account='resend-account',scope='shared')],{'Resend':FakeTransport()});events=self.c.db.execute("SELECT quota_kind,scope_key,state FROM mail_quota_events WHERE attempt_id='old' ORDER BY quota_kind").fetchall();self.assertEqual([(r[0],r[1],r[2]) for r in events],[('ACCOUNT','Resend:resend-account','COUNTED'),('POOL','shared','COUNTED')]);self.assertEqual(self.c.db.execute("SELECT v FROM settings WHERE k='mail_schema_version'").fetchone()[0],'3');self.assertEqual(len(self.c.db.execute("SELECT submission_key FROM mail_provider_attempts WHERE id='old'").fetchone()[0]),64)
+        self.c.db.executescript("CREATE TABLE mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);CREATE TABLE mail_reservations(attempt_id TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,window_name TEXT NOT NULL,window_start INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,window_name,window_start));");self.c.db.execute("INSERT INTO mail_provider_attempts VALUES('old','old-message','Resend','resend-account','ACCEPTED','old-ref','legacy',?,?)",(self.now,self.now));self.c.db.execute("INSERT INTO mail_reservations VALUES('old','Resend','resend-account','daily',?,'COUNTED')",(self.now,));install(self.c,[binding('Resend',account='resend-account',scope='shared')],{'Resend':FakeTransport()});events=self.c.db.execute("SELECT quota_kind,scope_key,state FROM mail_quota_events WHERE attempt_id='old' ORDER BY quota_kind").fetchall();self.assertEqual([(r[0],r[1],r[2]) for r in events],[('ACCOUNT','Resend:resend-account','COUNTED'),('POOL','shared','COUNTED')]);row=self.c.db.execute("SELECT submission_key,first_submitted_at,idempotency_expires_at,idempotency_policy FROM mail_provider_attempts WHERE id='old'").fetchone();self.assertEqual(self.c.db.execute("SELECT v FROM settings WHERE k='mail_schema_version'").fetchone()[0],'4');self.assertEqual((len(row[0]),row[1],row[2],row[3]),(64,self.now,self.now+86400,'SAFE_REPLAY_24H'))
     def test_same_code_no_expiry_extension_and_identity_flows(self):
         self.configured();self.c.register('person@example.org','InitialPassword123!');r1,p1=self.outbox('VERIFY');token_hash=hashlib.sha256(p1['token'].encode()).hexdigest();e1=self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(token_hash,)).fetchone()[0];self.now+=300;self.c.register('person@example.org','OtherPassword123!');r2,p2=self.outbox('VERIFY');self.assertEqual((p1['token'],e1),(p2['token'],self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(token_hash,)).fetchone()[0]));self.now=e1;self.c.register('person@example.org','OtherPassword123!');_,p3=self.outbox('VERIFY');self.assertNotEqual(p1['token'],p3['token']);self.c.verify(p3['token'],'InitialPassword123!');session=self.c.login('person@example.org','InitialPassword123!');self.c.request_reset('person@example.org');_,reset1=self.outbox('RESET');expiry=self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(hashlib.sha256(reset1['token'].encode()).hexdigest(),)).fetchone()[0];self.now+=1;self.c.request_reset('person@example.org');_,reset2=self.outbox('RESET');self.assertEqual(reset1['token'],reset2['token']);self.assertEqual(expiry,self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(hashlib.sha256(reset2['token'].encode()).hexdigest(),)).fetchone()[0]);self.c.reset(reset2['token'],'ResetPassword123!');service=WebSession(self.c);result,cookie=service.dispatch('/community/session/login',Message(),{'email':'person@example.org','password':'ResetPassword123!'},'fixture');headers=Message();headers['Cookie']=cookie.split(';')[0];headers['X-CSRF-Token']=result['csrf'];service.dispatch('/community/session/password',headers,{'current_password':'ResetPassword123!','new_password':'ChangedPassword123!'},'fixture');self.assertEqual(self.c.login('person@example.org','ChangedPassword123!')['user_id'],session['user_id'])
     def test_shared_pool_blocks_cross_provider_bypass_but_independent_pool_switches(self):
@@ -138,9 +138,76 @@ class Contract(unittest.TestCase):
         def crash(attempt_id,submission_key,result):raise Crash()
         d=MailDelivery(self.c.db,[b],{'Resend':first},clock=lambda:self.now,after_submit=crash)
         with self.assertRaises(Crash):d.send('accepted-crash',{})
-        row=self.c.db.execute("SELECT submission_key,outcome FROM mail_provider_attempts WHERE message_key='accepted-crash'").fetchone();self.assertEqual(row['outcome'],'INFLIGHT');self.assertEqual(len(row['submission_key']),64)
+        row=self.c.db.execute("SELECT submission_key,outcome FROM mail_provider_attempts WHERE message_key='accepted-crash'").fetchone();self.assertEqual(row['outcome'],'INFLIGHT');self.assertEqual(len(row['submission_key']),36);__import__('uuid').UUID(row['submission_key'])
         self.c.db.close();self.c=Center(self.tmp.name,KEY,'testkey',clock=lambda:self.now);second=DedupeTransport(server);restarted=MailDelivery(self.c.db,[b],{'Resend':second},clock=lambda:self.now)
         result=restarted.send('accepted-crash',{});self.assertEqual(result['state'],'ACCEPTED');self.assertEqual(first.calls,second.calls);self.assertEqual(len(server),1);self.assertEqual(self.c.db.execute("SELECT count(*) FROM mail_provider_attempts WHERE message_key='accepted-crash'").fetchone()[0],1)
+
+    def test_brevo_uuid_body_contract_and_accepted_crash_holds(self):
+        calls=[]
+        def opener(request,timeout):
+            calls.append(request)
+            if request.full_url.endswith('/v3/account'):return Response({'email':'fixture'})
+            return Response({'messageId':'brevo-once'})
+        resolver=lambda ref,p,a:{'secret':'fixture-secret','limits':{'daily':100},'pool_limits':{'daily':100}}
+        config={'version':1,'endpoint_allowlist':[ENDPOINTS['Brevo']],'bindings':[{'provider':'Brevo','account_id':'b1','transport':'HTTP','endpoint':ENDPOINTS['Brevo'],'quota_scope':'brevo-pool','from_address':'sender@example.org','secret_ref':'secretref:///fixture/brevo'}]}
+        bindings,transports=build_mail_configuration(config,resolver,opener,address_resolver=PUBLIC_DNS)
+        class Crash(BaseException):pass
+        def crash(attempt_id,submission_key,result):raise Crash()
+        delivery=MailDelivery(self.c.db,bindings,transports,clock=lambda:self.now,after_submit=crash);message={'email':'x@example.org','kind':'RESET','code':'123'}
+        with self.assertRaises(Crash):delivery.send('brevo-crash',message)
+        request=calls[-1];body=json.loads(request.data.decode());key=body['headers']['idempotencyKey'];__import__('uuid').UUID(key)
+        self.assertEqual(len(key),36);self.assertNotIn('Idempotency-key',dict(request.header_items()))
+        row=self.c.db.execute("SELECT first_submitted_at,idempotency_expires_at,idempotency_policy FROM mail_provider_attempts WHERE message_key='brevo-crash'").fetchone();self.assertEqual((row[1]-row[0],row[2]),(1800,'HOLD_RECONCILE_30M'))
+        self.c.db.close();self.c=Center(self.tmp.name,KEY,'testkey',clock=lambda:self.now);restarted=MailDelivery(self.c.db,bindings,transports,clock=lambda:self.now)
+        self.assertEqual(restarted.send('brevo-crash',message)['state'],'INFLIGHT');self.assertEqual(len(calls),2)
+
+    def test_resend_replay_ttl_boundaries_restart_and_clock_fail_hold(self):
+        class Crash(BaseException):pass
+        message={'email':'x@example.org','kind':'VERIFY','code':'123'}
+        for offset,replays in ((86399,True),(86400,False),(86401,False),(-1,False)):
+            directory=tempfile.TemporaryDirectory();now=[1794000000];center=Center(directory.name,KEY,'testkey',clock=lambda:now[0]);transport=FakeTransport()
+            def crash(attempt_id,submission_key,result):raise Crash()
+            delivery=MailDelivery(center.db,[binding()],{'Resend':transport},clock=lambda:now[0],after_submit=crash);key='ttl-'+str(offset)
+            with self.assertRaises(Crash):delivery.send(key,message)
+            row=center.db.execute('SELECT first_submitted_at,idempotency_expires_at,idempotency_policy FROM mail_provider_attempts WHERE message_key=?',(key,)).fetchone();self.assertEqual((row[0],row[1],row[2]),(now[0],now[0]+86400,'SAFE_REPLAY_24H'))
+            center.db.close();now[0]=1794000000+offset;center=Center(directory.name,KEY,'testkey',clock=lambda:now[0]);restarted=MailDelivery(center.db,[binding()],{'Resend':transport},clock=lambda:now[0]);result=restarted.send(key,message)
+            self.assertEqual((result['state'],len(transport.submissions)),('ACCEPTED',2) if replays else ('INFLIGHT',1));center.db.close();directory.cleanup()
+        directory=tempfile.TemporaryDirectory();now=[1794000000];center=Center(directory.name,KEY,'testkey',clock=lambda:now[0]);transport=FakeTransport()
+        def crash_unknown(attempt_id,submission_key,result):raise Crash()
+        delivery=MailDelivery(center.db,[binding()],{'Resend':transport},clock=lambda:now[0],after_submit=crash_unknown)
+        with self.assertRaises(Crash):delivery.send('ttl-missing-clock',message)
+        center.db.close();center=Center(directory.name,KEY,'testkey',clock=lambda:now[0]);restarted=MailDelivery(center.db,[binding()],{'Resend':transport},clock=lambda:None)
+        self.assertEqual(restarted.send('ttl-missing-clock',message)['state'],'INFLIGHT');self.assertEqual(len(transport.submissions),1);center.db.close();directory.cleanup()
+
+    def test_pinned_dns_single_resolution_sni_host_and_peer_validation(self):
+        events=[];resolutions=[]
+        class Connection:
+            def __init__(self,host,port,pinned_ip,context,timeout):self.peer_ip=pinned_ip;events.append(('CONNECT',host,port,pinned_ip,timeout))
+            def request(self,method,path,body=None,headers=None):events.append(('REQUEST',method,path,headers.get('Host')))
+            def getresponse(self):return Response({'data':[]})
+            def close(self):events.append(('CLOSE',))
+        def resolver(host,port,family,socktype):
+            resolutions.append(host)
+            return [(2,socktype,6,'',(('93.184.216.34' if len(resolutions)==1 else '127.0.0.1'),port))]
+        transport=ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],address_resolver=resolver,connection_factory=Connection);transport.authenticate()
+        self.assertEqual(resolutions,['api.resend.com']);self.assertIn(('CONNECT','api.resend.com',443,'93.184.216.34',20),events);self.assertIn(('REQUEST','GET','/domains?limit=1','api.resend.com'),events)
+        mixed=lambda host,port,family,socktype:[(2,socktype,6,'',('93.184.216.34',port)),(2,socktype,6,'',('127.0.0.1',port))]
+        with self.assertRaisesRegex(ValueError,'PUBLIC_PROVIDER_ADDRESS'):ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],address_resolver=mixed,connection_factory=Connection).authenticate()
+        class WrongPeer(Connection):
+            def __init__(self,*args):Connection.__init__(self,*args);self.peer_ip='93.184.216.35'
+        with self.assertRaisesRegex(ValueError,'PROVIDER_PEER_MISMATCH'):ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],address_resolver=PUBLIC_DNS,connection_factory=WrongPeer).authenticate()
+        raw=[]
+        class Raw:
+            def close(self):raw.append('CLOSE')
+        class TLS:
+            def getpeername(self):return ('93.184.216.34',443)
+        class Context:
+            verify_mode=2
+            check_hostname=True
+            def wrap_socket(self,sock,server_hostname=None):raw.append(('SNI',server_hostname));return TLS()
+        with patch('scripts.community_mail_delivery.socket.create_connection',side_effect=lambda target,timeout,source:raw.append(('SOCKET',target)) or Raw()):
+            connection=_PinnedHTTPSConnection('api.resend.com',443,'93.184.216.34',Context(),20);connection.connect()
+        self.assertIn(('SOCKET',('93.184.216.34',443)),raw);self.assertIn(('SNI','api.resend.com'),raw);self.assertEqual(connection.peer_ip,'93.184.216.34')
 
     def test_missing_secretref_is_not_configured_and_cli_passes_fake_resolver(self):
         config={'version':1,'endpoint_allowlist':[ENDPOINTS['Resend']],'bindings':[{'provider':'Resend','account_id':'r1','transport':'HTTP','endpoint':ENDPOINTS['Resend'],'quota_scope':'pool','from_address':'sender@example.org','secret_ref':'missing-not-secretref'}]}

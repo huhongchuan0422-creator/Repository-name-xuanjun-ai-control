@@ -1,6 +1,7 @@
 """Durable mail providers, shared quota, and original-Center integration."""
 import calendar
 import hashlib
+import http.client
 import ipaddress
 import json
 import math
@@ -10,10 +11,11 @@ import smtplib
 import ssl
 import time
 import types
+import uuid
 from email.message import EmailMessage
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, Request
 
 PROVIDERS=('Resend','SMTP2GO','Brevo')
 ATTEMPT_STATES=('INFLIGHT','NOT_SUBMITTED','DEFINITE_REJECTED','ACCEPTED','UNKNOWN','DELIVERED')
@@ -24,7 +26,7 @@ HTTP_ENDPOINTS={'Resend':'https://api.resend.com','SMTP2GO':'https://api.smtp2go
 SMTP_ENDPOINTS={'SMTP2GO':('smtp.smtp2go.com:465','smtp.smtp2go.com:587'),'Brevo':('smtp-relay.brevo.com:465','smtp-relay.brevo.com:587')}
 DDL='''
 CREATE TABLE IF NOT EXISTS mail_idempotency(message_key TEXT PRIMARY KEY,payload_sha256 TEXT NOT NULL,state TEXT NOT NULL,provider TEXT,attempt_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,submission_key TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,detail_sha256 TEXT,quota_scope TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,submission_key TEXT NOT NULL,first_submitted_at INTEGER,idempotency_expires_at INTEGER,idempotency_policy TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,detail_sha256 TEXT,quota_scope TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mail_reconciliation(attempt_id TEXT PRIMARY KEY,provider TEXT NOT NULL,next_check INTEGER NOT NULL,checks INTEGER NOT NULL DEFAULT 0,last_error TEXT);
 CREATE TABLE IF NOT EXISTS mail_quota_scopes(quota_kind TEXT NOT NULL,scope_key TEXT NOT NULL,window_name TEXT NOT NULL,ceiling INTEGER NOT NULL,PRIMARY KEY(quota_kind,scope_key,window_name));
 CREATE TABLE IF NOT EXISTS mail_quota_events(attempt_id TEXT NOT NULL,quota_kind TEXT NOT NULL,scope_key TEXT NOT NULL,window_name TEXT NOT NULL,event_at INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,quota_kind,scope_key,window_name));
@@ -70,7 +72,31 @@ def _public_addresses(host,port,resolver):
             raise ValueError('PUBLIC_PROVIDER_ADDRESS_REQUIRED')
         addresses.add(str(ip))
     if not addresses:raise ValueError('PROVIDER_DNS_RESOLUTION_REQUIRED')
-    return addresses
+    return tuple(sorted(addresses,key=lambda value:(ipaddress.ip_address(value).version,value)))
+
+def _public_ip(value):
+    try:ip=ipaddress.ip_address(value)
+    except ValueError:raise ValueError('PROVIDER_PEER_ADDRESS_REQUIRED') from None
+    if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+            or ip.is_unspecified or ip.is_multicast):raise ValueError('PUBLIC_PROVIDER_PEER_REQUIRED')
+    return str(ip)
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """Connect to one validated IP while retaining hostname TLS identity."""
+    def __init__(self,hostname,port,pinned_ip,context,timeout):
+        http.client.HTTPSConnection.__init__(self,hostname,port,timeout=timeout,context=context)
+        self.pinned_ip=_public_ip(pinned_ip);self.peer_ip=None
+    def connect(self):
+        sock=socket.create_connection((self.pinned_ip,self.port),self.timeout,self.source_address)
+        try:
+            self.sock=self._context.wrap_socket(sock,server_hostname=self.host)
+            peer=_public_ip(self.sock.getpeername()[0])
+            if peer!=self.pinned_ip:raise ValueError('PROVIDER_PEER_MISMATCH')
+            self.peer_ip=peer
+        except BaseException:
+            if self.sock is not None:self.sock.close()
+            else:sock.close()
+            raise
 
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,request,fp,code,message,headers,newurl):return None
@@ -85,28 +111,38 @@ class ProviderBinding:
         if type(quota_scope) is not str or not quota_scope or type(from_address) is not str or '@' not in from_address:raise ValueError('EXPLICIT_QUOTA_SCOPE_AND_SENDER_REQUIRED')
 
 class ProviderHTTPTransport:
-    def __init__(self,provider,endpoint,secret,allowlist,opener=None,address_resolver=None):
-        _endpoint(provider,'HTTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint.rstrip('/');self._secret=secret;self._opener=opener or build_opener(ProxyHandler({}),_NoRedirect()).open;self._resolver=address_resolver or socket.getaddrinfo;self._authenticated=False
-        self.idempotent_submission=provider in ('Resend','Brevo')
+    def __init__(self,provider,endpoint,secret,allowlist,opener=None,address_resolver=None,connection_factory=None):
+        _endpoint(provider,'HTTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint.rstrip('/');self._secret=secret;self._opener=opener;self._resolver=address_resolver or socket.getaddrinfo;self._connection_factory=connection_factory or _PinnedHTTPSConnection;self._authenticated=False
+        self.idempotent_submission=provider=='Resend';self.idempotency_policy='SAFE_REPLAY_24H' if provider=='Resend' else ('HOLD_RECONCILE_30M' if provider=='Brevo' else 'HOLD_RECONCILE')
         if type(secret) is not str or not secret:raise ValueError('SECRETREF_RESOLUTION_REQUIRED')
     def _headers(self,submission_key=None):
         if self.provider=='Resend':headers={'Authorization':'Bearer '+self._secret,'Content-Type':'application/json'}
         elif self.provider=='SMTP2GO':headers={'X-Smtp2go-Api-Key':self._secret,'Content-Type':'application/json'}
         else:headers={'api-key':self._secret,'Content-Type':'application/json'}
         if submission_key and self.provider=='Resend':headers['Idempotency-Key']=submission_key
-        if submission_key and self.provider=='Brevo':headers['idempotency-key']=submission_key
         return headers
     def _validate_url(self,url):
         parsed=urlparse(url);base=urlparse(self.endpoint)
         if (parsed.scheme,parsed.hostname,parsed.port or 443)!=(base.scheme,base.hostname,base.port or 443):raise ValueError('PROVIDER_FINAL_URL_DENIED')
-        _public_addresses(parsed.hostname,parsed.port or 443,self._resolver)
     def _call(self,method,path,payload=None,submission_key=None):
         url=self.endpoint+path;self._validate_url(url)
-        raw=None if payload is None else json.dumps(payload,separators=(',',':')).encode();response=self._opener(Request(url,data=raw,headers=self._headers(submission_key),method=method),timeout=20)
-        status=getattr(response,'status',getattr(response,'code',200))
+        parsed=urlparse(url);addresses=_public_addresses(parsed.hostname,parsed.port or 443,self._resolver);pinned_ip=addresses[0]
+        raw=None if payload is None else json.dumps(payload,separators=(',',':')).encode();headers=self._headers(submission_key)
+        if self._opener is not None:
+            response=self._opener(Request(url,data=raw,headers=headers,method=method),timeout=20)
+            status=getattr(response,'status',getattr(response,'code',200));final=response.geturl() if hasattr(response,'geturl') else url;body=response.read()
+        else:
+            headers['Host']=parsed.hostname
+            connection=self._connection_factory(parsed.hostname,parsed.port or 443,pinned_ip,ssl.create_default_context(),20)
+            try:
+                connection.request(method,path,body=raw,headers=headers)
+                response=connection.getresponse();peer=_public_ip(connection.peer_ip)
+                if peer!=pinned_ip:raise ValueError('PROVIDER_PEER_MISMATCH')
+                status=getattr(response,'status',getattr(response,'code',200));body=response.read()
+            finally:connection.close()
+            final=url
         if 300<=status<400:raise HTTPError(url,status,'PROVIDER_REDIRECT_DENIED',getattr(response,'headers',{}),None)
-        final=response.geturl() if hasattr(response,'geturl') else url;self._validate_url(final or url)
-        body=response.read();return json.loads(body.decode()) if body else {}
+        self._validate_url(final or url);return json.loads(body.decode()) if body else {}
     def authenticate(self):
         paths={'Resend':'/domains?limit=1','SMTP2GO':'/v3/stats/email_summary','Brevo':'/v3/account'}
         self._call('GET' if self.provider!='SMTP2GO' else 'POST',paths[self.provider],{} if self.provider=='SMTP2GO' else None);self._authenticated=True;return True
@@ -114,7 +150,7 @@ class ProviderHTTPTransport:
     def submit(self,binding,message,attempt_id,submission_key):
         payload={'from':binding.from_address,'to':[message['email']],'subject':message.get('subject',message['kind']),'text':message.get('text',message['code'])}
         paths={'Resend':'/emails','SMTP2GO':'/v3/email/send','Brevo':'/v3/smtp/email'}
-        if self.provider=='Brevo':payload={'sender':{'email':binding.from_address},'to':[{'email':message['email']}],'subject':payload['subject'],'textContent':payload['text']}
+        if self.provider=='Brevo':payload={'sender':{'email':binding.from_address},'to':[{'email':message['email']}],'subject':payload['subject'],'textContent':payload['text'],'headers':{'idempotencyKey':submission_key}}
         try:data=self._call('POST',paths[self.provider],payload,submission_key)
         except HTTPError as error:
             if error.code==429:return {'outcome':'NOT_SUBMITTED','detail_code':'RATE_LIMITED'}
@@ -146,6 +182,7 @@ class ProviderSMTPTransport:
         _endpoint(provider,'SMTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint;self.username=username;self._password=password;self._factory=smtp_factory;self._receipt_lookup=receipt_lookup;self._authenticated=False
         if not username or not password:raise ValueError('SECRETREF_RESOLUTION_REQUIRED')
         self.idempotent_submission=False
+        self.idempotency_policy='HOLD_RECONCILE'
     def _connect(self):
         host,raw=self.endpoint.rsplit(':',1);port=int(raw);context=ssl.create_default_context()
         if port==465:
@@ -235,13 +272,17 @@ class MailDelivery:
     def _migrate(self):
         self.db.executescript(DDL)
         columns={r[1] for r in self.db.execute('PRAGMA table_info(mail_provider_attempts)')}
-        for name,kind in (('detail_sha256','TEXT'),('quota_scope','TEXT'),('submission_key','TEXT')):
+        for name,kind in (('detail_sha256','TEXT'),('quota_scope','TEXT'),('submission_key','TEXT'),('first_submitted_at','INTEGER'),('idempotency_expires_at','INTEGER'),('idempotency_policy','TEXT')):
             if name not in columns:self.db.execute('ALTER TABLE mail_provider_attempts ADD COLUMN '+name+' '+kind)
         for row in self.db.execute('SELECT id FROM mail_provider_attempts WHERE submission_key IS NULL').fetchall():
             self.db.execute('UPDATE mail_provider_attempts SET submission_key=? WHERE id=?',(_sha('submission|'+row[0]),row[0]))
+        self.db.execute("UPDATE mail_provider_attempts SET first_submitted_at=created WHERE first_submitted_at IS NULL")
+        self.db.execute("UPDATE mail_provider_attempts SET idempotency_policy=CASE provider WHEN 'Resend' THEN 'SAFE_REPLAY_24H' WHEN 'Brevo' THEN 'HOLD_RECONCILE_30M' ELSE 'HOLD_RECONCILE' END WHERE idempotency_policy IS NULL")
+        self.db.execute("UPDATE mail_provider_attempts SET idempotency_expires_at=first_submitted_at+86400 WHERE provider='Resend' AND idempotency_expires_at IS NULL")
+        self.db.execute("UPDATE mail_provider_attempts SET idempotency_expires_at=first_submitted_at+1800 WHERE provider='Brevo' AND idempotency_expires_at IS NULL")
         self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS mail_provider_submission_unique ON mail_provider_attempts(provider,submission_key)')
         self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS mail_message_submission_unique ON mail_provider_attempts(message_key,provider,submission_key)')
-        self.db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES('mail_schema_version','3')")
+        self.db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES('mail_schema_version','4')")
     @property
     def ready(self):return bool(self.bindings)
     @property
@@ -271,6 +312,11 @@ class MailDelivery:
             self.db.commit()
         except BaseException:self.db.rollback();raise
     def _transport(self,binding):return self.transports.get((binding.provider,binding.account_id)) or self.transports.get(binding.provider)
+    def _idempotency(self,binding,now):
+        if binding.transport=='HTTP' and binding.provider=='Resend':return 'SAFE_REPLAY_24H',now+86400
+        if binding.transport=='HTTP' and binding.provider=='Brevo':return 'HOLD_RECONCILE_30M',now+1800
+        return 'HOLD_RECONCILE',None
+
     def _ceiling(self,binding,name,limit,kind):
         value=math.floor(limit*.9)
         if kind=='ACCOUNT' and binding.provider=='Resend' and name in RESEND_CEILINGS:value=min(value,RESEND_CEILINGS[name])
@@ -298,10 +344,10 @@ class MailDelivery:
                 used=self.db.execute("SELECT count(*) FROM mail_quota_events WHERE quota_kind=? AND scope_key=? AND window_name=? AND event_at>=? AND state!='RELEASED'",(kind,scope,name,self._lower(name,now))).fetchone()[0]
                 if used+1>ceiling:self.db.rollback();return False,None
             sequence=self.db.execute('SELECT count(*) FROM mail_provider_attempts WHERE message_key=?',(key,)).fetchone()[0]+1;attempt_id=_sha(key+'|'+str(sequence)+'|'+binding.provider+'|'+binding.account_id)
-            submission_key=_sha('submission|'+attempt_id)
+            submission_key=str(uuid.uuid5(uuid.NAMESPACE_URL,'dots-mail-submission:'+attempt_id));policy,expires=self._idempotency(binding,now)
             if old:self.db.execute("UPDATE mail_idempotency SET state='INFLIGHT',provider=?,attempt_id=?,updated=? WHERE message_key=?",(binding.provider,attempt_id,now,key))
             else:self.db.execute("INSERT INTO mail_idempotency VALUES(?,?,?,?,?,?,?)",(key,payload_sha,'INFLIGHT',binding.provider,attempt_id,now,now))
-            self.db.execute('INSERT INTO mail_provider_attempts(id,message_key,provider,account_id,submission_key,outcome,provider_ref,detail,detail_sha256,quota_scope,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(attempt_id,key,binding.provider,binding.account_id,submission_key,'INFLIGHT',None,'SUBMIT_STARTED',_sha('SUBMIT_STARTED'),binding.quota_scope,now,now))
+            self.db.execute('INSERT INTO mail_provider_attempts(id,message_key,provider,account_id,submission_key,first_submitted_at,idempotency_expires_at,idempotency_policy,outcome,provider_ref,detail,detail_sha256,quota_scope,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(attempt_id,key,binding.provider,binding.account_id,submission_key,now,expires,policy,'INFLIGHT',None,'SUBMIT_STARTED',_sha('SUBMIT_STARTED'),binding.quota_scope,now,now))
             for kind,scope,name,ceiling in specs:self.db.execute('INSERT INTO mail_quota_events VALUES(?,?,?,?,?,?)',(attempt_id,kind,scope,name,now,'HELD'))
             self.db.execute('INSERT INTO mail_reconciliation VALUES(?,?,?,0,NULL)',(attempt_id,binding.provider,now));self.db.commit();return attempt_id,None
         except BaseException:self.db.rollback();raise
@@ -341,7 +387,14 @@ class MailDelivery:
         binding=next((b for b in self.bindings if b.provider==row['provider'] and b.account_id==row['account_id']),None)
         if binding is None:return old
         transport=self._transport(binding)
-        if getattr(transport,'idempotent_submission',False) is not True:return old
+        if (row['idempotency_policy']!='SAFE_REPLAY_24H'
+                or getattr(transport,'idempotent_submission',False) is not True):return old
+        try:now=self.clock()
+        except Exception:return old
+        first=row['first_submitted_at'];expires=row['idempotency_expires_at']
+        if (type(now) not in (int,float) or not math.isfinite(now)
+                or type(first) is not int or type(expires) is not int
+                or now<first or now>=expires):return old
         return self._execute_attempt(row,binding,message)
 
     def send(self,key,message):
