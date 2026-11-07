@@ -2,23 +2,26 @@
 import hashlib,json,multiprocessing,os,sqlite3,tempfile,unittest
 from email.message import Message
 from scripts.pr122_customer_core import Center,Unavailable
-from scripts.community_mail_delivery import (MailDelivery,ProviderBinding,ProviderHTTPTransport,ProviderSMTPTransport,RESEND_CEILINGS,build_mail_configuration,install)
+from scripts.community_mail_delivery import (MailDelivery,ProviderBinding,ProviderHTTPTransport,ProviderSMTPTransport,RESEND_CEILINGS,_NoRedirect,build_mail_configuration,install,optional_mail_configuration)
 from scripts.community_web_session import WebSession
+from unittest.mock import patch
 _original_connect=sqlite3.connect
 sqlite3.connect=lambda path,*a,**k:_original_connect(os.fspath(path),*a,**k)
 KEY={'testkey':b'k'*32}
 ENDPOINTS={'Resend':'https://api.resend.com','SMTP2GO':'https://api.smtp2go.com','Brevo':'https://api.brevo.com'}
 class FakeTransport:
-    def __init__(self,*results,reconcile=None):self.results=list(results);self.reconcile_result=reconcile or {'outcome':'UNKNOWN','detail_code':'RECONCILIATION_PENDING'};self.submissions=[];self.reconciliations=[]
+    def __init__(self,*results,reconcile=None,idempotent=True):self.results=list(results);self.reconcile_result=reconcile or {'outcome':'UNKNOWN','detail_code':'RECONCILIATION_PENDING'};self.submissions=[];self.reconciliations=[];self.idempotent_submission=idempotent
     def authenticated(self,binding):return True
-    def submit(self,binding,message,attempt_id):
-        self.submissions.append((binding.provider,message,attempt_id));result=self.results.pop(0) if self.results else {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':binding.provider+'-'+attempt_id}
+    def submit(self,binding,message,attempt_id,submission_key):
+        self.submissions.append((binding.provider,message,attempt_id,submission_key));result=self.results.pop(0) if self.results else {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':binding.provider+'-'+attempt_id}
         if isinstance(result,BaseException):raise result
         return result
-    def reconcile(self,binding,provider_ref,attempt_id):self.reconciliations.append((binding.provider,attempt_id));return self.reconcile_result
+    def reconcile(self,binding,provider_ref,attempt_id,submission_key):self.reconciliations.append((binding.provider,attempt_id,submission_key));return self.reconcile_result
 class Response:
-    def __init__(self,value):self.value=value
+    def __init__(self,value,status=200,final_url=None):self.value=value;self.status=status;self.final_url=final_url
+    def geturl(self):return self.final_url
     def read(self):return json.dumps(self.value).encode()
+PUBLIC_DNS=lambda host,port,family,socktype:[(2,socktype,6,'',('93.184.216.34',port))]
 class FakeSMTP:
     def __init__(self,events):self.events=events
     def ehlo(self):self.events.append('EHLO')
@@ -43,7 +46,7 @@ class Contract(unittest.TestCase):
         self.c.mail_ready=True;self.c.register('legacy@example.org','InitialPassword123!');row,payload=self.outbox('VERIFY');self.c.verify(payload['token'],'InitialPassword123!');uid=self.c.login('legacy@example.org','InitialPassword123!')['user_id'];d=install(self.c);self.assertFalse(d.ready);self.assertEqual(set(d.provider_state.values()),{'NOT_CONFIGURED'});self.assertFalse(self.c.mail_ready);self.assertEqual(self.c.login('legacy@example.org','InitialPassword123!')['user_id'],uid)
         with self.assertRaisesRegex(Unavailable,'VERIFICATION_CHANNEL_PENDING'):self.c.register('none@example.org','InitialPassword123!')
     def test_v1_reservations_migrate_into_account_and_shared_pool_events(self):
-        self.c.db.executescript("CREATE TABLE mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);CREATE TABLE mail_reservations(attempt_id TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,window_name TEXT NOT NULL,window_start INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,window_name,window_start));");self.c.db.execute("INSERT INTO mail_provider_attempts VALUES('old','old-message','Resend','resend-account','ACCEPTED','old-ref','legacy',?,?)",(self.now,self.now));self.c.db.execute("INSERT INTO mail_reservations VALUES('old','Resend','resend-account','daily',?,'COUNTED')",(self.now,));install(self.c,[binding('Resend',account='resend-account',scope='shared')],{'Resend':FakeTransport()});events=self.c.db.execute("SELECT quota_kind,scope_key,state FROM mail_quota_events WHERE attempt_id='old' ORDER BY quota_kind").fetchall();self.assertEqual([(r[0],r[1],r[2]) for r in events],[('ACCOUNT','Resend:resend-account','COUNTED'),('POOL','shared','COUNTED')]);self.assertEqual(self.c.db.execute("SELECT v FROM settings WHERE k='mail_schema_version'").fetchone()[0],'2')
+        self.c.db.executescript("CREATE TABLE mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL);CREATE TABLE mail_reservations(attempt_id TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,window_name TEXT NOT NULL,window_start INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,window_name,window_start));");self.c.db.execute("INSERT INTO mail_provider_attempts VALUES('old','old-message','Resend','resend-account','ACCEPTED','old-ref','legacy',?,?)",(self.now,self.now));self.c.db.execute("INSERT INTO mail_reservations VALUES('old','Resend','resend-account','daily',?,'COUNTED')",(self.now,));install(self.c,[binding('Resend',account='resend-account',scope='shared')],{'Resend':FakeTransport()});events=self.c.db.execute("SELECT quota_kind,scope_key,state FROM mail_quota_events WHERE attempt_id='old' ORDER BY quota_kind").fetchall();self.assertEqual([(r[0],r[1],r[2]) for r in events],[('ACCOUNT','Resend:resend-account','COUNTED'),('POOL','shared','COUNTED')]);self.assertEqual(self.c.db.execute("SELECT v FROM settings WHERE k='mail_schema_version'").fetchone()[0],'3');self.assertEqual(len(self.c.db.execute("SELECT submission_key FROM mail_provider_attempts WHERE id='old'").fetchone()[0]),64)
     def test_same_code_no_expiry_extension_and_identity_flows(self):
         self.configured();self.c.register('person@example.org','InitialPassword123!');r1,p1=self.outbox('VERIFY');token_hash=hashlib.sha256(p1['token'].encode()).hexdigest();e1=self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(token_hash,)).fetchone()[0];self.now+=300;self.c.register('person@example.org','OtherPassword123!');r2,p2=self.outbox('VERIFY');self.assertEqual((p1['token'],e1),(p2['token'],self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(token_hash,)).fetchone()[0]));self.now=e1;self.c.register('person@example.org','OtherPassword123!');_,p3=self.outbox('VERIFY');self.assertNotEqual(p1['token'],p3['token']);self.c.verify(p3['token'],'InitialPassword123!');session=self.c.login('person@example.org','InitialPassword123!');self.c.request_reset('person@example.org');_,reset1=self.outbox('RESET');expiry=self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(hashlib.sha256(reset1['token'].encode()).hexdigest(),)).fetchone()[0];self.now+=1;self.c.request_reset('person@example.org');_,reset2=self.outbox('RESET');self.assertEqual(reset1['token'],reset2['token']);self.assertEqual(expiry,self.c.db.execute('SELECT expires FROM challenges WHERE token=?',(hashlib.sha256(reset2['token'].encode()).hexdigest(),)).fetchone()[0]);self.c.reset(reset2['token'],'ResetPassword123!');service=WebSession(self.c);result,cookie=service.dispatch('/community/session/login',Message(),{'email':'person@example.org','password':'ResetPassword123!'},'fixture');headers=Message();headers['Cookie']=cookie.split(';')[0];headers['X-CSRF-Token']=result['csrf'];service.dispatch('/community/session/password',headers,{'current_password':'ResetPassword123!','new_password':'ChangedPassword123!'},'fixture');self.assertEqual(self.c.login('person@example.org','ChangedPassword123!')['user_id'],session['user_id'])
     def test_shared_pool_blocks_cross_provider_bypass_but_independent_pool_switches(self):
@@ -69,7 +72,7 @@ class Contract(unittest.TestCase):
     def test_reconciled_not_submitted_releases_then_switches_backup(self):
         first=binding('Resend',scope='primary');second=binding('Brevo',scope='backup');primary=FakeTransport(reconcile={'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'});backup=FakeTransport();d,_=self.configured([first,second],{'Resend':primary,'Brevo':backup});aid,_=d._reserve('reconciled-switch',hashlib.sha256(b'{}').hexdigest(),first,self.now);self.assertEqual(d.reconcile(aid)['state'],'NOT_SUBMITTED');result=d.send('reconciled-switch',{});self.assertEqual(result['provider'],'Brevo');self.assertEqual(len(backup.submissions),1);self.assertEqual(set(r[0] for r in self.c.db.execute("SELECT state FROM mail_quota_events WHERE attempt_id=?",(aid,))),{'RELEASED'})
     def test_inflight_crash_restart_reconciliation_and_delivered_terminal(self):
-        b=binding();t=FakeTransport(reconcile={'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'});d,_=self.configured([b],{'Resend':t});aid,_=d._reserve('crash',hashlib.sha256(b'{}').hexdigest(),b,self.now);self.assertEqual(d._result('crash')['state'],'INFLIGHT');self.c.db.close();self.c=Center(self.tmp.name,KEY,'testkey',clock=lambda:self.now);t2=FakeTransport(reconcile={'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'});d2=install(self.c,[b],{'Resend':t2});self.assertEqual(d2.send('crash',{})['state'],'INFLIGHT');self.assertEqual(t2.submissions,[]);self.assertEqual(d2.reconcile(aid)['state'],'NOT_SUBMITTED');t2.results=[{'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':'receipt-1'}];accepted=d2.send('crash',{});self.assertEqual(accepted['state'],'ACCEPTED');delivered=d2.record_receipt('Resend','receipt-1');self.assertEqual(delivered['state'],'DELIVERED');self.assertEqual(self.c.db.execute('SELECT outcome FROM mail_provider_attempts WHERE id=?',(delivered['attempt_id'],)).fetchone()[0],'DELIVERED')
+        b=binding();t=FakeTransport(reconcile={'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'});d,_=self.configured([b],{'Resend':t});aid,_=d._reserve('crash',hashlib.sha256(b'{}').hexdigest(),b,self.now);self.assertEqual(d._result('crash')['state'],'INFLIGHT');self.c.db.close();self.c=Center(self.tmp.name,KEY,'testkey',clock=lambda:self.now);t2=FakeTransport(reconcile={'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'},idempotent=False);d2=install(self.c,[b],{'Resend':t2});self.assertEqual(d2.send('crash',{})['state'],'INFLIGHT');self.assertEqual(t2.submissions,[]);self.assertEqual(d2.reconcile(aid)['state'],'NOT_SUBMITTED');t2.results=[{'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':'receipt-1'}];accepted=d2.send('crash',{});self.assertEqual(accepted['state'],'ACCEPTED');delivered=d2.record_receipt('Resend','receipt-1');self.assertEqual(delivered['state'],'DELIVERED');self.assertEqual(self.c.db.execute('SELECT outcome FROM mail_provider_attempts WHERE id=?',(delivered['attempt_id'],)).fetchone()[0],'DELIVERED')
     def test_timeout_unknown_never_cross_provider_and_same_provider_reconciles_delivered(self):
         primary=FakeTransport(TimeoutError(),reconcile={'outcome':'DELIVERED','detail_code':'DELIVERED_RECEIPT','provider_ref':'same-provider'});backup=FakeTransport();d,_=self.configured([binding('Resend',scope='p'),binding('Brevo',scope='b')],{'Resend':primary,'Brevo':backup});result=d.send('unknown',{});self.assertEqual(result['state'],'UNKNOWN');self.assertEqual(backup.submissions,[]);self.assertEqual(d.reconcile(result['attempt_id'])['state'],'DELIVERED');self.assertEqual(primary.reconciliations[0][0],'Resend');self.assertEqual(self.c.db.execute('SELECT outcome FROM mail_provider_attempts WHERE id=?',(result['attempt_id'],)).fetchone()[0],'DELIVERED')
     def test_definite_reject_is_terminal_and_counted(self):
@@ -85,18 +88,80 @@ class Contract(unittest.TestCase):
             if request.full_url.endswith('/domains?limit=1'):return Response({'data':[]})
             if request.full_url.endswith('/emails'):return Response({'id':'resend-ref'})
             return Response({'status':'delivered'})
-        config={'version':1,'endpoint_allowlist':['https://api.resend.com'],'bindings':[{'provider':'Resend','account_id':'r1','transport':'HTTP','endpoint':'https://api.resend.com','quota_scope':'rpool','from_address':'sender@example.org','secret_ref':'secret://resend'}]}
+        config={'version':1,'endpoint_allowlist':['https://api.resend.com'],'bindings':[{'provider':'Resend','account_id':'r1','transport':'HTTP','endpoint':'https://api.resend.com','quota_scope':'rpool','from_address':'sender@example.org','secret_ref':'secretref:///fixture/resend'}]}
         resolver=lambda ref,p,a:{'secret':'fixture-secret','limits':{'daily':100,'monthly':3000},'pool_limits':{'daily':100,'monthly':3000}}
-        bs,ts=build_mail_configuration(config,resolver,opener);d=MailDelivery(self.c.db,bs,ts,clock=lambda:self.now);self.assertEqual(d.send('http',{'email':'x@example.org','kind':'VERIFY','code':'123'})['provider'],'Resend');self.assertTrue(any(url.endswith('/emails') for url,method,timeout,headers in calls));self.assertFalse(any('fixture-secret' in json.dumps(call) for call in calls))
+        bs,ts=build_mail_configuration(config,resolver,opener,address_resolver=PUBLIC_DNS);d=MailDelivery(self.c.db,bs,ts,clock=lambda:self.now);self.assertEqual(d.send('http',{'email':'x@example.org','kind':'VERIFY','code':'123'})['provider'],'Resend');self.assertTrue(any(url.endswith('/emails') for url,method,timeout,headers in calls));self.assertFalse(any('fixture-secret' in json.dumps(call) for call in calls));self.assertTrue(any('Idempotency-key' in headers for url,method,timeout,headers in calls if url.endswith('/emails')))
         def brevo_opener(request,timeout):
             if request.full_url.endswith('/v3/account'):return Response({'email':'fixture'})
             return Response({'messageId':'brevo-ref'})
-        brevo={'version':1,'endpoint_allowlist':['https://api.brevo.com'],'bindings':[{'provider':'Brevo','account_id':'b1','transport':'HTTP','endpoint':'https://api.brevo.com','quota_scope':'bpool','from_address':'sender@example.org','secret_ref':'secret://brevo'}]};bbs,bts=build_mail_configuration(brevo,resolver,brevo_opener);bd=MailDelivery(self.c.db,bbs,bts,clock=lambda:self.now);self.assertEqual(bd.send('brevo-http',{'email':'x@example.org','kind':'RESET','code':'123'})['provider'],'Brevo')
+        brevo={'version':1,'endpoint_allowlist':['https://api.brevo.com'],'bindings':[{'provider':'Brevo','account_id':'b1','transport':'HTTP','endpoint':'https://api.brevo.com','quota_scope':'bpool','from_address':'sender@example.org','secret_ref':'secretref:///fixture/brevo'}]};bbs,bts=build_mail_configuration(brevo,resolver,brevo_opener,address_resolver=PUBLIC_DNS);bd=MailDelivery(self.c.db,bbs,bts,clock=lambda:self.now);self.assertEqual(bd.send('brevo-http',{'email':'x@example.org','kind':'RESET','code':'123'})['provider'],'Brevo')
         bad=dict(config);bad['endpoint_allowlist']=['https://127.0.0.1'];bad['bindings']=[dict(config['bindings'][0],endpoint='https://127.0.0.1')]
         with self.assertRaises(ValueError):build_mail_configuration(bad,resolver,opener)
     def test_smtp_465_implicit_tls_and_587_starttls_certificate_context(self):
         for endpoint,expected_starttls in [('smtp.smtp2go.com:465',False),('smtp.smtp2go.com:587',True)]:
             events=[]
             def factory(host,port,**kwargs):events.append(('CONNECT',port,kwargs.get('context') is not None));return FakeSMTP(events)
-            transport=ProviderSMTPTransport('SMTP2GO',endpoint,'user','password',[endpoint],factory);transport.authenticate();b=binding('SMTP2GO',transport='SMTP',endpoint=endpoint);result=transport.submit(b,{'email':'x@example.org','kind':'VERIFY','code':'123'},'aid');self.assertEqual(result['outcome'],'ACCEPTED');self.assertEqual(any(x[0]=='STARTTLS' for x in events if isinstance(x,tuple)),expected_starttls);connect=next(x for x in events if isinstance(x,tuple) and x[0]=='CONNECT');self.assertEqual(connect[2],not expected_starttls)
+            transport=ProviderSMTPTransport('SMTP2GO',endpoint,'user','password',[endpoint],factory);transport.authenticate();b=binding('SMTP2GO',transport='SMTP',endpoint=endpoint);result=transport.submit(b,{'email':'x@example.org','kind':'VERIFY','code':'123'},'aid','submission');self.assertEqual(result['outcome'],'ACCEPTED');self.assertEqual(any(x[0]=='STARTTLS' for x in events if isinstance(x,tuple)),expected_starttls);connect=next(x for x in events if isinstance(x,tuple) and x[0]=='CONNECT');self.assertEqual(connect[2],not expected_starttls)
+    def test_http_redirects_and_private_or_changed_targets_are_denied_without_secret_forward(self):
+        b=binding();seen=[]
+        for code in (302,307,308):
+            calls=[]
+            def opener(request,timeout):
+                calls.append((request.full_url,dict(request.header_items()),request.data))
+                if len(calls)==1:return Response({'data':[]})
+                return Response({},status=code,final_url='https://127.0.0.1/steal')
+            transport=ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],opener,PUBLIC_DNS);transport.authenticate()
+            result=transport.submit(b,{'email':'x@example.org','kind':'VERIFY','code':'123'},'attempt','stable-key')
+            self.assertEqual(result['outcome'],'DEFINITE_REJECTED');self.assertEqual(len(calls),2);self.assertTrue(all(x[0].startswith(ENDPOINTS['Resend']) for x in calls));seen.extend(calls)
+        request=__import__('urllib.request',fromlist=['Request']).Request(ENDPOINTS['Resend']+'/emails',headers={'Authorization':'Bearer fixture-secret'},data=b'body')
+        self.assertIsNone(_NoRedirect().redirect_request(request,None,307,'redirect',{},'https://evil.example/steal'))
+        private_calls=[];private=lambda host,port,family,socktype:[(2,socktype,6,'',('127.0.0.1',port))]
+        with self.assertRaisesRegex(ValueError,'PUBLIC_PROVIDER_ADDRESS'):
+            ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],lambda r,timeout:private_calls.append(r),private).authenticate()
+        self.assertEqual(private_calls,[])
+        def changed(request,timeout):return Response({},final_url='https://external.example/steal')
+        with self.assertRaisesRegex(ValueError,'PROVIDER_FINAL_URL_DENIED'):
+            ProviderHTTPTransport('Resend',ENDPOINTS['Resend'],'fixture-secret',[ENDPOINTS['Resend']],changed,PUBLIC_DNS).authenticate()
+        self.assertNotIn('evil.example',repr(seen));self.assertNotIn('127.0.0.1',repr(seen))
+
+    def test_provider_accept_crash_restart_reuses_precommitted_key_without_duplicate(self):
+        class Crash(BaseException):pass
+        class DedupeTransport:
+            idempotent_submission=True
+            def __init__(self,server):self.server=server;self.calls=[]
+            def authenticated(self,binding):return True
+            def submit(self,binding,message,attempt_id,submission_key):
+                self.calls.append(submission_key);self.server.setdefault(submission_key,'provider-'+submission_key)
+                return {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':self.server[submission_key]}
+            def reconcile(self,binding,provider_ref,attempt_id,submission_key):return {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':provider_ref}
+        server={};b=binding();first=DedupeTransport(server)
+        def crash(attempt_id,submission_key,result):raise Crash()
+        d=MailDelivery(self.c.db,[b],{'Resend':first},clock=lambda:self.now,after_submit=crash)
+        with self.assertRaises(Crash):d.send('accepted-crash',{})
+        row=self.c.db.execute("SELECT submission_key,outcome FROM mail_provider_attempts WHERE message_key='accepted-crash'").fetchone();self.assertEqual(row['outcome'],'INFLIGHT');self.assertEqual(len(row['submission_key']),64)
+        self.c.db.close();self.c=Center(self.tmp.name,KEY,'testkey',clock=lambda:self.now);second=DedupeTransport(server);restarted=MailDelivery(self.c.db,[b],{'Resend':second},clock=lambda:self.now)
+        result=restarted.send('accepted-crash',{});self.assertEqual(result['state'],'ACCEPTED');self.assertEqual(first.calls,second.calls);self.assertEqual(len(server),1);self.assertEqual(self.c.db.execute("SELECT count(*) FROM mail_provider_attempts WHERE message_key='accepted-crash'").fetchone()[0],1)
+
+    def test_missing_secretref_is_not_configured_and_cli_passes_fake_resolver(self):
+        config={'version':1,'endpoint_allowlist':[ENDPOINTS['Resend']],'bindings':[{'provider':'Resend','account_id':'r1','transport':'HTTP','endpoint':ENDPOINTS['Resend'],'quota_scope':'pool','from_address':'sender@example.org','secret_ref':'missing-not-secretref'}]}
+        self.assertEqual(optional_mail_configuration(config), ((),{}))
+        secret_path=os.path.join(self.tmp.name,'mail-secret.json')
+        with open(secret_path,'w') as handle:
+            json.dump({'provider':'Resend','account_id':'r1','readback':{'secret':'fixture-secret','limits':{'daily':100,'monthly':3000},'pool_limits':{'daily':100,'monthly':3000}}},handle)
+        os.chmod(secret_path,0o600);secure=dict(config);secure['bindings']=[dict(config['bindings'][0],secret_ref='secretref://'+secret_path)]
+        def auth_opener(request,timeout):return Response({'data':[]})
+        bindings,transports=optional_mail_configuration(secure,opener=auth_opener,address_resolver=PUBLIC_DNS)
+        self.assertEqual((len(bindings),len(transports)),(1,1))
+        resolver=lambda ref,provider,account:{'fixture':(ref,provider,account)}
+        class Owner:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def serve(self):pass
+        captured=[]
+        from scripts import community_platform_host,community_first_install
+        def host_open(*args,**kwargs):captured.append(kwargs['mail_secret_resolver']('ref','Resend','r1'));return Owner()
+        with patch.object(community_platform_host.PlatformHost,'open',side_effect=host_open):self.assertEqual(community_platform_host.main(['--plan','p','--center-keys','k','--wechat-secret','w'],mail_secret_resolver=resolver),0)
+        def install_open(*args,**kwargs):captured.append(kwargs['mail_secret_resolver']('ref','Brevo','b1'));return Owner()
+        with patch.object(community_first_install.FirstInstallation,'from_files',side_effect=install_open):self.assertEqual(community_first_install.main(['--plan','p','--center-keys','k'],mail_secret_resolver=resolver),0)
+        self.assertEqual(captured,[{'fixture':('ref','Resend','r1')},{'fixture':('ref','Brevo','b1')}])
 if __name__=='__main__':unittest.main()

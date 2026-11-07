@@ -172,7 +172,7 @@ class PlatformHost:
         self.ocr_lock = None
 
     @classmethod
-    def open(cls, plan_path, keys_path, wechat_path, *, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
+    def open(cls, plan_path, keys_path, wechat_path, *, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None, mail_address_resolver=None):
         _require_nonroot()
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest() != CORE_SHA256:
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
@@ -213,11 +213,10 @@ class PlatformHost:
             # Original business lock is held before any Center constructor IO.
             owner.persistence = PersistentRuntime.open(plan['runtime_directory'],bindings,clock=lambda:owner.center.now())
             owner.center = Center(center_root, keys, key_material['active_key'])
-            from scripts.community_mail_delivery import build_mail_configuration,install as install_mail
+            from scripts.community_mail_delivery import optional_mail_configuration,install as install_mail
             if 'mail_provider_config' in plan:
-                if not callable(mail_secret_resolver):raise PermissionError('MAIL_SECRETREF_RESOLVER_REQUIRED')
                 mail_config=load_protected(plan['mail_provider_config'])
-                mail_bindings,mail_transports=build_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup)
+                mail_bindings,mail_transports=optional_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup,mail_address_resolver)
                 install_mail(owner.center,mail_bindings,mail_transports)
             else:install_mail(owner.center)
             owner.application = MiniApplication.from_existing_runtime(owner.center,
@@ -421,7 +420,7 @@ class PlatformHost:
         self.close()
 
 
-def main(argv=None):
+def main(argv=None,mail_secret_resolver=None,mail_http_opener=None,mail_address_resolver=None):
     parser = argparse.ArgumentParser(description='Admitted original community platform host')
     parser.add_argument('--plan',required=True)
     parser.add_argument('--center-keys',required=True)
@@ -442,7 +441,8 @@ def main(argv=None):
             if args.check_applicant_ocr_plan:
                 print(result, flush=True)
                 return 0
-        with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
+        with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret,mail_secret_resolver=mail_secret_resolver,
+                               mail_http_opener=mail_http_opener,mail_address_resolver=mail_address_resolver) as host:
             if args.applicant_image_scanner:
                 host.configure_applicant_image_scanner()
             if args.applicant_ocr_key_reference:

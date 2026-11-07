@@ -23,7 +23,7 @@ class FirstInstallation:
         self.persistence = None
 
     @classmethod
-    def initialize(cls, directory, keys, active_key, realm, bindings, *, clock, mail_config=None, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
+    def initialize(cls, directory, keys, active_key, realm, bindings, *, clock, mail_config=None, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None, mail_address_resolver=None):
         _require_nonroot()
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
@@ -52,10 +52,9 @@ class FirstInstallation:
         owner=cls()
         try:
             owner.center=Center(path/'identity',keys,active_key,clock=clock)
-            from scripts.community_mail_delivery import build_mail_configuration,install as install_mail
+            from scripts.community_mail_delivery import optional_mail_configuration,install as install_mail
             if mail_config is not None:
-                if not callable(mail_secret_resolver):raise PermissionError('MAIL_SECRETREF_RESOLVER_REQUIRED')
-                mail_bindings,mail_transports=build_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup)
+                mail_bindings,mail_transports=optional_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup,mail_address_resolver)
                 install_mail(owner.center,mail_bindings,mail_transports)
             else:install_mail(owner.center)
             owner.persistence=PersistentRuntime.initialize(str(path/'runtime'),bindings,clock=owner.center.now)
@@ -75,7 +74,7 @@ class FirstInstallation:
             raise
 
     @classmethod
-    def from_files(cls, plan_path, keys_path, *, clock, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
+    def from_files(cls, plan_path, keys_path, *, clock, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None, mail_address_resolver=None):
         """Explicit approved first install; never invoked by PlatformHost startup."""
         import base64
         from scripts.community_mini_host_config import load_protected
@@ -116,7 +115,8 @@ class FirstInstallation:
         mail_config=load_protected(plan['mail_provider_config']) if 'mail_provider_config' in plan else None
         return cls.initialize(plan['directory'],keys,material['active_key'],plan['realm'],bindings,clock=clock,
                               mail_config=mail_config,mail_secret_resolver=mail_secret_resolver,mail_http_opener=mail_http_opener,
-                              mail_smtp_factory=mail_smtp_factory,mail_receipt_lookup=mail_receipt_lookup)
+                              mail_smtp_factory=mail_smtp_factory,mail_receipt_lookup=mail_receipt_lookup,
+                              mail_address_resolver=mail_address_resolver)
 
     def close(self):
         first=None
@@ -134,7 +134,7 @@ class FirstInstallation:
     def __exit__(self,*args):self.close()
 
 
-def main(argv=None):
+def main(argv=None,mail_secret_resolver=None,mail_http_opener=None,mail_address_resolver=None):
     import argparse
     import time
     parser=argparse.ArgumentParser(description='Explicit approved NEW community installation')
@@ -142,7 +142,8 @@ def main(argv=None):
     parser.add_argument('--center-keys',required=True)
     args=parser.parse_args(argv)
     try:
-        with FirstInstallation.from_files(args.plan,args.center_keys,clock=lambda:int(time.time())):
+        with FirstInstallation.from_files(args.plan,args.center_keys,clock=lambda:int(time.time()),mail_secret_resolver=mail_secret_resolver,
+                                          mail_http_opener=mail_http_opener,mail_address_resolver=mail_address_resolver):
             pass
     except Exception:
         print('BACKEND_NOT_READY',flush=True)

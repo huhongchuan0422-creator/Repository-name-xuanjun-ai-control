@@ -5,6 +5,7 @@ import ipaddress
 import json
 import math
 import secrets
+import socket
 import smtplib
 import ssl
 import time
@@ -12,7 +13,7 @@ import types
 from email.message import EmailMessage
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 PROVIDERS=('Resend','SMTP2GO','Brevo')
 ATTEMPT_STATES=('INFLIGHT','NOT_SUBMITTED','DEFINITE_REJECTED','ACCEPTED','UNKNOWN','DELIVERED')
@@ -23,7 +24,7 @@ HTTP_ENDPOINTS={'Resend':'https://api.resend.com','SMTP2GO':'https://api.smtp2go
 SMTP_ENDPOINTS={'SMTP2GO':('smtp.smtp2go.com:465','smtp.smtp2go.com:587'),'Brevo':('smtp-relay.brevo.com:465','smtp-relay.brevo.com:587')}
 DDL='''
 CREATE TABLE IF NOT EXISTS mail_idempotency(message_key TEXT PRIMARY KEY,payload_sha256 TEXT NOT NULL,state TEXT NOT NULL,provider TEXT,attempt_id TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,detail_sha256 TEXT,quota_scope TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS mail_provider_attempts(id TEXT PRIMARY KEY,message_key TEXT NOT NULL,provider TEXT NOT NULL,account_id TEXT NOT NULL,submission_key TEXT NOT NULL,outcome TEXT NOT NULL,provider_ref TEXT,detail TEXT NOT NULL,detail_sha256 TEXT,quota_scope TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS mail_reconciliation(attempt_id TEXT PRIMARY KEY,provider TEXT NOT NULL,next_check INTEGER NOT NULL,checks INTEGER NOT NULL DEFAULT 0,last_error TEXT);
 CREATE TABLE IF NOT EXISTS mail_quota_scopes(quota_kind TEXT NOT NULL,scope_key TEXT NOT NULL,window_name TEXT NOT NULL,ceiling INTEGER NOT NULL,PRIMARY KEY(quota_kind,scope_key,window_name));
 CREATE TABLE IF NOT EXISTS mail_quota_events(attempt_id TEXT NOT NULL,quota_kind TEXT NOT NULL,scope_key TEXT NOT NULL,window_name TEXT NOT NULL,event_at INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(attempt_id,quota_kind,scope_key,window_name));
@@ -57,6 +58,24 @@ def _endpoint(provider,transport,endpoint,allowlist):
         if endpoint not in SMTP_ENDPOINTS.get(provider,()):raise ValueError('PINNED_SMTP_ENDPOINT_REQUIRED')
     else:raise ValueError('HTTP_OR_SMTP_TRANSPORT_REQUIRED')
 
+def _public_addresses(host,port,resolver):
+    try:rows=resolver(host,port,0,socket.SOCK_STREAM)
+    except (OSError,TypeError):raise ValueError('PROVIDER_DNS_RESOLUTION_REQUIRED') from None
+    addresses=set()
+    for row in rows:
+        try:address=row[4][0];ip=ipaddress.ip_address(address)
+        except (IndexError,TypeError,ValueError):raise ValueError('PUBLIC_PROVIDER_ADDRESS_REQUIRED') from None
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_unspecified or ip.is_multicast):
+            raise ValueError('PUBLIC_PROVIDER_ADDRESS_REQUIRED')
+        addresses.add(str(ip))
+    if not addresses:raise ValueError('PROVIDER_DNS_RESOLUTION_REQUIRED')
+    return addresses
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self,request,fp,code,message,headers,newurl):return None
+
+
 class ProviderBinding:
     def __init__(self,provider,account_id,transport,endpoint,limits,authenticated=False,quota_scope='center-default',pool_limits=None,from_address='noreply@example.invalid'):
         self.provider=provider;self.account_id=account_id;self.transport=transport;self.endpoint=endpoint;self.limits=_validate_limits(limits);self.authenticated=authenticated is True;self.quota_scope=quota_scope;self.pool_limits=_validate_limits(pool_limits or limits);self.from_address=from_address
@@ -66,34 +85,47 @@ class ProviderBinding:
         if type(quota_scope) is not str or not quota_scope or type(from_address) is not str or '@' not in from_address:raise ValueError('EXPLICIT_QUOTA_SCOPE_AND_SENDER_REQUIRED')
 
 class ProviderHTTPTransport:
-    def __init__(self,provider,endpoint,secret,allowlist,opener=None):
-        _endpoint(provider,'HTTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint.rstrip('/');self._secret=secret;self._opener=opener or urlopen;self._authenticated=False
+    def __init__(self,provider,endpoint,secret,allowlist,opener=None,address_resolver=None):
+        _endpoint(provider,'HTTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint.rstrip('/');self._secret=secret;self._opener=opener or build_opener(ProxyHandler({}),_NoRedirect()).open;self._resolver=address_resolver or socket.getaddrinfo;self._authenticated=False
+        self.idempotent_submission=provider in ('Resend','Brevo')
         if type(secret) is not str or not secret:raise ValueError('SECRETREF_RESOLUTION_REQUIRED')
-    def _headers(self):
-        if self.provider=='Resend':return {'Authorization':'Bearer '+self._secret,'Content-Type':'application/json'}
-        if self.provider=='SMTP2GO':return {'X-Smtp2go-Api-Key':self._secret,'Content-Type':'application/json'}
-        return {'api-key':self._secret,'Content-Type':'application/json'}
-    def _call(self,method,path,payload=None):
-        raw=None if payload is None else json.dumps(payload,separators=(',',':')).encode();response=self._opener(Request(self.endpoint+path,data=raw,headers=self._headers(),method=method),timeout=20)
+    def _headers(self,submission_key=None):
+        if self.provider=='Resend':headers={'Authorization':'Bearer '+self._secret,'Content-Type':'application/json'}
+        elif self.provider=='SMTP2GO':headers={'X-Smtp2go-Api-Key':self._secret,'Content-Type':'application/json'}
+        else:headers={'api-key':self._secret,'Content-Type':'application/json'}
+        if submission_key and self.provider=='Resend':headers['Idempotency-Key']=submission_key
+        if submission_key and self.provider=='Brevo':headers['idempotency-key']=submission_key
+        return headers
+    def _validate_url(self,url):
+        parsed=urlparse(url);base=urlparse(self.endpoint)
+        if (parsed.scheme,parsed.hostname,parsed.port or 443)!=(base.scheme,base.hostname,base.port or 443):raise ValueError('PROVIDER_FINAL_URL_DENIED')
+        _public_addresses(parsed.hostname,parsed.port or 443,self._resolver)
+    def _call(self,method,path,payload=None,submission_key=None):
+        url=self.endpoint+path;self._validate_url(url)
+        raw=None if payload is None else json.dumps(payload,separators=(',',':')).encode();response=self._opener(Request(url,data=raw,headers=self._headers(submission_key),method=method),timeout=20)
+        status=getattr(response,'status',getattr(response,'code',200))
+        if 300<=status<400:raise HTTPError(url,status,'PROVIDER_REDIRECT_DENIED',getattr(response,'headers',{}),None)
+        final=response.geturl() if hasattr(response,'geturl') else url;self._validate_url(final or url)
         body=response.read();return json.loads(body.decode()) if body else {}
     def authenticate(self):
         paths={'Resend':'/domains?limit=1','SMTP2GO':'/v3/stats/email_summary','Brevo':'/v3/account'}
         self._call('GET' if self.provider!='SMTP2GO' else 'POST',paths[self.provider],{} if self.provider=='SMTP2GO' else None);self._authenticated=True;return True
     def authenticated(self,binding):return self._authenticated and binding.provider==self.provider and binding.endpoint.rstrip('/')==self.endpoint
-    def submit(self,binding,message,attempt_id):
+    def submit(self,binding,message,attempt_id,submission_key):
         payload={'from':binding.from_address,'to':[message['email']],'subject':message.get('subject',message['kind']),'text':message.get('text',message['code'])}
         paths={'Resend':'/emails','SMTP2GO':'/v3/email/send','Brevo':'/v3/smtp/email'}
         if self.provider=='Brevo':payload={'sender':{'email':binding.from_address},'to':[{'email':message['email']}],'subject':payload['subject'],'textContent':payload['text']}
-        try:data=self._call('POST',paths[self.provider],payload)
+        try:data=self._call('POST',paths[self.provider],payload,submission_key)
         except HTTPError as error:
             if error.code==429:return {'outcome':'NOT_SUBMITTED','detail_code':'RATE_LIMITED'}
+            if 300<=error.code<400:return {'outcome':'DEFINITE_REJECTED','detail_code':'PROVIDER_REJECTED'}
             if error.code in (401,403):return {'outcome':'NOT_SUBMITTED','detail_code':'AUTH_FAILED'}
             return {'outcome':'DEFINITE_REJECTED','detail_code':'PROVIDER_REJECTED'}
-        except (TimeoutError,URLError):return {'outcome':'UNKNOWN','detail_code':'TRANSPORT_UNCERTAIN'}
+        except (TimeoutError,URLError,ValueError):return {'outcome':'UNKNOWN','detail_code':'TRANSPORT_UNCERTAIN'}
         ref=data.get('id') or data.get('request_id') or data.get('messageId') or data.get('message-id')
         if type(ref) is not str or not ref:return {'outcome':'UNKNOWN','detail_code':'TRANSPORT_UNCERTAIN'}
         return {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':ref}
-    def reconcile(self,binding,provider_ref,attempt_id):
+    def reconcile(self,binding,provider_ref,attempt_id,submission_key):
         if not provider_ref:return {'outcome':'UNKNOWN','detail_code':'RECONCILIATION_PENDING'}
         try:
             if self.provider=='Resend':data=self._call('GET','/emails/'+provider_ref)
@@ -113,6 +145,7 @@ class ProviderSMTPTransport:
     def __init__(self,provider,endpoint,username,password,allowlist,smtp_factory=None,receipt_lookup=None):
         _endpoint(provider,'SMTP',endpoint,allowlist);self.provider=provider;self.endpoint=endpoint;self.username=username;self._password=password;self._factory=smtp_factory;self._receipt_lookup=receipt_lookup;self._authenticated=False
         if not username or not password:raise ValueError('SECRETREF_RESOLUTION_REQUIRED')
+        self.idempotent_submission=False
     def _connect(self):
         host,raw=self.endpoint.rsplit(':',1);port=int(raw);context=ssl.create_default_context()
         if port==465:
@@ -126,7 +159,7 @@ class ProviderSMTPTransport:
         finally:client.quit()
         return True
     def authenticated(self,binding):return self._authenticated and binding.provider==self.provider and binding.endpoint==self.endpoint
-    def submit(self,binding,message,attempt_id):
+    def submit(self,binding,message,attempt_id,submission_key):
         mail=EmailMessage();mail['From']=binding.from_address;mail['To']=message['email'];mail['Subject']=message.get('subject',message['kind']);mail['Message-ID']='<'+attempt_id+'@mail.local>';mail.set_content(message.get('text',message['code']))
         try:
             client=self._connect()
@@ -137,14 +170,14 @@ class ProviderSMTPTransport:
         except (TimeoutError,smtplib.SMTPServerDisconnected,OSError):return {'outcome':'UNKNOWN','detail_code':'TRANSPORT_UNCERTAIN'}
         if refused:return {'outcome':'DEFINITE_REJECTED','detail_code':'PROVIDER_REJECTED'}
         return {'outcome':'ACCEPTED','detail_code':'ACCEPTED_BY_PROVIDER','provider_ref':attempt_id}
-    def reconcile(self,binding,provider_ref,attempt_id):
+    def reconcile(self,binding,provider_ref,attempt_id,submission_key):
         if self._receipt_lookup is None:return {'outcome':'UNKNOWN','detail_code':'RECONCILIATION_PENDING'}
         result=self._receipt_lookup(self.provider,provider_ref or attempt_id)
         if result=='DELIVERED':return {'outcome':'DELIVERED','detail_code':'DELIVERED_RECEIPT','provider_ref':provider_ref or attempt_id}
         if result=='NOT_SUBMITTED':return {'outcome':'NOT_SUBMITTED','detail_code':'RECONCILED_NOT_SUBMITTED'}
         return {'outcome':'UNKNOWN','detail_code':'RECONCILIATION_PENDING'}
 
-def build_mail_configuration(config,secret_resolver,opener=None,smtp_factory=None,receipt_lookup=None):
+def build_mail_configuration(config,secret_resolver,opener=None,smtp_factory=None,receipt_lookup=None,address_resolver=None):
     if type(config) is not dict or set(config)!=set(('version','endpoint_allowlist','bindings')) or config['version']!=1 or not callable(secret_resolver):raise ValueError('EXACT_PROTECTED_MAIL_CONFIG_REQUIRED')
     allowlist=config['endpoint_allowlist'];bindings=[];transports={}
     if type(config['bindings']) is not list:raise ValueError('EXACT_PROTECTED_MAIL_CONFIG_REQUIRED')
@@ -152,18 +185,45 @@ def build_mail_configuration(config,secret_resolver,opener=None,smtp_factory=Non
         fields=set(('provider','account_id','transport','endpoint','quota_scope','from_address','secret_ref'))
         if type(item) is not dict or set(item)!=fields:raise ValueError('EXACT_PROVIDER_BINDING_CONFIG_REQUIRED')
         _endpoint(item['provider'],item['transport'],item['endpoint'],allowlist)
+        reference=urlparse(item['secret_ref']) if type(item['secret_ref']) is str else None
+        if reference is None or reference.scheme!='secretref' or reference.query or reference.fragment:raise ValueError('SECRETREF_REFERENCE_REQUIRED')
+
         resolved=secret_resolver(item['secret_ref'],item['provider'],item['account_id'])
         if type(resolved) is not dict or set(resolved)-set(('secret','username','password','limits','pool_limits')):raise ValueError('EXACT_SECRETREF_READBACK_REQUIRED')
         limits=_validate_limits(resolved.get('limits'));pool=_validate_limits(resolved.get('pool_limits',limits))
-        if item['transport']=='HTTP':transport=ProviderHTTPTransport(item['provider'],item['endpoint'],resolved.get('secret'),allowlist,opener);transport.authenticate()
+        if item['transport']=='HTTP':transport=ProviderHTTPTransport(item['provider'],item['endpoint'],resolved.get('secret'),allowlist,opener,address_resolver);transport.authenticate()
         else:transport=ProviderSMTPTransport(item['provider'],item['endpoint'],resolved.get('username'),resolved.get('password'),allowlist,smtp_factory,receipt_lookup);transport.authenticate()
         binding=ProviderBinding(item['provider'],item['account_id'],item['transport'],item['endpoint'],limits,True,item['quota_scope'],pool,item['from_address'])
         bindings.append(binding);transports[(item['provider'],item['account_id'])]=transport
     return bindings,transports
 
+def protected_secretref_resolver(reference,provider,account_id):
+    """Resolve only a protected host-owned SecretRef document."""
+    from pathlib import Path
+    from scripts.community_mini_host_config import load_protected
+    if type(reference) is not str:raise ValueError('SECRETREF_REFERENCE_REQUIRED')
+    parsed=urlparse(reference)
+    if parsed.scheme!='secretref' or parsed.netloc or parsed.query or parsed.fragment or not parsed.path.startswith('/') or '..' in Path(parsed.path).parts:
+        raise ValueError('SECRETREF_REFERENCE_REQUIRED')
+    value=load_protected(parsed.path)
+    if (type(value) is not dict or set(value)!=set(('provider','account_id','readback'))
+            or value['provider']!=provider or value['account_id']!=account_id
+            or type(value['readback']) is not dict):
+        raise ValueError('SECRETREF_BINDING_MISMATCH')
+    return value['readback']
+
+def optional_mail_configuration(config,secret_resolver=None,opener=None,smtp_factory=None,receipt_lookup=None,address_resolver=None):
+    if config is None:return (),{}
+    resolver=secret_resolver if callable(secret_resolver) else protected_secretref_resolver
+    try:return build_mail_configuration(config,resolver,opener,smtp_factory,receipt_lookup,address_resolver)
+    except (OSError,PermissionError,ValueError):
+        # A missing/unresolvable binding is explicitly NOT_CONFIGURED.
+        return (),{}
+
+
 class MailDelivery:
-    def __init__(self,db,bindings=(),transports=None,clock=time.time):
-        self.db=db;self.clock=clock;self.bindings=tuple(sorted(bindings,key=lambda b:PROVIDERS.index(b.provider)));self.transports=transports or {};self._migrate();seen=set();pools={}
+    def __init__(self,db,bindings=(),transports=None,clock=time.time,after_submit=None):
+        self.db=db;self.clock=clock;self.after_submit=after_submit;self.bindings=tuple(sorted(bindings,key=lambda b:PROVIDERS.index(b.provider)));self.transports=transports or {};self._migrate();seen=set();pools={}
         for binding in self.bindings:
             key=(binding.provider,binding.account_id)
             if key in seen:raise ValueError('UNIQUE_PROVIDER_BINDING_REQUIRED')
@@ -175,9 +235,13 @@ class MailDelivery:
     def _migrate(self):
         self.db.executescript(DDL)
         columns={r[1] for r in self.db.execute('PRAGMA table_info(mail_provider_attempts)')}
-        for name,kind in (('detail_sha256','TEXT'),('quota_scope','TEXT')):
+        for name,kind in (('detail_sha256','TEXT'),('quota_scope','TEXT'),('submission_key','TEXT')):
             if name not in columns:self.db.execute('ALTER TABLE mail_provider_attempts ADD COLUMN '+name+' '+kind)
-        self.db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES('mail_schema_version','2')")
+        for row in self.db.execute('SELECT id FROM mail_provider_attempts WHERE submission_key IS NULL').fetchall():
+            self.db.execute('UPDATE mail_provider_attempts SET submission_key=? WHERE id=?',(_sha('submission|'+row[0]),row[0]))
+        self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS mail_provider_submission_unique ON mail_provider_attempts(provider,submission_key)')
+        self.db.execute('CREATE UNIQUE INDEX IF NOT EXISTS mail_message_submission_unique ON mail_provider_attempts(message_key,provider,submission_key)')
+        self.db.execute("INSERT OR REPLACE INTO settings(k,v) VALUES('mail_schema_version','3')")
     @property
     def ready(self):return bool(self.bindings)
     @property
@@ -234,9 +298,10 @@ class MailDelivery:
                 used=self.db.execute("SELECT count(*) FROM mail_quota_events WHERE quota_kind=? AND scope_key=? AND window_name=? AND event_at>=? AND state!='RELEASED'",(kind,scope,name,self._lower(name,now))).fetchone()[0]
                 if used+1>ceiling:self.db.rollback();return False,None
             sequence=self.db.execute('SELECT count(*) FROM mail_provider_attempts WHERE message_key=?',(key,)).fetchone()[0]+1;attempt_id=_sha(key+'|'+str(sequence)+'|'+binding.provider+'|'+binding.account_id)
+            submission_key=_sha('submission|'+attempt_id)
             if old:self.db.execute("UPDATE mail_idempotency SET state='INFLIGHT',provider=?,attempt_id=?,updated=? WHERE message_key=?",(binding.provider,attempt_id,now,key))
             else:self.db.execute("INSERT INTO mail_idempotency VALUES(?,?,?,?,?,?,?)",(key,payload_sha,'INFLIGHT',binding.provider,attempt_id,now,now))
-            self.db.execute('INSERT INTO mail_provider_attempts(id,message_key,provider,account_id,outcome,provider_ref,detail,detail_sha256,quota_scope,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?)',(attempt_id,key,binding.provider,binding.account_id,'INFLIGHT',None,'SUBMIT_STARTED',_sha('SUBMIT_STARTED'),binding.quota_scope,now,now))
+            self.db.execute('INSERT INTO mail_provider_attempts(id,message_key,provider,account_id,submission_key,outcome,provider_ref,detail,detail_sha256,quota_scope,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(attempt_id,key,binding.provider,binding.account_id,submission_key,'INFLIGHT',None,'SUBMIT_STARTED',_sha('SUBMIT_STARTED'),binding.quota_scope,now,now))
             for kind,scope,name,ceiling in specs:self.db.execute('INSERT INTO mail_quota_events VALUES(?,?,?,?,?,?)',(attempt_id,kind,scope,name,now,'HELD'))
             self.db.execute('INSERT INTO mail_reconciliation VALUES(?,?,?,0,NULL)',(attempt_id,binding.provider,now));self.db.commit();return attempt_id,None
         except BaseException:self.db.rollback();raise
@@ -261,32 +326,46 @@ class MailDelivery:
         if row:self.db.execute("UPDATE mail_idempotency SET state='UNAVAILABLE',updated=? WHERE message_key=? AND state IN ('NOT_SUBMITTED','UNAVAILABLE')",(now,key))
         else:self.db.execute("INSERT INTO mail_idempotency VALUES(?,?,?,?,?,?,?)",(key,sha,'UNAVAILABLE',None,None,now,now))
         return self._result(key)
+    def _execute_attempt(self,row,binding,message):
+        try:result=self._transport(binding).submit(binding,message,row['id'],row['submission_key'])
+        except Exception:
+            self._finish(row['id'],'UNKNOWN','TRANSPORT_UNCERTAIN');return self._result(row['message_key'])
+        if self.after_submit is not None:self.after_submit(row['id'],row['submission_key'],result)
+        outcome=result.get('outcome') if type(result) is dict else None;detail=result.get('detail_code') if type(result) is dict else None
+        if outcome not in ATTEMPT_STATES or outcome=='INFLIGHT':raise ValueError('EXACT_PROVIDER_RESULT_REQUIRED')
+        self._finish(row['id'],outcome,detail,result.get('provider_ref'))
+        return self._result(row['message_key'])
+    def _recover_inflight(self,old,message):
+        row=self.db.execute("SELECT * FROM mail_provider_attempts WHERE id=? AND outcome='INFLIGHT'",(old['attempt_id'],)).fetchone()
+        if not row:return old
+        binding=next((b for b in self.bindings if b.provider==row['provider'] and b.account_id==row['account_id']),None)
+        if binding is None:return old
+        transport=self._transport(binding)
+        if getattr(transport,'idempotent_submission',False) is not True:return old
+        return self._execute_attempt(row,binding,message)
+
     def send(self,key,message):
         if type(key) is not str or not key or type(message) is not dict:raise ValueError('MAIL_MESSAGE_REQUIRED')
         sha=hashlib.sha256(json.dumps(message,sort_keys=True,separators=(',',':')).encode()).hexdigest();old=self._result(key)
         if old:
             if old['payload_sha256']!=sha:raise ValueError('IDEMPOTENCY_PAYLOAD_MISMATCH')
+            if old['state']=='INFLIGHT':return self._recover_inflight(old,message)
             if old['state'] not in ('NOT_SUBMITTED','UNAVAILABLE'):return old
         if not self.ready:return {'message_key':key,'state':'UNAVAILABLE','reason':'VERIFICATION_CHANNEL_PENDING'}
         for binding in self._order(key):
             attempt_id,prior=self._reserve(key,sha,binding,int(self.clock()))
             if prior:return prior
             if attempt_id is False:continue
-            try:result=self._transport(binding).submit(binding,message,attempt_id)
-            except Exception:
-                self._finish(attempt_id,'UNKNOWN','TRANSPORT_UNCERTAIN');return self._result(key)
-            outcome=result.get('outcome') if type(result) is dict else None;detail=result.get('detail_code') if type(result) is dict else None
-            if outcome not in ATTEMPT_STATES or outcome=='INFLIGHT':raise ValueError('EXACT_PROVIDER_RESULT_REQUIRED')
-            self._finish(attempt_id,outcome,detail,result.get('provider_ref'))
-            if outcome=='NOT_SUBMITTED':continue
-            return self._result(key)
+            row=self.db.execute('SELECT * FROM mail_provider_attempts WHERE id=?',(attempt_id,)).fetchone();result=self._execute_attempt(row,binding,message)
+            if result['state']=='NOT_SUBMITTED':continue
+            return result
         return self._mark_unavailable(key,sha,int(self.clock()))
     def reconcile(self,attempt_id):
         row=self.db.execute("SELECT * FROM mail_provider_attempts WHERE id=? AND outcome IN ('INFLIGHT','UNKNOWN')",(attempt_id,)).fetchone()
         if not row:return None
         binding=next((b for b in self.bindings if b.provider==row['provider'] and b.account_id==row['account_id']),None)
         if binding is None:return {'attempt_id':attempt_id,'state':row['outcome']}
-        result=self._transport(binding).reconcile(binding,row['provider_ref'],attempt_id);outcome=result.get('outcome');detail=result.get('detail_code')
+        result=self._transport(binding).reconcile(binding,row['provider_ref'],attempt_id,row['submission_key']);outcome=result.get('outcome');detail=result.get('detail_code')
         if outcome in ATTEMPT_STATES and outcome!='INFLIGHT':self._finish(attempt_id,outcome,detail,result.get('provider_ref'))
         else:self.db.execute('UPDATE mail_reconciliation SET checks=checks+1,next_check=?,last_error=? WHERE attempt_id=?',(int(self.clock())+60,'RECONCILIATION_PENDING',attempt_id))
         return self._result(row['message_key'])
