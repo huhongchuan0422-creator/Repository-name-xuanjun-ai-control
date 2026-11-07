@@ -23,7 +23,7 @@ class FirstInstallation:
         self.persistence = None
 
     @classmethod
-    def initialize(cls, directory, keys, active_key, realm, bindings, *, clock):
+    def initialize(cls, directory, keys, active_key, realm, bindings, *, clock, mail_config=None, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
         _require_nonroot()
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
@@ -52,8 +52,12 @@ class FirstInstallation:
         owner=cls()
         try:
             owner.center=Center(path/'identity',keys,active_key,clock=clock)
-            from scripts.community_mail_delivery import install as install_mail
-            install_mail(owner.center)
+            from scripts.community_mail_delivery import build_mail_configuration,install as install_mail
+            if mail_config is not None:
+                if not callable(mail_secret_resolver):raise PermissionError('MAIL_SECRETREF_RESOLVER_REQUIRED')
+                mail_bindings,mail_transports=build_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup)
+                install_mail(owner.center,mail_bindings,mail_transports)
+            else:install_mail(owner.center)
             owner.persistence=PersistentRuntime.initialize(str(path/'runtime'),bindings,clock=owner.center.now)
             payload=dict(kind='COMMUNITY_PLATFORM_REALM',title=realm['title'],requirements=[],
                 source='OWNER_APPROVED_FIRST_INSTALL',authority_ref=realm['authority_ref'])
@@ -71,7 +75,7 @@ class FirstInstallation:
             raise
 
     @classmethod
-    def from_files(cls, plan_path, keys_path, *, clock):
+    def from_files(cls, plan_path, keys_path, *, clock, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
         """Explicit approved first install; never invoked by PlatformHost startup."""
         import base64
         from scripts.community_mini_host_config import load_protected
@@ -80,7 +84,7 @@ class FirstInstallation:
         plan=load_protected(plan_path)
         material=load_protected(keys_path)
         fields={'version','directory','realm','principals','bindings'}
-        if (type(plan) is not dict or set(plan)!=fields
+        if (type(plan) is not dict or not fields<=set(plan)<=fields|{'mail_provider_config'}
                 or type(plan['version']) is not int or plan['version']!=1
                 or type(plan['principals']) is not dict or not plan['principals']
                 or type(plan['bindings']) is not dict
@@ -109,8 +113,10 @@ class FirstInstallation:
                 keys[name]=base64.b64decode(encoded,validate=True)
         except Exception:
             raise ValueError('INVALID_FIRST_INSTALL_KEY_INPUT') from None
-        return cls.initialize(plan['directory'],keys,material['active_key'],
-                              plan['realm'],bindings,clock=clock)
+        mail_config=load_protected(plan['mail_provider_config']) if 'mail_provider_config' in plan else None
+        return cls.initialize(plan['directory'],keys,material['active_key'],plan['realm'],bindings,clock=clock,
+                              mail_config=mail_config,mail_secret_resolver=mail_secret_resolver,mail_http_opener=mail_http_opener,
+                              mail_smtp_factory=mail_smtp_factory,mail_receipt_lookup=mail_receipt_lookup)
 
     def close(self):
         first=None

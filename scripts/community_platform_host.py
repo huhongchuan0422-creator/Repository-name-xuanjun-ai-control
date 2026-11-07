@@ -21,7 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
-OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config'}
+OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config','mail_provider_config'}
 
 
 def _require_nonroot():
@@ -53,7 +53,7 @@ def _configuration(plan, key_material, wechat):
         raise ValueError('EXACT_WECHAT_SECRET_INPUT_REQUIRED')
     from scripts.community_mini_login import WechatCodeClient
     WechatCodeClient(wechat['appid'], wechat['app_secret'])  # Validate; no provider IO.
-    for reference in ('provider_reader_config','commerce_provider_config'):
+    for reference in ('provider_reader_config','commerce_provider_config','mail_provider_config'):
         if reference not in plan:continue
         ref = plan[reference]
         if (type(ref) is not str or not Path(ref).is_absolute()
@@ -172,7 +172,7 @@ class PlatformHost:
         self.ocr_lock = None
 
     @classmethod
-    def open(cls, plan_path, keys_path, wechat_path):
+    def open(cls, plan_path, keys_path, wechat_path, *, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None):
         _require_nonroot()
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest() != CORE_SHA256:
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
@@ -213,8 +213,13 @@ class PlatformHost:
             # Original business lock is held before any Center constructor IO.
             owner.persistence = PersistentRuntime.open(plan['runtime_directory'],bindings,clock=lambda:owner.center.now())
             owner.center = Center(center_root, keys, key_material['active_key'])
-            from scripts.community_mail_delivery import install as install_mail
-            install_mail(owner.center)
+            from scripts.community_mail_delivery import build_mail_configuration,install as install_mail
+            if 'mail_provider_config' in plan:
+                if not callable(mail_secret_resolver):raise PermissionError('MAIL_SECRETREF_RESOLVER_REQUIRED')
+                mail_config=load_protected(plan['mail_provider_config'])
+                mail_bindings,mail_transports=build_mail_configuration(mail_config,mail_secret_resolver,mail_http_opener,mail_smtp_factory,mail_receipt_lookup)
+                install_mail(owner.center,mail_bindings,mail_transports)
+            else:install_mail(owner.center)
             owner.application = MiniApplication.from_existing_runtime(owner.center,
                 owner.persistence.runtime, principals, config, wechat['app_secret'])
             if 'community_admin_authority' in plan:
