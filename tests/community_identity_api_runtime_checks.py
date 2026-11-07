@@ -10,13 +10,18 @@ from services.ocr_engine import api
 
 
 class IdentityApiRuntime(unittest.TestCase):
-    def test_runtime_is_exact_pinned_successor_and_immutable_core_store(self):
+    def test_runtime_is_exact_pinned_recovery_successor_and_immutable_core(self):
         from scripts import community_ocr_bridge
         lock=json.loads(Path(community_ocr_bridge.__file__).with_name('community_ocr_dependency.json').read_text())
-        self.assertEqual(lock['files']['api.py'],'32cf647f56f9f1fbed9d0c7d15bb50a0f60a9cd5124bd5ff835129196766636e')
+        self.assertEqual(lock['files']['api.py'],'8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e')
+        self.assertEqual(lock['files']['secure_store.py'],'30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25')
+        self.assertEqual(lock['local_successor']['source_files'],{'api.py':'services/ocr_engine/api.py','secure_store.py':'services/ocr_engine/secure_store.py'})
+        self.assertEqual(lock['local_successor']['patch_path'],'deploy/community-preview/ocr-recovery-api-store.patch')
         for name,digest in lock['files'].items():
             self.assertEqual(hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest(),digest)
-        for name in ('secure_store.py','ocr_core.py'):self.assertEqual(lock['files'][name],lock['upstream_files'][name])
+        self.assertEqual(lock['files']['ocr_core.py'],lock['upstream_files']['ocr_core.py'])
+        self.assertEqual(lock['files']['ocr_core.py'],'bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308')
+        self.assertNotEqual(lock['files']['secure_store.py'],lock['upstream_files']['secure_store.py'])
         self.assertEqual(api.ALLOWED_HINTS,{'business_license','id_front','id_back'})
     def test_real_api_persists_confirms_and_reopens_back_fields(self):
         fields={'issuing_authority':{'value':'SYNTHETIC ONLY','source':'ocr','requires_review':True,'source_boxes':[[[0,0],[1,0],[1,1],[0,1]]]},'valid_from':{'value':'2020-01-02'},'valid_to':{'value':'长期'}}
