@@ -20,6 +20,8 @@ on:
       - tests/test_community_wechat_sp_split_projection.py
       - deploy/community-preview/install-stopped-v1.sh
       - deploy/community-preview/endpoint.cjs
+      - deploy/community-preview/COMMUNITY_SOURCE_SHA.successor
+      - deploy/community-preview/Dockerfile.ui-successor
       - governance/features.json
       - .github/workflows/chatgpt-community-wechat-sp-offline.yml
   workflow_dispatch:
