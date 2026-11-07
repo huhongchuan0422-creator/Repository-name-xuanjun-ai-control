@@ -26,12 +26,14 @@ class SourceBoundary(unittest.TestCase):
         self.assertIn('已有历史材料保留',historical_photo['note'])
         self.assertIn('场景照片不做OCR',historical_photo['note'])
         self.assertIn('wx:if="{{group.ocrKind&&application}}"',native)
-        self.assertIn('识别本组已上传证照',native)
-        self.assertIn('人工核对',native)
+        self.assertIn('识别营业执照',native)
+        self.assertIn('识别身份证人像面',native)
+        self.assertIn('识别身份证国徽面',native)
+        self.assertIn('确认已核对',native)
         host=(ROOT/'scripts/community_platform_host.py').read_text()
         self.assertIn('if args.applicant_ocr_key_reference:',host)
         self.assertIn('EXISTING_OCR_KEY_REFERENCE_REQUIRED',host)
-        self.assertIn('尚未请求识别。识别结果需人工核对，不自动覆盖已填写资料。',native)
+        self.assertIn('点击识别后请核对结果，已填写的资料不会被自动覆盖。',native)
 
     def test_generated_inputs_and_scoped_fields(self):
         data=build()

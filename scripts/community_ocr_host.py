@@ -58,6 +58,8 @@ def _reason(error, stage):
         'OCR_RECOVERY_JOB_NOT_FOUND':'JOB_NOT_FOUND','OCR_RECOVERY_VIEW_NOT_FOUND':'JOB_NOT_FOUND',
         'OCR_RECOVERY_CONFIRMATION_REQUIRED':'CONFIRMATION_FAILED',
         'OCR_RECOVERY_RESULT_NOT_READY':'RESULT_READ_FAILED',
+        'OCR_RECOVERY_MATERIAL_NOT_FOUND':'JOB_NOT_FOUND',
+        'OCR_RECOVERY_MATERIAL_AMBIGUOUS':'IDEMPOTENCY_CONFLICT',
         'SHARED_DRAFT_DUAL_VERSION_CONFLICT':'SOURCE_BINDING_CHANGED',
     }
     if code in exact:return exact[code]
@@ -316,7 +318,15 @@ class HostOcr:
                 view_id=params['recovery_key'] if action=='recover_view' else params['recovery_id']
                 view=self.bridge.store.recovery_receipt(current.tenant_id,current.subject,'view',view_id)
                 if not view:raise PermissionError('OCR_RECOVERY_VIEW_NOT_FOUND')
-                self.bridge._recovery_current(current,params['application'],view)
+                source=self.bridge._recovery_current(current,params['application'],view)
+                if action=='recover_view' and params.get('locator')=={'current_material':True}:
+                    # A completed lookup future is not a uniqueness lease. Other
+                    # original jobs may arrive while the client is between polls.
+                    unique=self.bridge.store.resolve_material_recovery_job(current.tenant_id,current.subject,
+                        params['application'],source['document_type'],source['attachment_id'],source['document_sha256'])
+                    if unique['job_id']!=view['job_id']:
+                        raise PermissionError('OCR_RECOVERY_SOURCE_CHANGED')
+                    self.bridge._recovery_current(current,params['application'],view)
             if action in ('read','confirm'):
                 # A completed API future may wait across several client polls.
                 # Recheck its original job binding immediately before releasing

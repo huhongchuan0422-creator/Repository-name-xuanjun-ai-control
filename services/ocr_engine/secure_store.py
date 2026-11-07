@@ -323,6 +323,24 @@ class SecureSQLiteJobStore:
             db.execute("COMMIT")
             return len(rows)
 
+    def resolve_material_recovery_job(self, tenant_id, subject, application, document_type, attachment_id, document_sha256):
+        """Read-only exact owner/material search. All states count; never choose newest."""
+        expected = dict(tenant_id=tenant_id,subject=subject,onboarding_application_id=application,
+                        document_type=document_type,attachment_id=attachment_id,document_sha256=document_sha256)
+        if any(type(v) is not str or not v for v in expected.values()):
+            raise ValueError('OCR_RECOVERY_BINDING_INVALID')
+        matches=[]
+        with self._connect() as db:
+            rows=db.execute('SELECT ciphertext FROM ocr_jobs WHERE tenant_key=? AND subject_key=?',
+                (self._index(tenant_id),self._index(tenant_id+'/'+subject)))
+            for row in rows:
+                job=self._open(row['ciphertext'])
+                if all(type(job.get(k)) is str and job[k]==v for k,v in expected.items()):
+                    matches.append(job)
+                    if len(matches)>1:raise ValueError('OCR_RECOVERY_MATERIAL_AMBIGUOUS')
+        if not matches:raise ValueError('OCR_RECOVERY_MATERIAL_NOT_FOUND')
+        return self.resolve_recovery_job(tenant_id,subject,application,document_type,job_id=matches[0]['job_id'])
+
     def resolve_recovery_job(self, tenant_id, subject, application, document_type, *, job_id=None, original_key=None):
         """Exact owned lookup only; never create/claim/infer or select latest."""
         if bool(job_id) == bool(original_key):

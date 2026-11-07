@@ -139,13 +139,16 @@ class CommunityOcrBridge:
         if 'ocr:use' not in p.permissions or not self.authorize_application(p, application):
             raise PermissionError('OCR_APPLICATION_DENIED')
         self._context(p)
-        if type(locator) is not dict or set(locator) not in ({'job_id'}, {'original_key'}):
+        material_lookup=type(locator) is dict and set(locator)=={'current_material'} and locator['current_material'] is True
+        if not material_lookup and (type(locator) is not dict or set(locator) not in ({'job_id'}, {'original_key'})):
             raise ValueError('OCR_RECOVERY_EXACT_LOCATOR_REQUIRED')
-        job = self.store.resolve_recovery_job(p.tenant_id,p.subject,application,document_type,**locator)
+        source = self.source(p, application, document_type) if material_lookup else None
+        job = (self.store.resolve_material_recovery_job(p.tenant_id,p.subject,application,document_type,source['attachment_id'],source['document_sha256']) if material_lookup else
+            self.store.resolve_recovery_job(p.tenant_id,p.subject,application,document_type,**locator))
         from scripts.community_ocr_host import current_diagnostic
         context=current_diagnostic()
         if context:context.durable_job_retained=True
-        source = self.source(p, application, document_type)
+        source = source if material_lookup else self.source(p, application, document_type)
         for field in ('subject','tenant_id','document_type','attachment_id','document_sha256'):
             if source.get(field) != job.get(field):
                 raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
@@ -167,6 +170,10 @@ class CommunityOcrBridge:
         # Exact retries return the original snapshot, never a newly bound one.
         result=self.store.recovery_record(p.tenant_id,p.subject,'view',recovery_key,payload,view)
         self._recovery_current(p,application,result)
+        if material_lookup:
+            unique=self.store.resolve_material_recovery_job(p.tenant_id,p.subject,application,document_type,source['attachment_id'],source['document_sha256'])
+            if unique['job_id']!=result['job_id']:raise PermissionError('OCR_RECOVERY_SOURCE_CHANGED')
+            self._recovery_current(p,application,result)
         return result
 
     def _recovery_current(self, p, application, view):

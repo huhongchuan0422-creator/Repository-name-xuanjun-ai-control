@@ -3,7 +3,7 @@
   "source_tree": "cdb3918520b176286af570101c75885bcf07cde4",
   "files": {
     "api.py": "8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e",
-    "secure_store.py": "802d7f2f714273f807d3abd83a1e3896cabe26408664a89a0ef82c2cc0ce6167",
+    "secure_store.py": "30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25",
     "ocr_core.py": "bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308"
   },
   "upstream_files": {
@@ -14,7 +14,7 @@
   "local_successor": {
     "status": "UNPUBLISHED_LOCAL_CANDIDATE",
     "patch_path": "deploy/community-preview/ocr-recovery-api-store.patch",
-    "patch_sha256": "0eefb030a6ec5ff34136ff8604afbdf4fc8b68ce51a9e010597d43cd4d6fedd9",
+    "patch_sha256": "3653a2d7f45348379ec05c558529328b5e1dfa71df3e6d7ea4ec3e6140264d3b",
     "source_files": {
       "api.py": "services/ocr_engine/api.py",
       "secure_store.py": "services/ocr_engine/secure_store.py"

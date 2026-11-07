@@ -43,4 +43,41 @@ class RecoveryBridge(unittest.TestCase):
   self.view();self.source['wechat_version']=5
   with self.assertRaises(ValueError):self.view()
   self.assertEqual(self.store.recovery_receipt('tenant','owner','view','view-key')['binding']['provider_version'],4)
+class MaterialRecovery(unittest.TestCase):
+ setUp=RecoveryBridge.setUp
+ tearDown=RecoveryBridge.tearDown
+ def view(self):return self.b.recovery_view(self.p,'app','id_front',{'current_material':True},'material-view')
+ def test_unique_current_material_without_original_pointer(self):
+  v=self.view();self.assertEqual(v['job_id'],self.job['job_id']);self.assertFalse(v['confirmed'])
+  self.assertEqual(self.store.get(self.job['job_id'],'tenant'),self.original)
+ def test_zero_does_not_create(self):
+  self.source['attachment_id']='replacement'
+  with self.assertRaisesRegex(ValueError,'MATERIAL_NOT_FOUND'):self.view()
+  with self.store._connect() as db:self.assertEqual(db.execute('SELECT count(*) FROM ocr_jobs').fetchone()[0],1)
+ def test_duplicate_all_states_not_newest_or_success_only(self):
+  other=self.store.create('tenant','owner','app','id_front','digest','other-key','material','9',4)
+  with self.assertRaisesRegex(ValueError,'MATERIAL_AMBIGUOUS'):self.view()
+  self.store.update(other['job_id'],status='failed')
+  with self.assertRaisesRegex(ValueError,'MATERIAL_AMBIGUOUS'):self.view()
+ def test_lookup_cross_account_application_document_digest(self):
+  for k,v in [('subject','other'),('tenant_id','other'),('document_type','id_back'),('document_sha256','changed')]:
+   before=dict(self.source);self.source[k]=v
+   with self.assertRaises((ValueError,PermissionError)):self.view()
+   self.source=before
+ def test_revision_changes_during_lookup_refuses_fields(self):
+  original=self.store.resolve_material_recovery_job
+  def changed(*a):
+   job=original(*a);self.source['application_revision']='10';return job
+  self.store.resolve_material_recovery_job=changed
+  with self.assertRaisesRegex(PermissionError,'SOURCE_CHANGED'):self.view()
+ def test_duplicate_created_during_record_refuses_release(self):
+  original=self.store.recovery_record
+  def changed(*a):
+   v=original(*a);self.store.create('tenant','owner','app','id_front','digest','concurrent','material','9',4);return v
+  self.store.recovery_record=changed
+  with self.assertRaisesRegex(ValueError,'MATERIAL_AMBIGUOUS'):self.view()
+ def test_cannot_supply_material_identifiers(self):
+  for locator in ({'current_material':1},{'current_material':True,'attachment_id':'material'},{'current_material':True,'job_id':self.job['job_id']}):
+   with self.assertRaisesRegex(ValueError,'EXACT_LOCATOR_REQUIRED'):self.b.recovery_view(self.p,'app','id_front',locator,'invalid')
+
 if __name__=='__main__':unittest.main()

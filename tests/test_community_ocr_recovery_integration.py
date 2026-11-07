@@ -23,6 +23,13 @@ class RecoveryIntegration(SharedOcrComposition):
   before=self.snapshot();replay=self.recovery_call('apply',dict(application=self.app['application'],recovery_id='recovery-one',confirmation_id='confirmation-one',confirmation_revision=1,writeback_key='writeback-one'))
   self.assertEqual(replay.status_code,200,replay.text);self.assertEqual(saved.json(),replay.json());self.assertEqual(before,self.snapshot())
   self.assertEqual(old,self.store.get(job_id,self.source['tenant_id']))
+ def test_api_material_lookup_without_pointer_or_inference(self):
+  path=self.job();job_id=path.rsplit('/',1)[1];old=self.store.get(job_id,self.source['tenant_id'])
+  self.provider_edit()
+  response=self.recovery_call('view',dict(application=self.app['application'],document_type='business_license',locator={'current_material':True},recovery_key='cold-view'))
+  self.assertEqual(response.status_code,200,response.text);self.assertEqual(response.json()['job_id'],job_id)
+  self.assertFalse(response.json()['confirmed']);self.assertEqual(old,self.store.get(job_id,self.source['tenant_id']))
+  for field in ['subject','tenant_id','onboarding_application_id']:self.assertNotIn(field,response.json())
  def test_stale_recovery_confirmation_cannot_be_promoted(self):
   job_id=self.job().rsplit('/',1)[1]
   r=self.recovery_call('view',dict(application=self.app['application'],document_type='business_license',locator={'job_id':job_id},recovery_key='v2'));self.assertEqual(r.status_code,200,r.text)
@@ -51,12 +58,51 @@ class RecoveryIntegration(SharedOcrComposition):
   host.bridge.authenticate=admitted
   try:
    common=dict(application=self.app['application'])
-   v=host.dispatch(self.fx.token,'shop1',dict(common,action='recover_view',document_type='business_license',locator={'job_id':jobid},recovery_key='host-view'))
+   v=host.dispatch(self.fx.token,'shop1',dict(common,action='recover_view',document_type='business_license',locator={'current_material':True},recovery_key='host-view'))
    self.assertEqual(v['status_code'],200);self.assertEqual(v['result']['job_id'],jobid)
    c=host.dispatch(self.fx.token,'shop1',dict(common,action='recover_confirm',recovery_id='host-view',revision=1,fields={'company_name':'HOST HUMAN'},confirmation_key='host-confirm'))
    self.assertEqual(c['status_code'],200)
    a=host.dispatch(self.fx.token,'shop1',dict(common,action='recover_apply',recovery_id='host-view',confirmation_id='host-confirm',confirmation_revision=1,writeback_key='host-save'))
    self.assertTrue(a['result']['written']);self.assertEqual(calls,[])
    self.assertEqual(old,self.store.get(jobid,self.source['tenant_id']))
+  finally:host.close()
+ def test_host_cold_completed_future_rechecks_uniqueness(self):
+  from unittest.mock import patch
+  from scripts.community_ocr_host import HostOcr
+  from test_community_ocr_bridge import TestAdmission
+  jobid=self.job().rsplit('/',1)[1];old=self.store.get(jobid,self.source['tenant_id']);self.provider_edit()
+  create=self.api.create_app
+  calls=[]
+  def configured(**options):
+   original=options['authenticate']
+   def admitted(token):
+    p=original(token);p.permissions={'ocr:use'};return p
+   options['authenticate']=admitted
+   def no_inference(*args,**kwargs):calls.append(True);raise AssertionError('RECOVERY_MUST_NOT_INFER')
+   options['infer']=no_inference
+   return create(**options)
+  with patch.object(self.api,'create_app',side_effect=configured):host=HostOcr(self.fx.service,'shop1',self.api,self.store)
+  original=host.bridge.authenticate
+  def admitted(token):
+   p=original(token);p.permissions={'ocr:use'};return p
+  host.bridge.authenticate=admitted
+  try:
+   import time
+   from scripts.community_ocr_host import OcrPublicError
+   params=dict(application=self.app['application'],action='recover_view',document_type='business_license',locator={'current_material':True},recovery_key='late-unique')
+   submit=host.worker.submit;completed=[]
+   def slow(fn):
+    def delayed():
+     response=fn();completed.append(response.status_code);time.sleep(6);return response
+    return submit(delayed)
+   with patch.object(host.worker,'submit',side_effect=slow),self.assertRaises(PermissionError) as cm:host.dispatch(self.fx.token,'shop1',params)
+   self.assertEqual(str(cm.exception),'OCR_REQUEST_PENDING')
+   deadline=time.monotonic()+8
+   while time.monotonic()<deadline:host.service_actions();time.sleep(.05)
+   self.assertEqual(completed,[200]);self.assertTrue(host.inflight.done())
+   self.store.create(old['tenant_id'],old['subject'],old['onboarding_application_id'],old['document_type'],old['document_sha256'],'late-second-key',old['attachment_id'],old['application_revision'],old.get('provider_version'))
+   with self.assertRaisesRegex(ValueError,'OCR_RECOVERY_MATERIAL_AMBIGUOUS') as cm:host.dispatch(self.fx.token,'shop1',params)
+   self.assertEqual(cm.exception.ocr_diagnostic['reason'],'IDEMPOTENCY_CONFLICT')
+   self.assertEqual(calls,[]);self.assertEqual(old,self.store.get(jobid,self.source['tenant_id']))
   finally:host.close()
 if __name__=='__main__':unittest.main()
