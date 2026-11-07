@@ -52,6 +52,12 @@ https.get=(url,opts,cb)=>{assert.equal(url,helper.BASE+'/community/health');requ
         workflow=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         job=workflow.split('  mini-isolated-test-preview-354:',1)[1]
         self.assertIn('needs: [test, mini-sdk]',job)
+        job_env=job.split('    env:',1)[1].split('    steps:',1)[0]
+        self.assertNotIn('runner.',job_env)
+        self.assertEqual(job_env.strip(),'COMMUNITY_MINI_OPERATION: preview')
+        self.assertIn("printf 'COMMUNITY_MINI_PROJECT_PATH=%s/community-mini-isolated-354-%s-%s\\n'",job)
+        self.assertIn("printf 'COMMUNITY_PREVIEW_OUTPUT=%s/community-mini-isolated-354-receipt-%s-%s\\n'",job)
+        self.assertIn("printf 'COMMUNITY_MINI_CI_MODULE_ROOT=%s/community-mini-ci\\n'",job)
         self.assertIn('xuanjun-domestic-ops',job)
         self.assertIn('community_mini_isolated_preview_354.cjs prepare',job)
         self.assertIn('community_mini_isolated_preview_354.cjs preview',job)

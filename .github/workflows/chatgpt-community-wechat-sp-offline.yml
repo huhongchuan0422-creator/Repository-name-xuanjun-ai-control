@@ -1524,9 +1524,6 @@ jobs:
     timeout-minutes: 12
     env:
       COMMUNITY_MINI_OPERATION: preview
-      COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-isolated-354-${{ github.run_id }}-${{ github.run_attempt }}
-      COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-isolated-354-receipt-${{ github.run_id }}-${{ github.run_attempt }}
-      COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
     steps:
       - name: Verify existing domestic upload runner before loading credentials
         shell: bash
@@ -1539,6 +1536,9 @@ jobs:
           test -x "$node_bin"
           "$node_bin" --version
           printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_MINI_PROJECT_PATH=%s/community-mini-isolated-354-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_PREVIEW_OUTPUT=%s/community-mini-isolated-354-receipt-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_MINI_CI_MODULE_ROOT=%s/community-mini-ci\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           name: community-phase-integration-evidence
