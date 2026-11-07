@@ -171,7 +171,11 @@ class Contracts(unittest.TestCase):
         w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
         sdk=w.split('  mini-sdk:\n',1)[1].splitlines()[0].strip().removeprefix('if: ')
         preview=w.split('  mini-preview:\n',1)[1].splitlines()[0].strip().removeprefix('if: ')
-        self.assertEqual(sdk,preview)
+        isolated=w.split('  mini-isolated-test-preview-354:\n',1)[1].splitlines()[0].strip().removeprefix('if: ')
+        test_branch="(github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]'))"
+        # The original preview expression remains the exact OR suffix; do not
+        # replace or weaken its legacy product/target/control admission matrix.
+        self.assertEqual(sdk,test_branch+' || '+preview)
         base=dict(github=dict(event_name='workflow_dispatch',sha=CONTROL,ref='refs/heads/'+p.BRANCH,
            event={'head_commit':{'message':''}}),inputs=dict(preview_enabled=True,backend_image_enabled=False,
            preview_source_sha=CONTROL,preview_evidence_run_id=str(p.PRODUCT_RUN),preview_target=p.PROFILE,
@@ -183,8 +187,33 @@ class Contracts(unittest.TestCase):
         for ref in ['refs/heads/main','refs/tags/f131']:
             row=copy.deepcopy(base);row['github']['ref']=ref;cases.append(dict(expected=False,**row))
         program="const p=JSON.parse(process.argv[1]);const f=new Function('github','inputs','contains','return ('+p.expr+')');for(const c of p.cases){if(f(c.github,c.inputs,(s,t)=>String(s||'').includes(t))!==c.expected)throw Error('GUARD');}"
-        r=subprocess.run(['node','-e',program,json.dumps(dict(expr=sdk,cases=cases))],capture_output=True,text=True,timeout=10)
-        self.assertEqual(r.returncode,0,r.stderr)
+        for expr in (sdk,preview):
+            r=subprocess.run(['node','-e',program,json.dumps(dict(expr=expr,cases=cases))],capture_output=True,text=True,timeout=10)
+            self.assertEqual(r.returncode,0,r.stderr)
+        # Only the isolated test code path is added. Mixed legacy markers must
+        # close that new path, while leaving legacy marker semantics unchanged.
+        push_cases=[]
+        for message,sdk_wanted,preview_wanted,isolated_wanted,test_wanted in (
+            ('[mini-test-preview-354]',True,False,True,True),
+            ('ordinary change',False,False,False,False),
+            ('[mini-preview]',True,True,False,False),
+            ('[mini-upload]',True,True,False,False),
+            ('[mini-test-preview-354] [mini-preview]',True,True,False,False),
+            ('[mini-test-preview-354] [mini-upload]',True,True,False,False),
+            ('[mini-test-preview-354] [mini-preview] [mini-upload]',True,True,False,False),
+        ):
+            row=copy.deepcopy(base);row['github']['event_name']='push'
+            row['github']['event']['head_commit']['message']=message
+            push_cases.append((row,(sdk_wanted,preview_wanted,isolated_wanted,test_wanted)))
+        for index,expr in enumerate((sdk,preview,isolated,test_branch)):
+            selected=[dict(expected=wanted[index],**row) for row,wanted in push_cases]
+            r=subprocess.run(['node','-e',program,json.dumps(dict(expr=expr,cases=selected))],capture_output=True,text=True,timeout=10)
+            self.assertEqual(r.returncode,0,r.stderr)
+        for ref in ['refs/heads/main','refs/tags/f131']:
+            row=copy.deepcopy(base);row['github'].update(event_name='push',ref=ref)
+            row['github']['event']['head_commit']['message']='[mini-test-preview-354]'
+            r=subprocess.run(['node','-e',program,json.dumps(dict(expr=isolated,cases=[dict(expected=False,**row)]))],capture_output=True,text=True,timeout=10)
+            self.assertEqual(r.returncode,0,r.stderr)
     def test_download_only_fixed_github_token_request_then_clean_storage_request(self):
         from urllib.error import HTTPError
         requests=[]
