@@ -1292,7 +1292,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1515,4 +1515,108 @@ jobs:
         with:
           name: community-mini-development-${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'upload' || github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
           path: ${{ runner.temp }}/community-mini-preview/
+          retention-days: 7
+
+  mini-isolated-test-preview-354:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]')
+    needs: [test, mini-sdk]
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 12
+    env:
+      COMMUNITY_MINI_OPERATION: preview
+      COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-isolated-354-${{ github.run_id }}-${{ github.run_attempt }}
+      COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-isolated-354-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+      COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
+    steps:
+      - name: Verify existing domestic upload runner before loading credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZvt5t8tlrm8oiZ
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" -ne 0
+          node_bin="$(dirname "$(dirname "$RUNNER_TEMP")")/externals/node20/bin/node"
+          test -x "$node_bin"
+          "$node_bin" --version
+          printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: community-phase-integration-evidence
+          path: ${{ runner.temp }}/community-mini-source-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Verify exact Hosted source package and unpack without git checkout
+        env:
+          COMMUNITY_EXPECTED_SOURCE_SHA256: ${{ needs.test.outputs.source_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'SOURCE'
+          import hashlib,io,json,os,re,stat,zipfile
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          suffix=os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          raw=(temp/('community-mini-source-input-'+suffix)/'community-stage-source.zip').read_bytes()
+          expected=os.environ['COMMUNITY_EXPECTED_SOURCE_SHA256']
+          assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
+          archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
+          assert len(items)<2000 and len(items)==len({i.filename for i in items})
+          assert sum(i.file_size for i in items)<10000000
+          manifest=json.loads(archive.read('MANIFEST.json'))
+          assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
+          assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
+          assert set(archive.namelist())==set(manifest['files'])|{'MANIFEST.json'}
+          assert {'scripts/community_preview_fixed_product.py',
+                  'scripts/community_mini_current_input.py',
+                  'scripts/community_mini_r1_input.py',
+                  'deploy/community-preview/prepare-mini.cjs',
+                  'deploy/community-preview/endpoint.cjs',
+                  'deploy/community-preview/endpoint-profiles.json',
+                  'deploy/community-preview/native-backend-compatibility.json',
+                  'scripts/community_preview_readiness.py',
+                  'clients/community-mini/session.js',
+                  'clients/community-mini/pages/home/index.wxml','scripts/community_mini_isolated_preview_354.cjs'}.issubset(manifest['files'])
+          files={}
+          for item in items:
+              path=Path(item.filename)
+              assert not path.is_absolute() and '..' not in path.parts and chr(92) not in item.filename
+              assert stat.S_ISREG(item.external_attr >> 16)
+              data=archive.read(item)
+              if item.filename!='MANIFEST.json':
+                  assert hashlib.sha256(data).hexdigest()==manifest['files'][item.filename]
+              files[item.filename]=data
+          root=temp/('community-mini-preview-source-'+suffix);root.mkdir(mode=0o700)
+          for name,data in files.items():
+              path=root/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+              with path.open('xb') as out:out.write(data)
+              path.chmod(0o600)
+          print('EXACT_PREVIEW_SOURCE_MANIFEST=PASS; FILES='+str(len(manifest['files'])))
+          SOURCE
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: community-mini-sdk-runtime-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/community-mini-sdk-bundle
+      - name: Verify and unpack credential-free SDK into task temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/community-mini-sdk-bundle"
+          cat sdk.part.* > sdk.tar.gz
+          sha256sum -c sdk.sha256
+          mkdir -p "$RUNNER_TEMP/community-mini-ci"
+          tar --no-same-owner -xzf sdk.tar.gz -C "$RUNNER_TEMP/community-mini-ci"
+      - name: Verify exact isolated source and live test backend before credentials
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        run: '"$COMMUNITY_NODE_BINARY" scripts/community_mini_isolated_preview_354.cjs prepare'
+      - name: Generate isolated test preview using original WeChat secret
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        env:
+          WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
+          WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+        run: '"$COMMUNITY_NODE_BINARY" scripts/community_mini_isolated_preview_354.cjs preview'
+      - name: Preserve isolated preview receipt and code
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-isolated-test-preview-354
+          path: ${{ runner.temp }}/community-mini-isolated-354-receipt-${{ github.run_id }}-${{ github.run_attempt }}/
           retention-days: 7
