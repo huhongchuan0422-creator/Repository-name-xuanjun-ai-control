@@ -16,14 +16,27 @@ function context(env){
  requireTrue(typeof msg==='string'&&msg.includes(MARKER)&&!msg.includes('[mini-upload]')&&!msg.includes('[mini-preview]')&&event.after===env.GITHUB_SHA,'EXACT_TEST_PREVIEW_PUSH_REQUIRED');
  return env.GITHUB_SHA;
 }
-function expectedPrepared(){const h=Object.fromEntries(Object.entries(HASHES).filter(([n])=>!n.endsWith('.test.cjs')));delete h['app.js'];return h;}
+const SESSION_ORIGINAL_TRUST="baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview'";
+const SESSION_TEST_TRUST="baseUrl!=='"+BASE+"'";
+function derivedSession(original){
+ requireTrue(sha(original)===HASHES['session.js']&&original.split(SESSION_ORIGINAL_TRUST).length===2,'EXACT_SESSION_SOURCE_REQUIRED');
+ return original.replace(SESSION_ORIGINAL_TRUST,SESSION_TEST_TRUST);
+}
+function sessionBinding(root){
+ const derived=fs.readFileSync(path.join(root,'session.js'),'utf8');
+ requireTrue(derived.split(SESSION_TEST_TRUST).length===2,'EXACT_TEST_SESSION_TRUST_REQUIRED');
+ const original=derived.replace(SESSION_TEST_TRUST,SESSION_ORIGINAL_TRUST);
+ requireTrue(derivedSession(original)===derived,'TEST_SESSION_SOURCE_MISMATCH');
+ return {source_sha256:HASHES['session.js'],derived_sha256:sha(derived),trusted_path:BASE,transformation:'EXACT_EXISTING_PATH_REBIND_ONLY'};
+}
+function expectedPrepared(){const h=Object.fromEntries(Object.entries(HASHES).filter(([n])=>!n.endsWith('.test.cjs')));delete h['app.js'];delete h['session.js'];return h;}
 function preparedSource(root){
  const actual=sourceManifest(root),expected=expectedPrepared();
  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
  requireTrue(app.includes("baseUrl: '"+BASE+"'")&&app.includes("scene: '"+SCENE+"'")&&app.includes('payments: false, commerce: true'),'TEST_PREVIEW_APP_REQUIRED');
  const original=app.replace("baseUrl: '"+BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+SCENE+"'","baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false");
  requireTrue(sha(original)===HASHES['app.js'],'TEST_PREVIEW_APP_SOURCE_MISMATCH');expected['app.js']=sha(app);
- verifySource(root,expected);return actual;
+ expected['session.js']=sessionBinding(root).derived_sha256;verifySource(root,expected);return actual;
 }
 function verifyHealth(value,now){
  requireTrue(value&&value.status==='READY'&&value.scope==='PROCESS_AND_DATABASE_CONNECTIVITY'&&value.production_acceptance===false&&value.runtime_source_sha===SOURCE&&value.version_source==='IMAGE_BUILD_STAMP'&&Number.isSafeInteger(value.observed_at)&&value.observed_at<=now+30&&now-value.observed_at<=600,'TEST_BACKEND_EXACT_SOURCE_REQUIRED');return value;
@@ -46,7 +59,7 @@ async function prepare(env){
  const updated=original.replace(needle,"baseUrl: '"+BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+SCENE+"'");
  // Health is checked before publishing prepared project and before credential loading.
  const ready=await health();const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(out)),'.isolated-mini-'));
- try{for(const name of fs.readdirSync(source))fs.cpSync(path.join(source,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});fs.writeFileSync(path.join(temp,'app.js'),updated);preparedSource(temp);fs.renameSync(temp,out);}finally{fs.rmSync(temp,{recursive:true,force:true});}
+ try{for(const name of fs.readdirSync(source))fs.cpSync(path.join(source,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});fs.writeFileSync(path.join(temp,'app.js'),updated);fs.writeFileSync(path.join(temp,'session.js'),derivedSession(fs.readFileSync(path.join(source,'session.js'),'utf8')));preparedSource(temp);fs.renameSync(temp,out);}finally{fs.rmSync(temp,{recursive:true,force:true});}
  const output=env.COMMUNITY_PREVIEW_OUTPUT;requireTrue(output&&!fs.existsSync(output),'NEW_TEST_RECEIPT_DIRECTORY_REQUIRED');fs.mkdirSync(output);
  fs.writeFileSync(path.join(output,'backend-readiness.json'),JSON.stringify({status:'BACKEND_HEALTH_VERIFIED',control_source_sha:control,frontend_source_sha:SOURCE,backend_source_sha:ready.runtime_source_sha,baseUrl:BASE,scene:SCENE,compatibility:'EXACT_SOURCE_MATCH',observed_at:Math.floor(Date.now()/1000),login_verified:false,customer_acceptance:false,payment_enabled:false},null,2));
 }
@@ -57,7 +70,7 @@ async function preview(env){
  requireTrue(r.status==='BACKEND_HEALTH_VERIFIED'&&r.control_source_sha===control&&r.frontend_source_sha===SOURCE&&r.backend_source_sha===SOURCE&&r.baseUrl===BASE&&r.scene===SCENE&&r.login_verified===false&&r.customer_acceptance===false&&r.payment_enabled===false&&Number.isSafeInteger(r.observed_at)&&now-r.observed_at<=600&&r.observed_at<=now+30,'FRESH_TEST_READINESS_REQUIRED');
  requireTrue(!fs.existsSync(path.join(out,'receipt.json'))&&!fs.existsSync(path.join(out,'preview.png')),'TEST_PREVIEW_ALREADY_ATTEMPTED');
  await health();
- const receipt={status:'NOT_RUN',operation:'ISOLATED_TEST_PREVIEW_ONLY',head:SOURCE,frontend_source_sha:SOURCE,backend_source_sha:SOURCE,control_source_sha:control,appid:APPID,backend_base_url:BASE,entry_page:'pages/home/index',scene:SCENE,search_query:'scene='+SCENE,public_release:false,development_upload:false,payment_enabled:false,login_verified:false,customer_acceptance:false,source_hashes:preparedSource(projectPath)};
+ const receipt={status:'NOT_RUN',operation:'ISOLATED_TEST_PREVIEW_ONLY',head:SOURCE,frontend_source_sha:SOURCE,backend_source_sha:SOURCE,control_source_sha:control,appid:APPID,backend_base_url:BASE,entry_page:'pages/home/index',scene:SCENE,search_query:'scene='+SCENE,public_release:false,development_upload:false,payment_enabled:false,login_verified:false,customer_acceptance:false,source_hashes:preparedSource(projectPath),session_binding:sessionBinding(projectPath)};
  const save=()=>fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(receipt,null,2));
  requireTrue(env.WECHAT_MINIPROGRAM_APPID===APPID,'EXACT_APPID_REQUIRED');
  let key;try{key=normalizeUploadKey(env.WECHAT_MINIPROGRAM_PRIVATE_KEY);}catch(_){receipt.status='UPLOAD_KEY_INVALID_OR_UNAVAILABLE';save();throw Error(receipt.status);}
@@ -76,4 +89,4 @@ async function preview(env){
  finally{[console.log,console.error,console.warn,process.stdout.write,process.stderr.write]=old;key=null;delete env.WECHAT_MINIPROGRAM_PRIVATE_KEY;save();}
 }
 if(require.main===module){const op=process.argv[2];(op==='prepare'?prepare(process.env):op==='preview'?preview(process.env):Promise.reject(Error('PREPARE_OR_PREVIEW_REQUIRED'))).catch(e=>{console.error('ISOLATED_TEST_PREVIEW_STATUS='+(/^[A-Z0-9_]+$/.test(e.message)?e.message:'LOCAL_SETUP_FAILED'));process.exitCode=2;});}
-module.exports={SOURCE,BASE,SCENE,APPID,HASHES,context,preparedSource,verifyHealth,prepare,preview};
+module.exports={SOURCE,BASE,SCENE,APPID,HASHES,context,preparedSource,verifyHealth,prepare,preview,derivedSession,sessionBinding};

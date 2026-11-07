@@ -67,4 +67,42 @@ https.get=(url,opts,cb)=>{assert.equal(url,helper.BASE+'/community/health');requ
         original=workflow.split('  mini-preview:',1)[1].split('  mini-isolated-test-preview-354:',1)[0]
         self.assertNotIn('[mini-test-preview-354]',original)
 
+    def test_real_prepared_home_login_and_read_transport(self):
+        script=r'''
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const helper=require('./scripts/community_mini_isolated_preview_354.cjs');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'real-home-offline-'));
+const source=path.resolve('clients/community-mini');fs.cpSync(source,root,{recursive:true});
+const sessionPath=path.join(root,'session.js'),raw=fs.readFileSync(sessionPath,'utf8');
+const appPath=path.join(root,'app.js');fs.writeFileSync(appPath,fs.readFileSync(appPath,'utf8').replace("baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false","baseUrl: '"+helper.BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+helper.SCENE+"'"));
+function reset(){for(const k of Object.keys(require.cache))if(k.startsWith(root+path.sep))delete require.cache[k];}
+async function home(failure){
+ reset();let app,page,logins=0,requests=[];
+ global.App=x=>app=x;require(appPath);global.getApp=()=>app;global.Page=x=>page=x;global.getCurrentPages=()=>[page];
+ global.wx={getStorageSync:()=>false,login:o=>{logins++;o.success({code:'OFFLINE_SYNTHETIC_CODE'});},request:o=>{requests.push(o);if(failure){o.fail({errMsg:failure});return;}if(o.url.endsWith('/mini/login'))o.success({statusCode:200,data:{payment_enabled:false,result:{provider:'WECHAT_MINIPROGRAM',payment_enabled:false,session_token:'S'.repeat(40),expires_at:Math.floor(Date.now()/1000)+3600}}});else o.success({statusCode:200,data:{payment_enabled:false,result:{synthetic_only:true}}});}};
+ require(path.join(root,'pages/home/index.js'));page.data={...page.data};page.setData=v=>Object.assign(page.data,v);
+ await page.onLoad({scene:helper.SCENE});return {app,page,logins,requests};
+}
+(async()=>{
+ const baseline=await home();assert.equal(baseline.logins,0);assert.equal(baseline.requests.length,0);assert.equal(baseline.page.data.authenticated,false);
+ fs.writeFileSync(sessionPath,helper.derivedSession(raw));
+ const good=await home();assert.equal(good.logins,1);assert.equal(good.requests.length,1);assert.equal(good.requests[0].url,helper.BASE+'/mini/login');assert.deepEqual(good.requests[0].data,{code:'OFFLINE_SYNTHETIC_CODE'});assert.equal(good.page.scene,helper.SCENE);assert.equal(good.app.globalData.scene,helper.SCENE);assert.equal(good.page.data.authenticated,true);assert.equal(good.page.data.pending,false);
+ await good.page.session.merchant(helper.SCENE,'onboarding',{operation:'mine'});assert.equal(good.requests[1].url,helper.BASE+'/mini/merchant');assert.equal(good.requests[1].header['X-Community-Scene'],helper.SCENE);
+ await good.page.session.commerce(helper.SCENE,'profile_read',{});assert.equal(good.requests[2].url,helper.BASE+'/mini/api');assert.equal(good.requests[2].data.scene,helper.SCENE);
+ assert(good.requests.every(x=>x.url.startsWith(helper.BASE+'/mini/')));
+ const api=require(sessionPath);for(const base of [helper.BASE+'-evil',helper.BASE+'/extra','https://uk.wenwenwenyiyiyi.work/community-preview','https://evil.invalid/community-test-354d1fac'])assert.throws(()=>api.createSession({},base),/TRUSTED_BACKEND_REQUIRED/);
+ for(const [reason,label] of [['request:fail url not in domain list','NET_DOMAIN'],['request:fail certificate','NET_TLS'],['request:fail timeout','NET_TIMEOUT'],['request:fail connection lost','暂时无法连接服务']]){
+  const bad=await home(reason);assert.equal(bad.logins,1);assert.equal(bad.requests.length,1);assert.equal(bad.page.data.authenticated,false);assert.equal(bad.page.data.pending,false);assert(bad.page.data.status.includes(label),bad.page.data.status);
+ }
+ // Both derived-file tampering and an additional trust condition fail hash verification.
+ const patched=fs.readFileSync(sessionPath,'utf8');for(const bad of [raw,patched+'\n// changed',patched.replace(helper.BASE,helper.BASE+'-evil')]){fs.writeFileSync(sessionPath,bad);assert.throws(()=>helper.sessionBinding(root));}fs.writeFileSync(sessionPath,patched);
+ const binding=helper.sessionBinding(root);assert.equal(binding.source_sha256,helper.HASHES['session.js']);assert.notEqual(binding.source_sha256,binding.derived_sha256);assert.equal(binding.trusted_path,helper.BASE);
+ assert.equal(fs.readFileSync(path.join(source,'session.js'),'utf8'),raw);
+ console.log('REAL_HOME_LOGIN_CHAIN_AND_FAILURES_PASS_OFFLINE');
+})().finally(()=>{reset();fs.rmSync(root,{recursive:true,force:true});}).catch(e=>{console.error(e);process.exitCode=1;});
+'''
+        result=subprocess.run(['node','-e',script],cwd=ROOT,text=True,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+        self.assertIn('REAL_HOME_LOGIN_CHAIN_AND_FAILURES_PASS_OFFLINE',result.stdout)
+
 if __name__=='__main__':unittest.main()
