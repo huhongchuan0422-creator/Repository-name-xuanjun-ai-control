@@ -1,0 +1,10 @@
+task_center_digital_twin.test: PASS
+✔ tests/task_center_digital_twin.test.cjs (46.842663ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55.15776

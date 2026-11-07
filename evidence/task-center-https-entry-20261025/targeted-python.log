@@ -1,0 +1,102 @@
+test_external_assets_are_base_relative_and_configuration_is_strict (tests.test_task_center_session_auth.ExternalHttpsContractTests) ... task-center-app: GET /task-center-test/app.js
+task-center-app: GET /task-center-test/admin.js
+task-center-app: GET /task-center-test/login.js
+task-center-app: GET /task-center-test/login.html
+task-center-app: GET /task-center-test/oauth-callback.html
+ok
+test_external_base_path_host_origin_cookie_and_redirect_contract (tests.test_task_center_session_auth.ExternalHttpsContractTests) ... task-center-app: GET /task-center-test/admin.html
+task-center-app: GET /admin.html
+task-center-app: GET /task-center-test/login.html
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: GET /task-center-test/api/session
+task-center-app: POST /task-center-test/api/session/logout
+ok
+test_admin_page_uses_session_and_canonical_asset_query_contract (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... task-center-app: POST /api/session/login
+task-center-app: GET /admin.html
+task-center-app: GET /admin.js
+task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+ok
+test_bad_login_does_not_create_session_and_logs_never_need_secret (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... task-center-app: POST /api/session/login
+ok
+test_identity_cli_appends_distinct_role_subjects_without_overwrite (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... ok
+test_login_cookie_csrf_logout_and_expiry_are_server_enforced (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... task-center-app: GET /api/projection
+task-center-app: POST /api/session/login
+task-center-app: GET /api/session
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/logout
+task-center-app: GET /api/session
+task-center-app: POST /api/session/login
+task-center-app: GET /api/session
+ok
+test_non_admin_roles_complete_submit_rework_dual_review_and_accept (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/login
+task-center-app: POST /api/session/login
+task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+ok
+test_non_admin_session_cannot_read_or_mutate_admin_api (tests.test_task_center_session_auth.SessionAuthIntegrationTests) ... task-center-app: POST /api/session/login
+task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+ok
+test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+ok
+test_model_admin_api_is_server_backed_masked_and_authorized (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: GET /api/admin/model-control
+task-center-app: GET /admin.html
+ok
+test_mutation_and_path_escape_are_rejected (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: POST /api/projection
+task-center-app: GET /../../etc/passwd
+ok
+test_non_loopback_bind_is_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_get_is_read_only_with_active_wal (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: GET /api/projection
+ok
+test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: GET /api/projection
+task-center-app: GET /
+ok
+test_projection_rejects_existing_database_with_missing_schema (tests.test_task_center_app.TaskCenterAppTests) ... task-center-app: GET /api/projection
+ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 13.953s
+
+OK
+{"identity_kind": "TEST_ONLY_FIXTURE", "mode": "0600", "path": "/tmp/tmpk5vsk2gb/prepared-identities.json", "state": "CREATED"}
+{"identity_kind": "TEST_ONLY_FIXTURE", "mode": "0600", "path": "/tmp/tmpk5vsk2gb/prepared-identities.json", "state": "CREATED"}

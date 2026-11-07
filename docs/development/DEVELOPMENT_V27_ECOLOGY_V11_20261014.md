@@ -140,6 +140,16 @@ V2.7补充：资产复用检查之后，只有复杂且通用的功能才判断�
 
 优先建设可重复使用的任务、授权、成本、部署和证据基础。每项能力标记CORE_REQUIRED、CONDITIONAL_REQUIRED或DEFERRED，并记录首次需要它的业务动作；只实现对应最小范围。按第12.5节进入业务，不要求先做完所有远期底座，也不允许将安全、财务完整性和发布门禁降为可选。
 
+### 1.8 官方全生态现实运营闭环（设计，未部署）
+
+Owner实施边界：全生态采用“一个自动化环节完成并验收，再与前后环节完成连接验收，然后接入下一环节”的渐进方式建设，不在起步阶段一次建立全自动生态。当前实际实施范围仅限开发自动化环节；目标运营、自媒体、视频文案、发布、评论、私聊、引流、客户经营、交付运营、财务运营和分析优化在本轮只形成设计与后续路线，不授权启动真实运营，也不授权另建覆盖全部业务的新平台。
+
+玄钧云汇以软件定制、SaaS和Marketplace为商业基础，目标是形成由官方运营AI持续承接的目标驱动现实业务闭环：经营目标与受约束主指标 → 受众和渠道分析 → 自媒体选题、视频与文案生产 → 事实、版权和平台规则审核 → 决定适合的平台、发布时间、频率和版本 → 获准发布、评论服务、获准私聊与引流 → 线索进入CRM → 客户沟通与需求发现 → 多专家咨询、架构与产品经理澄清 → Requirement、SOW、报价和合同确认 → UI、开发、独立QA、独立Audit、部署与验收 → 财务核对、教程、客服、维护、续费与退出 → 可复用模块或方案上架 → 参与者按既有规则取得贡献、合作或销售收益 → 真实结果进入分析优化并产生下一轮任务。
+
+全生态运营不是由一个无限权限Agent包办，也不以聊天记忆作为业务状态。客户、模块、合同、订单、权益、任务、事件、账本和证据继续使用本文既有权威对象；生态运营中心只是原任务登记、调度和受控执行三层的统一入口，统一门面、多角色和运营视图只负责关联、展示和编排，不建立第二套Registry、任务中心、客户库、Analytics、财务账本或状态真相源。目标和Goal Plan按10.21作为原Project/Node Graph的版本化策略扩展，分析优化复用10.7 BUSINESS_METRICS_CENTER。
+
+“无人值守”仅指在已验证权限、合同、预算、地域、质量门禁和批准任务图内自动推进下一节点。需要本人验证、范围或预算扩大、高风险资金和生产动作、外部副作用不明、权限或合规冲突时保存checkpoint并进入人工决定；独立且已获授权的路径可以继续。验收以真实事件链、运行回执和Canonical State为准，本节及本轮新增章节均不因写入文档而视为已经部署。
+
 ## 2 权威数据与安全基础
 
 ### 2.1 权威边界与数据职责
@@ -347,6 +357,14 @@ Token刷新由受控服务执行，失败或撤销立即暂停依赖动作；保
 
 验收包括最小权限、跨租户拒绝、失效与撤销停用、重复回调去重、超时查证、费用计量、敏感日志检查及恢复。API接入是独立可注册能力，复用统一Connector和Task系统；不为每个渠道复制一套接入框架。
 
+### 3.7 完整小功能包与最小交付单元
+
+完整小功能包是任务拆分、工程验收和后续产品化的最小纵向单元，不是第五种商品层级。它可以映射既有Feature、Module或Package，但必须围绕一个可观察的用户目标，具有明确入口、输入、输出、范围内外和失败结果，不能只交付孤立页面、脚本、提示词或helper后即宣称功能完成。
+
+每个小功能包按适用范围同时具备：既有ID和版本引用、依赖与兼容条件、配置Schema、租户和权限边界、UI/API/Workflow或后台任务、模型角色策略、事件与计量、测试与Eval、安全审查、健康检查、部署、Canary、回滚、成本与价格引用、客户说明、教程、支持维护、退出及证据回写。内部helper可以作为实现组成，但未具备独立生命周期和客户价值时不得单独上架、收费或验收。
+
+适用项必须通过；不适用项须写明N/A理由及依据，不得用N/A隐藏尚未完成的依赖。验收至少覆盖新租户配置、无权益和跨租户拒绝、幂等、依赖失效、升级保留配置、停用恢复、用量成本不重复及可重放证据。定义、状态和商业数据复用原Registry、Commercial/Finance、Task和Canonical State；代码完成或单测通过不等于完整小功能包完成。
+
 ### 3.8 免费主体框架与功能板块归属
 
 主体框架免费，包括账号与租户入口、模块目录、基础导航、购买及账单查看、权限入口和必要的自助管理外壳。免费不代表赠送付费业务功能、无限模型调用、服务器、行情、部署或人工服务。没有启用功能模块时，框架不执行对应业务任务；安全与授权基础不能因免费而关闭。
@@ -404,6 +422,14 @@ Router 确定 Provider、Model、Fallback 与 Cost Policy。供应商与权威�
 版本化对象：PROMPT_VERSION、MODEL_ROUTING_VERSION、AGENT_INSTRUCTION_VERSION、TOOL_POLICY_VERSION、GUARD_VERSION、EVAL_SET_VERSION。
 
 模型负责理解和解释；Authority 提供事实，Finance 与 Calculator 提供确定性数字，Workflow 执行动作。报价、余额和收入确认不由自由文本推理直接决定。
+
+### 4.3 角色策略、成本与跨Provider连续性（设计，未部署）
+
+业务只调用能力角色，不把角色等同于Provider、模型商品名或Work会话。当前Owner策略可配置为：经实际评测可用时优先使用现有ChatGPT 5.6能力，减少Work承担可由受控执行角色完成的工作，并保留币安既有工作上下文和容量；低成本API补充摘要、分类、批处理等已验证任务。该策略进入MODEL_ROUTING_VERSION，属于可变配置，不写死为永久架构，也不证明相关账号、额度和接口已经实测。
+
+Router依次核验质量、安全和业务正确性、工具兼容、租户与数据分类、允许地域和保留政策、Provider健康、预算、权威费率、可用额度、延迟及限流。订阅/API余额和重置窗口只有在官方或已验证入口可读且带核验时间时才参与额度重置优化；UNKNOWN不得填0或推测恢复时间，但可以在其他已核实预算、调用上限和Provider策略内继续安全执行。财务、权限、安全、合同、架构、关键QA/Audit和生产变更不得因低价自动降级。
+
+Failover仅能选择通过相应Eval、接口兼容且满足同等地域、权限和数据政策的候选，并继承原task_id、checkpoint、版本、授权和剩余预算。切换不得取得额外写权，提交仍服从10.19唯一Writer；只有缺少执行所必需的预算或权限，或没有合格Provider时，才暂停对应依赖路径。验收覆盖主Provider成功、合规Failover和无合格候选暂停三类用例，并核对模型版本、地域、费用、质量、重复副作用和审计证据。
 
 ## 5 基础设施控制与自动供给
 
@@ -1238,6 +1264,16 @@ SOLUTION_CART 将客户选择转成完整可实施方案，而非只汇总商品
 
 市场说明与模块开发同步完成：适用客户、能力与限制、流程、输入输出、配置、依赖、版本、费用、续费、支持、隐私和退出。付款前检查已有权益避免重复出售；必要部署费、第三方费用及依赖总价不能隐藏。
 
+### 8.7 统一客户门面与端到端交付协同
+
+客户以同一会话和Customer Dashboard作为统一门面，连续承接内容线索、咨询、需求澄清、范围确认、报价、交付和售后，不要求在多个Agent之间重复背景。门面读取既有Customer/Tenant、CRM、Module Registry、Contract/Order/Entitlement、Task/Node/Event/Audit/Evidence；“咨询中、待确认、开发中、验收中、已交付、支持中”等仅是这些权威对象和事件的可重建投影，不另建客户、合同、任务或交付状态库。
+
+AI Product Manager负责统一回应、暴露风险和组织下一步，按需调用内容运营、客服、行业顾问、方案架构、UI/UX、Developer、TEST_QA_ENGINEER、INDEPENDENT_AUDITOR、平台/SRE、教程与客户成功、财务核对等角色。专家向同一项目提交带角色、版本、依据和TASK_ID的结论；PM不得替代Finance核价、确定性Calculator/Ledger、QA、Audit、Release Gate或客户授权。
+
+定制开发按以下八阶段推进：①免费咨询、架构建议与需求确认；②报价确认、合同和首付款，具体付款节点以合同为准；③原型确认；④UI与开发；⑤私有预览和客户反馈；⑥完整正式验收；⑦尾款和正式开通，具体条件以合同为准；⑧教程、支持与维护。Requirement和SOW至少写明目标、范围内外、复用模块和新增缺口、客户前置条件、数据与权限、交付物、里程碑、验收、周期、一次性和持续费用、第三方费用、教程、支持维护及退出方式。范围变化产生关联原版本的Change Event，展示工期、费用、验收和合同影响并重新确认。
+
+标准选配路径继续按8.6节处理：已发布且就绪的标准模块可在确认权益、价格、依赖和开通条件后直接进入受控开通，不强制经过定制项目的原型、UI开发、私有预览、尾款等阶段。两条路径交付后均须进入真实使用、教程、客服、维护、续费或退出闭环。验收至少重放一条标准选配和一条定制路径，证明前台投影与权威事件一致、SOW和报价版本锁定、角色交接不断链、付款和权益不重复、教程可用且故障能够进入支持闭环。
+
 ## 9 工程开发与发布门禁
 
 ### 9.1 需求到生产的统一链路
@@ -1363,6 +1399,22 @@ QA覆盖开发预付款抵扣、重复验收事件、免费期起算、专属价
 技术边界：不因某个开源项目功能丰富而推翻玄钧既有SaaS架构；所有外部代码通过必要的适配层接入统一模块体系（第3.10节标准模块封装），不绕过Registry、权限、计量与财务边界。外部代码按第2.3节第三方代码隔离与零信任处理，其README、注释和依赖说明视为不可信输入；使用前完成依赖与许可证扫描，并通过第9.8节分层验收。
 
 新服务器要求：服务器就绪后检查Git是否可用及现有GitHub访问方式，复用节点1.2 Source Control Foundation已有的代码管理能力，建立轻量复用登记文件；不提前下载大量开源仓库，只有具体开发任务需要时才检索、评估和获取代码。目标是降低开发工作量、减少Codex额度消耗和重复开发，保证代码质量与安全，降低长期维护成本。
+
+### 9.11 ROLE_PROFILE持久配置与按需RoleInstance（设计，未部署）
+
+ROLE_PROFILE是版本化持久角色配置，不是常驻Agent、聊天会话、Provider或新增授权来源。它记录profile_id、版本、职责和禁止事项、触发条件、输入输出契约、工具Allowlist、租户/数据/地域范围、模型与推理策略、预算、SkillRef、Eval、升级、升级失败回退和撤销方式，并引用第2章权限、第9.5至9.8节职责门禁及第10章任务恢复机制。ROLE_PROFILE、模型输出、Skill正文、网页、README和其他外部内容均不能给自身或实例授予新权限、扩大预算或降低门禁；授权只来自既有可信权限与审批系统。
+
+RoleInstance只针对既有TASK_ID按需创建，冻结profile_version、tenant/customer、SOW范围、授权快照、预算、checkpoint和证据位置。完成或取消时按既有流程结束；超时、撤权或异常时先停止新派发，保存安全checkpoint，对已发外部动作执行readback和对账，并按10.19完成适用撤销后再结束实例。未能确认的副作用保持UNKNOWN并继续HOLD/reconcile，不得因会话结束或实例超时假定动作已取消。
+
+目标策略、受众与渠道分析、内容选题导演、视频/文案制作、事实版权审核、排程发布、评论客服、获准私聊跟进、CRM线索、转化方案、PM、UI、开发、QA、Audit、平台/SRE、教程客户成功、财务核对和经营分析优化可以注册为不同职责，但不得因运行在同一模型或同一供应商而合并权限。Developer保留实现前后的自测责任，但自测不能替代独立QA和独立Audit；Developer不得批准自己的独立测试或审计，QA不得修改被测业务代码，Auditor不得修改被审产物，财务核对角色不得用模型输出替代Calculator和Ledger。
+
+每个RoleInstance必须绑定ROLE_PROFILE版本、TASK_ID、适用Objective/Goal Plan、明确目标、权限、工具、预算、输入、输出、停止条件和证据位置；没有已批准任务时不生成内容、不评论、不私聊、不发布、不调用模型空转，也不通过LLM轮询制造工作。常规采集、定时和指标计算优先由程序及事件完成，只有需要判断的节点才唤起相应AI角色。
+
+Skill沿用9.7流程：固定来源、版本和hash，核验许可证、依赖、脚本、权限、出网、数据范围、提示注入风险、测试、审计和Canary后才进入ROLE_PROFILE。升级须做差异检查和适用回归。撤销后禁止新实例和既有实例发起新的Skill调用；在途调用按其实际副作用、幂等、readback、对账和10.19边界安全收束，不能假定瞬间取消。公共知识、平台内部知识和客户专有知识按tenant、合同/SOW、角色和最小必要字段隔离。
+
+验收证明角色可在另一合格执行器上仅凭ROLE_PROFILE、Task事件和checkpoint续跑，不依赖原聊天记忆；实例创建幂等、越权和串租户被拒绝、职责隔离有效、Skill升级可回退、撤销后的新调用被阻止且在途副作用得到核对。
+
+任务中心而非聊天窗口持有执行控制：派发、有效Writer、资源范围、task/attempt/epoch、预算、检查点、事件和恢复状态均来自既有权威服务；对话只作为意图输入、查询和确认入口，不持有执行权威。文件正文及制品进入受控持久文件库，任务记录保存版本、bytes、SHA、可访问引用、读取权限、保留期限和可恢复检查，不仅保存聊天sandbox路径或摘要；交接验收必须由接手者实际读取并核hash，不能把“已有链接”视为已交付。
 
 ## 10 运营调度与恢复治理
 
@@ -1640,6 +1692,60 @@ Owner面板显示项目节点、真实进度、任务与Agent状态、人工待�
 
 更换模型前先验证其要求的接口形式（例如工具调用所用API）与现有适配器兼容，不能只替换模型名称。未完成真实配置验证前，不声明新模型生产可用。东京币安生产配置保持不变，不为节省额度直接修改交易执行、客户生产模型路由或财务生产链路。
 
+### 10.19 唯一Writer强制隔离与断点接管（2026-10-24）
+
+本节仅定义现有 canonical `task_supervisor` 下的 source-level Writer fencing，不建立第二任务中心，不扩展多角色或多模型调度，也不授予生产凭据、部署权限或生产接管能力。完整合同见 `docs/development/TASK_WRITER_FENCING_20261024.md`。
+
+authority 为 UNKNOWN、NONE、VALID、REVOKING、REVOKED；READY 仅为 task 状态。初始 source claim 由 canonical store 执行 NONE→VALID 并唯一分配 max_fence+1/max_epoch+1。接管不经过 REVOKED→NONE/READY 的可抢占窗口：同一 canonical 事务必须重新验证 REVOKED、exact append-once receiver ACK、独立的 resource_scope_digest 与 coverage_digest、完整 resource reservation，再直接分配下一代并转 VALID。旧版 active 迁移一律 UNKNOWN+HOLD；UNKNOWN 只能经可信 source inventory 原子持久 evidence、建立精确 resource reservation 后转 REVOKING，资料不足继续 HOLD。
+
+WriterTicket 只是 selector，digest 只校 bytes；可信 caller_id、run、session、gateway 必须与 canonical assignment 全部精确匹配。Writer API 不接受调用方传入 now，时间只取 Supervisor 注入时钟；要求 trusted_now<valid_until，时钟回退即 HOLD。过期仅阻止新提交，不证明进程或远端 effect 已停止。
+
+resource_key 由可信 source adapter 规范化；空白、control/NUL、空段、dot/dot-dot 与 alias 形式拒绝。不同 task 写同一规范资源同样互斥；完整 resource set 在一个 DB 事务中按固定排序冲突检查并全量登记，禁止部分占有。
+
+可信 Fence 实例固定同一 LOCAL_ONLY lock provider/root，单个 CommitLease 或 revoke 调用不得另传 root。锁根使用 canonical path、owner/mode、NOFOLLOW、inode pin 与 path-swap 检查；资源锁固定排序。CommitLease 在共享锁内重新核 authority/caller/time、CAS PREPARED→DISPATCHING，并持续持锁到 effect 结果持久为 CONFIRMED 或 UNKNOWN，消除 admitted source path 的 final-guard→effect 空窗。本机 flock 只代表 LOCAL_ONLY，不能冒充分布式或生产隔离。
+
+撤销固定为 VALID→REVOKING 先阻断新 intent/CommitLease，再由同一 provider 独占 drain；超时保持 REVOKING 并返回 REVOCATION_NOT_COMPLETED，可在同 generation 重入。成功 drain 必须持久 LOCAL_ONLY receipt，并绑定旧 attempt/lease/fence/epoch/ticket/spec/scope/provider。进程退出释放本地锁不代表远端 effect 已知；PREPARED/DISPATCHING/UNKNOWN 必须逐项可信对账。PREPARED 若确认从未 dispatch 只可转 NOT_APPLIED；UNKNOWN 禁止重新 DISPATCHING，但可追加只读 reconcile evidence 后转 CONFIRMED、NOT_APPLIED 或 CONFLICT。
+
+final receipt 每 operation 仅一次，同文幂等、异文冲突，并必须与 outcome、operation_id、resource_key、operation_marker 一致。CONFIRMED 还必须证明 before→CAS/effect→after 的可归因链，纯内容相等不算 APPLIED_EXACTLY。源码内提供纯离线 FakeTransactionalSink 与 Git CAS validator；Git 模型绑定 repo/branch/base HEAD/before tree/blob/requested after tree/blob/marker/readback commit，任何 branch/head/tree/blob/marker 冲突均不得自动换 HEAD/rebase。
+
+resource invalidation 不能接受任意 `outcome=INVALIDATED` 自述。源码阶段只接受可信 LOCAL_ONLY source adapter 生成的 exact receipt，并绑定 task、旧 attempt/lease/fence/epoch、ticket SHA、spec SHA、scope digest、resource_key、固定 provider 与 evidence。coverage digest 独立于 scope digest，覆盖旧身份/spec/scope、持久 drain receipt 与排序后的各资源 receipt hash；任何 UNKNOWN/MISSING/UNFENCED 均使整个 scope HOLD。
+
+receiver ACK 同一旧 generation append-once，同时绑定旧 task/attempt、新 attempt/owner/entry/caller/run/session/lease/gateway、checkpoint/spec、scope digest 与 coverage digest；同文重放幂等，异文禁止覆盖。
+
+schema/DDL/显式 migration 仍只归 `task_supervisor.py`。普通打开 v1/v2 先走 immutable read-only preflight，在任何 RW open、journal mode 或 wal/shm/journal 变化前返回 HOLD_MIGRATION_REQUIRED；offline migration 仅针对隔离 fixture，并须通过多 failpoint 中断回滚/重启测试和 FK/PK/index/unique schema 校验。生产 DB 迁移仍 NOT_EXECUTED。
+
+源码测试通过最多形成 source-framework candidate。FRAMEWORK_INVENTORY 与 PRODUCTION_INVENTORY 分开；本轮 production verdict 固定 HOLD，未知 capability 也 HOLD，任何 caller 自述 inventory_complete/raw_write_capable 均不得升级。真实 GitHub App/token、唯一 gateway、OS/DB/cloud 权限、生产 inventory、生产 migration 与部署全部另批。3/10/30/60 仍为 PROPOSED_UNADOPTED、DEFAULT_DISABLED；原 5/10/15 supervisor 行为不改。
+
+
+### 10.20 全生态事件编排、自动下一节点与异常人机边界（设计，未部署）
+
+本节不修改10.19，不新增Writer、fencing算法、锁服务、任务中心、状态库、CRM或财务真相源。编排仅关联既有Customer/Tenant、Module/Version、Contract/Entitlement、Node/Task、Ledger Entry及Event/Outbox，以稳定ID、对象版本、tenant_id、correlation/causation和evidence_ref形成可重建只读投影。投影只用于展示、依赖判断和候选节点计算，不反写或替代原权威对象。
+
+权威系统先提交状态和outbox，编排器再按event_id和对象版本去重、排序及回补。仅当当前任务验收完成、依赖PASS、权益、授权、预算和数据地域有效、无HOLD或未对账副作用，且候选属于已批准Node Graph时，才可向既有Task Gateway提交幂等create_task intent。编排不得擅自新增未授权项目、扩大范围、修改SOW、改变价格或绕过Release Gate；符合已批准客户立项或订单策略的新项目，可以按原Customer、Project、Registry、Contract/Order和Task规则生成并进入闭环，但不得另起平行真值。推进粒度须满足3.7完整小功能包，N/A项目须有依据。
+
+跨Provider恢复按4.3继承原task_id、checkpoint、证据、剩余预算和授权。余额或重置时间UNKNOWN时不使用该未知信息做额度重置优化；仍可在其他已核实预算、调用上限和合格Provider策略内继续。任何外部副作用均沿用既有intent、幂等、readback和reconcile语义；并发、接管和最终提交完全服从10.19。Provider切换不能建立第二Writer，也不能因响应超时重新执行已可能生效的发布、采购、付款或客户通知。
+
+现实无人值守只覆盖已授权低风险路径。新目标或范围、授权或合同歧义、执行必需预算或权限缺失、没有合格Provider、地域冲突、首次或高风险资金与生产动作、破坏性变更、重复失败、副作用UNKNOWN、10.19冲突、Skill或凭证撤销、平台要求本人验证等情况，均保存checkpoint并暂停对应依赖路径。升级包只生成一个明确blocker，包含触发事件、已尝试项、成本与风险、证据、回退点、候选方案和待决定问题；Owner、Work、Finance/Approval按既有职责处理，Dot只汇总路由，不能自批。决定后沿用原TASK_ID和checkpoint恢复。
+
+验收要求：投影可删除重建且不损失事实；重复、乱序和迟到事件不重复建任务；获准新项目只通过原对象和规则创建；下一节点可追溯到依赖、授权、权益、预算和验收；Provider中断可从checkpoint合规续跑，无合格候选或缺执行必需预算/权限时暂停对应路径；跨租户读取被拒绝。10.19按真实resource_key冲突域保证同一资源或重叠资源只有有效Writer提交，互不冲突的客户、项目和资源仍可在各自有效authority、lease、预算和容量内并行，不把全平台退化为单线程。真实Canary及异常演练完成前保持DESIGN_NOT_DEPLOYED。
+
+备用执行者B仅在需要接替时按需创建，从Task记录、checkpoint和已核hash制品恢复，不建立双Writer，也不依赖A主动撰写交接或主动交权；控制端仍须依10.19完成旧authority撤销、effect对账、resource coverage和新epoch准入。A恢复时先核当前身份及在途状态：仍VALID才按既定策略续跑；REVOKING、REVOKED或已被更高epoch替代时拒绝新写，已有成果仅作为待核资料保留。用户讨论的“两小时失联身份到期”只作为待落实的租约策略设计，本轮不修改现有runtime阈值；任何超时均不能替代真实resource fence及UNKNOWN副作用对账。
+
+### 10.21 目标驱动全运营任务链与全角色协同（设计，默认不启动）
+
+生态运营中心复用10.1、10.8和10.11的Task Registry、Node Graph、Task Gateway、Dispatcher和受控执行器，作为“任务登记层—调度层—执行层”的统一入口；它不建立第二任务中心、第二调度器或第二Analytics。Objective/Goal Plan作为原Project/Node Graph的版本化策略字段或关联扩展对象，至少记录objective_id、goal_plan_version、业务阶段、主指标、约束指标、基线、目标值、观察窗、归因规则、数据新鲜度、反作弊规则、预算、授权范围、停止条件、owner和evidence_ref。策略更新产生新版本，不回写篡改历史任务和结果。
+
+主指标用于明确“本轮最想完成什么”，可以是经审核内容完成数、合格发布数、有效互动、获准线索、已确认需求、合格报价、正式验收、持续使用或其他有定义的业务结果；不得把浏览量、评论数、私聊数或预测收入直接当作无约束最高目标。每个主指标同时绑定质量、投诉/退订、版权、平台规则、单位经济、预算、交付能力和客户体验等约束。机器人、重复事件、无效线索、垃圾互动、退款、拒付、作弊流量和未满足归因条件的结果不得计入完成数；分母、未归因和UNKNOWN必须保留，模型预测不得冒充真实收入、成交或客户效果。
+
+统一运营链为：Objective/Goal Plan → 受众、渠道和历史证据分析 → 选题及内容计划 → 视频、文案、图片或其他素材制作 → 事实、版权、品牌和商业披露审核 → 渠道、版本、发布时间、时区、频率和预算计划 → 获准排程与发布 → 评论服务和社区维护 → 在用户授权、平台规则和联系政策允许时进行私聊跟进 → CRM线索去重、归因和资格判断 → 免费咨询、架构与需求确认 → 报价、合同和交付 → 教程、客户成功与维护 → 财务、质量和业务结果核对 → 分析优化 → 生成下一轮已批准候选任务。标准选配和定制交付分别沿8.6、8.7执行。
+
+“什么平台发什么、什么时候发”由版本化Channel Profile、账号真实权限、受众语言和时区、内容类型与版权、商业/AI披露、平台规格、已验证历史数据、频率和配额、客户或Owner授权、预算及当前Provider能力共同决定。UNKNOWN保持UNKNOWN；缺渠道权限、素材权利或必要确认时转草稿、待确认或暂停，不使用浏览器模拟、共享账号、垃圾群发或绕过审核。评论和私聊只执行平台允许且已授权的动作，遵守退订、拒收、免打扰、速率、工作时段和数据最小化；不得盲目批量私信、诱导、骚扰或承诺播放量、成交和收益。
+
+分析优化严格复用10.7 BUSINESS_METRICS_CENTER的collect → validate → analyze → hypothesis → policy → eval → canary → measure闭环。A/B或多版本实验预先记录假设、适用受众、主指标和约束、样本与观察窗、预算、停止及回滚条件；不在结果后随意改口径。只有数据质量、归因和权限通过后才调整选题、格式、渠道、发布时间、频率、跟进方式、模型路由或任务优先级；优化建议先形成新Goal Plan/Policy版本，通过Eval和有限Canary后生效，不能由单次高值自动改生产规则。
+
+每个AI实例按9.11承担一个明确角色，并绑定ROLE_PROFILE、TASK_ID、Objective/Goal Plan、权限、工具、预算、输入输出和证据；目标策略、内容导演、制作、审核、渠道排程、评论客服、私聊跟进、CRM、转化、交付、客户成功、财务核对、质量风控和分析优化职责可串成同一任务图，但不得互相替代门禁或共享超范围权限。无批准任务不空转；确定性排程、去重、计数、限流、退订、预算和停止条件由程序执行。
+
+本节默认仅为设计，不授权启动任何真实账号运营、发布、评论、私聊、广告、客户联络或数据采集。首次真实动作仍须满足渠道、账号、内容权利、客户数据、预算、合同、人工确认和第3.5、第8至10章适用门禁。验收须以受控数据重放和沙箱证明目标版本、角色任务、渠道决策、实验归因、反作弊、退订、预算停止、失败恢复和证据闭环；真实Canary批准前不得标为ACTIVE。
 ## 11 方案知识与长期演进
 
 ### 11.1 企业方案知识图谱
@@ -1707,6 +1813,14 @@ PUBLIC_WELFARE_DIGITAL_OPERATIONS_SUITE 组合两套已验证能力，共用 Fou
 小说、短剧、漫剧和音乐作为后续独立自营项目，以同一控制面复用素材、任务、模型计量、版本、审核、授权发布、CRM及经营分析。专业能力分别建设：小说长程一致性，视频连续性与配音，音乐与声音授权等。每项目分开核算资源、调用、版权、人工和收入，既有小说资产先审查复用，不在云汇重复开发或占用交易生产资源。
 
 一次优先验证一个新增内容方向。预设项目预算、内容质量、版权与发布条件、产出节奏和继续或暂停标准；生成内容成功不等于能够变现。样本不足时保持试验，不同时扩展多条内容业务。
+
+### 11.9 自营、客户交付与生态产品化飞轮
+
+飞轮按“内部自营验证 → 限定范围真实客户 → 第二次可复用交付 → 标准模块或方案上架 → 伙伴和贡献者参与 → 新需求回流”推进。自营内容、客户咨询、开发和售后使用同一控制面及证据标准；内部成功不自动证明客户可售，首位客户成功也不自动证明已可公开Marketplace或开放第三方参与。
+
+每次交付把获授权的需求模式、兼容性、实际成本、失败恢复、教程、支持负担和客户效果写回Solution Graph。产品化仅复用合同允许的通用结构、代码、模板和去标识化证据；客户数据、专有配置和商业秘密保持隔离。第二次交付须核对复用率、工时、质量和毛利润是否改善，再决定公开、继续私有、调整价格、维护或下架。
+
+人类贡献报酬、CP、RS、ECV、推荐佣金、客户或开发者收入继续分别服从第6、7章和Ledger，不相互替代。推荐佣金严格沿用6.6节固定一级30%累计毛利润差额规则：累计毛利润G_t = R_t − C_t；累计应计佣金E_t = 30% × MAX(G_t, 0)；当期计提变动ΔE_t = E_t − E_(t−1)。G_t必须包含同一计量范围内的利润、亏损、退款、贷项、拒付及最终核实成本，不能逐笔只挑正毛利润或以新订单绕开历史亏损。计提与支付资格、付款时间和已付款后的冲回处理分开：不得从ΔE_t公式中减已付款金额；负ΔE_t按COMMISSION_REVERSAL记账，已付部分依合同抵扣后续可支付佣金，异常追偿进入财务流程。ECV和贡献记录不得包装为股权、现金兑付权、固定回报或保收益。本节不改变任何比例、累计公式、资金来源、合同权益或收入确认。
 
 ## 12 开发主线与依赖总览
 
@@ -1790,6 +1904,21 @@ V2.7不新增阶段，也不改变既有阶段0至8及68个节点的编号与顺
 
 
 执行边界：本增补先做只读核实与设计；优先复用现有OpenClaw、Dot与调度能力，不重复开发已有组件；不直接修改东京币安生产的模型、交易执行、客户生产模型路由及财务生产链路；新服务器完成真实配置验证前，不声明新模型生产可用；未经Owner明确批准，不增加订阅、不购买大量API额度或服务器资源。
+
+### 12.9 全生态自动运营最小分期与既有阶段映射
+
+本增补不新增阶段、不重排阶段0至8及既有节点；仅按最短依赖把新设计映射到原路线。该表是逐环建设与连接的后续路线，不是当前全部实施清单：本轮只实施开发自动化环节；其余运营、营销、内容、评论私聊、客户经营和财务等环节保持DESIGN_NOT_DEPLOYED。每一环必须先完成自身功能、权限、安全、成本和证据验收，再完成与上一环、下一环的事件、状态、失败恢复及责任边界连接验收，取得相应批准后才可接入；不得因路线已写入文档就自动创建运营任务、启动真实账号动作或新建整套平台。
+
+| 增量批次 | 映射 | 最小结果与退出条件 |
+| --- | --- | --- |
+| A 事实与协议 | 阶段0至1；1.7、1.8、1.9、1.12至1.15 | 只读核实角色、Skill、Provider、额度、地域、任务与现有客户/模块/合同对象；完成ROLE_PROFILE、事件投影和全链路dry-run设计。不得把10.19源码或文档当生产PASS。 |
+| B 一个完整小功能包 | 阶段2至3；2.2、2.4至2.8、2.12、2.17及3.1、3.7至3.9 | 选择一个边界最小但完整的功能，贯通租户、权益、配置、UI/API、测试、部署、教程、支持、计量和回滚；不得以helper代替。 |
+| C 内部真实闭环 | 阶段4 | INTERNAL TENANT先以受控账号或沙箱完成Goal Plan → 选题/视频/文案 → 审核 → 渠道与时段决策 → 获准发布/互动 → CRM线索 → 咨询 → SOW/报价 → 交付 → 使用 → 支持 → 指标回写和优化；问题真实暴露并恢复，但不据此宣称客户生产可用或获得真实账号运营授权。 |
+| D 首个限定客户 | 阶段5至6 | 在各阶段原业务目标内完成一个真实付费、授权和验收闭环；财务、渠道、数据、教程和维护均有证据，不改变阶段5、6原顺序。 |
+| E 第二次复用 | 阶段7 | 对第二客户或联合套件复用同一已发布资产，量化复用率、成本、质量和支持负担，达到产品化门禁。 |
+| F 生态开放 | 阶段8 | 具备多租户、贡献归属、结算、第三方安全、撤销、支持和治理证据后，才扩大Marketplace、伙伴、开发者和新Provider。 |
+
+任一批次未通过只暂停受影响路径；不得跳过安全、资金、合同、QA/Audit、Release Gate或10.19边界，也不得用规划章节、演示或部分CI通过代替退出条件。
 
 ## 13 阶段0 既有资产盘点
 
@@ -2429,6 +2558,20 @@ GEO位于阶段8，自用先于其商用但不改变总体主线。实际产品�
 额度节约与开源复用机制只有取得运行证据后才可标记为已实现，不以本文描述代替完成证明。
 
 验收项：①各服务器实际模型、认证方式与额度来源已登记，Codex套餐额度、API按量费用和其他供应商额度互不混用，无法读取的数据为UNKNOWN且未伪造；②同一TASK_ID不重复创建，同版本下已通过的审计未在无新证据时重跑；③相同失败指纹在一次有依据的修复后仍失败时任务暂停并保存证据包，无无限重试、无目的切换模型和Agent递归；④任务快照字段完整并可追溯到代码、测试与部署证据，上下文裁剪未丢失合同规则、安全边界、财务规则及关键证据；⑤涉及付费认证、采购、第三方平台接入的新路线均有方向与关键限制前置门的决策记录；⑥确定性工作由程序完成，关键任务未因额度不足被自动降级；⑦成本度量以验收通过任务的总成本为单位，节约目标在前20个实际完成节点基线之后核对，未达成时如实记录；⑧新模型在代表性任务验证并确认工具调用接口兼容前不进入生产，东京币安生产配置未被改动；⑨开源代码复用遵守检索限制，评估结果已登记，许可证与第三方代码安全检查完成，外部代码通过适配层接入。
+
+### 22.11 全生态自动运营增补一致性验收
+
+1. 事实口径：1.8、3.7、4.3、8.7、9.11、10.20、10.21、11.9和12.9均为设计；默认不启动真实运营，只有Canonical State、运行回执和获批真实Canary可把对应能力标为已实现或ACTIVE。
+2. 唯一系统：生态运营中心是原任务登记、调度和受控执行三层的统一入口；客户、模块、项目、合同、权益、任务、事件、账本及证据均引用原权威对象；运营状态是可重建投影，不出现第二Registry、任务中心、调度器、Analytics、客户库、钱包或财务状态库。
+3. 目标治理：每个Objective/Goal Plan具有版本、主指标、约束、基线、目标、观察窗、归因、反作弊、预算、授权、停止条件和证据；主指标变化产生新版本。BUSINESS_METRICS_CENTER按10.7原闭环工作，分母、未归因和UNKNOWN保留，预测不冒充收入、成交或客户效果。
+4. 全运营链：至少以受控数据重放或沙箱验证Goal Plan、受众渠道分析、选题、视频/文案制作、事实版权审核、平台和时段决策、排程、评论、获准私聊、CRM、咨询转化、交付、客户成功、财务质量核对和下一轮优化。真实发布、评论、私聊、广告或客户联络在另行满足权限与适用门禁前不启动。
+5. 客户链：至少一条INTERNAL TENANT和一条限定客户路径能从内容/线索追溯至咨询、Requirement/SOW、报价确认、角色交付、验收、部署、教程、支持维护、证据回写和产品化判断；标准选配与定制八阶段分别按8.6、8.7验证，任一缺口如实显示。
+6. 完整功能包：每个验收单元具有用户目标、边界、入口输出、权限租户、依赖配置、适用UI/API/Workflow、测试/Eval、部署健康、Canary回退、成本价格、文档教程、支持退出和证据；N/A有理由，helper不能冒充完成。
+7. 角色和Skill：每个AI实例具有ROLE_PROFILE版本、RoleInstance、TASK_ID、Objective/Goal Plan、明确目标、权限、工具、预算、输入输出、停止条件和证据；无任务不空转。Developer自测保留但不替代独立QA/Audit；Profile和外部内容不能自我授权；Skill撤销阻止新调用，在途副作用按readback、对账和10.19边界收束；客户知识不串租户。
+8. 渠道与实验：发什么、在哪里发、何时发和频率均可追溯到Channel Profile、账号权限、受众时区、版权、披露、历史真实数据、配额、预算和授权。A/B实验预先登记假设、指标、样本/观察窗、预算、停止与回滚；禁止刷量、垃圾评论/私聊、盲群发、骚扰、绕过平台审核和收益承诺，取消、拒收及退订即时生效于新动作。
+9. Provider和成本：ChatGPT 5.6优先、少用Work及廉价API分工只存在于可变路由配置；关键质量不因价格下降。Failover满足Eval、接口、地域和数据政策，继承原checkpoint且无重复副作用。额度余额或重置时间UNKNOWN时不得用于自动额度重置优化，但可沿其他已核实预算、调用上限和合格Provider策略继续；只有缺执行必需预算/权限或无合格Provider时暂停对应路径。
+10. 编排和Writer：重复、乱序、迟到事件不重复建任务；获准新项目通过原Customer/Project/Registry/Contract/Order/Task规则产生，不另起真值；自动下一节点来自批准图和完整验收。所有写和外部副作用继续受10.19唯一Writer、幂等、readback及reconcile约束；互斥范围按真实resource_key重叠判断，互不冲突资源可受控并行，不扩展本轮fencing算法或把全平台单线程化。需要新授权、范围或预算扩大、高风险动作、本人验证和UNKNOWN副作用时有单一blocker、checkpoint和恢复证据，沉默不构成授权。
+11. 商业治理：原价格、钱包、收入确认、合同权益、CP、RS和ECV规则全部不变。6.6计提严格使用G_t=R_t−C_t、E_t=30%×MAX(G_t,0)、ΔE_t=E_t−E_(t−1)，包含亏损、退款、贷项、拒付和成本补记；不得在ΔE_t中减已付款金额。计提、支付资格和实际付款分开，负变动按COMMISSION_REVERSAL处理。人类贡献及生态收益可追溯，不把ECV、贡献或推荐包装为股权、现金兑付或保证收益；阶段0至8及原节点不重排。
 
 ## 23 GEO智能增长后续功能板块详细方案
 

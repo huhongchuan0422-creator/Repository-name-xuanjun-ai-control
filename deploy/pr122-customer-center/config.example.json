@@ -1,0 +1,25 @@
+{
+  "state": "EXAMPLE_NOT_DEPLOYABLE_NO_CREDENTIALS",
+  "keys": {},
+  "active_key": "kms-key-version-required",
+  "authority_verify_key": "PROTECTED_CANONICAL_EXPORTER_KEY_REQUIRED",
+  "backup_key": "SEPARATE_OFFLINE_KEY_REQUIRED",
+  "backup_key_ref": "KMS_MAPPING_NOT_VERIFIED",
+  "task_registry": {
+    "db_path": "/var/lib/xuanjun-task-center/canonical.sqlite",
+    "task_id": "SET_TO_EXACT_EXISTING_TASK_ID",
+    "attempt_id": "SET_TO_EXACT_EXISTING_ATTEMPT_ID",
+    "spec_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "owner": "SET_TO_EXISTING_TASK_OWNER",
+    "writer_scope": "SET_TO_EXISTING_TASK_WRITER_SCOPE",
+    "authority_caller_id": "SET_TO_EXISTING_AUTHORITY_CALLER_ID",
+    "board_id": "SET_TO_EXISTING_BOARD_ID"
+  },
+  "providers": {
+    "smtp": null,
+    "telegram": null,
+    "feishu": null,
+    "secretref": null,
+    "web_ai": null
+  }
+}

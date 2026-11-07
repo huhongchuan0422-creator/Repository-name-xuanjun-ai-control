@@ -1,0 +1,766 @@
+diff --git a/demos/task-center-digital-twin/app.js b/demos/task-center-digital-twin/app.js
+index 10c30424..34efaa2f 100644
+--- a/demos/task-center-digital-twin/app.js
++++ b/demos/task-center-digital-twin/app.js
+@@ -14,8 +14,8 @@
+   function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
+   function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+   function overview(data){return '<section><h1>七板块运行概况</h1><p class="meta">仅显示健康、阻塞与卡点；任务明细在板块工作台。</p><div class="grid">'+data.boards.map(function(b){return '<article class="card"><h2>'+esc(boardNames[b.board_id])+'</h2><div class="metric">'+b.task_count+'</div><p class="status '+esc(b.health)+'">'+esc(b.health)+'</p><p>阻塞 '+b.blocked_count+' · 活跃 '+b.active_count+'</p><button data-go="'+href('board',b.board_id,null,{})+'">进入工作台</button></article>';}).join('')+'</div><h2>异常定位</h2><div class="grid">'+(data.anomalies.length?data.anomalies.map(function(a){return '<article class="card anomaly"><h3>'+esc(a.task_id)+'</h3><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><button data-go="'+href('task',a.board_id,a.task_id,{project:a.project_id})+'">定位卡点</button></article>';}).join(''):'<div class="card empty">当前投影无异常</div>')+'</div></section>';}
+-  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
+-  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>负责人：'+esc(t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', '))+'</p><p>解决责任方：'+esc(anomaly.responsible_party)+'</p><p class="evidence">证据要求：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
++  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE','CANCELLED','CAPABILITY_UNAVAILABLE'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
++  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>任务负责人：'+esc(t.task_responsible_party||t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>影响：'+esc(anomaly.impact)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', ')||'无明确依赖')+'</p><p>任务负责人：'+esc(anomaly.task_responsible_party)+'</p><p>解除责任方：'+esc(anomaly.resolution_responsible_party)+'</p><p class="evidence">证据：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
+   function render(data,route){if(!data||data.mode!=='TEST_ONLY')return '<div class="notice">未加载可信 TEST_ONLY 投影，请先运行 export-ui。</div>';return route.view==='board'?board(data,route):route.view==='task'?task(data,route):overview(data);}
+   function boot(doc,win,data){var app=doc.getElementById('app');function paint(){var route=parseRoute(win.location.hash);app.innerHTML=render(data,route);app.querySelectorAll('[data-go]').forEach(function(x){x.onclick=function(){win.location.hash=x.getAttribute('data-go');};});var apply=doc.getElementById('applyFilter');if(apply)apply.onclick=function(){win.location.hash=href('board',route.board,null,{project:doc.getElementById('projectFilter').value,state:doc.getElementById('stateFilter').value,owner:doc.getElementById('ownerFilter').value});};}win.addEventListener('hashchange',paint);doc.getElementById('home').onclick=function(){win.location.hash='#overview';};paint();}
+   var api={parseRoute:parseRoute,href:href,filterTasks:filterTasks,render:render,boot:boot};
+diff --git a/demos/task-center-digital-twin/digital-twin-data.js b/demos/task-center-digital-twin/digital-twin-data.js
+index d99de17b..7678f468 100644
+--- a/demos/task-center-digital-twin/digital-twin-data.js
++++ b/demos/task-center-digital-twin/digital-twin-data.js
+@@ -1,29 +1,11 @@
+ window.XUANJUN_TWIN_DATA = {
+-  "anomalies": [
+-    {
+-      "anomaly_id": "dependency:delivery-node",
+-      "board_id": "acceptance-delivery",
+-      "depends_on": [
+-        "qa-node"
+-      ],
+-      "evidence_ref": [
+-        "qa-report-demo"
+-      ],
+-      "impact": "TASK_START_BLOCKED",
+-      "missing": "DEPENDENCY_WAIT",
+-      "next_action": "WAIT_DEPENDENCIES",
+-      "node_id": "delivery",
+-      "project_id": "project-demo",
+-      "responsible_party": "developer",
+-      "task_id": "delivery-node"
+-    }
+-  ],
++  "anomalies": [],
+   "boards": [
+     {
+       "active_count": 0,
+-      "blocked_count": 1,
++      "blocked_count": 0,
+       "board_id": "acceptance-delivery",
+-      "health": "BLOCKED",
++      "health": "STABLE",
+       "task_count": 1
+     },
+     {
+@@ -55,11 +37,11 @@ window.XUANJUN_TWIN_DATA = {
+       "task_count": 0
+     },
+     {
+-      "active_count": 0,
++      "active_count": 1,
+       "blocked_count": 0,
+       "board_id": "research-development",
+-      "health": "STABLE",
+-      "task_count": 1
++      "health": "ACTIVE",
++      "task_count": 2
+     },
+     {
+       "active_count": 0,
+@@ -74,36 +56,79 @@ window.XUANJUN_TWIN_DATA = {
+   "schema": 2,
+   "tasks": [
+     {
+-      "attempt_id": "UNKNOWN",
+-      "authority_state": "NONE",
+-      "blocker": "DEPENDENCY_WAIT",
+-      "board_id": "acceptance-delivery",
+-      "checkpoint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+-      "checkpoints": [],
++      "attempt_id": "demo-a-attempt",
++      "authority_state": "VALID",
++      "blocker": null,
++      "board_id": "research-development",
++      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++      "checkpoints": [
++        {
++          "attempt_id": "demo-a-prior",
++          "checkpoint_id": "demo-a-checkpoint",
++          "created_at": 1792914219.1551578,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:shared\"]"
++        }
++      ],
+       "dependencies": [
+         {
+-          "event_id": null,
+-          "producer_task_id": "qa-node",
+-          "required_evidence_ref": "qa-report-demo",
+-          "required_version": "accepted-v1",
+-          "state": "WAITING"
++          "event_attempt_id": "demo-b-attempt",
++          "event_id": "terminal-demo-b-attempt",
++          "producer_task_id": "demo-b",
++          "required_evidence_ref": "evid-demo-b",
++          "required_version": "b-v1",
++          "state": "RECEIVED"
+         }
+       ],
+-      "epoch": null,
+-      "input_version": "accepted-v1",
++      "epoch": 1,
++      "input_version": "input-v1",
+       "module_id": "xuanjun.scheduler.kernel",
+-      "next_action": "WAIT_DEPENDENCIES",
+-      "node_id": "delivery",
+-      "output_version": "delivery-v1",
++      "next_action": "RESUME_ADMISSION_REQUIRED",
++      "node_id": "node-demo-a",
++      "output_version": "a-v1",
+       "preemptible": true,
+       "priority": 100,
+-      "project_id": "project-demo",
++      "project_id": "demo-project",
+       "resources": [
+-        "fake:delivery/demo"
++        "fake:shared"
+       ],
+-      "responsible_party": "developer",
+-      "state": "READY",
+-      "task_id": "delivery-node"
++      "responsible_party": "test-executor",
++      "state": "STARTED",
++      "task_id": "demo-a",
++      "task_responsible_party": "test-executor"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "authority_state": "REVOKED",
++      "blocker": null,
++      "board_id": "acceptance-delivery",
++      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
++      "checkpoints": [
++        {
++          "attempt_id": "demo-b-attempt",
++          "checkpoint_id": "terminal-checkpoint-demo-b-attempt",
++          "created_at": 1792914219.174842,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:demo-b\"]"
++        }
++      ],
++      "dependencies": [],
++      "epoch": 1,
++      "input_version": "input-v1",
++      "module_id": "xuanjun.scheduler.kernel",
++      "next_action": "DEPENDENCIES_RECHECK",
++      "node_id": "node-demo-b",
++      "output_version": "b-v1",
++      "preemptible": true,
++      "priority": 50,
++      "project_id": "demo-project",
++      "resources": [
++        "fake:demo-b"
++      ],
++      "responsible_party": "test-executor",
++      "state": "SUCCESS",
++      "task_id": "demo-b",
++      "task_responsible_party": "test-executor"
+     },
+     {
+       "attempt_id": "UNKNOWN",
+@@ -111,25 +136,107 @@ window.XUANJUN_TWIN_DATA = {
+       "blocker": null,
+       "board_id": "research-development",
+       "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-      "checkpoints": [],
++      "checkpoints": [
++        {
++          "attempt_id": "demo-c-attempt",
++          "checkpoint_id": "demo-c-checkpoint",
++          "created_at": 1792914219.2738826,
++          "effects_state": "RECONCILED",
++          "resources_json": "[\"fake:shared\"]"
++        }
++      ],
+       "dependencies": [],
+       "epoch": null,
+-      "input_version": "candidate-v1",
++      "input_version": "input-v1",
+       "module_id": "xuanjun.scheduler.kernel",
+-      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
+-      "node_id": "qa-acceptance",
+-      "output_version": "accepted-v1",
+-      "preemptible": true,
+-      "priority": 50,
+-      "project_id": "project-demo",
++      "next_action": "RESUME_FROM_CHECKPOINT",
++      "node_id": "node-demo-c",
++      "output_version": "c-v1",
++      "preemptible": false,
++      "priority": 10,
++      "project_id": "demo-project",
+       "resources": [
+-        "fake:qa/demo"
++        "fake:shared"
+       ],
+-      "responsible_party": "qa",
++      "responsible_party": "test-executor",
+       "state": "READY",
+-      "task_id": "qa-node"
++      "task_id": "demo-c",
++      "task_responsible_party": "test-executor"
+     }
+   ],
+-  "tenant_id": "tenant-demo",
+-  "timeline": []
++  "tenant_id": "tenant-a",
++  "timeline": [
++    {
++      "attempt_id": "demo-c-attempt",
++      "event_id": "received-demo-c-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-c-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.1604135,
++      "task_id": "demo-c"
++    },
++    {
++      "attempt_id": "demo-c-attempt",
++      "event_id": "started-demo-c-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-c-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.1604135,
++      "task_id": "demo-c"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "received-demo-b-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-b-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.1680598,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "started-demo-b-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-b-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.1680598,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "demo-b-progress",
++      "evidence_kind": "TEST_RUN",
++      "evidence_ref": "demo-test-run",
++      "kind": "PROGRESS",
++      "observed_at": 1792914219.1724398,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-b-attempt",
++      "event_id": "terminal-demo-b-attempt",
++      "evidence_kind": "TEST_RUN",
++      "evidence_ref": "test-terminal-demo-b-attempt",
++      "kind": "TERMINAL",
++      "observed_at": 1792914219.174842,
++      "task_id": "demo-b"
++    },
++    {
++      "attempt_id": "demo-a-attempt",
++      "event_id": "received-demo-a-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-received-demo-a-attempt",
++      "kind": "RECEIVED",
++      "observed_at": 1792914219.3061314,
++      "task_id": "demo-a"
++    },
++    {
++      "attempt_id": "demo-a-attempt",
++      "event_id": "started-demo-a-attempt",
++      "evidence_kind": "PHASE_EXECUTION",
++      "evidence_ref": "test-started-demo-a-attempt",
++      "kind": "STARTED",
++      "observed_at": 1792914219.3061314,
++      "task_id": "demo-a"
++    }
++  ]
+ };
+diff --git a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+index a1190091..b7c5e8ad 100644
+--- a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
++++ b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+@@ -33,6 +33,11 @@ python3 scripts/reusable_scheduler_cli.py \
+   --test-authority-key 0123456789abcdef0123456789abcdef \
+   export-ui --tenant tenant-a \
+   --output demos/task-center-digital-twin/digital-twin-data.js
++python3 scripts/reusable_scheduler_cli.py \
++  --db /tmp/xuanjun-scheduler-test.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  recover-unstarted --tenant tenant-a \
++  --lock-root /tmp/xuanjun-scheduler-locks
+ ```
+
+ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
+@@ -40,6 +45,8 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ `register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
+ `examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
+ `digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
++`recover-unstarted` 只能在已经确认旧 TEST_ONLY 进程退出后运行；它复用原 Fence
++的 drain、资源失效覆盖和 rollback，不猜测进程存活，也不签发新 Writer。
+
+ ## 事实阶段
+
+@@ -57,12 +64,16 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ - inbox、消费回执和依赖引用使用 `tenant + producer task + producer attempt + event` 完整身份，同名事件可跨任务合法并存。
+ - claim 后 grant CAS 遇过期/撤销时执行本地 fence revocation，并把未开始 claim 收敛回 READY；不会留下 VALID 半启动或重复消费。
+ - Gateway 每次从持久依赖表计算合法等待集合并显式传给原 `Supervisor.scan`；仅 READY 且仍等待的任务免于“未接单超时”，活跃任务不能被豁免。
++- claim 提交后进程退出形成的 `RECEIVED + VALID + 无 STARTED` 持久中间态，可在确认旧进程退出后经 `recover-unstarted` 收敛；旧 grant 标为 `INTERRUPTED`，资源 claim 清除，且不写伪造 STARTED。
++- 依赖等待时长不计入派发超时。完整版本/证据 ACK 被消费时，任务的解锁事实和监督期限在同一事务更新；不会刷新 resume grant 或复用过期许可。
++- 七板块健康同时识别依赖等待、HOLD、FAILURE、CANCELLED 和 CAPABILITY_UNAVAILABLE；任务负责人和解除责任方分字段，证据不足时为 `UNKNOWN`。
+
+ ## 数字孪生界面
+
+ - 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
+ - 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
+ - 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
++- 异常详情分别显示任务负责人、解除责任方、事实影响和证据；不再把受阻任务 owner 自动当成问题解决方。
+ - hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
+ - 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
+
+diff --git a/scripts/reusable_scheduler_cli.py b/scripts/reusable_scheduler_cli.py
+index f24281a6..e4001c2a 100644
+--- a/scripts/reusable_scheduler_cli.py
++++ b/scripts/reusable_scheduler_cli.py
+@@ -112,6 +112,10 @@ def main(argv=None):
+     export.add_argument('--tenant', required=True)
+     export.add_argument('--principal', default='local-viewer')
+     export.add_argument('--output', required=True)
++    recover = sub.add_parser('recover-unstarted')
++    recover.add_argument('--tenant', required=True)
++    recover.add_argument('--principal', default='local-recovery-controller')
++    recover.add_argument('--lock-root', required=True)
+     args = parser.parse_args(argv)
+     if args.command is None:
+         parser.error('a command is required')
+@@ -131,7 +135,7 @@ def main(argv=None):
+             with open(args.graph, 'r') as stream:
+                 graph = json.load(stream)
+             value = gateway.register_graph(context, graph)
+-        else:
++        elif args.command == 'export-ui':
+             context = authority.issue(args.tenant, args.principal)
+             value = gateway.projection(context)
+             output = os.path.realpath(args.output)
+@@ -144,6 +148,14 @@ def main(argv=None):
+                      'tenant_id': value['tenant_id'],
+                      'tasks': len(value['tasks']),
+                      'anomalies': len(value['anomalies'])}
++        else:
++            context = authority.issue(args.tenant, args.principal)
++            fence = Fence(supervisor, os.path.realpath(args.lock_root))
++            try:
++                value = {'recovered': TestOnlyExecutor(
++                    gateway, fence, context).recover_incomplete_starts()}
++            finally:
++                fence.close()
+         print(json.dumps(value, ensure_ascii=False,
+                          sort_keys=True, indent=2))
+     finally:
+diff --git a/scripts/reusable_task_gateway.py b/scripts/reusable_task_gateway.py
+index 0658eb9d..a8a443e1 100644
+--- a/scripts/reusable_task_gateway.py
++++ b/scripts/reusable_task_gateway.py
+@@ -466,9 +466,13 @@ class GatewayKernel(object):
+                       (dep['consumer_task_id'],)).fetchone()[0]
+                     if remaining == 0:
+                         self.db.execute('''UPDATE tasks SET
+-                          next_action='RESUME_ADMISSION_REQUIRED',updated_at=?
++                          next_action='RESUME_ADMISSION_REQUIRED',
++                          receipt_deadline=?,started_deadline=?,
++                          progress_deadline=?,terminal_deadline=?,
++                          handoff_deadline=?,updated_at=?
+                           WHERE task_id=? AND state='READY' ''',
+-                          (now, dep['consumer_task_id']))
++                          (now + 300, now + 600, now + 900, now + 3600,
++                           now + 900, now, dep['consumer_task_id']))
+             self.db.execute('''UPDATE gateway_inbox
+               SET state='CONSUMED_ACK',acked_at=?
+               WHERE tenant_id=? AND producer_task_id=?
+@@ -752,14 +756,28 @@ class GatewayKernel(object):
+             self.db.execute('''DELETE FROM resource_claims WHERE task_id=?
+               AND attempt_id=? AND state='REVOKED' ''',
+               (task_id, attempt_id))
++            interrupted = self.db.execute('''UPDATE gateway_resume_grants
++              SET state='INTERRUPTED' WHERE task_id=?
++              AND state IN ('ELIGIBLE','STARTED')''', (task_id,))
++            interrupted_count = self.db.execute(
++                'SELECT changes()').fetchone()[0]
++            next_action = ('REISSUE_RESUME_GRANT' if interrupted_count
++                           else 'CLAIM_TEST_ONLY_EXECUTOR')
+             self.db.execute('''UPDATE tasks SET state='READY',
+               authority_state='NONE',authority_valid_until=NULL,
+               run_id=?,session_id=?,attempt_id=?,lease_id=?,fence=NULL,
+-              epoch=NULL,next_action='RECHECK_RESUME_ADMISSION',
++              epoch=NULL,next_action=?,
+               writer_stopped='TRUE',effects_reconciled='TRUE',updated_at=?
+               WHERE task_id=? AND authority_state='REVOKED' ''',
+-              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, now, task_id))
+-        return {'state': 'READY', 'claim_state': 'ROLLED_BACK'}
++              (UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, next_action, now, task_id))
++            self.db.execute('''INSERT OR IGNORE INTO gateway_delivery_receipts
++              VALUES (?,?,?,?,?,?)''',
++              (task_id, attempt_id, 'unstarted-recovery:' + attempt_id,
++               'UNSTARTED_CLAIM_RECOVERED',
++               'NO_STARTED_EVENT_RESOURCE_COVERAGE_RECONCILED', now))
++        return {'state': 'READY', 'claim_state': 'ROLLED_BACK',
++                'interrupted_grants': interrupted_count,
++                'next_action': next_action}
+
+     def preemption_decision(self, context, running_task_id, waiting_task_id):
+         """Pure policy verdict; it never stops a process or transfers a lock."""
+@@ -843,6 +861,16 @@ class GatewayKernel(object):
+               attempt_id,checkpoint_id,effects_state,resources_json,created_at
+               FROM gateway_checkpoints WHERE task_id=? ORDER BY created_at''',
+               (row['task_id'],))]
++            dependency_blockers = [dep for dep in deps
++                                   if dep['state'] != 'RECEIVED']
++            blocker = None
++            if dependency_blockers:
++                blocker = 'DEPENDENCY_WAIT'
++            elif row['state'] == 'HOLD':
++                blocker = 'TASK_HOLD'
++            elif row['state'] in ('FAILURE', 'CANCELLED',
++                                  'CAPABILITY_UNAVAILABLE'):
++                blocker = 'TASK_TERMINAL_' + row['state']
+             tasks.append({
+                 'task_id': row['task_id'], 'project_id': row['project_id'],
+                 'node_id': row['node_id'], 'state': row['state'],
+@@ -856,9 +884,9 @@ class GatewayKernel(object):
+                 'module_id': row['module_id'], 'dependencies': deps,
+                 'board_id': row['board_id'],
+                 'responsible_party': row['owner'],
++                'task_responsible_party': row['owner'],
+                 'next_action': row['next_action'],
+-                'blocker': ('DEPENDENCY_WAIT' if any(
+-                    dep['state'] != 'RECEIVED' for dep in deps) else None),
++                'blocker': blocker,
+                 'resources': json.loads(row['resources_json']),
+                 'checkpoints': checkpoints,
+             })
+@@ -884,20 +912,52 @@ class GatewayKernel(object):
+                                       'NO_DATA' if not board_tasks else
+                                       'STABLE')})
+             for task in blocked:
++                unresolved_dependencies = [dep for dep in
++                                           task['dependencies']
++                                           if dep['state'] != 'RECEIVED']
++                resolver = UNKNOWN
++                evidence = []
++                depends_on = []
++                if task['blocker'] == 'DEPENDENCY_WAIT':
++                    depends_on = [dep['producer_task_id'] for dep in
++                                  unresolved_dependencies]
++                    owners = {self.supervisor._task(task_id)['owner']
++                              for task_id in depends_on}
++                    if len(owners) == 1:
++                        resolver = next(iter(owners))
++                    evidence = [dep['required_evidence_ref'] for dep in
++                                unresolved_dependencies]
++                    impact = 'DEPENDENT_TASK_NOT_STARTABLE'
++                else:
++                    terminal = [event for event in events
++                                if event['task_id'] == task['task_id']
++                                and event['kind'] in
++                                ('TERMINAL', 'SUPERVISION_ACTION')]
++                    evidence = [event['evidence_ref'] for event in terminal
++                                if event['evidence_ref']]
++                    impact = {
++                        'TASK_HOLD': 'TASK_EXECUTION_HELD',
++                        'TASK_TERMINAL_FAILURE': 'TASK_TERMINATED_FAILURE',
++                        'TASK_TERMINAL_CANCELLED': 'TASK_TERMINATED_CANCELLED',
++                        'TASK_TERMINAL_CAPABILITY_UNAVAILABLE':
++                            'TASK_CAPABILITY_UNAVAILABLE',
++                    }.get(task['blocker'], UNKNOWN)
++                if not evidence:
++                    evidence = [UNKNOWN]
+                 anomalies.append({
+-                    'anomaly_id': 'dependency:' + task['task_id'],
++                    'anomaly_id': task['blocker'].lower() + ':' +
++                                  task['task_id'],
+                     'board_id': board_id, 'project_id': task['project_id'],
+                     'task_id': task['task_id'], 'node_id': task['node_id'],
+                     'missing': task['blocker'],
+-                    'depends_on': [dep['producer_task_id'] for dep in
+-                                   task['dependencies']
+-                                   if dep['state'] != 'RECEIVED'],
+-                    'impact': 'TASK_START_BLOCKED',
+-                    'responsible_party': task['responsible_party'],
++                    'depends_on': depends_on,
++                    'impact': impact,
++                    'responsible_party': resolver,
++                    'task_responsible_party':
++                        task['task_responsible_party'],
++                    'resolution_responsible_party': resolver,
+                     'next_action': task['next_action'],
+-                    'evidence_ref': [dep['required_evidence_ref'] for dep in
+-                                     task['dependencies']
+-                                     if dep['state'] != 'RECEIVED'],
++                    'evidence_ref': evidence,
+                 })
+         return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
+                 'boards': boards, 'anomalies': anomalies,
+@@ -908,7 +968,8 @@ class GatewayKernel(object):
+ class TestOnlyExecutor(object):
+     """Explicit local adapter that drives real Supervisor/Fence transitions."""
+
+-    def __init__(self, gateway, fence, context, clock=None):
++    def __init__(self, gateway, fence, context, clock=None,
++                 start_claim_hook=None):
+         if not isinstance(fence, Fence):
+             raise ValueError('SOURCE_ONLY_FENCE_REQUIRED')
+         self.gateway = gateway
+@@ -916,6 +977,40 @@ class TestOnlyExecutor(object):
+         self.fence = fence
+         self.context = context
+         self.clock = clock or gateway.clock
++        self.start_claim_hook = start_claim_hook
++
++    def recover_incomplete_starts(self, now=None):
++        """Converge proven-dead TEST_ONLY claims with no STARTED event.
++
++        The caller invokes this only after the prior local process has exited.
++        Existing Fence drain and source invalidation receipts remain the safety
++        proof; this method neither guesses process liveness nor creates a new
++        authority system.
++        """
++        now = self.clock() if now is None else _finite(now, 'time')
++        tenant_id = self.gateway.tenants.verify(self.context)
++        rows = list(self.gateway.db.execute('''SELECT t.task_id,t.attempt_id
++          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
++          WHERE m.tenant_id=? AND t.state='RECEIVED'
++          AND t.authority_state='VALID' AND NOT EXISTS(
++            SELECT 1 FROM events e WHERE e.task_id=t.task_id
++            AND e.attempt_id=t.attempt_id AND e.kind='STARTED')
++          ORDER BY t.task_id''', (tenant_id,)))
++        recovered = []
++        for row in rows:
++            controller = {'role': 'REVOCATION_CONTROLLER',
++                          'caller_id': 'test-restart-recovery'}
++            self.fence.begin_revocation(row['task_id'], controller)
++            self.fence.drain(row['task_id'], controller, timeout=1)
++            self.fence.invalidate_source_resources(
++                row['task_id'], 'restart-unstarted')
++            self.supervisor.complete_revocation(row['task_id'])
++            receipt = self.gateway.rollback_unstarted_claim(
++                self.context, row['task_id'], row['attempt_id'], now=now)
++            receipt.update({'task_id': row['task_id'],
++                            'attempt_id': row['attempt_id']})
++            recovered.append(receipt)
++        return recovered
+
+     def _caller(self, name):
+         return {'caller_id': 'test-writer-' + name,
+@@ -934,6 +1029,8 @@ class TestOnlyExecutor(object):
+         ticket = self.fence.claim(
+             task_id, attempt_id, task['owner'], task['entry'], caller,
+             'lease-' + attempt_id, resources, valid_until)
++        if self.start_claim_hook is not None:
++            self.start_claim_hook(task_id, attempt_id, ticket)
+         try:
+             now = self.clock()
+             if resume_grant_id is not None:
+diff --git a/scripts/task_supervisor.py b/scripts/task_supervisor.py
+index 31985057..db9b0a10 100644
+--- a/scripts/task_supervisor.py
++++ b/scripts/task_supervisor.py
+@@ -1885,7 +1885,13 @@ class Supervisor(object):
+                         and task['next_action'] == 'WAIT_DEPENDENCIES'):
+                     continue
+                 if task['state'] == 'READY':
+-                    base = task['created_at']
++                    # Dependency time is not dispatch latency.  Once the
++                    # Gateway consumes the exact dependency ACK it updates the
++                    # canonical next action and updated_at; supervision starts
++                    # from that durable unlock fact, not graph creation.
++                    base = (task['updated_at'] if task['next_action'] ==
++                            'RESUME_ADMISSION_REQUIRED'
++                            else task['created_at'])
+                 elif task['state'] == 'RECEIVED':
+                     base = task['received_at']
+                 elif task['state'] in ('STARTED','RUNNING'):
+diff --git a/tests/task_center_digital_twin.test.cjs b/tests/task_center_digital_twin.test.cjs
+index 721c6ee5..a932ec11 100644
+--- a/tests/task_center_digital_twin.test.cjs
++++ b/tests/task_center_digital_twin.test.cjs
+@@ -1,12 +1,14 @@
+ 'use strict';
+ const assert=require('assert');
+ const ui=require('../demos/task-center-digital-twin/app.js');
+-const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'TASK_START_BLOCKED',depends_on:['t-b'],responsible_party:'dev',evidence_ref:['qa']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
++const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',evidence_ref:['qa-proof']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
+ assert.deepStrictEqual(ui.parseRoute('#task/research-development/t-a?project=p-1'),{view:'task',board:'research-development',task:'t-a',query:{project:'p-1'}});
+ assert.strictEqual(ui.filterTasks(data,ui.parseRoute('#board/research-development?project=p-1')).length,1);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/七板块运行概况/);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/定位卡点/);
+ assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/研发工作台/);
+ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/异常证据/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/任务负责人：dev/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/解除责任方：qa/);
+ assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
+ console.log('task_center_digital_twin.test: PASS');
+diff --git a/tests/test_reusable_task_gateway.py b/tests/test_reusable_task_gateway.py
+index f71f00c5..8ece76cd 100644
+--- a/tests/test_reusable_task_gateway.py
++++ b/tests/test_reusable_task_gateway.py
+@@ -3,6 +3,7 @@ from __future__ import print_function
+ import json
+ import os
+ import shutil
++import subprocess
+ import tempfile
+ import unittest
+
+@@ -478,6 +479,141 @@ class KernelTests(unittest.TestCase):
+         self.assertEqual({row['task_id']: row['status'] for row in
+             self.gateway.monitor(self.a)}['task-a'], 'WAITING_DEPENDENCY')
+
++    def test_restart_converges_claim_before_grant_consume_without_started(self):
++        self.register_wait_graph()
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
++            ['fake:shared'], 1001)
++        outbox = self.start_complete_b()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 1014)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 1014)
++        self.gateway.acknowledge_event(
++            self.a, 'task-b', 'attempt-b1', outbox['event_id'], 1015)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 2000, 1016)
++        self.fence.close(); self.supervisor.close()
++        scripts = os.path.realpath(os.path.join(
++            os.path.dirname(__file__), '..', 'scripts'))
++        child = r'''
++import os,sys
++sys.path.insert(0,sys.argv[1])
++from task_supervisor import Supervisor
++from task_writer_fence import Fence
++from reusable_task_gateway import GatewayKernel,TestOnlyExecutor,TestTenantAuthority
++clock=lambda:1020.0
++s=Supervisor(sys.argv[2],clock)
++a=TestTenantAuthority(b'k'*32)
++g=GatewayKernel(s,a,clock)
++f=Fence(s,sys.argv[3])
++e=TestOnlyExecutor(g,f,a.issue('tenant-a','owner-a'),clock,
++                   start_claim_hook=lambda *_:os._exit(73))
++e.start('task-a','attempt-a-crash',['fake:shared'],2000,
++        'checkpoint-a0',sys.argv[4])
++'''
++        completed = subprocess.run(
++            [sys.executable, '-c', child, scripts, self.path,
++             self.lock_root, grant['grant_id']], check=False)
++        self.assertEqual(completed.returncode, 73)
++        self.now = 1030
++        self.supervisor = Supervisor(self.path, lambda: self.now)
++        self.gateway = GatewayKernel(
++            self.supervisor, self.authority, lambda: self.now)
++        self.fence = Fence(self.supervisor, self.lock_root)
++        task = self.supervisor._task('task-a')
++        self.assertEqual((task['state'], task['authority_state']),
++                         ('RECEIVED', 'VALID'))
++        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
++          gateway_resume_grants WHERE grant_id=?''',
++          (grant['grant_id'],)).fetchone()[0], 'ELIGIBLE')
++        recovered = self.executor().recover_incomplete_starts(now=self.now)
++        self.assertEqual(len(recovered), 1)
++        self.assertEqual(recovered[0]['interrupted_grants'], 1)
++        task = self.supervisor._task('task-a')
++        self.assertEqual((task['state'], task['authority_state'],
++                          task['next_action']),
++                         ('READY', 'NONE', 'REISSUE_RESUME_GRANT'))
++        self.assertEqual(self.supervisor.db.execute(
++            "SELECT COUNT(*) FROM resource_claims WHERE task_id='task-a'"
++        ).fetchone()[0], 0)
++        self.assertEqual(self.supervisor.db.execute('''SELECT COUNT(*) FROM
++          events WHERE task_id='task-a' AND kind='STARTED' ''').fetchone()[0], 0)
++        self.assertEqual(self.supervisor.db.execute('''SELECT state FROM
++          gateway_resume_grants WHERE grant_id=?''',
++          (grant['grant_id'],)).fetchone()[0], 'INTERRUPTED')
++        self.assertEqual(self.executor().recover_incomplete_starts(now=1031), [])
++
++    def test_long_dependency_wait_unlocks_fresh_dispatch_clock_and_starts(self):
++        self.register_wait_graph()
++        self.gateway.save_waiting_checkpoint(
++            self.a, 'task-a', 'attempt-a0', 'checkpoint-a0', {},
++            ['fake:shared'], 1001)
++        self.now = 10000
++        exe = self.executor()
++        exe.start('task-b', 'attempt-b-long',
++                  ['fake:resource-task-b'], 20000)
++        exe.complete_success('task-b', 'attempt-b-long', 'f' * 64,
++                             [{'evidence_ref': 'evid-b-v3'}], 10001)
++        outbox = self.supervisor.db.execute('''SELECT outbox_id,event_id FROM
++          outbox WHERE task_id='task-b' ''').fetchone()
++        self.gateway.mark_outbox_sent(self.a, outbox['outbox_id'], 'sent', 10002)
++        self.gateway.receive_outbox(self.a, outbox['outbox_id'], 10003)
++        self.gateway.acknowledge_event(
++            self.a, 'task-b', 'attempt-b-long', outbox['event_id'], 10004)
++        actions = self.gateway.scan(self.a, now=10005)
++        self.assertNotIn('task-a', {row['task_id'] for row in actions})
++        task = self.supervisor._task('task-a')
++        self.assertEqual(task['updated_at'], 10004)
++        self.assertEqual(task['receipt_deadline'], 10304)
++        grant = self.gateway.issue_resume_grant(
++            self.a, 'task-a', 'checkpoint-a0', 11000, 10006)
++        self.now = 10007
++        started = self.executor().start(
++            'task-a', 'attempt-a-long', ['fake:shared'], 11000,
++            'checkpoint-a0', grant['grant_id'])
++        self.assertEqual(started['state'], 'STARTED')
++
++    def test_projection_reports_hold_failure_and_distinct_resolver(self):
++        producer = self.task('task-b', 'b-v1', board='acceptance-delivery')
++        producer['owner'] = 'acceptance-owner'
++        consumer = self.task('task-a', 'a-v1', dependencies=[{
++            'task_id': 'task-b', 'version': 'b-v1',
++            'evidence_ref': 'acceptance-proof'}])
++        consumer['owner'] = 'development-owner'
++        held = self.task('task-h', 'h-v1', board='operations')
++        failed = self.task('task-f', 'f-v1', board='customer')
++        self.gateway.register_graph(self.a, self.graph(
++            tasks=[producer, consumer, held, failed]), now=1000)
++        self.now = 1001
++        self.executor().start('task-f', 'attempt-f1',
++                              ['fake:resource-task-f'], 3000)
++        self.supervisor.record(
++            'task-f', 'attempt-f1', 'failed-f1', 'TERMINAL', 1002,
++            'TEST_RUN', 'failure-proof', {
++                'state': 'FAILURE', 'artifact_sha256': UNKNOWN,
++                'writer_stopped': UNKNOWN, 'effects_reconciled': UNKNOWN,
++                'next_action': 'INSPECT_FAILURE',
++                'completion_evidence': []})
++        self.gateway.scan(self.a, now=2000)
++        value = self.gateway.projection(self.a)
++        anomalies = {row['task_id']: row for row in value['anomalies']}
++        self.assertEqual(anomalies['task-a']['task_responsible_party'],
++                         'development-owner')
++        self.assertEqual(anomalies['task-a']['resolution_responsible_party'],
++                         'acceptance-owner')
++        self.assertEqual(anomalies['task-a']['impact'],
++                         'DEPENDENT_TASK_NOT_STARTABLE')
++        self.assertEqual(anomalies['task-f']['impact'],
++                         'TASK_TERMINATED_FAILURE')
++        self.assertEqual(anomalies['task-f']['resolution_responsible_party'],
++                         UNKNOWN)
++        self.assertEqual(anomalies['task-h']['impact'],
++                         'TASK_EXECUTION_HELD')
++        self.assertEqual(anomalies['task-h']['evidence_ref'][0],
++                         'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
++        boards = {row['board_id']: row for row in value['boards']}
++        self.assertEqual(boards['operations']['health'], 'BLOCKED')
++        self.assertEqual(boards['customer']['health'], 'BLOCKED')
++
+     def test_multi_project_cross_board_partial_flow_and_tenant_projection(self):
+         ops = self.task('task-a', 'brief-v1', board='operations')
+         dev = self.task('task-b', 'build-v1', dependencies=[{

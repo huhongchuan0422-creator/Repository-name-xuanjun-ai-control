@@ -1,0 +1,579 @@
+{
+  "anomalies": [
+    {
+      "anomaly_id": "task_terminal_failure:customer-failed",
+      "board_id": "customer",
+      "depends_on": [],
+      "evidence_ref": [
+        "test-customer-failure"
+      ],
+      "impact": "TASK_TERMINATED_FAILURE",
+      "missing": "TASK_TERMINAL_FAILURE",
+      "next_action": "INVESTIGATE_FAILURE",
+      "node_id": "node-customer-failed",
+      "project_id": "project-customer",
+      "resolution_responsible_party": "UNKNOWN",
+      "responsible_party": "UNKNOWN",
+      "task_id": "customer-failed",
+      "task_responsible_party": "customer-owner"
+    },
+    {
+      "anomaly_id": "dependency_wait:ecosystem-waiting",
+      "board_id": "shared-ecosystem",
+      "depends_on": [
+        "maintenance-source"
+      ],
+      "evidence_ref": [
+        "evid-maintenance-source"
+      ],
+      "impact": "DEPENDENT_TASK_NOT_STARTABLE",
+      "missing": "DEPENDENCY_WAIT",
+      "next_action": "WAIT_DEPENDENCIES",
+      "node_id": "node-ecosystem-waiting",
+      "project_id": "project-maintenance",
+      "resolution_responsible_party": "maintainer",
+      "responsible_party": "maintainer",
+      "task_id": "ecosystem-waiting",
+      "task_responsible_party": "ecosystem-owner"
+    }
+  ],
+  "boards": [
+    {
+      "active_count": 0,
+      "blocked_count": 0,
+      "board_id": "acceptance-delivery",
+      "health": "STABLE",
+      "task_count": 1
+    },
+    {
+      "active_count": 0,
+      "blocked_count": 1,
+      "board_id": "customer",
+      "health": "BLOCKED",
+      "task_count": 1
+    },
+    {
+      "active_count": 0,
+      "blocked_count": 0,
+      "board_id": "finance",
+      "health": "STABLE",
+      "task_count": 1
+    },
+    {
+      "active_count": 0,
+      "blocked_count": 0,
+      "board_id": "maintenance",
+      "health": "STABLE",
+      "task_count": 1
+    },
+    {
+      "active_count": 1,
+      "blocked_count": 0,
+      "board_id": "operations",
+      "health": "ACTIVE",
+      "task_count": 1
+    },
+    {
+      "active_count": 1,
+      "blocked_count": 0,
+      "board_id": "research-development",
+      "health": "ACTIVE",
+      "task_count": 2
+    },
+    {
+      "active_count": 0,
+      "blocked_count": 1,
+      "board_id": "shared-ecosystem",
+      "health": "BLOCKED",
+      "task_count": 1
+    }
+  ],
+  "mode": "TEST_ONLY",
+  "observed_at": 1792915896.2627702,
+  "production_status": "NOT_IMPLEMENTED",
+  "schema": 3,
+  "tasks": [
+    {
+      "attempt_id": "demo-a-attempt",
+      "authority_state": "VALID",
+      "authority_valid_until": 1792916496.19513,
+      "blocker": null,
+      "board_id": "research-development",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
+        {
+          "attempt_id": "demo-a-prior",
+          "checkpoint_id": "demo-a-checkpoint",
+          "created_at": 1792915896.1253595,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:shared\"]"
+        }
+      ],
+      "dependencies": [
+        {
+          "event_attempt_id": "demo-b-attempt",
+          "event_id": "terminal-demo-b-attempt",
+          "producer_task_id": "demo-b",
+          "required_evidence_ref": "evid-demo-b",
+          "required_version": "b-v1",
+          "state": "RECEIVED"
+        }
+      ],
+      "effects_reconciled": "UNKNOWN",
+      "epoch": 1,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.1978478,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "RESUME_ADMISSION_REQUIRED",
+      "node_id": "node-demo-a",
+      "output_version": "a-v1",
+      "preemptible": true,
+      "priority": 100,
+      "process_state": "UNKNOWN",
+      "project_id": "demo-project",
+      "received_at": 1792915896.1955395,
+      "resources": [
+        "fake:shared"
+      ],
+      "responsible_party": "test-executor",
+      "run_id": "test-run-demo-a-attempt",
+      "runtime_status": "LIVENESS_UNKNOWN",
+      "session_id": "test-session-demo-a-attempt",
+      "session_state": "UNKNOWN",
+      "started_at": 1792915896.1978478,
+      "state": "STARTED",
+      "task_id": "demo-a",
+      "task_responsible_party": "test-executor",
+      "writer_identity": "test-writer-demo-a-attempt",
+      "writer_stopped": "UNKNOWN"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "authority_state": "REVOKED",
+      "authority_valid_until": null,
+      "blocker": null,
+      "board_id": "acceptance-delivery",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
+        {
+          "attempt_id": "demo-b-attempt",
+          "checkpoint_id": "terminal-checkpoint-demo-b-attempt",
+          "created_at": 1792915896.1449208,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:demo-b\"]"
+        }
+      ],
+      "dependencies": [],
+      "effects_reconciled": "TRUE",
+      "epoch": 1,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.1449208,
+      "last_real_progress_at": 1792915896.1425068,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "DEPENDENCIES_RECHECK",
+      "node_id": "node-demo-b",
+      "output_version": "b-v1",
+      "preemptible": true,
+      "priority": 50,
+      "process_state": "UNKNOWN",
+      "project_id": "demo-project",
+      "received_at": 1792915896.1358175,
+      "resources": [
+        "fake:demo-b"
+      ],
+      "responsible_party": "test-executor",
+      "run_id": "test-run-demo-b-attempt",
+      "runtime_status": "SUCCESS",
+      "session_id": "test-session-demo-b-attempt",
+      "session_state": "UNKNOWN",
+      "started_at": 1792915896.1381707,
+      "state": "SUCCESS",
+      "task_id": "demo-b",
+      "task_responsible_party": "test-executor",
+      "writer_identity": "test-writer-demo-b-attempt",
+      "writer_stopped": "TRUE"
+    },
+    {
+      "attempt_id": "customer-failed-1",
+      "authority_state": "REVOKED",
+      "authority_valid_until": null,
+      "blocker": "TASK_TERMINAL_FAILURE",
+      "board_id": "customer",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
+        {
+          "attempt_id": "customer-failed-1",
+          "checkpoint_id": "terminal-checkpoint-customer-failed-1",
+          "created_at": 1792915896.234829,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:customer-failed\"]"
+        }
+      ],
+      "dependencies": [],
+      "effects_reconciled": "TRUE",
+      "epoch": 1,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.234829,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "INVESTIGATE_FAILURE",
+      "node_id": "node-customer-failed",
+      "output_version": "v1",
+      "preemptible": true,
+      "priority": 40,
+      "process_state": "UNKNOWN",
+      "project_id": "project-customer",
+      "received_at": 1792915896.2273185,
+      "resources": [
+        "fake:customer-failed"
+      ],
+      "responsible_party": "customer-owner",
+      "run_id": "test-run-customer-failed-1",
+      "runtime_status": "FAILURE",
+      "session_id": "test-session-customer-failed-1",
+      "session_state": "UNKNOWN",
+      "started_at": 1792915896.229686,
+      "state": "FAILURE",
+      "task_id": "customer-failed",
+      "task_responsible_party": "customer-owner",
+      "writer_identity": "test-writer-customer-failed-1",
+      "writer_stopped": "TRUE"
+    },
+    {
+      "attempt_id": "UNKNOWN",
+      "authority_state": "NONE",
+      "authority_valid_until": null,
+      "blocker": "DEPENDENCY_WAIT",
+      "board_id": "shared-ecosystem",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [],
+      "dependencies": [
+        {
+          "event_attempt_id": null,
+          "event_id": null,
+          "producer_task_id": "maintenance-source",
+          "required_evidence_ref": "evid-maintenance-source",
+          "required_version": "m-v1",
+          "state": "WAITING"
+        }
+      ],
+      "effects_reconciled": "UNKNOWN",
+      "epoch": null,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.2143354,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "WAIT_DEPENDENCIES",
+      "node_id": "node-ecosystem-waiting",
+      "output_version": "e-v1",
+      "preemptible": true,
+      "priority": 40,
+      "process_state": "UNKNOWN",
+      "project_id": "project-maintenance",
+      "received_at": null,
+      "resources": [
+        "fake:ecosystem-waiting"
+      ],
+      "responsible_party": "ecosystem-owner",
+      "run_id": "UNKNOWN",
+      "runtime_status": "WAITING_DEPENDENCY",
+      "session_id": "UNKNOWN",
+      "session_state": "UNKNOWN",
+      "started_at": null,
+      "state": "READY",
+      "task_id": "ecosystem-waiting",
+      "task_responsible_party": "ecosystem-owner",
+      "writer_identity": "UNKNOWN",
+      "writer_stopped": "UNKNOWN"
+    },
+    {
+      "attempt_id": "UNKNOWN",
+      "authority_state": "NONE",
+      "authority_valid_until": null,
+      "blocker": null,
+      "board_id": "finance",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [],
+      "dependencies": [],
+      "effects_reconciled": "UNKNOWN",
+      "epoch": null,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.2059953,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
+      "node_id": "node-finance-awaiting",
+      "output_version": "v1",
+      "preemptible": true,
+      "priority": 40,
+      "process_state": "UNKNOWN",
+      "project_id": "project-customer",
+      "received_at": null,
+      "resources": [
+        "fake:finance-awaiting"
+      ],
+      "responsible_party": "finance-owner",
+      "run_id": "UNKNOWN",
+      "runtime_status": "WAITING_AUTHORIZATION",
+      "session_id": "UNKNOWN",
+      "session_state": "UNKNOWN",
+      "started_at": null,
+      "state": "READY",
+      "task_id": "finance-awaiting",
+      "task_responsible_party": "finance-owner",
+      "writer_identity": "UNKNOWN",
+      "writer_stopped": "UNKNOWN"
+    },
+    {
+      "attempt_id": "UNKNOWN",
+      "authority_state": "NONE",
+      "authority_valid_until": null,
+      "blocker": null,
+      "board_id": "maintenance",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [],
+      "dependencies": [],
+      "effects_reconciled": "UNKNOWN",
+      "epoch": null,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.2143354,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
+      "node_id": "node-maintenance-source",
+      "output_version": "m-v1",
+      "preemptible": true,
+      "priority": 40,
+      "process_state": "UNKNOWN",
+      "project_id": "project-maintenance",
+      "received_at": null,
+      "resources": [
+        "fake:maintenance-source"
+      ],
+      "responsible_party": "maintainer",
+      "run_id": "UNKNOWN",
+      "runtime_status": "WAITING_AUTHORIZATION",
+      "session_id": "UNKNOWN",
+      "session_state": "UNKNOWN",
+      "started_at": null,
+      "state": "READY",
+      "task_id": "maintenance-source",
+      "task_responsible_party": "maintainer",
+      "writer_identity": "UNKNOWN",
+      "writer_stopped": "UNKNOWN"
+    },
+    {
+      "attempt_id": "operations-unknown-1",
+      "authority_state": "VALID",
+      "authority_valid_until": 1792916496.259525,
+      "blocker": null,
+      "board_id": "operations",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [],
+      "dependencies": [],
+      "effects_reconciled": "UNKNOWN",
+      "epoch": 1,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.2627702,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "CLAIM_TEST_ONLY_EXECUTOR",
+      "node_id": "node-operations-unknown",
+      "output_version": "o-v1",
+      "preemptible": true,
+      "priority": 40,
+      "process_state": "UNKNOWN",
+      "project_id": "project-operations",
+      "received_at": 1792915896.2597442,
+      "resources": [
+        "fake:operations-unknown"
+      ],
+      "responsible_party": "operator",
+      "run_id": "test-run-operations-unknown-1",
+      "runtime_status": "LIVENESS_UNKNOWN",
+      "session_id": "test-session-operations-unknown-1",
+      "session_state": "UNKNOWN",
+      "started_at": 1792915896.2627702,
+      "state": "STARTED",
+      "task_id": "operations-unknown",
+      "task_responsible_party": "operator",
+      "writer_identity": "test-writer-operations-unknown-1",
+      "writer_stopped": "UNKNOWN"
+    },
+    {
+      "attempt_id": "UNKNOWN",
+      "authority_state": "NONE",
+      "authority_valid_until": null,
+      "blocker": null,
+      "board_id": "research-development",
+      "checkpoint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkpoints": [
+        {
+          "attempt_id": "demo-c-attempt",
+          "checkpoint_id": "demo-c-checkpoint",
+          "created_at": 1792915896.176167,
+          "effects_state": "RECONCILED",
+          "resources_json": "[\"fake:shared\"]"
+        }
+      ],
+      "dependencies": [],
+      "effects_reconciled": "TRUE",
+      "epoch": null,
+      "executor_instance_id": "UNKNOWN",
+      "input_version": "input-v1",
+      "last_event_at": 1792915896.130976,
+      "last_real_progress_at": null,
+      "module_id": "xuanjun.scheduler.kernel",
+      "next_action": "RESUME_FROM_CHECKPOINT",
+      "node_id": "node-demo-c",
+      "output_version": "c-v1",
+      "preemptible": false,
+      "priority": 10,
+      "process_state": "UNKNOWN",
+      "project_id": "demo-project",
+      "received_at": 1792915896.1281219,
+      "resources": [
+        "fake:shared"
+      ],
+      "responsible_party": "test-executor",
+      "run_id": "UNKNOWN",
+      "runtime_status": "WAITING_AUTHORIZATION",
+      "session_id": "UNKNOWN",
+      "session_state": "UNKNOWN",
+      "started_at": 1792915896.130976,
+      "state": "READY",
+      "task_id": "demo-c",
+      "task_responsible_party": "test-executor",
+      "writer_identity": "test-writer-demo-c-attempt",
+      "writer_stopped": "TRUE"
+    }
+  ],
+  "tenant_id": "tenant-app",
+  "timeline": [
+    {
+      "attempt_id": "demo-c-attempt",
+      "event_id": "received-demo-c-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-c-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792915896.130976,
+      "task_id": "demo-c"
+    },
+    {
+      "attempt_id": "demo-c-attempt",
+      "event_id": "started-demo-c-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-c-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792915896.130976,
+      "task_id": "demo-c"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "received-demo-b-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-b-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792915896.1381707,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "started-demo-b-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-b-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792915896.1381707,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "demo-b-progress",
+      "evidence_kind": "TEST_RUN",
+      "evidence_ref": "demo-test-run",
+      "kind": "PROGRESS",
+      "observed_at": 1792915896.1425068,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-b-attempt",
+      "event_id": "terminal-demo-b-attempt",
+      "evidence_kind": "TEST_RUN",
+      "evidence_ref": "test-terminal-demo-b-attempt",
+      "kind": "TERMINAL",
+      "observed_at": 1792915896.1449208,
+      "task_id": "demo-b"
+    },
+    {
+      "attempt_id": "demo-a-attempt",
+      "event_id": "received-demo-a-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-demo-a-attempt",
+      "kind": "RECEIVED",
+      "observed_at": 1792915896.1978478,
+      "task_id": "demo-a"
+    },
+    {
+      "attempt_id": "demo-a-attempt",
+      "event_id": "started-demo-a-attempt",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-demo-a-attempt",
+      "kind": "STARTED",
+      "observed_at": 1792915896.1978478,
+      "task_id": "demo-a"
+    },
+    {
+      "attempt_id": "customer-failed-1",
+      "event_id": "received-customer-failed-1",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-customer-failed-1",
+      "kind": "RECEIVED",
+      "observed_at": 1792915896.229686,
+      "task_id": "customer-failed"
+    },
+    {
+      "attempt_id": "customer-failed-1",
+      "event_id": "started-customer-failed-1",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-customer-failed-1",
+      "kind": "STARTED",
+      "observed_at": 1792915896.229686,
+      "task_id": "customer-failed"
+    },
+    {
+      "attempt_id": "customer-failed-1",
+      "event_id": "terminal-customer-failed-1",
+      "evidence_kind": "TEST_RUN",
+      "evidence_ref": "test-customer-failure",
+      "kind": "TERMINAL",
+      "observed_at": 1792915896.234829,
+      "task_id": "customer-failed"
+    },
+    {
+      "attempt_id": "operations-unknown-1",
+      "event_id": "received-operations-unknown-1",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-received-operations-unknown-1",
+      "kind": "RECEIVED",
+      "observed_at": 1792915896.2627702,
+      "task_id": "operations-unknown"
+    },
+    {
+      "attempt_id": "operations-unknown-1",
+      "event_id": "started-operations-unknown-1",
+      "evidence_kind": "PHASE_EXECUTION",
+      "evidence_ref": "test-started-operations-unknown-1",
+      "kind": "STARTED",
+      "observed_at": 1792915896.2627702,
+      "task_id": "operations-unknown"
+    }
+  ]
+}

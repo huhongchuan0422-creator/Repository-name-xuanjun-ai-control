@@ -1,0 +1,46 @@
+................................................................task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 400 -
+.task-center-app: "GET /api/admin/model-control HTTP/1.1" 403 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /admin.html HTTP/1.1" 200 -
+.task-center-app: "POST /api/projection HTTP/1.1" 405 -
+task-center-app: "GET /../../etc/passwd HTTP/1.1" 404 -
+..task-center-app: "GET /api/projection HTTP/1.1" 200 -
+.task-center-app: "GET /api/projection HTTP/1.1" 200 -
+task-center-app: "GET / HTTP/1.1" 200 -
+.task-center-app: "GET /api/projection HTTP/1.1" 500 -
+.task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "POST /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/admin/model-control HTTP/1.1" 200 -
+task-center-app: "GET /api/projection HTTP/1.1" 200 -
+.
+----------------------------------------------------------------------
+Ran 72 tests in 29.959s
+
+OK

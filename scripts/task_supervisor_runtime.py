@@ -135,7 +135,9 @@ def publish(path, value):
             os.unlink(temporary)
 
 
-def tick(path, identity, snapshot, now=None):
+def tick(path, identity, snapshot, now=None, correction_interval=300):
+    if type(correction_interval) is not int or correction_interval not in (180,300):
+        raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if snapshot != path + '.supervisor.json':
         raise ValueError('HOLD_FIXED_SNAPSHOT_REQUIRED')
     lock = acquire_lock(path + '.supervisor.lock')
@@ -151,6 +153,7 @@ def tick(path, identity, snapshot, now=None):
         _validate_open_file(path, ledger_fd, identity)
         now = time.time() if now is None else now
         actions = supervisor.scan(now=now)
+        corrections = supervisor.correction_rules(now=now, interval=correction_interval)
         source_hashes = {}
         sources = {
             'task_supervisor.py': supervisor_module.__file__,
@@ -188,6 +191,7 @@ def tick(path, identity, snapshot, now=None):
                   'source_sha256': source_hashes,
                   'ledger_identity': _identity(info), 'tasks': tasks,
                   'actions': actions, 'pending_outbox': pending,
+                  'correction_rules': corrections,
                   'provider': 'CAPABILITY_UNAVAILABLE',
                   'dispatch_performed': False, 'authority_effect': 'NONE',
                   'liveness': 'TICK_OBSERVED_NOT_CONTINUOUS_SERVICE_PROOF'}
@@ -201,6 +205,38 @@ def tick(path, identity, snapshot, now=None):
         os.close(lock)
 
 
+class CorrectionObserver:
+    """Existing HTTP server loop hook; no extra thread/service and no DB writes."""
+    def __init__(self,path,interval=300,clock=None):
+        if type(interval) is not int or interval not in (180,300):raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+        self.path=os.path.realpath(path);self.interval=interval;self.clock=clock or time.monotonic
+        self.next_check=0;self.last_report=None
+        self.status={'state':'WAITING_FIRST_OBSERVATION','interval':interval,'dispatch_performed':False,'business_mutation':False}
+    def tick(self):
+        now=self.clock()
+        if now<self.next_check:return
+        self.next_check=now+self.interval
+        db=None
+        try:
+            from urllib.parse import quote
+            if not os.path.isfile(self.path):raise ValueError('EXISTING_DB_REQUIRED')
+            db=sqlite3.connect('file:'+quote(self.path)+'?mode=ro',uri=True,timeout=.25)
+            db.row_factory=sqlite3.Row;db.execute('PRAGMA query_only=ON');db.execute('PRAGMA temp_store=MEMORY')
+            deadline=time.monotonic()+0.1
+            db.set_progress_handler(lambda:1 if time.monotonic()>deadline else 0,500)
+            s=Supervisor.__new__(Supervisor);s.db=db;s.path=self.path;s.clock=time.time
+            report=s.correction_rules(now=time.time(),interval=self.interval,observe_only=True)
+            self.last_report=report
+            self.status={'state':'OBSERVATION_ONLY','interval':self.interval,'observed_at':time.time(),
+                'task_count':len(report['observations']),'finding_count':sum(len(x['findings']) for x in report['observations']),
+                'dispatch_performed':False,'business_mutation':False}
+        except Exception:
+            self.last_report=None
+            self.status={'state':'HOLD_OBSERVATION_SOURCE_UNAVAILABLE','interval':self.interval,'dispatch_performed':False,'business_mutation':False}
+        finally:
+            if db is not None:db.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ledger', required=True)
@@ -208,6 +244,7 @@ def main():
     parser.add_argument('--release-manifest', required=True)
     parser.add_argument('--release-manifest-sha256', required=True)
     parser.add_argument('--verify-only', action='store_true')
+    parser.add_argument('--correction-interval', type=int, choices=(180,300), default=300)
     args = parser.parse_args()
     if os.geteuid() == 0:
         raise SystemExit('HOLD_NONROOT_SUPERVISOR_REQUIRED')
@@ -218,7 +255,7 @@ def main():
                       'authority_effect': 'NONE'}
         else:
             result = tick(args.ledger, args.ledger_identity,
-                          args.ledger + '.supervisor.json')
+                          args.ledger + '.supervisor.json', correction_interval=args.correction_interval)
         print(json.dumps(result, sort_keys=True, allow_nan=False))
     except Exception as error:
         code = str(error)

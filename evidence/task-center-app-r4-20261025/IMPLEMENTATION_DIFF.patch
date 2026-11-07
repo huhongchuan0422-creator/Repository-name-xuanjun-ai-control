@@ -1,0 +1,734 @@
+diff --git a/demos/task-center-digital-twin/app.js b/demos/task-center-digital-twin/app.js
+index 34efaa2f..86fa948e 100644
+--- a/demos/task-center-digital-twin/app.js
++++ b/demos/task-center-digital-twin/app.js
+@@ -1,24 +1,19 @@
+ (function(root){
+   'use strict';
+   var boardNames={operations:'运营',customer:'客户','research-development':'研发','acceptance-delivery':'验收交付',maintenance:'维护','shared-ecosystem':'共享生态',finance:'财务'};
+-  function parseRoute(hash){
+-    var raw=(hash||'#overview').replace(/^#/,'').split('?');
+-    var parts=raw[0].split('/').filter(Boolean), query={};
+-    new URLSearchParams(raw[1]||'').forEach(function(v,k){query[k]=v;});
+-    return {view:parts[0]||'overview',board:parts[1]||null,task:parts[2]||null,query:query};
+-  }
+-  function href(view,board,task,query){
+-    var path='#'+view+(board?'/'+board:'')+(task?'/'+task:'');
+-    var params=new URLSearchParams(query||{}).toString(); return path+(params?'?'+params:'');
+-  }
+-  function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
++  function parseRoute(hash){var raw=(hash||'#overview').replace(/^#/,'').split('?'),parts=raw[0].split('/').filter(Boolean),query={};new URLSearchParams(raw[1]||'').forEach(function(v,k){query[k]=v;});return {view:parts[0]||'overview',board:parts[1]||null,task:parts[2]||null,query:query};}
++  function href(view,board,task,query){var path='#'+view+(board?'/'+encodeURIComponent(board):'')+(task?'/'+encodeURIComponent(task):'');var params=new URLSearchParams(query||{}).toString();return path+(params?'?'+params:'');}
+   function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+-  function overview(data){return '<section><h1>七板块运行概况</h1><p class="meta">仅显示健康、阻塞与卡点；任务明细在板块工作台。</p><div class="grid">'+data.boards.map(function(b){return '<article class="card"><h2>'+esc(boardNames[b.board_id])+'</h2><div class="metric">'+b.task_count+'</div><p class="status '+esc(b.health)+'">'+esc(b.health)+'</p><p>阻塞 '+b.blocked_count+' · 活跃 '+b.active_count+'</p><button data-go="'+href('board',b.board_id,null,{})+'">进入工作台</button></article>';}).join('')+'</div><h2>异常定位</h2><div class="grid">'+(data.anomalies.length?data.anomalies.map(function(a){return '<article class="card anomaly"><h3>'+esc(a.task_id)+'</h3><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><button data-go="'+href('task',a.board_id,a.task_id,{project:a.project_id})+'">定位卡点</button></article>';}).join(''):'<div class="card empty">当前投影无异常</div>')+'</div></section>';}
+-  function board(data,route){var tasks=filterTasks(data,route);return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE','CANCELLED','CAPABILITY_UNAVAILABLE'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div><div class="grid">'+(tasks.length?tasks.map(function(t){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.project_id)+' / '+esc(t.node_id)+'</div></div><span>'+esc(t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,route.query)+'">详情</button></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</div></section>';}
+-  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var anomaly=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>执行事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>状态：'+esc(t.state)+'</p><p>任务负责人：'+esc(t.task_responsible_party||t.responsible_party)+'</p><p>attempt：'+esc(t.attempt_id)+'</p><p>epoch：'+esc(t.epoch)+'</p></article><article class="card"><h2>下一动作与阻塞</h2><p>下一动作：'+esc(t.next_action)+'</p><p>阻塞：'+esc(t.blocker||'无')+'</p><p>权限：'+esc(t.authority_state)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p></article></div>'+(anomaly?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(anomaly.missing)+'</p><p>影响：'+esc(anomaly.impact)+'</p><p>依赖：'+esc(anomaly.depends_on.join(', ')||'无明确依赖')+'</p><p>任务负责人：'+esc(anomaly.task_responsible_party)+'</p><p>解除责任方：'+esc(anomaly.resolution_responsible_party)+'</p><p class="evidence">证据：'+esc(anomaly.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
+-  function render(data,route){if(!data||data.mode!=='TEST_ONLY')return '<div class="notice">未加载可信 TEST_ONLY 投影，请先运行 export-ui。</div>';return route.view==='board'?board(data,route):route.view==='task'?task(data,route):overview(data);}
+-  function boot(doc,win,data){var app=doc.getElementById('app');function paint(){var route=parseRoute(win.location.hash);app.innerHTML=render(data,route);app.querySelectorAll('[data-go]').forEach(function(x){x.onclick=function(){win.location.hash=x.getAttribute('data-go');};});var apply=doc.getElementById('applyFilter');if(apply)apply.onclick=function(){win.location.hash=href('board',route.board,null,{project:doc.getElementById('projectFilter').value,state:doc.getElementById('stateFilter').value,owner:doc.getElementById('ownerFilter').value});};}win.addEventListener('hashchange',paint);doc.getElementById('home').onclick=function(){win.location.hash='#overview';};paint();}
+-  var api={parseRoute:parseRoute,href:href,filterTasks:filterTasks,render:render,boot:boot};
++  function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
++  function overview(data){return '<section><div class="title-row"><div><h1>七板块运行概况</h1><p class="meta">只展示健康、阻塞和卡点；项目、任务、AI事实下沉。</p></div><button id="refresh">刷新同源数据</button></div><div class="grid">'+data.boards.map(function(b){return '<article class="card board-card"><div class="board-icon">'+esc(boardNames[b.board_id].slice(0,1))+'</div><h2>'+esc(boardNames[b.board_id])+'</h2><div class="metric">'+b.task_count+'</div><p class="status '+esc(b.health)+'">'+esc(b.health)+'</p><p>阻塞 '+b.blocked_count+' · 活跃 '+b.active_count+'</p><button data-go="'+href('board',b.board_id,null,{})+'">进入工作台</button></article>';}).join('')+'</div><h2>异常直达</h2><div class="grid">'+(data.anomalies.length?data.anomalies.map(function(a){return '<article class="card anomaly"><h3>'+esc(a.task_id)+'</h3><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><p>解除责任：'+esc(a.resolution_responsible_party)+'</p><button data-go="'+href('task',a.board_id,a.task_id,{project:a.project_id})+'">定位卡点</button></article>';}).join(''):'<div class="card empty">当前投影无异常</div>')+'</div></section>';}
++  function taskCard(t,query){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.node_id)+'</div></div><span>'+esc(t.runtime_status||t.state)+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,query)+'">详情</button></article>';}
++  function board(data,route){var tasks=filterTasks(data,route),projects={};tasks.forEach(function(t){(projects[t.project_id]||(projects[t.project_id]=[])).push(t);});return '<section><div class="crumb"><button data-go="#overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE','CANCELLED','CAPABILITY_UNAVAILABLE'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div>'+(Object.keys(projects).length?Object.keys(projects).sort().map(function(p){return '<article class="project-group"><div class="project-head"><div><h2>'+esc(p)+'</h2><span>'+projects[p].length+' 个任务</span></div><button data-go="'+href('project',route.board,p,route.query)+'">项目详情</button></div><div class="grid">'+projects[p].map(function(t){return taskCard(t,route.query);}).join('')+'</div></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</section>';}
++  function project(data,route){var projectId=decodeURIComponent(route.task||''),tasks=data.tasks.filter(function(t){return t.board_id===route.board&&t.project_id===projectId;}),blocked=tasks.filter(function(t){return t.blocker;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',route.board,null,route.query)+'">'+esc(boardNames[route.board])+'</button> / '+esc(projectId)+'</div><h1>'+esc(projectId)+'</h1><p class="meta">'+tasks.length+' 个任务 · '+blocked.length+' 个卡点；项目详情来自同一 SQLite 投影。</p><div class="grid">'+tasks.map(function(t){return taskCard(t,route.query);}).join('')+'</div></section>';}
++  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var a=data.anomalies.find(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-go="#overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>任务事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>权威状态：'+esc(t.state)+'</p><p>运行投影：'+esc(t.runtime_status||t.state)+'</p><p>负责人：'+esc(t.task_responsible_party)+'</p><p>下一动作：'+esc(t.next_action)+'</p></article><article class="card"><h2>执行角色与进程事实</h2><p>Writer：'+esc(t.writer_identity)+'</p><p>run / session：'+esc(t.run_id)+' / '+esc(t.session_id)+'</p><p>attempt / epoch：'+esc(t.attempt_id)+' / '+esc(t.epoch)+'</p><p>会话：'+esc(t.session_state)+'</p><p>进程：'+esc(t.process_state)+'</p><p>最后真实进展：'+esc(t.last_real_progress_at)+'</p></article><article class="card"><h2>权限与断点</h2><p>权限：'+esc(t.authority_state)+'</p><p>有效期：'+esc(t.authority_valid_until)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p><p>副作用对账：'+esc(t.effects_reconciled)+'</p><p>Writer停止：'+esc(t.writer_stopped)+'</p></article></div>'+(a?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><p>依赖：'+esc(a.depends_on.join(', ')||'无明确依赖')+'</p><p>任务负责人：'+esc(a.task_responsible_party)+'</p><p>解除责任方：'+esc(a.resolution_responsible_party)+'</p><p>下一动作：'+esc(a.next_action)+'</p><p class="evidence">证据：'+esc(a.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
++  function render(data,route){if(!data||data.mode!=='TEST_ONLY')return '<div class="notice">未加载可信 TEST_ONLY 投影。</div>';return route.view==='board'?board(data,route):route.view==='project'?project(data,route):route.view==='task'?task(data,route):overview(data);}
++  function loadProjection(fetcher){return fetcher('/api/projection',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('PROJECTION_HTTP_'+r.status);return r.json();}).then(function(d){if(d.mode!=='TEST_ONLY')throw new Error('TEST_ONLY_PROJECTION_REQUIRED');return d;});}
++  function boot(doc,win,snapshot){var app=doc.getElementById('app'),mode=doc.getElementById('dataMode'),data=snapshot||null;function paint(){app.innerHTML=render(data,parseRoute(win.location.hash));wire();}function wire(){app.querySelectorAll('[data-go]').forEach(function(x){x.onclick=function(){win.location.hash=x.getAttribute('data-go');};});var route=parseRoute(win.location.hash),apply=doc.getElementById('applyFilter');if(apply)apply.onclick=function(){win.location.hash=href('board',route.board,null,{project:doc.getElementById('projectFilter').value,state:doc.getElementById('stateFilter').value,owner:doc.getElementById('ownerFilter').value});};var refresh=doc.getElementById('refresh');if(refresh)refresh.onclick=reload;}function reload(){if(!win.fetch||win.location.protocol==='file:'){mode.textContent='SNAPSHOT_ONLY · 非实时';paint();return Promise.resolve(data);}mode.textContent='LOADING';return loadProjection(win.fetch.bind(win)).then(function(next){data=next;mode.textContent='LIVE_SQLITE · '+next.observed_at;paint();return next;}).catch(function(e){mode.textContent='LOAD_FAILED · '+e.message;paint();});}win.addEventListener('hashchange',paint);doc.getElementById('home').onclick=function(){win.location.hash='#overview';};reload();}
++  var api={parseRoute:parseRoute,href:href,filterTasks:filterTasks,render:render,loadProjection:loadProjection,boot:boot};
+   if(typeof module!=='undefined')module.exports=api;
+   if(root.document)boot(root.document,root,root.XUANJUN_TWIN_DATA);
+ })(typeof window!=='undefined'?window:this);
+diff --git a/demos/task-center-digital-twin/index.html b/demos/task-center-digital-twin/index.html
+index 05c2713b..d97dbe09 100644
+--- a/demos/task-center-digital-twin/index.html
++++ b/demos/task-center-digital-twin/index.html
+@@ -7,7 +7,7 @@
+   <link rel="stylesheet" href="styles.css">
+ </head>
+ <body>
+-  <header><div><strong>玄钧全生态数字孪生</strong><span>TEST_ONLY · 非生产控制台</span></div><button id="home">七板块总览</button></header>
++  <header><div><strong>玄钧全生态数字孪生</strong><span id="dataMode">TEST_ONLY · 数据加载中</span></div><button id="home">七板块总览</button></header>
+   <main id="app" aria-live="polite"></main>
+   <script src="digital-twin-data.js"></script>
+   <script src="app.js"></script>
+diff --git a/demos/task-center-digital-twin/styles.css b/demos/task-center-digital-twin/styles.css
+index ffe48e42..6be9ab63 100644
+--- a/demos/task-center-digital-twin/styles.css
++++ b/demos/task-center-digital-twin/styles.css
+@@ -1 +1 @@
+-:root{font-family:Inter,"Noto Sans SC",sans-serif;color:#10243e;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}header{min-height:64px;background:#10243e;color:white;display:flex;align-items:center;justify-content:space-between;padding:12px 24px}header span{display:block;font-size:12px;color:#9fc4e8;margin-top:3px}button,select,input{font:inherit;min-height:40px}button{cursor:pointer;border:1px solid #b8c8da;border-radius:8px;background:white;color:#163454;padding:8px 12px}main{max-width:1280px;margin:auto;padding:24px}.notice{padding:12px;border-left:4px solid #d77800;background:#fff6e8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}.card{background:white;border:1px solid #d8e2ed;border-radius:12px;padding:16px;box-shadow:0 2px 10px #13304a0d}.card h2,.card h3{margin-top:0}.metric{font-size:28px;font-weight:700}.meta{color:#5e7187;font-size:13px}.status{display:inline-flex;gap:6px;align-items:center;font-weight:650}.status:before{content:"●"}.BLOCKED:before{content:"▲"}.NO_DATA:before{content:"○"}.ACTIVE:before{content:"▶"}.STABLE:before{content:"✓"}.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.task{display:grid;grid-template-columns:minmax(150px,2fr) repeat(3,minmax(100px,1fr));gap:10px;align-items:center}.anomaly{border-left:4px solid #bc2525}.crumb{margin-bottom:14px;color:#536a82}.evidence{overflow-wrap:anywhere}.empty{text-align:center;padding:48px;color:#64788e}@media(max-width:768px){main{padding:14px}.task{grid-template-columns:1fr}.toolbar>*{width:100%}header{padding:10px 14px}}
++:root{font-family:Inter,"Noto Sans SC",sans-serif;color:#10243e;background:radial-gradient(circle at top right,#e8f3ff 0,#f5f8fc 38%,#eef3f8 100%)}*{box-sizing:border-box}body{margin:0;min-height:100vh}header{min-height:72px;background:linear-gradient(115deg,#0b2541,#153f68 62%,#176b78);color:white;display:flex;align-items:center;justify-content:space-between;padding:12px 28px;box-shadow:0 8px 28px #0c274333}header strong{font-size:20px;letter-spacing:.03em}header span{display:block;font-size:12px;color:#b9d8ef;margin-top:5px}button,select,input{font:inherit;min-height:40px}button{cursor:pointer;border:1px solid #bdd0e2;border-radius:9px;background:#fff;color:#163454;padding:8px 13px;transition:.15s}button:hover{border-color:#2c7da0;box-shadow:0 3px 12px #24577720}main{max-width:1320px;margin:auto;padding:30px 24px 64px}.title-row,.project-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.notice{padding:14px;border-left:4px solid #d77800;background:#fff6e8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:16px}.card{background:#ffffffdc;backdrop-filter:blur(8px);border:1px solid #d4e0ec;border-radius:16px;padding:18px;box-shadow:0 8px 28px #13304a0e}.board-card{position:relative;overflow:hidden}.board-card:after{content:"";position:absolute;right:-24px;top:-24px;width:90px;height:90px;border-radius:50%;background:#2c7da00c}.board-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#e2f1f6;color:#14556b;font-weight:800}.card h2,.card h3{margin-top:10px}.metric{font-size:34px;font-weight:750}.meta{color:#5e7187;font-size:13px}.status{display:inline-flex;gap:6px;align-items:center;font-weight:650}.status:before{content:"●"}.BLOCKED:before{content:"▲"}.NO_DATA:before{content:"○"}.ACTIVE:before{content:"▶"}.STABLE:before{content:"✓"}.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}.project-group{margin:22px 0}.project-head{margin-bottom:10px}.project-head h2{margin:0}.task{display:grid;grid-template-columns:minmax(150px,2fr) repeat(3,minmax(100px,1fr));gap:10px;align-items:center}.anomaly{border-left:5px solid #bc2525}.crumb{margin-bottom:14px;color:#536a82}.evidence{overflow-wrap:anywhere}.empty{text-align:center;padding:48px;color:#64788e}@media(max-width:768px){main{padding:18px 14px}.task{grid-template-columns:1fr}.toolbar>*{width:100%}header{padding:10px 14px}.title-row,.project-head{align-items:flex-start;flex-direction:column}}
+diff --git a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+index b7c5e8ad..437b84c6 100644
+--- a/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
++++ b/docs/development/REUSABLE_SCHEDULER_KERNEL_20261025.md
+@@ -38,13 +38,28 @@ python3 scripts/reusable_scheduler_cli.py \
+   --test-authority-key 0123456789abcdef0123456789abcdef \
+   recover-unstarted --tenant tenant-a \
+   --lock-root /tmp/xuanjun-scheduler-locks
++python3 scripts/reusable_scheduler_cli.py \
++  --db /tmp/xuanjun-task-center.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  app-demo --tenant tenant-app --lock-root /tmp/xuanjun-task-center-locks
++python3 scripts/task_center_app.py \
++  --db /tmp/xuanjun-task-center.sqlite \
++  --test-authority-key 0123456789abcdef0123456789abcdef \
++  --tenant tenant-app --host 127.0.0.1 --port 8765
++# 停止：同一前台终端按 Ctrl-C；没有远程停止或写入端点。
+ ```
+ 
+-CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不监听端口。
+-`demo` 在同一数据库执行 TEST_ONLY 闭环；随后 `project` 是一次独立进程重启读取。
++除显式 `task_center_app.py` 外，CLI 只读写指定本地 TEST_ONLY 数据库，
++不创建常驻服务。Web 应用只允许回环地址、只提供 GET 静态文件和
++`/api/projection`；每次请求从同一个 Supervisor SQLite 构建投影，POST 返回
++405，不存在真实派单、暂停、恢复或生产控制端点。
++`demo` 在同一数据库执行 TEST_ONLY 闭环；`app-demo` 增加多项目、失败、
++等待授权、等待依赖和“有任务状态但进程事实未知”的应用数据；随后
++`project` 或 Web 应用是独立进程重启读取。
+ `register` 是任意合法任务图的本地入口，不依赖固定 A/B/C demo；接口图样例见
+ `examples/reusable-scheduler-task-graph.json`。`export-ui` 从同一数据库生成离线
+-`digital-twin-data.js`，随后双击 `demos/task-center-digital-twin/index.html`。
++`digital-twin-data.js` 只供双击文件时的 `SNAPSHOT_ONLY` 降级查看；通过本地
++Web 应用访问时页面读取 `/api/projection`，不以导出文件维护第二份状态。
+ `recover-unstarted` 只能在已经确认旧 TEST_ONLY 进程退出后运行；它复用原 Fence
+ 的 drain、资源失效覆盖和 rollback，不猜测进程存活，也不签发新 Writer。
+ 
+@@ -71,10 +86,13 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ ## 数字孪生界面
+ 
+ - 总览只显示七板块任务数、活跃数、阻塞数和健康摘要，不铺任务明细或单个 AI 状态。
+-- 点击板块进入工作台，可按项目、状态和负责人筛选；点击异常直接进入绑定的板块/项目/任务卡点。
+-- 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、下一动作和证据要求。
++- 点击板块进入工作台，按项目分组并可按项目、状态和负责人筛选；项目页继续
++  下钻任务，点击异常直接进入绑定的板块/项目/任务卡点。
++- 任务详情显示同源的任务、节点、attempt、epoch、权限、checkpoint、阻塞、
++  下一动作和证据要求；会话、执行进程和实例没有独立证明时明确为 `UNKNOWN`。
+ - 异常详情分别显示任务负责人、解除责任方、事实影响和证据；不再把受阻任务 owner 自动当成问题解决方。
+-- hash 路由保留板块、项目与筛选条件；界面健康和异常均来自 `projection(schema=2)`，不是 `app.js` 硬编码成功状态。
++- hash 路由保留板块、项目与筛选条件；界面健康和异常均来自
++  `projection(schema=3)`，不是 `app.js` 硬编码成功状态。
+ - 本机无可用 Chromium/Firefox 可执行文件；浏览器点击/截图为 `BROWSER_UNVERIFIED`。Node 组合测试只证明路由、筛选、异常定位和详情渲染逻辑，不冒充真实浏览器 E2E。
+ 
+ ## SaaS 模块契约
+@@ -86,6 +104,17 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ 
+ 租户上下文必须由服务端可信入口断言。本包以 HMAC TEST authority 验证这一边界；仅提交 `tenant_id` 会被拒绝。生产身份提供者和密钥管理不在本包内。
+ 
++## P2/P3 接入准备（只读契约）
++
++`task_center_execution_contract.ExternalReceiptContract` 只校验并规范化已观察到的
++P2/P3 回执，不写账、不 ACK、不派发。字段固定为 `source, tenant_id,
++task_id, attempt_id, input_version, event_id, phase, status, evidence_ref,
++permission_scope`。阶段只允许 `SENT / ACK / RESULT / ACCEPTANCE`，并保持互不
++等价。可信租户上下文、任务归属和输入版本全部匹配后只返回
++`VALIDATED_NOT_CONSUMED`；跨租户、错版本或未知来源在任何写入前拒绝。
++P2/P3 尚未完成真实安装验收，因此生产 adapter、凭据、登记和执行接线均为
++`NOT_IMPLEMENTED / NOT_EXECUTED`，本模块不会成为 P2/P3 或社区/B5 的新前置。
++
+ ## 已知剩余项
+ 
+ - PR143 尚为 Draft，本包不是合并或生产许可。
+@@ -93,3 +122,4 @@ CLI 只读取指定本地数据库并输出 JSON 投影，不创建服务、不
+ - `release_revoked_resources` 仅在同库已存在 checkpoint、零在途、对账完成、完整 revocation coverage 时释放 LOCAL_ONLY claim；生产资源释放需原资源系统回执。
+ - 图注册已先做完整结构/环验证；当前 Supervisor 单任务注册 API 仍是逐任务提交，进程在注册中途崩溃时需要后续原生批量注册事务完善。
+ - 七板块投影与界面均为 TEST_ONLY 设计/模拟；生产数据采集、实时进程探测和真实控制入口仍为 `NOT_IMPLEMENTED`。
++- P2/P3 生产回执 adapter 与真实登记未实现；当前仅有严格 TEST_ONLY 契约校验。
+diff --git a/scripts/reusable_scheduler_cli.py b/scripts/reusable_scheduler_cli.py
+index e4001c2a..ff210af4 100644
+--- a/scripts/reusable_scheduler_cli.py
++++ b/scripts/reusable_scheduler_cli.py
+@@ -92,6 +92,61 @@ def run_demo(gateway, authority, tenant, lock_root):
+         fence.close()
+ 
+ 
++def app_demo_graph(graph_id, tenant, project, specs):
++    tasks = []
++    for task_id, board, owner, output, dependencies in specs:
++        tasks.append({
++            'task_id': task_id, 'node_id': 'node-' + task_id,
++            'stage': 'TEST_ONLY', 'owner': owner, 'entry': 'TEST_ONLY',
++            'checkpoint_sha256': 'a' * 64, 'spec_sha256': 'b' * 64,
++            'input_version': 'input-v1', 'output_version': output,
++            'priority': 40, 'preemptible': True,
++            'module_id': 'xuanjun.scheduler.kernel', 'board_id': board,
++            'resources': ['fake:' + task_id],
++            'dependencies': dependencies,
++            'completion_evidence': [{'evidence_ref': 'evid-' + task_id}],
++        })
++    return {'graph_id': graph_id, 'tenant_id': tenant,
++            'project_id': project, 'graph_version': 'v1', 'tasks': tasks}
++
++
++def run_app_demo(gateway, authority, tenant, lock_root):
++    """Create a multi-project TEST_ONLY application dataset."""
++    run_demo(gateway, authority, tenant, lock_root)
++    context = authority.issue(tenant, 'local-app-demo')
++    graphs = [
++        app_demo_graph('app-customer', tenant, 'project-customer', [
++            ('customer-failed', 'customer', 'customer-owner', 'v1', []),
++            ('finance-awaiting', 'finance', 'finance-owner', 'v1', []),
++        ]),
++        app_demo_graph('app-maintenance', tenant, 'project-maintenance', [
++            ('maintenance-source', 'maintenance', 'maintainer', 'm-v1', []),
++            ('ecosystem-waiting', 'shared-ecosystem', 'ecosystem-owner',
++             'e-v1', [{'task_id': 'maintenance-source', 'version': 'm-v1',
++                       'evidence_ref': 'evid-maintenance-source'}]),
++        ]),
++        app_demo_graph('app-operations', tenant, 'project-operations', [
++            ('operations-unknown', 'operations', 'operator', 'o-v1', []),
++        ]),
++    ]
++    for graph in graphs:
++        gateway.register_graph(context, graph)
++    fence = Fence(gateway.supervisor, lock_root)
++    executor = TestOnlyExecutor(gateway, fence, context)
++    try:
++        executor.start('customer-failed', 'customer-failed-1',
++                       ['fake:customer-failed'], time.time() + 600)
++        executor.complete_failure('customer-failed', 'customer-failed-1',
++                                  'test-customer-failure')
++        # Start without a progress fact: projection must say liveness UNKNOWN,
++        # not infer a running process from the task state.
++        executor.start('operations-unknown', 'operations-unknown-1',
++                       ['fake:operations-unknown'], time.time() + 600)
++        return gateway.projection(context)
++    finally:
++        fence.close()
++
++
+ def main(argv=None):
+     parser = argparse.ArgumentParser()
+     parser.add_argument('--db', required=True)
+@@ -104,6 +159,9 @@ def main(argv=None):
+     demo = sub.add_parser('demo')
+     demo.add_argument('--tenant', required=True)
+     demo.add_argument('--lock-root', required=True)
++    app_demo = sub.add_parser('app-demo')
++    app_demo.add_argument('--tenant', required=True)
++    app_demo.add_argument('--lock-root', required=True)
+     register = sub.add_parser('register')
+     register.add_argument('--tenant', required=True)
+     register.add_argument('--principal', default='local-registrar')
+@@ -130,6 +188,9 @@ def main(argv=None):
+         elif args.command == 'demo':
+             value = run_demo(gateway, authority, args.tenant,
+                              os.path.realpath(args.lock_root))
++        elif args.command == 'app-demo':
++            value = run_app_demo(gateway, authority, args.tenant,
++                                 os.path.realpath(args.lock_root))
+         elif args.command == 'register':
+             context = authority.issue(args.tenant, args.principal)
+             with open(args.graph, 'r') as stream:
+diff --git a/scripts/reusable_task_gateway.py b/scripts/reusable_task_gateway.py
+index a8a443e1..74954805 100644
+--- a/scripts/reusable_task_gateway.py
++++ b/scripts/reusable_task_gateway.py
+@@ -871,9 +871,18 @@ class GatewayKernel(object):
+             elif row['state'] in ('FAILURE', 'CANCELLED',
+                                   'CAPABILITY_UNAVAILABLE'):
+                 blocker = 'TASK_TERMINAL_' + row['state']
++            runtime_status = row['state']
++            if dependency_blockers and row['state'] == 'READY':
++                runtime_status = 'WAITING_DEPENDENCY'
++            elif row['state'] == 'READY' and row['authority_state'] == 'NONE':
++                runtime_status = 'WAITING_AUTHORIZATION'
++            elif (row['state'] in ('RECEIVED', 'STARTED', 'RUNNING')
++                  and row['last_real_progress_at'] is None):
++                runtime_status = 'LIVENESS_UNKNOWN'
+             tasks.append({
+                 'task_id': row['task_id'], 'project_id': row['project_id'],
+                 'node_id': row['node_id'], 'state': row['state'],
++                'runtime_status': runtime_status,
+                 'authority_state': row['authority_state'],
+                 'attempt_id': row['attempt_id'], 'epoch': row['epoch'],
+                 'checkpoint_sha256': row['checkpoint_sha256'],
+@@ -885,6 +894,22 @@ class GatewayKernel(object):
+                 'board_id': row['board_id'],
+                 'responsible_party': row['owner'],
+                 'task_responsible_party': row['owner'],
++                'run_id': row['run_id'],
++                'session_id': row['session_id'],
++                'writer_identity': row['authority_caller_id'],
++                'authority_valid_until': row['authority_valid_until'],
++                'received_at': row['received_at'],
++                'started_at': row['started_at'],
++                'last_real_progress_at': row['last_real_progress_at'],
++                'last_event_at': row['last_event_at'],
++                'writer_stopped': row['writer_stopped'],
++                'effects_reconciled': row['effects_reconciled'],
++                # The canonical ledger has no independently verified per-task
++                # process/session liveness adapter yet.  Never infer either
++                # value from task state or from a finished chat turn.
++                'process_state': UNKNOWN,
++                'session_state': UNKNOWN,
++                'executor_instance_id': UNKNOWN,
+                 'next_action': row['next_action'],
+                 'blocker': blocker,
+                 'resources': json.loads(row['resources_json']),
+@@ -959,7 +984,11 @@ class GatewayKernel(object):
+                     'next_action': task['next_action'],
+                     'evidence_ref': evidence,
+                 })
+-        return {'schema': 2, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
++        projection_time = self.db.execute('''SELECT MAX(t.last_event_at)
++          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
++          WHERE m.tenant_id=?''', (tenant_id,)).fetchone()[0]
++        return {'schema': 3, 'mode': TEST_ONLY, 'tenant_id': tenant_id,
++                'observed_at': projection_time,
+                 'boards': boards, 'anomalies': anomalies,
+                 'tasks': tasks, 'timeline': events,
+                 'production_status': 'NOT_IMPLEMENTED'}
+@@ -1094,3 +1123,32 @@ class TestOnlyExecutor(object):
+             self.context, task_id, attempt_id, checkpoint_id,
+             'test-terminal-release', now, resume_ready=False)
+         return result
++
++    def complete_failure(self, task_id, attempt_id, evidence_ref, now=None):
++        """Persist a real TEST_ONLY failure and safely release its claim."""
++        self.gateway.assert_task_context(self.context, task_id)
++        now = self.clock() if now is None else now
++        result = self.supervisor.record(
++            task_id, attempt_id, 'terminal-' + attempt_id, 'TERMINAL', now,
++            'TEST_RUN', evidence_ref,
++            {'state': 'FAILURE', 'artifact_sha256': UNKNOWN,
++             'writer_stopped': True,
++             'effects_reconciled': True,
++             'next_action': 'INVESTIGATE_FAILURE',
++             'completion_evidence': []})
++        task = self.supervisor._task(task_id)
++        resources = json.loads(task['resource_scope_json'])
++        checkpoint_id = 'terminal-checkpoint-' + attempt_id
++        self.gateway.save_checkpoint(
++            self.context, task_id, attempt_id, checkpoint_id,
++            {'terminal_state': 'FAILURE'}, [], 'RECONCILED', resources, now)
++        controller = {'role': 'REVOCATION_CONTROLLER',
++                      'caller_id': 'test-executor-finalizer'}
++        self.fence.begin_revocation(task_id, controller)
++        self.fence.drain(task_id, controller, timeout=1)
++        self.fence.invalidate_source_resources(task_id, 'terminal-release')
++        self.supervisor.complete_revocation(task_id)
++        self.gateway.release_revoked_resources(
++            self.context, task_id, attempt_id, checkpoint_id,
++            'test-terminal-release', now, resume_ready=False)
++        return result
+diff --git a/scripts/task_center_app.py b/scripts/task_center_app.py
+new file mode 100644
+index 00000000..95f2dd4b
+--- /dev/null
++++ b/scripts/task_center_app.py
+@@ -0,0 +1,134 @@
++"""Loopback-only TEST_ONLY task-center web application.
++
++The API rebuilds every projection from the canonical Supervisor SQLite file.
++It exposes no mutation endpoint and cannot dispatch production work.
++"""
++from __future__ import print_function
++
++import argparse
++import json
++import os
++import signal
++import sys
++from http.server import BaseHTTPRequestHandler, HTTPServer
++
++sys.path.insert(0, os.path.dirname(__file__))
++from reusable_task_gateway import GatewayKernel, TestTenantAuthority
++from task_supervisor import Supervisor
++
++
++ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
++ASSET_ROOT = os.path.join(ROOT, 'demos', 'task-center-digital-twin')
++ASSETS = {
++    '/': ('index.html', 'text/html; charset=utf-8'),
++    '/index.html': ('index.html', 'text/html; charset=utf-8'),
++    '/app.js': ('app.js', 'application/javascript; charset=utf-8'),
++    '/styles.css': ('styles.css', 'text/css; charset=utf-8'),
++}
++
++
++def _json_bytes(value):
++    return json.dumps(value, ensure_ascii=False, sort_keys=True,
++                      separators=(',', ':')).encode('utf-8')
++
++
++def build_handler(db_path, authority_key, tenant_id, principal_id):
++    class TaskCenterHandler(BaseHTTPRequestHandler):
++        server_version = 'XuanjunTaskCenter/1.0-TEST_ONLY'
++
++        def log_message(self, fmt, *args):
++            sys.stderr.write('task-center-app: ' + fmt % args + '\n')
++
++        def _send(self, status, body, content_type):
++            self.send_response(status)
++            self.send_header('Content-Type', content_type)
++            self.send_header('Content-Length', str(len(body)))
++            self.send_header('Cache-Control', 'no-store')
++            self.send_header('X-Content-Type-Options', 'nosniff')
++            self.send_header('Content-Security-Policy',
++                             "default-src 'self'; object-src 'none'; "
++                             "frame-ancestors 'none'")
++            self.end_headers()
++            self.wfile.write(body)
++
++        def do_GET(self):
++            path = self.path.split('?', 1)[0]
++            if path == '/api/projection':
++                supervisor = None
++                try:
++                    supervisor = Supervisor(db_path)
++                    authority = TestTenantAuthority(authority_key)
++                    gateway = GatewayKernel(supervisor, authority)
++                    context = authority.issue(tenant_id, principal_id)
++                    self._send(200, _json_bytes(gateway.projection(context)),
++                               'application/json; charset=utf-8')
++                except Exception as exc:
++                    self._send(500, _json_bytes({
++                        'mode': 'TEST_ONLY', 'error': type(exc).__name__,
++                        'detail': str(exc), 'production_status':
++                        'NOT_IMPLEMENTED'}),
++                        'application/json; charset=utf-8')
++                finally:
++                    if supervisor is not None:
++                        supervisor.close()
++                return
++            asset = ASSETS.get(path)
++            if asset is None:
++                self._send(404, b'not found\n', 'text/plain; charset=utf-8')
++                return
++            with open(os.path.join(ASSET_ROOT, asset[0]), 'rb') as stream:
++                self._send(200, stream.read(), asset[1])
++
++        def do_POST(self):
++            self._send(405, b'read only\n', 'text/plain; charset=utf-8')
++
++    return TaskCenterHandler
++
++
++def make_server(db_path, authority_key, tenant_id, principal_id,
++                host='127.0.0.1', port=8765):
++    if host not in ('127.0.0.1', 'localhost', '::1'):
++        raise ValueError('LOOPBACK_HOST_REQUIRED')
++    if not os.path.isfile(db_path):
++        raise ValueError('CANONICAL_SQLITE_REQUIRED')
++    handler = build_handler(os.path.realpath(db_path), authority_key,
++                            tenant_id, principal_id)
++    return HTTPServer((host, port), handler)
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--db', required=True)
++    parser.add_argument('--test-authority-key', required=True)
++    parser.add_argument('--tenant', required=True)
++    parser.add_argument('--principal', default='local-ui-viewer')
++    parser.add_argument('--host', default='127.0.0.1')
++    parser.add_argument('--port', type=int, default=8765)
++    args = parser.parse_args(argv)
++    key = args.test_authority_key.encode('utf-8')
++    server = make_server(args.db, key, args.tenant, args.principal,
++                         args.host, args.port)
++    receipt = {'state': 'STARTED', 'mode': 'TEST_ONLY',
++               'url': 'http://%s:%d/' % server.server_address,
++               'db': os.path.realpath(args.db), 'tenant_id': args.tenant,
++               'mutation_api': 'DISABLED',
++               'production_status': 'NOT_IMPLEMENTED'}
++    print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
++    previous_term = signal.getsignal(signal.SIGTERM)
++    signal.signal(signal.SIGTERM,
++                  lambda _signum, _frame: (_ for _ in ()).throw(
++                      KeyboardInterrupt()))
++    try:
++        server.serve_forever()
++    except KeyboardInterrupt:
++        pass
++    finally:
++        server.server_close()
++        signal.signal(signal.SIGTERM, previous_term)
++        print(json.dumps({'state': 'STOPPED', 'mode': 'TEST_ONLY'},
++                         sort_keys=True), flush=True)
++    return 0
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())
+diff --git a/scripts/task_center_execution_contract.py b/scripts/task_center_execution_contract.py
+new file mode 100644
+index 00000000..f92159d6
+--- /dev/null
++++ b/scripts/task_center_execution_contract.py
+@@ -0,0 +1,51 @@
++"""Read-only P2/P3 receipt mapping contract for the TEST_ONLY task center.
++
++It validates an already-observed external receipt against the canonical task
++and returns a normalized fact.  It never writes, dispatches, acknowledges, or
++claims authority; production adapters remain NOT_IMPLEMENTED.
++"""
++from __future__ import print_function
++
++from reusable_task_gateway import _text
++
++
++PHASES = frozenset(('SENT', 'ACK', 'RESULT', 'ACCEPTANCE'))
++SOURCES = frozenset(('P2', 'P3'))
++
++
++class ExternalReceiptContract(object):
++    def __init__(self, gateway, context):
++        self.gateway = gateway
++        self.context = context
++
++    def normalize(self, value):
++        required = {'source', 'tenant_id', 'task_id', 'attempt_id',
++                    'input_version', 'event_id', 'phase', 'status',
++                    'evidence_ref', 'permission_scope'}
++        if not isinstance(value, dict) or set(value) != required:
++            raise ValueError('EXACT_EXTERNAL_RECEIPT_REQUIRED')
++        if value['source'] not in SOURCES:
++            raise ValueError('P2_P3_SOURCE_REQUIRED')
++        if value['phase'] not in PHASES:
++            raise ValueError('CANONICAL_RECEIPT_PHASE_REQUIRED')
++        tenant = self.gateway.tenants.verify(self.context)
++        if value['tenant_id'] != tenant:
++            raise ValueError('CROSS_TENANT_RECEIPT_REJECTED')
++        self.gateway.assert_task_context(self.context, value['task_id'])
++        metadata = self.gateway.db.execute('''SELECT input_version FROM
++          gateway_task_metadata WHERE task_id=?''',
++          (value['task_id'],)).fetchone()
++        if metadata['input_version'] != value['input_version']:
++            raise ValueError('INPUT_VERSION_MISMATCH')
++        for name in required - {'source', 'phase', 'tenant_id'}:
++            _text(value[name], name)
++        return {
++            'source': value['source'], 'tenant_id': tenant,
++            'task_id': value['task_id'], 'attempt_id': value['attempt_id'],
++            'input_version': value['input_version'],
++            'event_id': value['event_id'], 'phase': value['phase'],
++            'status': value['status'], 'evidence_ref': value['evidence_ref'],
++            'permission_scope': value['permission_scope'],
++            'mapping_state': 'VALIDATED_NOT_CONSUMED',
++            'production_adapter': 'NOT_IMPLEMENTED',
++        }
+diff --git a/tests/task_center_digital_twin.test.cjs b/tests/task_center_digital_twin.test.cjs
+index a932ec11..b96daae5 100644
+--- a/tests/task_center_digital_twin.test.cjs
++++ b/tests/task_center_digital_twin.test.cjs
+@@ -1,14 +1,18 @@
+ 'use strict';
+ const assert=require('assert');
+ const ui=require('../demos/task-center-digital-twin/app.js');
+-const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',evidence_ref:['qa-proof']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a'}]};
++const data={mode:'TEST_ONLY',boards:[{board_id:'research-development',task_count:2,active_count:1,blocked_count:1,health:'BLOCKED'}],anomalies:[{task_id:'t-a',board_id:'research-development',project_id:'p-1',missing:'DEPENDENCY_WAIT',impact:'DEPENDENT_TASK_NOT_STARTABLE',depends_on:['t-b'],responsible_party:'qa',task_responsible_party:'dev',resolution_responsible_party:'qa',next_action:'WAIT',evidence_ref:['qa-proof']}],tasks:[{task_id:'t-a',project_id:'p-1',node_id:'n-a',board_id:'research-development',state:'READY',runtime_status:'WAITING_DEPENDENCY',responsible_party:'dev',task_responsible_party:'dev',attempt_id:'UNKNOWN',epoch:null,next_action:'WAIT_DEPENDENCIES',blocker:'DEPENDENCY_WAIT',authority_state:'NONE',checkpoint_sha256:'a',writer_identity:'UNKNOWN',run_id:'UNKNOWN',session_id:'UNKNOWN',session_state:'UNKNOWN',process_state:'UNKNOWN',last_real_progress_at:null,effects_reconciled:'UNKNOWN',writer_stopped:'UNKNOWN'}]};
+ assert.deepStrictEqual(ui.parseRoute('#task/research-development/t-a?project=p-1'),{view:'task',board:'research-development',task:'t-a',query:{project:'p-1'}});
+ assert.strictEqual(ui.filterTasks(data,ui.parseRoute('#board/research-development?project=p-1')).length,1);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/七板块运行概况/);
+ assert.match(ui.render(data,ui.parseRoute('#overview')),/定位卡点/);
+ assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/研发工作台/);
++assert.match(ui.render(data,ui.parseRoute('#board\/research-development?project=p-1')),/项目详情/);
++assert.match(ui.render(data,ui.parseRoute('#project\/research-development\/p-1')),/1 个任务/);
+ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/异常证据/);
+ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/任务负责人：dev/);
+ assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/解除责任方：qa/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/进程：UNKNOWN/);
++assert.match(ui.render(data,ui.parseRoute('#task/research-development/t-a?project=p-1')),/运行投影：WAITING_DEPENDENCY/);
+ assert.match(ui.href('board','research-development',null,{project:'p-1'}),/^#board\/research-development\?project=p-1$/);
+-console.log('task_center_digital_twin.test: PASS');
++ui.loadProjection(()=>Promise.resolve({ok:true,json:()=>Promise.resolve(data)})).then(x=>{assert.strictEqual(x,data);console.log('task_center_digital_twin.test: PASS');});
+diff --git a/tests/test_reusable_scheduler_cli.py b/tests/test_reusable_scheduler_cli.py
+index 2f92ffc6..5e20a163 100644
+--- a/tests/test_reusable_scheduler_cli.py
++++ b/tests/test_reusable_scheduler_cli.py
+@@ -34,7 +34,7 @@ class SchedulerCliTests(unittest.TestCase):
+             'register', '--tenant', 'tenant-demo', '--graph', EXAMPLE)
+         self.assertFalse(registered['duplicate'])
+         projection = self.run_cli('project', '--tenant', 'tenant-demo')
+-        self.assertEqual(projection['schema'], 2)
++        self.assertEqual(projection['schema'], 3)
+         self.assertEqual(len(projection['boards']), 7)
+         self.assertEqual(len(projection['tasks']), 2)
+         self.assertEqual(len(projection['anomalies']), 1)
+@@ -54,6 +54,22 @@ class SchedulerCliTests(unittest.TestCase):
+         self.assertEqual(first, second)
+         self.assertEqual(len(second['tasks']), 3)
+ 
++    def test_app_demo_is_multi_project_dynamic_and_restart_rebuilds(self):
++        first = self.run_cli('app-demo', '--tenant', 'tenant-app',
++                             '--lock-root', os.path.join(self.root, 'locks'))
++        second = self.run_cli('project', '--tenant', 'tenant-app')
++        self.assertEqual(first, second)
++        self.assertGreaterEqual(len({x['project_id'] for x in
++                                    second['tasks']}), 4)
++        states = {x['task_id']: x['runtime_status']
++                  for x in second['tasks']}
++        self.assertEqual(states['customer-failed'], 'FAILURE')
++        self.assertEqual(states['finance-awaiting'],
++                         'WAITING_AUTHORIZATION')
++        self.assertEqual(states['ecosystem-waiting'],
++                         'WAITING_DEPENDENCY')
++        self.assertEqual(states['operations-unknown'], 'LIVENESS_UNKNOWN')
++
+ 
+ if __name__ == '__main__':
+     unittest.main()
+diff --git a/tests/test_task_center_app.py b/tests/test_task_center_app.py
+new file mode 100644
+index 00000000..8ebd74d9
+--- /dev/null
++++ b/tests/test_task_center_app.py
+@@ -0,0 +1,77 @@
++from __future__ import print_function
++
++import json
++import os
++import shutil
++import tempfile
++import threading
++import unittest
++from urllib.request import Request, urlopen
++
++ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
++sys_path = os.path.join(ROOT, 'scripts')
++import sys
++sys.path.insert(0, sys_path)
++from reusable_scheduler_cli import demo_graph
++from reusable_task_gateway import GatewayKernel, TestTenantAuthority
++from task_center_app import make_server
++from task_supervisor import Supervisor
++
++
++KEY = b'0123456789abcdef0123456789abcdef'
++
++
++class TaskCenterAppTests(unittest.TestCase):
++    def setUp(self):
++        self.root = tempfile.mkdtemp()
++        self.db = os.path.join(self.root, 'state.sqlite3')
++        supervisor = Supervisor(self.db)
++        authority = TestTenantAuthority(KEY)
++        GatewayKernel(supervisor, authority).register_graph(
++            authority.issue('tenant-ui', 'seed'), demo_graph('tenant-ui'))
++        supervisor.close()
++        self.server = make_server(self.db, KEY, 'tenant-ui', 'viewer',
++                                  port=0)
++        self.thread = threading.Thread(target=self.server.serve_forever)
++        self.thread.daemon = True
++        self.thread.start()
++        self.base = 'http://127.0.0.1:%d' % self.server.server_port
++
++    def tearDown(self):
++        self.server.shutdown(); self.server.server_close()
++        self.thread.join(2)
++        shutil.rmtree(self.root)
++
++    def get(self, path):
++        response = urlopen(self.base + path, timeout=3)
++        return response.status, response.headers, response.read()
++
++    def test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves(self):
++        status, headers, body = self.get('/api/projection')
++        self.assertEqual(status, 200)
++        self.assertEqual(headers['Cache-Control'], 'no-store')
++        value = json.loads(body.decode('utf-8'))
++        self.assertEqual(value['schema'], 3)
++        self.assertEqual(value['tenant_id'], 'tenant-ui')
++        self.assertEqual(len(value['tasks']), 3)
++        self.assertTrue(all(t['process_state'] == 'UNKNOWN'
++                            for t in value['tasks']))
++        status, _, body = self.get('/')
++        self.assertEqual(status, 200)
++        self.assertIn(b'id="dataMode"', body)
++
++    def test_mutation_and_path_escape_are_rejected(self):
++        with self.assertRaises(Exception):
++            urlopen(Request(self.base + '/api/projection', data=b'{}',
++                            method='POST'), timeout=3)
++        with self.assertRaises(Exception):
++            self.get('/../../etc/passwd')
++
++    def test_non_loopback_bind_is_rejected(self):
++        with self.assertRaisesRegex(ValueError, 'LOOPBACK'):
++            make_server(self.db, KEY, 'tenant-ui', 'viewer',
++                        host='0.0.0.0', port=0)
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/tests/test_task_center_execution_contract.py b/tests/test_task_center_execution_contract.py
+new file mode 100644
+index 00000000..916dd09a
+--- /dev/null
++++ b/tests/test_task_center_execution_contract.py
+@@ -0,0 +1,72 @@
++from __future__ import print_function
++
++import copy
++import os
++import shutil
++import tempfile
++import unittest
++
++ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
++import sys
++sys.path.insert(0, os.path.join(ROOT, 'scripts'))
++from reusable_scheduler_cli import demo_graph
++from reusable_task_gateway import GatewayKernel, TestTenantAuthority
++from task_center_execution_contract import ExternalReceiptContract
++from task_supervisor import Supervisor
++
++
++KEY = b'0123456789abcdef0123456789abcdef'
++
++
++class ExternalReceiptContractTests(unittest.TestCase):
++    def setUp(self):
++        self.root = tempfile.mkdtemp()
++        self.supervisor = Supervisor(os.path.join(self.root, 'state.sqlite3'))
++        self.authority = TestTenantAuthority(KEY)
++        self.gateway = GatewayKernel(self.supervisor, self.authority)
++        self.a = self.authority.issue('tenant-a', 'adapter-a')
++        self.b = self.authority.issue('tenant-b', 'adapter-b')
++        self.gateway.register_graph(self.a, demo_graph('tenant-a'))
++        self.contract = ExternalReceiptContract(self.gateway, self.a)
++        self.receipt = {
++            'source': 'P2', 'tenant_id': 'tenant-a', 'task_id': 'demo-b',
++            'attempt_id': 'attempt-1', 'input_version': 'input-v1',
++            'event_id': 'event-1', 'phase': 'SENT', 'status': 'SENT',
++            'evidence_ref': 'receipt-evidence',
++            'permission_scope': 'TEST_ONLY_NO_DISPATCH'}
++
++    def tearDown(self):
++        self.supervisor.close(); shutil.rmtree(self.root)
++
++    def test_p2_p3_phase_mapping_is_validation_only(self):
++        for source in ('P2', 'P3'):
++            for phase in ('SENT', 'ACK', 'RESULT', 'ACCEPTANCE'):
++                value = copy.deepcopy(self.receipt)
++                value.update(source=source, phase=phase, status=phase)
++                result = self.contract.normalize(value)
++                self.assertEqual(result['mapping_state'],
++                                 'VALIDATED_NOT_CONSUMED')
++                self.assertEqual(result['production_adapter'],
++                                 'NOT_IMPLEMENTED')
++
++    def test_cross_tenant_and_wrong_version_reject_without_writes(self):
++        before = self.supervisor.db.total_changes
++        wrong = copy.deepcopy(self.receipt); wrong['tenant_id'] = 'tenant-b'
++        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
++            self.contract.normalize(wrong)
++        wrong = copy.deepcopy(self.receipt); wrong['input_version'] = 'v-old'
++        with self.assertRaisesRegex(ValueError, 'VERSION_MISMATCH'):
++            self.contract.normalize(wrong)
++        self.assertEqual(before, self.supervisor.db.total_changes)
++
++    def test_raw_tenant_or_unknown_source_cannot_bypass_context(self):
++        wrong = copy.deepcopy(self.receipt); wrong['source'] = 'OTHER'
++        with self.assertRaisesRegex(ValueError, 'P2_P3'):
++            self.contract.normalize(wrong)
++        other = ExternalReceiptContract(self.gateway, self.b)
++        with self.assertRaisesRegex(ValueError, 'CROSS_TENANT'):
++            other.normalize(self.receipt)
++
++
++if __name__ == '__main__':
++    unittest.main()

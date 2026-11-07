@@ -1,0 +1,1528 @@
+...............................E.......E...EEEEEE.EEEE.EEEEEEEE...............................................................................EE.E.....................................EE................................................................EEEEE.EEEEEEE..............................................................s...........................................RECEIPT_VALIDATED_NOT_ADMITTED
+{"state": "fixture"}
+RECEIPT_VALIDATED_NOT_ADMITTED
+{"state":"HOLD","redispatch_allowed":false}
+..RECEIPT_VALIDATED_NOT_ADMITTED
+{"state":"SUPERVISOR_TIMEOUT_UNKNOWN","redispatch_allowed":false}
+.E.....FFFFFFFF...........E.E..EEEEEEEEE/usr/lib64/python3.6/tempfile.py:840: ResourceWarning: Implicitly cleaning up <TemporaryDirectory '/tmp/tmpjrnso4zi'>
+  _warnings.warn(warn_message, ResourceWarning)
+EEEEEEEE.....................................................EEEEE.....E.......E.......EEE.EE...E....Etask-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+.task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: GET /api/admin/model-control
+task-center-app: GET /admin.html
+.task-center-app: POST /api/projection
+task-center-app: GET /../../etc/passwd
+..task-center-app: GET /api/projection
+.task-center-app: GET /api/projection
+task-center-app: GET /
+.task-center-app: GET /api/projection
+....task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: GET /api/projection
+task-center-app: GET /api/projection
+task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: GET /api/admin/model-control
+task-center-app: GET /api/projection
+......task-center-app: GET /task-center-test/app.js
+task-center-app: GET /task-center-test/admin.js
+task-center-app: GET /task-center-test/login.js
+task-center-app: GET /task-center-test/login.html
+task-center-app: GET /task-center-test/oauth-callback.html
+.task-center-app: GET /task-center-test/admin.html
+task-center-app: GET /admin.html
+task-center-app: GET /task-center-test/login.html
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: POST /task-center-test/api/session/login
+task-center-app: GET /task-center-test/api/session
+task-center-app: POST /task-center-test/api/session/logout
+.task-center-app: POST /api/session/login
+task-center-app: GET /admin.html
+task-center-app: GET /admin.js
+task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+.task-center-app: POST /api/session/login
+..task-center-app: GET /api/projection
+task-center-app: POST /api/session/login
+task-center-app: GET /api/session
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/logout
+task-center-app: GET /api/session
+task-center-app: POST /api/session/login
+task-center-app: GET /api/session
+.task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/session/login
+task-center-app: POST /api/session/login
+task-center-app: POST /api/session/login
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+.task-center-app: POST /api/session/login
+task-center-app: GET /api/admin/model-control
+task-center-app: POST /api/admin/model-control
+........................................./home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor.py:288: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/tmp8culj8bo'>
+  before_bytes=open(self.path,'rb').read()
+/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor.py:294: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/tmp8culj8bo'>
+  self.assertEqual(before_bytes,open(self.path,'rb').read())
+.EEE.............................................FFFE..................................................
+======================================================================
+ERROR: test_05_url (test_community_ad_contract.CommunityAdOfflineTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_contract.py", line 23, in test_05_url
+    self.assertTrue(safe_creative_url("https://example.org/campaign"))
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_contract.py", line 72, in safe_creative_url
+    return "." in host and host.isascii() and all(label and len(label) <= 63 and
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_13_url_rejects_ipv4_ipv6_trailing_period_unicode (test_community_ad_contract.CommunityAdOfflineTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_contract.py", line 65, in test_13_url_rejects_ipv4_ipv6_trailing_period_unicode
+    self.assertFalse(safe_creative_url(url))
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_contract.py", line 72, in safe_creative_url
+    return "." in host and host.isascii() and all(label and len(label) <= 63 and
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_campaign_duplicate_does_not_append_audit (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 40, in test_campaign_duplicate_does_not_append_audit
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_cannot_edit_or_delete_audit_history (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 101, in test_cannot_edit_or_delete_audit_history
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_create_draft_and_audit_atomic (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 17, in test_create_draft_and_audit_atomic
+    result=self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_creative_approval_is_platform_moderator_only (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 89, in test_creative_approval_is_platform_moderator_only
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_cross_tenant_actor_rejected (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 22, in test_cross_tenant_actor_rejected
+    create_campaign(self.db,self.scope,self.record,dict(self.actor,tenant_id="other"),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_cross_tenant_state_transition_denied (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 110, in test_cross_tenant_state_transition_denied
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_keyset_pagination (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 66, in test_keyset_pagination
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_metrics_atomic_duplicate (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 44, in test_metrics_atomic_duplicate
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_metrics_slot_kind_separation (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 50, in test_metrics_slot_kind_separation
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_no_ad_before_approval (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 25, in test_no_ad_before_approval
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_persistent_close_and_two_reopens (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 123, in test_persistent_close_and_two_reopens
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_refuses_unsafe_url (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 59, in test_refuses_unsafe_url
+    create_campaign(self.db,self.scope,dict(self.record,target_url="javascript:alert(1)"),self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_rejects_illegal_slot_and_invalid_time (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 62, in test_rejects_illegal_slot_and_invalid_time
+    create_campaign(self.db,self.scope,dict(self.record,slot="unknown"),self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_requires_approved_moderation_and_active (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 28, in test_requires_approved_moderation_and_active
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_stale_version_rejected_before_update (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 95, in test_stale_version_rejected_before_update
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_status_and_moderator_complete_lifecycle (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 75, in test_status_and_moderator_complete_lifecycle
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_tenant_scope_for_query_and_selection (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 35, in test_tenant_scope_for_query_and_selection
+    self.create()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 15, in create
+    def create(self): return create_campaign(self.db,self.scope,self.record,self.actor,100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_unknown_campaign_metric_denied (test_community_ad_store.OfflineAdStoreTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_ad_store.py", line 56, in test_unknown_campaign_metric_denied
+    record_metric(self.db,self.scope,AMOUNT,"CLICK","ev1","missing",130)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 134, in record_metric
+    t,m,s=_scope(scope);_now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_default_off_is_success_without_upload (test_community_preview_entry_registration.EntryRegistration)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 27, in test_default_off_is_success_without_upload
+    result=self.run_guard(PREVIEW_ENABLED='false',PREVIEW_SOURCE_SHA='',PREVIEW_EVIDENCE_RUN_ID='')
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_exact_original_reference_is_registration_only (test_community_preview_entry_registration.EntryRegistration)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 32, in test_exact_original_reference_is_registration_only
+    result=self.run_guard()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_main_other_branch_or_repository_cannot_request_preview (test_community_preview_entry_registration.EntryRegistration) (patch={'RUN_REF': 'refs/heads/main'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 39, in test_main_other_branch_or_repository_cannot_request_preview
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_main_other_branch_or_repository_cannot_request_preview (test_community_preview_entry_registration.EntryRegistration) (patch={'RUN_REF': 'refs/heads/other'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 39, in test_main_other_branch_or_repository_cannot_request_preview
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_main_other_branch_or_repository_cannot_request_preview (test_community_preview_entry_registration.EntryRegistration) (patch={'RUN_REPOSITORY': 'other/repository'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 39, in test_main_other_branch_or_repository_cannot_request_preview
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_missing_wrong_or_malformed_sha_is_rejected (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_SOURCE_SHA': ''})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 44, in test_missing_wrong_or_malformed_sha_is_rejected
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_missing_wrong_or_malformed_sha_is_rejected (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_SOURCE_SHA': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 44, in test_missing_wrong_or_malformed_sha_is_rejected
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_missing_wrong_or_malformed_sha_is_rejected (test_community_preview_entry_registration.EntryRegistration) (patch={'RUN_SHA': 'not-a-sha', 'PREVIEW_SOURCE_SHA': 'not-a-sha'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 44, in test_missing_wrong_or_malformed_sha_is_rejected
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_switch_is_not_truthy_string (test_community_preview_entry_registration.EntryRegistration)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 52, in test_switch_is_not_truthy_string
+    self.assertNotEqual(self.run_guard(PREVIEW_ENABLED='yes').returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_wrong_target_and_missing_evidence_fail_closed (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_TARGET': 'legacy'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 49, in test_wrong_target_and_missing_evidence_fail_closed
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_wrong_target_and_missing_evidence_fail_closed (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_TARGET': 'unknown'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 49, in test_wrong_target_and_missing_evidence_fail_closed
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_wrong_target_and_missing_evidence_fail_closed (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_EVIDENCE_RUN_ID': ''})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 49, in test_wrong_target_and_missing_evidence_fail_closed
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_wrong_target_and_missing_evidence_fail_closed (test_community_preview_entry_registration.EntryRegistration) (patch={'PREVIEW_EVIDENCE_RUN_ID': '../jobs'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 49, in test_wrong_target_and_missing_evidence_fail_closed
+    with self.subTest(patch=patch):self.assertNotEqual(self.run_guard(**patch).returncode,0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_community_preview_entry_registration.py", line 24, in run_guard
+    capture_output=True,text=True,timeout=5)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
+======================================================================
+ERROR: test_controlled_environment_reads_existing_ledger_and_real_git_bytes (test_development_entry_intake.CanonicalBindingTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_development_entry_intake.py", line 159, in test_controlled_environment_reads_existing_ledger_and_real_git_bytes
+    os.mkdir(root)
+FileExistsError: [Errno 17] File exists: '/tmp/candidate-repo'
+
+======================================================================
+ERROR: test_dirty_checkout_is_rejected_and_commit_object_bytes_are_exact (test_development_entry_intake.CanonicalBindingTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_development_entry_intake.py", line 187, in test_dirty_checkout_is_rejected_and_commit_object_bytes_are_exact
+    os.mkdir(root)
+FileExistsError: [Errno 17] File exists: '/tmp/candidate-dirty'
+
+======================================================================
+ERROR: test_compliant (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 26, in test_compliant
+    def test_compliant(self):self.assertEqual(self.check(),[])
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_directory_is_not_a_test_file (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 77, in test_directory_is_not_a_test_file
+    self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_existing_node_test_layouts (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 45, in test_existing_node_test_layouts
+    self.assertEqual(self.check(),[])
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_external_symlink_test_reference_fails (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 73, in test_external_symlink_test_reference_fails
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_missing_acceptance (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 32, in test_missing_acceptance
+    self.assertIn("EXAMPLE_FEATURE: MISSING_ACCEPTANCE_CRITERIA",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_missing_node_test_still_fails (test_feature_compliance_check.GovernanceTests) (reference='clients/community-mini/absent.test.cjs')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 50, in test_missing_node_test_still_fails
+    self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_missing_node_test_still_fails (test_feature_compliance_check.GovernanceTests) (reference='scripts/community_mini_key.test.cjs')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 50, in test_missing_node_test_still_fails
+    self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_missing_test_file (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 35, in test_missing_test_file
+    self.assertIn("EXAMPLE_FEATURE: ACCEPTANCE_TEST_NOT_FOUND",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_new_executable_requires_feature_mapping (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 85, in test_new_executable_requires_feature_mapping
+    self.check()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_no_evidence_claim (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 83, in test_no_evidence_claim
+    self.assertIn("EXAMPLE_FEATURE: VERIFIED_WITHOUT_EVIDENCE",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_no_path_escape (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 98, in test_no_path_escape
+    self.assertIn("EXAMPLE_FEATURE: DESIGN_DOCUMENT_NOT_FOUND",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference=None)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='/tests/test_feature.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='tests/../docs/development/spec.md')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='tests/./test_feature.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='tests//test_feature.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_noncanonical_and_invalid_test_references_fail (test_feature_compliance_check.GovernanceTests) (reference='tests\\test_feature.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 66, in test_noncanonical_and_invalid_test_references_fail
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_premature_deployment (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 80, in test_premature_deployment
+    self.assertIn("EXAMPLE_FEATURE: DEPLOYED_WITHOUT_RECEIPT",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_reference_layout_remains_restricted (test_feature_compliance_check.GovernanceTests) (reference='clients/community-mini/client.js')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 60, in test_reference_layout_remains_restricted
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_reference_layout_remains_restricted (test_feature_compliance_check.GovernanceTests) (reference='scripts/feature_compliance_check.py')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 60, in test_reference_layout_remains_restricted
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_reference_layout_remains_restricted (test_feature_compliance_check.GovernanceTests) (reference='scripts/other.test.cjs')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 60, in test_reference_layout_remains_restricted
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_reference_layout_remains_restricted (test_feature_compliance_check.GovernanceTests) (reference='clients/other/client.test.cjs')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 60, in test_reference_layout_remains_restricted
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_reference_layout_remains_restricted (test_feature_compliance_check.GovernanceTests) (reference='clients/community-mini/nested/client.test.cjs')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 60, in test_reference_layout_remains_restricted
+    self.assertIn("EXAMPLE_FEATURE: MISSING_TEST_REFERENCES",self.check())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_registered_executable_passes (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 91, in test_registered_executable_passes
+    self.check()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_unrelated_document_not_blocked (test_feature_compliance_check.GovernanceTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 94, in test_unrelated_document_not_blocked
+    self.check()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_feature_compliance_check.py", line 25, in check
+    return validate(self.root,"governance/features.json")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/feature_compliance_check.py", line 58, in validate
+    if not docpath.is_relative_to(root.resolve()) or not docpath.is_file():
+AttributeError: 'PosixPath' object has no attribute 'is_relative_to'
+
+======================================================================
+ERROR: test_original_pinned_runtime_missing_activation_holds (test_p2_uk_swas_diagnostic.ExistingRuntimeFactoryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 701, in test_original_pinned_runtime_missing_activation_holds
+    with tempfile.TemporaryDirectory(dir='/root',prefix='p2-original-read-fixture-') as folder:
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-original-read-fixture-xnqux7r1'
+
+======================================================================
+ERROR: test_first_consumption_and_restart_replay (test_p2_uk_swas_diagnostic.RemoteIdentityProtocolTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 441, in test_first_consumption_and_restart_replay
+    self.assertEqual(self.run_request()['state'],'REMOTE_IDENTITY_COMPLETE')
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 438, in run_request
+    self.store,self.broker,self.approval,lambda:100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/p2_uk_swas_diagnostic.py", line 412, in consume_remote_identity
+    'local_identity',request['nonce'])
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/p2_swas_receipt_validator.py", line 56, in validate
+    raise Hold('RECEIPT_REJECTED') from None
+scripts.p2_swas_receipt_validator.Hold: RECEIPT_REJECTED
+
+======================================================================
+ERROR: test_revoked_approval_denies_replay (test_p2_uk_swas_diagnostic.RemoteIdentityProtocolTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 463, in test_revoked_approval_denies_replay
+    self.run_request();self.approval=lambda *args:False
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 438, in run_request
+    self.store,self.broker,self.approval,lambda:100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/p2_uk_swas_diagnostic.py", line 412, in consume_remote_identity
+    'local_identity',request['nonce'])
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/p2_swas_receipt_validator.py", line 56, in validate
+    raise Hold('RECEIPT_REJECTED') from None
+scripts.p2_swas_receipt_validator.Hold: RECEIPT_REJECTED
+
+======================================================================
+ERROR: test_exact_owner_anchor_and_body_required (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-yl85f1qq'
+
+======================================================================
+ERROR: test_fsync_error_consumes_does_not_publish_or_retry (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-598v2qwr'
+
+======================================================================
+ERROR: test_input_hash_drift_before_consumption (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-e2wkmwxl'
+
+======================================================================
+ERROR: test_inspect_hashes_only_no_success_inference (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-0f2wyn1t'
+
+======================================================================
+ERROR: test_install_each_persistent_checkpoint_failure_preserved (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-kn9k6ubi'
+
+======================================================================
+ERROR: test_install_real_atomic_publish_exact_bytes (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-59g6xqpq'
+
+======================================================================
+ERROR: test_installed_attempt_cannot_repeat (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-osmw_m0h'
+
+======================================================================
+ERROR: test_interrupted_rollback_cannot_repeat (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-7_7qa1eu'
+
+======================================================================
+ERROR: test_metadata_drift_rejects_before_stage (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-avn5ece4'
+
+======================================================================
+ERROR: test_new_rollback_quarantines_preserves_evidence (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-hodtxcpa'
+
+======================================================================
+ERROR: test_old_target_not_overwritten (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-4dmo1ewl'
+
+======================================================================
+ERROR: test_preflight_no_private_reads_no_network_no_writes (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-lf1bciad'
+
+======================================================================
+ERROR: test_rename_noreplace_real_race (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-f0tio34c'
+
+======================================================================
+ERROR: test_revocation_after_stage_holds (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-vrsn1d0_'
+
+======================================================================
+ERROR: test_self_review_expiry_and_cloud_grant_rejected (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-qijao6zz'
+
+======================================================================
+ERROR: test_source_symlink_rejected (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-pp07vhdc'
+
+======================================================================
+ERROR: test_unknown_target_blocks_rollback (test_p2_uk_swas_diagnostic.SitePreparationTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 729, in setUp
+    self.tmp=tempfile.TemporaryDirectory(dir='/root',prefix='p2-site-isolated-')
+  File "/usr/lib64/python3.6/tempfile.py", line 809, in __init__
+    self.name = mkdtemp(suffix, prefix, dir)
+  File "/usr/lib64/python3.6/tempfile.py", line 387, in mkdtemp
+    _os.mkdir(file, 0o700)
+PermissionError: [Errno 13] Permission denied: '/root/p2-site-isolated-kstsqg8r'
+
+======================================================================
+ERROR: test_approved_slots_are_independent (test_stage5_active_ad_integration.IntegratedAdTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 27, in test_approved_slots_are_independent
+    self.active(S,AMOUNT,'amountad',10);self.active(S,SUCCESS,'receiptad',2)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 21, in active
+    create_campaign(self.a,s,record,actor(s),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_scope_priority_and_expiry (test_stage5_active_ad_integration.IntegratedAdTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 33, in test_scope_priority_and_expiry
+    self.active(S,AMOUNT,'low',1);self.active(S,AMOUNT,'high',10)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 21, in active
+    create_campaign(self.a,s,record,actor(s),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_success_candidate_does_not_mean_success_page_allowed (test_stage5_active_ad_integration.IntegratedAdTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 43, in test_success_candidate_does_not_mean_success_page_allowed
+    self.active(S,SUCCESS,'receiptad',10)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 21, in active
+    create_campaign(self.a,s,record,actor(s),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_unapproved_ad_is_never_selected (test_stage5_active_ad_integration.IntegratedAdTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_active_ad_integration.py", line 40, in test_unapproved_ad_is_never_selected
+    'title':'Draft','target_url':'https://example.org/draft','priority':100},actor(S),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_stage5_browser_e2e (unittest.loader._FailedTest)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_stage5_browser_e2e
+Traceback (most recent call last):
+  File "/usr/lib64/python3.6/unittest/loader.py", line 428, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib64/python3.6/unittest/loader.py", line 369, in _get_module_from_name
+    __import__(name)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_browser_e2e.py", line 9, in <module>
+    from playwright.sync_api import sync_playwright, expect
+ModuleNotFoundError: No module named 'playwright'
+
+
+======================================================================
+ERROR: test_simulation_success_does_not_release_receipt_ad (test_stage5_checkout_read_integration.IntegratedReadTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_checkout_read_integration.py", line 35, in test_simulation_success_does_not_release_receipt_ad
+    self.active_ad(AMOUNT);self.active_ad(SUCCESS)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_checkout_read_integration.py", line 23, in active_ad
+    create_campaign(self.a,S,record,actor(S),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_stage5_default_bootstrap_browser (unittest.loader._FailedTest)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_stage5_default_bootstrap_browser
+Traceback (most recent call last):
+  File "/usr/lib64/python3.6/unittest/loader.py", line 428, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib64/python3.6/unittest/loader.py", line 369, in _get_module_from_name
+    __import__(name)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_default_bootstrap_browser.py", line 4, in <module>
+    from playwright.sync_api import sync_playwright, expect
+ModuleNotFoundError: No module named 'playwright'
+
+
+======================================================================
+ERROR: test_normal_default_demo_closes_all_runtime_databases (test_stage5_owned_cleanup.CleanupTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_owned_cleanup.py", line 49, in test_normal_default_demo_closes_all_runtime_databases
+    srv=serve_local(port=0)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_api.py", line 255, in serve_local
+    merchant_db, ad_db, now = fixture_stores()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_bootstrap.py", line 50, in fixture_stores
+    create_campaign(a,DEMO_SCOPE,record,owner,now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_primary_backup_failure_survives_failing_source_close (test_stage5_owned_cleanup.CleanupTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_owned_cleanup.py", line 109, in test_primary_backup_failure_survives_failing_source_close
+    bootstrap.fixture_stores()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_bootstrap.py", line 50, in fixture_stores
+    create_campaign(a,DEMO_SCOPE,record,owner,now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_second_connection_failure_closes_first (test_stage5_owned_cleanup.CleanupTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_owned_cleanup.py", line 31, in test_second_connection_failure_closes_first
+    bootstrap.fixture_stores()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_bootstrap.py", line 50, in fixture_stores
+    create_campaign(a,DEMO_SCOPE,record,owner,now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_source_close_failure_on_success_closes_runtime_too (test_stage5_owned_cleanup.CleanupTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_owned_cleanup.py", line 138, in test_source_close_failure_on_success_closes_runtime_too
+    bootstrap.fixture_stores()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_bootstrap.py", line 50, in fixture_stores
+    create_campaign(a,DEMO_SCOPE,record,owner,now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_success_closes_seed_sources_before_transferring_runtime (test_stage5_owned_cleanup.CleanupTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_owned_cleanup.py", line 65, in test_success_closes_seed_sources_before_transferring_runtime
+    runtime_m,runtime_a,_=bootstrap.fixture_stores()
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_demo_bootstrap.py", line 50, in fixture_stores
+    create_campaign(a,DEMO_SCOPE,record,owner,now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_stage5_storefront_browser_e2e (unittest.loader._FailedTest)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_stage5_storefront_browser_e2e
+Traceback (most recent call last):
+  File "/usr/lib64/python3.6/unittest/loader.py", line 428, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib64/python3.6/unittest/loader.py", line 369, in _get_module_from_name
+    __import__(name)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_storefront_browser_e2e.py", line 9, in <module>
+    from playwright.sync_api import sync_playwright, expect
+ModuleNotFoundError: No module named 'playwright'
+
+
+======================================================================
+ERROR: test_two_ad_slots_only_amount_can_be_returned (test_stage5_storefront_http.StorefrontHTTPTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_storefront_http.py", line 52, in test_two_ad_slots_only_amount_can_be_returned
+    self.activate(AMOUNT,"amount1");self.activate(SUCCESS,"success1")
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_stage5_storefront_http.py", line 41, in activate
+    create_campaign(self.a,S,rec,owner(S),100)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 95, in create_campaign
+    t,m,s=_scope(scope); _now(now)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in _scope
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/scripts/community_ad_store.py", line 84, in <genexpr>
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+AttributeError: 'str' object has no attribute 'isascii'
+
+======================================================================
+ERROR: test_v2_active_attempt_migrates_to_unknown_hold (test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor.py", line 266, in test_v2_active_attempt_migrates_to_unknown_hold
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_v2_migration_failpoints_rollback_and_restart_cleanly (test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor.py", line 321, in test_v2_migration_failpoints_rollback_and_restart_cleanly
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_v2_normal_open_is_zero_write_then_explicit_migration (test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor.py", line 221, in test_v2_normal_open_is_zero_write_then_explicit_migration
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_exact_manifest_accepts_release (test_task_supervisor_runtime.ReleaseManifestTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor_runtime.py", line 214, in test_exact_manifest_accepts_release
+    trusted_uid=os.geteuid())
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/../scripts/task_supervisor_runtime_entry.py", line 50, in verify_release
+    _trusted_directory(os.path.join(root, 'scripts'), trusted_uid)
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/../scripts/task_supervisor_runtime_entry.py", line 44, in _trusted_directory
+    raise ValueError('HOLD_UNTRUSTED_RELEASE_DIRECTORY')
+ValueError: HOLD_UNTRUSTED_RELEASE_DIRECTORY
+
+======================================================================
+FAIL: test_approval_changed_after_sts_stops_before_command (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_credential_mode_refused_before_sts (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_epoch_drift_stops_before_credentials (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_isolated_cli_rejects_fifo_before_read (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_isolated_cli_rejects_missing_sibling_without_pythonpath_import (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_ledger_substitution_stops (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_real_root_files_to_dispatch_and_separate_query (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_source_byte_drift_stops (test_p2_uk_swas_diagnostic.ProtectedEntryTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_p2_uk_swas_diagnostic.py", line 215, in setUp
+    self.assertEqual(os.geteuid(),0,'Root fixtures required; run offline tests via sudo')
+AssertionError: 1002 != 0 : Root fixtures required; run offline tests via sudo
+
+======================================================================
+FAIL: test_bytecode_cache_fails_closed (test_task_supervisor_runtime.ReleaseManifestTests)
+----------------------------------------------------------------------
+ValueError: HOLD_UNTRUSTED_RELEASE_DIRECTORY
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor_runtime.py", line 243, in test_bytecode_cache_fails_closed
+    verify_release(self.manifest,self.digest,trusted_uid=os.geteuid())
+AssertionError: "BYTECODE_CACHE" does not match "HOLD_UNTRUSTED_RELEASE_DIRECTORY"
+
+======================================================================
+FAIL: test_changed_manifest_fails_closed (test_task_supervisor_runtime.ReleaseManifestTests)
+----------------------------------------------------------------------
+ValueError: HOLD_UNTRUSTED_RELEASE_DIRECTORY
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor_runtime.py", line 229, in test_changed_manifest_fails_closed
+    verify_release(self.manifest,'0'*64,trusted_uid=os.geteuid())
+AssertionError: "MANIFEST_DIGEST" does not match "HOLD_UNTRUSTED_RELEASE_DIRECTORY"
+
+======================================================================
+FAIL: test_changed_source_fails_closed (test_task_supervisor_runtime.ReleaseManifestTests)
+----------------------------------------------------------------------
+ValueError: HOLD_UNTRUSTED_RELEASE_DIRECTORY
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/xuanjun-task-center-https-bc317/tests/test_task_supervisor_runtime.py", line 223, in test_changed_source_fails_closed
+    verify_release(self.manifest,self.digest,trusted_uid=os.geteuid())
+AssertionError: "SOURCE_DIGEST" does not match "HOLD_UNTRUSTED_RELEASE_DIRECTORY"
+
+----------------------------------------------------------------------
+Ran 685 tests in 77.948s
+
+FAILED (failures=11, errors=100, skipped=1)
+{"identity_kind": "TEST_ONLY_FIXTURE", "mode": "0600", "path": "/tmp/tmp8pgi3k1w/prepared-identities.json", "state": "CREATED"}
+{"identity_kind": "TEST_ONLY_FIXTURE", "mode": "0600", "path": "/tmp/tmp8pgi3k1w/prepared-identities.json", "state": "CREATED"}
