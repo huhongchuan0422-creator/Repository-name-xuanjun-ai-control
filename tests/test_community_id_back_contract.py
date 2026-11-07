@@ -50,22 +50,28 @@ class IdentityBackContract(unittest.TestCase):
         return self.client.post(path+'/confirm',headers={**self.headers,'Idempotency-Key':key},json=dict(
             revision=revision,application_revision=seen['application_revision'],provider_version=seen['provider_version'],
             fields=fields or VALUES[seen['document_type']]))
-    def test_actual_successor_hash_and_unchanged_store_core(self):
+    def test_actual_successor_hash_and_unchanged_core(self):
         lock=json.loads(Path('scripts/community_ocr_dependency.json').read_text())
         self.assertEqual(self.api.ALLOWED_HINTS,{'business_license','id_front','id_back'})
         for name,digest in lock['files'].items():
             self.assertEqual(hashlib.sha256((Path(self.api.__file__).parent/name).read_bytes()).hexdigest(),digest)
-        for name in ('secure_store.py','ocr_core.py'):
-            self.assertEqual(lock['files'][name],lock['upstream_files'][name])
+        self.assertEqual(lock['files']['ocr_core.py'],lock['upstream_files']['ocr_core.py'])
+        self.assertEqual(set(lock['local_successor']['source_files']),{'api.py','secure_store.py'})
+        for name,relative in lock['local_successor']['source_files'].items():
+            self.assertEqual(hashlib.sha256(Path(relative).read_bytes()).hexdigest(),lock['files'][name])
         self.assertEqual(set(self.api.CONFIRM_KEYS['id_back']),set(VALUES['id_back']))
     def test_successor_patch_matches_original_ref_bytes_exactly(self):
         import os,subprocess,difflib
         lock=json.loads(Path('scripts/community_ocr_dependency.json').read_text())
         root=os.environ.get('COMMUNITY_TEST_PINNED_OCR_DIR')
-        raw=(Path(root)/'api.py').read_bytes() if root else subprocess.check_output(['git','show',lock['source_sha']+':services/ocr_engine/api.py'])
-        self.assertEqual(hashlib.sha256(raw).hexdigest(),lock['upstream_files']['api.py'])
-        candidate=Path('services/ocr_engine/api.py').read_text()
-        patch=''.join(difflib.unified_diff(raw.decode().splitlines(True),candidate.splitlines(True),fromfile='a/services/ocr_engine/api.py',tofile='b/services/ocr_engine/api.py'))
+        patches=[]
+        for name,relative in sorted(lock['local_successor']['source_files'].items()):
+            original_path='services/ocr_engine/'+name
+            raw=(Path(root)/name).read_bytes() if root else subprocess.check_output(['git','show',lock['source_sha']+':'+original_path])
+            self.assertEqual(hashlib.sha256(raw).hexdigest(),lock['upstream_files'][name])
+            candidate=Path(relative).read_text()
+            patches.append(''.join(difflib.unified_diff(raw.decode().splitlines(True),candidate.splitlines(True),fromfile='a/'+original_path,tofile='b/'+original_path)))
+        patch=''.join(patches)
         self.assertEqual(Path(lock['local_successor']['patch_path']).read_text(),patch)
         self.assertEqual(hashlib.sha256(patch.encode()).hexdigest(),lock['local_successor']['patch_sha256'])
         self.assertEqual(lock['local_successor']['status'],'UNPUBLISHED_LOCAL_CANDIDATE')
