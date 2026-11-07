@@ -180,7 +180,7 @@ class WechatApplyment:
 
     def _fill_confirmed_document_draft(self, session, csrf, application, *,document_type,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields, source_check=None):
+                                     confirmed_fields, source_check=None, recovery_receipt=None, recovery_replay_check=None):
         """Host-only empty-field fill, original Center transaction + two CAS.
 
         Caller must supply both versions from an independently bound human
@@ -201,12 +201,26 @@ class WechatApplyment:
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         if document_type not in ('business_license','id_front','id_back'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
         allowed={'business_license':{'company_name','registered_address'},'id_front':{'id_name','id_number','registered_address'},'id_back':{'valid_from','valid_to'}}[document_type]
+        if recovery_receipt is not None and document_type=='business_license':
+            allowed=allowed|{'credit_code','legal_representative'}
         if (type(confirmed_fields) is not dict or not confirmed_fields
                 or not set(confirmed_fields)<=allowed):
             raise ValueError('CONFIRMED_LICENSE_FIELDS_ONLY')
         for value in confirmed_fields.values():
             if type(value) is not str or not value.strip():raise ValueError('CONFIRMED_LICENSE_STRING_REQUIRED')
             safe_text(value,512)
+        if recovery_receipt is not None:
+            if (type(recovery_receipt) is not dict or set(recovery_receipt)!={'id','payload_hash'}
+                    or any(type(v) is not str or not re.fullmatch('[a-f0-9]{64}',v) for v in recovery_receipt.values())
+                    or not callable(recovery_replay_check)):
+                raise ValueError('OCR_RECOVERY_RECEIPT_INVALID')
+        def retain_receipt(owner, outcome):
+            if recovery_receipt is not None:
+                key=recovery_receipt['id']
+                payload=dict(payload_hash=recovery_receipt['payload_hash'],outcome=outcome)
+                c.db.execute("INSERT INTO links VALUES('COMMUNITY_OCR_RECOVERY_WRITEBACK',?,?,?,?,1)",
+                    (key,owner,application,c.encrypt(canonical(payload),'ocr-recovery-writeback:'+key)))
+            return outcome
         with c.tx():  # Original BEGIN IMMEDIATE; owns both writes and audit.
             uid=c.session(session,csrf)
             owner,meta,platform=self.onboarding._load(application,uid)
@@ -217,6 +231,20 @@ class WechatApplyment:
                 return self._read(application)
             record=provider();version=record['version'] if record is not None else 0
             if type(version) is not int or version<(1 if record is not None else 0):raise ValueError('PROVIDER_VERSION_INVALID')
+            if recovery_receipt is not None:
+                key=recovery_receipt['id']
+                prior=c.db.execute("SELECT user_id,active,payload FROM links WHERE channel='COMMUNITY_OCR_RECOVERY_WRITEBACK' AND subject_idx=? AND project=?",(key,application)).fetchone()
+                if prior is not None:
+                    if prior['user_id']!=owner or prior['active']!=1:raise PermissionError('OCR_RECOVERY_RECEIPT_OWNER_CHANGED')
+                    saved=json.loads(c.decrypt(prior['payload'],'ocr-recovery-writeback:'+key))
+                    if saved.get('payload_hash')!=recovery_receipt['payload_hash']:raise ValueError('OCR_RECOVERY_IDEMPOTENCY_CONFLICT')
+                    outcome=saved['outcome']
+                    if (platform['revision']!=outcome['application_revision'] or version!=outcome['wechat_version']
+                            or platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
+                            or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
+                        raise ValueError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
+                    recovery_replay_check(platform['revision'],version)
+                    return outcome
             if platform['revision']!=expected_application_revision or version!=expected_wechat_version:
                 raise ValueError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
             if (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
@@ -240,18 +268,38 @@ class WechatApplyment:
                     # Provider names project into platform views. A different manual
                     # value on either side prevents filling the other side with a
                     # conflicting suggestion (even without changing its raw column).
-                    if any(value and value!=name for value in (fields['legal_name'],existing)):
+                    if any((value.strip() if recovery_receipt is not None else value) and value!=name for value in (fields['legal_name'],existing)):
                         skipped.append('company_name')
                     else:
                         changed=False
-                        if not fields['legal_name']:fields['legal_name']=name;changed=True
-                        if not existing:
+                        if not (fields['legal_name'].strip() if recovery_receipt is not None else fields['legal_name']):fields['legal_name']=name;changed=True
+                        if not (existing.strip() if recovery_receipt is not None else existing):
                             profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['merchant_name']=name
                             changed=True
                         if changed:applied.append('company_name')
+                if recovery_receipt is not None:
+                    for key,target in (('credit_code','license_number'),('legal_representative','legal_person')):
+                        if key not in confirmed_fields:continue
+                        existing=license_info.get(target,'')
+                        if type(existing) is not str:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+                        if existing.strip():skipped.append(key)
+                        else:
+                            profile.setdefault('subject_info',{}).setdefault('business_license_info',{})[target]=confirmed_fields[key]
+                            applied.append(key)
                 address=confirmed_fields.get('registered_address')
                 if address is not None:
-                    if fields['address']:skipped.append('registered_address')
+                    if recovery_receipt is not None:
+                        existing=license_info.get('license_address','')
+                        if type(existing) is not str:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
+                        if any(v.strip() and v!=address for v in (fields['address'],existing)):
+                            skipped.append('registered_address')
+                        else:
+                            changed=False
+                            if not fields['address'].strip():fields['address']=address;changed=True
+                            if not existing.strip():
+                                profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['license_address']=address;changed=True
+                            if changed:applied.append('registered_address')
+                    elif fields['address']:skipped.append('registered_address')
                     else:fields['address']=address;applied.append('registered_address')
             else:
                 # Identity type belongs to the applicant's original provider
@@ -267,12 +315,12 @@ class WechatApplyment:
                     if key not in confirmed_fields:continue
                     existing=card.get(target,'')
                     if type(existing) is not str:raise ValueError('ORIGINAL_IDCARD_PROFILE_REQUIRED')
-                    if existing:skipped.append(key)
+                    if (existing.strip() if recovery_receipt is not None else existing):skipped.append(key)
                     else:card[target]=confirmed_fields[key];applied.append(key)
                 if applied:identity['id_card_info']=card
             if not applied:
                 if source_check is not None:source_check(platform['revision'],version)
-                return dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped)
+                return retain_receipt(owner,dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped))
             if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
             # Recheck after decoding/validation and immediately before first write.
             if (c.session(session,csrf)!=uid or self.onboarding._load(application,uid)[2]!=platform
@@ -291,7 +339,7 @@ class WechatApplyment:
                     or latest['fields']!=fields or latest_meta.get('reviews')!={}
                     or provider()!=result):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             if source_check is not None:source_check(revision,result['version'])
-            return dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped)
+            return retain_receipt(owner,dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped))
 
     def _provider_domain(self,record,*,submission=False):
         merchant=self.reader._mchid

@@ -50,6 +50,15 @@ def _reason(error, stage):
         'IMAGE_DECODE_FAILED':'IMAGE_INVALID','IMAGE_PIXEL_LIMIT':'IMAGE_INVALID',
         'LICENSE_OCR_UPSTREAM_PIN_MISMATCH':'MODEL_PIN_MISMATCH','OCR_PINNED_DEPENDENCY_REQUIRED':'MODEL_PIN_MISMATCH',
         'OCR_INFERENCE_FAILED':'INFERENCE_FAILED',
+        'OCR_RECOVERY_IDEMPOTENCY_CONFLICT':'IDEMPOTENCY_CONFLICT',
+        'OCR_RECOVERY_SOURCE_CHANGED':'SOURCE_BINDING_CHANGED',
+        'OCR_RECOVERY_BINDING_INVALID':'SOURCE_BINDING_CHANGED',
+        'OCR_RECOVERY_BINDING_MISSING':'SOURCE_BINDING_CHANGED',
+        'OCR_RECOVERY_VIEW_CHANGED':'APPLICATION_REVISION_CHANGED',
+        'OCR_RECOVERY_JOB_NOT_FOUND':'JOB_NOT_FOUND','OCR_RECOVERY_VIEW_NOT_FOUND':'JOB_NOT_FOUND',
+        'OCR_RECOVERY_CONFIRMATION_REQUIRED':'CONFIRMATION_FAILED',
+        'OCR_RECOVERY_RESULT_NOT_READY':'RESULT_READ_FAILED',
+        'SHARED_DRAFT_DUAL_VERSION_CONFLICT':'SOURCE_BINDING_CHANGED',
     }
     if code in exact:return exact[code]
     for key in ('det','cls','rec'):
@@ -188,7 +197,7 @@ class HostOcr:
         try:return self._dispatch(token,scene,params)
         except BaseException as error:
             if safe_diagnostic(getattr(error,'ocr_diagnostic',None)) is None:
-                if not isinstance(error, PermissionError):context.phase({'submit':'EXECUTION','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK'}.get(context.action,'ADMISSION'))
+                if not isinstance(error, PermissionError):context.phase({'submit':'EXECUTION','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK','recover_view':'RESULT_READ','recover_confirm':'CONFIRMATION','recover_apply':'WRITEBACK'}.get(context.action,'ADMISSION'))
                 _attach_failure(error,context)
             raise
         finally:_CURRENT_DIAGNOSTIC.reset(reset)
@@ -205,13 +214,24 @@ class HostOcr:
             raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         action=params['action'];base={'action','application'}
         extras={'submit':{'document_type','idempotency_key'},'read':{'job_id'},
-                'confirm':{'job_id','revision','fields','idempotency_key','application_revision','provider_version'},'delete':{'job_id'},'apply_confirmed':{'job_id','confirmation_revision'}}
+                'confirm':{'job_id','revision','fields','idempotency_key','application_revision','provider_version'},'delete':{'job_id'},'apply_confirmed':{'job_id','confirmation_revision'},
+                'recover_view':{'document_type','locator','recovery_key'},
+                'recover_confirm':{'recovery_id','revision','fields','confirmation_key'},
+                'recover_apply':{'recovery_id','confirmation_id','confirmation_revision','writeback_key'}}
         if action not in extras or set(params)!=base|extras[action]:raise ValueError('OCR_EXACT_REQUEST_REQUIRED')
         p=self.bridge.authenticate(token)
         if not self.bridge.authorize_application(p,params['application']):raise PermissionError('OCR_APPLICATION_DENIED')
         key=(token,scene,repr(sorted(params.items())))
         headers={'Authorization':'Bearer '+token}
-        if action=='submit':
+        recovery_action=action.startswith('recover_')
+        if recovery_action:
+            operation=action[len('recover_'):]
+            body={k:v for k,v in params.items() if k!='action'}
+            if operation=='apply':
+                result=self.bridge.recovery_apply(p,**body)
+                return {'status_code':200,'result':result,'writeback':'WRITTEN' if result.get('written') is True else 'NO_EMPTY_FIELDS_CHANGED'}
+            method='POST';path='/api/v1/ocr/recovery/'+operation;options={'json':body}
+        elif action=='submit':
             source=self.bridge.source(p,params['application'],params['document_type'])
             snapshot={k:v for k,v in source.items() if k!='data'}
             method='POST';path='/api/v1/ocr/jobs'
@@ -245,7 +265,7 @@ class HostOcr:
         def run():
             import asyncio
             reset=_CURRENT_DIAGNOSTIC.set(request_context)
-            request_context.phase({'submit':'QUEUE','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK'}.get(action,'ADMISSION'))
+            request_context.phase({'submit':'QUEUE','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK','recover_view':'RESULT_READ','recover_confirm':'CONFIRMATION','recover_apply':'WRITEBACK'}.get(action,'ADMISSION'))
             try:return asyncio.run(request())
             finally:_CURRENT_DIAGNOSTIC.reset(reset)
         self.busy=True
@@ -291,6 +311,12 @@ class HostOcr:
                 if completed_context.failure is not None:error.ocr_diagnostic=dict(completed_context.failure)
                 else:_attach_failure(error,completed_context)
                 raise error
+            if recovery_action:
+                payload=response.json()
+                view_id=params['recovery_key'] if action=='recover_view' else params['recovery_id']
+                view=self.bridge.store.recovery_receipt(current.tenant_id,current.subject,'view',view_id)
+                if not view:raise PermissionError('OCR_RECOVERY_VIEW_NOT_FOUND')
+                self.bridge._recovery_current(current,params['application'],view)
             if action in ('read','confirm'):
                 # A completed API future may wait across several client polls.
                 # Recheck its original job binding immediately before releasing

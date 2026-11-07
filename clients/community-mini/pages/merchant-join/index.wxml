@@ -22,16 +22,16 @@
    <image class="material-preview" src="{{materialPreviews[item.id]}}" mode="aspectFit" />
    <view wx:if="{{uploadFeedback&&uploadFeedback.kind===item.id}}" class="material-upload-overlay" aria-live="polite"><text class="material-upload-label">{{uploadFeedback.label}}</text></view>
   </view>
-  <text wx:if="{{step!==1||item.uploaded||item.synced}}" class="material-state">{{item.uploaded?'原申请已上传':'未选择材料'}} · {{item.synced?'已关联微信草稿':'未关联微信草稿'}}{{item.uploaded?' · 审核：'+(stateLabels[item.review]||'状态待核对'):''}}</text>
-  <button wx:if="{{item.uploaded}}" class="text-link" data-kind="{{item.id}}" bindtap="syncMaterial" disabled="{{pending||!canEditWechat}}">{{item.synced?'重新关联当前材料':'关联当前微信资料草稿'}}</button>
-  <button wx:if="{{group.photos&&item.synced&&item.id!=='cashier_photo'}}" class="text-link" data-kind="{{item.id}}" bindtap="removeScenePhoto" disabled="{{pending||!canEditWechat}}">移除草稿关联（原上传保留）</button>
+  <text wx:if="{{step!==1||item.uploaded||item.synced}}" class="material-state">{{item.uploaded?'原申请已上传':'未选择材料'}} · {{item.synced?'已选用于微信申请':'尚未选用于微信申请'}}{{item.uploaded?' · 审核：'+(stateLabels[item.review]||'状态待核对'):''}}</text>
+  <button wx:if="{{item.uploaded}}" class="text-link" data-kind="{{item.id}}" bindtap="syncMaterial" disabled="{{pending||!canEditWechat}}">{{item.synced?'更新申请照片':'用于微信申请'}}</button>
+  <button wx:if="{{group.photos&&item.synced&&item.id!=='cashier_photo'}}" class="text-link" data-kind="{{item.id}}" bindtap="removeScenePhoto" disabled="{{pending||!canEditWechat}}">取消选用（保留原照片）</button>
   <button wx:if="{{item.id==='cashier_photo'&&item.uploaded}}" class="text-link" bindtap="removeCashierPhoto" disabled="{{pending||!canEditPlatform}}">移除本次收银台材料（历史保留）</button>
  </view>
  <view wx:if="{{group.ocrKind&&application}}" class="group-recognition">
-  <button class="text-link" data-kind="{{group.ocrKind}}" bindtap="recognizeDocument" disabled="{{pending}}">{{group.ocrBackKind?'识别已上传身份证人像面':'识别本组已上传证照'}}</button>
-  <button wx:if="{{group.ocrBackKind}}" class="text-link" data-kind="{{group.ocrBackKind}}" bindtap="recognizeDocument" disabled="{{pending}}">识别已上传身份证国徽面</button>
-  <view wx:if="{{ocrKind===group.ocrKind||(group.ocrBackKind&&ocrKind===group.ocrBackKind)}}"><text class="hint" aria-live="polite">{{ocrStatus}}</text><view wx:for="{{ocrRows}}" wx:key="key" wx:if="{{item.key==='issuing_authority'}}"><label>{{item.label}}<input value="{{item.value}}" data-key="{{item.key}}" bindinput="editOcrSuggestion" bindfocus="focusOcrSuggestion" bindblur="blurOcrSuggestion" disabled="{{pending}}" /><text wx:if="{{item.hint}}" class="hint">{{item.hint}}</text></label></view><button wx:if="{{ocrJob}}" class="text-link" bindtap="readOcr" disabled="{{pending}}">读取本组识别状态</button><button wx:if="{{ocrRows.length}}" bindtap="confirmOcr" disabled="{{pending}}">我已核对，留存人工确认</button><button wx:if="{{ocrConfirmed}}" bindtap="fillOcrDraft" disabled="{{pending||!canEditWechat}}">把已核对资料填入空白项并保存</button></view>
-  <text wx:else class="hint">尚未请求识别。识别结果需人工核对，不自动覆盖已填写资料。</text>
+  <button class="text-link" data-kind="{{group.ocrKind}}" bindtap="recognizeDocument" disabled="{{pending}}">{{group.ocrBackKind?'识别身份证人像面':'识别营业执照'}}</button>
+  <button wx:if="{{group.ocrBackKind}}" class="text-link" data-kind="{{group.ocrBackKind}}" bindtap="recognizeDocument" disabled="{{pending}}">识别身份证国徽面</button>
+  <view wx:if="{{ocrKind===group.ocrKind||(group.ocrBackKind&&ocrKind===group.ocrBackKind)}}"><text class="hint" aria-live="polite">{{ocrStatus}}</text><view wx:for="{{ocrRows}}" wx:key="key" wx:if="{{item.key==='issuing_authority'}}"><label>{{item.label}}<input value="{{item.value}}" data-key="{{item.key}}" bindinput="editOcrSuggestion" bindfocus="focusOcrSuggestion" bindblur="blurOcrSuggestion" disabled="{{pending}}" /><text wx:if="{{item.hint}}" class="hint">{{item.hint}}</text></label></view><button wx:if="{{ocrJob}}" class="text-link" bindtap="readOcr" disabled="{{pending}}">查看识别结果</button><button wx:if="{{ocrRows.length}}" bindtap="confirmOcr" disabled="{{pending}}">确认已核对</button><button wx:if="{{ocrConfirmed}}" bindtap="fillOcrDraft" disabled="{{pending||!canEditWechat}}">保存已核对资料（仅填空白，不覆盖已有内容）</button></view>
+  <text wx:else class="hint">点击识别后请核对结果，已填写的资料不会被自动覆盖。</text>
  </view>
  <button wx:if="{{group.hasOcrFields}}" class="edit-group" hover-class="edit-group-pressed" aria-label="{{editMaterialGroup===group.id?'收起资料编辑，未保存修改仍保留':'点击修改本组识别资料'}}" data-group="{{group.id}}" bindtap="toggleMaterialEdit" disabled="{{pending||!canEditWechat}}">{{editMaterialGroup===group.id?'收起修改':'点击修改'}}</button>
  <text wx:if="{{group.hasOcrFields}}" class="fields-heading">识别结果请核对</text>

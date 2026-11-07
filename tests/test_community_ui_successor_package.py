@@ -11,6 +11,7 @@ RUNTIME_CHANGED = {
     'scripts/community_platform_host.py',
     'demos/community-stage/ui-preview/sources.js',
     'services/ocr_engine/api.py',
+    'services/ocr_engine/secure_store.py',
     'scripts/community_ocr_dependency.json',
     'scripts/community_ocr_bridge.py',
     'scripts/community_identity_layout.py',

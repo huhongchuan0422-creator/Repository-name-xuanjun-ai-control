@@ -129,6 +129,13 @@ class MiniMerchant:
             code=str(error)
             if diagnostic['reason'] in ('OWNER_WAIT_TIMEOUT','OWNER_QUEUE_FULL','HOST_STOPPED','OWNER_THREAD_REQUIRED'):public='OCR_UNAVAILABLE'
             elif code=='OCR_REQUEST_PENDING':public='OCR_REQUEST_PENDING'
+            elif p.get('action') in ('recover_view','recover_confirm','recover_apply') and code in (
+                    'OCR_RECOVERY_SOURCE_CHANGED','OCR_RECOVERY_VIEW_CHANGED','OCR_RECOVERY_IDEMPOTENCY_CONFLICT',
+                    'SHARED_DRAFT_DUAL_VERSION_CONFLICT'):
+                # Exact current-view conflicts are not account revocation. Keep the
+                # existing unavailable response semantics; all auth failures below
+                # still invalidate the original client session as before.
+                public='OCR_UNAVAILABLE'
             elif any(v in code for v in ('REVOKED','CHANGED','EXPIRED','REVISION','BINDING')):public='OCR_SOURCE_CHANGED'
             elif any(v in code for v in ('AUTH','SESSION','PERMISSION','PRINCIPAL')):public='OCR_AUTH_DENIED'
             else:public='OCR_UNAVAILABLE'

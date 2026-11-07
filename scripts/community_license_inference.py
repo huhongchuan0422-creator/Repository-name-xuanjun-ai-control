@@ -22,6 +22,7 @@ UPSTREAM_FILES = {
 # Deployment manifest requires this successor; legacy runtime remains usable
 # for same-model offline comparison. Core/store/model pins are unchanged.
 COMPATIBLE_API_SHA256 = '32cf647f56f9f1fbed9d0c7d15bb50a0f60a9cd5124bd5ff835129196766636e'
+RECOVERY_RUNTIME_FILES = {'api.py': '8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e', 'secure_store.py': '802d7f2f714273f807d3abd83a1e3896cabe26408664a89a0ef82c2cc0ce6167', 'ocr_core.py': 'bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308'}
 EXPECTED_FIELDS = {
     'business_license': ('company_name', 'credit_code', 'legal_representative', 'registered_address'),
     'id_front': ('id_name', 'id_number', 'registered_address'),
@@ -138,10 +139,10 @@ def _choose_orientation(runs, document_type, width, height):
 def run_license_layout_ocr(image, document_type, max_bytes=8*1024*1024, max_pixels=20_000_000):
     from services.ocr_engine import ocr_core
     root = Path(ocr_core.__file__).resolve().parent
-    for name, digest in UPSTREAM_FILES.items():
-        accepted = {digest, COMPATIBLE_API_SHA256} if name == 'api.py' else {digest}
-        if hashlib.sha256((root/name).read_bytes()).hexdigest() not in accepted:
-            raise PermissionError('LICENSE_OCR_UPSTREAM_PIN_MISMATCH')
+    observed={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in UPSTREAM_FILES}
+    legacy=dict(UPSTREAM_FILES,**{'api.py':COMPATIBLE_API_SHA256})
+    if observed not in (UPSTREAM_FILES,legacy,RECOVERY_RUNTIME_FILES):
+        raise PermissionError('LICENSE_OCR_UPSTREAM_PIN_MISMATCH')
     if document_type not in EXPECTED_FIELDS:
         raise ValueError('UNSUPPORTED_DOCUMENT_TYPE')
     if not isinstance(image, bytes) or not image or len(image)>max_bytes:

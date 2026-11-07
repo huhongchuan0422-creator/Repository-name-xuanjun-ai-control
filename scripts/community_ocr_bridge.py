@@ -29,7 +29,7 @@ def on_owner(method):
         from scripts.community_ocr_host import current_diagnostic, _attach_failure, _CURRENT_DIAGNOSTIC
         context=current_diagnostic()
         stage={'authenticate':'AUTHENTICATION','authorize_application':'APPLICATION_AUTHORIZATION',
-               'source':'SOURCE_BINDING','authorize_attachment':'SOURCE_BINDING','apply_confirmed':'WRITEBACK'}.get(method.__name__,'ADMISSION')
+               'source':'SOURCE_BINDING','authorize_attachment':'SOURCE_BINDING','apply_confirmed':'WRITEBACK','recovery_view':'RESULT_READ','recovery_confirm':'CONFIRMATION','recovery_apply':'WRITEBACK'}.get(method.__name__,'ADMISSION')
         def execute():
             import threading
             if context:context.phase(stage)
@@ -40,7 +40,7 @@ def on_owner(method):
             except BaseException as error:
                 _attach_failure(error,context,stage=stage);raise
             finally:
-                if context:context.phase({'submit':'QUEUE','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK'}.get(context.action,'ADMISSION'))
+                if context:context.phase({'submit':'QUEUE','read':'RESULT_READ','confirm':'CONFIRMATION','apply_confirmed':'WRITEBACK','recover_view':'RESULT_READ','recover_confirm':'CONFIRMATION','recover_apply':'WRITEBACK'}.get(context.action,'ADMISSION'))
                 _CURRENT_DIAGNOSTIC.reset(reset)
         execute.ocr_context=context;execute.ocr_stage=stage
         return self.owner_call(execute)
@@ -132,6 +132,142 @@ class CommunityOcrBridge:
         if 'wechat_version' in source:
             result['provider_version'] = source['wechat_version']
         return result
+
+    @on_owner
+    def recovery_view(self, p, application, document_type, locator, recovery_key):
+        """New explicitly authorized exact-material view; old jobs stay immutable."""
+        if 'ocr:use' not in p.permissions or not self.authorize_application(p, application):
+            raise PermissionError('OCR_APPLICATION_DENIED')
+        self._context(p)
+        if type(locator) is not dict or set(locator) not in ({'job_id'}, {'original_key'}):
+            raise ValueError('OCR_RECOVERY_EXACT_LOCATOR_REQUIRED')
+        job = self.store.resolve_recovery_job(p.tenant_id,p.subject,application,document_type,**locator)
+        from scripts.community_ocr_host import current_diagnostic
+        context=current_diagnostic()
+        if context:context.durable_job_retained=True
+        source = self.source(p, application, document_type)
+        for field in ('subject','tenant_id','document_type','attachment_id','document_sha256'):
+            if source.get(field) != job.get(field):
+                raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
+        if job['status'] not in ('needs_review','confirmed'):
+            raise ValueError('OCR_RECOVERY_RESULT_NOT_READY')
+        if (type(source.get('application_revision')) is not str or not __import__('re').fullmatch('[1-9][0-9]*',source['application_revision'])
+                or source.get('wechat_version') is not None and (type(source['wechat_version']) is not int or source['wechat_version']<0)):
+            raise PermissionError('OCR_RECOVERY_BINDING_INVALID')
+        binding = dict(application_revision=source['application_revision'],
+            provider_version=source.get('wechat_version'),document_type=document_type,
+            attachment_id=source['attachment_id'],content_sha256=source['document_sha256'])
+        payload = dict(application=application,document_type=document_type,locator=locator,binding=binding)
+        view = dict(recovery_id=recovery_key,revision=1,job_id=job['job_id'],
+            subject=p.subject,tenant_id=p.tenant_id,onboarding_application_id=application,
+            original_application_revision=job['application_revision'],
+            original_provider_version=job.get('provider_version'),binding=binding,
+            fields={k:v for k,v in job.get('fields',{}).items() if k in CONFIRMED_KEYS[document_type]-{'business_scope'}},status='needs_review',confirmed=False,
+            requires_human_confirmation=True,authenticity_verified=False)
+        # Exact retries return the original snapshot, never a newly bound one.
+        result=self.store.recovery_record(p.tenant_id,p.subject,'view',recovery_key,payload,view)
+        self._recovery_current(p,application,result)
+        return result
+
+    def _recovery_current(self, p, application, view):
+        self._context(p)
+        if (not self.authorize_application(p,application) or
+                view.get('subject') != p.subject or view.get('tenant_id') != p.tenant_id or
+                view.get('onboarding_application_id') != application):
+            raise PermissionError('OCR_APPLICATION_DENIED')
+        binding=view['binding']
+        job=self.store.resolve_recovery_job(p.tenant_id,p.subject,application,binding['document_type'],job_id=view['job_id'])
+        from scripts.community_ocr_host import current_diagnostic
+        context=current_diagnostic()
+        if context:context.durable_job_retained=True
+        source=self.source(p,application,binding['document_type'])
+        current=dict(application_revision=source['application_revision'],provider_version=source.get('wechat_version'),
+            document_type=source['document_type'],attachment_id=source['attachment_id'],content_sha256=source['document_sha256'])
+        from scripts.community_ocr_host import current_diagnostic
+        context=current_diagnostic()
+        if context:context.durable_job_retained=True
+        if (current != binding or any(type(current[k]) is not type(binding[k]) for k in current) or job['attachment_id'] != binding['attachment_id'] or
+                job['document_sha256'] != binding['content_sha256']):
+            reason=('APPLICATION_REVISION_CHANGED' if type(current['application_revision']) is not type(binding['application_revision']) or current['application_revision']!=binding['application_revision'] else
+                    'PROVIDER_VERSION_CHANGED' if type(current['provider_version']) is not type(binding['provider_version']) or current['provider_version']!=binding['provider_version'] else 'ATTACHMENT_CHANGED')
+            if context:context.fail(reason=reason,stage='SOURCE_BINDING')
+            raise PermissionError('OCR_RECOVERY_SOURCE_CHANGED')
+        return source
+
+    @on_owner
+    def recovery_confirm(self,p,application,recovery_id,revision,fields,confirmation_key):
+        if 'ocr:use' not in p.permissions:raise PermissionError('OCR_PERMISSION_DENIED')
+        view=self.store.recovery_receipt(p.tenant_id,p.subject,'view',recovery_id)
+        if not view:raise PermissionError('OCR_RECOVERY_VIEW_NOT_FOUND')
+        self._recovery_current(p,application,view)
+        if type(revision) is not int or revision != view['revision']:
+            raise ValueError('OCR_RECOVERY_VIEW_CHANGED')
+        allowed=CONFIRMED_KEYS[view['binding']['document_type']]-{'business_scope'}
+        if (type(fields) is not dict or not fields or not set(fields)<=allowed or
+                any(type(v) is not str or not v.strip() or len(v)>4096 for v in fields.values())):
+            raise ValueError('OCR_CONFIRMED_FIELDS_INVALID')
+        payload=dict(recovery_id=recovery_id,revision=revision,fields=fields,binding=view['binding'])
+        confirmation=dict(view,confirmation_id=confirmation_key,confirmation_revision=1,
+            confirmed_fields=dict(fields),status='confirmed',confirmed=True)
+        result=self.store.recovery_record(p.tenant_id,p.subject,'confirm',confirmation_key,payload,confirmation)
+        self._recovery_current(p,application,view)
+        return result
+
+    @on_owner
+    def recovery_apply(self,p,application,recovery_id,confirmation_id,confirmation_revision,writeback_key):
+        """Explicit blank-only save, with durable receipt in the original draft tx."""
+        import hashlib,json
+        if 'ocr:use' not in p.permissions:raise PermissionError('OCR_PERMISSION_DENIED')
+        self._context(p)
+        if not self.authorize_application(p,application):raise PermissionError('OCR_APPLICATION_DENIED')
+        confirmation=self.store.recovery_receipt(p.tenant_id,p.subject,'confirm',confirmation_id)
+        if (not confirmation or confirmation.get('recovery_id') != recovery_id
+                or type(confirmation_revision) is not int
+                or confirmation.get('confirmation_revision') != confirmation_revision
+                or confirmation.get('onboarding_application_id') != application
+                or confirmation.get('subject') != p.subject or confirmation.get('tenant_id') != p.tenant_id):
+            raise PermissionError('OCR_RECOVERY_CONFIRMATION_REQUIRED')
+        binding=confirmation['binding'];doc=binding['document_type']
+        service=self.merchant.onboarding.wechat_applyment
+        if service is None:raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
+        if type(writeback_key) is not str or not writeback_key:raise ValueError('OCR_RECOVERY_OPERATION_INVALID')
+        # Current-material checks are mandatory even for a committed-receipt replay.
+        def material(source):
+            if any(source.get(k)!=v for k,v in dict(subject=p.subject,tenant_id=p.tenant_id,
+                    document_type=doc,attachment_id=binding['attachment_id'],document_sha256=binding['content_sha256']).items()):
+                raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
+        original=self.store.resolve_recovery_job(p.tenant_id,p.subject,application,doc,job_id=confirmation['job_id'])
+        from scripts.community_ocr_host import current_diagnostic
+        context=current_diagnostic()
+        if context:context.durable_job_retained=True
+        material(self.source(p,application,doc))
+        if original['attachment_id']!=binding['attachment_id'] or original['document_sha256']!=binding['content_sha256']:
+            raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
+        fields=confirmation['confirmed_fields']
+        allowed={'business_license':('company_name','credit_code','legal_representative','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to')}[doc]
+        selected={k:v for k,v in fields.items() if k in allowed and v.strip()}
+        if not selected:
+            self._recovery_current(p,application,confirmation)
+            return dict(written=False,application_revision=int(binding['application_revision']),wechat_version=binding['provider_version'],applied=[],skipped=[])
+        uid,_,csrf,_=self.merchant._ocr_context(p._community_token,self.scene,self.applicant_mode)
+        frozen=json.dumps(confirmation,sort_keys=True)
+        def check(application_version,provider_version):
+            self._context(p)
+            current=self.store.recovery_receipt(p.tenant_id,p.subject,'confirm',confirmation_id)
+            if json.dumps(current,sort_keys=True)!=frozen:raise PermissionError('OCR_CONFIRMATION_SNAPSHOT_CHANGED')
+            # Original transaction is already open: use its in-transaction reader.
+            now=self.merchant.ocr_source(p._community_token,self.scene,application,KINDS[doc],applicant=self.applicant_mode)
+            material(now)
+            if now['application_revision']!=application_version:raise PermissionError('OCR_APPLICATION_REVISION_CHANGED')
+            provider=service._read(application);version=0 if provider is None else provider['version']
+            if type(version) is not int or version!=provider_version:raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
+            self.store.resolve_recovery_job(p.tenant_id,p.subject,application,doc,job_id=confirmation['job_id'])
+        identity=json.dumps([p.tenant_id,p.subject,application,writeback_key],separators=(',',':'))
+        request=json.dumps([recovery_id,confirmation_id,confirmation_revision,binding,fields],sort_keys=True,separators=(',',':'))
+        receipt=dict(id=self.store._index('recovery-writeback/'+identity),payload_hash=hashlib.sha256(request.encode()).hexdigest())
+        return service._fill_confirmed_document_draft(p._community_token,csrf,application,document_type=doc,
+            expected_application_revision=int(binding['application_revision']),expected_wechat_version=binding['provider_version'],
+            confirmed_fields=selected,source_check=check,recovery_receipt=receipt,recovery_replay_check=check)
 
     @on_owner
     def apply_confirmed(self, p, job_id, *, expected_confirmation_revision):
@@ -253,6 +389,10 @@ def compose(merchant, scene, ocr_api, store, owner_call, infer=None, *, applican
     bridge.store = store
     options = dict(authenticate=bridge.authenticate, store=store,
         authorize_application=bridge.authorize_application, authorize_attachment=bridge.authorize_attachment)
+    def recovery(operation,p,body):
+        methods={'view':bridge.recovery_view,'confirm':bridge.recovery_confirm,'apply':bridge.recovery_apply}
+        return methods[operation](p,**body)
+    options['recovery']=recovery
     if infer is not None:
         options['infer'] = infer
     return bridge, ocr_api.create_app(**options)

@@ -165,7 +165,7 @@ def _shared_writeback_eligible(snapshot):
                 "document_type": document_type, "attachment_id": attachment_id, "content_sha256": digest}
     return binding == expected and isinstance(snapshot.get("confirmed_fields"), dict) and bool(snapshot.get("confirmed_fields"))
 
-def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
+def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None, recovery=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
     if store is None:
@@ -188,6 +188,25 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not p.tenant_id or not p.subject or "ocr:use" not in p.permissions:
             raise HTTPException(status_code=403, detail="OCR_PERMISSION_DENIED")
         return p
+    @app.post("/api/v1/ocr/recovery/{operation}")
+    async def recover(operation: str, request: Request, authorization: Optional[str] = Header(None)):
+        p=principal(authorization)
+        if recovery is None:raise HTTPException(status_code=403,detail="OCR_RECOVERY_NOT_CONFIGURED")
+        body=await request.json()
+        schemas={"view":{"application","document_type","locator","recovery_key"},
+                 "confirm":{"application","recovery_id","revision","fields","confirmation_key"},
+                 "apply":{"application","recovery_id","confirmation_id","confirmation_revision","writeback_key"}}
+        if operation not in schemas or type(body) is not dict or set(body)!=schemas[operation]:
+            raise HTTPException(status_code=400,detail="OCR_EXACT_REQUEST_REQUIRED")
+        try:
+            result=recovery(operation,p,body)
+        except (PermissionError,ValueError) as error:
+            code=str(error)
+            if not __import__('re').fullmatch('[A-Z_]{1,100}',code):code='OCR_RECOVERY_REJECTED'
+            raise HTTPException(status_code=403,detail=code)
+        # Internal identity/material references never leave the protected bridge.
+        return {k:v for k,v in result.items() if k not in {'subject','tenant_id','onboarding_application_id'}}
+
     @app.post("/api/v1/ocr/jobs", status_code=202)
     async def submit(file: UploadFile = File(...), document_type: str = Form(...),
                      onboarding_application_id: str = Form(...), attachment_id: str = Form(...),
