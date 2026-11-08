@@ -166,7 +166,7 @@ class HostedImageEntry(unittest.TestCase):
         # the exact original artifact name, even when there is only one match.
         name='xuanjun-ocr-linux-x86_64-cp311-cb28f605291cde6dc48a2d6431166211059dc595'
         expected=Path('original-ocr-evidence')/name/'xuanjun-ocr-linux-x86_64-cp311.tar.gz'
-        self.assertEqual(command,['python','community-image-context/scripts/community_ocr_image_inputs.py',str(expected),'community-image-context/ocr-runtime'])
+        self.assertEqual(command,['python','community-image-context/scripts/community_ocr_image_inputs.py',str(expected),'community-image-context/ocr-runtime','--verification-upstream','community-image-context/verification-upstream'])
 
     def test_missing_original_ocr_bundle_rejects_before_destination_write(self):
         import tempfile
