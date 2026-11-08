@@ -139,8 +139,18 @@ class ApiContract(unittest.TestCase):
             factory.assert_not_called()
 
     def test_unknown_type_rejected_not_misrouted_to_id(self):
-        with self.assertRaisesRegex(ValueError,'^UNSUPPORTED_DOCUMENT_TYPE$'):
-            run_license_layout_ocr(b'synthetic','bank_card')
+        import base64,hashlib,json
+        from scripts import community_license_inference as adapter
+        fixture=json.loads((Path(__file__).parent/'fixtures/community_license_columns90_image.json').read_text())
+        self.assertEqual(fixture['scope'],'SYNTHETIC_TEST_ONLY_NOT_REAL_LICENSE')
+        raw=base64.b64decode(fixture['png_base64'],validate=True)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),fixture['png_sha256'])
+        document_type='synthetic_unsupported_document'
+        self.assertNotIn(document_type,adapter.EXPECTED_FIELDS)
+        with patch.object(ocr_core,'_verified_model_paths',side_effect=AssertionError('UNKNOWN_TYPE_MODEL_CALL_FORBIDDEN')) as models:
+            with self.assertRaisesRegex(ValueError,'^UNSUPPORTED_DOCUMENT_TYPE$'):
+                run_license_layout_ocr(raw,document_type)
+            models.assert_not_called()
     def test_license_original_byte_and_magic_checks(self):
         for data,error in [(b'','INVALID_IMAGE_SIZE'),(b'wrong','UNSUPPORTED_IMAGE_MAGIC')]:
             with self.assertRaisesRegex(ValueError,'^'+error+'$'):
