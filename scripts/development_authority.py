@@ -7,6 +7,7 @@ import json
 import math
 import os
 import sqlite3
+import stat
 import time
 from urllib.parse import quote
 
@@ -24,6 +25,50 @@ EXPECTED_KEYS = frozenset(('issuer', 'instance_id', 'version', 'service_id',
                            'task_id', 'attempt_id', 'lease_id', 'fence',
                            'epoch', 'resource_scope_digest', 'request_id',
                            'now', 'max_age'))
+
+
+class SQLiteReplayGuard(object):
+    """Durably consume a replay tuple with one SQLite uniqueness CAS."""
+
+    def __init__(self, path):
+        if not isinstance(path, str) or not os.path.isabs(path):
+            raise ValueError('REPLAY_DB_ABSOLUTE_PATH_REQUIRED')
+        self.path = path
+        if not os.path.exists(path):
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                 getattr(os, 'O_NOFOLLOW', 0), 0o600)
+            os.close(descriptor)
+        info = os.lstat(path)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600):
+            raise ValueError('UNSAFE_REPLAY_DB')
+        self.db = sqlite3.connect(path, timeout=5, isolation_level=None)
+        self.db.execute('PRAGMA journal_mode=WAL')
+        self.db.execute('PRAGMA synchronous=FULL')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS consumed_authority_requests(
+          issuer TEXT NOT NULL,instance_id TEXT NOT NULL,request_id TEXT NOT NULL,
+          consumed_at REAL NOT NULL,PRIMARY KEY(issuer,instance_id,request_id))''')
+
+    def __call__(self, key):
+        if (not isinstance(key, tuple) or len(key) != 3
+                or any(not isinstance(x, str) or not x for x in key)):
+            raise ValueError('EXACT_REPLAY_KEY_REQUIRED')
+        try:
+            self.db.execute('BEGIN IMMEDIATE')
+            self.db.execute('INSERT INTO consumed_authority_requests VALUES(?,?,?,?)',
+                            key + (time.time(),))
+            self.db.execute('COMMIT')
+            return True
+        except sqlite3.IntegrityError:
+            self.db.execute('ROLLBACK')
+            return False
+        except Exception:
+            try: self.db.execute('ROLLBACK')
+            except Exception: pass
+            raise
+
+    def close(self):
+        self.db.close()
 
 
 def canonical_bytes(value):
@@ -196,7 +241,8 @@ def verify_envelope(envelope, public_key, trust, expected, replay_guard=None):
     if (not isinstance(expected, dict) or set(expected) != EXPECTED_KEYS
             or not isinstance(trust, dict) or set(trust) != {'anchor_id'}
             or not isinstance(trust['anchor_id'], str) or not trust['anchor_id']
-            or not isinstance(public_key, Ed25519PublicKey)):
+            or not isinstance(public_key, Ed25519PublicKey)
+            or replay_guard is None or not callable(replay_guard)):
         raise ValueError('TRUSTED_EXPECTATIONS_REQUIRED')
     if not isinstance(envelope, dict) or set(envelope) != {'payload', 'signature'}:
         raise ValueError('AUTHORITY_ENVELOPE_REQUIRED')
@@ -243,6 +289,10 @@ def verify_envelope(envelope, public_key, trust, expected, replay_guard=None):
             or payload.get('revocation', {}).get('state') != 'VALID'):
         raise ValueError('AUTHORITY_NOT_AUTHORIZED')
     replay_key = (expected['issuer'], expected['instance_id'], expected['request_id'])
-    if replay_guard is not None and not replay_guard(replay_key):
+    try:
+        consumed = replay_guard(replay_key)
+    except Exception:
+        raise ValueError('AUTHORITY_REPLAY_GUARD_FAILED')
+    if consumed is not True:
         raise ValueError('AUTHORITY_REPLAY_REJECTED')
     return payload

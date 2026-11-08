@@ -8,6 +8,13 @@ no expected value may be copied from the envelope being verified.
 
 ## Frozen installation
 
+Formal runtime preflight is executable with
+`python3 scripts/development_authority_runtime.py`; it requires Python 3.11+,
+SQLite 3.40+ and exactly cryptography 42.0.8. The repository's SQLite 3.26 /
+Python 3.6 compatibility environment is a migration fixture only and must fail
+this formal preflight (exit 69). `requirements-authority.lock` is the formal
+Python dependency pin.
+
 Install an exact reviewed commit and tree (never a moving branch or `latest`),
 record `git rev-parse HEAD HEAD^{tree}`, and pin the Python wheel/application
 artifact by SHA-256. Before replacing anything, copy the prior executable,
@@ -50,9 +57,32 @@ only when `verify_envelope` returns successfully and `authority.authorized` is
 exactly `true`. Reader rejection code **69 remains a rejection code**, never a
 component identity or a success target.
 
+`development_authority_reader.py` is the executable reference/probe. Every
+verification requires an absolute persistent replay database. A missing guard,
+storage error, UNKNOWN result, duplicate in another worker, or duplicate after
+restart rejects. A legal status recheck therefore uses a fresh request ID; the
+same signed authorization request is never reusable.
+
 First claim requires an injected authenticated Owner authorization and the
 authenticated developer identity fixed in the canonical development contract.
 Caller-supplied owner/developer strings are not authority.
+`development_identity_adapter.py` verifies an Ed25519 Owner grant bound to the
+canonical contract digest and developer identity before producing the exact
+shape consumed by `claim_development_writer`. ABSENT registration history is
+allowed only for this verified first registration; the adapter creates no
+historical event itself.
+
+## Artifact and operational workflow
+
+`development_authority_release.py manifest` binds the application artifact to
+the reviewed commit/tree and SHA-256 with `deployment_authorized=false`.
+Operators must inspect the manifest and preflight first, back up executable,
+unit/config/public trust bundle and database backup manifest, apply only an
+approved exact artifact, query with positive and negative probes, and recover
+by restoring those backups. Key rotation publishes and probes the new public
+anchor before signer cutover, retains the prior config for rollback, and removes
+the old anchor only after both probes pass. These are audit requirements, not
+deployment authorization; this source change performs no install or rotation.
 
 ## Rotation, recovery and compatibility
 
