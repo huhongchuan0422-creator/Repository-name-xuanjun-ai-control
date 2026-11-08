@@ -1,0 +1,61 @@
+import base64, hashlib, importlib.util, io, json, os, sqlite3, tarfile, tempfile, time, unittest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+spec=importlib.util.spec_from_file_location('bootstrap_candidate',os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py'))
+b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
+
+class BootstrapTests(unittest.TestCase):
+ def setUp(self):
+  self.tmp=tempfile.TemporaryDirectory();self.dir=self.tmp.name;self.fds=[]
+  self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
+  self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode()}
+  z=io.BytesIO()
+  with tarfile.open(fileobj=z,mode='w') as t:
+   m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
+  self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}}})
+  self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture'}
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)');db.close();os.chmod(self.ledger,0o600)
+  self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
+ def tearDown(self):
+  for fd in self.fds:os.close(fd)
+  self.tmp.cleanup()
+ def fd(self,name,data):
+  p=os.path.join(self.dir,name);open(p,'wb').write(data);os.chmod(p,0o600);fd=os.open(p,os.O_RDONLY);self.fds.append(fd);return fd
+ def verify(self, payload=None,signature=None,carrier=None,manifest=None,trust=None,scope=None):
+  p=payload or self.payload; signature=signature if signature is not None else base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier if carrier is None else carrier);mf=self.fd('manifest',self.manifest if manifest is None else manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':signature}));tf=self.fd('trust',b.canonical(trust or self.trust));lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  return b.verify(cf,mf,rf,tf,self.ledger,lf,scope or {'task':'task','attempt':'attempt'},owner=os.getuid())
+ def test_valid_and_replay(self):
+  self.assertEqual(self.verify()[0],self.carrier)
+  with self.assertRaises(Exception):self.verify()
+ def test_signature(self):
+  with self.assertRaisesRegex(b.Hold,'SIGNATURE_INVALID'):self.verify(signature=base64.b64encode(b'bad').decode())
+ def test_digest(self):
+  with self.assertRaisesRegex(b.Hold,'DIGEST_MISMATCH'):self.verify(carrier=b'bad')
+ def test_expiry(self):
+  p=dict(self.payload,expiry=1)
+  with self.assertRaisesRegex(b.Hold,'RECEIPT_EXPIRED'):self.verify(payload=p)
+ def test_scope(self):
+  with self.assertRaisesRegex(b.Hold,'RECEIPT_SCOPE'):self.verify(scope={'task':'other','attempt':'attempt'})
+ def test_archive_traversal_and_link(self):
+  for name,kind in [('../x',tarfile.REGTYPE),('link',tarfile.SYMTYPE)]:
+   z=io.BytesIO()
+   with tarfile.open(fileobj=z,mode='w') as t:
+    m=tarfile.TarInfo(name);m.type=kind;m.linkname='x';t.addfile(m)
+   with self.assertRaises(b.Hold):b.inspect_archive(z.getvalue(),{})
+ def test_open_nofollow_and_traversal(self):
+  os.symlink('/etc/passwd',os.path.join(self.dir,'link'));dfd=os.open(self.dir,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(dfd)
+  for path in ('../x','/etc/passwd','link'):
+   with self.assertRaises(Exception):b.open_relative(dfd,path)
+ def test_hardlink_and_device(self):
+  self.fd('a',b'x');os.link(os.path.join(self.dir,'a'),os.path.join(self.dir,'hard'));f=os.open(os.path.join(self.dir,'hard'),os.O_RDONLY);self.fds.append(f)
+  with self.assertRaises(b.Hold):b.stable_read(f,os.getuid(),100)
+  f=os.open('/dev/null',os.O_RDONLY);self.fds.append(f)
+  with self.assertRaises(b.Hold):b.stable_read(f,os.getuid(),100)
+ def test_missing_log(self):
+  os.unlink(self.log)
+  with self.assertRaises(FileNotFoundError):self.verify()
+ def test_missing_ledger(self):
+  os.unlink(self.ledger)
+  with self.assertRaisesRegex(b.Hold,'LEDGER_REQUIRED'):self.verify()
+if __name__=='__main__':unittest.main()

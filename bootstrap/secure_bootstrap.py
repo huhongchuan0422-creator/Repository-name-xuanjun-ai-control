@@ -58,10 +58,10 @@ def inspect_archive(blob, members):
             require(len(data)==m.size and members.get(p)=={'type':'file','size':m.size,'sha256':sha(data)},'MEMBER_MISMATCH')
     require(seen==set(members),'MEMBER_SET')
 
-def consume(db_path, receipt):
+def consume(db_path, receipt, owner=0):
     # The controller provisions the DB and WAL mode. Do not create missing DB/schema.
     require(os.path.isabs(db_path) and os.path.isfile(db_path) and not os.path.islink(db_path),'LEDGER_REQUIRED')
-    st=os.stat(db_path);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==0 and not st.st_mode&0o077,'LEDGER_PERMISSIONS')
+    st=os.stat(db_path);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==owner and not st.st_mode&0o077,'LEDGER_PERMISSIONS')
     db=sqlite3.connect('file:'+db_path+'?mode=rw',uri=True,timeout=5,isolation_level=None)
     try:
         require(db.execute('PRAGMA journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
@@ -96,7 +96,7 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     manifest_raw=stable_read(manifest_fd,owner,4*1024*1024);carrier=stable_read(carrier_fd,owner,128*1024*1024)
     require(sha(manifest_raw)==p['manifest_sha256'] and sha(carrier)==p['carrier_sha256'],'DIGEST_MISMATCH')
     manifest=parse(manifest_raw);require(set(manifest)=={'members'},'MANIFEST_FIELDS');inspect_archive(carrier,manifest['members'])
-    consume(ledger_path,p)
+    consume(ledger_path,p,owner)
     os.write(log_fd,(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode());os.fsync(log_fd)
     return carrier,p
 
