@@ -81,3 +81,57 @@ test('legacy scope rows and edits are removed on reopen before an uncertain read
 test('legacy pending confirmation with scope resolves exact prior snapshot without resending it',async()=>{const f=await ready();const prior={company_name:'OLD HUMAN COMPANY',business_scope:'OLD HUMAN SCOPE'};f.page.ocrCapture={...f.page.ocrCapture,pending_confirmation:true,pending_confirmation_revision:1,pending_confirmation_edit_version:0,pending_confirmation_provider_version:1,pending_confirmation_fields:prior};f.page.onUnload();f.page.session=f.session;f.page.dead=false;f.page.ocrHidden=false;f.setRead(result({status:'confirmed',confirmation_revision:1,confirmed_fields:prior}));await f.page.restoreKnownOcr();assert.equal(f.page.ocrCapture.pending_confirmation,false);assert.equal(f.page.data.ocrConfirmed,true);assert.equal(row(f).value,'OLD HUMAN COMPANY');assert.equal(row(f,'business_scope'),undefined);assert.equal(f.calls.filter(x=>x.action==='confirm').length,0);assert.equal(f.scrolls.length,0);});
 test('stale injected scope row cannot bypass the new confirmation allowlist',async()=>{const f=await ready();f.page.data.ocrRows.push({key:'business_scope',value:'STALE SCOPE'});let sent;f.handleConfirm(p=>{sent=clone(p.fields);return {result:{job_id:p.job_id,status:'confirmed',revision:p.revision,recorded:true,application_revision:p.application_revision,provider_version:p.provider_version}};});await f.page.confirmOcr();assert.deepEqual(sent,{company_name:'SYNTHETIC COMPANY'});});
 test('late legacy scope does not restore an input or overwrite a human company edit',async()=>{const f=await ready(),d=deferred();f.handleRead(()=>d.promise);const pending=f.page.readOcr();edit(f,'HUMAN COMPANY');d.resolve({result:result({fields:{company_name:{value:'STALE COMPANY'},business_scope:{value:'STALE SCOPE'}}})});await pending;assert.equal(row(f).value,'HUMAN COMPANY');assert.equal(row(f,'business_scope'),undefined);assert.equal(f.page.data.ocrConfirmed,false);assert.equal(f.scrolls.length,0);});
+
+test('document OCR progress overlays its own image and clears on terminal result without editing data',async()=>{
+ const f=fixture(),before=clone(f.page.data.application);await f.start();
+ assert.deepEqual(clone(f.page.data.ocrFeedback),{kind:'business_license',label:'正在识别，请稍候'});
+ f.setRead(result({status:'queued',fields:{}}));await f.page.readOcr();assert.equal(f.page.data.ocrFeedback.label,'等待识别，请稍候');
+ f.setRead(result());await f.page.readOcr();assert.equal(f.page.data.ocrFeedback,null);
+ assert.deepEqual(clone(f.page.data.application),before);assert.deepEqual(f.page.profile,{});
+});
+test('OCR overlay follows both ID sides and bank card, never unrelated scene photos',()=>{
+ const f=fixture();f.page.ocrPolling=true;f.page.ocrCurrent=()=>true;
+ for(const [document_type,kind] of Object.entries({business_license:'business_license',id_front:'identity_front',id_back:'identity_back',bank_card:'bank_card'})){
+  f.page.ocrCapture={document_type};f.page.updateOcrView({ocrConfirmed:false,ocrProgressState:'processing',ocrStatus:'正在识别中'});assert.equal(f.page.data.ocrFeedback.kind,kind);
+ }
+ f.page.ocrCapture={document_type:'storefront_photo'};f.page.updateOcrView();assert.equal(f.page.data.ocrFeedback,null);
+});
+test('OCR retry status remains visible but final failure, invalidation and logout clear overlay',async()=>{
+ const f=fixture();await f.start();f.page.waitForOcr({networkKind:'TIMEOUT'});assert.match(f.page.data.ocrFeedback.label,/正在查询/);
+ f.setRead(result({status:'failed',fields:{}}));await f.page.readOcr();assert.equal(f.page.data.ocrFeedback,null);
+ f.page.ocrPolling=true;f.page.updateOcrView({ocrProgressState:'processing'});assert.ok(f.page.data.ocrFeedback);f.page.invalidateOcr();assert.equal(f.page.data.ocrFeedback,null);
+ const g=fixture();g.session.clear=()=>{};await g.start();g.page.customerSessionRevoked();assert.equal(g.page.data.ocrFeedback,null);
+});
+test('upload overlay retains priority and OCR uses large centered image overlay in both image slots',()=>{
+ const w=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxml'),'utf8'),css=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxss'),'utf8');
+ assert.equal((w.match(/wx:elif="\{\{ocrFeedback&&ocrFeedback.kind===/g)||[]).length,2);
+ assert.match(w,/uploadFeedback.label\}\}<\/text><\/view>\s*<view wx:elif="\{\{ocrFeedback&&ocrFeedback.kind===item.id/);
+ assert.match(w,/ocrFeedback.kind==='bank_card'/);assert.match(css,/\.material-upload-overlay\{[^}]*position:absolute;[^}]*align-items:center;justify-content:center/);
+ assert.match(css,/\.material-ocr-overlay \.material-ocr-label\{font-size:36rpx;font-weight:700/);
+});
+
+test('first pending OCR submission overlays before any provider response',async()=>{
+ const f=fixture(),d=deferred(),original=f.session.merchant;
+ f.session.merchant=async(scene,op,p)=>op==='ocr'&&p.action==='submit'?d.promise:original(scene,op,p);
+ const running=f.start();await Promise.resolve();assert.equal(f.page.data.ocrFeedback.kind,'business_license');assert.equal(f.page.data.ocrProgressState,'requesting');
+ d.resolve({result:{job_id:'synthetic-job'}});await running;assert.equal(f.page.data.ocrFeedback.kind,'business_license');
+});
+test('terminal OCR hides overlay even while polling retains focused input',async()=>{
+ const f=await ready();f.page.focusOcrSuggestion({currentTarget:{dataset:{key:'company_name'}}});
+ f.setRead(result({fields:{company_name:{value:'NEW SUGGESTION'}}}));await f.page.readOcr();
+ assert.equal(f.page.ocrPolling,true);assert.equal(f.page.data.ocrProgressState,'needs_review');assert.equal(f.page.data.ocrFeedback,null);
+});
+
+test('personal account shows bound OCR name without writing it as saved holder',async()=>{
+ const f=fixture();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC LEGAL'}}}));await f.start();
+ const before=clone(f.page.profile),display=f.page.personalAccountDisplay();assert.equal(display.personalAccountName,'SYNTHETIC LEGAL');assert.match(display.personalAccountNameHint,/尚未写入/);assert.deepEqual(f.page.profile,before);
+ f.page.data.application.materials.business_license.object_id='replaced';assert.equal(f.page.personalAccountDisplay().personalAccountName,'尚未取得姓名');
+});
+test('saved personal account holder is never replaced by OCR suggestion',async()=>{
+ const f=fixture();f.setRead(result({fields:{legal_representative:{value:'OTHER OCR NAME'}}}));await f.start();
+ f.page.profile={bank_account_info:{account_name:'SAVED HOLDER'}};assert.equal(f.page.personalAccountDisplay().personalAccountName,'SAVED HOLDER');assert.equal(f.page.profile.bank_account_info.account_name,'SAVED HOLDER');
+});
+test('conflicting real source names remain visible as conflict, not confirmed holder',()=>{
+ const f=fixture();f.page.profile={subject_info:{identity_info:{id_card_info:{id_card_name:'IDENTITY NAME'}},business_license_info:{legal_person:'LICENSE NAME'}}};
+ const d=f.page.personalAccountDisplay();assert.match(d.personalAccountName,/IDENTITY NAME/);assert.match(d.personalAccountName,/LICENSE NAME/);assert.match(d.personalAccountNameHint,/不一致/);assert.equal(f.page.profile.bank_account_info,undefined);
+});

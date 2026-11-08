@@ -47,3 +47,5 @@
 .onboarding-page .material-preview-frame .material-preview{margin-top:0}
 .material-upload-overlay{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;background:rgba(25,46,48,.30);padding:24rpx;box-sizing:border-box}
 .material-upload-label{display:block;max-width:100%;padding:18rpx 24rpx;border-radius:16rpx;background:rgba(25,46,48,.90);color:#fff;font-size:30rpx;font-weight:600;line-height:1.6;text-align:center;word-break:break-word}
+
+.material-ocr-overlay .material-ocr-label{font-size:36rpx;font-weight:700;line-height:1.5}

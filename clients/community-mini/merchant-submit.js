@@ -1,9 +1,11 @@
 'use strict';
 // One user action, two existing review queues. Never invokes provider execution.
-async function submitSharedReview({read,submitPlatform,submitWechat,current}){
+async function submitSharedReview({read,submitPlatform,submitWechat,current,preflight}){
  let state=await read();if(!current())return {cancelled:true};
  const id=state.application;
  if(typeof id!=='string'||!id||!Number.isSafeInteger(state.revision)||!Number.isSafeInteger(state.version))throw Error('申请版本未确认，请刷新原申请');
+ if(preflight)await preflight(state,{platform:['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState),wechat:['DRAFT','CORRECTION'].includes(state.reviewState)});
+ if(!current())return {cancelled:true};
  if(['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState)){
   await submitPlatform({application:id,revision:state.revision});
   if(!current())return {cancelled:true};
@@ -12,6 +14,8 @@ async function submitSharedReview({read,submitPlatform,submitWechat,current}){
  }
  if(!['SUBMITTED','IN_REVIEW','APPROVED'].includes(state.platformState))throw Error('平台申请状态未确认，请刷新原申请');
  if(['DRAFT','CORRECTION'].includes(state.reviewState)){
+  if(preflight)await preflight(state,{platform:false,wechat:true});
+  if(!current())return {cancelled:true};
   await submitWechat({application:id,expected_version:state.version});
   if(!current())return {cancelled:true};
   state=await read();if(!current())return {cancelled:true};

@@ -61,4 +61,47 @@ function reusedFieldLinks(profile,options){return reusedFields(profile,options).
 function syncReusedFields(profile,options,links){let changed=0;const fields=reusedFields(profile,options);for(const f of fields){if(f.missing){if(f.targetPath===licenseRegion.BIZ_ADDRESS_CODE_PATH&&Object.prototype.hasOwnProperty.call(links,f.targetPath)&&get(profile,f.targetPath)===links[f.targetPath]){const store=get(profile,'business_info.sales_info.biz_store_info');if(store){delete store.biz_address_code;changed++;}delete links[f.targetPath];}continue;}const previous=get(profile,f.targetPath),linked=Object.prototype.hasOwnProperty.call(links,f.targetPath)&&previous===links[f.targetPath];if(!previous||linked){if(previous!==f.sourceValue){put(profile,f.targetPath,f.sourceValue);changed++;}links[f.targetPath]=f.sourceValue;}}return changed;}
 function reuseView(fields){return {reuseHint:reuseHint(fields),conflictActions:fields.filter(f=>f.conflict&&!f.missing&&!f.sourceConflict).map(f=>({label:f.label,targetPath:f.targetPath,sourceValue:f.sourceValue,previousValue:f.value}))};}
 function reuseHint(fields){return fields.some(f=>f.sourceConflict)?'第一步证件姓名与营业执照法人/经营者姓名不一致，请返回第一步核对。':fields.some(f=>f.conflict)?'原申请资料与第一步内容不同，已保留原值，请返回第一步核对。':fields.some(f=>f.missing)?'请先返回第一步完善资料，已填写的内容会保留。':'';}
-module.exports={get,put,rows,platformFields,docs,materialGroups,mobilePhoneError,legalContactName,storeReuseFields,reuseStoreFields,servicePhoneReuse,reuseServicePhone,reuseHint,reusedFieldLinks,syncReusedFields,personalAccountReuse,legalContactReuse,reusedFields,regionReuse};
+// Presentation of the existing required inputs, not a second validation policy.
+// Presence is not validity, approval, or OCR confirmation. No profile writes.
+function reviewRequirements(profile,options,materials,application){
+ const present=v=>typeof v==='string'?!!v.trim():Array.isArray(v)?v.length>0:v!==undefined&&v!==null&&v!==false;
+ const labels=new Map(definitions.map(f=>[f.path,f.label]));
+ const result=[];
+ for(const step of [0,1,2])for(const group of materialGroups(profile,options,materials,step)){
+  const items=[],seen=new Set();
+  const add=(path,label,value=get(profile,path))=>{if(seen.has(path))return;seen.add(path);items.push({path,label,complete:present(value)});};
+  for(const f of group.fields)if(f.required){
+   if(f.path.endsWith('mini_program_appid'))add('mini_appid','小程序 AppID（服务商或商户任选一项）',present(get(profile,f.path))||present(get(profile,f.path.replace('mini_program_appid','mini_program_sub_appid'))));
+   else add(f.path,f.label);
+  }
+  if(group.docPath)add(group.docPath,'证件类型');
+  if(group.id==='contact'&&options.contact==='LEGAL')add('contact_info.contact_name','法人/经营者联系人姓名');
+  if(group.id==='applicant')add('contact_info.contact_type','办理人类型');
+  if(group.id==='license'){add('subject_info.subject_type','主体类型');if(['store','both'].includes(options.scene))add('subject_info.business_license_info.license_address','营业执照注册地址（实体经营适用）');}
+  if(group.id==='scene'){add('business_info.sales_info.sales_scenes_type','实际经营场景');if(application&&application.declarations)add('declaration:scene','确认实际经营场景',application.declarations.scene!=='unknown');}
+  if(group.id==='beneficiaries'&&application&&application.declarations)add('declaration:ubos','确认受益人情况',application.declarations.ubos!=='unknown');
+  if(group.id==='store')for(const f of storeReuseFields(profile).concat(regionReuse(profile)))add(f.targetPath,f.label);
+  if(group.id===(options.scene==='mini'?'mini':'store'))add('business_info.service_phone','客服电话');
+  if(group.id==='bank'){
+   add('bank_account_info.account_name','结算开户名称');
+   if(get(profile,'bank_account_info.account_bank')==='其他银行')add('bank_branch','支行联行号或支行全称',present(get(profile,'bank_account_info.bank_branch_id'))||present(get(profile,'bank_account_info.bank_name')));
+   for(const path of ['settlement_info.settlement_id','settlement_info.qualification_type'])add(path,labels.get(path));
+  }
+  for(const m of group.materials){
+   if(group.optional||m.id==='cashier_photo')continue;
+   items.push({path:'material:'+m.id,label:m.title,complete:!!m.uploaded&&(m.id==='industry_permit'||!!m.synced),material:true,uploaded:!!m.uploaded,wechatRequired:m.id!=='industry_permit',synced:!!m.synced});
+  }
+  if(group.id==='license'&&get(profile,'subject_info.finance_institution')===true){add('subject_info.finance_institution_info.finance_type','金融机构类型');add('subject_info.finance_institution_info.finance_license_pics','金融业务许可证资料');}
+  if(group.id==='bank'&&get(profile,'settlement_info.activities_id')){add('settlement_info.debit_activities_rate','优惠活动借记卡费率');add('settlement_info.credit_activities_rate','优惠活动信用卡费率');}
+  const missing=items.filter(x=>!x.complete);
+  result.push({id:group.id,title:group.title,step,items,total:items.length,completed:items.length-missing.length,missing:missing.map(x=>x.label+(x.material&&x.uploaded?'（尚未用于微信申请）':'')),missingText:missing.map(x=>x.label+(x.material&&x.uploaded?'（尚未用于微信申请）':'')).join('、')});
+ }
+ return result;
+}
+function assertReviewComplete(groups,application,{platform,wechat}){
+ const missing=[];
+ if(wechat)for(const g of groups)for(const item of g.items)if(item.material?item.wechatRequired&&!item.synced:!item.complete)missing.push(g.title+'：'+item.label+(item.material&&item.uploaded?'（已上传，尚未用于微信申请）':''));
+ if(platform&&application){for(const kind of application.required_materials||[])if(!(application.materials||{})[kind]){const item=groups.flatMap(g=>g.items).find(x=>x.path==='material:'+kind);const label=item?item.label:kind;if(!missing.some(x=>x.includes(label)))missing.push('原申请证照：'+label);}}
+ if(missing.length){const e=Error('必填资料尚未完成，请补齐：'+missing.join('；'));e.submitPreflight=true;e.issues=missing;throw e;}
+}
+module.exports={assertReviewComplete,reviewRequirements,get,put,rows,platformFields,docs,materialGroups,mobilePhoneError,legalContactName,storeReuseFields,reuseStoreFields,servicePhoneReuse,reuseServicePhone,reuseHint,reusedFieldLinks,syncReusedFields,personalAccountReuse,legalContactReuse,reusedFields,regionReuse};
