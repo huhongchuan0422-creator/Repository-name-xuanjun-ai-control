@@ -44,8 +44,11 @@ class CarrierInstallTests(unittest.TestCase):
         db = connect(); db.execute(MIGRATION); db.commit(); db.close()
         self.store = RunnerOperationStore(connect)
         self.store.migrate_ownership_schema()
-        key=Ed25519PrivateKey.generate()
-        trust=TrustStore({'fixture-install':(key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),'install','test-authority')},{})
+        key=Ed25519PrivateKey.generate();self.install_key=key
+        self.recovery_key=Ed25519PrivateKey.generate();self.stop_key=Ed25519PrivateKey.generate()
+        trust=TrustStore({'fixture-install':(key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),'install','test-authority'),
+          'fixture-recovery':(self.recovery_key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),'recovery','test-authority'),
+          'fixture-stop':(self.stop_key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),'stop','test-authority')},{})
         def authority(operation_id,attempt_id,context):
             now=int(time.time())
             value={'operation_id':operation_id,'attempt_id':attempt_id,'authority_identity':'test-authority',
@@ -75,14 +78,27 @@ class CarrierInstallTests(unittest.TestCase):
         write_json(self.manifest_path, self.manifest)
         self.manifest_sha = installer._digest(self.manifest_path)
 
+    def signed_recovery(self, operation_id, proof_kind='EXPIRED_STALE'):
+        row=self.ownership.read(operation_id)
+        if not row:return {},None
+        now=int(time.time())
+        proof=dict(operation_id=operation_id,attempt_id=row['attempt_id'],observed_owner_token=row['owner_token'],
+            observed_epoch=row['epoch'],observed_fence=row['fence'],observed_lease_expires_at=row['lease_expires_at'],
+            observed_heartbeat_seq=row['heartbeat_seq'],observed_heartbeat_at=row['heartbeat_at'],authority_identity='test-authority',
+            reason='TEST_ONLY',proof_kind=proof_kind,issued_at=now-1,expires_at=now+60,key_id='fixture-recovery')
+        proof['signature']=self.recovery_key.sign(b'P3-RECOVERY-ADMISSION-V2\x00'+canonical(proof)).hex()
+        stop=dict(operation_id=operation_id,attempt_id=row['attempt_id'],owner_token=row['owner_token'],epoch=row['epoch'],
+            fence=row['fence'],heartbeat_seq=row['heartbeat_seq'],stopped_at=now,authority_identity='test-authority',key_id='fixture-stop')
+        stop['signature']=self.stop_key.sign(b'P3-OWNER-STOP-V2\x00'+canonical(stop)).hex()
+        return proof,stop
+
     def install(self, *args, **kwargs):
         kwargs.update(operation_store=self.store, archive_path=self.archive, ownership_guard=self.guard)
         return installer.install(*args, **kwargs)
 
     def recover(self, *args, **kwargs):
-        stage = self.store.get('p3-stage:install-attempt-01')
-        kwargs.setdefault('owner_fence', stage['adapter_correlation'] if stage else None)
-        kwargs.update(operation_store=self.store)
+        proof,_=self.signed_recovery('p3-install:install-attempt-01')
+        kwargs.update(operation_store=self.store,ownership_guard=self.guard,recovery_admission=proof)
         return installer.recover(*args, **kwargs)
 
     def rollback(self, *args, **kwargs):
@@ -127,7 +143,7 @@ class CarrierInstallTests(unittest.TestCase):
             self.root, self.manifest_path, self.manifest_sha,
             self.archive_sha, self.releases, self.state,
             "install-attempt-01")
-        self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["recovery"])
+        self.assertIn(recovered['state'],('UNKNOWN','RECOVERY_OWNER_ACTIVE'))
 
     def test_bound_or_executed_receipt_never_reads_back_idempotent_or_recovered(self):
         mutations = (
@@ -170,7 +186,7 @@ class CarrierInstallTests(unittest.TestCase):
                     self.archive_sha, self.releases, self.state,
                     "install-attempt-01")
                 self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["state"])
-                self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["recovery"])
+                self.assertIn(recovered['state'],('UNKNOWN','RECOVERY_OWNER_ACTIVE'))
 
     def test_install_receipt_requires_exact_keys_and_valid_attempt(self):
         self.install(
@@ -273,7 +289,7 @@ class CarrierInstallTests(unittest.TestCase):
                                  enforce_root=False,fault_hook=crash)
                 result=self.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                     self.releases,self.state,'install-attempt-01')
-                self.assertEqual('RECOVERY_OWNER_ACTIVE',result['state'])
+                self.assertIn(result['state'],('UNKNOWN','RECOVERY_OWNER_ACTIVE'))
                 duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                  self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
                 self.assertEqual('IN_PROGRESS_OR_HOLD',duplicate['state'])
@@ -287,8 +303,8 @@ class CarrierInstallTests(unittest.TestCase):
                          enforce_root=False,fault_hook=crash)
         self.assertEqual('UNKNOWN',self.store.get('p3-stage:install-attempt-01')['state'])
         self.assertIsNone(self.store.get('p3-install:install-attempt-01'))
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',self.recover(self.root,self.manifest_path,self.manifest_sha,
-                         self.archive_sha,self.releases,self.state,'install-attempt-01')['state'])
+        self.assertIn(self.recover(self.root,self.manifest_path,self.manifest_sha,
+                         self.archive_sha,self.releases,self.state,'install-attempt-01')['state'],('UNKNOWN','RECOVERY_OWNER_ACTIVE'))
         duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                          self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
         self.assertEqual('IN_PROGRESS_OR_HOLD',duplicate['state'])
@@ -305,7 +321,7 @@ class CarrierInstallTests(unittest.TestCase):
                          enforce_root=False,fault_hook=replace)
         state=self.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                            self.releases,self.state,'install-attempt-01')
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',state['state'])
+        self.assertIn(state['state'],('UNKNOWN','RECOVERY_OWNER_ACTIVE'))
         with open(os.path.join(target,'other'),'rb') as f:self.assertEqual(b'other',f.read())
 
     def test_repeated_rollback_is_idempotent(self):

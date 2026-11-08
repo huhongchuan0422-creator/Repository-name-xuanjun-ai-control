@@ -2,12 +2,14 @@
 
 No database, key, authority, timer, or service is created at import. The host
 must explicitly migrate its authorized store and provide a trusted clock and
-configured Ed25519 TrustStore. This module is NOT yet wired to the installer;
-the legacy installer remains vulnerable and must stay disabled.
+configured Ed25519 TrustStore. Install and signed install recovery use the
+guard; rollback remains outside this recovery-only slice.
 """
 import contextlib
 import errno
 import fcntl
+import hashlib
+import json
 import os
 import stat
 try:
@@ -134,7 +136,7 @@ class OwnershipStore:
         finally:
             db.close()
 
-    def claim_recovery(self, admission, stop_receipt=None):
+    def _claim_recovery_under_guard(self, admission, stop_receipt=None):
         now=self._now();exact(admission,ADMISSION_KEYS);window(admission,now)
         for key in ('operation_id','attempt_id','observed_owner_token','observed_fence','authority_identity','reason','proof_kind'):
             if not text(admission[key]):raise ValueError('INVALID_RECOVERY_ADMISSION')
@@ -164,6 +166,9 @@ class OwnershipStore:
             db.execute('BEGIN IMMEDIATE')
             locked_now = self._now()
             window(admission, locked_now)
+            self.trust.verify(admission,'recovery',admission['authority_identity'],b'P3-RECOVERY-ADMISSION-V2\x00')
+            if stopped:
+                self.trust.verify(stop_receipt,'stop',admission['authority_identity'],b'P3-OWNER-STOP-V2\x00')
             if stopped and stop_receipt['stopped_at'] > locked_now:
                 raise PermissionError('STOP_RECEIPT_TIME_INVALID')
             if not stopped and not (admission['observed_lease_expires_at'] < locked_now and
@@ -208,9 +213,32 @@ class OwnershipGuard:
                 info=os.fstat(fd)
                 self.lock_identity=(info.st_dev,info.st_ino,info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode))
             finally:os.close(fd)
+            self._bind_lock_to_database()
         except BaseException:
             os.close(self.lock_dir_fd)
             raise
+
+    def _bind_lock_to_database(self):
+        """Persist one lock identity for every guarded actor on this DB."""
+        operation_id='p3:ownership-guard-lock:v1'
+        body=json.dumps({'kind':'ownership-guard-lock','identity':self.lock_identity},
+                        sort_keys=True,separators=(',',':'))
+        digest=hashlib.sha256(body.encode('utf-8')).hexdigest()
+        db=self.store.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT request_digest,request_json,state FROM p3_effect_operations WHERE operation_id=?',
+                           (operation_id,)).fetchone()
+            if row is None:
+                db.execute('INSERT INTO p3_effect_operations(operation_id,request_digest,identity_json,request_json,state) VALUES(?,?,?,?,?)',
+                           (operation_id,digest,'{"kind":"ownership-guard-lock"}',body,'SUCCEEDED'))
+            elif row!=(digest,body,'SUCCEEDED'):
+                raise PermissionError('GUARD_DATABASE_BINDING_MISMATCH')
+            db.commit()
+        except BaseException:
+            db.rollback();raise
+        finally:
+            db.close()
 
     def close(self):
         os.close(self.lock_dir_fd)
@@ -227,7 +255,7 @@ class OwnershipGuard:
             os.close(fd);raise
 
     @contextlib.contextmanager
-    def _exclusive(self):
+    def _exclusive(self, blocking=False):
         fd=self._open_lock()
         try:
             info=os.fstat(fd)
@@ -235,7 +263,7 @@ class OwnershipGuard:
             if identity != self.lock_identity:
                 raise PermissionError('LOCK_FILE_IDENTITY_CHANGED')
             try:
-                fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                fcntl.flock(fd,fcntl.LOCK_EX if blocking else fcntl.LOCK_EX|fcntl.LOCK_NB)
             except OSError as error:
                 if error.errno in (errno.EACCES,errno.EAGAIN):
                     raise PermissionError('OWNERSHIP_LOCK_BUSY')
@@ -267,7 +295,7 @@ class OwnershipGuard:
             return self.store.claim_initial(operation_id,attempt_id,lease_seconds)
 
     def assert_owner(self, operation_id, owner):
-        with self._exclusive():
+        with self._exclusive(blocking=True):
             with self.store.owner_effect_transaction(operation_id,owner):
                 pass
 
@@ -281,7 +309,7 @@ class OwnershipGuard:
     @contextlib.contextmanager
     def with_owner_lock(self, operation_id, owner):
         """Keep claimants out while the owner performs non-transactional steps."""
-        with self._exclusive():
+        with self._exclusive(blocking=True):
             with self.store.owner_effect_transaction(operation_id,owner):
                 pass
             yield
@@ -289,15 +317,16 @@ class OwnershipGuard:
     @contextlib.contextmanager
     def with_exclusive_side_effect(self, operation_id, owner, attempt_id=None, authority_context=None):
         """Hold flock and DB write lock through caller's effect and journal CAS."""
-        with self._exclusive():
+        with self._exclusive(blocking=True):
             with self.store.owner_effect_transaction(operation_id,owner) as db:
                 if attempt_id is not None:
                     self.verify_install_authority(operation_id,attempt_id,authority_context)
                 yield db
 
     def claim_recovery(self, admission, stop_receipt=None):
-        with self._exclusive():
-            return self.store.claim_recovery(admission,stop_receipt)
+        # An effect holding this lock must finish its DB commit before takeover.
+        with self._exclusive(blocking=True):
+            return self.store._claim_recovery_under_guard(admission,stop_receipt)
 
     @contextlib.contextmanager
     def with_exclusive_reconciliation(self, operation_id, recovery_owner):

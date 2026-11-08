@@ -8,7 +8,7 @@ import unittest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
 from src.p3_admission_v2 import TrustStore,canonical
-from src.p3_operation_kernel import RunnerOperationStore
+from src.p3_operation_kernel import RunnerOperationStore,MIGRATION
 from src.p3_recovery_authority import OWNERSHIP_MIGRATION, OwnershipStore, OwnershipGuard, HeartbeatLease
 
 class RecoveryAuthorityTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class RecoveryAuthorityTests(unittest.TestCase):
         self.db=os.path.join(self.tmp.name,'db')
         def connect():return sqlite3.connect(self.db,timeout=10)
         self.connect=connect
-        db=connect();db.execute(OWNERSHIP_MIGRATION);db.execute("CREATE TABLE effects (state TEXT NOT NULL)");db.commit();db.close()
+        db=connect();db.execute(MIGRATION);db.execute(OWNERSHIP_MIGRATION);db.execute("CREATE TABLE effects (state TEXT NOT NULL)");db.commit();db.close()
         self.keys={k:Ed25519PrivateKey.generate() for k in ('recovery','stop')}
         trust=TrustStore({k:(v.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),k,'test-authority') for k,v in self.keys.items()}, {})
         self.now=1000
@@ -73,13 +73,29 @@ class RecoveryAuthorityTests(unittest.TestCase):
                     db.execute("INSERT INTO effects(state) VALUES ('SWITCHED')")
             except Exception as error:errors.append(str(error))
         thread=threading.Thread(target=effect);thread.start();self.assertTrue(entered.wait(5))
-        before=self.store.read('operation')
-        with self.assertRaisesRegex(PermissionError,'OWNERSHIP_LOCK_BUSY'):
-            guard.claim_recovery(proof,stop)
+        before=self.store.read('operation');claimed=[];attempting=threading.Event()
+        def recover():
+            attempting.set()
+            try:claimed.append(guard.claim_recovery(proof,stop))
+            except Exception as error:errors.append(str(error))
+        waiter=threading.Thread(target=recover);waiter.start();self.assertTrue(attempting.wait(5))
+        time.sleep(.05)
+        self.assertTrue(waiter.is_alive())
         self.assertEqual(before,self.store.read('operation'))
-        release.set();thread.join(5);self.assertEqual([],errors)
-        claimed=guard.claim_recovery(proof,stop)
-        self.assertEqual(2,claimed['epoch'])
+        release.set();thread.join(5);waiter.join(5);self.assertEqual([],errors)
+        self.assertEqual(2,claimed[0]['epoch'])
+
+    def test_same_database_rejects_a_different_lock_inode(self):
+        lockdir=os.path.join(self.tmp.name,'locks');os.mkdir(lockdir,0o700)
+        for name in ('one','two'):
+            fd=os.open(os.path.join(lockdir,name),os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600);os.close(fd)
+        directory=os.open(lockdir,os.O_RDONLY|os.O_DIRECTORY)
+        first=OwnershipGuard(self.store,directory,'one')
+        try:
+            same=OwnershipGuard(self.store,directory,'one');same.close()
+            with self.assertRaisesRegex(PermissionError,'GUARD_DATABASE_BINDING_MISMATCH'):
+                OwnershipGuard(self.store,directory,'two')
+        finally:first.close();os.close(directory)
 
     def test_guard_rejects_swapped_lock_inode(self):
         lockdir=os.path.join(self.tmp.name,'locks');os.mkdir(lockdir,0o700)
@@ -96,31 +112,31 @@ class RecoveryAuthorityTests(unittest.TestCase):
 
     def test_active_owner_rejects_stale_claim_and_row_is_unchanged(self):
         before=self.store.read('operation');proof=self.admission('EXPIRED_STALE')
-        with self.assertRaises(PermissionError):self.store.claim_recovery(proof)
+        with self.assertRaises(PermissionError):self.store._claim_recovery_under_guard(proof)
         self.assertEqual(before,self.store.read('operation'))
     def test_expired_observation_with_changed_heartbeat_rejects(self):
         self.now=1050;self.assertTrue(self.store.heartbeat('operation',self.owner,0,5))
         self.now=1100;proof=self.admission('EXPIRED_STALE')
         self.now=1052;self.assertTrue(self.store.heartbeat('operation',self.owner,1,60))
         self.now=1100
-        with self.assertRaises(PermissionError):self.store.claim_recovery(proof)
+        with self.assertRaises(PermissionError):self.store._claim_recovery_under_guard(proof)
         self.assertEqual(2,self.store.read('operation')['heartbeat_seq'])
     def test_stale_lease_claim_fences_old_owner_before_rename(self):
-        self.now=1200;new=self.store.claim_recovery(self.admission('EXPIRED_STALE'))
+        self.now=1200;new=self.store._claim_recovery_under_guard(self.admission('EXPIRED_STALE'))
         self.assertEqual(2,new['epoch'])
         with self.assertRaises(PermissionError):
             with self.store.owner_effect_transaction('operation',self.owner):
                 self.fail('old owner must not reach effect')
     def test_signed_stop_receipt_claims_and_rejects_tampering(self):
         admission=self.admission('STOP_RECEIPT');receipt=self.stop();bad=dict(receipt,signature='00'*64)
-        with self.assertRaises(PermissionError):self.store.claim_recovery(admission,bad)
-        recovered=self.store.claim_recovery(admission,receipt)
+        with self.assertRaises(PermissionError):self.store._claim_recovery_under_guard(admission,bad)
+        recovered=self.store._claim_recovery_under_guard(admission,receipt)
         self.assertEqual(2,recovered['epoch'])
         with self.assertRaises(PermissionError):
             with self.store.owner_effect_transaction('operation',self.owner):pass
     def test_only_new_recovery_owner_can_commit_fenced_journal_update(self):
         self.now=1200
-        replacement=self.store.claim_recovery(self.admission('EXPIRED_STALE'))
+        replacement=self.store._claim_recovery_under_guard(self.admission('EXPIRED_STALE'))
         for denied in (self.owner,dict(replacement,fence='0'*64)):
             with self.assertRaises(PermissionError):
                 with self.store.recovery_effect_transaction('operation',denied) as db:
@@ -131,8 +147,8 @@ class RecoveryAuthorityTests(unittest.TestCase):
 
     def test_bad_admission_signature_and_extra_fields_rejected(self):
         self.now=1200;proof=self.admission('EXPIRED_STALE')
-        with self.assertRaises(PermissionError):self.store.claim_recovery(dict(proof,signature='00'*64))
-        with self.assertRaises(ValueError):self.store.claim_recovery(dict(proof,extra=True))
+        with self.assertRaises(PermissionError):self.store._claim_recovery_under_guard(dict(proof,signature='00'*64))
+        with self.assertRaises(ValueError):self.store._claim_recovery_under_guard(dict(proof,extra=True))
     def test_rename_lock_excludes_recovery_claim_until_commit(self):
         # TEST_ONLY signed stop evidence and a stable clock: the DB lock must
         # still serialize the claim against any in-flight effect.
@@ -148,7 +164,7 @@ class RecoveryAuthorityTests(unittest.TestCase):
             except Exception as e:errors.append(type(e).__name__)
         thread=threading.Thread(target=old_owner);thread.start();self.assertTrue(inside.wait(5))
         def claim():
-            try:self.store.claim_recovery(proof,stop);claimed.set()
+            try:self.store._claim_recovery_under_guard(proof,stop);claimed.set()
             except Exception as e:errors.append(type(e).__name__)
         recovery=threading.Thread(target=claim);recovery.start();time.sleep(.1)
         self.assertFalse(claimed.is_set())

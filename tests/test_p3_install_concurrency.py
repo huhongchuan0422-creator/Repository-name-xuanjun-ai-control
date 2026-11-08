@@ -37,6 +37,8 @@ class ConcurrentInstallTests(unittest.TestCase):
         carrier_fixtures.CarrierInstallTests.setUp(self)
     def tearDown(self):
         carrier_fixtures.CarrierInstallTests.tearDown(self)
+    def signed_recovery(self,operation_id,proof_kind='EXPIRED_STALE'):
+        return carrier_fixtures.CarrierInstallTests.signed_recovery(self,operation_id,proof_kind)
     def spec(self):
         return {'db':self.dbpath,'root':self.root,'manifest':self.manifest_path,'manifest_sha':self.manifest_sha,
                 'archive_sha':self.archive_sha,'releases':self.releases,'state':self.state,
@@ -85,11 +87,14 @@ class ConcurrentInstallTests(unittest.TestCase):
         journal=self.store.get('p3-install:install-attempt-01')
         self.assertEqual('RUNNING',journal['state'])
         args=(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,self.releases,self.state,'install-attempt-01')
-        wrong=installer.recover(*args,operation_store=self.store,owner_fence='0'*64)
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',wrong['recovery'])
+        proof,stop=self.signed_recovery('p3-install:install-attempt-01','STOP_RECEIPT')
+        wrong=installer.recover(*args,operation_store=self.store,ownership_guard=self.guard,
+                                recovery_admission=dict(proof,signature='0'*128),stop_receipt=stop)
+        self.assertEqual('RECOVERY_OWNER_ACTIVE',wrong['state'])
         self.assertEqual(journal,self.store.get('p3-install:install-attempt-01'))
-        result=installer.recover(*args,operation_store=self.store,owner_fence=stage['adapter_correlation'])
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',result['state'])
+        result=installer.recover(*args,operation_store=self.store,ownership_guard=self.guard,
+                                 recovery_admission=proof,stop_receipt=stop)
+        self.assertEqual('SWITCHED',result['state'])
         duplicate=installer.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                 self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False,
                 operation_store=self.store,archive_path=self.archive,ownership_guard=self.guard)
@@ -107,13 +112,13 @@ class ConcurrentInstallTests(unittest.TestCase):
             except Exception as e:output.append(type(e).__name__+':'+str(e))
         thread=threading.Thread(target=run);thread.start();self.assertTrue(entered.wait(10))
         before=self.store.get('p3-install:install-attempt-01')
-        fence=self.store.get('p3-stage:install-attempt-01')['adapter_correlation']
+        proof,_=self.signed_recovery('p3-install:install-attempt-01')
         barrier=threading.Barrier(100); answers=queue.Queue()
         def recover_attempt():
             try:
                 barrier.wait(timeout=15)
                 result=installer.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
-                    self.releases,self.state,'install-attempt-01',operation_store=self.store,owner_fence=fence)
+                    self.releases,self.state,'install-attempt-01',operation_store=self.store,ownership_guard=self.guard,recovery_admission=proof)
                 answers.put(('ok',result['state']))
             except Exception as e:answers.put(('error',type(e).__name__+':'+str(e)))
         calls=[threading.Thread(target=recover_attempt) for _ in range(100)]
@@ -180,7 +185,8 @@ class ConcurrentInstallTests(unittest.TestCase):
         from src.p3_recovery_authority import OwnershipStore,OwnershipGuard,OWNERSHIP_MIGRATION
         other=os.path.join(self.tmp,'other.sqlite')
         def other_connect():return sqlite3.connect(other,timeout=10)
-        db=other_connect();db.execute(OWNERSHIP_MIGRATION);db.commit();db.close()
+        from src.p3_operation_kernel import MIGRATION
+        db=other_connect();db.execute(MIGRATION);db.execute(OWNERSHIP_MIGRATION);db.commit();db.close()
         other_owner=OwnershipStore(other_connect,self.ownership.trust,lambda:int(time.time()),10)
         other_guard=OwnershipGuard(other_owner,self.lockdir_fd,'guard',self.guard.install_authority_reader)
         try:
@@ -247,8 +253,11 @@ class ConcurrentInstallTests(unittest.TestCase):
         release.set();t.join(15);self.assertEqual(['winner-crash'],errors)
         journal=self.store.get('p3-install:install-attempt-01');self.assertEqual('UNKNOWN',journal['state'])
         args=(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,self.releases,self.state,'install-attempt-01')
-        wrong=installer.recover(*args,operation_store=self.store,owner_fence='0'*64)
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',wrong['recovery'])
+        proof,stop=self.signed_recovery('p3-install:install-attempt-01','STOP_RECEIPT')
+        wrong=installer.recover(*args,operation_store=self.store,ownership_guard=self.guard,
+                                recovery_admission=dict(proof,signature='0'*128),stop_receipt=stop)
+        self.assertEqual('RECOVERY_OWNER_ACTIVE',wrong['state'])
         self.assertEqual(journal,self.store.get('p3-install:install-attempt-01'))
-        ok=installer.recover(*args,operation_store=self.store,owner_fence=before['adapter_correlation'])
-        self.assertEqual('RECOVERY_OWNER_ACTIVE',ok['state'])
+        ok=installer.recover(*args,operation_store=self.store,ownership_guard=self.guard,
+                             recovery_admission=proof,stop_receipt=stop)
+        self.assertEqual('SWITCHED',ok['state'])

@@ -409,12 +409,43 @@ def readback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
 
 
 def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
-            release_root, state_root, attempt_id, operation_store=None, owner_fence=None):
-    """Recovery remains disabled until signed takeover is wired end to end."""
+            release_root, state_root, attempt_id, *, operation_store,
+            ownership_guard, recovery_admission, stop_receipt=None):
+    """Claim signed install recovery; old-fence-only calls are prohibited."""
     _store_required(operation_store)
+    if OwnershipGuard is None or not isinstance(ownership_guard,OwnershipGuard):
+        raise PermissionError("OWNERSHIP_GUARD_REQUIRED")
+    _same_store(operation_store,ownership_guard)
     if not ATTEMPT.fullmatch(attempt_id or ""):
         raise ValueError("VALID_ATTEMPT_REQUIRED")
-    return {"state":"RECOVERY_OWNER_ACTIVE", "recovery":"RECOVERY_OWNER_ACTIVE", "automatic_retry":False}
+    op="p3-install:"+attempt_id
+    if (not isinstance(recovery_admission,dict) or recovery_admission.get('operation_id')!=op
+            or recovery_admission.get('attempt_id')!=attempt_id):
+        return {"state":"UNKNOWN","recovery":"RECOVERY_ADMISSION_SCOPE_HOLD","automatic_retry":False}
+    row=operation_store.get(op)
+    if not row:
+        return {"state":"UNKNOWN","recovery":"RESULT_MISSING_HOLD_NO_REPLAY","automatic_retry":False}
+    binding=json.loads(row['request_json'])['admission']
+    if (binding.get('context')!={'manifest_sha256':manifest_sha256,'artifact_digest':carrier_archive_sha256}
+            or binding.get('current')!='p3-'+carrier_archive_sha256[:20]):
+        return {"state":"UNKNOWN","recovery":"SCOPE_CONFLICT_HOLD","automatic_retry":False}
+    fd=open_absolute_dir(release_root,os.geteuid());coordinator=SwitchCoordinator(fd,operation_store)
+    try:
+        info=os.fstat(fd)
+        if (info.st_dev,info.st_ino)!=(binding['root_dev'],binding['root_ino']):
+            return {"state":"UNKNOWN","recovery":"ROOT_IDENTITY_HOLD","automatic_retry":False}
+        try:
+            recovery_owner=ownership_guard.claim_recovery(recovery_admission,stop_receipt)
+        except (PermissionError,ValueError,KeyError):
+            return {"state":"RECOVERY_OWNER_ACTIVE","recovery":"RECOVERY_ADMISSION_REJECTED_HOLD","automatic_retry":False}
+        try:
+            result=coordinator.reconcile_install_guarded(op,ownership_guard,recovery_owner)
+        except PermissionError:
+            return {"state":"UNKNOWN","recovery":"RECOVERY_LOCK_HOLD","automatic_retry":False}
+        state=result['state']
+        return {"state":state,"recovery":"SIGNED_RECOVERY_RECONCILED" if state=='SWITCHED' else 'RESULT_MISSING_HOLD_NO_REPLAY',"automatic_retry":False}
+    finally:
+        coordinator.close();os.close(fd)
 
 def _rollback_checkpoint(path, manifest):
     receipt = os.path.join(path, "INSTALL_RECEIPT.json")

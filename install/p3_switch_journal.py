@@ -168,6 +168,8 @@ class SwitchCoordinator:
                     pass
             raise
     def reconcile(self, op):
+        if op.startswith('p3-install:'):
+            raise PermissionError('SIGNED_INSTALL_RECOVERY_REQUIRED')
         row = self.store.get(op)
         if not row: raise ValueError('OPERATION_NOT_FOUND')
         if row['state'] not in ('RUNNING','UNKNOWN','SUCCEEDED'):
@@ -193,6 +195,36 @@ class SwitchCoordinator:
             return {'state':'NOT_SWITCHED_HOLD'}
         self._hold(op)
         return {'state':'UNKNOWN'}
+
+    def reconcile_install_guarded(self, op, ownership_guard, recovery_owner):
+        """Reconcile install only under the newly claimed recovery epoch."""
+        with ownership_guard.with_exclusive_reconciliation(op,recovery_owner) as db:
+            raw=db.execute('SELECT request_json,state FROM p3_effect_operations WHERE operation_id=?',(op,)).fetchone()
+            if not raw: raise ValueError('OPERATION_NOT_FOUND')
+            binding=json.loads(raw[0])['admission'];state=raw[1]
+            root=os.fstat(self.root_fd)
+            if (root.st_dev,root.st_ino)!=(binding['root_dev'],binding['root_ino']):
+                return {'state':'UNKNOWN'}
+            try:
+                current=snapshot(self.root_fd,binding['current'])
+                staged=snapshot(self.root_fd,binding['staged'])
+            except Exception:
+                return {'state':'UNKNOWN'}
+            if current==binding['staged_state'] and staged==binding['prestate']:
+                os.fsync(self.root_fd)
+                if state in ('RUNNING','UNKNOWN'):
+                    count=db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state=?',
+                        ('SUCCEEDED',json.dumps({'phase':'SWITCHED_RECONCILED'},sort_keys=True,separators=(',',':')),op,state)).rowcount
+                    if count!=1:raise RuntimeError('RECONCILE_CAS_CONFLICT')
+                elif state!='SUCCEEDED':return {'state':'UNKNOWN'}
+                return {'state':'SWITCHED'}
+            if current==binding['prestate'] and staged==binding['staged_state']:
+                if state=='RUNNING':
+                    count=db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state=?',
+                        ('UNKNOWN',json.dumps({'phase':'UNKNOWN'},sort_keys=True,separators=(',',':')),op,state)).rowcount
+                    if count!=1:raise RuntimeError('RECONCILE_CAS_CONFLICT')
+                return {'state':'NOT_SWITCHED_HOLD'}
+            return {'state':'UNKNOWN'}
 
     def rollback(self, op, original_op, hook=None):
         if op == original_op:
