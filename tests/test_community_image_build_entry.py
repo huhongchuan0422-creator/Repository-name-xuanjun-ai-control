@@ -155,15 +155,15 @@ class HostedImageEntry(unittest.TestCase):
     def test_original_ocr_download_id_keeps_named_directory_and_exact_validator_path(self):
         import shlex
         download=self.workflow.split('      - name: Read original successful PR139 offline OCR artifact (no rebuild)\n',1)[1].split('      - name:',1)[0]
-        self.assertIn('uses: actions/download-artifact@v4',download)
-        self.assertIn("artifact-ids: '12553737114'",download)
-        self.assertIn("run-id: '40076963020'",download)
-        self.assertIn('path: original-ocr-evidence',download)
-        self.assertNotIn('merge-multiple: true',download)
+        self.assertIn('ocr-original-12553737114-restored/original-ocr-artifact-12553737114.zip',download)
+        self.assertIn("--proto '=https'",download)
+        for token in ('245668446','d5142f25afdf6f48297545e504a201039b2d85608af6d16b3d9b5ddb3b6a81a9','245599357','5d4ac9dad0badefaab20853cc4ceff0be9caf4c4501cebb4e318599007d662f6','ORIGINAL_OCR_ZIP_MEMBERS_MISMATCH','ORIGINAL_OCR_ZIP_REGULAR_FILES_REQUIRED','exist_ok=False','ORIGINAL_OCR_RELEASE_RESTORATION=PASS'):
+            self.assertIn(token,download)
+        self.assertNotIn('actions/download-artifact',download)
+        self.assertNotIn('extractall',download)
         step=self.workflow.split('      - name: Verify fixed original OCR bundle and preserve community vendor pins\n',1)[1].split('      - name:',1)[0]
         command=shlex.split(step.split('        run: |\n',1)[1].strip())
-        # download-artifact with artifact-ids and the default merge=false keeps
-        # the exact original artifact name, even when there is only one match.
+        # The hash-verified restored ZIP preserves the original validator path.
         name='xuanjun-ocr-linux-x86_64-cp311-cb28f605291cde6dc48a2d6431166211059dc595'
         expected=Path('original-ocr-evidence')/name/'xuanjun-ocr-linux-x86_64-cp311.tar.gz'
         self.assertEqual(command,['python','community-image-context/scripts/community_ocr_image_inputs.py',str(expected),'community-image-context/ocr-runtime','--verification-upstream','community-image-context/verification-upstream'])
