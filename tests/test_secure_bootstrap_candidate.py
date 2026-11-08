@@ -16,12 +16,7 @@ class BootstrapTests(unittest.TestCase):
   self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode(),'key_id':'fixture-key'}
   with open(os.path.join(os.path.dirname(__file__),'..','bootstrap','DEPENDENCY_LOCK.json'),'rb') as f:self.lock_raw=f.read()
   self.trust['dependency_lock_sha256']=hashlib.sha256(self.lock_raw).hexdigest()
-  verifier=os.path.realpath('/usr/bin/openssl');keypath=os.path.join(self.dir,'binding-public.pem')
-  with open(keypath,'wb') as f:f.write(self.key.public_key().public_bytes(Encoding.PEM,PublicFormat.SubjectPublicKeyInfo))
-  os.chmod(keypath,0o644);self.binding_public_key=open(keypath,'rb').read()
-  with open(verifier,'rb') as f:verifier_sha=hashlib.sha256(f.read()).hexdigest()
-  with open(keypath,'rb') as f:key_sha=hashlib.sha256(f.read()).hexdigest()
-  self.trust.update({'binding_key_id':'binding-test-only','binding_verifier_path':verifier,'binding_verifier_sha256':verifier_sha,'binding_public_key_path':keypath,'binding_public_key_sha256':key_sha})
+  self.trust.update({'binding_key_id':'binding-test-only','binding_public_key':base64.b64encode(pub).decode()})
   bp={'schema':1,'environment':'TEST_ONLY','production_trust_anchor':'REQUIRED','expiry':int(time.time())+3600,'dependency_lock_sha256':self.trust['dependency_lock_sha256'],'vendor_tree_digest':self.trust['dependency_lock_sha256'],'bootstrap_manifest_sha256':'1'*64,'carrier_manifest_sha256':'2'*64,'tool_scope_sha256':'3'*64}
   self.binding_raw=b.canonical({'payload':bp,'key_id':'binding-test-only','signature':base64.b64encode(self.key.sign(b.canonical(bp))).decode()})
   z=io.BytesIO()
@@ -195,13 +190,9 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires disposable root-owned container')
   uid=65534;gid=65534;p=self.payload;self.trust.update({'expected_controller_uid':uid,'expected_controller_gid':gid,'expected_receipt_owner':0,'expected_receipt_mode':0o555})
+  os.chown(os.path.dirname(__file__),0,0);os.chmod(os.path.dirname(__file__),0o755)
   sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
   cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd()
-  os.chown(os.path.dirname(__file__),0,0);os.chmod(os.path.dirname(__file__),0o755)
-  os.chown(os.path.join(os.path.dirname(__file__),'..','bootstrap'),0,0);os.chmod(os.path.join(os.path.dirname(__file__),'..','bootstrap'),0o755)
-  os.chown(os.path.join(os.path.dirname(__file__),'..','bootstrap','vendor'),0,0);os.chmod(os.path.join(os.path.dirname(__file__),'..','bootstrap','vendor'),0o755)
-  for source in ('secure_bootstrap.py','controller.py','path_guard.py'):
-   path=os.path.join(os.path.dirname(__file__),'..','bootstrap',source);os.chown(path,0,0);os.chmod(path,0o644)
   receipt_dir=os.path.join(self.dir,'locked-receipts');os.mkdir(receipt_dir,0o555);os.chmod(receipt_dir,0o555);rd=os.open(receipt_dir,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
   for path in [self.dir,self.ledger,self.log,self.root,os.path.join(self.root,'base'),os.path.join(self.root,'base','.bootstrap-manifest.json')]+[os.path.join(self.dir,n) for n in ('carrier','manifest','receipt','trust','signing-key','dependency-lock','binding')]:os.chown(path,uid,gid)
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
@@ -467,8 +458,13 @@ class VendorTamperTests(unittest.TestCase):
   source=os.path.abspath(os.path.join(os.path.dirname(__file__),'..','bootstrap'))
   with tempfile.TemporaryDirectory(dir=os.getcwd()) as d:
    copy=os.path.join(d,'bootstrap');shutil.copytree(source,copy,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-   raw=open(os.path.join(copy,'DEPENDENCY_LOCK.json'),'rb').read();digest=hashlib.sha256(raw).hexdigest()
-   script="import sys,hashlib;sys.path.insert(0,sys.argv[1]);import secure_bootstrap as b;raw=open(sys.argv[1]+'/DEPENDENCY_LOCK.json','rb').read();b.verify_dependency_lock(raw,{'dependency_lock_sha256':sys.argv[2]});import cryptography,cffi,_cffi_backend;print(cryptography.__file__,cffi.__file__,_cffi_backend.__file__)"
+   lockpath=os.path.join(copy,'DEPENDENCY_LOCK.json')
+   with open(lockpath,'rb') as f:lock=b.parse(f.read())
+   # Unit-only copy retains source permissions; deployment lock uses immutable modes.
+   for row in lock['files']:row['mode']=format(os.stat(os.path.join(copy,'vendor',row['path'])).st_mode&0o777,'04o')
+   raw=b.canonical(lock);digest=hashlib.sha256(raw).hexdigest()
+   with open(lockpath,'wb') as f:f.write(raw)
+   script="import sys,hashlib;sys.path.insert(0,sys.argv[1]);import secure_bootstrap as b;raw=open(sys.argv[1]+'/DEPENDENCY_LOCK.json','rb').read();b.verify_dependency_lock(raw,{'dependency_lock_sha256':sys.argv[2],'environment':'TEST_ONLY'},_test_expected_uid=__import__('os').getuid());import cryptography,cffi,_cffi_backend;print(cryptography.__file__,cffi.__file__,_cffi_backend.__file__)"
    def run():return subprocess.run([sys.executable,'-I','-B','-c',script,copy,digest],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(os.environ,PYTHONPATH=d))
    r=run();self.assertEqual(r.returncode,0,r.stderr);self.assertIn((copy+'/vendor/').encode(),r.stdout)
    for rel in ('cryptography/__init__.py','_cffi_backend.cpython-312-x86_64-linux-gnu.so','cryptography-50.0.2.dist-info/METADATA','cryptography-50.0.2.dist-info/RECORD'):

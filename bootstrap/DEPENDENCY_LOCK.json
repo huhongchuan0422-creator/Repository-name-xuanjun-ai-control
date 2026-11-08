@@ -5,931 +5,931 @@
   },
   "files": [
     {
-      "mode": "0755",
+      "mode": "0555",
       "path": "_cffi_backend.cpython-312-x86_64-linux-gnu.so",
       "sha256": "9bc1d08072255a5ec2db10fc75df1dd9e73097a75cd9150cfe875ebd6712f17c",
       "size": 348856
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/__init__.py",
       "sha256": "c47b2db28c5f197e242d4dd4af95b7ebb0da65763fc76972cafd06f93e942cda",
       "size": 511
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_cffi_errors.h",
       "sha256": "5b383ed01bb5fcad8610ad29494e5be90d86000b9d71a17cec7346f0ba05996c",
       "size": 3583
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_cffi_gen_src.py",
       "sha256": "c94479de91526ec6b7b2c17bfd53aa5d368a78be402531ccfddc99f48198f6cc",
       "size": 7044
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_cffi_include.h",
       "sha256": "cd8e8a168a3f6e96b4d8f6a042cd61cde5bd3b9eac9e2a25a32c6abd1280a2df",
       "size": 15234
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_embedding.h",
       "sha256": "3e101d00c70a0a5013559fa505c65e0c4735d85e85a9575a1ed689d8f920e84f",
       "size": 17554
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_imp_emulation.py",
       "sha256": "4714441bccc06c8d913c6070c3dd2eff97e2f2c59d6a1a5d8a93a83f3929ec2d",
       "size": 2960
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/_shimmed_dist_utils.py",
       "sha256": "0638f6c26f3265bbc5bd6131e4011f9aa6aa6726458587e8c8b2d01e45d9b9aa",
       "size": 2230
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/api.py",
       "sha256": "7165f5665b1c98ec9392fb61881a5458b712441b6a9699fe9a806ee1eb019b32",
       "size": 42013
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/backend_ctypes.py",
       "sha256": "4fb092735e0fe6fca5a22e61ca8c7af2a841597d3bf68c075da1836d8fd4edba",
       "size": 42283
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/cffi_opcode.py",
       "sha256": "e7ed5c53aa691c6cecb2d17f7a88250fff2d08393bebf6619338f77d6e1289cd",
       "size": 5723
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/commontypes.py",
       "sha256": "ecdeb33ed08596fc57316847574f29b148dd6082b65e0b0ddf2a39760b9afefe",
       "size": 2805
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/cparser.py",
       "sha256": "598fa8c785064ae552613b609b4d8598681b99cb9a6812b79a816591d1529ac5",
       "size": 44754
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/error.py",
       "sha256": "bfac53892e14d24bc3732e21fc10d1a39bf7f5942e8fe20c4582efe444dd759b",
       "size": 877
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/ffiplatform.py",
       "sha256": "6afc458dd8a460626812d9893bb7b0566c06fd511597a119fd668d859602aafe",
       "size": 3584
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/gen_src.py",
       "sha256": "4d4fd9543c282e71cf95a97cfe63e6a71ab2589ed4ef9da34dcdd4b13984d502",
       "size": 132
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/lock.py",
       "sha256": "97d4d37703083298ba8c39091a742013d72f4c847b0809ed209afc1061edde96",
       "size": 747
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/model.py",
       "sha256": "700f9b10089b70751bb5ba9f80cab408b42314f02357425247333229588d805e",
       "size": 21752
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/parse_c_type.h",
       "sha256": "39dc107f033d92dababe5081e377b11509b10c1b63d8c04d74af0b625d79b63c",
       "size": 5976
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/pkgconfig.py",
       "sha256": "bb2b75d7b4d079e6b77636a03355b9828f11a67c921938280b337c407c997657",
       "size": 4365
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/recompiler.py",
       "sha256": "4c9545d3b985cd819357ab33a76ccfac977674928737e781fd2ba22621a5f4ac",
       "size": 65140
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/setuptools_ext.py",
       "sha256": "a59ae74ea54290632abbc37123191d6c8b65eb981e84c3f52e8ada51d4fbfb85",
       "size": 9566
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/vengine_cpy.py",
       "sha256": "ad1a2e610e819650085cd8d91933d45b9e2b07de76aa2de0726d7a4965d628b7",
       "size": 43030
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/vengine_gen.py",
       "sha256": "67f2aa685eabe789f98b886341385975bfb50c14c48a69d4e32e04fcac520838",
       "size": 26931
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi/verifier.py",
       "sha256": "c48cd5f220cc859d7eaa15f74515f80d6a36934ed6a5c271761840157023ae66",
       "size": 11154
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/INSTALLER",
       "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
       "size": 4
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/METADATA",
       "sha256": "558bafb9093a8e790175d9ecff9688382981d744877dad86fd6770db0f4dc918",
       "size": 2527
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/RECORD",
       "sha256": "b969980238002b932225ec4a23927be30d4ffc585e531558d064508677655d15",
       "size": 3600
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/REQUESTED",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/WHEEL",
       "sha256": "504ac80cc95190c99aea177550563d7939b8fca6b1431c01c0d435e74afbbd0e",
       "size": 151
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/entry_points.txt",
       "sha256": "a6b6108011f8e27050fe5269bba88c8051b414697880d3b0b6fbe3a03a0b001c",
       "size": 132
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/top_level.txt",
       "sha256": "ac4ed6477ad97cd2b1588f7e8e7ea1b0708097b303901f859ae41bc568c57a14",
       "size": 19
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cffi-2.1.1.dist-info/licenses/LICENSE",
       "sha256": "5ba24ddc57067f9249add644c3afc41a5d6dc37e23433ef759d95df370b0af63",
       "size": 1123
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/__about__.py",
       "sha256": "95184137751279e4ccc0ababa44ed8bc380fbcdd5ba584f0407c5d14e31c109d",
       "size": 445
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/__init__.py",
       "sha256": "9ad86e52b4dde0544e0a9518ad322a863cfab3a4fd763019ad5ee7675a0c9b6a",
       "size": 364
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/cobblestone.py",
       "sha256": "4fff85d3cf8051fde58daca965e92535357585639b1f9ee8a38e66552ce4f707",
       "size": 693
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/exceptions.py",
       "sha256": "f37e445882dcd9fc31c3e83214cae27220b64aa8558844c1d742c14b2b670c87",
       "size": 1087
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/fernet.py",
       "sha256": "dac2c23ce99e8e13956ee75c4b742c3353c8b876f109e45c46d5a49dc437982a",
       "size": 7687
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/py.typed",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/utils.py",
       "sha256": "21aed2d106734b47b3c2920741f63c1b57bea381a3ac78a31175e3c00af58ae2",
       "size": 4635
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/__init__.py",
       "sha256": "e48c2b2d6ad5a7402312bff815d586fd5d39ecd489198fd6e1e80d36cb9cb748",
       "size": 455
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/_oid.py",
       "sha256": "3a17b69d413a5e32b1d5417a4c0b06532daff06509f958bd0d2e32c52ba4b795",
       "size": 18150
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/asn1/__init__.py",
       "sha256": "62a613a071858cb38a8a0442d341c68fa86b8c4c1bbb548fa408aeebebbe7daa",
       "size": 812
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/asn1/asn1.py",
       "sha256": "f6671fae676f2bb2ad8e1458a1f3330235b4bbb9efa9b7ecbcf7db84d40ad414",
       "size": 19152
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/backends/__init__.py",
       "sha256": "3b98ef28541d6675e129ea89f87b6e95a10bf4d8bb9abd660f3658e641e56212",
       "size": 361
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/backends/openssl/__init__.py",
       "sha256": "a778e625f9c26a0f62139b1d32b37a56f544bb9e6ee3ac5a4bf223a08d12ae60",
       "size": 305
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/backends/openssl/backend.py",
       "sha256": "d0d73315b8b01b17eaf6a8b6f281d8af4f2bfebed5420e005c78dbd2814fc2a0",
       "size": 10475
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0755",
+      "mode": "0555",
       "path": "cryptography/hazmat/bindings/_rust.abi3.so",
       "sha256": "f28d787117880abb13cc08822d1a0704d27e0fb33155d353f10a0a67efa6c4c1",
       "size": 14436232
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/__init__.pyi",
       "sha256": "b949e7bceabfb9a99e62704da66b2fdd244054ed16406a63239f1a47594be0ac",
       "size": 2285
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/_openssl.pyi",
       "sha256": "4ffe53a583bc6e08483e3010dc1b40001ab0f82718b241e9f76c26e4f358e9d7",
       "size": 228
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/asn1.pyi",
       "sha256": "06b1a30bc27a9f0b92fabdc455c757241f27768b5f63d99b41839fa5b3c6d070",
       "size": 354
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/cobblestone.pyi",
       "sha256": "f6551fd56d614ebb33109e18a527093483d20fd04e33ba3e0bcdbe9ad4831bda",
       "size": 1325
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/declarative_asn1.pyi",
       "sha256": "30198e6732d37663c9ebed4ae80ab73d3b872753068117c8bb484881a83ba1c1",
       "size": 3866
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/exceptions.pyi",
       "sha256": "7b15ebdb1c3fd29075924f777186ccdcca216f3a149233a6b3564c522d2e4191",
       "size": 640
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/ocsp.pyi",
       "sha256": "54f556b8a1c8f4432cd3d64b458006bd1d08cf49823261335c0920247a2fa683",
       "size": 4020
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/pkcs12.pyi",
       "sha256": "bc411de700e266f6fc64615ace22c26962f3030a06fedbcf5312d0c39fee3a5f",
       "size": 1605
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/pkcs7.pyi",
       "sha256": "b711812628ea66c84472aadae9bc8f35b9e2b08765c733922073f6865f5aacfb",
       "size": 1601
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/test_support.pyi",
       "sha256": "3cf86577e5a43bbe3789714f79b786d0bb602b4693cc6763708b1acb51a6e461",
       "size": 757
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/x509.pyi",
       "sha256": "2d54f886d04db1ee608a3421e0685535811b00ed04d40360136f2d5aac378382",
       "size": 10211
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/__init__.pyi",
       "sha256": "3ba18ecaf0f1b7aca589c0766851aebb945c199cbd5232a762a191f2bab3bddc",
       "size": 1578
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/aead.pyi",
       "sha256": "eddfbec5d734beecd17b84b6bae41a1a6fbd1862afe0d7122d070bc9671a0fab",
       "size": 4582
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/ciphers.pyi",
       "sha256": "2e13f31d649726ae20ac02579facd2bd249d57e698208b1c1c3c083e524618fb",
       "size": 1315
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/cmac.pyi",
       "sha256": "9cf1f45f9ed1629b00911a305698d0887139eba4e1513c7b617aec69d9ab9879",
       "size": 564
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/dh.pyi",
       "sha256": "6774c2f86d38f931ed49d00e3cb3358761bb9a5e5b75ad4495951c9f9c29ba19",
       "size": 1564
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/dsa.pyi",
       "sha256": "a81b64823d9a95bb76a8572767d503ae1ce83610953bb1d36f2e5549fd445cc2",
       "size": 1299
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/ec.pyi",
       "sha256": "cc9cb4a516b99fefe9d9d9b8e4fc44081ffe07a49567234a7e3c450e93ea4f7f",
       "size": 1691
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/ed25519.pyi",
       "sha256": "5577d77791ba8548af837f7d4750d87665b77936f411e6f30d3aa3442da0691c",
       "size": 532
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/ed448.pyi",
       "sha256": "631e3d96a7678ec0fb6f188357591c68cac392dba0e5ebe2e5aeb37ab322cb6b",
       "size": 514
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/hashes.pyi",
       "sha256": "6c57b74f5dd47b24489d424c0fe47902b19318ba960e25a8d8bbf6286cd46dfe",
       "size": 1076
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/hmac.pyi",
       "sha256": "057667ecd0e32f72406d85b4490f298358b20b90db4175615008b0b22f03151f",
       "size": 702
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/hpke.pyi",
       "sha256": "a7f8462e7e981fe11aac91755796d4b14b638a9be2100a5c4793b4b141c92ed7",
       "size": 2914
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/kdf.pyi",
       "sha256": "1e288b74407d9ea32c4ef330885a694297cfcfa7c7533f7f8298c407f5c03970",
       "size": 6619
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/keys.pyi",
       "sha256": "b5e22df0ce9910c26b9f8b375b45275b40d9fb7d0977af169d2b0a286d76e25d",
       "size": 912
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/keywrap.pyi",
       "sha256": "9860891284389718b8091393044b94cdbf54e24cbc9f9d8bde20ef08e5cd0512",
       "size": 733
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/mldsa.pyi",
       "sha256": "1fce170d6d134372c785d1890f9b8f6834f98a31222ba319cad5d873cac135fe",
       "size": 1421
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/mlkem.pyi",
       "sha256": "6f2a1ebace3e9483a55a5122450742734d2a0a45e9381e6978163aca8f6293cb",
       "size": 835
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/poly1305.pyi",
       "sha256": "fd25bd36d4391439406dd72516d5a94f89469b1288287a4dfb88fc27607361f4",
       "size": 585
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/rsa.pyi",
       "sha256": "d8e4023525e4c6073edeec35c620829682104d5ea9f7f90aefd62ed2b85980f7",
       "size": 1364
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/x25519.pyi",
       "sha256": "7b09f81a94326fbccfc04fa78bb1adc9080c0b403598bbaa62c4b2aafea723fb",
       "size": 523
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/_rust/openssl/x448.pyi",
       "sha256": "8ee4d94e6962f233bfe5572e7e0faf1efc7fb42c9ece648b221ffd3d4dd37332",
       "size": 505
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/openssl/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/openssl/_conditional.py",
       "sha256": "bdfce2fb11dd4ad01c2508cbaaa3a54a8b3de0bf03feda85b417bb3afc3e2ad6",
       "size": 5611
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/bindings/openssl/binding.py",
       "sha256": "16cb8bc5b4e7aea5bad3e7405ad6a482e7deabb4e7a9a41a8b53dcec3a30ae3a",
       "size": 3706
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/decrepit/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/decrepit/ciphers/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/decrepit/ciphers/algorithms.py",
       "sha256": "5923e3336b177eb2c35ebb4de51ecdeab0355c5edbf772357bf96f0f8cb1da80",
       "size": 3752
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/decrepit/ciphers/modes.py",
       "sha256": "3aafcf1300a47b938b73339faffbf300e27ac0fc7eae5b2f1c05cf06e8796fda",
       "size": 1649
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/_asymmetric.py",
       "sha256": "46181ca2e501e874e214306b4752f1aa4323a54c4888dbd0d6bff3263446eaa4",
       "size": 532
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/_cipheralgorithm.py",
       "sha256": "121de2ee5c1e7477e2d1e2d2b07f773d9c502b363d23a9642baeef2f8579b4e7",
       "size": 1522
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/_modes.py",
       "sha256": "fc4880383f096fa5a915796ec247144f7102cff4c7f318c6bdb4251a4366e7d4",
       "size": 3075
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/_serialization.py",
       "sha256": "862d3125b941019f29999c769566be96bba9871befbc6de0f4334ad06f0e75fb",
       "size": 4440
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/cmac.py",
       "sha256": "b33fece87fdc6273afc7e54d59d20a85185edd89a9f33f09d03dc206a397de08",
       "size": 338
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/constant_time.py",
       "sha256": "c5dba7593d277fc3af29d72a52186514a6b21a9e3f3e0549454d96d702d2aff0",
       "size": 422
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/hashes.py",
       "sha256": "4abb7081cdffa45bd97c88518fd7b5a7859d8be17f3e995e18796a240460b4e8",
       "size": 7916
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/hmac.py",
       "sha256": "469077cfdcf9b248ab090ae6ef341bb67a7da4b327023ae54d4bcaa85e5a0c37",
       "size": 423
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/hpke.py",
       "sha256": "46c1e2b2c0b997e7533e7d69d896dcac8ac09c306b2ea339ba0045486a662aee",
       "size": 865
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/keywrap.py",
       "sha256": "b7db7c299bb367852cdf4012521236ecc64f3cf2b2e041114439002be94ced34",
       "size": 735
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/padding.py",
       "sha256": "413f94f8dbd5d9e4063b5c153db0e234635273d91e4434be8a0e5c40eacbcf41",
       "size": 1865
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/poly1305.py",
       "sha256": "3f910f415f9107f1493da869834d6ed13b384bf3e7026b2ba312065db19e451a",
       "size": 355
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/__init__.py",
       "sha256": "c0709b59f69e7daf9f93a4c74b0f6d87d7c952c4ad268ef6e39c1f141aa676e0",
       "size": 216
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/dh.py",
       "sha256": "467b767cb683a501234125fc7cdb659935ce2478e5b7f0ca419d5595f85d8dae",
       "size": 5793
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/dsa.py",
       "sha256": "910cd3562a8023d3e210b34e05ca3f9fa31f3f737d7a120f91276e3a9ba9b743",
       "size": 4482
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/ec.py",
       "sha256": "2e495508b2f16db433aa213a1d16984d16ae2cca61614c37b44e9cf28048c584",
       "size": 10183
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/ed25519.py",
       "sha256": "99b7df2efb3edcf8020de835ad05d55e1ec62e7b6554be004e390811ce29b793",
       "size": 2998
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/ed448.py",
       "sha256": "9f474aeb2f952f1bb0fb3beb0f1b8f4f8e7df21ca6817fb5472fe3abd6944211",
       "size": 4002
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/mldsa.py",
       "sha256": "2c731a694d26eba12c4ab4a87567f87b691d99d0d14c41910b5cbe7c22b118ad",
       "size": 13803
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/mlkem.py",
       "sha256": "c2f5647854fee287fe55c500111dbecc8ff98574faaf04c93cc090f2017d1930",
       "size": 7901
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/padding.py",
       "sha256": "8db81a8ef18763090f8cc0e58c7bb99713019437e60b15947b6005d92e8a135d",
       "size": 3678
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/rsa.py",
       "sha256": "94813b9467b8e3d5b95112d3282a6f1467ab213a2e2a8655f46c2e4f349cb12a",
       "size": 8492
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/types.py",
       "sha256": "4a32614eb9c544b9533dd62b043d69a0c8ba723606f9f8747d221a427dd0522c",
       "size": 2588
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/utils.py",
       "sha256": "42cf117bd1853e35bfb4da7fef721e2448cf09fd2c94e22c58ec68eaaca64fa9",
       "size": 821
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/x25519.py",
       "sha256": "950720524f8f8ae6e3f329c535641e6267b7b5864c80742a9112a42033872f3a",
       "size": 3888
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/asymmetric/x448.py",
       "sha256": "6f7ee283b93ba681ba4890ebcb8da3f849428f9ab8790d17e421663744a7f33f",
       "size": 3913
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/ciphers/__init__.py",
       "sha256": "7b21179a393afc265768e3d80ebeef018197af6f50bf38162f6fb8092a252c5b",
       "size": 680
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/ciphers/aead.py",
       "sha256": "173972c7bc3c29841a9330e9d735a026722beb6ce066b815875bb68787b1079e",
       "size": 634
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/ciphers/algorithms.py",
       "sha256": "2067c2c9c6093a1d53be8237e2b7f0f0a7c9ff19add69fc3a4186dd8582171ea",
       "size": 3496
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/ciphers/base.py",
       "sha256": "6810bb1c7041a22c5e6e6a5aad5af4525383b37543d00ec1ea8cff01a4630eff",
       "size": 4253
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/ciphers/modes.py",
       "sha256": "1fb0194a02624930428b482b2fdecdc5a912f79d09c852982ecadaf2d8c73f14",
       "size": 6003
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/__init__.py",
       "sha256": "bf7ca2601194dbbd84a233576f07d865d6db7c8f5c54e0821b79d78530dd6b79",
       "size": 1037
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/argon2.py",
       "sha256": "649c7e7a7525000e28edbe3a0b5c25cc6fd7010416d3022416050a92b33fc00f",
       "size": 632
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/concatkdf.py",
       "sha256": "0459ce292ef6b71285d3242f012af435aeee873bcb1e95027242b988d002fda4",
       "size": 591
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/hkdf.py",
       "sha256": "33494011f468738929a78fa7c038fdc81faf359ba420e60442b5255ac04d9fda",
       "size": 543
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/kbkdf.py",
       "sha256": "0b7c3df6f8c5aa1ab3031cc5387e33cef5681e46f9002e8bcfa00440657b77f8",
       "size": 737
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/pbkdf2.py",
       "sha256": "5dc86493df6cf8c93a6fa2920a8baa764f0557288d54e48521e9e69d6ded2e04",
       "size": 468
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/scrypt.py",
       "sha256": "5f259475452686e23d57a4ea00f3afba3092306bf55d0760d1adb52160a63be5",
       "size": 590
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/kdf/x963kdf.py",
       "sha256": "40a8e145e86e4ec02cb4bdfce1b29fbe3bafd727dd6a6007561b014567a7d95c",
       "size": 456
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/serialization/__init__.py",
       "sha256": "7d772ee3dba02fdaf1869465ff06639cca84f430a484231cb11c5f8ffa93bde8",
       "size": 2217
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/serialization/base.py",
       "sha256": "48006bbe8d12f3a41ca01963ec3a6378b5b2da5cd032bca28a827a0eb1184150",
       "size": 651
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/serialization/pkcs12.py",
       "sha256": "992f5c14d1b869fcefb1ea1ce5ed4c5a863656c91f2fc37c63f3858e5ebb96e6",
       "size": 5104
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/serialization/pkcs7.py",
       "sha256": "98533b385b99f1c0b1506528a380a87fa06708773f21bc750108e37f19cf971a",
       "size": 13998
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/serialization/ssh.py",
       "sha256": "162b177bf9d429d3c67ea10d5612a99a86b399a23ca87f067be5466dcd1dca4c",
       "size": 53592
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/twofactor/__init__.py",
       "sha256": "b66319181fa0e08535afb94816a012534d7dcebd2e3e9ff010161cc1d0c22820",
       "size": 258
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/twofactor/hotp.py",
       "sha256": "8af668e41adc08658bb2aaa5e27655d175c28f218f8bf8877c3165b4694e2709",
       "size": 3256
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/hazmat/primitives/twofactor/totp.py",
       "sha256": "9b92cfa512f4d24a78cd8f204e3af9e477f3f5a3253d2e7790799591240299d6",
       "size": 1652
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/__init__.py",
       "sha256": "d0a54d4e646d758357fe2fdec2c4cdcdb4e6d9ed6ac9fa0e85ce1e9a883984be",
       "size": 8253
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/base.py",
       "sha256": "50830a9309acc75d01477fe09c14410814f0429d7e3bcc247d59bb6b31fefe61",
       "size": 28311
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/certificate_transparency.py",
       "sha256": "26aa0e203865c089eb60c156e88167efb589d2f885f8f07fae5655defb3d3187",
       "size": 797
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/extensions.py",
       "sha256": "fa25dcc169c82f5ce5e4c977055245904a3fef59dc5def387a1beacd6d6c2b83",
       "size": 77975
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/general_name.py",
       "sha256": "b0ffeb575d50969b24e31dd75c6258fccbf443fb3d76d8de2dc907b23a4b4284",
       "size": 7836
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/name.py",
       "sha256": "a08db0e95758f33830eeaa4d865c44c79d765b40215835d0ac361fe44b0cd8f6",
       "size": 15566
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/ocsp.py",
       "sha256": "61ecba35d155d4c3e3a29db8323fd57a78c4a60de451a328a5258e2b401b781b",
       "size": 12699
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/oid.py",
       "sha256": "054ce05d71955a296406474a3d39bd478a84944f600061e07583cc640a7b3c9a",
       "size": 931
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography/x509/verification.py",
       "sha256": "811d82d9cf97650b5b959853e53e6f8d228eb426fbe1e7f66a53d59847301653",
       "size": 958
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/INSTALLER",
       "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
       "size": 4
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/METADATA",
       "sha256": "047cfc71226409de4318b360aef15c63a2adf609731e3dcf7fe932f14ea042ee",
       "size": 4394
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/RECORD",
       "sha256": "e650e13d10f32657e45a00d075ffbca2a4261205bbba88c4de3cf1e6779c1b26",
       "size": 17965
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/REQUESTED",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/WHEEL",
       "sha256": "d6ef5e0a74f57394b6b6f26d88cf0e687862a6157a09a5f177cd7211acb9ee9f",
       "size": 109
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/licenses/LICENSE",
       "sha256": "3e0c7c091a948b82533ba98fd7cbb40432d6f1a9acbf85f5922d2f99a93ae6bb",
       "size": 197
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/licenses/LICENSE.APACHE",
       "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe",
       "size": 11360
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/licenses/LICENSE.BSD",
       "sha256": "602c4c7482de6479dd2e9793cda275e5e63d773dacd1eca689232ab7008fb4fb",
       "size": 1532
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/sboms/cryptography-rust.cyclonedx.json",
       "sha256": "b2dc68865311153a886ba5631d7f4d67af7c44b23cd2b375c3b37184b1a2db38",
       "size": 45685
     },
     {
-      "mode": "0644",
+      "mode": "0444",
       "path": "cryptography-50.0.2.dist-info/sboms/sbom.json",
       "sha256": "1d9756164a26855b671fd64bc484e9e0834666be75cc53c4f204bdb761eaa76d",
       "size": 1206

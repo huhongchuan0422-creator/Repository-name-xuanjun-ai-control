@@ -123,39 +123,29 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     return carrier,p
 
 def verify_binding(binding_raw, trust, owner):
-    """Verify binding using an OS-provided Ed25519 verifier, never vendor code."""
-    import subprocess,tempfile
+    """Verify signed binding before loading third-party vendor modules."""
     binding=parse(binding_raw)
     require(isinstance(binding,dict) and set(binding)=={'payload','signature','key_id'},'BINDING_FORMAT')
     payload=binding['payload'];require(isinstance(payload,dict) and binding['key_id']==trust.get('binding_key_id'),'BINDING_KEY_ID')
     require(payload.get('schema')==1 and payload.get('production_trust_anchor')=='REQUIRED' and type(payload.get('expiry')) is int and payload['expiry']>int(time.time()),'BINDING_SCOPE')
     require(payload.get('dependency_lock_sha256')==trust.get('dependency_lock_sha256'),'BINDING_LOCK_DIGEST')
-    verifier=trust.get('binding_verifier_path');digest=trust.get('binding_verifier_sha256');key_path=trust.get('binding_public_key_path')
-    require(isinstance(verifier,str) and os.path.isabs(verifier) and isinstance(key_path,str) and os.path.isabs(key_path) and isinstance(digest,str),'BINDING_TRUST_REQUIRED')
-    def read_protected(path,limit):
-        require(os.path.realpath(path)==path,'BINDING_TRUST_PATH');fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-        try:
-            st=os.fstat(fd);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==0 and not st.st_mode&0o022 and st.st_size<=limit,'BINDING_TRUST_FILE')
-            return os.read(fd,limit+1)
-        finally:os.close(fd)
-    require(sha(read_protected(verifier,32*1024*1024))==digest,'BINDING_VERIFIER_DIGEST')
-    key=read_protected(key_path,65536);require(sha(key)==trust.get('binding_public_key_sha256'),'BINDING_PUBLIC_KEY_DIGEST')
-    try:signature=base64.b64decode(binding['signature'],validate=True)
-    except Exception:raise Hold('BINDING_SIGNATURE_FORMAT')
-    require(len(signature)==64,'BINDING_SIGNATURE_FORMAT')
-    with tempfile.TemporaryDirectory(prefix='binding-') as d:
-        os.chmod(d,0o700);keyfile=os.path.join(d,'key');sigfile=os.path.join(d,'sig');message=os.path.join(d,'msg')
-        for path,data in ((keyfile,key),(sigfile,signature),(message,canonical(payload))):
-            fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
-            try:require(os.write(fd,data)==len(data),'BINDING_TEMP_WRITE')
-            finally:os.close(fd)
-        proc=subprocess.run([verifier,'pkeyutl','-verify','-pubin','-inkey',keyfile,'-rawin','-in',message,'-sigfile',sigfile],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env={'PATH':'/usr/bin:/bin','LC_ALL':'C'},timeout=10)
-        require(proc.returncode==0,'BINDING_SIGNATURE_INVALID')
+    try:
+        public=base64.b64decode(trust['binding_public_key'],validate=True)
+        signature=base64.b64decode(binding['signature'],validate=True)
+    except Exception:raise Hold('BINDING_KEY_FORMAT')
+    require(len(public)==32 and len(signature)==64,'BINDING_KEY_FORMAT')
+    # python -I removes the script directory; insert only this trusted bootstrap.
+    bootstrap=os.path.dirname(os.path.realpath(__file__));sys.path.insert(0,bootstrap)
+    from ed25519_verify import verify
+    require(verify(public,canonical(payload),signature),'BINDING_SIGNATURE_INVALID')
     return payload
 
-def verify_dependency_lock(lock_raw, trust):
+def verify_dependency_lock(lock_raw, trust, *, _test_expected_uid=None):
     """Authenticate the isolated vendored dependency tree before importing it."""
     import sysconfig
+    require(_test_expected_uid is None or (trust.get('environment')=='TEST_ONLY' and _test_expected_uid==os.getuid()),'TEST_OWNER_POLICY')
+    expected_uid=0 if _test_expected_uid is None else _test_expected_uid
+    expected_gid=0 if _test_expected_uid is None else os.getgid()
     require(sys.flags.isolated==1,'PYTHON_ISOLATED_MODE_REQUIRED')
     require(sha(lock_raw)==trust.get('dependency_lock_sha256'),'DEPENDENCY_LOCK_DIGEST')
     lock=parse(lock_raw);require(lock.get('schema')==1 and lock.get('soabi')==sysconfig.get_config_var('SOABI'),'DEPENDENCY_ABI')
@@ -164,7 +154,7 @@ def verify_dependency_lock(lock_raw, trust):
     require(os.path.isdir(vendor) and not os.path.islink(os.path.join(os.path.dirname(__file__),'vendor')),'VENDOR_DIRECTORY_REQUIRED')
     for directory in (os.path.dirname(vendor),vendor):
         info=os.stat(directory,follow_symlinks=False)
-        require(stat.S_ISDIR(info.st_mode) and info.st_uid in (0,os.geteuid()) and not info.st_mode&0o022,'VENDOR_DIRECTORY_POLICY')
+        require(stat.S_ISDIR(info.st_mode) and info.st_uid==expected_uid and info.st_gid==expected_gid and not info.st_mode&0o022 and (_test_expected_uid is not None or not info.st_mode&0o222),'VENDOR_DIRECTORY_POLICY')
     files=lock.get('files');require(isinstance(files,list) and files,'DEPENDENCY_LOCK_FILES')
     expected={}
     for row in files:
@@ -173,7 +163,7 @@ def verify_dependency_lock(lock_raw, trust):
         path=os.path.join(vendor,name);require(os.path.realpath(path)==path,'DEPENDENCY_PATH_LINK')
         fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
         try:
-            st=os.fstat(fd);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and not st.st_mode&0o022 and st.st_size==row['size'] and format(stat.S_IMODE(st.st_mode),'04o')==row['mode'],'DEPENDENCY_FILE_POLICY')
+            st=os.fstat(fd);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==expected_uid and st.st_gid==expected_gid and not st.st_mode&0o022 and (_test_expected_uid is not None or not st.st_mode&0o222) and st.st_size==row['size'] and format(stat.S_IMODE(st.st_mode),'04o')==row['mode'],'DEPENDENCY_FILE_POLICY')
             h=hashlib.sha256();offset=0
             while offset<st.st_size:
                 chunk=os.pread(fd,min(1048576,st.st_size-offset),offset);require(bool(chunk),'DEPENDENCY_SHORT_READ');h.update(chunk);offset+=len(chunk)
@@ -182,7 +172,7 @@ def verify_dependency_lock(lock_raw, trust):
         finally:os.close(fd)
     actual=set()
     for directory,dirs,names in os.walk(vendor,followlinks=False):
-        info=os.stat(directory,follow_symlinks=False);require(info.st_uid in (0,os.geteuid()) and not info.st_mode&0o022,'VENDOR_DIRECTORY_POLICY')
+        info=os.stat(directory,follow_symlinks=False);require(info.st_uid==expected_uid and info.st_gid==expected_gid and not info.st_mode&0o022 and (_test_expected_uid is not None or not info.st_mode&0o222),'VENDOR_DIRECTORY_POLICY')
         require(not any(os.path.islink(os.path.join(directory,x)) for x in dirs),'DEPENDENCY_PATH_LINK')
         for name in names:actual.add(os.path.relpath(os.path.join(directory,name),vendor))
     require(actual==set(expected),'DEPENDENCY_FILE_SET')

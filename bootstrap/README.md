@@ -50,3 +50,14 @@ the success receipt hash deliberately stays UNKNOWN for independent review.
 Reconciliation compares the stored manifest file digest, not every installed
 file; complete tree-content verification remains a release blocker. This is
 still experimental and must not be used for production installation.
+
+## File-descriptor provenance contract
+
+`FD_PROVENANCE=TRUSTED_CONTROLLER_OPENER`: binding, lock, trust, archive and
+receipt descriptors must be opened by the authenticated controller identity
+and its configured UID/GID, using component-wise dirfd/openat with O_NOFOLLOW.
+An untrusted caller must not supply descriptors. Bootstrap validates the open
+regular inode, link count, owner/mode, bytes, digest and signature; it cannot
+and need not infer whether a descriptor was previously opened via a symlink.
+The identity and opener contract must be bound by the independently authenticated
+controller trust configuration and confirmed by platform admission.
