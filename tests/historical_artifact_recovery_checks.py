@@ -1,5 +1,6 @@
 """Exact historical fixture transport recovery, with no production execution."""
 import hashlib
+import os
 import unittest
 from unittest.mock import patch
 from scripts import community_historical_artifact_recovery as r
@@ -17,6 +18,12 @@ class HistoricalArtifactRecovery(unittest.TestCase):
                 r.validate(label, body)
         self.assertEqual(len(self.exact['old']), 107650)
         self.assertEqual(len(self.exact['new']), 117926)
+
+    def test_current_ci_sha_cannot_change_historical_builder_identity(self):
+        with patch.dict(os.environ, {'GITHUB_SHA': 'f' * 40}):
+            for label in ('old', 'new'):
+                self.assertEqual(r.recover_artifact(label), self.exact[label])
+            self.assertEqual(os.environ['GITHUB_SHA'], 'f' * 40)
 
     def test_original_archive_corruption_is_rejected(self):
         for label, body in self.exact.items():

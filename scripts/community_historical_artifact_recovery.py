@@ -138,8 +138,11 @@ def recover_artifact(label, repo=ROOT):
             require(subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=work,
                                             text=True).strip() == commit,
                     'HISTORICAL_WORKTREE_COMMIT_MISMATCH')
+            # Reproduce the historical builder's original commit-bound environment,
+            # only for this isolated child. The live checkout/GitHub identity stays unchanged.
+            builder_env = dict(os.environ, GITHUB_SHA=commit)
             subprocess.run([sys.executable, '-B', '-m', 'scripts.community_preview_bc_build'],
-                           cwd=work, check=True, capture_output=True)
+                           cwd=work, env=builder_env, check=True, capture_output=True)
             files = {}
             for name in names_for(label):
                 path = work / name
