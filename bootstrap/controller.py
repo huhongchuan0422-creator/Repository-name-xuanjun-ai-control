@@ -11,10 +11,10 @@ def check(value, reason):
     if not value: raise ControllerError(reason)
 
 def ledger(path, owner):
-    info=os.lstat(path);check(stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_uid==owner and not info.st_mode&0o077,'LEDGER_PERMISSIONS')
+    verifylib.checked_ledger_path(path,owner)
     db=sqlite3.connect('file:'+path+'?mode=rw',uri=True,timeout=5,isolation_level=None)
     check(db.execute('pragma journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
-    db.execute('pragma synchronous=FULL')
+    db.execute('pragma busy_timeout=5000');db.execute('pragma synchronous=FULL')
     return db
 
 def transition(path, owner, nonce, before, after):

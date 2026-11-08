@@ -12,8 +12,8 @@ class BootstrapTests(unittest.TestCase):
   z=io.BytesIO()
   with tarfile.open(fileobj=z,mode='w') as t:
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
-  self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}}})
-  self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture'}
+  self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{}})
+  self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
   self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
@@ -87,3 +87,31 @@ class InstallerTests(BootstrapTests):
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller
   with sqlite3.connect(self.ledger) as db:db.execute("insert into operations values('n','t','a','RUNNING')")
   controller.recover(self.ledger,os.getuid());self.assertEqual(self.state(),'UNKNOWN')
+
+class ScopeAndConcurrencyTests(BootstrapTests):
+ def test_write_scope_denied_by_default(self):
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  p=dict(self.payload,manifest_sha256=b.sha(manifest))
+  with self.assertRaisesRegex(b.Hold,'TOOL_SCOPE_DENIED'):self.verify(payload=p,manifest=manifest)
+ def test_write_scope_allowed_when_explicit(self):
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  p=dict(self.payload,manifest_sha256=b.sha(manifest),tool_scope={'mode':'WRITE_ALLOWED','tools':{'task_submit':'project-a'}})
+  self.verify(payload=p,manifest=manifest)
+ def test_read_only_rejects_named_write(self):
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  p=dict(self.payload,manifest_sha256=b.sha(manifest),tool_scope={'mode':'READ_ONLY','tools':{'task_submit':'project-a'}})
+  with self.assertRaisesRegex(b.Hold,'WRITE_TOOL_DENIED'):self.verify(payload=p,manifest=manifest)
+ def test_relative_ledger_rejected(self):
+  with self.assertRaisesRegex(b.Hold,'LEDGER_ABSOLUTE_REQUIRED'):b.checked_ledger_path('ledger',os.getuid())
+ def test_concurrent_consume_twenty_processes(self):
+  import multiprocessing
+  ctx=multiprocessing.get_context('fork');start=ctx.Event();queue=ctx.Queue()
+  def worker(i):
+   start.wait()
+   try:b.consume(self.ledger,dict(self.payload,nonce='n'+str(i)),os.getuid());queue.put('ok')
+   except Exception:queue.put('reject')
+  jobs=[ctx.Process(target=worker,args=(i,)) for i in range(20)]
+  for job in jobs:job.start()
+  start.set();out=[queue.get(timeout=15) for _ in jobs]
+  for job in jobs:job.join(15);self.assertEqual(job.exitcode,0)
+  self.assertEqual(out.count('ok'),1);self.assertEqual(out.count('reject'),19)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Independent pre-execution verifier. No carrier imports. Candidate, not deployed."""
-import argparse, base64, hashlib, io, json, os, re, sqlite3, stat, sys, tarfile, time
+import argparse, base64, fcntl, hashlib, io, json, os, re, sqlite3, stat, sys, tarfile, time
 
 class Hold(Exception): pass
 
@@ -58,13 +58,21 @@ def inspect_archive(blob, members):
             require(len(data)==m.size and members.get(p)=={'type':'file','size':m.size,'sha256':sha(data)},'MEMBER_MISMATCH')
     require(seen==set(members),'MEMBER_SET')
 
+def checked_ledger_path(path, owner):
+    require(os.path.isabs(path), 'LEDGER_ABSOLUTE_REQUIRED')
+    parent=os.path.dirname(path); st=os.lstat(parent)
+    require(stat.S_ISDIR(st.st_mode) and st.st_uid==owner and not st.st_mode&0o077, 'LEDGER_PARENT_PERMISSIONS')
+    info=os.lstat(path)
+    require(stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_uid==owner and not info.st_mode&0o077, 'LEDGER_PERMISSIONS')
+
 def consume(db_path, receipt, owner=0):
     # The controller provisions the DB and WAL mode. Do not create missing DB/schema.
     require(os.path.isabs(db_path) and os.path.isfile(db_path) and not os.path.islink(db_path),'LEDGER_REQUIRED')
-    st=os.stat(db_path);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==owner and not st.st_mode&0o077,'LEDGER_PERMISSIONS')
+    checked_ledger_path(db_path,owner)
     db=sqlite3.connect('file:'+db_path+'?mode=rw',uri=True,timeout=5,isolation_level=None)
     try:
         require(db.execute('PRAGMA journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
+        db.execute('PRAGMA busy_timeout=5000');db.execute('PRAGMA synchronous=FULL')
         db.execute('BEGIN IMMEDIATE')
         require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
         require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
@@ -77,11 +85,11 @@ def consume(db_path, receipt, owner=0):
 
 def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None):
     # Check the supplied evidence sink before reserving a nonce or reading carrier.
-    ls=os.fstat(log_fd);require(stat.S_ISREG(ls.st_mode) and ls.st_nlink==1 and ls.st_uid==owner and not ls.st_mode&0o022,'LOG_REQUIRED')
+    ls=os.fstat(log_fd);require(stat.S_ISREG(ls.st_mode) and ls.st_nlink==1 and ls.st_uid==owner and not ls.st_mode&0o022 and fcntl.fcntl(log_fd,fcntl.F_GETFL)&os.O_APPEND,'LOG_REQUIRED')
     trust=parse(stable_read(trust_fd,owner,65536));require(trust.get('mode') in ('ED25519','DIGEST_ALLOWLIST'),'TRUST_ANCHOR_REQUIRED')
     require(trust.get('environment') in ('PRODUCTION','TEST_ONLY'),'TRUST_ENVIRONMENT_REQUIRED')
     receipt=parse(stable_read(receipt_fd,owner,65536));require(set(receipt)=={'payload','signature'},'RECEIPT_FORMAT')
-    p=receipt['payload'];keys={'carrier_sha256','manifest_sha256','task','attempt','nonce','expiry','controller'}
+    p=receipt['payload'];keys={'carrier_sha256','manifest_sha256','task','attempt','nonce','expiry','controller','tool_scope'}
     require(isinstance(p,dict) and set(p)==keys,'RECEIPT_FIELDS')
     require(all(isinstance(p[x],str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}',p[x]) for x in ('task','attempt','nonce','controller')),'RECEIPT_ID')
     require(type(p['expiry']) is int and p['expiry']>int(time.time() if now is None else now),'RECEIPT_EXPIRED')
@@ -95,7 +103,14 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
         require(sha(canonical(p)) in trust.get('receipt_sha256_allowlist',[]),'RECEIPT_NOT_ALLOWLISTED')
     manifest_raw=stable_read(manifest_fd,owner,4*1024*1024);carrier=stable_read(carrier_fd,owner,128*1024*1024)
     require(sha(manifest_raw)==p['manifest_sha256'] and sha(carrier)==p['carrier_sha256'],'DIGEST_MISMATCH')
-    manifest=parse(manifest_raw);require(set(manifest)=={'members'},'MANIFEST_FIELDS');inspect_archive(carrier,manifest['members'])
+    manifest=parse(manifest_raw);require(set(manifest)=={'members','tool_scope'},'MANIFEST_FIELDS')
+    tool_scope=p['tool_scope'];require(isinstance(tool_scope,dict) and set(tool_scope)=={'mode','tools'},'TOOL_SCOPE_REQUIRED')
+    require(tool_scope['mode'] in ('READ_ONLY','WRITE_ALLOWED') and isinstance(tool_scope['tools'],dict),'TOOL_SCOPE_INVALID')
+    require(isinstance(manifest['tool_scope'],dict),'MANIFEST_SCOPE_INVALID')
+    for name,resource in manifest['tool_scope'].items():
+        require(name in tool_scope['tools'] and tool_scope['tools'][name]==resource and isinstance(resource,str) and bool(resource),'TOOL_SCOPE_DENIED')
+        if tool_scope['mode']=='READ_ONLY':require(name in ('task_list','task_read_context','task_query_result','task_get','task_capabilities','task_dispatch_contract'),'WRITE_TOOL_DENIED')
+    inspect_archive(carrier,manifest['members'])
     consume(ledger_path,p,owner)
     os.write(log_fd,(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode());os.fsync(log_fd)
     return carrier,p
