@@ -18,9 +18,14 @@ except ImportError:
     from .p3_operation_kernel import RunnerOperationStore
 
 try:
-    from p3_admission_v2 import TrustStore, admission as admission_v2
+    from p3_admission_v2 import TrustStore, admission as admission_v2, digest as v2_digest, verify_outcome
 except ImportError:
-    from .p3_admission_v2 import TrustStore, admission as admission_v2
+    from .p3_admission_v2 import TrustStore, admission as admission_v2, digest as v2_digest, verify_outcome
+
+try:
+    from p3_verified_runtime import VerifiedRuntimeRegistry
+except ImportError:
+    from .p3_verified_runtime import VerifiedRuntimeRegistry
 
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -345,7 +350,7 @@ class RunnerController(object):
 
     def __init__(self, gate, verifier, adapter, operation_store=None,
                  trust_store=None, gate_proof_reader=None, v2_clock=None,
-                 authenticated_subject=None, legacy_test_only=False):
+                 authenticated_subject=None, legacy_test_only=False, runtime_registry=None):
         if not isinstance(gate, AdmissionGate):
             raise TypeError("ADMISSION_GATE_REQUIRED")
         if not isinstance(verifier, ReceiptVerifier):
@@ -359,6 +364,7 @@ class RunnerController(object):
         self.legacy_test_only = legacy_test_only
         self.trust_store, self.gate_proof_reader = trust_store, gate_proof_reader
         self.v2_clock, self.authenticated_subject = v2_clock, authenticated_subject
+        self.runtime_registry = runtime_registry
 
     def _invoke(self, operation, subject, admission):
         proof = self.gate.check(subject)
@@ -375,7 +381,8 @@ class RunnerController(object):
         else:
             if (not isinstance(self.trust_store, TrustStore)
                     or not callable(self.gate_proof_reader) or not callable(self.v2_clock)
-                    or not _text(self.authenticated_subject)):
+                    or not _text(self.authenticated_subject)
+                    or not isinstance(self.runtime_registry, VerifiedRuntimeRegistry)):
                 raise PermissionError("V2_TRUST_AND_AUTHORITY_REQUIRED")
             now = self.v2_clock()
             admission_v2(admission, now)
@@ -397,10 +404,14 @@ class RunnerController(object):
             if (provider_statement["epoch"] != admission["epoch"]
                     or adapter_statement["epoch"] != admission["epoch"]):
                 raise PermissionError("COMPONENT_EPOCH_MISMATCH")
+            observed_provider = self.runtime_registry.observe(self.verifier.provider, provider_statement)
+            observed_adapter = self.runtime_registry.observe(self.adapter, adapter_statement)
+            runtime_digest = v2_digest({"provider": observed_provider, "adapter": observed_adapter})
             operation_id = admission["operation_id"]
             request_binding = {"admission": admission, "gate_proof_digest": gate_digest,
                                "provider_identity_digest": provider_digest,
-                               "adapter_identity_digest": adapter_digest}
+                               "adapter_identity_digest": adapter_digest,
+                               "runtime_identity_digest": runtime_digest}
         created, row = store.reserve(operation_id, subject, request_binding, operation)
         if row["state"] == "SUCCEEDED":
             return json.loads(row["receipt_json"])["result"]
@@ -413,7 +424,7 @@ class RunnerController(object):
             try:
                 evidence_ref = (getattr(self.adapter, operation)(dict(admission))
                                 if self.legacy_test_only else
-                                self.adapter.execute(operation_id, row["request_digest"], dict(admission), operation))
+                                self.adapter.execute(operation_id, row["request_digest"], dict(admission), operation, runtime_digest))
             except Exception:
                 store.transition(operation_id, "RUNNING", "UNKNOWN")
                 return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
@@ -424,28 +435,40 @@ class RunnerController(object):
                 return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                         "automatic_retry": False, "started": False}
             try:
-                evidence_ref = reconcile(operation_id, row["request_digest"], dict(subject))
+                evidence_ref = (reconcile(operation_id, row["request_digest"], dict(subject))
+                                if self.legacy_test_only else
+                                reconcile(operation_id, row["request_digest"], dict(admission), runtime_digest))
             except Exception:
                 return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                         "automatic_retry": False, "started": False}
         try:
-            receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
-            payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
-                             "EXACT_RUNNER_ACK_REQUIRED")
-            if (payload["operation"] != operation or payload["accepted"] is not True
-                    or payload["started"] is not False or not _text(payload["native_id"])):
-                raise ValueError("ACK_IS_NOT_STARTED")
+            if self.legacy_test_only:
+                receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
+                payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
+                                 "EXACT_RUNNER_ACK_REQUIRED")
+                if (payload["operation"] != operation or payload["accepted"] is not True
+                        or payload["started"] is not False or not _text(payload["native_id"])):
+                    raise ValueError("ACK_IS_NOT_STARTED")
+                receipt_hash = receipt["receipt_sha256"]
+                correlation = evidence_ref
+            else:
+                receipt = evidence_ref
+                receipt_hash = verify_outcome(self.trust_store, receipt, admission["provider_id"],
+                    {"operation_id":operation_id, "request_digest":row["request_digest"],
+                     "admission_digest":v2_digest(admission),
+                     "runtime_identity_digest":runtime_digest}, self.v2_clock(), reconcile=not created)
+                correlation = receipt["external_correlation"]
         except Exception:
             store.transition(operation_id, "RUNNING", "UNKNOWN")
             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                     "automatic_retry": False, "started": False}
         result = {"state": "ACKNOWLEDGED_AWAITING_STARTED", "operation": operation,
-                  "started": False, "receipt_sha256": receipt["receipt_sha256"],
+                  "started": False, "receipt_sha256": receipt_hash,
                   "automatic_retry": False}
         # Reconciliation may race with the first caller. Only an authenticated
         # receipt may settle either live state; no transition redials the runner.
-        store.transition(operation_id, "RUNNING", "SUCCEEDED", {"result": result, "receipt": receipt}, evidence_ref)
-        store.transition(operation_id, "UNKNOWN", "SUCCEEDED", {"result": result, "receipt": receipt}, evidence_ref)
+        store.transition(operation_id, "RUNNING", "SUCCEEDED", {"result": result, "receipt": receipt}, correlation)
+        store.transition(operation_id, "UNKNOWN", "SUCCEEDED", {"result": result, "receipt": receipt}, correlation)
         saved = store.get(operation_id)
         if saved and saved["state"] == "SUCCEEDED":
             return json.loads(saved["receipt_json"])["result"]

@@ -9,7 +9,7 @@ FIELDS = frozenset(('task_id', 'spec_id', 'artifact_digest', 'attempt_id',
     'subject', 'provider_id', 'adapter_id', 'permission_scope', 'operation_id',
     'issued_at', 'expires_at'))
 STATEMENT = frozenset(('id', 'binary_digest', 'instance', 'epoch',
-    'capabilities', 'issued_at', 'expires_at', 'key_id', 'signature'))
+    'capabilities', 'issued_at', 'expires_at', 'runtime', 'key_id', 'signature'))
 HEX = re.compile(r'^[0-9a-f]{64}$')
 
 
@@ -108,3 +108,28 @@ class TrustStore:
         if value['binary_digest'] not in self.allowed_binaries.get((role, principal), ()):
             raise PermissionError('UNTRUSTED_COMPONENT_DIGEST')
         return digest(value)
+
+RECEIPT_FIELDS = frozenset(('operation_id','request_digest','admission_digest',
+    'runtime_identity_digest','status','result','external_correlation','issued_at',
+    'key_id','signature'))
+RECONCILE_FIELDS = frozenset(('operation_id','request_digest','admission_digest',
+    'runtime_identity_digest','status','result','external_correlation','issued_at',
+    'evidence_digest','key_id','signature'))
+
+def verify_outcome(trust, evidence, principal, expected, now, reconcile=False):
+    exact(evidence, RECONCILE_FIELDS if reconcile else RECEIPT_FIELDS)
+    if any(type(evidence[k]) is not str or evidence[k] != expected[k]
+           for k in ('operation_id','request_digest','admission_digest','runtime_identity_digest')):
+        raise PermissionError('OUTCOME_BINDING_MISMATCH')
+    if (type(now) is not int or type(evidence['issued_at']) is not int
+            or evidence['issued_at'] < 0 or evidence['issued_at'] > now
+            or evidence['status'] != 'ACKNOWLEDGED'
+            or evidence['result'] != 'ACCEPTED_NOT_STARTED'
+            or not text(evidence['external_correlation'])):
+        raise PermissionError('UNTRUSTED_OUTCOME_STATE')
+    if reconcile and (not isinstance(evidence['evidence_digest'], str)
+                      or not HEX.fullmatch(evidence['evidence_digest'])):
+        raise PermissionError('RECONCILE_EVIDENCE_REQUIRED')
+    trust.verify(evidence, 'receipt', principal,
+                 b'P3-RECONCILE-V2\x00' if reconcile else b'P3-RECEIPT-V2\x00')
+    return digest(evidence)

@@ -23,8 +23,8 @@
     "runtime/p3_host_wiring.py": "e5b062ae99cbf2c5d8084c268de7da3dd72fa01de60e0200821892aa84ac49af",
     "runtime/p3_lifecycle.py": "d330b85d453d0d293cb62bbc931b1670d22f2112815ac84bf09d229021d02e30",
     "runtime/p3_owner_reminders.py": "ef52c2727978e6578d8875d2ff6212b5539fe3f42777bd4be0179cbb17094499",
-    "src/p3_host_boundaries.py": "673a5386ef22db648f5a9481cf9a341bc24ce923b58b843ab10b6fd04300fd0f",
-    "src/p3_host_callsite.py": "c71b7df0f8f441681e006062ae1647889c957d18aa04a6f61742e662a3a885e4",
+    "src/p3_host_boundaries.py": "2ccf28ea66bc1f5c891f8d049a26c50d5e423297a6138715c445b638416d2659",
+    "src/p3_host_callsite.py": "1d5a484835239c6d2a011873f9fe7351444cd547416e49acf448f5953b6e4911",
     "TEST_DISCOVERY_IMPORT_IDENTITY_FIX.md": "b2c724e3c3f010db3dec6b00f963bac24a2494d72c50401e3ee45963c3a03cad",
     "tests/test_p3_carrier_install.py": "6512daaa0be1e72e60a53c6a23d8a05c64dd17369b12506cba7270de766379b4",
     "tests/test_p3_host_boundaries.py": "9963592af837dee2cc76f693f96e30ab87fb15cb4a0e7e744b8ae3681fda3560",
@@ -37,8 +37,9 @@
     "tests/test_p3_operation_kernel.py": "4d976dedddc491d8837b6695ada23d78b9b6585e6e5278c4c04afb5ace8c65fd",
     "install/p3_secure_fd.py": "020752aefaea4d55eeea03f890ed7ab1945ec200360e8602831c1682325a3ffa",
     "tests/test_p3_secure_fd.py": "d5d15eb1ab47aa04b6b13ad1ff79bbe125452e87327b37d702b6f5de54003cb9",
-    "src/p3_admission_v2.py": "18aea4fb3f5545cf566c5e85e2247a5e5e67458405d4c299a770bb2d97c95c6d",
-    "tests/test_p3_admission_v2.py": "3333568b53ac963b7b3b9326a37f6911d733b2e874a1c00619ba91218cea9fe5"
+    "src/p3_admission_v2.py": "f3b6fc9c166cc84f040bc0285271589e08d3927e3cf3e98536d0ea63e9c23eda",
+    "tests/test_p3_admission_v2.py": "aa32ef81f67e8a1419dcb749f7dcdd89e2f9b238f7282193748782c9e08a2738",
+    "src/p3_verified_runtime.py": "76156b6280770edcc4fd83af265528a6f712a96b13a494785890e7fef79f3693"
   },
   "release_files": [
     "config/p3-default-off.json",
@@ -53,7 +54,8 @@
     "vendor/xuanjun-p3-lifecycle-local-candidate-20261028.zip",
     "vendor/xuanjun-p3-owner-reminder-increment-20261028.zip",
     "src/p3_operation_kernel.py",
-    "src/p3_admission_v2.py"
+    "src/p3_admission_v2.py",
+    "src/p3_verified_runtime.py"
   ],
   "base_reviews": {
     "independent_qa": {
