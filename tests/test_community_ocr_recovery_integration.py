@@ -91,9 +91,9 @@ class RecoveryIntegration(SharedOcrComposition):
    from scripts.community_ocr_host import OcrPublicError
    params=dict(application=self.app['application'],action='recover_view',document_type='business_license',locator={'current_material':True},recovery_key='late-unique')
    submit=host.worker.submit;completed=[]
-   def slow(fn):
+   def slow(fn,*args,**kwargs):
     def delayed():
-     response=fn();completed.append(response.status_code);time.sleep(6);return response
+     response=fn(*args,**kwargs);completed.append(response.status_code);time.sleep(6);return response
     return submit(delayed)
    with patch.object(host.worker,'submit',side_effect=slow),self.assertRaises(PermissionError) as cm:host.dispatch(self.fx.token,'shop1',params)
    self.assertEqual(str(cm.exception),'OCR_REQUEST_PENDING')

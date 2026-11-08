@@ -52,7 +52,10 @@ class IdentityBackContract(unittest.TestCase):
             fields=fields or VALUES[seen['document_type']]))
     def test_actual_successor_hash_and_unchanged_core(self):
         lock=json.loads(Path('scripts/community_ocr_dependency.json').read_text())
-        self.assertEqual(self.api.ALLOWED_HINTS,{'business_license','id_front','id_back'})
+        self.assertEqual(self.api.ALLOWED_HINTS,{'business_license','id_front','id_back','bank_card'})
+        self.assertEqual(set(self.api.CONFIRM_KEYS),{'business_license','id_front','id_back','bank_card'})
+        self.assertEqual(set(self.api.CONFIRM_KEYS['bank_card']),{'account_number','account_bank'})
+        self.assertEqual(set(self.api.CONFIRM_KEYS['id_front']),set(VALUES['id_front']))
         for name,digest in lock['files'].items():
             self.assertEqual(hashlib.sha256((Path(self.api.__file__).parent/name).read_bytes()).hexdigest(),digest)
         self.assertEqual(lock['files']['ocr_core.py'],lock['upstream_files']['ocr_core.py'])
