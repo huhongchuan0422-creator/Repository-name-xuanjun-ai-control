@@ -209,6 +209,27 @@ class InstallerTests(BootstrapTests):
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],'SUCCEEDED')
   self.assertTrue(os.path.isfile(os.path.join(receipt_dir,'receipt-nonce.json')))
   print('NONROOT_POSITIVE uid=%s receipt_owner=%s mode=0700 exit=0 ledger=SUCCEEDED' %(uid,uid))
+ def test_cli_authorized_rollback(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  install=common+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
+  r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,0,r.stderr)
+  with sqlite3.connect(self.ledger) as db:pre=db.execute('select prestate_digest from operations').fetchone()[0]
+  payload={'install_op':'install:nonce','prestate_digest':pre,'rollback_op':'rollback:one','nonce':'rollback-nonce','expiry':int(time.time())+600,'controller':'fixture'}
+  def authfd(data,signature=None):
+   sign=signature or base64.b64encode(self.key.sign(b.canonical(data))).decode()
+   return self.fd('rollback-auth',b.canonical({'payload':data,'signature':sign,'key_id':'fixture-key'}))
+  def call(data,signature=None):
+   fd=authfd(data,signature);cmd=common+['--rollback','--rollback-authorization-fd',str(fd),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key']
+   return subprocess.run(cmd,pass_fds=fds+(fd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  for invalid in (dict(payload,expiry=1),dict(payload,install_op='install:wrong')):
+   result=call(invalid);self.assertNotEqual(result.returncode,0);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce')
+  result=call(payload,base64.b64encode(b'bad').decode());self.assertNotEqual(result.returncode,0)
+  result=call(payload);self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+  again=call(payload);self.assertEqual(again.returncode,0,again.stderr);self.assertEqual(result.stdout,again.stdout)
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
@@ -253,6 +274,20 @@ class InstallerTests(BootstrapTests):
   with self.assertRaises(controller.ControllerError):controller.rollback(self.ledger,self.root,os.getuid(),lf,trustfd,keyfd,'fixture-key',rd,'install:nonce','rollback:one','a'*64,failpoint='after_rename')
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
   self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+ def test_rollback_three_failure_windows_reconcile(self):
+  import controller
+  self.run_install();tf=self.fd('rbtrust',b.canonical(self.trust));kf=self.fd('rbkey',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd);lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  args=(self.ledger,self.root,os.getuid(),lf,tf,kf,'fixture-key',rd,'install:nonce','rollback:one','a'*64)
+  with self.assertRaises(controller.ControllerError):controller.rollback(*args,failpoint='before_rename')
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust),receipt_dir_fd=rd),0)
+  with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'FAILED');db.execute('delete from rollbacks')
+  with self.assertRaises(controller.ControllerError):controller.rollback(*args,failpoint='after_rename')
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust),receipt_dir_fd=rd),1)
+  with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN');db.execute('delete from rollbacks')
+  os.unlink(os.path.join(self.root,'current'));os.symlink('release-nonce',os.path.join(self.root,'current'))
+  with self.assertRaises(controller.ControllerError):controller.rollback(*args,failpoint='before_receipt')
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust),receipt_dir_fd=rd),1)
+  with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
  def test_recover_running_as_unknown(self):
   import sys
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller

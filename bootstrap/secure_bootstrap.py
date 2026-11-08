@@ -123,6 +123,8 @@ def main():
         print('HOLD SQLITE_VERSION_UNSUPPORTED',file=sys.stderr);return 1
     a=argparse.ArgumentParser()
     a.add_argument('--reconcile',action='store_true')
+    a.add_argument('--rollback',action='store_true')
+    a.add_argument('--rollback-authorization-fd',type=int)
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
     a.add_argument('--trust-fd',type=int,required=True)
     a.add_argument('--receipt-dir-fd',type=int,required=True)
@@ -134,7 +136,7 @@ def main():
     for n in ('task','attempt','receipt-key-id'):a.add_argument('--'+n)
     x=a.parse_args()
     try:
-        from controller import run,reconcile_pending
+        from controller import run,reconcile_pending,rollback
         from path_guard import GuardedAudit
         require(os.geteuid()==x.expected_controller_uid and os.getegid()==x.expected_controller_gid,'CONTROLLER_IDENTITY_MISMATCH')
         trust=parse(stable_read(x.trust_fd,x.expected_controller_uid,65536))
@@ -147,6 +149,18 @@ def main():
                 pending=reconcile_pending(x.ledger,x.expected_controller_uid,x.root,audit.file,audit,stable_read(x.trust_fd,x.expected_controller_uid,65536),receipt_dir_fd=x.receipt_dir_fd)
                 require(pending==0,'UNKNOWN_RECONCILIATION_REQUIRED')
                 print('RECONCILED')
+            elif x.rollback:
+                require(x.rollback_authorization_fd is not None and x.receipt_signing_key_fd is not None and x.receipt_key_id,'ROLLBACK_ARGUMENTS_REQUIRED')
+                auth_raw=stable_read(x.rollback_authorization_fd,x.expected_controller_uid,65536);auth=parse(auth_raw)
+                require(isinstance(auth,dict) and set(auth)=={'payload','signature','key_id'} and auth['key_id']==trust.get('key_id'),'ROLLBACK_AUTH_FORMAT')
+                p=auth['payload'];require(isinstance(p,dict) and set(p)=={'install_op','prestate_digest','rollback_op','nonce','expiry','controller'},'ROLLBACK_AUTH_FIELDS')
+                require(all(isinstance(p[k],str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}',p[k]) for k in ('install_op','rollback_op','nonce')) and isinstance(p['prestate_digest'],str) and re.fullmatch('[0-9a-f]{64}',p['prestate_digest']),'ROLLBACK_AUTH_FIELDS')
+                require(type(p['expiry']) is int and p['expiry']>int(time.time()) and p['controller']==trust.get('controller'),'ROLLBACK_AUTH_SCOPE')
+                from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+                try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(auth['signature'],validate=True),canonical(p))
+                except Exception:raise Hold('ROLLBACK_AUTH_SIGNATURE')
+                result=rollback(x.ledger,x.root,x.expected_controller_uid,audit.file,x.trust_fd,x.receipt_signing_key_fd,x.receipt_key_id,x.receipt_dir_fd,p['install_op'],p['rollback_op'],sha(canonical(p)),audit=audit,authorized_prestate_digest=p['prestate_digest'])
+                require(result['state']=='SUCCEEDED','ROLLBACK_NOT_SUCCEEDED');print(json.dumps(result,sort_keys=True))
             else:
                 require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
                 target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd);print('INSTALLED '+target)

@@ -164,7 +164,28 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             try:
                 columns={r[1] for r in db.execute('PRAGMA table_info(operations)')}
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rollbacks'").fetchone():
-                    check(db.execute("SELECT 1 FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN') LIMIT 1").fetchone() is None,'ROLLBACK_RECONCILIATION_REQUIRED')
+                    for rb in db.execute("SELECT * FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN')").fetchall():
+                        old=rb['state'];new='UNKNOWN'
+                        try:
+                            cur=_current(rootfd)
+                            check(verified_tree(rootfd,rb['from_target'],owner)==rb['from_digest'] and verified_tree(rootfd,rb['to_target'],owner)==rb['to_digest'],'ROLLBACK_TREE')
+                            if cur==rb['from_target']:
+                                name='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json'
+                                check(receipt_dir_fd is not None and not _exists(receipt_dir_fd,name),'ROLLBACK_RECEIPT_CONFLICT');new='FAILED'
+                            elif cur==rb['to_target']:
+                                check(receipt_dir_fd is not None and trust_raw is not None,'ROLLBACK_RECEIPT_REQUIRED')
+                                name='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json'
+                                obj=verifylib.parse(_file_bytes(receipt_dir_fd,name,owner,65536));trust=verifylib.parse(trust_raw);payload=obj['payload']
+                                check(set(obj)=={'payload','key_id','signature'} and obj['key_id']==trust['key_id'],'ROLLBACK_RECEIPT_KEY')
+                                check(payload['install_op']==rb['install_op'] and payload['rollback_op']==rb['operation_id'] and payload['attempt']==rb['attempt'] and payload['request_digest']==rb['request_digest'] and payload['from_tree_digest']==rb['from_digest'] and payload['to_tree_digest']==rb['to_digest'] and payload['controller_identity']==trust['controller'],'ROLLBACK_RECEIPT_BINDING')
+                                from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+                                try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
+                                except Exception:raise ControllerError('ROLLBACK_SIGNATURE')
+                                new='SUCCEEDED';db.execute('UPDATE rollbacks SET receipt_json=? WHERE operation_id=?',(verifylib.canonical(obj).decode(),rb['operation_id']))
+                        except (OSError,ValueError,TypeError,KeyError,ControllerError):new='UNKNOWN'
+                        if new!=old:
+                            log(log_fd,{'event':'ROLLBACK_RECONCILE','operation':rb['operation_id'],'from':old,'to':new},audit)
+                            db.execute('UPDATE rollbacks SET state=? WHERE operation_id=? AND state=?',(new,rb['operation_id'],old))
                 required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash','operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}
                 rows=db.execute("SELECT * FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchall()
                 for row in rows:
@@ -209,7 +230,9 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             except BaseException:
                 if db.in_transaction:db.execute('ROLLBACK')
                 raise
-            return db.execute("SELECT COUNT(*) FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchone()[0]
+            pending=db.execute("SELECT COUNT(*) FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchone()[0]
+            if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rollbacks'").fetchone():pending+=db.execute("SELECT COUNT(*) FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN')").fetchone()[0]
+            return pending
     finally:os.close(rootfd)
 
 def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None):
@@ -347,7 +370,7 @@ def reconcile_pending(path, owner, root, log_fd, audit=None, trust_raw=None,rece
         finally:os.close(lock)
     finally:os.close(rootfd)
 
-def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receipt_dir_fd,install_op,rollback_op,request_digest,audit=None,failpoint=None):
+def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receipt_dir_fd,install_op,rollback_op,request_digest,audit=None,failpoint=None,authorized_prestate_digest=None):
     """Experimental rollback. Caller must provide independent authorization."""
     from path_guard import GuardedLedger
     from cryptography.hazmat.primitives import serialization
@@ -371,9 +394,17 @@ def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receip
                 old=db.execute('SELECT * FROM rollbacks WHERE operation_id=?',(rollback_op,)).fetchone()
                 if old:
                     check(old['request_digest']==request_digest and old['install_op']==install_op,'ROLLBACK_REQUEST_CONFLICT')
+                    check(old['state']=='SUCCEEDED' and old['receipt_json'],'ROLLBACK_NOT_SUCCEEDED')
+                    name='rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest()+'.json'
+                    raw=_file_bytes(receipt_dir_fd,name,owner,65536);check(raw.decode()==old['receipt_json'],'ROLLBACK_RECEIPT_CONFLICT')
+                    obj=verifylib.parse(raw);payload=obj['payload'];check(obj['key_id']==key_id and payload['rollback_op']==rollback_op and payload['request_digest']==request_digest and payload['install_op']==install_op,'ROLLBACK_RECEIPT_BINDING')
+                    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+                    try:Ed25519PublicKey.from_public_bytes(pub).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
+                    except Exception:raise ControllerError('ROLLBACK_SIGNATURE')
+                    check(_current(rootfd)==old['to_target'] and verified_tree(rootfd,old['to_target'],owner)==old['to_digest'],'ROLLBACK_POSTSTATE')
                     result={'state':old['state'],'receipt':old['receipt_json']};db.execute('COMMIT');return result
                 check(db.execute("SELECT 1 FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN')").fetchone() is None,'ROLLBACK_UNKNOWN_HOLD')
-                installed=db.execute("SELECT * FROM operations WHERE operation_id=? AND state='SUCCEEDED'",(install_op,)).fetchone();check(installed is not None,'INSTALL_OPERATION_REQUIRED')
+                installed=db.execute("SELECT * FROM operations WHERE operation_id=? AND state='SUCCEEDED'",(install_op,)).fetchone();check(installed is not None,'INSTALL_OPERATION_REQUIRED');check(authorized_prestate_digest is None or installed['prestate_digest']==authorized_prestate_digest,'AUTHORIZATION_PRESTATE_MISMATCH')
                 from_target=_name(installed['intended_target']);to_target=_name(installed['prestate_target'])
                 check(_current(rootfd)==from_target,'ROLLBACK_CURRENT_MISMATCH')
                 fd=open_dir(rootfd,to_target)
