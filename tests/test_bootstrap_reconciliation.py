@@ -29,8 +29,8 @@ class ReconcileTests(unittest.TestCase):
     with sqlite3.connect(self.db) as db:db.execute('delete from operations')
  def test_complete_stage_is_removed_and_failed(self):
   self.mk_target('stage-n',b'new');self.row();self.assertEqual(self.go(),0);self.assertEqual(self.state(),'FAILED');self.assertFalse(os.path.exists(os.path.join(self.root,'stage-n')))
- def test_switched_and_receipt_match_is_success(self):
-  self.mk_target('release-n',b'new');self.switch('release-n');rh=self.receipt();self.row(receipt_hash=rh);self.assertEqual(self.go(),0);self.assertEqual(self.state(),'SUCCEEDED')
+ def test_unsigned_legacy_receipt_stays_unknown(self):
+  self.mk_target('release-n',b'new');self.switch('release-n');rh=self.receipt();self.row(receipt_hash=rh);self.assertEqual(self.go(),1);self.assertEqual(self.state(),'UNKNOWN')
  def test_receipt_missing_and_tampered_remain_unknown(self):
   for mode in ('missing','tampered','wrong_binding'):
    with self.subTest(mode=mode):

@@ -180,9 +180,9 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None):
                             check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
                             raw=_file_bytes(rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
                             check(verifylib.sha(raw)==rh,'RECEIPT_MISMATCH')
-                            receipt=verifylib.parse(raw)
-                            check(receipt=={'nonce':row['nonce'],'target':target,'manifest_sha256':mh,'outcome':'SUCCEEDED'},'RECEIPT_SCOPE')
-                            outcome='SUCCEEDED';reason='RECEIPT_AND_CURRENT_MATCH'
+                            # Legacy local receipts carry no controller signature.
+                            # Never promote them to SUCCEEDED.
+                            raise ControllerError('SIGNED_OPERATION_RECEIPT_REQUIRED')
                         elif current==pre:
                             check(not target_exists,'UNSWITCHED_TARGET_CONFLICT')
                             if stage_exists:
