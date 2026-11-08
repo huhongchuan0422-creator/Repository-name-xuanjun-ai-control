@@ -11,6 +11,7 @@ from __future__ import absolute_import
 
 import argparse
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -228,7 +229,7 @@ def _archive_check(archive_path, manifest, expected):
 
 
 def _store_required(store):
-    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition")):
+    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition", "reserve_owned", "transition_owned")):
         raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
 
 
@@ -284,21 +285,23 @@ def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     op = "p3-install:" + attempt_id
     coordinator = SwitchCoordinator(release_fd, operation_store)
     try:
-        if operation_store.get(op) is not None:
-            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
         from_stat = os.fstat(release_fd)
+        stage_op = "p3-stage:" + attempt_id
+        owner_fence = os.urandom(32).hex()
+        owns_stage = False
+        created, _ = operation_store.reserve_owned(stage_op, {"kind":"install-stage"},
+            {"root_dev":from_stat.st_dev, "root_ino":from_stat.st_ino, "staged":staged,
+             "target":target, "manifest_sha256":manifest_sha256,
+             "artifact_digest":carrier_archive_sha256}, "stage", owner_fence)
+        if not created:
+            # Losing calls do not change, reconcile, clean up, or inspect staging.
+            return {"state":"IN_PROGRESS_OR_HOLD", "automatic_retry":False}
+        owns_stage = True
         try:
             os.stat(target, dir_fd=release_fd, follow_symlinks=False)
             raise ValueError("EXISTING_RELEASE_CONFLICT")
         except FileNotFoundError:
             pass
-        stage_op = "p3-stage:" + attempt_id
-        created, _ = operation_store.reserve(stage_op, {"kind":"install-stage"},
-            {"root_dev":from_stat.st_dev, "root_ino":from_stat.st_ino, "staged":staged,
-             "target":target, "manifest_sha256":manifest_sha256,
-             "artifact_digest":carrier_archive_sha256}, "stage")
-        if not created or not operation_store.transition(stage_op, "RESERVED", "RUNNING", {"phase":"STAGING"}):
-            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
         os.mkdir(staged, 0o700, dir_fd=release_fd)
         os.fsync(release_fd)
         staging_fd = os.open(staged, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=release_fd)
@@ -323,7 +326,7 @@ def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
         if not coordinator.prepare(op, staged, target, context={
                 "manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}, require_absent=True):
             raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
-        if not operation_store.transition(stage_op, "RUNNING", "SUCCEEDED", {"phase":"STAGED"}):
+        if not operation_store.transition_owned(stage_op, owner_fence, "RUNNING", "SUCCEEDED", {"phase":"STAGED"}):
             raise RuntimeError("STAGING_JOURNAL_CONFLICT")
         result = coordinator.switch(op, staged, target, fault_hook, prepared=True)
         if result["state"] != "SWITCHED":
@@ -331,8 +334,8 @@ def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
         return {"state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
                 "target":os.path.join(release_root,target), "verified":True}
     except BaseException:
-        if 'stage_op' in locals():
-            operation_store.transition(stage_op, "RUNNING", "UNKNOWN", {"phase":"STAGING_UNKNOWN"})
+        if 'owns_stage' in locals() and owns_stage:
+            operation_store.transition_owned(stage_op, owner_fence, "RUNNING", "UNKNOWN", {"phase":"STAGING_UNKNOWN"})
         raise
     finally:
         coordinator.close()
@@ -351,10 +354,15 @@ def readback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
 
 
 def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
-            release_root, state_root, attempt_id, operation_store=None):
+            release_root, state_root, attempt_id, operation_store=None, owner_fence=None):
     _store_required(operation_store)
     if not ATTEMPT.fullmatch(attempt_id or ""):
         raise ValueError("VALID_ATTEMPT_REQUIRED")
+    stage = operation_store.get("p3-stage:" + attempt_id)
+    stored_fence = stage.get("adapter_correlation") if stage else None
+    if (not isinstance(owner_fence, str) or not isinstance(stored_fence, str)
+            or not hmac.compare_digest(owner_fence, stored_fence)):
+        return {"state":"UNKNOWN", "recovery":"OWNER_FENCE_MISMATCH_HOLD", "automatic_retry":False}
     fd = open_absolute_dir(release_root, os.geteuid())
     coordinator = SwitchCoordinator(fd, operation_store)
     try:

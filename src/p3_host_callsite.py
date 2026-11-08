@@ -27,7 +27,7 @@ EXPECTED_MODULE_SHA256 = {
     "p3_host_boundaries": "2ccf28ea66bc1f5c891f8d049a26c50d5e423297a6138715c445b638416d2659",
     "p3_admission_v2": "f3b6fc9c166cc84f040bc0285271589e08d3927e3cf3e98536d0ea63e9c23eda",
     "p3_verified_runtime": "76156b6280770edcc4fd83af265528a6f712a96b13a494785890e7fef79f3693",
-    "p3_operation_kernel": "22bb692c357d9fb5ab5285e76f94afa9659e8623d572fb49c1caa898f234b3d1",
+    "p3_operation_kernel": "ad93fdc6b17864b62ee67588d0d6491fb52dc82588b02e1ebec1e86b48de8c7f",
     "p3_host_wiring": "e5b062ae99cbf2c5d8084c268de7da3dd72fa01de60e0200821892aa84ac49af",
     "p3_lifecycle": "d330b85d453d0d293cb62bbc931b1670d22f2112815ac84bf09d229021d02e30",
     "p3_owner_reminders": "ef52c2727978e6578d8875d2ff6212b5539fe3f42777bd4be0179cbb17094499",

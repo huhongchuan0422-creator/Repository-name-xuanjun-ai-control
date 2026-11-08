@@ -200,3 +200,47 @@ class RunnerOperationStore:
 
     def transition(self, operation_id, source, target, receipt=None, correlation=None):
         return OperationKernel._transition(self, operation_id, source, target, receipt, correlation)
+
+    def reserve_owned(self, operation_id, subject, admission, operation, owner_fence):
+        """Atomically create a RUNNING reservation owned by one fencing token."""
+        if not isinstance(owner_fence, str) or len(owner_fence) != 64 or any(c not in '0123456789abcdef' for c in owner_fence):
+            raise ValueError('VALID_OWNER_FENCE_REQUIRED')
+        body = _json({'subject': subject, 'admission': admission, 'operation': operation})
+        identity = _json(subject)
+        digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            row = OperationKernel._read(self, db, operation_id)
+            if row:
+                if row['request_digest'] != digest or row['identity_json'] != identity or row['request_json'] != body:
+                    raise ValueError('OPERATION_ID_CONFLICT')
+                db.commit()
+                return False, row
+            try:
+                db.execute('INSERT INTO p3_effect_operations(operation_id,request_digest,identity_json,request_json,state,receipt_json,adapter_correlation) VALUES(?,?,?,?,?,?,?)',
+                           (operation_id,digest,identity,body,'RUNNING',_json({'phase':'STAGING'}),owner_fence))
+            except sqlite3.IntegrityError:
+                raise ValueError('REQUEST_DIGEST_CONFLICT')
+            db.commit()
+            return True, None
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def transition_owned(self, operation_id, owner_fence, source, target, receipt=None):
+        """Compare-and-swap guarded by both operation state and owner fence."""
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            cursor = db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state=? AND adapter_correlation=?',
+                                (target,_json(receipt) if receipt is not None else None,operation_id,source,owner_fence))
+            db.commit()
+            return cursor.rowcount == 1
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()

@@ -60,6 +60,8 @@ class CarrierInstallTests(unittest.TestCase):
         return installer.install(*args, **kwargs)
 
     def recover(self, *args, **kwargs):
+        stage = self.store.get('p3-stage:install-attempt-01')
+        kwargs.setdefault('owner_fence', stage['adapter_correlation'] if stage else None)
         kwargs.update(operation_store=self.store)
         return installer.recover(*args, **kwargs)
 
@@ -96,10 +98,10 @@ class CarrierInstallTests(unittest.TestCase):
             self.archive_sha, self.releases, self.state, "install-attempt-01",
             lambda: True, enforce_root=False)
         self.assertEqual("INSTALLED_DEFAULT_OFF_NOT_BOUND", first["state"])
-        with self.assertRaisesRegex(RuntimeError, "INSTALL_ATTEMPT_RECONCILE_FIRST"):
-            self.install(self.root, self.manifest_path, self.manifest_sha,
+        second = self.install(self.root, self.manifest_path, self.manifest_sha,
                          self.archive_sha, self.releases, self.state,
                          "install-attempt-01", lambda: True, enforce_root=False)
+        self.assertEqual("IN_PROGRESS_OR_HOLD", second["state"])
         recovered = self.recover(
             self.root, self.manifest_path, self.manifest_sha,
             self.archive_sha, self.releases, self.state,
@@ -136,13 +138,12 @@ class CarrierInstallTests(unittest.TestCase):
                 self.assertEqual("CONFLICT", observed["state"])
                 self.assertIn(observed["field"], mutation)
 
-                with self.assertRaisesRegex(
-                        RuntimeError, "INSTALL_ATTEMPT_RECONCILE_FIRST"):
-                    self.install(
+                duplicate = self.install(
                         self.root, self.manifest_path, self.manifest_sha,
                         self.archive_sha, self.releases, self.state,
                         "install-attempt-01", lambda: True,
                         enforce_root=False)
+                self.assertEqual("IN_PROGRESS_OR_HOLD", duplicate["state"])
 
                 recovered = self.recover(
                     self.root, self.manifest_path, self.manifest_sha,
@@ -252,9 +253,9 @@ class CarrierInstallTests(unittest.TestCase):
                 result=self.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                     self.releases,self.state,'install-attempt-01')
                 self.assertEqual('NOT_SWITCHED_HOLD' if point=='before_rename' else 'SWITCHED',result['state'])
-                with self.assertRaises(RuntimeError):
-                    self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
+                duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                  self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
+                self.assertEqual('IN_PROGRESS_OR_HOLD',duplicate['state'])
 
     def test_staging_receipt_crash_is_durable_unknown_and_no_replay(self):
         def crash(phase):
@@ -267,9 +268,9 @@ class CarrierInstallTests(unittest.TestCase):
         self.assertIsNone(self.store.get('p3-install:install-attempt-01'))
         self.assertEqual('UNKNOWN',self.recover(self.root,self.manifest_path,self.manifest_sha,
                          self.archive_sha,self.releases,self.state,'install-attempt-01')['state'])
-        with self.assertRaises(RuntimeError):
-            self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
+        duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                          self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
+        self.assertEqual('IN_PROGRESS_OR_HOLD',duplicate['state'])
 
     def test_replaced_target_before_rename_yields_unknown_not_replay(self):
         target=os.path.join(self.releases,'p3-'+self.archive_sha[:20])
