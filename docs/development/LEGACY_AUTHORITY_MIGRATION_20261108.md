@@ -1,5 +1,33 @@
 # Canonical legacy ledger → FORMAL authority migration
 
+> Candidate contract revision 2. Production execution remains prohibited until
+> fresh independent QA, Security, Release and Platform approvals are recorded.
+
+## Platform handoff contract
+
+Platform owns production stop/start, backup, lock proof and root-controlled
+trust key. Developer must not execute these commands against production:
+
+```sh
+python3 scripts/legacy_authority_migration.py probe --db "$DB"
+python3 scripts/legacy_authority_migration.py create-freeze --db "$DB" --backup "$BACKUP" --backup-sha256 "$BACKUP_SHA256" --operation-id "$OPERATION_ID" --freeze-trust-key "$ROOT_KEY" --output "$FREEZE_RECEIPT" --ttl-seconds 300
+python3 scripts/legacy_authority_migration.py apply --db "$DB" --backup "$BACKUP" --backup-sha256 "$BACKUP_SHA256" --expected-fingerprint 3e871a9911be87760cb7aa691113b570228f922a609b50ffbd2974e31b7ceb45 --freeze-receipt "$FREEZE_RECEIPT" --freeze-trust-key "$ROOT_KEY" --operation-id "$OPERATION_ID"
+python3 scripts/legacy_authority_migration.py recover --db "$DB" --operation-id "$OPERATION_ID"
+```
+
+`probe` emits only canonical path, file hash, full schema fingerprint, pragmas,
+integrity/classification and count; it never exports row content. Platform may
+provide its JSON or a controlled read-only copy to QA. Unavailable production
+backup evidence is not a PASS.
+
+The canonical, HMAC-SHA256 freeze receipt binds operation, schema version,
+DB/backup realpaths, device/inode, DB/WAL/SHM size/mtime/hash, backup SHA,
+creation/expiry and STOPPED/NO_WRITER/lock state. Apply rechecks it immediately.
+Query/recover verifies canonical receipt JSON, SHA-256 and operation/request/
+source/backup/target/status/generation bindings. Any mismatch is `INTEGRITY_*`.
+FORMAL requires the complete table/column/index/FK/CHECK/profile manifest;
+pragma-only, partial or TEST_ONLY-shaped databases remain unknown.
+
 This is an offline Platform runbook. It prepares authority schema; it does not
 register historical tasks or create attempts, leases, fences, epochs, or P3
 authority. A first registration must subsequently be made through the reviewed
@@ -11,30 +39,14 @@ The only accepted source is the exact canonical legacy schema fingerprint
 alone is never sufficient. Unknown, partial, TEST_ONLY, corrupt, wrong-file,
 wrong-backup, unfrozen, symlink, and concurrently locked inputs fail closed.
 
-Use a new operation id and the production values supplied by the migration
-change ticket:
-
-```sh
-python3 scripts/legacy_authority_migration.py inspect --db "$LEDGER_COPY"
-python3 scripts/legacy_authority_migration.py apply \
-  --db "$LEDGER_COPY" --backup "$VERIFIED_BACKUP" \
-  --backup-sha256 8e88a3d23159b9076e2e9513ef0076e812f7d0a695e19621295fb7b8a6f4fa1e \
-  --expected-fingerprint 3e871a9911be87760cb7aa691113b570228f922a609b50ffbd2974e31b7ceb45 \
-  --freeze-marker /run/xuanjun-authority/canonical-ledger.WRITE_FROZEN \
-  --operation-id "$OPERATION_ID"
-python3 scripts/legacy_authority_migration.py query --db "$LEDGER_COPY" \
-  --operation-id "$OPERATION_ID"
-python3 scripts/legacy_authority_migration.py recover --db "$LEDGER_COPY" \
-  --operation-id "$OPERATION_ID"
-```
-
 `apply` first requires the ledger bytes to equal the verified, distinct backup,
 then obtains an exclusive SQLite lock and performs every ALTER, conservative
 backfill, table/index creation, profile write, version write, and receipt write
 in one transaction. On a process/commit-window ambiguity, run `recover`: a
-`COMMITTED` receipt is authoritative; `NOT_COMMITTED` means the transaction
-rolled back and the same operation may be retried; `UNKNOWN` is a hold for
-manual reconciliation. Repeating a committed operation returns the same stored
+cryptographically and structurally valid `COMMITTED` receipt is authoritative;
+`NOT_COMMITTED` means the transaction rolled back. A missing or mismatched
+receipt is an explicit `INTEGRITY_*` rejection, never authoritative success or
+generic UNKNOWN. Repeating a committed operation with a fresh freeze returns the same stored
 receipt and performs no DDL.
 
 Historical rows map `task_id=id` and remain `authority_state=NONE`, with no

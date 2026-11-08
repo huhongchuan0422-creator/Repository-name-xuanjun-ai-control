@@ -1,11 +1,94 @@
-test_concurrent_writer_lock_fails_closed (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
-test_every_step_failure_rolls_back_and_retry_recovers (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
-test_observed_backup_schema_pin (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... skipped 'production backup unavailable'
-test_restart_recovery_unknown_reconciliation_and_constraints (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
-test_success_preserves_legacy_and_is_idempotent (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
-test_wrong_sha_unknown_partial_and_missing_freeze_rejected (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+test_concurrent_writer_rejected (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpz9_mfbzv/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_every_step_failure_rolls_back (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpems0kn9x/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_freeze_empty_stale_wrong_operation_tamper_and_state_change (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpon6sa7ie/key'>
+  open(self.key,'wb').write(b'k'*32)
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:37: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpon6sa7ie/freeze.json' mode='r' encoding='UTF-8'>
+  self.make_freeze(); data=json.load(open(self.freeze)); data['payload']['writer_state']='WRITER'; open(self.freeze,'w').write(json.dumps(data))
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:37: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpon6sa7ie/freeze.json' mode='w' encoding='UTF-8'>
+  self.make_freeze(); data=json.load(open(self.freeze)); data['payload']['writer_state']='WRITER'; open(self.freeze,'w').write(json.dumps(data))
+ok
+test_probe_contains_no_rows (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmp6uupj25l/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_receipt_attacks_fail_integrity (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpvcn69_5v/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_receipt_noncanonical_and_cross_binding_rejected (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmp6t5i11v2/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_schema_spoof_and_partial_are_unknown (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpklhrcq6t/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_success_is_conservative_idempotent_and_fk_indexed (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_legacy_authority_migration.py:8: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpnfoc0svn/key'>
+  open(self.key,'wb').write(b'k'*32)
+ok
+test_authenticated_first_registration_bundle (tests.test_development_authority_operational.OperationalTests) ... ok
+test_http_200_authorized_false_and_reader_exit_69 (tests.test_development_authority_operational.OperationalTests) ... ok
+test_reader_69_is_never_success_for_bad_anchor_or_future_time (tests.test_development_authority_operational.OperationalTests) ... ok
+test_runtime_preflight_is_verifiable_and_manifest_hash_is_fixed (tests.test_development_authority_operational.OperationalTests) ... ok
+test_arbitrary_verifier_injection_is_rejected (tests.test_authority_security_regressions.SecurityRegressions) ... ok
+test_formal_open_rejects_test_only_ledger_despite_environment (tests.test_authority_security_regressions.SecurityRegressions) ... ok
+test_inspect_apply_query_recover_rotates_backup_and_receipts (tests.test_authority_security_regressions.SecurityRegressions) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:74: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmp4l457gt2/one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:74: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmp4l457gt2/two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp4l457gt2/lifecycle/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:103: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp4l457gt2/lifecycle/receipts/recover-f08558e2b892547da7e68d80b025700d9a9ff619f2e69810a50b7537f52ed616.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+ok
+test_purposes_are_isolated_but_authorization_never_repeats (tests.test_authority_security_regressions.SecurityRegressions) ... ok
+test_recover_expected_state_cas_and_restart_idempotency (tests.test_authority_security_regressions.SecurityRegressions) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:89: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpsugfihq5/one'>
+  open(one,'wb').write(b'one'); lifecycle(root,'apply',one,{'verified':True})
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpsugfihq5/recover-cas/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+ok
+test_recover_fault_boundaries_restart_and_concurrent_retry_return_one_receipt (tests.test_authority_security_regressions.SecurityRegressions) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_prepared-one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_prepared-two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_prepared/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:103: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_prepared/receipts/recover-bcf41eaf3753522cb8fa61afeb8d4f71a7b4a141ff48dbc6b2a5135aa97ac9ca.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_state-one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_state-two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_state/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:103: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_state/receipts/recover-bcf41eaf3753522cb8fa61afeb8d4f71a7b4a141ff48dbc6b2a5135aa97ac9ca.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_receipt-one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_receipt-two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_receipt/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:103: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_receipt/receipts/recover-bcf41eaf3753522cb8fa61afeb8d4f71a7b4a141ff48dbc6b2a5135aa97ac9ca.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_completed-one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:114: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfdhq3j68/recover_after_completed-two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:77: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_completed/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:103: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfdhq3j68/recover_after_completed/receipts/recover-bcf41eaf3753522cb8fa61afeb8d4f71a7b4a141ff48dbc6b2a5135aa97ac9ca.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+ok
+test_release_every_manifest_field_and_signature_tamper_rejects (tests.test_authority_security_regressions.SecurityRegressions) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:59: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmph7af93lw/artifact.tar'>
+  artifact=os.path.join(self.tmp.name,'artifact.tar'); open(artifact,'wb').write(b'bytes')
+ok
+test_shared_multiprocess_ledger_has_one_global_authorization (tests.test_authority_security_regressions.SecurityRegressions) ... {"authorized": false, "error": "AUTHORITY_NOT_AUTHORIZED"}
+{"authorized": false, "error": "AUTHORITY_TRUST_ANCHOR_MISMATCH"}
+ok
+test_signed_formal_provider_cannot_empty_omit_or_replace_forbidden_policy (tests.test_authority_security_regressions.SecurityRegressions) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.299s
+Ran 21 tests in 0.540s
 
-OK (skipped=1)
+OK
