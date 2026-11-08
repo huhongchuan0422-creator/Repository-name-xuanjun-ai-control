@@ -322,6 +322,27 @@ class InstallerTests(BootstrapTests):
   r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],'UNKNOWN')
   self.assertEqual(os.lstat(os.path.join(self.root,'current')).st_ino,before)
+ def test_cli_three_install_crash_windows(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  install=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
+  for hook,code,expected_current,expected_state in [('install_crash_before_rename',95,'base','FAILED'),('install_crash_after_rename',94,'release-nonce','UNKNOWN'),('install_crash_before_receipt',96,'release-nonce','UNKNOWN')]:
+   with self.subTest(hook=hook):
+    r=subprocess.run(install+['--test-only-crash-hook',hook],pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,code,r.stderr)
+    with sqlite3.connect(self.ledger) as db:row=db.execute('select switch_intent,operation_id,attempt,prestate_dev,prestate_ino,prestate_digest,tree_digest from operations').fetchone()
+    intent=json.loads(row[0]);self.assertEqual(intent['operation_id'],row[1]);self.assertEqual(intent['fence'],row[2]);self.assertEqual((intent['from_dev'],intent['from_ino']),(row[3],row[4]));self.assertEqual((intent['from_tree'],intent['to_tree']),(row[5],row[6]))
+    st=os.stat(os.path.join(self.root,'release-nonce'));self.assertEqual((intent['to_dev'],intent['to_ino']),(st.st_dev,st.st_ino));self.assertEqual(os.readlink(os.path.join(self.root,'current')),expected_current)
+    before=os.lstat(os.path.join(self.root,'current')).st_ino;r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertEqual(r.returncode,0 if expected_state=='FAILED' else 1,r.stderr);self.assertEqual(os.lstat(os.path.join(self.root,'current')).st_ino,before)
+    with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],expected_state);db.execute('delete from operations')
+    if expected_current!='base':os.unlink(os.path.join(self.root,'current'));os.symlink('base',os.path.join(self.root,'current'))
+    import shutil
+    shutil.rmtree(os.path.join(self.root,'release-nonce'))
+    try:os.unlink(os.path.join(self.root,'.current-nonce'))
+    except FileNotFoundError:pass
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
