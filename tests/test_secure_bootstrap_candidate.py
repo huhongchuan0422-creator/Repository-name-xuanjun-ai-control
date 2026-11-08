@@ -24,7 +24,7 @@ class BootstrapTests(unittest.TestCase):
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
   self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
-  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text,prestate_dev integer,prestate_ino integer,switch_intent text)');db.execute('create table rollbacks(operation_id text primary key,request_digest text,install_op text,attempt text,from_target text,to_target text,from_digest text,to_digest text,state text,receipt_json text,receipt_path text,key_id text)');db.close();os.chmod(self.ledger,0o600)
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text,prestate_dev integer,prestate_ino integer,switch_intent text,binding_digest text,carrier_archive_digest text,carrier_manifest_digest text,tool_scope_digest text,source_manifest_digest text,staged_tree_digest text,receipt_key_id text)');db.execute('create table rollbacks(operation_id text primary key,request_digest text,install_op text,attempt text,from_target text,to_target text,from_digest text,to_digest text,state text,receipt_json text,receipt_path text,key_id text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
@@ -108,6 +108,17 @@ class InstallerTests(BootstrapTests):
   result=controller.run(af,mf,rf,tf,self.ledger,lf,{'task':'task','attempt':'attempt'},self.root,owner=os.getuid(),signing_key_fd=kf,key_id='fixture-key',bound_artifacts=bound)
   self.assertEqual(result,'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),result)
   with open(os.path.join(self.root,result,'TOOL_SCOPE.json'),'rb') as f:self.assertEqual(f.read(),scope)
+  with sqlite3.connect(self.ledger) as db:
+   row=db.execute('select binding_digest,carrier_archive_digest,carrier_manifest_digest,tool_scope_digest,source_manifest_digest,staged_tree_digest,receipt_key_id from operations').fetchone()
+   self.assertEqual(row[:5],(bound.binding_digest,bound.archive_digest,bound.manifest_digest,bound.scope_digest,bound.manifest_digest));self.assertEqual(row[6],'fixture-key')
+   db.execute("update operations set state='UNKNOWN'")
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust)),0)
+  for column in ('binding_digest','carrier_archive_digest','carrier_manifest_digest','tool_scope_digest','source_manifest_digest','staged_tree_digest','receipt_key_id'):
+   with sqlite3.connect(self.ledger) as db:
+    old=db.execute('select '+column+' from operations').fetchone()[0];db.execute("update operations set state='UNKNOWN',"+column+"=?",('0'*64,))
+   self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust)),1,column)
+   with sqlite3.connect(self.ledger) as db:db.execute('update operations set '+column+'=?',(old,))
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust)),0)
  def test_install_and_reinstall(self):
   self.assertEqual(self.run_install(),'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce');self.assertEqual(self.state(),'SUCCEEDED')
   with self.assertRaises(Exception):self.run_install()

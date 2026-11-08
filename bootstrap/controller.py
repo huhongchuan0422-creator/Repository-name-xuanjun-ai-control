@@ -194,6 +194,10 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                     before=row['state'];outcome='UNKNOWN';reason='EVIDENCE_MISSING'
                     try:
                         check(required.issubset(columns),'EVIDENCE_SCHEMA')
+                        trust=verifylib.parse(trust_raw) if trust_raw is not None else {}
+                        bound_columns={'binding_digest','carrier_archive_digest','carrier_manifest_digest','tool_scope_digest','source_manifest_digest','staged_tree_digest','receipt_key_id'}
+                        is_bound=bound_columns.issubset(columns) and all(row[k] is not None for k in bound_columns)
+                        check(is_bound or trust.get('environment')=='TEST_ONLY','UNKNOWN_NEEDS_MANUAL_RECONCILE')
                         pre=_name(row['prestate_target']);stage=_name(row['staging_target']);target=_name(row['intended_target'])
                         prehash=row['prestate_hash'];mh=row['manifest_hash'];rh=row['receipt_hash']
                         check(all(isinstance(v,str) and re.fullmatch('[0-9a-f]{64}',v) for v in (prehash,mh)),'EVIDENCE_DIGEST')
@@ -213,7 +217,11 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                             targetfd=open_dir(rootfd,target)
                             try:
                                 staged_manifest=verifylib.parse(_file_bytes(targetfd,'.bootstrap-manifest.json',owner))
-                                check(staged_manifest.get('source_manifest_sha256')==mh or (verifylib.parse(trust_raw).get('environment')=='TEST_ONLY' and _target_manifest(rootfd,target,owner)==mh),'TARGET_MISMATCH')
+                                check(staged_manifest.get('source_manifest_sha256')==mh or (not is_bound and trust.get('environment')=='TEST_ONLY' and _target_manifest(rootfd,target,owner)==mh),'TARGET_MISMATCH')
+                                if is_bound:
+                                    check(row['carrier_archive_digest']==row['carrier_digest'] and row['carrier_manifest_digest']==row['source_manifest_digest']==row['manifest_digest']==mh and row['receipt_key_id']==row['key_id'] and row['staged_tree_digest']==row['tree_digest'],'LEDGER_ARTIFACT_BINDING')
+                                    check(staged_manifest.get('source_manifest_sha256')==row['source_manifest_digest'] and staged_manifest.get('scope_sha256')==row['tool_scope_digest'],'STAGED_MANIFEST_BINDING')
+                                    check(verifylib.sha(_file_bytes(targetfd,'TOOL_SCOPE.json',owner,1024*1024))==row['tool_scope_digest'],'STAGED_SCOPE_MISMATCH')
                             finally:os.close(targetfd)
                             check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
                             raw=_file_bytes(receipt_dir_fd if receipt_dir_fd is not None else rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
@@ -221,7 +229,10 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                             check(trust_raw is not None,'RECEIPT_TRUST_REQUIRED')
                             obj=verifylib.parse(raw);payload=obj['payload'];trust=verifylib.parse(trust_raw)
                             check(set(obj)=={'payload','signature','key_id'} and obj['key_id']==trust.get('key_id'),'RECEIPT_KEY_ID')
-                            check(set(payload)=={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at','switch_intent_digest'},'RECEIPT_FIELDS')
+                            receipt_fields={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at','switch_intent_digest'}
+                            if is_bound:receipt_fields|={'binding_digest','tool_scope_digest','source_manifest_digest'}
+                            check(set(payload)==receipt_fields,'RECEIPT_FIELDS')
+                            if is_bound:check(payload['binding_digest']==row['binding_digest'] and payload['tool_scope_digest']==row['tool_scope_digest'] and payload['source_manifest_digest']==row['source_manifest_digest'],'RECEIPT_ARTIFACT_BINDING')
                             check(isinstance(payload['carrier_digest'],str) and re.fullmatch('[0-9a-f]{64}',payload['carrier_digest']) and type(payload['issued_at']) is int,'RECEIPT_FIELDS')
                             check(payload['operation_id']==row['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['carrier_digest']==row['carrier_digest'] and payload['switch_intent_digest']==verifylib.sha(row['switch_intent'].encode()) and payload['manifest_digest']==row['manifest_digest']==mh and payload['tree_digest']==row['tree_digest'] and payload['prestate_digest']==row['prestate_digest'] and obj['key_id']==row['key_id'] and row['receipt_path']=='receipt-'+row['nonce']+'.json' and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
                             check(payload['tree_digest']==verified_tree(rootfd,target,owner) and payload['prestate_digest']==verified_tree(rootfd,pre,owner),'RECEIPT_TREE')
@@ -276,10 +287,16 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         try:prestat=os.fstat(pre_fd)
         finally:os.close(pre_fd)
         evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner),'prestate_digest':prestate_tree,'prestate_dev':prestat.st_dev,'prestate_ino':prestat.st_ino,'key_id':key_id}
+        if bound_artifacts is not None:
+            signed=verifylib.parse(bound_artifacts.manifest_raw)
+            entries={r['path']:({'type':'directory'} if r['type']=='directory' else {'type':'file','size':r['size'],'sha256':r['sha256']}) for r in signed['members']}
+            normalized=verifylib.canonical({'members':entries,'source_manifest_sha256':bound_artifacts.manifest_digest,'scope_sha256':bound_artifacts.scope_digest})
+            evidence['bound']=bound_artifacts;evidence['staged_tree_digest']=verifylib.sha(verifylib.canonical({'manifest_sha256':verifylib.sha(normalized),'members':entries}))
     finally:os.close(currentfd)
     from path_guard import GuardedLedger
     with GuardedLedger(ledger_path,owner) as schema:
         columns={r[1] for r in schema.db.execute('PRAGMA table_info(operations)')}
+        if bound_artifacts is not None:check({'binding_digest','carrier_archive_digest','carrier_manifest_digest','tool_scope_digest','source_manifest_digest','staged_tree_digest','receipt_key_id'}.issubset(columns),'LEDGER_BINDING_SCHEMA_REQUIRED')
         check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','prestate_dev','prestate_ino','switch_intent'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
     blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence,bound=bound_artifacts)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
@@ -311,6 +328,7 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
             os.fsync(stage)
         finally:os.close(stage)
         stage_tree=verified_tree(rootfd,name,owner)
+        if bound_artifacts is not None:check(stage_tree==evidence['staged_tree_digest'],'LEDGER_STAGED_TREE_MISMATCH')
         if bound_artifacts is not None:
             signed_manifest=verifylib.parse(bound_artifacts.manifest_raw)
             members={r['path']:({'type':'directory'} if r['type']=='directory' else {'type':'file','size':r['size'],'sha256':r['sha256']}) for r in signed_manifest['members']}
@@ -354,6 +372,7 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         if failpoint=='after_switch':raise ControllerError('INJECTED')
         check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
         payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time()),'switch_intent_digest':verifylib.sha(intent.encode())}
+        if bound_artifacts is not None:payload.update({'binding_digest':bound_artifacts.binding_digest,'tool_scope_digest':bound_artifacts.scope_digest,'source_manifest_digest':bound_artifacts.manifest_digest})
         receipt=verifylib.canonical({'payload':payload,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode(),'key_id':key_id})
         temp='.receipt-'+nonce+'.tmp';final='receipt-'+nonce+'.json'
         receiptfd=receipt_dir_fd if receipt_dir_fd is not None else rootfd
