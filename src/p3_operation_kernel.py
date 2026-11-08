@@ -153,3 +153,50 @@ class OperationKernel:
             return self._row(operation_id)
         self._transition(operation_id, row['state'], evidence['outcome'], evidence, evidence['correlation'])
         return self._row(operation_id)
+
+class RunnerOperationStore:
+    """Durable reservation against an existing DB with MIGRATION applied.
+
+    This legacy-field bridge is not a replacement for authenticated V2
+    admission, adapter identity verification, or canonical authority fencing.
+    The caller must supply a connection to the same durable DB after restart.
+    """
+    def __init__(self, connect):
+        if not callable(connect):
+            raise TypeError('CONNECTION_FACTORY_REQUIRED')
+        self.connect = connect
+
+    def get(self, operation_id):
+        db = self.connect()
+        try:
+            return OperationKernel._read(self, db, operation_id)
+        finally:
+            db.close()
+
+    def reserve(self, operation_id, subject, admission, operation):
+        body = _json({'subject': subject, 'admission': admission, 'operation': operation})
+        identity = _json(subject)
+        digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            row = OperationKernel._read(self, db, operation_id)
+            if row:
+                if row['request_digest'] != digest or row['identity_json'] != identity or row['request_json'] != body:
+                    raise ValueError('OPERATION_ID_CONFLICT')
+                db.commit()
+                return False, row
+            try:
+                db.execute('INSERT INTO p3_effect_operations(operation_id,request_digest,identity_json,request_json,state) VALUES(?,?,?,?,?)', (operation_id, digest, identity, body, 'RESERVED'))
+            except sqlite3.IntegrityError:
+                raise ValueError('REQUEST_DIGEST_CONFLICT')
+            db.commit()
+            return True, self.get(operation_id)
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def transition(self, operation_id, source, target, receipt=None, correlation=None):
+        return OperationKernel._transition(self, operation_id, source, target, receipt, correlation)

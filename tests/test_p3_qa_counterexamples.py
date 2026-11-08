@@ -1,6 +1,10 @@
 from __future__ import absolute_import
 
 import unittest
+import sqlite3
+import tempfile
+import os
+from src.p3_operation_kernel import MIGRATION, RunnerOperationStore
 
 from src.p3_host_boundaries import (AdmissionGate, EvidenceReaders,
     OutboxController, OutboxTransport, ReceiptVerifier, RunnerAdapter,
@@ -142,6 +146,15 @@ class Supervisor(object):
 
 class QACounterexamples(unittest.TestCase):
     def setUp(self):
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        self.addCleanup(lambda: os.unlink(path))
+        def connect(): return sqlite3.connect(path, timeout=10)
+        db = connect()
+        db.execute(MIGRATION)
+        db.commit()
+        db.close()
+        self.store = RunnerOperationStore(connect)
         self.provider = Provider()
         self.verifier = ReceiptVerifier(self.provider)
         self.gate = AdmissionGate(lambda: admission(), lambda: NOW,
@@ -150,7 +163,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_started_payload_fence_must_match_receipt_subject(self):
         runner = TamperedAckRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store)
         self.provider.add("started", "STARTED", {
             "native_state": "RUNNING", "lease_owner": "writer-1",
             "lease_until": 1050.0, "fence": 99, "checkpoint": {"step": 1},
@@ -226,7 +239,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_unverifiable_post_launch_ack_is_explicit_hold(self):
         runner = TamperedAckRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store)
         result = controller.launch(SUBJECT, admission())
         self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])
@@ -256,7 +269,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_unverifiable_post_stop_receipt_is_explicit_hold(self):
         runner = UnverifiableStopRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store)
         result = controller.stop(SUBJECT, "progress deadline")
         self.assertEqual("UNKNOWN_STOP_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])

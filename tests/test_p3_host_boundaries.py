@@ -1,6 +1,11 @@
 from __future__ import absolute_import
 
 import unittest
+import sqlite3
+import threading
+import tempfile
+import os
+from src.p3_operation_kernel import MIGRATION, RunnerOperationStore
 
 from src.p3_host_boundaries import (AdmissionGate, EvidenceReaders, OutboxController,
     OutboxTransport, ReceiptVerifier, RunnerAdapter, RunnerController,
@@ -117,6 +122,15 @@ class Supervisor(object):
 
 class BoundaryTests(unittest.TestCase):
     def setUp(self):
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        self.addCleanup(lambda: os.unlink(path))
+        def connect(): return sqlite3.connect(path, timeout=10)
+        db = connect()
+        db.execute(MIGRATION)
+        db.commit()
+        db.close()
+        self.store = RunnerOperationStore(connect)
         self.provider = Provider()
         self.verifier = ReceiptVerifier(self.provider)
         self.runner = Runner(self.provider)
@@ -128,7 +142,7 @@ class BoundaryTests(unittest.TestCase):
                              notifications_enabled=notifications)
 
     def controller(self, enabled=True):
-        return RunnerController(self.gate(enabled), self.verifier, self.runner)
+        return RunnerController(self.gate(enabled), self.verifier, self.runner, self.store)
 
     def test_default_off_never_invokes_runner(self):
         with self.assertRaises(PermissionError):
@@ -138,7 +152,7 @@ class BoundaryTests(unittest.TestCase):
     def test_missing_p2_admission_fails_before_runner(self):
         gate = self.gate(proof=admission(p2_accepted=False))
         with self.assertRaises(PermissionError):
-            RunnerController(gate, self.verifier, self.runner).launch(SUBJECT, {})
+            RunnerController(gate, self.verifier, self.runner, self.store).launch(SUBJECT, {})
         self.assertEqual([], self.runner.calls)
 
     def test_runner_ack_is_not_started(self):
@@ -184,6 +198,56 @@ class BoundaryTests(unittest.TestCase):
         for value in (missing, extra):
             with self.assertRaises(ValueError):
                 self.controller().launch(SUBJECT, value)
+        self.assertEqual([], self.runner.calls)
+
+    def test_serial_and_restarted_launch_use_one_adapter_call(self):
+        first = self.controller().launch(SUBJECT, admission())
+        second = self.controller().launch(SUBJECT, admission())
+        restarted = RunnerController(self.gate(), self.verifier, self.runner,
+                                     RunnerOperationStore(self.store.connect))
+        third = restarted.launch(SUBJECT, admission())
+        self.assertEqual(first, second)
+        self.assertEqual(first, third)
+        self.assertEqual(["launch"], self.runner.calls)
+
+    def test_concurrent_launch_calls_adapter_once(self):
+        barrier = threading.Barrier(12)
+        errors = []
+        def run():
+            try:
+                barrier.wait()
+                self.controller().launch(SUBJECT, admission())
+            except Exception as error:
+                errors.append(error)
+        threads = [threading.Thread(target=run) for _ in range(12)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual([], errors)
+        self.assertEqual(["launch"], self.runner.calls)
+
+    def test_lost_reply_reconciles_without_second_launch(self):
+        runner = self.runner
+        def lost(value):
+            runner._ack("launch")
+            raise RuntimeError("ack reply lost")
+        reconciliations = []
+        def reconcile(operation_id, digest, subject):
+            reconciliations.append((operation_id, digest, subject))
+            return "ack-launch"
+        runner.launch = lost
+        runner.reconcile = reconcile
+        first = self.controller().launch(SUBJECT, admission())
+        second = self.controller().launch(SUBJECT, admission())
+        self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", first["state"])
+        self.assertEqual("ACKNOWLEDGED_AWAITING_STARTED", second["state"])
+        self.assertEqual(["launch"], runner.calls)
+        self.assertEqual(1, len(reconciliations))
+
+    def test_missing_store_fails_before_launch(self):
+        with self.assertRaises(PermissionError):
+            RunnerController(self.gate(), self.verifier, self.runner).launch(SUBJECT, admission())
         self.assertEqual([], self.runner.calls)
 
     def test_started_receipt_is_forwarded_to_original_supervisor(self):

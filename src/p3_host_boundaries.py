@@ -12,6 +12,11 @@ import json
 import math
 import re
 
+try:
+    from p3_operation_kernel import RunnerOperationStore
+except ImportError:
+    from .p3_operation_kernel import RunnerOperationStore
+
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -333,7 +338,7 @@ class RunnerController(object):
     """No automatic retry: unknown launch/resume/stop effects become HOLD."""
     ACK_PAYLOAD_KEYS = {"operation", "accepted", "started", "native_id"}
 
-    def __init__(self, gate, verifier, adapter):
+    def __init__(self, gate, verifier, adapter, operation_store=None):
         if not isinstance(gate, AdmissionGate):
             raise TypeError("ADMISSION_GATE_REQUIRED")
         if not isinstance(verifier, ReceiptVerifier):
@@ -341,6 +346,7 @@ class RunnerController(object):
         if not isinstance(adapter, RunnerAdapter):
             raise TypeError("RUNNER_ADAPTER_REQUIRED")
         self.gate, self.verifier, self.adapter = gate, verifier, adapter
+        self.operation_store = operation_store
 
     def _invoke(self, operation, subject, admission):
         proof = self.gate.check(subject)
@@ -351,27 +357,60 @@ class RunnerController(object):
         if any(type(admission[k]) is not type(proof[k]) or admission[k] != proof[k]
                for k in AdmissionGate.KEYS):
             raise PermissionError("RUNNER_ADMISSION_MISMATCH")
-        try:
-            evidence_ref = getattr(self.adapter, operation)(dict(admission))
-        except Exception:
+        # Stable per-lineage operation key; changed admission under the same
+        # lineage conflicts instead of silently issuing another effect.
+        store = self.operation_store
+        if not isinstance(store, RunnerOperationStore):
+            raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
+        operation_id = _digest({"operation": operation, "subject": subject})
+        created, row = store.reserve(operation_id, subject, admission, operation)
+        if row["state"] == "SUCCEEDED":
+            return json.loads(row["receipt_json"])["result"]
+        if not created and row["state"] not in ("RUNNING", "UNKNOWN"):
             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                     "automatic_retry": False, "started": False}
+        if created:
+            if not store.transition(operation_id, "RESERVED", "RUNNING"):
+                raise RuntimeError("RUNNER_RESERVATION_LOST")
+            try:
+                evidence_ref = getattr(self.adapter, operation)(dict(admission))
+            except Exception:
+                store.transition(operation_id, "RUNNING", "UNKNOWN")
+                return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                        "automatic_retry": False, "started": False}
+        else:
+            reconcile = getattr(self.adapter, "reconcile", None)
+            if not callable(reconcile):
+                return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                        "automatic_retry": False, "started": False}
+            try:
+                evidence_ref = reconcile(operation_id, row["request_digest"], dict(subject))
+            except Exception:
+                return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                        "automatic_retry": False, "started": False}
         try:
             receipt = self.verifier.read(evidence_ref, "RUNNER_ACK", subject)
             payload = _exact(receipt["payload"], self.ACK_PAYLOAD_KEYS,
                              "EXACT_RUNNER_ACK_REQUIRED")
-            if (payload["operation"] != operation
-                    or payload["accepted"] is not True
-                    or payload["started"] is not False
-                    or not _text(payload["native_id"])):
+            if (payload["operation"] != operation or payload["accepted"] is not True
+                    or payload["started"] is not False or not _text(payload["native_id"])):
                 raise ValueError("ACK_IS_NOT_STARTED")
         except Exception:
+            store.transition(operation_id, "RUNNING", "UNKNOWN")
             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                     "automatic_retry": False, "started": False}
-        return {"state": "ACKNOWLEDGED_AWAITING_STARTED",
-                "operation": operation, "started": False,
-                "receipt_sha256": receipt["receipt_sha256"],
-                "automatic_retry": False}
+        result = {"state": "ACKNOWLEDGED_AWAITING_STARTED", "operation": operation,
+                  "started": False, "receipt_sha256": receipt["receipt_sha256"],
+                  "automatic_retry": False}
+        # Reconciliation may race with the first caller. Only an authenticated
+        # receipt may settle either live state; no transition redials the runner.
+        store.transition(operation_id, "RUNNING", "SUCCEEDED", {"result": result, "receipt": receipt}, evidence_ref)
+        store.transition(operation_id, "UNKNOWN", "SUCCEEDED", {"result": result, "receipt": receipt}, evidence_ref)
+        saved = store.get(operation_id)
+        if saved and saved["state"] == "SUCCEEDED":
+            return json.loads(saved["receipt_json"])["result"]
+        return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
+                "automatic_retry": False, "started": False}
 
     def launch(self, subject, admission):
         return self._invoke("launch", subject, admission)
