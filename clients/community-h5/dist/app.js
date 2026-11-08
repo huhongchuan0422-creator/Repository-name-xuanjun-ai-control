@@ -2268,7 +2268,9 @@ module.exports=function create({prefix='/h5',csrf='',fetch:request=globalThis.fe
     if(['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(code))e.ocrCode=code;
    }
    if(response.status===400&&path==='/merchant'&&body.operation==='onboarding'&&['submit','wechat_submit_review'].includes(body.params?.operation)&&code==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(data.reason))e.regionReason=data.reason;
-   const preserve=response.status===403&&path==='/merchant'&&((body.operation==='ocr'&&['OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(code))||(body.operation==='onboarding'&&body.params?.operation==='wechat_media'&&code==='WECHAT_MEDIA_UNAVAILABLE'));
+   const orderUnavailable=response.status===403&&path==='/api'&&['commerce.purchase_read','commerce.purchase_recover'].includes(body.operation)&&code==='ORDER_UNAVAILABLE';
+   if(orderUnavailable)e.message='当前账号无法读取或恢复该订单；结果尚未确认，请保留原订单编号';
+   const preserve=orderUnavailable||response.status===403&&path==='/merchant'&&((body.operation==='ocr'&&['OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(code))||(body.operation==='onboarding'&&body.params?.operation==='wechat_media'&&code==='WECHAT_MEDIA_UNAVAILABLE'));
    if(preserve){e.sessionPreserved=true;if(code==='WECHAT_MEDIA_UNAVAILABLE')e.mediaCode=code}
    if(path==='/merchant'&&body.operation==='onboarding'&&body.params?.operation==='upload'&&[408,502,503,504].includes(response.status))e.uploadResultUnknown=true;
    if(response.status===401||response.status===403&&!preserve)clear();

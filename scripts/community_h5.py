@@ -10,6 +10,9 @@ from scripts.community_mini_merchant import MiniMerchant
 from scripts.community_license_region import RegionValidationError
 from scripts.pr122_customer_core import Denied
 
+class OrderUnavailable(PermissionError):
+    '''Original owned-order denial, not session revocation; no existence disclosure.'''
+
 def credentials(center, headers):
     token = cookie_token(headers)
     values = headers.get_all('X-CSRF-Token', [])
@@ -40,7 +43,16 @@ class H5:
             if path=='/h5/api':
                 if type(body) is not dict or set(body)!={'scene','operation','params'}:raise ValueError('EXACT_H5_BODY_REQUIRED')
                 # Reuse consumer dispatcher and live original ownership checks.
-                return self.gateway.dispatch(session,body),None
+                try:
+                    return self.gateway.dispatch(session,body),None
+                except PermissionError as error:
+                    # Original dispatcher has already checked identity, scene and
+                    # ownership. Keep missing and other-owner orders identical.
+                    expected = {'commerce.purchase_recover':'OWNED_BASKET_RESERVATION_REQUIRED',
+                                'commerce.purchase_read':'CUSTOMER_ORDER_DENIED'}
+                    if type(error) is PermissionError and expected.get(body['operation']) == str(error):
+                        raise OrderUnavailable('ORDER_UNAVAILABLE') from None
+                    raise
             if path=='/h5/merchant':
                 if type(body) is not dict or set(body)!={'scene','operation','params'}:raise ValueError('EXACT_H5_BODY_REQUIRED')
                 return self.merchant.dispatch(session,body['scene'],{k:body[k] for k in ('operation','params')}),None
@@ -107,6 +119,7 @@ def make_handler(h5, dist):
                 if type(error) is Denied and str(error)=='RATE_LIMIT':return self.answer(429,{'error':'RATE_LIMIT'})
                 from scripts.community_ocr_host import OcrPublicError
                 from scripts.community_wechat_applyment import WechatMediaUnavailable
+                if type(error) is OrderUnavailable:return self.answer(403,{'error':'ORDER_UNAVAILABLE'})
                 self.answer(403,error.public_payload() if type(error) is OcrPublicError else {'error':'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except RegionValidationError as error:self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})
             except (ValueError,TypeError,KeyError):self.answer(400,{'error':'INVALID_REQUEST'})
