@@ -1,7 +1,7 @@
 import base64, hashlib, importlib.util, io, json, os, sqlite3, sys, tarfile, tempfile, time, unittest
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),"..","bootstrap"))
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 spec=importlib.util.spec_from_file_location('bootstrap_candidate',os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py'))
 b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 
@@ -10,7 +10,7 @@ class BootstrapTests(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory(dir=os.getcwd());self.dir=self.tmp.name;self.fds=[]
   self.sqlite_version=sqlite3.sqlite_version_info;sqlite3.sqlite_version_info=(3,53,1)
   self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
-  self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode()}
+  self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode(),'key_id':'fixture-key'}
   z=io.BytesIO()
   with tarfile.open(fileobj=z,mode='w') as t:
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
@@ -66,7 +66,7 @@ class InstallerTests(BootstrapTests):
  def setUp(self):
   super().setUp();self.root=os.path.join(self.dir,'root');os.mkdir(self.root,0o700)
   os.mkdir(os.path.join(self.root,'base'),0o700)
-  with open(os.path.join(self.root,'base','.bootstrap-manifest.json'),'wb') as f:f.write(b'base')
+  with open(os.path.join(self.root,'base','.bootstrap-manifest.json'),'wb') as f:f.write(b.canonical({'members':{}}))
   os.chmod(os.path.join(self.root,'base','.bootstrap-manifest.json'),0o600);os.symlink('base',os.path.join(self.root,'current'))
  def run_install(self,failpoint=None):
   import sys
@@ -75,12 +75,44 @@ class InstallerTests(BootstrapTests):
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
   args=[self.fd('carrier',self.carrier),self.fd('manifest',self.manifest),self.fd('receipt',b.canonical({'payload':p,'signature':sig})),self.fd('trust',b.canonical(self.trust)),self.ledger]
   lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
-  return controller.run(*(args+[lf,{'task':p['task'],'attempt':p['attempt']},self.root]),owner=os.getuid(),failpoint=failpoint)
+  keyfd=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  return controller.run(*(args+[lf,{'task':p['task'],'attempt':p['attempt']},self.root]),owner=os.getuid(),failpoint=failpoint,signing_key_fd=keyfd,key_id='fixture-key')
  def state(self):
   with sqlite3.connect(self.ledger) as db:return db.execute('select state from operations').fetchone()[0]
  def test_install_and_reinstall(self):
   self.assertEqual(self.run_install(),'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce');self.assertEqual(self.state(),'SUCCEEDED')
   with self.assertRaises(Exception):self.run_install()
+ def test_signed_receipt_and_reconcile(self):
+  import controller
+  self.run_install()
+  with open(os.path.join(self.root,'receipt-nonce.json'),'rb') as f:raw=f.read()
+  item=b.parse(raw);self.key.public_key().verify(base64.b64decode(item['signature']),b.canonical(item['payload']))
+  self.assertEqual(item['payload']['operation_id'],'install:nonce')
+  with sqlite3.connect(self.ledger) as db:db.execute("update operations set state='UNKNOWN' where nonce='nonce'")
+  lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust)),0)
+  self.assertEqual(self.state(),'SUCCEEDED')
+ def test_bad_signing_key_prevents_effects(self):
+  import controller
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  args=[self.fd('carrier',self.carrier),self.fd('manifest',self.manifest),self.fd('receipt',b.canonical({'payload':p,'signature':sig})),self.fd('trust',b.canonical(self.trust)),self.ledger]
+  lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  bad=self.fd('bad-key',Ed25519PrivateKey.generate().private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  with self.assertRaisesRegex(controller.ControllerError,'SIGNING_KEY_MISMATCH'):
+   controller.run(*(args+[lf,{'task':'task','attempt':'attempt'},self.root]),owner=os.getuid(),signing_key_fd=bad,key_id='fixture-key')
+  self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+ def test_receipt_write_failure_is_unknown(self):
+  open(os.path.join(self.root,'receipt-nonce.json'),'wb').close()
+  with self.assertRaises(Exception):self.run_install()
+  self.assertEqual(self.state(),'UNKNOWN')
+ def test_tree_tamper_prevents_recovery_success(self):
+  import controller
+  self.run_install()
+  with sqlite3.connect(self.ledger) as db:db.execute("update operations set state='UNKNOWN' where nonce='nonce'")
+  with open(os.path.join(self.root,'release-nonce','payload'),'wb') as f:f.write(b'evil')
+  lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  self.assertEqual(controller.reconcile_pending(self.ledger,os.getuid(),self.root,lf,trust_raw=b.canonical(self.trust)),1)
+  self.assertEqual(self.state(),'UNKNOWN')
  def test_failure_windows_unknown(self):
   import sys
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller

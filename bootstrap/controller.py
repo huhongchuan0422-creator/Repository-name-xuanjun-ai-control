@@ -2,7 +2,7 @@
 
 No carrier code is imported or executed. Production integration is not provided.
 """
-import fcntl, hashlib, io, json, os, re, sqlite3, stat, tarfile, tempfile
+import base64, fcntl, hashlib, io, json, os, re, sqlite3, stat, tarfile, tempfile, time
 import secure_bootstrap as verifylib
 
 class ControllerError(Exception): pass
@@ -152,7 +152,7 @@ def _remove_tree(parent,name,owner):
         if remove:os.rmdir(item,dir_fd=parent_fd);os.fsync(parent_fd)
     walk(parent,name,False);walk(parent,name,True)
 
-def _reconcile_pending_locked(path, owner, root, log_fd, audit=None):
+def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=None):
     """Reconcile under the caller-held controller lock; missing evidence holds."""
     from path_guard import GuardedLedger
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -180,9 +180,17 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None):
                             check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
                             raw=_file_bytes(rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
                             check(verifylib.sha(raw)==rh,'RECEIPT_MISMATCH')
-                            # Legacy local receipts carry no controller signature.
-                            # Never promote them to SUCCEEDED.
-                            raise ControllerError('SIGNED_OPERATION_RECEIPT_REQUIRED')
+                            check(trust_raw is not None,'RECEIPT_TRUST_REQUIRED')
+                            obj=verifylib.parse(raw);payload=obj['payload'];trust=verifylib.parse(trust_raw)
+                            check(set(obj)=={'payload','signature','key_id'} and obj['key_id']==trust.get('key_id'),'RECEIPT_KEY_ID')
+                            check(set(payload)=={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at'},'RECEIPT_FIELDS')
+                            check(isinstance(payload['carrier_digest'],str) and re.fullmatch('[0-9a-f]{64}',payload['carrier_digest']) and type(payload['issued_at']) is int,'RECEIPT_FIELDS')
+                            check(payload['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['manifest_digest']==mh and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
+                            check(payload['tree_digest']==verified_tree(rootfd,target,owner) and payload['prestate_digest']==verified_tree(rootfd,pre,owner),'RECEIPT_TREE')
+                            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+                            try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
+                            except Exception:raise ControllerError('RECEIPT_SIGNATURE')
+                            outcome='SUCCEEDED';reason='SIGNED_RECEIPT_AND_TREE_MATCH'
                         elif current==pre:
                             check(not target_exists,'UNSWITCHED_TARGET_CONFLICT')
                             if stage_exists:
@@ -202,15 +210,25 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None):
             return db.execute("SELECT COUNT(*) FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchone()[0]
     finally:os.close(rootfd)
 
-def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
+def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None):
     """Fixture implementation only; caller must exclusively control root and ledger."""
     rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and not rootst.st_mode&0o077,'ROOT_PERMISSIONS')
-    check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit)==0,'UNKNOWN_RECONCILIATION_REQUIRED')
+    check(signing_key_fd is not None and isinstance(key_id,str) and key_id,'SIGNING_KEY_REQUIRED')
+    trust_raw=verifylib.stable_read(trust_fd,owner,65536);trust=verifylib.parse(trust_raw)
+    check(trust.get('mode')=='ED25519' and trust.get('key_id')==key_id,'SIGNING_KEY_ID')
+    keyinfo=os.fstat(signing_key_fd);check(keyinfo.st_uid==owner and stat.S_IMODE(keyinfo.st_mode)==0o600,'SIGNING_KEY_PERMISSIONS')
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    private=Ed25519PrivateKey.from_private_bytes(verifylib.stable_read(signing_key_fd,owner,32))
+    public=private.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
+    check(base64.b64encode(public).decode()==trust.get('public_key'),'SIGNING_KEY_MISMATCH')
+    check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit,trust_raw)==0,'UNKNOWN_RECONCILIATION_REQUIRED')
     # Before effects, verify complete signed input and atomically reserve nonce.
     if audit is not None: audit.write(b'{"event":"STARTING"}\n')
     currentfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
         pre=_current(currentfd);check(pre is not None,'PRESTATE_REQUIRED')
+        prestate_tree=verified_tree(currentfd,pre,owner)
         evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner)}
     finally:os.close(currentfd)
     blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
@@ -234,6 +252,7 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
             finally:os.close(fd)
             os.fsync(stage)
         finally:os.close(stage)
+        stage_tree=verified_tree(rootfd,name,owner)
         if failpoint=='after_extract':raise ControllerError('INJECTED')
         target='release-'+nonce
         os.rename(name,target,src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
@@ -242,11 +261,15 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         os.symlink(target,link,dir_fd=rootfd)
         os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
         if failpoint=='after_switch':raise ControllerError('INJECTED')
-        receipt=verifylib.canonical({'nonce':nonce,'target':target,'manifest_sha256':p['manifest_sha256'],'outcome':'SUCCEEDED'})
-        fd=os.open('receipt-'+nonce+'.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
+        payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time())}
+        receipt=verifylib.canonical({'payload':payload,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode(),'key_id':key_id})
+        temp='.receipt-'+nonce+'.tmp';final='receipt-'+nonce+'.json'
+        fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
         try:check(os.write(fd,receipt)==len(receipt),'SHORT_RECEIPT_WRITE');os.fsync(fd)
         finally:os.close(fd)
-        os.fsync(rootfd)
+        os.link(temp,final,src_dir_fd=rootfd,dst_dir_fd=rootfd,follow_symlinks=False);os.unlink(temp,dir_fd=rootfd);os.fsync(rootfd)
+        check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
         from path_guard import GuardedLedger
         with GuardedLedger(ledger_path,owner) as g:
             g.db.execute('BEGIN IMMEDIATE')
@@ -278,7 +301,7 @@ def recover(path, owner):
             raise
 
 
-def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
+def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None):
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
         st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
@@ -286,12 +309,12 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
         try:
             st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
             fcntl.flock(lock,fcntl.LOCK_EX)
-            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit)
+            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit,signing_key_fd,key_id)
         finally:os.close(lock)
     finally:os.close(rootfd)
 
 
-def reconcile_pending(path, owner, root, log_fd, audit=None):
+def reconcile_pending(path, owner, root, log_fd, audit=None, trust_raw=None):
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
         st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
@@ -299,6 +322,6 @@ def reconcile_pending(path, owner, root, log_fd, audit=None):
         try:
             st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
             fcntl.flock(lock,fcntl.LOCK_EX)
-            return _reconcile_pending_locked(path,owner,root,log_fd,audit)
+            return _reconcile_pending_locked(path,owner,root,log_fd,audit,trust_raw)
         finally:os.close(lock)
     finally:os.close(rootfd)
