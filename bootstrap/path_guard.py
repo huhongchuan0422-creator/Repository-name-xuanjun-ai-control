@@ -78,7 +78,10 @@ class GuardedLedger:
 class GuardedAudit:
     def __init__(self,path,owner):
         self.guard=Guard(path,owner);self.file=None
-        try:self.file=self.guard.open_file(os.O_WRONLY|os.O_APPEND)
+        try:
+            st=os.fstat(self.guard.fd)
+            guard(st.st_uid==owner and not st.st_mode&0o077,'PRIVATE_AUDIT_DIRECTORY_REQUIRED')
+            self.file=self.guard.open_file(os.O_WRONLY|os.O_APPEND)
         except BaseException:self.guard.close();raise
     def write(self,data):
         guard(self.guard.matches(self.file),'AUDIT_REPLACED')

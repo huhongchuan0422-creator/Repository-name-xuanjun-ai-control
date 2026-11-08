@@ -18,3 +18,19 @@ an installation gate only; it does not enforce runtime MCP authorization. A
 20-process test checks that one reservation succeeds for an identical attempt.
 This is still not the full production path contract: ancestor directory and
 SQLite path races, recovery evidence and rollback are not yet resolved.
+
+## Deployment trust contract and SQLite preflight
+
+Ledger and audit must each be in a controller-only directory owned by the
+controller service uid and with no group/other access; all ancestors must be
+owned by root or controller and not writable by group/other. Carrier service
+identity must be distinct and unable to traverse these directories. Production
+platform admission must verify account exclusivity, directory uid/gid/mode,
+ACLs, mounts and service sandbox. Filesystem mode checks alone cannot establish
+absence of ACL grants or malicious processes sharing the controller uid. A
+process acting as the controller uid is in the trusted computing base; its
+compromise is outside this boundary. These deployment facts remain unverified.
+
+The carrier manifest requires `minimum_sqlite: [3,35,0]`. Bootstrap refuses
+older SQLite before reservation. Tests of other paths on SQLite 3.26 override
+only the reported version for fixture coverage, not compatibility evidence.

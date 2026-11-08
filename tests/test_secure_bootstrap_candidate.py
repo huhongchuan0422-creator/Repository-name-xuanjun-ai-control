@@ -8,18 +8,19 @@ b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 class BootstrapTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(dir=os.getcwd());self.dir=self.tmp.name;self.fds=[]
+  self.sqlite_version=sqlite3.sqlite_version_info;sqlite3.sqlite_version_info=(3,53,1)
   self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
   self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode()}
   z=io.BytesIO()
   with tarfile.open(fileobj=z,mode='w') as t:
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
-  self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{}})
+  self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
   self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
-  self.tmp.cleanup()
+  sqlite3.sqlite_version_info=self.sqlite_version;self.tmp.cleanup()
  def fd(self,name,data):
   p=os.path.join(self.dir,name);open(p,'wb').write(data);os.chmod(p,0o600);fd=os.open(p,os.O_RDONLY);self.fds.append(fd);return fd
  def verify(self, payload=None,signature=None,carrier=None,manifest=None,trust=None,scope=None):
@@ -91,15 +92,15 @@ class InstallerTests(BootstrapTests):
 
 class ScopeAndConcurrencyTests(BootstrapTests):
  def test_write_scope_denied_by_default(self):
-  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'},'minimum_sqlite':[3,35,0]})
   p=dict(self.payload,manifest_sha256=b.sha(manifest))
   with self.assertRaisesRegex(b.Hold,'TOOL_SCOPE_DENIED'):self.verify(payload=p,manifest=manifest)
  def test_write_scope_allowed_when_explicit(self):
-  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'},'minimum_sqlite':[3,35,0]})
   p=dict(self.payload,manifest_sha256=b.sha(manifest),tool_scope={'mode':'WRITE_ALLOWED','tools':{'task_submit':'project-a'}})
   self.verify(payload=p,manifest=manifest)
  def test_read_only_rejects_named_write(self):
-  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'}})
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'task_submit':'project-a'},'minimum_sqlite':[3,35,0]})
   p=dict(self.payload,manifest_sha256=b.sha(manifest),tool_scope={'mode':'READ_ONLY','tools':{'task_submit':'project-a'}})
   with self.assertRaisesRegex(b.Hold,'WRITE_TOOL_DENIED'):self.verify(payload=p,manifest=manifest)
  def test_relative_ledger_rejected(self):
@@ -116,3 +117,9 @@ class ScopeAndConcurrencyTests(BootstrapTests):
   start.set();out=[queue.get(timeout=15) for _ in jobs]
   for job in jobs:job.join(15);self.assertEqual(job.exitcode,0)
   self.assertEqual(out.count('ok'),1);self.assertEqual(out.count('reject'),19)
+
+class SqlitePreflightTests(BootstrapTests):
+ def test_unsupported_sqlite_rejected_before_reserve(self):
+  sqlite3.sqlite_version_info=(3,26,0)
+  with self.assertRaisesRegex(b.Hold,'SQLITE_VERSION_UNSUPPORTED'):self.verify()
+  with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select count(*) from operations').fetchone()[0],0)
