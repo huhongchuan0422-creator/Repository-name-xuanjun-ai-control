@@ -8,6 +8,10 @@ FIELDS={'schema','artifact','artifact_sha256','source_sha256','commit','tree',
         'created_at','deployment_authorized','signature'}
 SIG_FIELDS={'algorithm','anchor_id','canonical_sha256','value'}
 
+def _lifecycle_failpoint(name):
+    """No-op production seam overridden only by fault-injection tests."""
+    return None
+
 def sha256(path):
     h=hashlib.sha256()
     with open(path,'rb') as stream:
@@ -102,11 +106,21 @@ def _lifecycle_locked(root,command,artifact=None,verified=None,operation_id=None
             if operation.get('status')=='COMPLETED': return operation['receipt']
             receipt=operation['receipt']
             if state==receipt['state']:
+                _atomic(os.path.join(receipts,'%08d-recover.json'%
+                                     receipt['state']['generation']),receipt)
+                operation['status']='COMPLETED'; _atomic(operation_path,operation)
+                return receipt
+            if state==operation.get('before_state'):
+                state=receipt['state']
+                _atomic(state_path,state)
+                _atomic(os.path.join(receipts,'%08d-recover.json'%
+                                     state['generation']),receipt)
                 operation['status']='COMPLETED'; _atomic(operation_path,operation)
                 return receipt
             raise ValueError('RECOVERY_OPERATION_UNKNOWN_REQUIRES_RECONCILIATION')
         if state.get('generation')!=expected_generation or state.get('status')!=expected_status:
             raise ValueError('RECOVERY_EXPECTED_STATE_CAS_FAILED')
+        before_state=dict(state)
         if state.get('status')=='UNKNOWN' and state.get('pending'):
             target=os.path.join(root,'artifacts',state['pending'])
             if os.path.isfile(target) and sha256(target)==state['pending']:
@@ -125,11 +139,15 @@ def _lifecycle_locked(root,command,artifact=None,verified=None,operation_id=None
     if command=='recover':
         receipt['operation_id']=operation_id; receipt['request_digest']=request_digest
         _atomic(operation_path,{'status':'PREPARED','request_digest':request_digest,
-                                'receipt':receipt})
+                                'before_state':before_state,'receipt':receipt})
+        _lifecycle_failpoint('recover_after_prepared')
     _atomic(state_path,state)
+    if command=='recover': _lifecycle_failpoint('recover_after_state')
     _atomic(os.path.join(receipts,'%08d-%s.json'%(state['generation'],command)),receipt)
+    if command=='recover': _lifecycle_failpoint('recover_after_receipt')
     if command=='recover': _atomic(operation_path,{'status':'COMPLETED',
       'request_digest':request_digest,'receipt':receipt})
+    if command=='recover': _lifecycle_failpoint('recover_after_completed')
     return receipt
 
 def main(argv=None):

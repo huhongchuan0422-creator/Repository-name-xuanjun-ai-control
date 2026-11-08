@@ -16,11 +16,21 @@ from development_authority import (authority_payload, close_verified_ledger,
                                    sign_payload, SQLiteReplayGuard)
 from secure_file_input import read_owned_secret_file
 
+# Non-configurable minimum isolation set.  Deployment configuration may append
+# paths through its signed class policy, but cannot redefine these classes.
+TRUSTED_DEPLOYMENT_CLASSES = {
+    'formal-primary': frozenset((
+        '/srv/xuanjun/test/task-center.sqlite3',
+        '/var/lib/xuanjun/test/task-center.sqlite3',
+    )),
+}
+
 
 def load_config(path):
     value = json.loads(read_owned_secret_file(path, 'AUTHORITY_ISSUER_CONFIG'))
     required = {'ledger_db', 'replay_db', 'replay_device', 'replay_inode',
-                'forbidden_ledger_paths', 'issuer', 'instance_id',
+                'forbidden_ledger_paths', 'forbidden_ledger_policy_file',
+                'deployment_class', 'issuer', 'instance_id',
                 'version', 'anchor_id', 'service_id', 'bearer_token_file',
                 'private_key_file', 'deployment_public_key_file',
                 'deployment_anchor_id', 'deployment_signature'}
@@ -47,6 +57,41 @@ def load_config(path):
         value['deployment_public_key_file'],'AUTHORITY_DEPLOYMENT_PUBLIC_KEY').encode('ascii'))
     try: deployment_key.verify(base64.b64decode(signature['value'],validate=True),raw)
     except Exception: raise ValueError('SIGNED_DEPLOYMENT_CONFIG_INVALID')
+    policy=json.loads(read_owned_secret_file(
+        value['forbidden_ledger_policy_file'],'AUTHORITY_FORBIDDEN_LEDGER_POLICY'))
+    policy_fields={'schema','deployment_class','forbidden_ledger_paths','signature'}
+    if not isinstance(policy,dict) or set(policy)!=policy_fields:
+        raise ValueError('SIGNED_FORBIDDEN_LEDGER_POLICY_REQUIRED')
+    policy_signature=policy['signature']
+    policy_unsigned={k:v for k,v in policy.items() if k!='signature'}
+    policy_raw=canonical_bytes(policy_unsigned)
+    builtins=TRUSTED_DEPLOYMENT_CLASSES.get(value['deployment_class'])
+    if (not builtins
+            or policy_unsigned.get('schema')!=1
+            or policy_unsigned.get('deployment_class')!=value['deployment_class']
+            or not isinstance(policy_unsigned.get('forbidden_ledger_paths'),list)
+            or not policy_unsigned['forbidden_ledger_paths']
+            or any(not isinstance(x,str) or not os.path.isabs(x)
+                   for x in policy_unsigned['forbidden_ledger_paths'])
+            or len(set(policy_unsigned['forbidden_ledger_paths'])) !=
+                   len(policy_unsigned['forbidden_ledger_paths'])
+            or not isinstance(policy_signature,dict)
+            or set(policy_signature)!={'algorithm','anchor_id','canonical_sha256','value'}
+            or policy_signature['algorithm']!='Ed25519'
+            or policy_signature['anchor_id']!=value['deployment_anchor_id']
+            or policy_signature['canonical_sha256']!=hashlib.sha256(policy_raw).hexdigest()):
+        raise ValueError('SIGNED_FORBIDDEN_LEDGER_POLICY_REQUIRED')
+    try:
+        deployment_key.verify(base64.b64decode(policy_signature['value'],validate=True),policy_raw)
+    except Exception:
+        raise ValueError('SIGNED_FORBIDDEN_LEDGER_POLICY_INVALID')
+    if not builtins.issubset(set(policy_unsigned['forbidden_ledger_paths'])):
+        raise ValueError('BUILTIN_FORBIDDEN_LEDGER_PATH_MISSING')
+    # A valid provider config may add entries, but cannot remove or replace any
+    # TEST_ONLY identity fixed by the signed deployment-class trust policy.
+    if not set(policy_unsigned['forbidden_ledger_paths']).issubset(
+            set(value['forbidden_ledger_paths'])):
+        raise ValueError('REQUIRED_FORBIDDEN_LEDGER_PATH_MISSING')
     token = read_owned_secret_file(value['bearer_token_file'],
                                    'AUTHORITY_READER_TOKEN').strip()
     if len(token) < 32:

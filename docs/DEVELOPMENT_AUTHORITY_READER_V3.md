@@ -26,7 +26,12 @@ The issuer configuration has exactly these fields:
 ```json
 {
   "ledger_db": "/srv/xuanjun/formal/development.sqlite3",
-  "forbidden_ledger_paths": ["/srv/xuanjun/test/task-center.sqlite3"],
+  "forbidden_ledger_paths": [
+    "/srv/xuanjun/test/task-center.sqlite3",
+    "/var/lib/xuanjun/test/task-center.sqlite3"
+  ],
+  "forbidden_ledger_policy_file": "/etc/xuanjun/authority-forbidden-ledgers.json",
+  "deployment_class": "formal-primary",
   "issuer": "xuanjun-formal-ledger",
   "instance_id": "development-authority-01",
   "version": "3.0.1",
@@ -36,6 +41,14 @@ The issuer configuration has exactly these fields:
   "private_key_file": "/etc/xuanjun/authority-ed25519.pem"
 }
 ```
+
+The source-frozen deployment class supplies a non-removable minimum TEST_ONLY
+path set.  The owner-only policy file is separately signed by the pinned
+deployment root and may add paths for that class; the signed provider config may
+only append further paths.  An empty list, unrelated replacement, missing
+built-in/policy path, wrong deployment class, or invalid policy signature fails
+before the provider opens a ledger.  Independently, the opened inode is checked
+against every path/alias and its runtime profile must be exactly `FORMAL`.
 
 Configuration and secret files must be owner-only. Run the issuer as a distinct
 OS identity with read-only ledger access and private-key access. Readers get the

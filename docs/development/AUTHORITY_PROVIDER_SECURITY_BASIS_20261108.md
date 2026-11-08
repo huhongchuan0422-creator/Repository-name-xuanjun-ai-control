@@ -15,8 +15,11 @@ wrong-key rejection path.
 * A production Supervisor accepts only a `DevelopmentIdentityVerifier` instance.
   `TrustedRegistrationVerifier` binds the owner trust key at construction.
 * Test injection is not a formal-provider credential. Formal provider startup
-  rejects test-ledger identities independently of environment variables; test
-  fixtures enter only through the isolated test constructor.
+  rejects test-ledger identities independently of environment variables.  A
+  source-frozen deployment-class minimum, a separately deployment-root-signed
+  policy, and the provider's signed append-only list are all enforced; config
+  signing cannot legalize an empty/replacement list. Test fixtures enter only
+  through the isolated test constructor.
 * Replay consumption is owned by the authenticated authority service, not by a
   reader/worker configuration. Its provisioned device/inode identity is fixed
   at startup and checked on every request. Consumption is one atomic SQLite primary-key insertion over issuer,

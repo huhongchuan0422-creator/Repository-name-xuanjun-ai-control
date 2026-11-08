@@ -1,8 +1,13 @@
-import copy, multiprocessing, os, tempfile, unittest
+import base64, copy, hashlib, json, multiprocessing, os, sqlite3, tempfile, threading, unittest
 import sys
+from unittest import mock
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','scripts'))
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
 from development_authority import SQLiteReplayGuard
+from development_authority import canonical_bytes
+from development_authority_provider import load_config, make_server
+import development_authority_release as release
 from development_authority_release import manifest, verify, lifecycle
 from task_supervisor import Supervisor
 
@@ -15,6 +20,41 @@ def consume(path,key,out):
 class SecurityRegressions(unittest.TestCase):
     def setUp(self): self.tmp=tempfile.TemporaryDirectory()
     def tearDown(self): self.tmp.cleanup()
+    def secret(self,name,value):
+        path=os.path.join(self.tmp.name,name)
+        with open(path,'w') as stream: stream.write(value)
+        os.chmod(path,0o600); return path
+    def signed_provider_config(self,forbidden,required=None):
+        deployment=Ed25519PrivateKey.generate(); issuer=Ed25519PrivateKey.generate()
+        public=deployment.public_key().public_bytes(
+          serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        private=issuer.private_bytes(serialization.Encoding.PEM,
+          serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode()
+        replay=os.path.join(self.tmp.name,'replay.db'); SQLiteReplayGuard(replay).close()
+        ledger=os.path.join(self.tmp.name,'formal.db'); db=sqlite3.connect(ledger)
+        db.executescript("CREATE TABLE IF NOT EXISTS tasks(task_id TEXT); CREATE TABLE IF NOT EXISTS resource_claims(resource_key TEXT); CREATE TABLE IF NOT EXISTS authority_runtime_profile(singleton INTEGER PRIMARY KEY,profile TEXT); INSERT OR REPLACE INTO authority_runtime_profile VALUES(1,'FORMAL');")
+        db.commit(); db.close()
+        policy_unsigned={'schema':1,'deployment_class':'formal-primary',
+          'forbidden_ledger_paths':list(required if required is not None else [os.path.join(self.tmp.name,'test-a.db'),os.path.join(self.tmp.name,'test-b.db')])}
+        policy_raw=canonical_bytes(policy_unsigned)
+        policy=dict(policy_unsigned,signature={'algorithm':'Ed25519','anchor_id':'deploy-1',
+          'canonical_sha256':hashlib.sha256(policy_raw).hexdigest(),
+          'value':base64.b64encode(deployment.sign(policy_raw)).decode()})
+        config={'ledger_db':ledger,'replay_db':replay,
+          'replay_device':os.stat(replay).st_dev,'replay_inode':os.stat(replay).st_ino,
+          'forbidden_ledger_paths':list(forbidden),
+          'forbidden_ledger_policy_file':self.secret('policy.json',json.dumps(policy)),
+          'deployment_class':'formal-primary','issuer':'formal','instance_id':'one',
+          'version':'3','anchor_id':'authority-1','service_id':'reader-1',
+          'bearer_token_file':self.secret('token','t'*32),
+          'private_key_file':self.secret('issuer.pem',private),
+          'deployment_public_key_file':self.secret('deploy.pem',public),
+          'deployment_anchor_id':'deploy-1'}
+        raw=canonical_bytes(config); config['deployment_signature']={
+          'algorithm':'Ed25519','anchor_id':'deploy-1',
+          'canonical_sha256':hashlib.sha256(raw).hexdigest(),
+          'value':base64.b64encode(deployment.sign(raw)).decode()}
+        return self.secret('provider.json',json.dumps(config))
     def test_release_every_manifest_field_and_signature_tamper_rejects(self):
         artifact=os.path.join(self.tmp.name,'artifact.tar'); open(artifact,'wb').write(b'bytes')
         key=Ed25519PrivateKey.generate(); source='f'*64
@@ -52,6 +92,46 @@ class SecurityRegressions(unittest.TestCase):
               expected_generation=0,expected_status='ACTIVE')
         # A new invocation reads the durable operation receipt and cannot toggle again.
         state=lifecycle(root,'query')['state']; self.assertEqual(state['generation'],1)
+    def test_signed_formal_provider_cannot_empty_omit_or_replace_forbidden_policy(self):
+        required=[os.path.join(self.tmp.name,'test-a.db'),os.path.join(self.tmp.name,'test-b.db')]
+        with mock.patch.dict('development_authority_provider.TRUSTED_DEPLOYMENT_CLASSES',
+                             {'formal-primary':frozenset(required)},clear=True):
+            for index,forbidden in enumerate(([],required[:1],
+                                             [os.path.join(self.tmp.name,'other.db')])):
+                with self.subTest(index=index), self.assertRaisesRegex(ValueError,
+                  'REQUIRED_FORBIDDEN|EXACT_AUTHORITY'):
+                    load_config(self.signed_provider_config(forbidden,required))
+            config=load_config(self.signed_provider_config(required,required))
+            server=make_server(config,port=0); server.server_close()
+            os.symlink(config['ledger_db'],required[0])
+            with self.assertRaisesRegex(ValueError,'FORMAL_LEDGER_FILE_IDENTITY'):
+                make_server(config,port=0)
+
+    def test_recover_fault_boundaries_restart_and_concurrent_retry_return_one_receipt(self):
+        for failpoint in ('recover_after_prepared','recover_after_state',
+                          'recover_after_receipt','recover_after_completed'):
+            root=os.path.join(self.tmp.name,failpoint); one=root+'-one'; two=root+'-two'
+            open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+            lifecycle(root,'apply',one,{'verified':True}); lifecycle(root,'apply',two,{'verified':True})
+            original=release._lifecycle_failpoint
+            def fail(name,target=failpoint):
+                if name==target: raise RuntimeError('injected '+name)
+            release._lifecycle_failpoint=fail
+            try:
+                with self.assertRaisesRegex(RuntimeError,'injected'):
+                    lifecycle(root,'recover',operation_id='same-op',
+                      expected_generation=2,expected_status='ACTIVE')
+            finally: release._lifecycle_failpoint=original
+            results=[]
+            def retry():
+                results.append(lifecycle(root,'recover',operation_id='same-op',
+                  expected_generation=2,expected_status='ACTIVE'))
+            threads=[threading.Thread(target=retry) for _ in range(4)]
+            [thread.start() for thread in threads]; [thread.join() for thread in threads]
+            self.assertEqual(results,[results[0]]*4)
+            self.assertEqual(results[0],lifecycle(root,'recover',operation_id='same-op',
+              expected_generation=2,expected_status='ACTIVE'))
+            self.assertEqual(lifecycle(root,'query')['state']['generation'],3)
     def test_arbitrary_verifier_injection_is_rejected(self):
         path=os.path.join(self.tmp.name,'ledger')
         with self.assertRaisesRegex(ValueError,'CONTROLLED'):
