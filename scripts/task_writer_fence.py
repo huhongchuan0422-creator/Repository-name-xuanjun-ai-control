@@ -394,13 +394,14 @@ class Fence(object):
             task_id, attempt_id, owner, entry, caller, lease_id,
             self.locks.provider_id, keys, valid_until)
 
-    def claim_first_development_writer(self, task_id, owner, entry, caller,
-                                       resources, valid_until):
+    def claim_first_development_writer(self, task_id, entry, caller,
+                                       resources, valid_until, owner_grant,
+                                       developer_credential):
         """Claim a registered development task with ledger-issued ids."""
         keys = self.adapter.normalize_many(resources)
         return self.supervisor.claim_development_writer(
-            task_id, owner, entry, caller, self.locks.provider_id, keys,
-            valid_until)
+            task_id, entry, caller, self.locks.provider_id, keys,
+            valid_until, owner_grant, developer_credential)
 
     def prepare(self, ticket, caller, operation):
         operation = dict(operation)

@@ -7,7 +7,6 @@ from __future__ import print_function
 
 import argparse
 import hashlib
-import hmac
 import json
 import os
 import signal
@@ -273,76 +272,6 @@ def _json_bytes(value):
                       separators=(',', ':')).encode('utf-8')
 
 
-AUTHORITY_READER_PERMISSION = 'development-authority:read'
-
-
-def read_development_authority(db_path, task_id, config, observed_at=None):
-    """Read and sign one authority snapshot from the formal ledger."""
-    observed_at = time.time() if observed_at is None else observed_at
-    Supervisor._readonly_preflight(db_path)
-    connection = _read_only_connection(db_path, {'tasks'})
-    try:
-        row = connection.execute('SELECT * FROM tasks WHERE task_id=?',
-                                 (task_id,)).fetchone()
-        if row is None:
-            raise KeyError(task_id)
-        payload = Supervisor.authority_projection(
-            dict(row), observed_at, config['issuer'], config['instance_id'],
-            config['version'], config['trust_anchor_id'])
-        payload['reader'] = {'service_identity': config['service_id'],
-                             'permission': AUTHORITY_READER_PERMISSION}
-        raw = _json_bytes(payload)
-        return {'payload': payload,
-                'signature': {
-                    'algorithm': 'HMAC-SHA256',
-                    'anchor_id': config['trust_anchor_id'],
-                    'canonical_sha256': hashlib.sha256(raw).hexdigest(),
-                    'value': hmac.new(config['signing_key'], raw,
-                                      hashlib.sha256).hexdigest()}}
-    finally:
-        connection.close()
-
-
-def verify_development_authority(envelope, trust_anchor_id, signing_key):
-    """Reader-v3 trust-anchor verification; fail closed on any mismatch."""
-    if (not isinstance(envelope, dict) or set(envelope) !=
-            {'payload', 'signature'} or not isinstance(signing_key, bytes)):
-        raise ValueError('AUTHORITY_ENVELOPE_REQUIRED')
-    signature = envelope['signature']
-    if (not isinstance(signature, dict) or set(signature) !=
-            {'algorithm', 'anchor_id', 'canonical_sha256', 'value'}
-            or signature['algorithm'] != 'HMAC-SHA256'
-            or signature['anchor_id'] != trust_anchor_id):
-        raise ValueError('AUTHORITY_TRUST_ANCHOR_MISMATCH')
-    raw = _json_bytes(envelope['payload'])
-    if not hmac.compare_digest(signature['canonical_sha256'],
-                               hashlib.sha256(raw).hexdigest()):
-        raise ValueError('AUTHORITY_CANONICAL_DIGEST_MISMATCH')
-    expected = hmac.new(signing_key, raw, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(signature['value'], expected):
-        raise ValueError('AUTHORITY_SIGNATURE_INVALID')
-    return envelope['payload']
-
-
-def load_authority_provider_config(path):
-    value=json.loads(_read_owned_secret_file(path,'AUTHORITY_PROVIDER_CONFIG'))
-    required={'ledger_db','issuer','instance_id','version','trust_anchor_id',
-              'service_id','bearer_token_file','signing_key_file','permissions'}
-    if not isinstance(value,dict) or set(value)!=required:
-        raise ValueError('EXACT_AUTHORITY_PROVIDER_CONFIG_REQUIRED')
-    token=_read_owned_secret_file(value['bearer_token_file'],
-                                  'AUTHORITY_READER_TOKEN').strip()
-    key=_read_owned_secret_file(value['signing_key_file'],
-                                'AUTHORITY_SIGNING_KEY').rstrip('\r\n').encode()
-    if len(token)<16 or len(key)<32:
-        raise ValueError('AUTHORITY_PROVIDER_SECRET_TOO_SHORT')
-    return {'ledger_db':value['ledger_db'],'issuer':value['issuer'],
-            'instance_id':value['instance_id'],'version':value['version'],
-            'trust_anchor_id':value['trust_anchor_id'],
-            'service_id':value['service_id'],'bearer_token':token,
-            'signing_key':key,'permissions':value['permissions']}
-
-
 class CodexWorkerLoop(object):
     """Optional TEST_ONLY durable dispatcher using the canonical SQLite DB."""
     def __init__(self,db_path,authority_key,tenant_id,transports,interval=1.0):
@@ -400,7 +329,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
                   mcp_model_worker_enabled=False,mcp_dispatch_config=None,
-                  mcp_development_host=None,authority_provider=None):
+                  mcp_development_host=None):
     mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
@@ -665,38 +594,6 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             if path == '/mcp':
                 self._send(405,_json_bytes({'error':'MCP_POST_REQUIRED'}),
                   'application/json; charset=utf-8',[('Allow','POST')]);return
-            if path == '/api/v3/development-authority':
-                if authority_provider is None:
-                    self._send(404,b'not found\n','text/plain; charset=utf-8');return
-                supplied_identity=self.headers.get(
-                    'X-Xuanjun-Service-Identity','')
-                supplied_auth=self.headers.get('Authorization','')
-                expected_auth='Bearer '+authority_provider['bearer_token']
-                if (not hmac.compare_digest(supplied_identity,
-                                            authority_provider['service_id'])
-                        or not hmac.compare_digest(supplied_auth,
-                                                   expected_auth)):
-                    self._send(403,_json_bytes(
-                      {'error':'AUTHORITY_READER_FORBIDDEN'}),
-                      'application/json; charset=utf-8');return
-                try:
-                    query=__import__('urllib.parse').parse.parse_qs(
-                      urlsplit(self.path).query,keep_blank_values=True)
-                    if (set(query) != {'task_id'} or len(query['task_id']) != 1
-                            or not query['task_id'][0]):
-                        raise ValueError('EXACT_AUTHORITY_QUERY_REQUIRED')
-                    result=read_development_authority(
-                      authority_provider['ledger_db'],query['task_id'][0],
-                      authority_provider)
-                    self._send(200,_json_bytes(result),
-                      'application/json; charset=utf-8')
-                except KeyError:
-                    self._send(404,_json_bytes({'error':'TASK_NOT_FOUND'}),
-                      'application/json; charset=utf-8')
-                except Exception as exc:
-                    self._send(400,_json_bytes({'error':str(exc)}),
-                      'application/json; charset=utf-8')
-                return
             if path == '/api/session':
                 session=self._session()
                 if session is None:
@@ -1400,7 +1297,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
                 mcp_dispatch_config=None,mcp_development_host=None,
-                correction_observer_interval=None,authority_provider=None):
+                correction_observer_interval=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_development_host is not None:
@@ -1416,28 +1313,6 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise ValueError('MCP_DISPATCH_REQUIRES_AUTHENTICATED_MCP')
     if host not in ('127.0.0.1', 'localhost', '::1'):
         raise ValueError('LOOPBACK_HOST_REQUIRED')
-    if authority_provider is not None:
-        required={'ledger_db','issuer','instance_id','version','trust_anchor_id',
-                  'service_id','bearer_token','signing_key','permissions'}
-        if (not isinstance(authority_provider,dict)
-                or set(authority_provider)!=required
-                or authority_provider['permissions']!=
-                   [AUTHORITY_READER_PERMISSION]
-                or not isinstance(authority_provider['signing_key'],bytes)
-                or len(authority_provider['signing_key'])<32
-                or any(not isinstance(authority_provider[name],str)
-                       or not authority_provider[name]
-                       for name in required-{'signing_key','permissions'})):
-            raise ValueError('EXACT_AUTHORITY_PROVIDER_CONFIG_REQUIRED')
-        ledger=os.path.realpath(authority_provider['ledger_db'])
-        if (ledger==os.path.realpath(db_path)
-                or ledger.startswith('/opt/xuanjun-task-center-test/current/')):
-            raise ValueError('FORMAL_DEVELOPMENT_LEDGER_REQUIRED')
-        if not os.path.isfile(ledger):
-            raise ValueError('CANONICAL_AUTHORITY_LEDGER_REQUIRED')
-        Supervisor._readonly_preflight(ledger)
-        authority_provider=dict(authority_provider)
-        authority_provider['ledger_db']=ledger
     if not os.path.isfile(db_path):
         raise ValueError('CANONICAL_SQLITE_REQUIRED')
     check_existing_bindings(db_path,mcp_dispatch_config)
@@ -1485,7 +1360,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
                                 mcp_model_worker_enabled,mcp_dispatch_config,
-                                mcp_development_host,authority_provider)
+                                mcp_development_host)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
@@ -1537,7 +1412,6 @@ def main(argv=None):
     parser.add_argument('--mcp-dispatch-config-file')
     parser.add_argument('--mcp-development-config-file')
     parser.add_argument('--correction-observer-interval',type=int,choices=(180,300))
-    parser.add_argument('--authority-provider-config-file')
     args = parser.parse_args(argv)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
@@ -1593,10 +1467,7 @@ def main(argv=None):
                            if args.mcp_dispatch_config_file else None),
                          mcp_development_host=(load_development_host(args.mcp_development_config_file)
                            if args.mcp_development_config_file else None),
-                         correction_observer_interval=args.correction_observer_interval,
-                         authority_provider=(load_authority_provider_config(
-                           args.authority_provider_config_file) if
-                           args.authority_provider_config_file else None))
+                         correction_observer_interval=args.correction_observer_interval)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
@@ -1618,8 +1489,6 @@ def main(argv=None):
                'mcp': ('ENABLED' if args.enable_mcp else 'DISABLED'),
                'mcp_model_outbound': ('ENABLED_ZERO_SPEND_GATES' if
                   args.allow_mcp_model_outbound else 'DISABLED'),
-               'development_authority_provider': ('ENABLED' if
-                  args.authority_provider_config_file else 'DISABLED'),
                'production_status': 'NOT_IMPLEMENTED'}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)

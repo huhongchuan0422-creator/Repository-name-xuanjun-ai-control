@@ -1,48 +1,80 @@
-# Development authority reader v3
+# Development authority provider/reader v3
 
-The endpoint `GET /api/v3/development-authority?task_id=...` reads only the
-configured canonical development ledger. It does not read the Task Center
-fixture database, issue authority, or mutate the ledger.
+`development_authority_provider.py` is the formal loopback issuer. The
+TEST_ONLY Task Center application neither exposes this route nor loads a formal
+private key. Consumers receive only the pinned Ed25519 public key and must call
+`verify_envelope` with values from trusted configuration and the actual request;
+no expected value may be copied from the envelope being verified.
 
-## Provider configuration
+## Frozen installation
 
-Pass `--authority-provider-config-file` with an owner-only JSON file:
+Install an exact reviewed commit and tree (never a moving branch or `latest`),
+record `git rev-parse HEAD HEAD^{tree}`, and pin the Python wheel/application
+artifact by SHA-256. Before replacing anything, copy the prior executable,
+service file, owner-only configuration, public trust bundle, and database backup
+manifest to a dated owner-only rollback directory. Do not copy the private key.
+
+The issuer configuration has exactly these fields:
 
 ```json
 {
-  "ledger_db": "/path/to/formal/xuanjun-ledger.sqlite3",
-  "issuer": "xuanjun-ledger",
-  "instance_id": "development-dispatcher-1",
-  "version": "3.0.0",
-  "trust_anchor_id": "development-authority-anchor-1",
-  "service_id": "reader-v3",
-  "bearer_token_file": "/path/to/reader-token",
-  "signing_key_file": "/path/to/signing-key",
-  "permissions": ["development-authority:read"]
+  "ledger_db": "/srv/xuanjun/formal/development.sqlite3",
+  "forbidden_ledger_paths": ["/srv/xuanjun/test/task-center.sqlite3"],
+  "issuer": "xuanjun-formal-ledger",
+  "instance_id": "development-authority-01",
+  "version": "3.0.1",
+  "anchor_id": "development-authority-2026-11",
+  "service_id": "mcp-authority-reader",
+  "bearer_token_file": "/etc/xuanjun/authority-reader.token",
+  "private_key_file": "/etc/xuanjun/authority-ed25519.pem"
 }
 ```
 
-The token and signing key files must be owner-only files accepted by
-`secure_file_input`; the token is at least 16 characters and the signing key
-at least 32 bytes. The formal ledger must differ from `--db`. Paths below
-`/opt/xuanjun-task-center-test/current/` are rejected.
+Configuration and secret files must be owner-only. Run the issuer as a distinct
+OS identity with read-only ledger access and private-key access. Readers get the
+corresponding public key, pinned issuer, instance, semantic version, anchor,
+service identity and maximum age. The provider checks logical path, resolved
+file, device/inode identity, link count and the inode actually opened by SQLite;
+the TEST_ONLY ledger and any hardlink/symlink alias are rejected.
 
-The reader sends `Authorization: Bearer ...` and
-`X-Xuanjun-Service-Identity: reader-v3`, then calls
-`verify_development_authority(...)` with its pinned anchor id and key. It must
-also reject a payload whose `authority.fresh` is false or whose identity,
-task, attempt, lease, fence, epoch, or resource scope differs from its request.
+## Request and authorization
 
-## Installation and rollback
+The authenticated request is exactly `task_id` plus a unique `request_id`.
+The signed response binds issuer/instance/version, reader service identity,
+task, attempt, lease, fence, epoch and resource-scope digest. A verifier also
+checks schema/kind, signature, legal active task state, valid resource claims,
+lease expiry against a trusted clock, revocation state and replay consumption.
 
-1. Install the frozen commit and verify its Git tree before restart.
-2. Provision the formal ledger path, the two owner-only secret files, and the
-   owner-only provider JSON; add the CLI flag to the existing loopback service.
-3. Put the reverse proxy route for this exact GET endpoint behind the same
-   HTTPS host. Do not expose a mutation method.
-4. Probe first without credentials (must be 403), then with the enrolled
-   reader identity and verify the signed envelope and freshness.
+HTTP 200 means only that a signed status query succeeded. Execution is allowed
+only when `verify_envelope` returns successfully and `authority.authorized` is
+exactly `true`. Reader rejection code **69 remains a rejection code**, never a
+component identity or a success target.
 
-Rollback removes the CLI flag and reverse-proxy route, restarts the prior
-frozen commit, and leaves the canonical ledger untouched. Token/key rotation
-is performed by replacing the owner-only files and restarting the service.
+First claim requires an injected authenticated Owner authorization and the
+authenticated developer identity fixed in the canonical development contract.
+Caller-supplied owner/developer strings are not authority.
+
+## Rotation, recovery and compatibility
+
+1. Generate the next Ed25519 key offline; publish its public anchor first.
+2. During a bounded overlap, accept both explicitly pinned anchor IDs, but sign
+   each envelope with exactly one key. Never distribute the private key to a
+   reader or TEST_ONLY process.
+3. Restart the issuer on the frozen artifact, probe old/new anchors, then remove
+   the old public anchor and securely retire the old private key.
+4. On startup, identity change, clock rollback, ledger/schema failure or signer
+   failure, stop serving authorization and preserve the prior config and logs.
+   Restore the database only through the ledger's documented backup process;
+   re-check inode identity and registrations before restart.
+
+Legacy HMAC envelopes and v1/v2 schemas are rejected. A staged compatibility
+adapter may query an old provider for display-only status, but it must always
+return `authorized=false` and cannot feed execution. Rollback removes the v3
+route and restores the pinned prior service/config; it never converts v3 proof
+into legacy authority.
+
+After deployment, acceptance requires a real provider and formal task
+registration: one correctly bound positive envelope must authorize, while
+wrong task/attempt/lease/fence/epoch/scope/service/issuer/version, stale,
+revoked, replayed and tampered envelopes must all reject. Unit tests do not
+replace that wiring evidence.

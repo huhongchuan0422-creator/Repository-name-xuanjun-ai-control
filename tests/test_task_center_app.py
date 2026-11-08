@@ -82,62 +82,11 @@ class TaskCenterAppTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b'id="dataMode"', body)
 
-    def test_reader_v3_uses_distinct_formal_ledger_identity_and_trust_anchor(self):
-        ledger=os.path.join(self.root,'development-ledger.sqlite3')
-        supervisor=Supervisor(ledger,lambda:1000.0)
-        supervisor.register(dict(task_id='dev-1',parent_task_id='parent',
-          stage='dev',owner='developer',entry='WORK',checkpoint_sha256='a'*64,
-          spec_sha256='b'*64,next_action='implement',dependencies=[],
-          completion_conditions=['tests'],progress_deadline=1900,
-          receipt_deadline=1100,started_deadline=1200,
-          terminal_deadline=3000,handoff_deadline=1800),now=1000)
-        supervisor.register_development_contract('dev-1',dict(
-          task_id='dev-1',spec_sha256='b'*64,checkpoint_sha256='a'*64,
-          target_repository='owner/repo',target_base_sha='c'*40,entry='WORK',
-          developer={'issuer':'native','subject':'developer'},
-          allowed_files=['src/f.py'],trusted_reviewers=[
-            {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
-            {'issuer':'native','subject':'sec','key_id':'sec','role':'SECURITY'}]))
-        supervisor.claim_development_writer('dev-1','developer','WORK',
-          {'caller_id':'writer','run_id':'run','session_id':'session',
-           'gateway_id':'gateway'},'provider',['git:owner/repo/main'],2000)
-        supervisor.close()
-        key=b'k'*32
-        config={'ledger_db':ledger,'issuer':'xuanjun-ledger',
-          'instance_id':'development-dispatcher-1','version':'3.0.0',
-          'trust_anchor_id':'authority-anchor-1','service_id':'reader-v3',
-          'bearer_token':'reader-token-1234567890','signing_key':key,
-          'permissions':['development-authority:read']}
-        server=make_server(self.db,KEY,'tenant-ui','viewer',port=0,
-                           authority_provider=config)
-        thread=threading.Thread(target=server.serve_forever)
-        thread.daemon=True;thread.start()
-        url='http://127.0.0.1:%d/api/v3/development-authority?task_id=dev-1'%server.server_port
-        opener=build_opener(ProxyHandler({}))
-        try:
-            with self.assertRaises(HTTPError) as denied:opener.open(url,timeout=3)
-            self.assertEqual(denied.exception.code,403)
-            request=Request(url,headers={'Authorization':
-              'Bearer reader-token-1234567890',
-              'X-Xuanjun-Service-Identity':'reader-v3'})
-            envelope=json.loads(opener.open(request,timeout=3).read().decode())
-            payload=task_center_app.verify_development_authority(
-              envelope,'authority-anchor-1',key)
-            self.assertEqual(payload['task']['task_id'],'dev-1')
-            self.assertEqual(payload['authority']['state'],'VALID')
-            self.assertEqual(payload['reader']['permission'],
-                             'development-authority:read')
-            envelope['payload']['task']['task_id']='tampered'
-            with self.assertRaisesRegex(ValueError,'DIGEST_MISMATCH'):
-                task_center_app.verify_development_authority(
-                  envelope,'authority-anchor-1',key)
-        finally:
-            server.shutdown();server.server_close();thread.join(2)
-
-        with self.assertRaisesRegex(ValueError,'FORMAL_DEVELOPMENT_LEDGER'):
-            bad=dict(config);bad['ledger_db']=self.db
-            make_server(self.db,KEY,'tenant-ui','viewer',port=0,
-                        authority_provider=bad)
+    def test_test_only_app_has_no_formal_authority_signing_capability(self):
+        with self.assertRaises(HTTPError) as missing:
+            urlopen(self.base + '/api/v3/development-authority?task_id=dev-1',
+                    timeout=3)
+        self.assertEqual(missing.exception.code, 404)
 
     def test_projection_get_is_read_only_with_active_wal(self):
         writer = Supervisor(self.db)

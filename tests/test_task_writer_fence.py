@@ -24,7 +24,11 @@ class WriterFenceTests(unittest.TestCase):
         self.path = os.path.join(self.directory.name, 'ledger.sqlite')
         self.lock_root = os.path.join(self.directory.name, 'locks')
         self.now = 1000.0
-        self.s = Supervisor(self.path, lambda: self.now)
+        self.s = Supervisor(self.path, lambda: self.now,
+            lambda owner, developer, task, digest: {
+              'task_id':task,'contract_sha256':digest,
+              'owner':{'issuer':'owner-auth','subject':'developer'},
+              'developer':{'issuer':'native','subject':'developer'}})
         self.fence = Fence(self.s, self.lock_root)
         self.register('t1')
 
@@ -70,7 +74,8 @@ class WriterFenceTests(unittest.TestCase):
             {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
             {'issuer':'native','subject':'sec','key_id':'sec','role':'SECURITY'}]))
         ticket=self.fence.claim_first_development_writer(
-          't1','developer','WORK',self.caller(),['git:owner/repo/main'],1700)
+          't1','WORK',self.caller(),['git:owner/repo/main'],1700,
+          'owner-proof','developer-proof')
         self.assertRegex(ticket['attempt_id'],r'^attempt-[0-9a-f]{32}$')
         self.assertRegex(ticket['lease_id'],r'^lease-[0-9a-f]{32}$')
         self.assertEqual(ticket['lock_provider_id'],self.fence.locks.provider_id)
