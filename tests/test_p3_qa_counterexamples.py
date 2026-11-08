@@ -163,7 +163,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_started_payload_fence_must_match_receipt_subject(self):
         runner = TamperedAckRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner, self.store)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store, legacy_test_only=True)
         self.provider.add("started", "STARTED", {
             "native_state": "RUNNING", "lease_owner": "writer-1",
             "lease_until": 1050.0, "fence": 99, "checkpoint": {"step": 1},
@@ -239,7 +239,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_unverifiable_post_launch_ack_is_explicit_hold(self):
         runner = TamperedAckRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner, self.store)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store, legacy_test_only=True)
         result = controller.launch(SUBJECT, admission())
         self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])
@@ -269,7 +269,7 @@ class QACounterexamples(unittest.TestCase):
 
     def test_unverifiable_post_stop_receipt_is_explicit_hold(self):
         runner = UnverifiableStopRunner(self.provider)
-        controller = RunnerController(self.gate, self.verifier, runner, self.store)
+        controller = RunnerController(self.gate, self.verifier, runner, self.store, legacy_test_only=True)
         result = controller.stop(SUBJECT, "progress deadline")
         self.assertEqual("UNKNOWN_STOP_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])

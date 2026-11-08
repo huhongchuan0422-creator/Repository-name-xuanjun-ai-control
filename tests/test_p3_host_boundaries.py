@@ -142,7 +142,7 @@ class BoundaryTests(unittest.TestCase):
                              notifications_enabled=notifications)
 
     def controller(self, enabled=True):
-        return RunnerController(self.gate(enabled), self.verifier, self.runner, self.store)
+        return RunnerController(self.gate(enabled), self.verifier, self.runner, self.store, legacy_test_only=True)
 
     def test_default_off_never_invokes_runner(self):
         with self.assertRaises(PermissionError):
@@ -152,7 +152,7 @@ class BoundaryTests(unittest.TestCase):
     def test_missing_p2_admission_fails_before_runner(self):
         gate = self.gate(proof=admission(p2_accepted=False))
         with self.assertRaises(PermissionError):
-            RunnerController(gate, self.verifier, self.runner, self.store).launch(SUBJECT, {})
+            RunnerController(gate, self.verifier, self.runner, self.store, legacy_test_only=True).launch(SUBJECT, {})
         self.assertEqual([], self.runner.calls)
 
     def test_runner_ack_is_not_started(self):
@@ -204,7 +204,7 @@ class BoundaryTests(unittest.TestCase):
         first = self.controller().launch(SUBJECT, admission())
         second = self.controller().launch(SUBJECT, admission())
         restarted = RunnerController(self.gate(), self.verifier, self.runner,
-                                     RunnerOperationStore(self.store.connect))
+                                     RunnerOperationStore(self.store.connect), legacy_test_only=True)
         third = restarted.launch(SUBJECT, admission())
         self.assertEqual(first, second)
         self.assertEqual(first, third)

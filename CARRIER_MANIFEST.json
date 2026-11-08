@@ -23,20 +23,22 @@
     "runtime/p3_host_wiring.py": "e5b062ae99cbf2c5d8084c268de7da3dd72fa01de60e0200821892aa84ac49af",
     "runtime/p3_lifecycle.py": "d330b85d453d0d293cb62bbc931b1670d22f2112815ac84bf09d229021d02e30",
     "runtime/p3_owner_reminders.py": "ef52c2727978e6578d8875d2ff6212b5539fe3f42777bd4be0179cbb17094499",
-    "src/p3_host_boundaries.py": "3815ed737c630877b179108a33b7f7412f9a43e274298579e1e8540d7eb4476d",
-    "src/p3_host_callsite.py": "484261b38cc81f7b6c527b31b633f881f28ac6ac14acbac950b64d48b91ee052",
+    "src/p3_host_boundaries.py": "673a5386ef22db648f5a9481cf9a341bc24ce923b58b843ab10b6fd04300fd0f",
+    "src/p3_host_callsite.py": "c71b7df0f8f441681e006062ae1647889c957d18aa04a6f61742e662a3a885e4",
     "TEST_DISCOVERY_IMPORT_IDENTITY_FIX.md": "b2c724e3c3f010db3dec6b00f963bac24a2494d72c50401e3ee45963c3a03cad",
     "tests/test_p3_carrier_install.py": "6512daaa0be1e72e60a53c6a23d8a05c64dd17369b12506cba7270de766379b4",
-    "tests/test_p3_host_boundaries.py": "eb84588790f71c0e551c27ef246ff86d5fd350faabd75e3f80454597bb7bf0f9",
+    "tests/test_p3_host_boundaries.py": "9963592af837dee2cc76f693f96e30ab87fb15cb4a0e7e744b8ae3681fda3560",
     "tests/test_p3_host_callsite.py": "7487d283fe02703e5177ec5ce39fbeb8fdd383184e189ea464932f2ae61af555",
-    "tests/test_p3_qa_counterexamples.py": "9e1ddeee3c78aae32cfaaf4bff91ccf50642b642eaab2936f79477b8cc19f51d",
+    "tests/test_p3_qa_counterexamples.py": "56357804d564b8fe1382ac4e877a9f291b502484c3c67cea3e1e905fada34226",
     "vendor/xuanjun-p3-host-wiring-increment-20261028.zip": "d41d80623bf4e5017a277affcd5937e79ecdfa0615de7c1bf02943c4e9e2aa93",
     "vendor/xuanjun-p3-lifecycle-local-candidate-20261028.zip": "34fda99283a3593daff6810f4c70b3d1b9d6afcee9c491a7030f6195e2ae0252",
     "vendor/xuanjun-p3-owner-reminder-increment-20261028.zip": "20e219cecd31967b5fbd1603ce9485fe3afd7cfb62116615cbfa9647dbf6ee3d",
     "src/p3_operation_kernel.py": "22bb692c357d9fb5ab5285e76f94afa9659e8623d572fb49c1caa898f234b3d1",
     "tests/test_p3_operation_kernel.py": "4d976dedddc491d8837b6695ada23d78b9b6585e6e5278c4c04afb5ace8c65fd",
     "install/p3_secure_fd.py": "020752aefaea4d55eeea03f890ed7ab1945ec200360e8602831c1682325a3ffa",
-    "tests/test_p3_secure_fd.py": "d5d15eb1ab47aa04b6b13ad1ff79bbe125452e87327b37d702b6f5de54003cb9"
+    "tests/test_p3_secure_fd.py": "d5d15eb1ab47aa04b6b13ad1ff79bbe125452e87327b37d702b6f5de54003cb9",
+    "src/p3_admission_v2.py": "18aea4fb3f5545cf566c5e85e2247a5e5e67458405d4c299a770bb2d97c95c6d",
+    "tests/test_p3_admission_v2.py": "3333568b53ac963b7b3b9326a37f6911d733b2e874a1c00619ba91218cea9fe5"
   },
   "release_files": [
     "config/p3-default-off.json",
@@ -50,7 +52,8 @@
     "vendor/xuanjun-p3-host-wiring-increment-20261028.zip",
     "vendor/xuanjun-p3-lifecycle-local-candidate-20261028.zip",
     "vendor/xuanjun-p3-owner-reminder-increment-20261028.zip",
-    "src/p3_operation_kernel.py"
+    "src/p3_operation_kernel.py",
+    "src/p3_admission_v2.py"
   ],
   "base_reviews": {
     "independent_qa": {

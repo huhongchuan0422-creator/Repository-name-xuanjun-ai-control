@@ -24,7 +24,8 @@ except ImportError:  # package-form local tests; installed host uses flat module
 
 
 EXPECTED_MODULE_SHA256 = {
-    "p3_host_boundaries": "3815ed737c630877b179108a33b7f7412f9a43e274298579e1e8540d7eb4476d",
+    "p3_host_boundaries": "673a5386ef22db648f5a9481cf9a341bc24ce923b58b843ab10b6fd04300fd0f",
+    "p3_admission_v2": "18aea4fb3f5545cf566c5e85e2247a5e5e67458405d4c299a770bb2d97c95c6d",
     "p3_operation_kernel": "22bb692c357d9fb5ab5285e76f94afa9659e8623d572fb49c1caa898f234b3d1",
     "p3_host_wiring": "e5b062ae99cbf2c5d8084c268de7da3dd72fa01de60e0200821892aa84ac49af",
     "p3_lifecycle": "d330b85d453d0d293cb62bbc931b1670d22f2112815ac84bf09d229021d02e30",
@@ -95,7 +96,8 @@ def compose_existing_p3_host(
         completion_index=None, receipt_provider=None, runner_adapter=None,
         outbox_transport=None, executor=None, event_reader=None,
         eligibility_reader=None, notification_adapter=None, subject=None,
-        modules=None, operation_store=None):
+        modules=None, operation_store=None, trust_store=None,
+        gate_proof_reader=None, v2_clock=None, authenticated_subject=None):
     """Compose the frozen callsite, or return an inert readback while disabled.
 
     ``existing_p3_ledger`` is mandatory even while disabled so callers cannot
@@ -132,7 +134,9 @@ def compose_existing_p3_host(
         completion_index=completion_index)
     runner = None
     if runner_adapter is not None:
-        runner = RunnerController(gate, verifier, runner_adapter, operation_store)
+        runner = RunnerController(gate, verifier, runner_adapter, operation_store,
+                                  trust_store, gate_proof_reader, v2_clock,
+                                  authenticated_subject)
     outbox = None
     if outbox_transport is not None:
         outbox = OutboxController(gate, verifier, outbox_transport)

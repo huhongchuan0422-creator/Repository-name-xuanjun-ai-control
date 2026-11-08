@@ -17,6 +17,11 @@ try:
 except ImportError:
     from .p3_operation_kernel import RunnerOperationStore
 
+try:
+    from p3_admission_v2 import TrustStore, admission as admission_v2
+except ImportError:
+    from .p3_admission_v2 import TrustStore, admission as admission_v2
+
 
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -338,7 +343,9 @@ class RunnerController(object):
     """No automatic retry: unknown launch/resume/stop effects become HOLD."""
     ACK_PAYLOAD_KEYS = {"operation", "accepted", "started", "native_id"}
 
-    def __init__(self, gate, verifier, adapter, operation_store=None):
+    def __init__(self, gate, verifier, adapter, operation_store=None,
+                 trust_store=None, gate_proof_reader=None, v2_clock=None,
+                 authenticated_subject=None, legacy_test_only=False):
         if not isinstance(gate, AdmissionGate):
             raise TypeError("ADMISSION_GATE_REQUIRED")
         if not isinstance(verifier, ReceiptVerifier):
@@ -347,23 +354,54 @@ class RunnerController(object):
             raise TypeError("RUNNER_ADAPTER_REQUIRED")
         self.gate, self.verifier, self.adapter = gate, verifier, adapter
         self.operation_store = operation_store
+        if type(legacy_test_only) is not bool:
+            raise ValueError("BOOLEAN_TEST_FLAG_REQUIRED")
+        self.legacy_test_only = legacy_test_only
+        self.trust_store, self.gate_proof_reader = trust_store, gate_proof_reader
+        self.v2_clock, self.authenticated_subject = v2_clock, authenticated_subject
 
     def _invoke(self, operation, subject, admission):
         proof = self.gate.check(subject)
-        # The supported carrier admission shape is the exact gate proof.  Do not
-        # pass opaque or independently supplied lineage through to the runner.
-        # This is not authentication of the reader, nor a replay reservation.
-        _exact(admission, AdmissionGate.KEYS, "EXACT_RUNNER_ADMISSION_REQUIRED")
-        if any(type(admission[k]) is not type(proof[k]) or admission[k] != proof[k]
-               for k in AdmissionGate.KEYS):
-            raise PermissionError("RUNNER_ADMISSION_MISMATCH")
-        # Stable per-lineage operation key; changed admission under the same
-        # lineage conflicts instead of silently issuing another effect.
         store = self.operation_store
         if not isinstance(store, RunnerOperationStore):
             raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
-        operation_id = _digest({"operation": operation, "subject": subject})
-        created, row = store.reserve(operation_id, subject, admission, operation)
+        if self.legacy_test_only:
+            _exact(admission, AdmissionGate.KEYS, "EXACT_RUNNER_ADMISSION_REQUIRED")
+            if any(type(admission[k]) is not type(proof[k]) or admission[k] != proof[k]
+                   for k in AdmissionGate.KEYS):
+                raise PermissionError("RUNNER_ADMISSION_MISMATCH")
+            operation_id = _digest({"operation": operation, "subject": subject})
+            request_binding = admission
+        else:
+            if (not isinstance(self.trust_store, TrustStore)
+                    or not callable(self.gate_proof_reader) or not callable(self.v2_clock)
+                    or not _text(self.authenticated_subject)):
+                raise PermissionError("V2_TRUST_AND_AUTHORITY_REQUIRED")
+            now = self.v2_clock()
+            admission_v2(admission, now)
+            if (admission["subject"] != self.authenticated_subject
+                    or admission["permission_scope"] != "p3:" + operation
+                    or any(admission[k] != subject[k] for k in
+                           ("task_id", "run_id", "session_id", "fence", "epoch", "generation"))
+                    or admission["spec_id"] != subject["spec_hash"]):
+                raise PermissionError("V2_SUBJECT_OR_SCOPE_MISMATCH")
+            gate_digest = self.trust_store.gate(self.gate_proof_reader(), admission, now)
+            provider_identity = getattr(self.verifier.provider, "identity", None)
+            adapter_identity = getattr(self.adapter, "identity", None)
+            if not callable(provider_identity) or not callable(adapter_identity) or not callable(getattr(self.adapter, "execute", None)) or not callable(getattr(self.adapter, "reconcile", None)):
+                raise PermissionError("V2_COMPONENT_IDENTITY_REQUIRED")
+            provider_statement = provider_identity()
+            adapter_statement = adapter_identity()
+            provider_digest = self.trust_store.identity(provider_statement, "provider", admission["provider_id"], operation, now)
+            adapter_digest = self.trust_store.identity(adapter_statement, "adapter", admission["adapter_id"], operation, now)
+            if (provider_statement["epoch"] != admission["epoch"]
+                    or adapter_statement["epoch"] != admission["epoch"]):
+                raise PermissionError("COMPONENT_EPOCH_MISMATCH")
+            operation_id = admission["operation_id"]
+            request_binding = {"admission": admission, "gate_proof_digest": gate_digest,
+                               "provider_identity_digest": provider_digest,
+                               "adapter_identity_digest": adapter_digest}
+        created, row = store.reserve(operation_id, subject, request_binding, operation)
         if row["state"] == "SUCCEEDED":
             return json.loads(row["receipt_json"])["result"]
         if not created and row["state"] not in ("RUNNING", "UNKNOWN"):
@@ -373,7 +411,9 @@ class RunnerController(object):
             if not store.transition(operation_id, "RESERVED", "RUNNING"):
                 raise RuntimeError("RUNNER_RESERVATION_LOST")
             try:
-                evidence_ref = getattr(self.adapter, operation)(dict(admission))
+                evidence_ref = (getattr(self.adapter, operation)(dict(admission))
+                                if self.legacy_test_only else
+                                self.adapter.execute(operation_id, row["request_digest"], dict(admission), operation))
             except Exception:
                 store.transition(operation_id, "RUNNING", "UNKNOWN")
                 return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
