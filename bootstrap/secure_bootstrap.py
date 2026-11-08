@@ -104,7 +104,11 @@ def consume(db_path, receipt, owner=0, evidence=None):
         try:
             guarded.check();db.execute('BEGIN IMMEDIATE');guarded.check()
             require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
-            require(db.execute("SELECT 1 FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN') LIMIT 1").fetchone() is None,'UNRESOLVED_OPERATION')
+            existing=db.execute("SELECT carrier_digest,manifest_digest FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone()
+            if existing is not None:
+                require(tuple(existing)==(receipt['carrier_sha256'],receipt['manifest_sha256']),'DIGEST_CONFLICT')
+                raise Hold('ATTEMPT_IN_FLIGHT')
+            require(db.execute("SELECT 1 FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN','UNKNOWN_NEEDS_MANUAL_RECONCILE') LIMIT 1").fetchone() is None,'UNRESOLVED_OPERATION')
             require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
             if evidence is None:
                 db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
@@ -254,6 +258,8 @@ def main():
         binding=verify_binding(stable_read(x.binding_fd,x.expected_controller_uid,65536),trust,x.expected_controller_uid)
         require(binding.get('environment')==trust.get('environment'),'BINDING_ENVIRONMENT')
         verify_dependency_lock(stable_read(x.dependency_lock_fd,x.expected_controller_uid,8*1024*1024),trust)
+        # Ensure controller and CLI share the same module/class identity.
+        sys.modules['secure_bootstrap']=sys.modules[__name__]
         from controller import run,reconcile_pending,rollback
         from path_guard import GuardedAudit
         require(trust.get('expected_controller_uid',0)==x.expected_controller_uid and trust.get('expected_controller_gid',0)==x.expected_controller_gid,'CONTROLLER_TRUST_MISMATCH')
