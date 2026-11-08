@@ -1,4 +1,4 @@
-"""Reproduce expired test-only Actions ZIPs from their unchanged Git sources.
+"""Reproduce unavailable test-only Actions ZIPs from their unchanged Git sources.
 
 Runs the historical offline builder in a temporary detached worktree. Never
 installs anything or publishes the generated carrier/document files. Both the
@@ -94,6 +94,14 @@ def wrapper(label, files):
     output += struct.pack('<4s4H2IH', b'PK\x05\x06', 0, 0, len(names), len(names),
                           len(central), start, 0)
     body = bytes(output)
+    if digest(body) != SPECS[label][1]:
+        print('HISTORICAL_RECOVERY_COMPRESSION_DIAGNOSTIC', label,
+              'outer_sha256=' + digest(body),
+              'inner_sha256=' + digest(files[PREFIX + 'control-stopped-v1.zip']),
+              'manifest_sha256=' + digest(files[PREFIX + 'manifest.json']),
+              'python_zlib=' + zlib.ZLIB_RUNTIME_VERSION, file=sys.stderr)
+        print(subprocess.check_output(['node', '-p', 'JSON.stringify(process.versions)'],
+                                      text=True).strip(), file=sys.stderr)
     validate(label, body)
     return body
 
