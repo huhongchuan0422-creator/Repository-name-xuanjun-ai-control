@@ -125,6 +125,7 @@ def main():
     a.add_argument('--reconcile',action='store_true')
     a.add_argument('--rollback',action='store_true')
     a.add_argument('--rollback-authorization-fd',type=int)
+    a.add_argument('--test-only-crash-hook',choices=('crash_before_rename','crash_after_rename','crash_before_receipt'))
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
     a.add_argument('--trust-fd',type=int,required=True)
     a.add_argument('--receipt-dir-fd',type=int,required=True)
@@ -159,7 +160,8 @@ def main():
                 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
                 try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(auth['signature'],validate=True),canonical(p))
                 except Exception:raise Hold('ROLLBACK_AUTH_SIGNATURE')
-                result=rollback(x.ledger,x.root,x.expected_controller_uid,audit.file,x.trust_fd,x.receipt_signing_key_fd,x.receipt_key_id,x.receipt_dir_fd,p['install_op'],p['rollback_op'],sha(canonical(p)),audit=audit,authorized_prestate_digest=p['prestate_digest'])
+                require(x.test_only_crash_hook is None or trust.get('environment')=='TEST_ONLY','TEST_HOOK_FORBIDDEN')
+                result=rollback(x.ledger,x.root,x.expected_controller_uid,audit.file,x.trust_fd,x.receipt_signing_key_fd,x.receipt_key_id,x.receipt_dir_fd,p['install_op'],p['rollback_op'],sha(canonical(p)),audit=audit,authorized_prestate_digest=p['prestate_digest'],failpoint=x.test_only_crash_hook)
                 require(result['state']=='SUCCEEDED','ROLLBACK_NOT_SUCCEEDED');print(json.dumps(result,sort_keys=True))
             else:
                 require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')

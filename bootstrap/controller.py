@@ -164,19 +164,21 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             try:
                 columns={r[1] for r in db.execute('PRAGMA table_info(operations)')}
                 if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rollbacks'").fetchone():
+                    rb_columns={r[1] for r in db.execute('PRAGMA table_info(rollbacks)')}
+                    check({'operation_id','request_digest','install_op','attempt','from_target','to_target','from_digest','to_digest','state','receipt_json','receipt_path','key_id'}.issubset(rb_columns),'ROLLBACK_SCHEMA_REQUIRED')
                     for rb in db.execute("SELECT * FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN')").fetchall():
                         old=rb['state'];new='UNKNOWN'
                         try:
                             cur=_current(rootfd)
                             check(verified_tree(rootfd,rb['from_target'],owner)==rb['from_digest'] and verified_tree(rootfd,rb['to_target'],owner)==rb['to_digest'],'ROLLBACK_TREE')
                             if cur==rb['from_target']:
-                                name='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json'
+                                name=rb['receipt_path'];check(name=='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json','ROLLBACK_RECEIPT_PATH')
                                 check(receipt_dir_fd is not None and not _exists(receipt_dir_fd,name),'ROLLBACK_RECEIPT_CONFLICT');new='FAILED'
                             elif cur==rb['to_target']:
                                 check(receipt_dir_fd is not None and trust_raw is not None,'ROLLBACK_RECEIPT_REQUIRED')
-                                name='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json'
+                                name=rb['receipt_path'];check(name=='rollback-'+hashlib.sha256(rb['operation_id'].encode()).hexdigest()+'.json','ROLLBACK_RECEIPT_PATH')
                                 obj=verifylib.parse(_file_bytes(receipt_dir_fd,name,owner,65536));trust=verifylib.parse(trust_raw);payload=obj['payload']
-                                check(set(obj)=={'payload','key_id','signature'} and obj['key_id']==trust['key_id'],'ROLLBACK_RECEIPT_KEY')
+                                check(set(obj)=={'payload','key_id','signature'} and obj['key_id']==trust['key_id']==rb['key_id'],'ROLLBACK_RECEIPT_KEY')
                                 check(payload['install_op']==rb['install_op'] and payload['rollback_op']==rb['operation_id'] and payload['attempt']==rb['attempt'] and payload['request_digest']==rb['request_digest'] and payload['from_tree_digest']==rb['from_digest'] and payload['to_tree_digest']==rb['to_digest'] and payload['controller_identity']==trust['controller'],'ROLLBACK_RECEIPT_BINDING')
                                 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
                                 try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
@@ -411,18 +413,21 @@ def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receip
                 try:st=os.fstat(fd);check((st.st_dev,st.st_ino)==(installed['prestate_dev'],installed['prestate_ino']),'PRESTATE_INODE_MISMATCH')
                 finally:os.close(fd)
                 check(verified_tree(rootfd,from_target,owner)==installed['tree_digest'] and verified_tree(rootfd,to_target,owner)==installed['prestate_digest'],'ROLLBACK_TREE_MISMATCH')
-                db.execute('INSERT INTO rollbacks(operation_id,request_digest,install_op,attempt,from_target,to_target,from_digest,to_digest,state,receipt_json) VALUES(?,?,?,?,?,?,?,?,?,NULL)',(rollback_op,request_digest,install_op,installed['attempt'],from_target,to_target,installed['tree_digest'],installed['prestate_digest'],'ROLLBACK_PREPARED'))
+                db.execute('INSERT INTO rollbacks(operation_id,request_digest,install_op,attempt,from_target,to_target,from_digest,to_digest,state,receipt_json,receipt_path,key_id) VALUES(?,?,?,?,?,?,?,?,?,NULL,?,?)',(rollback_op,request_digest,install_op,installed['attempt'],from_target,to_target,installed['tree_digest'],installed['prestate_digest'],'ROLLBACK_PREPARED','rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest()+'.json',key_id))
                 log(log_fd,{'event':'ROLLBACK_PREPARED','operation':rollback_op},audit);g.check();db.execute('COMMIT');reserved=True
             except BaseException:
                 if db.in_transaction:db.execute('ROLLBACK')
                 raise
         if failpoint=='before_rename':raise ControllerError('INJECTED_BEFORE_RENAME')
+        if failpoint=='crash_before_rename':os._exit(91)
         link='.rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest();os.symlink(to_target,link,dir_fd=rootfd);os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd)
         if failpoint=='after_rename':raise ControllerError('INJECTED_AFTER_RENAME')
+        if failpoint=='crash_after_rename':os._exit(92)
         os.fsync(rootfd)
         with GuardedLedger(ledger_path,owner) as g:
             g.db.execute('BEGIN IMMEDIATE');g.db.execute("UPDATE rollbacks SET state='SWITCHED' WHERE operation_id=? AND state='ROLLBACK_PREPARED'",(rollback_op,));g.db.execute('COMMIT')
         if failpoint=='before_receipt':raise ControllerError('INJECTED_BEFORE_RECEIPT')
+        if failpoint=='crash_before_receipt':os._exit(93)
         check(_current(rootfd)==to_target and verified_tree(rootfd,to_target,owner)==installed['prestate_digest'],'ROLLBACK_POSTSTATE')
         payload={'install_op':install_op,'rollback_op':rollback_op,'attempt':installed['attempt'],'request_digest':request_digest,'from_tree_digest':installed['tree_digest'],'to_tree_digest':installed['prestate_digest'],'controller_identity':trust['controller'],'issued_at':int(time.time())}
         receipt=verifylib.canonical({'payload':payload,'key_id':key_id,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode()})

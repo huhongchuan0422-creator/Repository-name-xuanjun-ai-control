@@ -18,7 +18,7 @@ class BootstrapTests(unittest.TestCase):
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
   self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
-  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text,prestate_dev integer,prestate_ino integer)');db.execute('create table rollbacks(operation_id text primary key,request_digest text,install_op text,attempt text,from_target text,to_target text,from_digest text,to_digest text,state text,receipt_json text)');db.close();os.chmod(self.ledger,0o600)
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text,prestate_dev integer,prestate_ino integer)');db.execute('create table rollbacks(operation_id text primary key,request_digest text,install_op text,attempt text,from_target text,to_target text,from_digest text,to_digest text,state text,receipt_json text,receipt_path text,key_id text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
@@ -230,6 +230,45 @@ class InstallerTests(BootstrapTests):
   result=call(payload,base64.b64encode(b'bad').decode());self.assertNotEqual(result.returncode,0)
   result=call(payload);self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
   again=call(payload);self.assertEqual(again.returncode,0,again.stderr);self.assertEqual(result.stdout,again.stdout)
+  receipt_path=os.path.join(self.root,'rollback-'+hashlib.sha256(b'rollback:one').hexdigest()+'.json')
+  with open(receipt_path,'rb') as f:original=f.read()
+  original_hash=hashlib.sha256(original).hexdigest();linkstat=os.lstat(os.path.join(self.root,'current'))
+  for field in ('payload','signature','key_id','operation'):
+   obj=b.parse(original)
+   if field=='payload':obj['payload']['from_tree_digest']='0'*64
+   elif field=='signature':obj['signature']=base64.b64encode(b'bad').decode()
+   elif field=='key_id':obj['key_id']='wrong'
+   else:obj['payload']['rollback_op']='wrong'
+   with open(receipt_path,'wb') as f:f.write(b.canonical(obj))
+   attempt=call(payload);self.assertNotEqual(attempt.returncode,0);self.assertEqual(os.lstat(os.path.join(self.root,'current')).st_ino,linkstat.st_ino)
+   with open(receipt_path,'wb') as f:f.write(original)
+  self.assertEqual(hashlib.sha256(original).hexdigest(),original_hash)
+ def test_cli_rollback_crash_windows(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cmd=common+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
+  r=subprocess.run(cmd,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,0,r.stderr)
+  with sqlite3.connect(self.ledger) as db:pre=db.execute('select prestate_digest from operations').fetchone()[0]
+  for i,(hook,code,current,state) in enumerate([('crash_before_rename',91,'release-nonce','FAILED'),('crash_after_rename',92,'base','UNKNOWN'),('crash_before_receipt',93,'base','UNKNOWN')]):
+   with self.subTest(hook=hook):
+    if os.readlink(os.path.join(self.root,'current'))!='release-nonce':os.unlink(os.path.join(self.root,'current'));os.symlink('release-nonce',os.path.join(self.root,'current'))
+    with sqlite3.connect(self.ledger) as db:db.execute('delete from rollbacks')
+    payload={'install_op':'install:nonce','prestate_digest':pre,'rollback_op':'rollback:'+str(i),'nonce':'nonce:'+str(i),'expiry':int(time.time())+600,'controller':'fixture'}
+    afd=self.fd('authorization-'+str(i),b.canonical({'payload':payload,'signature':base64.b64encode(self.key.sign(b.canonical(payload))).decode(),'key_id':'fixture-key'}))
+    rb=common+['--rollback','--rollback-authorization-fd',str(afd),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--test-only-crash-hook',hook]
+    r=subprocess.run(rb,pass_fds=fds+(afd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,code,r.stderr)
+    with sqlite3.connect(self.ledger) as db:
+     row=db.execute('select state,receipt_path,key_id,from_digest,to_digest,install_op,operation_id from rollbacks').fetchone()
+     self.assertEqual(row[0],'SWITCHED' if i==2 else 'ROLLBACK_PREPARED');self.assertTrue(all(row[1:]));self.assertEqual(row[-2: ],('install:nonce','rollback:'+str(i)))
+    self.assertEqual(os.readlink(os.path.join(self.root,'current')),current)
+    r=subprocess.run(common+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertEqual(r.returncode,0 if state=='FAILED' else 1,r.stderr)
+    with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],state)
+    if state=='UNKNOWN':
+     r=subprocess.run(rb,pass_fds=fds+(afd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
