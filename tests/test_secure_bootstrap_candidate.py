@@ -89,6 +89,25 @@ class InstallerTests(BootstrapTests):
   return controller.run(*(args+[lf,{'task':p['task'],'attempt':p['attempt']},self.root]),owner=os.getuid(),failpoint=failpoint,signing_key_fd=keyfd,key_id='fixture-key')
  def state(self):
   with sqlite3.connect(self.ledger) as db:return db.execute('select state from operations').fetchone()[0]
+ def test_verified_bound_snapshot_installs_without_path_reopen(self):
+  import controller
+  scope=b.canonical({'schema':1,'default_off':True,'default_mode':'READ_ONLY','allowed_write_tools':[],'unknown_dynamic_tools':'DENY'})
+  out=io.BytesIO()
+  with tarfile.open(fileobj=out,mode='w') as t:
+   for name,data in [('TOOL_SCOPE.json',scope),('payload',b'abc')]:
+    member=tarfile.TarInfo(name);member.size=len(data);t.addfile(member,io.BytesIO(data))
+  archive=out.getvalue();members=[{'path':name,'type':'file','size':len(data),'sha256':b.sha(data)} for name,data in [('TOOL_SCOPE.json',scope),('payload',b'abc')]]
+  manifest=b.canonical({'artifact_sha256':b.sha(archive),'tool_scope_sha256':b.sha(scope),'members':members})
+  binding={'carrier_archive_sha256':b.sha(archive),'carrier_manifest_sha256':b.sha(manifest),'tool_scope_sha256':b.sha(scope)}
+  af=self.fd('bound-carrier',archive);mf=self.fd('bound-manifest',manifest);sf=self.fd('bound-scope',scope);bound=b.verify_bound_artifacts(af,mf,sf,binding,os.getuid())
+  # Exercise controller module's copy of the verified type, as in the real CLI.
+  import secure_bootstrap as runtime_b
+  bound=runtime_b.verify_bound_artifacts(af,mf,sf,binding,os.getuid())
+  os.rename(os.path.join(self.dir,'bound-carrier'),os.path.join(self.dir,'old-carrier'));self.fd('bound-carrier',b'changed')
+  p=dict(self.payload,carrier_sha256=b.sha(archive),manifest_sha256=b.sha(manifest));rf=self.fd('bound-receipt',b.canonical({'payload':p,'signature':base64.b64encode(self.key.sign(b.canonical(p))).decode()}));tf=self.fd('bound-trust',b.canonical(self.trust));kf=self.fd('bound-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  result=controller.run(af,mf,rf,tf,self.ledger,lf,{'task':'task','attempt':'attempt'},self.root,owner=os.getuid(),signing_key_fd=kf,key_id='fixture-key',bound_artifacts=bound)
+  self.assertEqual(result,'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),result)
+  with open(os.path.join(self.root,result,'TOOL_SCOPE.json'),'rb') as f:self.assertEqual(f.read(),scope)
  def test_install_and_reinstall(self):
   self.assertEqual(self.run_install(),'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce');self.assertEqual(self.state(),'SUCCEEDED')
   with self.assertRaises(Exception):self.run_install()

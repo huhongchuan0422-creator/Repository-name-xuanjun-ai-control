@@ -246,8 +246,8 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             return pending
     finally:os.close(rootfd)
 
-def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None):
-    """Fixture implementation only; caller must exclusively control root and ledger."""
+def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None,bound_artifacts=None):
+    """Installer for authenticated snapshots; legacy path remains test-only."""
     rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and rootst.st_gid==os.getegid() and stat.S_IMODE(rootst.st_mode)==0o700,'ROOT_PERMISSIONS')
     check(signing_key_fd is not None and isinstance(key_id,str) and key_id,'SIGNING_KEY_REQUIRED')
     trust_raw=verifylib.stable_read(trust_fd,owner,65536);trust=verifylib.parse(trust_raw)
@@ -277,7 +277,7 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
     with GuardedLedger(ledger_path,owner) as schema:
         columns={r[1] for r in schema.db.execute('PRAGMA table_info(operations)')}
         check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','prestate_dev','prestate_ino','switch_intent'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
-    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
+    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence,bound=bound_artifacts)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     running=False
@@ -290,8 +290,16 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         stage=open_dir(rootfd,name)
         try:
             extract(blob,stage)
-            manifest=verifylib.stable_read(manifest_fd,owner,4*1024*1024)
-            check(verifylib.sha(manifest)==p['manifest_sha256'],'MANIFEST_CHANGED')
+            if bound_artifacts is not None:
+                signed_manifest=verifylib.parse(bound_artifacts.manifest_raw)
+                members={r['path']:({'type':'directory'} if r['type']=='directory' else {'type':'file','size':r['size'],'sha256':r['sha256']}) for r in signed_manifest['members']}
+                manifest=verifylib.canonical({'members':members,'source_manifest_sha256':bound_artifacts.manifest_digest,'scope_sha256':bound_artifacts.scope_digest})
+                scopefd=os.open('TOOL_SCOPE.json',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=stage)
+                try:check(verifylib.sha(verifylib.stable_read(scopefd,owner,1024*1024))==bound_artifacts.scope_digest,'STAGED_SCOPE_MISMATCH')
+                finally:os.close(scopefd)
+            else:
+                manifest=verifylib.stable_read(manifest_fd,owner,4*1024*1024)
+                check(verifylib.sha(manifest)==p['manifest_sha256'],'MANIFEST_CHANGED')
             fd=os.open('.bootstrap-manifest.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=stage)
             try:
                 check(os.write(fd,manifest)==len(manifest),'SHORT_MANIFEST_WRITE');os.fsync(fd)
@@ -299,6 +307,11 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
             os.fsync(stage)
         finally:os.close(stage)
         stage_tree=verified_tree(rootfd,name,owner)
+        if bound_artifacts is not None:
+            signed_manifest=verifylib.parse(bound_artifacts.manifest_raw)
+            members={r['path']:({'type':'directory'} if r['type']=='directory' else {'type':'file','size':r['size'],'sha256':r['sha256']}) for r in signed_manifest['members']}
+            expected_tree=verifylib.sha(verifylib.canonical({'manifest_sha256':verifylib.sha(manifest),'members':members}))
+            check(stage_tree==expected_tree,'BOUND_STAGE_TREE_MISMATCH')
         from path_guard import GuardedLedger
         with GuardedLedger(ledger_path,owner) as g:
             g.db.execute('BEGIN IMMEDIATE')
@@ -377,7 +390,8 @@ def recover(path, owner):
 
 
 def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None,bound_artifacts=None):
-    if bound_artifacts is not None:raise ControllerError('BOUND_ARTIFACT_INSTALL_NOT_YET_IMPLEMENTED')
+    if bound_artifacts is not None:check(isinstance(bound_artifacts,verifylib.VerifiedBoundArtifacts),'VERIFIED_BOUND_ARTIFACT_REQUIRED')
+    else:check(verifylib.parse(verifylib.stable_read(trust_fd,owner,65536)).get('environment')=='TEST_ONLY','LEGACY_INSTALL_FORBIDDEN')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
         st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
@@ -385,7 +399,7 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
         try:
             st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
             fcntl.flock(lock,fcntl.LOCK_EX)
-            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit,signing_key_fd,key_id,receipt_dir_fd)
+            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit,signing_key_fd,key_id,receipt_dir_fd,bound_artifacts)
         finally:os.close(lock)
     finally:os.close(rootfd)
 

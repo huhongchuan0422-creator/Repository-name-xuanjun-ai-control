@@ -17,9 +17,9 @@ class BindingArtifactTests(unittest.TestCase):
     os.chmod(p,0o600);x=os.open(p,os.O_RDONLY);fds.append(x);return x
    try:
     a=fd('archive',carrier);m=fd('manifest',manifest);s=fd('scope',scope)
-    self.assertEqual(b.verify_bound_artifacts(a,m,s,binding,os.getuid())[0],carrier)
+    self.assertEqual(b.verify_bound_artifacts(a,m,s,binding,os.getuid()).archive,carrier)
     os.rename(os.path.join(d,'archive'),os.path.join(d,'original'));fd('archive',b'evil')
-    self.assertEqual(b.verify_bound_artifacts(a,m,s,binding,os.getuid())[0],carrier)
+    self.assertEqual(b.verify_bound_artifacts(a,m,s,binding,os.getuid()).archive,carrier)
     for values in ((fd('wrong-archive',carrier+b'x'),m,s),(a,fd('wrong-manifest',manifest+b' '),s),(a,m,fd('wrong-scope',scope+b' '))):
      with self.assertRaisesRegex(b.Hold,'BINDING_ARTIFACT_MISMATCH'):b.verify_bound_artifacts(*values,binding,os.getuid())
     changed=dict(binding,carrier_archive_sha256='0'*64)

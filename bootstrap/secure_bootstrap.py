@@ -58,6 +58,17 @@ def inspect_archive(blob, members):
             require(len(data)==m.size and members.get(p)=={'type':'file','size':m.size,'sha256':sha(data)},'MEMBER_MISMATCH')
     require(seen==set(members),'MEMBER_SET')
 
+class VerifiedBoundArtifacts:
+    """Immutable snapshot created only after binding and member validation."""
+    __slots__=('archive','manifest_raw','scope_raw','archive_digest','manifest_digest','scope_digest','binding_digest','_sealed')
+    def __init__(self, archive, manifest_raw, scope_raw, binding, _token):
+        require(_token is _BOUND_TOKEN,'BOUND_ARTIFACT_CONSTRUCTION_FORBIDDEN')
+        object.__setattr__(self,'archive',archive);object.__setattr__(self,'manifest_raw',manifest_raw);object.__setattr__(self,'scope_raw',scope_raw)
+        object.__setattr__(self,'archive_digest',sha(archive));object.__setattr__(self,'manifest_digest',sha(manifest_raw));object.__setattr__(self,'scope_digest',sha(scope_raw));object.__setattr__(self,'binding_digest',sha(canonical(binding)));object.__setattr__(self,'_sealed',True)
+    def __setattr__(self,name,value):raise AttributeError('IMMUTABLE_BOUND_ARTIFACT')
+
+_BOUND_TOKEN=object()
+
 def verify_bound_artifacts(carrier_fd, manifest_fd, tool_scope_fd, binding, owner):
     """Capture stable controller-opened bytes and enforce signed artifact binding."""
     archive=stable_read(carrier_fd,owner,128*1024*1024)
@@ -78,7 +89,7 @@ def verify_bound_artifacts(carrier_fd, manifest_fd, tool_scope_fd, binding, owne
             entries[row['path']]={'type':'file','size':row['size'],'sha256':row['sha256']}
     require(entries.get('TOOL_SCOPE.json')=={'type':'file','size':len(scope_raw),'sha256':sha(scope_raw)},'CARRIER_TOOL_SCOPE_REQUIRED')
     inspect_archive(archive,entries)
-    return archive,manifest_raw,scope_raw
+    return VerifiedBoundArtifacts(archive,manifest_raw,scope_raw,binding,_BOUND_TOKEN)
 
 def checked_ledger_path(path, owner):
     from path_guard import Guard
@@ -104,7 +115,7 @@ def consume(db_path, receipt, owner=0, evidence=None):
             if db.in_transaction:db.execute('ROLLBACK')
             raise
 
-def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None,audit=None,evidence=None):
+def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None,audit=None,evidence=None,bound=None):
     # Check the supplied evidence sink before reserving a nonce or reading carrier.
     ls=os.fstat(log_fd);require(stat.S_ISREG(ls.st_mode) and ls.st_nlink==1 and ls.st_uid==owner and not ls.st_mode&0o022 and fcntl.fcntl(log_fd,fcntl.F_GETFL)&os.O_APPEND,'LOG_REQUIRED')
     trust=parse(stable_read(trust_fd,owner,65536));require(trust.get('mode') in ('ED25519','DIGEST_ALLOWLIST'),'TRUST_ANCHOR_REQUIRED')
@@ -122,9 +133,12 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     else:
         require(trust.get('environment')=='PRODUCTION' and os.fstat(trust_fd).st_uid==0,'ALLOWLIST_ROOT_REQUIRED')
         require(sha(canonical(p)) in trust.get('receipt_sha256_allowlist',[]),'RECEIPT_NOT_ALLOWLISTED')
-    manifest_raw=stable_read(manifest_fd,owner,4*1024*1024);carrier=stable_read(carrier_fd,owner,128*1024*1024)
+    manifest_raw=bound.manifest_raw if bound else stable_read(manifest_fd,owner,4*1024*1024);carrier=bound.archive if bound else stable_read(carrier_fd,owner,128*1024*1024)
     require(sha(manifest_raw)==p['manifest_sha256'] and sha(carrier)==p['carrier_sha256'],'DIGEST_MISMATCH')
-    manifest=parse(manifest_raw);require(set(manifest)=={'members','tool_scope','minimum_sqlite'},'MANIFEST_FIELDS')
+    manifest=parse(manifest_raw)
+    if bound is not None:
+        manifest={'members':{r['path']:({'type':'directory'} if r['type']=='directory' else {'type':'file','size':r['size'],'sha256':r['sha256']}) for r in manifest['members']},'tool_scope':{},'minimum_sqlite':[3,35,0]}
+    require(set(manifest)=={'members','tool_scope','minimum_sqlite'},'MANIFEST_FIELDS')
     require(manifest['minimum_sqlite']==[3,35,0] and sqlite3.sqlite_version_info >= tuple(manifest['minimum_sqlite']),'SQLITE_VERSION_UNSUPPORTED')
     tool_scope=p['tool_scope'];require(isinstance(tool_scope,dict) and set(tool_scope)=={'mode','tools'},'TOOL_SCOPE_REQUIRED')
     require(tool_scope['mode'] in ('READ_ONLY','WRITE_ALLOWED') and isinstance(tool_scope['tools'],dict),'TOOL_SCOPE_INVALID')
