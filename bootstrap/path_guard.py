@@ -50,7 +50,7 @@ class GuardedLedger:
         self.guard=Guard(path,owner); self.file=None; self.db=None
         try:
             st=os.fstat(self.guard.fd)
-            guard(st.st_uid==owner and not st.st_mode&0o077,'PRIVATE_LEDGER_DIRECTORY_REQUIRED')
+            guard(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'PRIVATE_LEDGER_DIRECTORY_REQUIRED')
             self.file=self.guard.open_file(os.O_RDWR)
             self.check_sidecars()
             proc='/proc/self/fd/%d/%s' % (self.guard.fd,self.guard.name)
@@ -80,7 +80,7 @@ class GuardedAudit:
         self.guard=Guard(path,owner);self.file=None
         try:
             st=os.fstat(self.guard.fd)
-            guard(st.st_uid==owner and not st.st_mode&0o077,'PRIVATE_AUDIT_DIRECTORY_REQUIRED')
+            guard(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'PRIVATE_AUDIT_DIRECTORY_REQUIRED')
             self.file=self.guard.open_file(os.O_WRONLY|os.O_APPEND)
         except BaseException:self.guard.close();raise
     def write(self,data):

@@ -152,12 +152,12 @@ def _remove_tree(parent,name,owner):
         if remove:os.rmdir(item,dir_fd=parent_fd);os.fsync(parent_fd)
     walk(parent,name,False);walk(parent,name,True)
 
-def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=None):
+def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=None, receipt_dir_fd=None):
     """Reconcile under the caller-held controller lock; missing evidence holds."""
     from path_guard import GuardedLedger
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
-        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
         with GuardedLedger(path,owner) as g:
             db=g.db;db.row_factory=sqlite3.Row
             g.check();db.execute('BEGIN IMMEDIATE')
@@ -178,7 +178,7 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                             check(not stage_exists and target_exists,'TARGET_CONFLICT')
                             check(_target_manifest(rootfd,target,owner)==mh,'TARGET_MISMATCH')
                             check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
-                            raw=_file_bytes(rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
+                            raw=_file_bytes(receipt_dir_fd if receipt_dir_fd is not None else rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
                             check(verifylib.sha(raw)==rh,'RECEIPT_MISMATCH')
                             check(trust_raw is not None,'RECEIPT_TRUST_REQUIRED')
                             obj=verifylib.parse(raw);payload=obj['payload'];trust=verifylib.parse(trust_raw)
@@ -210,9 +210,9 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             return db.execute("SELECT COUNT(*) FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchone()[0]
     finally:os.close(rootfd)
 
-def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None):
+def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None):
     """Fixture implementation only; caller must exclusively control root and ledger."""
-    rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and not rootst.st_mode&0o077,'ROOT_PERMISSIONS')
+    rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and rootst.st_gid==os.getegid() and stat.S_IMODE(rootst.st_mode)==0o700,'ROOT_PERMISSIONS')
     check(signing_key_fd is not None and isinstance(key_id,str) and key_id,'SIGNING_KEY_REQUIRED')
     trust_raw=verifylib.stable_read(trust_fd,owner,65536);trust=verifylib.parse(trust_raw)
     check(trust.get('mode')=='ED25519' and trust.get('key_id')==key_id,'SIGNING_KEY_ID')
@@ -222,7 +222,10 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
     private=Ed25519PrivateKey.from_private_bytes(verifylib.stable_read(signing_key_fd,owner,32))
     public=private.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
     check(base64.b64encode(public).decode()==trust.get('public_key'),'SIGNING_KEY_MISMATCH')
-    check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit,trust_raw)==0,'UNKNOWN_RECONCILIATION_REQUIRED')
+    check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit,trust_raw,receipt_dir_fd)==0,'UNKNOWN_RECONCILIATION_REQUIRED')
+    # Verify receipt output is writable before reserving or switching current.
+    if receipt_dir_fd is not None:
+        check(os.access('.',os.W_OK|os.X_OK,dir_fd=receipt_dir_fd,effective_ids=True),'RECEIPT_DIRECTORY_UNWRITABLE')
     # Before effects, verify complete signed input and atomically reserve nonce.
     if audit is not None: audit.write(b'{"event":"STARTING"}\n')
     currentfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -277,10 +280,11 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time())}
         receipt=verifylib.canonical({'payload':payload,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode(),'key_id':key_id})
         temp='.receipt-'+nonce+'.tmp';final='receipt-'+nonce+'.json'
-        fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        receiptfd=receipt_dir_fd if receipt_dir_fd is not None else rootfd
+        fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=receiptfd)
         try:check(os.write(fd,receipt)==len(receipt),'SHORT_RECEIPT_WRITE');os.fsync(fd)
         finally:os.close(fd)
-        os.link(temp,final,src_dir_fd=rootfd,dst_dir_fd=rootfd,follow_symlinks=False);os.unlink(temp,dir_fd=rootfd);os.fsync(rootfd)
+        os.link(temp,final,src_dir_fd=receiptfd,dst_dir_fd=receiptfd,follow_symlinks=False);os.unlink(temp,dir_fd=receiptfd);os.fsync(receiptfd)
         check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
         from path_guard import GuardedLedger
         with GuardedLedger(ledger_path,owner) as g:
@@ -313,27 +317,27 @@ def recover(path, owner):
             raise
 
 
-def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None):
+def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None):
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
-        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
         lock=os.open('.bootstrap.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
         try:
             st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
             fcntl.flock(lock,fcntl.LOCK_EX)
-            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit,signing_key_fd,key_id)
+            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit,signing_key_fd,key_id,receipt_dir_fd)
         finally:os.close(lock)
     finally:os.close(rootfd)
 
 
-def reconcile_pending(path, owner, root, log_fd, audit=None, trust_raw=None):
+def reconcile_pending(path, owner, root, log_fd, audit=None, trust_raw=None,receipt_dir_fd=None):
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
-        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
         lock=os.open('.bootstrap.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
         try:
             st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
             fcntl.flock(lock,fcntl.LOCK_EX)
-            return _reconcile_pending_locked(path,owner,root,log_fd,audit,trust_raw)
+            return _reconcile_pending_locked(path,owner,root,log_fd,audit,trust_raw,receipt_dir_fd)
         finally:os.close(lock)
     finally:os.close(rootfd)

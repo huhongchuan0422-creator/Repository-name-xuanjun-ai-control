@@ -125,20 +125,31 @@ def main():
     a.add_argument('--reconcile',action='store_true')
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
     a.add_argument('--trust-fd',type=int,required=True)
+    a.add_argument('--receipt-dir-fd',type=int,required=True)
+    a.add_argument('--expected-controller-uid',type=int,default=0)
+    a.add_argument('--expected-controller-gid',type=int,default=0)
+    a.add_argument('--expected-receipt-owner',type=int,default=0)
+    a.add_argument('--expected-receipt-mode',type=lambda v:int(v,8),default=0o700)
     for n in ('ledger','audit','root'):a.add_argument('--'+n,required=True)
     for n in ('task','attempt','receipt-key-id'):a.add_argument('--'+n)
     x=a.parse_args()
     try:
         from controller import run,reconcile_pending
         from path_guard import GuardedAudit
-        with GuardedAudit(x.audit,0) as audit:
+        require(os.geteuid()==x.expected_controller_uid and os.getegid()==x.expected_controller_gid,'CONTROLLER_IDENTITY_MISMATCH')
+        trust=parse(stable_read(x.trust_fd,x.expected_controller_uid,65536))
+        require(trust.get('expected_controller_uid',0)==x.expected_controller_uid and trust.get('expected_controller_gid',0)==x.expected_controller_gid,'CONTROLLER_TRUST_MISMATCH')
+        require(trust.get('expected_receipt_owner',0)==x.expected_receipt_owner and trust.get('expected_receipt_mode',448)==x.expected_receipt_mode,'RECEIPT_TRUST_MISMATCH')
+        rd=os.fstat(x.receipt_dir_fd)
+        require(stat.S_ISDIR(rd.st_mode) and rd.st_uid==x.expected_receipt_owner and stat.S_IMODE(rd.st_mode)==x.expected_receipt_mode,'RECEIPT_DIRECTORY_REQUIRED')
+        with GuardedAudit(x.audit,x.expected_controller_uid) as audit:
             if x.reconcile:
-                pending=reconcile_pending(x.ledger,0,x.root,audit.file,audit,stable_read(x.trust_fd,0,65536))
+                pending=reconcile_pending(x.ledger,x.expected_controller_uid,x.root,audit.file,audit,stable_read(x.trust_fd,x.expected_controller_uid,65536),receipt_dir_fd=x.receipt_dir_fd)
                 require(pending==0,'UNKNOWN_RECONCILIATION_REQUIRED')
                 print('RECONCILED')
             else:
                 require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
-                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id);print('INSTALLED '+target)
+                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())
