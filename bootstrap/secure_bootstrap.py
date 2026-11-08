@@ -118,15 +118,24 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     return carrier,p
 
 def main():
-    a=argparse.ArgumentParser();
-    for n in ('carrier-fd','manifest-fd','receipt-fd','trust-fd','receipt-signing-key-fd'): a.add_argument('--'+n,type=int,required=True)
-    for n in ('ledger','audit','task','attempt','root','receipt-key-id'):a.add_argument('--'+n,required=True)
+    a=argparse.ArgumentParser()
+    a.add_argument('--reconcile',action='store_true')
+    for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
+    a.add_argument('--trust-fd',type=int,required=True)
+    for n in ('ledger','audit','root'):a.add_argument('--'+n,required=True)
+    for n in ('task','attempt','receipt-key-id'):a.add_argument('--'+n)
     x=a.parse_args()
     try:
-        from controller import run
+        from controller import run,reconcile_pending
         from path_guard import GuardedAudit
         with GuardedAudit(x.audit,0) as audit:
-            target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id);print('INSTALLED '+target)
+            if x.reconcile:
+                pending=reconcile_pending(x.ledger,0,x.root,audit.file,audit,stable_read(x.trust_fd,0,65536))
+                require(pending==0,'UNKNOWN_RECONCILIATION_REQUIRED')
+                print('RECONCILED')
+            else:
+                require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
+                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())

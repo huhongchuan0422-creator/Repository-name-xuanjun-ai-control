@@ -8,7 +8,8 @@ b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 class BootstrapTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(dir=os.getcwd());self.dir=self.tmp.name;self.fds=[]
-  self.sqlite_version=sqlite3.sqlite_version_info;sqlite3.sqlite_version_info=(3,53,1)
+  self.sqlite_version=sqlite3.sqlite_version_info
+  if os.environ.get('MCP_UNIT_TEST_VERSION_OVERRIDE')=='1':sqlite3.sqlite_version_info=(3,53,1)
   self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
   self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode(),'key_id':'fixture-key'}
   z=io.BytesIO()
@@ -140,11 +141,42 @@ class InstallerTests(BootstrapTests):
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
   cmd=[sys.executable,cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
   proc=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf),stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True)
-  self.assertEqual(proc.returncode,0,proc.stderr);self.assertEqual(self.state(),'SUCCEEDED')
+  if os.environ.get('MCP_EXPECT_OLD_SQLITE')=='1':
+   self.assertLess(sqlite3.sqlite_version_info,(3,35,0));self.assertNotEqual(proc.returncode,0);self.assertIn('SQLITE_VERSION_UNSUPPORTED',proc.stderr)
+   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select count(*) from operations').fetchone()[0],0)
+   return
+  self.assertGreaterEqual(sqlite3.sqlite_version_info,(3,35,0));self.assertEqual(proc.returncode,0,proc.stderr);self.assertEqual(self.state(),'SUCCEEDED')
   with open(os.path.join(self.root,'release-nonce','payload'),'rb') as f:self.assertEqual(f.read(),b'abc')
   with open(os.path.join(self.root,'receipt-nonce.json'),'rb') as f:item=b.parse(f.read())
   self.key.public_key().verify(base64.b64decode(item['signature']),b.canonical(item['payload']))
   with open(self.log,'rb') as f:self.assertIn(b'SUCCEEDED',f.read())
+ def test_cli_reconcile_tampering(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
+  base=[sys.executable,cli,'--trust-fd',str(tf),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
+  install=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
+  fds=(cf,mf,rf,tf,kf);r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  self.assertEqual(r.returncode,0,r.stderr);target=os.path.join(self.root,'release-nonce');receipt=os.path.join(self.root,'receipt-nonce.json')
+  with open(receipt,'rb') as f:original=f.read()
+  for mode in ('content','symlink','receipt'):
+   with self.subTest(mode=mode):
+    with sqlite3.connect(self.ledger) as db:db.execute("update operations set state='UNKNOWN' where nonce='nonce'")
+    if mode=='content':
+     with open(os.path.join(target,'payload'),'wb') as f:f.write(b'bad')
+    elif mode=='symlink':os.symlink('/etc/passwd',os.path.join(target,'evil'))
+    else:
+     with open(receipt,'wb') as f:f.write(b'bad')
+    r=subprocess.run(base+['--reconcile'],pass_fds=(tf,),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertNotEqual(r.returncode,0);self.assertEqual(self.state(),'UNKNOWN')
+    r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
+    if mode=='content':
+     with open(os.path.join(target,'payload'),'wb') as f:f.write(b'abc')
+    elif mode=='symlink':os.unlink(os.path.join(target,'evil'))
+    else:
+     with open(receipt,'wb') as f:f.write(original)
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
