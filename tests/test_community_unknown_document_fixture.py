@@ -25,3 +25,19 @@ class UnknownDocumentFixture(unittest.TestCase):
         raw = base64.b64decode(fixture['png_base64'], validate=True)
         self.assertEqual(hashlib.sha256(raw).hexdigest(), fixture['png_sha256'])
         self.assertTrue(raw.startswith(b'\x89PNG\r\n\x1a\n'))
+
+
+
+class RuntimeIdentityPinFixture(unittest.TestCase):
+    def test_image_contract_assertions_track_current_pinned_successor(self):
+        lock = json.loads(Path('scripts/community_ocr_dependency.json').read_text())
+        tree = ast.parse(Path('tests/community_identity_api_runtime_checks.py').read_text())
+        constants = {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+        for digest in lock['files'].values():
+            self.assertIn(digest, constants)
+        self.assertIn(lock['local_successor']['patch_path'], constants)
+        self.assertIn(lock['local_successor']['patch_sha256'], constants)
+        self.assertIn('bank_card', constants)
+        for name, path in lock['local_successor']['source_files'].items():
+            self.assertEqual(hashlib.sha256(Path(path).read_bytes()).hexdigest(), lock['files'][name])
+        self.assertEqual(hashlib.sha256(Path(lock['local_successor']['patch_path']).read_bytes()).hexdigest(), lock['local_successor']['patch_sha256'])

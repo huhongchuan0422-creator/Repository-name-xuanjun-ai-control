@@ -13,16 +13,17 @@ class IdentityApiRuntime(unittest.TestCase):
     def test_runtime_is_exact_pinned_recovery_successor_and_immutable_core(self):
         from scripts import community_ocr_bridge
         lock=json.loads(Path(community_ocr_bridge.__file__).with_name('community_ocr_dependency.json').read_text())
-        self.assertEqual(lock['files']['api.py'],'8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e')
+        self.assertEqual(lock['files']['api.py'],'65f7bc31e43d0104297aa574f4d42754288faab3c2d0e02fd37ab334742a877d')
         self.assertEqual(lock['files']['secure_store.py'],'30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25')
         self.assertEqual(lock['local_successor']['source_files'],{'api.py':'services/ocr_engine/api.py','secure_store.py':'services/ocr_engine/secure_store.py'})
-        self.assertEqual(lock['local_successor']['patch_path'],'deploy/community-preview/ocr-recovery-api-store.patch')
+        self.assertEqual(lock['local_successor']['patch_path'],'deploy/community-preview/ocr-bank-card-successor.patch')
+        self.assertEqual(lock['local_successor']['patch_sha256'],'636230f82b27afa1cf88412698a78f244eeb207d2b08bee7fbf1173bf35b9e21')
         for name,digest in lock['files'].items():
             self.assertEqual(hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest(),digest)
         self.assertEqual(lock['files']['ocr_core.py'],lock['upstream_files']['ocr_core.py'])
         self.assertEqual(lock['files']['ocr_core.py'],'bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308')
         self.assertNotEqual(lock['files']['secure_store.py'],lock['upstream_files']['secure_store.py'])
-        self.assertEqual(api.ALLOWED_HINTS,{'business_license','id_front','id_back'})
+        self.assertEqual(api.ALLOWED_HINTS,{'business_license','id_front','id_back','bank_card'})
     def test_real_api_persists_confirms_and_reopens_back_fields(self):
         fields={'issuing_authority':{'value':'SYNTHETIC ONLY','source':'ocr','requires_review':True,'source_boxes':[[[0,0],[1,0],[1,1],[0,1]]]},'valid_from':{'value':'2020-01-02'},'valid_to':{'value':'长期'}}
         evidence={'orientation':{'ambiguous':False,'clockwise_rotation_to_upright_degrees':90,'inference_calls':4},'correction_counterclockwise_degrees':270,'input_dimensions':{'width':100,'height':50},'source_coordinate_space':'input_image_pixels','extraction_after_pixel_rotation':True,'unresolved_validity_candidates':[{'value':'2020.01.02-长期','source_lines':[3]}],'warnings':['SYNTHETIC_REVIEW_REQUIRED']}
