@@ -24,6 +24,11 @@ try:
 except ImportError:
     from p3_secure_fd import open_absolute_dir, copy_member, read_member
 
+try:
+    from install.p3_switch_journal import SwitchCoordinator
+except ImportError:
+    from p3_switch_journal import SwitchCoordinator
+
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -88,7 +93,7 @@ def verify_carrier(root, manifest_path, expected_manifest_sha256):
         "execution_enabled", "notifications_enabled", "files",
         "release_files", "base_reviews",
     }
-    if not isinstance(manifest, dict) or set(manifest) != keys:
+    if not isinstance(manifest, dict) or set(manifest) not in (keys, keys | {"artifact_digest"}):
         raise ValueError("EXACT_CARRIER_MANIFEST_REQUIRED")
     if (manifest["schema"] != 1
             or manifest["kind"] != "P3_IMMUTABLE_DEFAULT_OFF_INSTALL_CARRIER"
@@ -98,6 +103,8 @@ def verify_carrier(root, manifest_path, expected_manifest_sha256):
             or manifest["execution_enabled"] is not False
             or manifest["notifications_enabled"] is not False):
         raise ValueError("CARRIER_IDENTITY_OR_DEFAULT_OFF_INVALID")
+    if "artifact_digest" in manifest and not SHA256.fullmatch(manifest["artifact_digest"] or ""):
+        raise ValueError("INVALID_ARTIFACT_DIGEST")
     files = manifest["files"]
     release_files = manifest["release_files"]
     if not isinstance(files, dict) or not files or not isinstance(release_files, list):
@@ -207,78 +214,129 @@ def _readback_target(target, manifest, manifest_sha256, carrier_archive_sha256):
             "attempt_id": receipt.get("attempt_id"), "verified": True}
 
 
+def _archive_check(archive_path, manifest, expected):
+    if (not isinstance(archive_path, str) or not os.path.isabs(archive_path)
+            or manifest.get("artifact_digest") != expected
+            or not SHA256.fullmatch(expected or "")):
+        raise ValueError("BOUND_ARCHIVE_REQUIRED")
+    parent = open_absolute_dir(os.path.dirname(archive_path), os.geteuid())
+    try:
+        read_member(parent, os.path.basename(archive_path), os.geteuid(), expected,
+                    maximum=256*1024*1024)
+    finally:
+        os.close(parent)
+
+
+def _store_required(store):
+    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition")):
+        raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
+
+
+def _fd_receipt(staging_fd, value):
+    encoded = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    fd = os.open("INSTALL_RECEIPT.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                 0o400, dir_fd=staging_fd)
+    try:
+        offset = 0
+        while offset < len(encoded):
+            written = os.write(fd, encoded[offset:])
+            if written <= 0: raise IOError("SHORT_RECEIPT_WRITE")
+            offset += written
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    os.fsync(staging_fd)
+
+
 def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
             release_root, state_root, attempt_id, fresh_authority,
-            enforce_root=True):
+            enforce_root=True, operation_store=None, archive_path=None, fault_hook=None):
     if enforce_root and os.geteuid() != 0:
         raise PermissionError("ROOT_INSTALL_REQUIRED")
+    _store_required(operation_store)
     for path in (root, manifest_path, release_root, state_root):
         _canonical(path)
-    if (not SHA256.fullmatch(carrier_archive_sha256 or "")
-            or not ATTEMPT.fullmatch(attempt_id or "")):
-        raise ValueError("CARRIER_SHA_AND_ATTEMPT_REQUIRED")
+    if not ATTEMPT.fullmatch(attempt_id or ""):
+        raise ValueError("VALID_ATTEMPT_REQUIRED")
     manifest = verify_carrier(root, manifest_path, manifest_sha256)
+    _archive_check(archive_path, manifest, carrier_archive_sha256)
     _fresh_authority(fresh_authority)
-    os.makedirs(release_root, mode=0o750, exist_ok=True)
-    os.makedirs(state_root, mode=0o750, exist_ok=True)
-    attempts = os.path.join(state_root, "attempts")
-    os.makedirs(attempts, mode=0o750, exist_ok=True)
-    target = os.path.join(release_root, "p3-" + carrier_archive_sha256[:20])
-    observed = _readback_target(
-        target, manifest, manifest_sha256, carrier_archive_sha256)
-    if observed["state"] == "INSTALLED_DEFAULT_OFF_NOT_BOUND":
-        return dict(observed, idempotent=True)
-    if observed["state"] != "ABSENT":
-        raise ValueError("EXISTING_RELEASE_CONFLICT")
-    intent = os.path.join(attempts, attempt_id + ".intent.json")
-    if os.path.lexists(intent):
-        # UNKNOWN effect: never replay.  The caller must use readback/recover.
-        raise RuntimeError("ATTEMPT_ALREADY_HAS_INTENT_RECONCILE_FIRST")
-    _exclusive_json(intent, {
-        "schema": 1, "state": "INSTALLING_DEFAULT_OFF",
-        "attempt_id": attempt_id, "target": target,
-        "carrier_archive_sha256": carrier_archive_sha256,
-    })
-    staging = tempfile.mkdtemp(prefix=".p3-", dir=release_root)
+    parent_fd = open_absolute_dir(os.path.dirname(release_root), os.geteuid())
     try:
-        source_fd = open_absolute_dir(root, os.geteuid())
+        name = os.path.basename(release_root)
+        if name in ('', '.', '..'):
+            raise ValueError("VALID_RELEASE_ROOT_REQUIRED")
         try:
-            staging_fd = open_absolute_dir(staging, os.geteuid())
-            try:
-                for name in sorted(manifest["release_files"]):
-                    _copy_verified(source_fd, staging_fd, name, manifest["files"][name])
-                os.fsync(staging_fd)
-            finally:
-                os.close(staging_fd)
-        finally:
-            os.close(source_fd)
-        # Permissions, P2/P3 release, locks and consumed records are mutable.
-        # Fresh-read again immediately before the atomic release rename.
-        _fresh_authority(fresh_authority)
-        receipt = {
-            "schema": 1, "state": "INSTALLED_DEFAULT_OFF_NOT_BOUND",
-            "attempt_id": attempt_id,
-            "source_commit": manifest["source_commit"],
-            "source_tree": manifest["source_tree"],
-            "carrier_manifest_sha256": manifest_sha256,
-            "carrier_archive_sha256": carrier_archive_sha256,
-            "execution_enabled": False, "notifications_enabled": False,
-            "host_bound": False, "real_task_executed": False,
-        }
-        _atomic_json(os.path.join(staging, "INSTALL_RECEIPT.json"), receipt)
-        os.rename(staging, target)
-        directory = os.open(release_root,
-                            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+            os.mkdir(name, 0o750, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+        except FileExistsError:
+            pass
+        release_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
     finally:
-        if os.path.isdir(staging):
-            shutil.rmtree(staging)
-    return _readback_target(target, manifest, manifest_sha256,
-                            carrier_archive_sha256)
-
+        os.close(parent_fd)
+    release_info = os.fstat(release_fd)
+    if release_info.st_uid != os.geteuid() or release_info.st_mode & 0o022:
+        os.close(release_fd)
+        raise PermissionError("UNTRUSTED_RELEASE_ROOT")
+    source_fd = None
+    staged = ".p3-stage-" + attempt_id
+    target = "p3-" + carrier_archive_sha256[:20]
+    op = "p3-install:" + attempt_id
+    coordinator = SwitchCoordinator(release_fd, operation_store)
+    try:
+        if operation_store.get(op) is not None:
+            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
+        from_stat = os.fstat(release_fd)
+        try:
+            os.stat(target, dir_fd=release_fd, follow_symlinks=False)
+            raise ValueError("EXISTING_RELEASE_CONFLICT")
+        except FileNotFoundError:
+            pass
+        stage_op = "p3-stage:" + attempt_id
+        created, _ = operation_store.reserve(stage_op, {"kind":"install-stage"},
+            {"root_dev":from_stat.st_dev, "root_ino":from_stat.st_ino, "staged":staged,
+             "target":target, "manifest_sha256":manifest_sha256,
+             "artifact_digest":carrier_archive_sha256}, "stage")
+        if not created or not operation_store.transition(stage_op, "RESERVED", "RUNNING", {"phase":"STAGING"}):
+            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
+        os.mkdir(staged, 0o700, dir_fd=release_fd)
+        os.fsync(release_fd)
+        staging_fd = os.open(staged, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=release_fd)
+        try:
+            if os.fstat(staging_fd).st_dev != from_stat.st_dev:
+                raise ValueError("CROSS_FILESYSTEM_REFUSED")
+            source_fd = open_absolute_dir(root, os.geteuid())
+            for name in sorted(manifest["release_files"]):
+                _copy_verified(source_fd, staging_fd, name, manifest["files"][name])
+            receipt = {"schema":1, "state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
+                       "source_commit":manifest["source_commit"], "source_tree":manifest["source_tree"],
+                       "carrier_manifest_sha256":manifest_sha256, "carrier_archive_sha256":carrier_archive_sha256,
+                       "execution_enabled":False, "notifications_enabled":False,
+                       "host_bound":False, "real_task_executed":False}
+            if fault_hook: fault_hook("before_receipt")
+            _fd_receipt(staging_fd, receipt)
+            if fault_hook: fault_hook("after_receipt")
+        finally:
+            if source_fd is not None: os.close(source_fd)
+            os.close(staging_fd)
+        _fresh_authority(fresh_authority)
+        if not coordinator.prepare(op, staged, target, context={
+                "manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}, require_absent=True):
+            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
+        if not operation_store.transition(stage_op, "RUNNING", "SUCCEEDED", {"phase":"STAGED"}):
+            raise RuntimeError("STAGING_JOURNAL_CONFLICT")
+        result = coordinator.switch(op, staged, target, fault_hook, prepared=True)
+        if result["state"] != "SWITCHED":
+            return {"state":"UNKNOWN", "automatic_retry":False}
+        return {"state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
+                "target":os.path.join(release_root,target), "verified":True}
+    except BaseException:
+        if 'stage_op' in locals():
+            operation_store.transition(stage_op, "RUNNING", "UNKNOWN", {"phase":"STAGING_UNKNOWN"})
+        raise
+    finally:
+        coordinator.close()
+        os.close(release_fd)
 
 def readback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
              release_root):
@@ -293,26 +351,28 @@ def readback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
 
 
 def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
-            release_root, state_root, attempt_id):
-    """Read an interrupted attempt without repeating any write."""
-    for path in (root, manifest_path, release_root, state_root):
-        _canonical(path)
-    if (not ATTEMPT.fullmatch(attempt_id or "")
-            or not SHA256.fullmatch(carrier_archive_sha256 or "")):
-        raise ValueError("VALID_ATTEMPT_AND_CARRIER_SHA_REQUIRED")
-    observed = readback(root, manifest_path, manifest_sha256,
-                        carrier_archive_sha256, release_root)
-    intent = os.path.join(state_root, "attempts", attempt_id + ".intent.json")
-    if not os.path.isfile(intent) or os.path.islink(intent):
-        return dict(observed, recovery="NO_MATCHING_INTENT")
-    value, _ = _read_json(intent, maximum=65536)
-    if (value.get("attempt_id") != attempt_id
-            or value.get("carrier_archive_sha256") != carrier_archive_sha256):
-        return dict(observed, recovery="INTENT_CONFLICT_HOLD")
-    if observed["state"] == "INSTALLED_DEFAULT_OFF_NOT_BOUND":
-        return dict(observed, recovery="INSTALLED_EFFECT_RECOVERED_NO_REPLAY")
-    return dict(observed, recovery="RESULT_MISSING_HOLD_NO_REPLAY")
-
+            release_root, state_root, attempt_id, operation_store=None):
+    _store_required(operation_store)
+    if not ATTEMPT.fullmatch(attempt_id or ""):
+        raise ValueError("VALID_ATTEMPT_REQUIRED")
+    fd = open_absolute_dir(release_root, os.geteuid())
+    coordinator = SwitchCoordinator(fd, operation_store)
+    try:
+        op = "p3-install:" + attempt_id
+        row = operation_store.get(op)
+        if not row:
+            return {"state":"UNKNOWN", "recovery":"RESULT_MISSING_HOLD_NO_REPLAY", "automatic_retry":False}
+        binding = json.loads(row["request_json"])["admission"]
+        if (binding.get("context") != {"manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}
+                or binding.get("current") != "p3-" + carrier_archive_sha256[:20]):
+            return {"state":"UNKNOWN", "recovery":"SCOPE_CONFLICT_HOLD", "automatic_retry":False}
+        result = coordinator.reconcile(op)
+        state = result["state"]
+        return {"state":state,
+                "recovery":"INSTALLED_EFFECT_RECOVERED_NO_REPLAY" if state == "SWITCHED" else "RESULT_MISSING_HOLD_NO_REPLAY",
+                "automatic_retry":False}
+    finally:
+        coordinator.close(); os.close(fd)
 
 def _rollback_checkpoint(path, manifest):
     receipt = os.path.join(path, "INSTALL_RECEIPT.json")
@@ -341,106 +401,32 @@ def _rollback_receipt(attempt_id, carrier_archive_sha256, manifest):
 
 def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
              release_root, state_root, attempt_id, fresh_authority,
-             enforce_root=True):
-    """Quarantine an unbound default-off release; never touch ledger/history."""
+             enforce_root=True, operation_store=None, original_install_attempt=None,
+             fault_hook=None):
     if enforce_root and os.geteuid() != 0:
         raise PermissionError("ROOT_ROLLBACK_REQUIRED")
-    for path in (root, manifest_path, release_root, state_root):
-        _canonical(path)
-    if (not ATTEMPT.fullmatch(attempt_id or "")
-            or not SHA256.fullmatch(carrier_archive_sha256 or "")):
-        raise ValueError("VALID_ATTEMPT_AND_CARRIER_SHA_REQUIRED")
-    manifest = verify_carrier(root, manifest_path, manifest_sha256)
+    _store_required(operation_store)
+    if not ATTEMPT.fullmatch(attempt_id or "") or not ATTEMPT.fullmatch(original_install_attempt or ""):
+        raise ValueError("VALID_ATTEMPTS_REQUIRED")
     _fresh_authority(fresh_authority)
-    target = os.path.join(release_root, "p3-" + carrier_archive_sha256[:20])
-    quarantine_root = os.path.join(state_root, "rolled-back")
-    destination = os.path.join(quarantine_root, attempt_id)
-    rollback_attempts = os.path.join(state_root, "rollback-attempts")
-    intent_path = os.path.join(rollback_attempts, attempt_id + ".intent.json")
-
-    if os.path.isfile(intent_path) and not os.path.islink(intent_path):
-        intent, _ = _read_json(intent_path, maximum=1024 * 1024)
-        expected = {
-            "schema": 1, "state": "ROLLBACK_INTENT",
-            "attempt_id": attempt_id, "source": target,
-            "destination": destination,
-            "carrier_manifest_sha256": manifest_sha256,
-            "carrier_archive_sha256": carrier_archive_sha256,
-            "source_commit": manifest["source_commit"],
-            "source_tree": manifest["source_tree"],
-        }
-        if (not isinstance(intent, dict)
-                or set(intent) != set(expected) | {"checkpoint"}
-                or any(intent.get(key) != value for key, value in expected.items())
-                or not isinstance(intent.get("checkpoint"), dict)):
-            raise ValueError("ROLLBACK_INTENT_MISMATCH_HOLD")
-        target_exists = os.path.isdir(target) and not os.path.islink(target)
-        destination_exists = (os.path.isdir(destination)
-                              and not os.path.islink(destination))
-        if target_exists and destination_exists:
-            raise ValueError("ROLLBACK_DUPLICATE_LOCATION_HOLD")
-        if not target_exists and not destination_exists:
-            raise RuntimeError("ROLLBACK_RESULT_MISSING_HOLD_NO_REPLAY")
-        current = destination if destination_exists else target
-        if _rollback_checkpoint(current, manifest) != intent["checkpoint"]:
-            raise ValueError("ROLLBACK_DESTINATION_CHECKPOINT_MISMATCH_HOLD")
-        if destination_exists:
-            receipt_path = os.path.join(destination, "ROLLBACK_RECEIPT.json")
-            expected_receipt = _rollback_receipt(
-                attempt_id, carrier_archive_sha256, manifest)
-            if os.path.isfile(receipt_path) and not os.path.islink(receipt_path):
-                receipt, _ = _read_json(receipt_path, maximum=65536)
-                if receipt != expected_receipt:
-                    raise ValueError("ROLLBACK_RECEIPT_MISMATCH_HOLD")
-            else:
-                _atomic_json(receipt_path, expected_receipt)
-            return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
-                    "destination": destination, "verified": True,
-                    "recovery": "ROLLBACK_EFFECT_RECOVERED_NO_REPLAY"}
-        # The durable intent exists but rename did not occur.  The exact target
-        # checkpoint is unchanged, so resume from that checkpoint once.
-        _fresh_authority(fresh_authority)
-        os.rename(target, destination)
-        _atomic_json(os.path.join(destination, "ROLLBACK_RECEIPT.json"),
-                     _rollback_receipt(
-                         attempt_id, carrier_archive_sha256, manifest))
-        return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
-                "destination": destination, "verified": True,
-                "recovery": "ROLLBACK_RESUMED_FROM_DURABLE_INTENT"}
-
-    if os.path.lexists(intent_path):
-        raise ValueError("ROLLBACK_INTENT_NOT_REGULAR_HOLD")
-    observed = _readback_target(target, manifest, manifest_sha256,
-                                carrier_archive_sha256)
-    if observed["state"] == "ABSENT":
-        return dict(observed, idempotent=True)
-    if observed["state"] != "INSTALLED_DEFAULT_OFF_NOT_BOUND":
-        raise ValueError("ROLLBACK_READBACK_CONFLICT")
-    receipt, _ = _read_json(os.path.join(target, "INSTALL_RECEIPT.json"), 65536)
-    if receipt.get("host_bound") is not False or receipt.get("real_task_executed") is not False:
-        raise PermissionError("BOUND_OR_EXECUTED_RELEASE_REQUIRES_HOST_STOP_RECONCILIATION")
-    checkpoint = _rollback_checkpoint(target, manifest)
-    _fresh_authority(fresh_authority)
-    os.makedirs(quarantine_root, mode=0o750, exist_ok=True)
-    os.makedirs(rollback_attempts, mode=0o750, exist_ok=True)
-    if os.path.lexists(destination):
-        raise RuntimeError("ROLLBACK_ATTEMPT_ALREADY_EXISTS_RECONCILE_FIRST")
-    _exclusive_json(intent_path, {
-        "schema": 1, "state": "ROLLBACK_INTENT", "attempt_id": attempt_id,
-        "source": target, "destination": destination,
-        "carrier_manifest_sha256": manifest_sha256,
-        "carrier_archive_sha256": carrier_archive_sha256,
-        "source_commit": manifest["source_commit"],
-        "source_tree": manifest["source_tree"],
-        "checkpoint": checkpoint,
-    })
-    _fresh_authority(fresh_authority)
-    os.rename(target, destination)
-    _atomic_json(os.path.join(destination, "ROLLBACK_RECEIPT.json"),
-                 _rollback_receipt(attempt_id, carrier_archive_sha256, manifest))
-    return {"state": "ROLLED_BACK_DEFAULT_OFF_QUARANTINED",
-            "destination": destination, "verified": True}
-
+    original = operation_store.get("p3-install:"+original_install_attempt)
+    if not original:
+        return {"state":"UNKNOWN", "automatic_retry":False}
+    binding = json.loads(original["request_json"])["admission"]
+    if (binding.get("context") != {"manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}
+            or binding.get("current") != "p3-" + carrier_archive_sha256[:20]):
+        return {"state":"UNKNOWN", "automatic_retry":False}
+    fd = open_absolute_dir(release_root, os.geteuid())
+    coordinator = SwitchCoordinator(fd, operation_store)
+    try:
+        result = coordinator.rollback("p3-rollback:"+attempt_id,
+                                      "p3-install:"+original_install_attempt, fault_hook)
+        if result["state"] != "ROLLED_BACK":
+            return {"state":"UNKNOWN", "automatic_retry":False}
+        return {"state":"ROLLED_BACK_DEFAULT_OFF_QUARANTINED", "verified":True,
+                "recovery":"ROLLBACK_EFFECT_RECOVERED_NO_REPLAY"}
+    finally:
+        coordinator.close(); os.close(fd)
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
@@ -465,13 +451,7 @@ def main(argv=None):
             args.carrier_archive_sha256, args.release_root), sort_keys=True))
         return 0
     if args.operation == "recover":
-        if not args.state_root or not args.attempt_id:
-            parser.error("recover requires state root and attempt ID")
-        print(json.dumps(recover(
-            args.root, args.manifest, args.manifest_sha256,
-            args.carrier_archive_sha256, args.release_root,
-            args.state_root, args.attempt_id), sort_keys=True))
-        return 0
+        parser.error("recover requires a host-injected durable OperationStore; CLI recovery is disabled")
     return 0
 
 
