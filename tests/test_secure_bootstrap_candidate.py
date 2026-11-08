@@ -293,6 +293,24 @@ class InstallerTests(BootstrapTests):
     self.assertNotEqual(r.returncode,0);self.assertIn(b'ROLLBACK_SCHEMA_REQUIRED',r.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
     with sqlite3.connect(self.ledger) as db:
      if missing!='state':self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
+ def test_cli_twenty_process_install_rollback(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cmd=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
+  procs=[subprocess.Popen(cmd,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE) for _ in range(20)];results=[(p.wait(timeout=30),p.communicate()) for p in procs]
+  self.assertEqual(sum(r[0]==0 for r in results),1)
+  with sqlite3.connect(self.ledger) as db:pre=db.execute('select prestate_digest from operations').fetchone()[0]
+  payload={'install_op':'install:nonce','prestate_digest':pre,'rollback_op':'rollback:parallel','nonce':'parallel-nonce','expiry':int(time.time())+600,'controller':'fixture'}
+  afd=self.fd('concurrent-auth',b.canonical({'payload':payload,'signature':base64.b64encode(self.key.sign(b.canonical(payload))).decode(),'key_id':'fixture-key'}))
+  rb=base+['--rollback','--rollback-authorization-fd',str(afd),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key']
+  procs=[subprocess.Popen(rb,pass_fds=fds+(afd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE) for _ in range(20)];results=[(p.wait(timeout=30),p.communicate()) for p in procs]
+  self.assertTrue(all(r[0]==0 for r in results),results);self.assertEqual(len({r[1][0] for r in results}),1)
+  with open(self.log,'rb') as f:events=[json.loads(x) for x in f if x.strip()]
+  self.assertEqual(sum(e.get('event')=='ROLLBACK_SWITCH' and e.get('operation')=='rollback:parallel' for e in events),1)
+  self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
