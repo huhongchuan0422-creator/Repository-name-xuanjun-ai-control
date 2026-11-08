@@ -210,8 +210,9 @@ class CarrierInstallTests(unittest.TestCase):
             self.rollback(self.root, self.manifest_path, self.manifest_sha, self.archive_sha,
                           self.releases, self.state, 'rollback-attempt-01', lambda:True,
                           enforce_root=False, fault_hook=interrupt)
-        result=self.rollback(self.root, self.manifest_path, self.manifest_sha, self.archive_sha,
-                             self.releases, self.state, 'rollback-attempt-01', lambda:True, enforce_root=False)
+        fence=self.store.get('p3-rollback-owner:install-attempt-01')['adapter_correlation']
+        result=installer.recover_rollback(self.releases, 'rollback-attempt-01', 'install-attempt-01',
+                                           operation_store=self.store, owner_fence=fence)
         self.assertEqual('ROLLBACK_EFFECT_RECOVERED_NO_REPLAY',result['recovery'])
         self.assertEqual('ROLLED_BACK_DEFAULT_OFF_QUARANTINED',result['state'])
 
@@ -227,8 +228,9 @@ class CarrierInstallTests(unittest.TestCase):
         path=os.path.join(self.releases,'.p3-stage-install-attempt-01','src','module.py')
         os.chmod(path,0o600)
         with open(path,'ab') as output: output.write(b'changed')
-        result=self.rollback(self.root, self.manifest_path, self.manifest_sha, self.archive_sha,
-                             self.releases, self.state, 'rollback-attempt-01', lambda:True, enforce_root=False)
+        fence=self.store.get('p3-rollback-owner:install-attempt-01')['adapter_correlation']
+        result=installer.recover_rollback(self.releases,'rollback-attempt-01','install-attempt-01',
+                                           operation_store=self.store,owner_fence=fence)
         self.assertEqual('UNKNOWN',result['state'])
 
     def test_archive_tampering_rejected_before_journal_or_effect(self):
@@ -293,7 +295,7 @@ class CarrierInstallTests(unittest.TestCase):
         for _ in range(2):
             result=self.rollback(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                  self.releases,self.state,'rollback-attempt-01',lambda:True,enforce_root=False)
-            self.assertEqual('ROLLED_BACK_DEFAULT_OFF_QUARANTINED',result['state'])
+            self.assertIn(result['state'],('ROLLED_BACK_DEFAULT_OFF_QUARANTINED','IN_PROGRESS_OR_HOLD'))
 
     def test_cross_device_staging_is_rejected_and_journaled_unknown(self):
         original=installer.os.fstat

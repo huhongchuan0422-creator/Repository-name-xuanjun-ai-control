@@ -229,7 +229,7 @@ def _archive_check(archive_path, manifest, expected):
 
 
 def _store_required(store):
-    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition", "reserve_owned", "transition_owned")):
+    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition", "reserve_owned", "transition_owned", "acquire_guard", "reserve_owned_with_guard", "claim_guard_recovery", "finish_guard_recovery")):
         raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
 
 
@@ -365,6 +365,10 @@ def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
         return {"state":"UNKNOWN", "recovery":"OWNER_FENCE_MISMATCH_HOLD", "automatic_retry":False}
     fd = open_absolute_dir(release_root, os.geteuid())
     coordinator = SwitchCoordinator(fd, operation_store)
+    guard_id = "p3-recovery-guard:" + attempt_id
+    guard_scope = {"install_op":"p3-install:" + attempt_id}
+    guard_fence = os.urandom(32).hex()
+    guard_acquired = False
     try:
         op = "p3-install:" + attempt_id
         row = operation_store.get(op)
@@ -374,13 +378,20 @@ def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
         if (binding.get("context") != {"manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}
                 or binding.get("current") != "p3-" + carrier_archive_sha256[:20]):
             return {"state":"UNKNOWN", "recovery":"SCOPE_CONFLICT_HOLD", "automatic_retry":False}
+        guard_acquired = operation_store.acquire_guard(guard_id, guard_scope, guard_fence)
+        if not guard_acquired:
+            return {"state":"IN_PROGRESS_OR_HOLD", "recovery":"EXCLUSIVE_RECOVERY_HOLD", "automatic_retry":False}
         result = coordinator.reconcile(op)
         state = result["state"]
         return {"state":state,
                 "recovery":"INSTALLED_EFFECT_RECOVERED_NO_REPLAY" if state == "SWITCHED" else "RESULT_MISSING_HOLD_NO_REPLAY",
                 "automatic_retry":False}
     finally:
-        coordinator.close(); os.close(fd)
+        try:
+            if guard_acquired and not operation_store.transition_owned(guard_id, guard_fence, "RUNNING", "SUCCEEDED", {"phase":"GUARD_RELEASED"}):
+                raise RuntimeError("RECOVERY_GUARD_RELEASE_CONFLICT")
+        finally:
+            coordinator.close(); os.close(fd)
 
 def _rollback_checkpoint(path, manifest):
     receipt = os.path.join(path, "INSTALL_RECEIPT.json")
@@ -417,7 +428,8 @@ def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     if not ATTEMPT.fullmatch(attempt_id or "") or not ATTEMPT.fullmatch(original_install_attempt or ""):
         raise ValueError("VALID_ATTEMPTS_REQUIRED")
     _fresh_authority(fresh_authority)
-    original = operation_store.get("p3-install:"+original_install_attempt)
+    original_op = "p3-install:" + original_install_attempt
+    original = operation_store.get(original_op)
     if not original:
         return {"state":"UNKNOWN", "automatic_retry":False}
     binding = json.loads(original["request_json"])["admission"]
@@ -426,13 +438,86 @@ def rollback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
         return {"state":"UNKNOWN", "automatic_retry":False}
     fd = open_absolute_dir(release_root, os.geteuid())
     coordinator = SwitchCoordinator(fd, operation_store)
+    owner_op = "p3-rollback-owner:" + original_install_attempt
+    journal_op = "p3-rollback:" + attempt_id
+    guard_id = "p3-recovery-guard:" + original_install_attempt
+    guard_scope = {"install_op":original_op}
+    fence = os.urandom(32).hex()
+    owns = False
     try:
-        result = coordinator.rollback("p3-rollback:"+attempt_id,
-                                      "p3-install:"+original_install_attempt, fault_hook)
+        root_info = os.fstat(fd)
+        owns, _ = operation_store.reserve_owned_with_guard(
+            owner_op, {"kind":"rollback-owner"},
+            {"install_op":original_op, "journal_op":journal_op, "root_dev":root_info.st_dev,
+             "root_ino":root_info.st_ino, "manifest_sha256":manifest_sha256,
+             "artifact_digest":carrier_archive_sha256}, "rollback", fence, guard_id, guard_scope)
+        if not owns:
+            return {"state":"IN_PROGRESS_OR_HOLD", "automatic_retry":False}
+        result = coordinator.rollback(journal_op, original_op, fault_hook)
         if result["state"] != "ROLLED_BACK":
+            operation_store.transition_owned(owner_op, fence, "RUNNING", "UNKNOWN", {"phase":"ROLLBACK_UNKNOWN"})
+            operation_store.transition_owned(guard_id, fence, "RUNNING", "UNKNOWN", {"phase":"RECOVERY_UNKNOWN"})
             return {"state":"UNKNOWN", "automatic_retry":False}
+        if not operation_store.transition_owned(owner_op, fence, "RUNNING", "SUCCEEDED", {"phase":"ROLLED_BACK"}):
+            raise RuntimeError("ROLLBACK_OWNER_CONFLICT")
+        if not operation_store.transition_owned(guard_id, fence, "RUNNING", "SUCCEEDED", {"phase":"GUARD_RELEASED"}):
+            raise RuntimeError("RECOVERY_GUARD_CONFLICT")
         return {"state":"ROLLED_BACK_DEFAULT_OFF_QUARANTINED", "verified":True,
-                "recovery":"ROLLBACK_EFFECT_RECOVERED_NO_REPLAY"}
+                "recovery":"ROLLBACK_EFFECT_RECORDED_NO_REPLAY"}
+    except BaseException:
+        if owns:
+            operation_store.transition_owned(owner_op, fence, "RUNNING", "UNKNOWN", {"phase":"ROLLBACK_UNKNOWN"})
+            operation_store.transition_owned(guard_id, fence, "RUNNING", "UNKNOWN", {"phase":"RECOVERY_UNKNOWN"})
+        raise
+    finally:
+        coordinator.close(); os.close(fd)
+
+
+def recover_rollback(release_root, attempt_id, original_install_attempt,
+                     operation_store=None, owner_fence=None):
+    """Reconcile a stopped rollback owner; never repeat rename."""
+    _store_required(operation_store)
+    if not ATTEMPT.fullmatch(attempt_id or "") or not ATTEMPT.fullmatch(original_install_attempt or ""):
+        raise ValueError("VALID_ATTEMPTS_REQUIRED")
+    owner_op = "p3-rollback-owner:" + original_install_attempt
+    journal_op = "p3-rollback:" + attempt_id
+    guard_id = "p3-recovery-guard:" + original_install_attempt
+    owner = operation_store.get(owner_op)
+    guard = operation_store.get(guard_id)
+    if not owner or not guard or not isinstance(owner_fence, str):
+        return {"state":"UNKNOWN", "automatic_retry":False}
+    stored = owner.get("adapter_correlation")
+    guard_fence = guard.get("adapter_correlation")
+    if (not isinstance(stored,str) or not isinstance(guard_fence,str)
+            or not hmac.compare_digest(owner_fence,stored)
+            or not hmac.compare_digest(owner_fence,guard_fence)):
+        return {"state":"UNKNOWN", "recovery":"OWNER_FENCE_MISMATCH_HOLD", "automatic_retry":False}
+    owner_binding = json.loads(owner["request_json"])["admission"]
+    if owner_binding.get("install_op") != "p3-install:"+original_install_attempt or owner_binding.get("journal_op") != journal_op:
+        return {"state":"UNKNOWN", "recovery":"SCOPE_CONFLICT_HOLD", "automatic_retry":False}
+    recovery_token = os.urandom(32).hex()
+    fd = open_absolute_dir(release_root, os.geteuid())
+    coordinator = SwitchCoordinator(fd, operation_store)
+    try:
+        root = os.fstat(fd)
+        if (root.st_dev,root.st_ino) != (owner_binding['root_dev'],owner_binding['root_ino']):
+            return {"state":"UNKNOWN", "automatic_retry":False}
+        journal = operation_store.get(journal_op)
+        if not journal:
+            return {"state":"UNKNOWN", "recovery":"RESULT_MISSING_HOLD_NO_REPLAY", "automatic_retry":False}
+        if not operation_store.claim_guard_recovery(guard_id, owner_fence, recovery_token):
+            return {"state":"IN_PROGRESS_OR_HOLD", "automatic_retry":False}
+        outcome = coordinator.reconcile(journal_op)
+        if outcome["state"] != "SWITCHED":
+            return {"state":"UNKNOWN", "recovery":"RESULT_MISSING_HOLD_NO_REPLAY", "automatic_retry":False}
+        if owner['state'] in ('RUNNING','UNKNOWN'):
+            if not operation_store.transition_owned(owner_op,owner_fence,owner['state'],"SUCCEEDED",{"phase":"ROLLED_BACK_RECONCILED"}):
+                return {"state":"UNKNOWN", "automatic_retry":False}
+        elif owner['state'] != 'SUCCEEDED':
+            return {"state":"UNKNOWN", "automatic_retry":False}
+        if not operation_store.finish_guard_recovery(guard_id, owner_fence, recovery_token):
+            return {"state":"UNKNOWN", "automatic_retry":False}
+        return {"state":"ROLLED_BACK_DEFAULT_OFF_QUARANTINED", "recovery":"ROLLBACK_EFFECT_RECOVERED_NO_REPLAY", "verified":True}
     finally:
         coordinator.close(); os.close(fd)
 

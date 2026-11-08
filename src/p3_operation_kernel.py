@@ -244,3 +244,103 @@ class RunnerOperationStore:
             raise
         finally:
             db.close()
+
+    @staticmethod
+    def _guard_binding(guard_id, guard_scope):
+        body = _json({'kind':'exclusive-recovery-guard', 'guard_id':guard_id, 'scope':guard_scope})
+        return body, hashlib.sha256(body.encode('utf-8')).hexdigest()
+
+    def _acquire_guard_tx(self, db, guard_id, guard_scope, owner_fence):
+        body, digest = self._guard_binding(guard_id, guard_scope)
+        row = OperationKernel._read(self, db, guard_id)
+        if row:
+            if row['request_digest'] != digest or row['request_json'] != body:
+                raise ValueError('GUARD_SCOPE_CONFLICT')
+            if row['state'] != 'SUCCEEDED':
+                return False
+            changed = db.execute('UPDATE p3_effect_operations SET state=?, receipt_json=?, adapter_correlation=? WHERE operation_id=? AND state=?',
+                ('RUNNING', _json({'phase':'GUARD_HELD'}), owner_fence, guard_id, 'SUCCEEDED')).rowcount
+            return changed == 1
+        db.execute('INSERT INTO p3_effect_operations(operation_id,request_digest,identity_json,request_json,state,receipt_json,adapter_correlation) VALUES(?,?,?,?,?,?,?)',
+            (guard_id, digest, _json({'kind':'guard'}), body, 'RUNNING', _json({'phase':'GUARD_HELD'}), owner_fence))
+        return True
+
+    def acquire_guard(self, guard_id, guard_scope, owner_fence):
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            acquired = self._acquire_guard_tx(db, guard_id, guard_scope, owner_fence)
+            db.commit()
+            return acquired
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def reserve_owned_with_guard(self, operation_id, subject, admission, operation,
+                                 owner_fence, guard_id, guard_scope):
+        if not isinstance(owner_fence, str) or len(owner_fence) != 64 or any(c not in '0123456789abcdef' for c in owner_fence):
+            raise ValueError('VALID_OWNER_FENCE_REQUIRED')
+        body = _json({'subject':subject, 'admission':admission, 'operation':operation})
+        identity = _json(subject)
+        digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            row = OperationKernel._read(self, db, operation_id)
+            if row:
+                if row['request_digest'] != digest or row['identity_json'] != identity or row['request_json'] != body:
+                    raise ValueError('OPERATION_ID_CONFLICT')
+                db.commit()
+                return False, row
+            if not self._acquire_guard_tx(db, guard_id, guard_scope, owner_fence):
+                db.rollback()
+                return False, None
+            db.execute('INSERT INTO p3_effect_operations(operation_id,request_digest,identity_json,request_json,state,receipt_json,adapter_correlation) VALUES(?,?,?,?,?,?,?)',
+                (operation_id,digest,identity,body,'RUNNING',_json({'phase':'ROLLBACK_OWNER'}),owner_fence))
+            db.commit()
+            return True, None
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def claim_guard_recovery(self, guard_id, owner_fence, recovery_token):
+        """Single reconciler for a stopped fenced owner; never changes owner fence."""
+        if not isinstance(recovery_token, str) or len(recovery_token) != 64:
+            raise ValueError('RECOVERY_TOKEN_REQUIRED')
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            row = OperationKernel._read(self, db, guard_id)
+            if (not row or row['state'] not in ('RUNNING','UNKNOWN')
+                    or row['adapter_correlation'] != owner_fence
+                    or row['receipt_json'] not in (_json({'phase':'GUARD_HELD'}), _json({'phase':'RECOVERY_UNKNOWN'}))):
+                db.rollback()
+                return False
+            changed = db.execute('UPDATE p3_effect_operations SET receipt_json=? WHERE operation_id=? AND state=? AND adapter_correlation=? AND receipt_json=?',
+                (_json({'phase':'RECOVERING','token':recovery_token}),guard_id,row['state'],owner_fence,row['receipt_json'])).rowcount
+            db.commit()
+            return changed == 1
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def finish_guard_recovery(self, guard_id, owner_fence, recovery_token):
+        db = self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            changed = db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state IN (?,?) AND adapter_correlation=? AND receipt_json=?',
+                ('SUCCEEDED',_json({'phase':'GUARD_RELEASED'}),guard_id,'RUNNING','UNKNOWN',owner_fence,
+                 _json({'phase':'RECOVERING','token':recovery_token}))).rowcount
+            db.commit()
+            return changed == 1
+        except BaseException:
+            db.rollback()
+            raise
+        finally:
+            db.close()
