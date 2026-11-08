@@ -67,6 +67,54 @@ def _file_bytes(dfd, name, owner, limit=4*1024*1024):
     try:return verifylib.stable_read(fd,owner,limit)
     finally:os.close(fd)
 
+def verified_tree(rootfd,target,owner):
+    """Validate every installed entry against its manifest; return tree digest."""
+    directory=open_dir(rootfd,_name(target));entries={}
+    try:
+        rootstat=os.fstat(directory);check(rootstat.st_uid==owner and stat.S_IMODE(rootstat.st_mode)==0o700,'TREE_ROOT_MODE')
+        raw=_file_bytes(directory,'.bootstrap-manifest.json',owner)
+        manifest=verifylib.parse(raw);check(isinstance(manifest,dict) and isinstance(manifest.get('members'),dict),'TREE_MANIFEST')
+        members=manifest['members']
+        def walk(fd,prefix=''):
+            for name in sorted(os.listdir(fd)):
+                if not prefix and name=='.bootstrap-manifest.json':continue
+                check(name not in ('','.','..') and '/' not in name,'TREE_PATH')
+                path=prefix+name;info=os.stat(name,dir_fd=fd,follow_symlinks=False)
+                check(info.st_uid==owner,'TREE_OWNER')
+                if stat.S_ISDIR(info.st_mode):
+                    check(stat.S_IMODE(info.st_mode)==0o700,'TREE_DIR_MODE')
+                    sub=open_dir(fd,name)
+                    try:
+                        st=os.fstat(sub);check((st.st_dev,st.st_ino)==(info.st_dev,info.st_ino),'TREE_CHANGED')
+                        entries[path]={'type':'directory'};walk(sub,path+'/')
+                    finally:os.close(sub)
+                else:
+                    check(stat.S_ISREG(info.st_mode) and info.st_nlink==1 and stat.S_IMODE(info.st_mode)==0o600,'TREE_FILE_MODE')
+                    f=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=fd)
+                    try:
+                        st=os.fstat(f);check((st.st_dev,st.st_ino)==(info.st_dev,info.st_ino),'TREE_CHANGED')
+                        data=verifylib.stable_read(f,owner,64*1024*1024)
+                    finally:os.close(f)
+                    entries[path]={'type':'file','size':len(data),'sha256':verifylib.sha(data)}
+        walk(directory);check(entries==members,'TREE_MEMBER_MISMATCH')
+        return verifylib.sha(verifylib.canonical({'manifest_sha256':verifylib.sha(raw),'members':entries}))
+    finally:os.close(directory)
+
+def verify_operation_receipt(raw, trust_raw, operation, attempt, current_tree, prestate_tree):
+    """Verify controller-signed receipt, independent from carrier code."""
+    import base64
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    trust=verifylib.parse(trust_raw);receipt=verifylib.parse(raw)
+    check(trust.get('mode')=='ED25519' and trust.get('environment') in ('TEST_ONLY','PRODUCTION'),'RECEIPT_TRUST')
+    check(isinstance(receipt,dict) and set(receipt)=={'payload','signature'},'RECEIPT_FORMAT')
+    expected={'operation':operation,'attempt':attempt,'current_tree_sha256':current_tree,'prestate_tree_sha256':prestate_tree,'controller':trust.get('controller'),'outcome':'SUCCEEDED'}
+    check(receipt['payload']==expected,'RECEIPT_BINDING')
+    try:
+        key=Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True))
+        key.verify(base64.b64decode(receipt['signature'],validate=True),verifylib.canonical(expected))
+    except Exception:raise ControllerError('RECEIPT_SIGNATURE')
+    return expected
+
 def _target_manifest(rootfd, target, owner):
     d=open_dir(rootfd,_name(target))
     try:
