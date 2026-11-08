@@ -44,6 +44,17 @@ class CarrierInstallTests(unittest.TestCase):
         self.manifest_sha = installer._digest(self.manifest_path)
         self.archive_sha = "3" * 64
 
+    def test_install_rejects_symlink_source_ancestor(self):
+        original = os.path.join(self.root, 'src')
+        moved = os.path.join(self.root, 'actual')
+        os.rename(original, moved)
+        os.symlink('actual', original)
+        with self.assertRaises((OSError, ValueError, PermissionError)):
+            installer.install(self.root, self.manifest_path, self.manifest_sha,
+                              self.archive_sha, self.releases, self.state,
+                              'install-attempt-01', lambda: True, enforce_root=False)
+        self.assertFalse(os.path.exists(self.releases))
+
     def _install_receipt_path(self):
         return os.path.join(
             self.releases, "p3-" + self.archive_sha[:20],

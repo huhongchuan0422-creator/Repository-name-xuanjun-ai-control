@@ -19,6 +19,11 @@ import stat
 import sys
 import tempfile
 
+try:
+    from install.p3_secure_fd import open_absolute_dir, copy_member, read_member
+except ImportError:
+    from p3_secure_fd import open_absolute_dir, copy_member, read_member
+
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -68,10 +73,16 @@ def _canonical(path):
 def verify_carrier(root, manifest_path, expected_manifest_sha256):
     _canonical(root)
     _canonical(manifest_path)
-    if (not SHA256.fullmatch(expected_manifest_sha256 or "")
-            or _digest(manifest_path) != expected_manifest_sha256):
+    if not SHA256.fullmatch(expected_manifest_sha256 or ""):
         raise ValueError("CARRIER_MANIFEST_SHA256_MISMATCH")
-    manifest, _ = _read_json(manifest_path)
+    relative_manifest = os.path.relpath(manifest_path, root)
+    root_fd = open_absolute_dir(root, os.geteuid())
+    try:
+        data = read_member(root_fd, relative_manifest, os.geteuid(),
+                           expected_manifest_sha256, maximum=1024*1024)
+        manifest = json.loads(data.decode("utf-8"))
+    finally:
+        os.close(root_fd)
     keys = {
         "schema", "kind", "source_commit", "source_tree", "default_off",
         "execution_enabled", "notifications_enabled", "files",
@@ -93,14 +104,21 @@ def verify_carrier(root, manifest_path, expected_manifest_sha256):
         raise ValueError("CARRIER_FILE_SET_REQUIRED")
     if not release_files or not set(release_files).issubset(set(files)):
         raise ValueError("RELEASE_FILE_SET_INVALID")
-    for name, expected in files.items():
-        if (not isinstance(name, str) or name.startswith("/")
-                or ".." in name.split("/")
-                or not SHA256.fullmatch(expected or "")):
-            raise ValueError("INVALID_CARRIER_MEMBER")
-        path = os.path.join(root, name)
-        if os.path.islink(path) or not os.path.isfile(path) or _digest(path) != expected:
-            raise ValueError("CARRIER_MEMBER_MISMATCH:%s" % name)
+    root_fd = open_absolute_dir(root, os.geteuid())
+    try:
+        for name, expected in files.items():
+            if (not isinstance(name, str) or name.startswith("/")
+                    or ".." in name.split("/")
+                    or not SHA256.fullmatch(expected or "")):
+                raise ValueError("INVALID_CARRIER_MEMBER")
+            try:
+                read_member(root_fd, name, os.geteuid(), expected)
+            except ValueError as error:
+                if str(error) == "FILE_HASH_MISMATCH":
+                    raise ValueError("CARRIER_MEMBER_MISMATCH:%s" % name)
+                raise
+    finally:
+        os.close(root_fd)
     return manifest
 
 
@@ -114,29 +132,9 @@ def _fresh_authority(reader):
         raise PermissionError("CURRENT_CONTROLLED_ENTRY_AUTHORITY_REQUIRED")
 
 
-def _copy_verified(source, destination, expected):
-    source_descriptor = os.open(
-        source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    try:
-        info = os.fstat(source_descriptor)
-        if not stat.S_ISREG(info.st_mode):
-            raise ValueError("REGULAR_SOURCE_REQUIRED")
-        destination_descriptor = os.open(
-            destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o444)
-        value = hashlib.sha256()
-        with os.fdopen(destination_descriptor, "wb") as output:
-            while True:
-                chunk = os.read(source_descriptor, 65536)
-                if not chunk:
-                    break
-                value.update(chunk)
-                output.write(chunk)
-            output.flush()
-            os.fsync(output.fileno())
-    finally:
-        os.close(source_descriptor)
-    if value.hexdigest() != expected:
-        raise ValueError("SOURCE_CHANGED_DURING_COPY")
+def _copy_verified(source_root_fd, staging_root_fd, relative, expected):
+    """Copy from pinned root into private staging; never reopen source path."""
+    return copy_member(source_root_fd, staging_root_fd, relative, os.geteuid(), expected)
 
 
 def _atomic_json(path, value, mode=0o440):
@@ -243,11 +241,17 @@ def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     })
     staging = tempfile.mkdtemp(prefix=".p3-", dir=release_root)
     try:
-        for name in sorted(manifest["release_files"]):
-            destination = os.path.join(staging, name)
-            os.makedirs(os.path.dirname(destination), mode=0o750, exist_ok=True)
-            _copy_verified(os.path.join(root, name), destination,
-                           manifest["files"][name])
+        source_fd = open_absolute_dir(root, os.geteuid())
+        try:
+            staging_fd = open_absolute_dir(staging, os.geteuid())
+            try:
+                for name in sorted(manifest["release_files"]):
+                    _copy_verified(source_fd, staging_fd, name, manifest["files"][name])
+                os.fsync(staging_fd)
+            finally:
+                os.close(staging_fd)
+        finally:
+            os.close(source_fd)
         # Permissions, P2/P3 release, locks and consumed records are mutable.
         # Fresh-read again immediately before the atomic release rename.
         _fresh_authority(fresh_authority)
