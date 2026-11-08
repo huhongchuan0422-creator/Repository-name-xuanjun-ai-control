@@ -35,11 +35,36 @@ class SecurityRegressions(unittest.TestCase):
         self.assertIsNone(lifecycle(root,'inspect')['state']['active'])
         lifecycle(root,'apply',one,{'verified':True}); lifecycle(root,'apply',two,{'verified':True})
         before=lifecycle(root,'query')['state']; self.assertEqual(before['active'],__import__('hashlib').sha256(b'two').hexdigest())
-        lifecycle(root,'recover'); after=lifecycle(root,'query'); self.assertEqual(after['state']['active'],__import__('hashlib').sha256(b'one').hexdigest()); self.assertEqual(len(after['receipt_files']),3)
+        receipt=lifecycle(root,'recover',operation_id='recover-1',
+          expected_generation=2,expected_status='ACTIVE')
+        self.assertEqual(receipt,lifecycle(root,'recover',operation_id='recover-1',
+          expected_generation=2,expected_status='ACTIVE'))
+        with self.assertRaisesRegex(ValueError,'REQUEST_MISMATCH'):
+            lifecycle(root,'recover',operation_id='recover-1',
+              expected_generation=3,expected_status='ACTIVE')
+        after=lifecycle(root,'query'); self.assertEqual(after['state']['active'],__import__('hashlib').sha256(b'one').hexdigest()); self.assertEqual(after['state']['generation'],3)
+
+    def test_recover_expected_state_cas_and_restart_idempotency(self):
+        root=os.path.join(self.tmp.name,'recover-cas'); one=os.path.join(self.tmp.name,'one')
+        open(one,'wb').write(b'one'); lifecycle(root,'apply',one,{'verified':True})
+        with self.assertRaisesRegex(ValueError,'CAS'):
+            lifecycle(root,'recover',operation_id='wrong-generation',
+              expected_generation=0,expected_status='ACTIVE')
+        # A new invocation reads the durable operation receipt and cannot toggle again.
+        state=lifecycle(root,'query')['state']; self.assertEqual(state['generation'],1)
     def test_arbitrary_verifier_injection_is_rejected(self):
         path=os.path.join(self.tmp.name,'ledger')
         with self.assertRaisesRegex(ValueError,'CONTROLLED'):
             Supervisor(path,development_identity_verifier=lambda *x:{})
+    def test_formal_open_rejects_test_only_ledger_despite_environment(self):
+        from task_supervisor import TestOnlyDevelopmentIdentityVerifier
+        from development_authority import open_verified_ledger
+        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
+        path=os.path.join(self.tmp.name,'test-only-ledger')
+        supervisor=Supervisor(path,development_identity_verifier=
+          TestOnlyDevelopmentIdentityVerifier(lambda *x:{})); supervisor.close()
+        with self.assertRaisesRegex(ValueError,'TEST_ONLY_LEDGER_FORBIDDEN'):
+            open_verified_ledger(path,formal_only=True)
     def test_shared_multiprocess_ledger_has_one_global_authorization(self):
         path=os.path.join(self.tmp.name,'shared.db'); SQLiteReplayGuard(path).close()
         queue=multiprocessing.Queue(); key=('issuer','instance','AUTHORIZATION_CONSUME','a'*64,'nonce')

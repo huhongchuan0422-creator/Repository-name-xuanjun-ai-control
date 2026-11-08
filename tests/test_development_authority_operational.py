@@ -28,7 +28,7 @@ class OperationalTests(unittest.TestCase):
         public=self.private.public_key().public_bytes(serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo).decode()
         return {'url':'http://127.0.0.1:8787/api/v3/development-authority',
           'bearer_token_file':self.secret('token','x'*32),'public_key_file':self.secret('public',public),
-          'replay_db':os.path.join(self.root.name,'replay.db'),'anchor_id':'anchor-1',
+          'anchor_id':'anchor-1',
           'issuer':'formal-issuer','instance_id':'provider-1','version':'3.0.1','service_id':'reader-1',
           'attempt_id':'attempt-1','lease_id':'lease-1','fence':1,'epoch':1,
           'resource_scope_digest':'a'*64,'max_age':5.0,'target_sha256':'d'*64}

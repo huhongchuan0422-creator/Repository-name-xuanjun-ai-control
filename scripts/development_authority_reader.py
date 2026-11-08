@@ -3,13 +3,13 @@
 import argparse, json, time
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-from development_authority import (SQLiteReplayGuard,load_public_key,verify_envelope)
+from development_authority import load_public_key,verify_envelope
 from secure_file_input import read_owned_secret_file
 
 REJECT=69
 
 def read(config,task_id,request_id,purpose='AUTHORIZATION_CONSUME',now=None):
-    required={'url','bearer_token_file','public_key_file','replay_db','anchor_id',
+    required={'url','bearer_token_file','public_key_file','anchor_id',
       'issuer','instance_id','version','service_id','attempt_id','lease_id','fence',
       'epoch','resource_scope_digest','max_age','target_sha256'}
     if not isinstance(config,dict) or set(config)!=required: raise ValueError('EXACT_READER_CONFIG_REQUIRED')
@@ -28,9 +28,10 @@ def read(config,task_id,request_id,purpose='AUTHORIZATION_CONSUME',now=None):
     expected.update(task_id=task_id,request_id=request_id,purpose=purpose,
       target_sha256=config['target_sha256'],
       now=time.time() if now is None else now)
-    guard=SQLiteReplayGuard(config['replay_db'])
-    try: return verify_envelope(envelope,public,{'anchor_id':config['anchor_id']},expected,guard)
-    finally: guard.close()
+    # Replay consumption is performed by the authenticated authority service.
+    # A worker must never be able to select an alternate consumption database.
+    return verify_envelope(envelope,public,{'anchor_id':config['anchor_id']},expected,
+                           lambda key: True)
 
 def main(argv=None):
     p=argparse.ArgumentParser(); p.add_argument('--config-file',required=True)

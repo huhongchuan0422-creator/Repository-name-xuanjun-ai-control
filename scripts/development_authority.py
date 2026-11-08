@@ -100,7 +100,7 @@ def _owned_regular_nofollow(path, label):
     return fd, after
 
 
-def open_verified_ledger(path, forbidden_paths=()):
+def open_verified_ledger(path, forbidden_paths=(), formal_only=False):
     """Open exactly the checked inode and reject aliases to test ledgers."""
     fd, identity = _owned_regular_nofollow(path, 'FORMAL_LEDGER')
     try:
@@ -124,6 +124,13 @@ def open_verified_ledger(path, forbidden_paths=()):
             "SELECT name FROM sqlite_master WHERE type='table'")}
         if not {'tasks', 'resource_claims'}.issubset(actual):
             raise ValueError('FORMAL_LEDGER_SCHEMA_REQUIRED')
+        if formal_only:
+            if 'authority_runtime_profile' not in actual:
+                raise ValueError('FORMAL_LEDGER_PROFILE_REQUIRED')
+            profile = connection.execute(
+                'SELECT profile FROM authority_runtime_profile WHERE singleton=1').fetchone()
+            if profile is None or profile[0] != 'FORMAL':
+                raise ValueError('TEST_ONLY_LEDGER_FORBIDDEN')
         current = os.stat(path, follow_symlinks=False)
         if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
             raise ValueError('FORMAL_LEDGER_TOCTOU_REJECTED')

@@ -1,5 +1,5 @@
 """Signed fail-closed release verification and reversible local lifecycle."""
-import argparse, base64, hashlib, json, os, shutil, tempfile, time
+import argparse, base64, fcntl, hashlib, json, os, shutil, tempfile, time
 from development_authority import canonical_bytes, load_private_key, load_public_key
 from secure_file_input import read_owned_secret_file
 
@@ -56,7 +56,19 @@ def _atomic(path,value):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 
-def lifecycle(root,command,artifact=None,verified=None):
+def lifecycle(root,command,artifact=None,verified=None,operation_id=None,
+              expected_generation=None,expected_status=None):
+    os.makedirs(root,exist_ok=True)
+    lock=open(os.path.join(root,'.lifecycle.lock'),'a+')
+    fcntl.flock(lock,fcntl.LOCK_EX)
+    try:
+        return _lifecycle_locked(root,command,artifact,verified,operation_id,
+                                 expected_generation,expected_status)
+    finally:
+        fcntl.flock(lock,fcntl.LOCK_UN); lock.close()
+
+def _lifecycle_locked(root,command,artifact=None,verified=None,operation_id=None,
+                      expected_generation=None,expected_status=None):
     state_path=os.path.join(root,'state.json'); receipts=os.path.join(root,'receipts')
     state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
     if command=='inspect':
@@ -78,6 +90,23 @@ def lifecycle(root,command,artifact=None,verified=None):
         state={'generation':pending['generation'],'status':'ACTIVE','active':digest,
           'backup':pending.get('active'),'pending':None}
     elif command=='recover':
+        if not isinstance(operation_id,str) or not operation_id: raise ValueError('RECOVERY_OPERATION_ID_REQUIRED')
+        operation_path=os.path.join(receipts,'recover-'+hashlib.sha256(operation_id.encode()).hexdigest()+'.json')
+        request={'operation_id':operation_id,'expected_generation':expected_generation,
+                 'expected_status':expected_status}
+        request_digest=hashlib.sha256(json.dumps(request,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        if os.path.isfile(operation_path):
+            operation=json.load(open(operation_path))
+            if operation.get('request_digest')!=request_digest:
+                raise ValueError('RECOVERY_OPERATION_REQUEST_MISMATCH')
+            if operation.get('status')=='COMPLETED': return operation['receipt']
+            receipt=operation['receipt']
+            if state==receipt['state']:
+                operation['status']='COMPLETED'; _atomic(operation_path,operation)
+                return receipt
+            raise ValueError('RECOVERY_OPERATION_UNKNOWN_REQUIRES_RECONCILIATION')
+        if state.get('generation')!=expected_generation or state.get('status')!=expected_status:
+            raise ValueError('RECOVERY_EXPECTED_STATE_CAS_FAILED')
         if state.get('status')=='UNKNOWN' and state.get('pending'):
             target=os.path.join(root,'artifacts',state['pending'])
             if os.path.isfile(target) and sha256(target)==state['pending']:
@@ -92,8 +121,16 @@ def lifecycle(root,command,artifact=None,verified=None):
             state={'generation':state['generation']+1,'status':'ACTIVE','active':state['backup'],
               'backup':state['active'],'pending':None}
     else: raise ValueError('LIFECYCLE_COMMAND_REQUIRED')
-    _atomic(state_path,state); receipt={'command':command,'state':state,'observed_at':int(time.time())}
-    _atomic(os.path.join(receipts,'%08d-%s.json'%(state['generation'],command)),receipt); return receipt
+    receipt={'command':command,'state':state,'observed_at':int(time.time())}
+    if command=='recover':
+        receipt['operation_id']=operation_id; receipt['request_digest']=request_digest
+        _atomic(operation_path,{'status':'PREPARED','request_digest':request_digest,
+                                'receipt':receipt})
+    _atomic(state_path,state)
+    _atomic(os.path.join(receipts,'%08d-%s.json'%(state['generation'],command)),receipt)
+    if command=='recover': _atomic(operation_path,{'status':'COMPLETED',
+      'request_digest':request_digest,'receipt':receipt})
+    return receipt
 
 def main(argv=None):
     p=argparse.ArgumentParser(); sub=p.add_subparsers(dest='command')
@@ -101,8 +138,12 @@ def main(argv=None):
     for x in (m,v):
         x.add_argument('--artifact',required=True); x.add_argument('--commit',required=True); x.add_argument('--tree',required=True); x.add_argument('--source-sha256',required=True); x.add_argument('--anchor-id',required=True)
     m.add_argument('--private-key-file',required=True); v.add_argument('--manifest',required=True); v.add_argument('--public-key-file',required=True)
-    for name in ('inspect','query','recover'):
+    for name in ('inspect','query'):
         q=sub.add_parser(name); q.add_argument('--root',required=True)
+    q=sub.add_parser('recover'); q.add_argument('--root',required=True)
+    q.add_argument('--operation-id',required=True)
+    q.add_argument('--expected-generation',required=True,type=int)
+    q.add_argument('--expected-status',required=True)
     a=sub.add_parser('apply'); a.add_argument('--root',required=True); a.add_argument('--artifact',required=True); a.add_argument('--verified-receipt',required=True)
     a=p.parse_args(argv)
     if a.command is None: p.error('a command is required')
@@ -112,6 +153,9 @@ def main(argv=None):
         if a.command=='verify':
             key=load_public_key(read_owned_secret_file(a.public_key_file,'RELEASE_PUBLIC_KEY').encode()); result=verify(a.artifact,json.load(open(a.manifest)),key,a.anchor_id,a.commit,a.tree,a.source_sha256); print(json.dumps(result,sort_keys=True)); return 0
         if a.command=='apply': result=lifecycle(a.root,'apply',a.artifact,json.load(open(a.verified_receipt)))
+        elif a.command=='recover': result=lifecycle(a.root,a.command,
+          operation_id=a.operation_id,expected_generation=a.expected_generation,
+          expected_status=a.expected_status)
         else: result=lifecycle(a.root,a.command)
         print(json.dumps(result,sort_keys=True)); return 0
     except Exception as exc: print(json.dumps({'verified':False,'error':str(exc)},sort_keys=True)); return REJECT

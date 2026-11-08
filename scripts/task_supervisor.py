@@ -145,6 +145,17 @@ class Supervisor(object):
         try:
             self.db.execute('PRAGMA foreign_keys=ON')
             self._schema()
+            self.db.execute('''CREATE TABLE IF NOT EXISTS authority_runtime_profile(
+              singleton INTEGER PRIMARY KEY CHECK(singleton=1),profile TEXT NOT NULL)''')
+            profile = ('FORMAL' if development_identity_verifier is not None
+                       and development_identity_verifier.production_trusted
+                       else 'TEST_ONLY')
+            self.db.execute('INSERT OR IGNORE INTO authority_runtime_profile VALUES(1,?)',
+                            (profile,))
+            stored = self.db.execute('SELECT profile FROM authority_runtime_profile WHERE singleton=1').fetchone()[0]
+            if stored != profile and development_identity_verifier is not None:
+                raise ValueError('AUTHORITY_RUNTIME_PROFILE_MISMATCH')
+            self.db.commit()
             self.db.execute('PRAGMA journal_mode=WAL')
         except Exception:
             self.db.close()
