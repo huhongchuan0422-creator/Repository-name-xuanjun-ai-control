@@ -1,0 +1,129 @@
+name: Community Isolated Preview Candidate Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_only:
+        description: 'Build the fixed community preview candidate package only.'
+        required: true
+        default: 'true'
+        type: choice
+        options: ['true']
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fixed candidate source
+        uses: actions/checkout@v4
+        with:
+          ref: 865d52a86e1ca735af49925419d66336fffc8891
+          persist-credentials: false
+
+      - name: Verify fixed source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.package_only }}" = true
+          test "$(git rev-parse HEAD)" = "865d52a86e1ca735af49925419d66336fffc8891"
+          test "$(git rev-parse HEAD^{tree})" = "01e914b05adde56e3c7e1786c5bd71b477bc8dc4"
+          test -z "$(git status --porcelain)"
+
+      - name: Validate candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n deploy/community-preview/deploy.sh
+          python -m unittest -v tests.test_community_preview_candidate
+
+      - name: Build exact tracked package and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/community-preview-package"
+          ROOT="$OUT/root"
+          mkdir -p "$ROOT"
+
+          git ls-files -z --             scripts             tests             demos             clients/community-mini             deploy/community-preview > "$OUT/TRACKED.zlist"
+          test -s "$OUT/TRACKED.zlist"
+
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          out = Path(os.environ["RUNNER_TEMP"]) / "community-preview-package"
+          raw = (out / "TRACKED.zlist").read_bytes()
+          paths = [p.decode() for p in raw.split(b"\0") if p]
+
+          required = {
+              "clients/community-mini/app.js",
+              "deploy/community-preview/deploy.sh",
+              "deploy/community-preview/server.py",
+          }
+          missing = sorted(required.difference(paths))
+          if missing:
+              raise SystemExit("REQUIRED_TRACKED_PATH_MISSING:" + ",".join(missing))
+
+          prefixes = (
+              "scripts/",
+              "tests/",
+              "demos/",
+              "clients/community-mini/",
+              "deploy/community-preview/",
+          )
+          for path in paths:
+              parts = Path(path).parts
+              if path.startswith("/") or ".." in parts:
+                  raise SystemExit("UNSAFE_TRACKED_PATH:" + path)
+              if not path.startswith(prefixes):
+                  raise SystemExit("UNEXPECTED_TRACKED_PATH:" + path)
+          PY
+
+          # checkout-index exports only the fixed commit's tracked files and
+          # preserves the repository-relative parent directories.
+          git checkout-index --prefix="$ROOT/" -z --stdin < "$OUT/TRACKED.zlist"
+
+          : > "$OUT/MANIFEST.sha256"
+          while IFS= read -r -d '' path; do
+            test -f "$ROOT/$path"
+            (
+              cd "$ROOT"
+              sha256sum "$path"
+            ) >> "$OUT/MANIFEST.sha256"
+          done < "$OUT/TRACKED.zlist"
+
+          tar -C "$ROOT"             --null --files-from="$OUT/TRACKED.zlist"             --sort=name --mtime='UTC 1970-01-01'             --owner=0 --group=0 --numeric-owner             -czf "$OUT/community-preview-candidate.tar.gz"
+
+          tar -tzf "$OUT/community-preview-candidate.tar.gz" | sort > "$OUT/PACKAGE.members"
+          tr '\0' '\n' < "$OUT/TRACKED.zlist" | sort > "$OUT/TRACKED.members"
+
+          diff -u "$OUT/TRACKED.members" "$OUT/PACKAGE.members"
+          grep -Fx 'clients/community-mini/app.js' "$OUT/PACKAGE.members"
+          grep -Fx 'deploy/community-preview/deploy.sh' "$OUT/PACKAGE.members"
+          if grep -E '(^|/)(__pycache__|\.pytest_cache|node_modules|\.coverage)(/|$)|\.pyc$' "$OUT/PACKAGE.members"; then
+            echo "UNTRACKED_OR_CACHE_MEMBER_DENIED" >&2
+            exit 1
+          fi
+
+          {
+            echo "SOURCE_COMMIT=865d52a86e1ca735af49925419d66336fffc8891"
+            echo "SOURCE_TREE=01e914b05adde56e3c7e1786c5bd71b477bc8dc4"
+            echo "PACKAGE_SHA256=$(sha256sum "$OUT/community-preview-candidate.tar.gz" | awk '{print $1}')"
+            echo "MANIFEST_SHA256=$(sha256sum "$OUT/MANIFEST.sha256" | awk '{print $1}')"
+            echo "MEMBERS_SHA256=$(sha256sum "$OUT/PACKAGE.members" | awk '{print $1}')"
+            echo "FILE_COUNT=$(wc -l < "$OUT/TRACKED.members")"
+          } | tee "$OUT/RECEIPT.txt"
+
+      - name: Upload candidate package
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-isolated-preview-candidate
+          path: |
+            ${{ runner.temp }}/community-preview-package/community-preview-candidate.tar.gz
+            ${{ runner.temp }}/community-preview-package/MANIFEST.sha256
+            ${{ runner.temp }}/community-preview-package/PACKAGE.members
+            ${{ runner.temp }}/community-preview-package/RECEIPT.txt
+          retention-days: 7
