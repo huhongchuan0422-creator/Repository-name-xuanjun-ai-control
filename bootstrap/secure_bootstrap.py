@@ -71,6 +71,7 @@ def consume(db_path, receipt, owner=0):
         try:
             guarded.check();db.execute('BEGIN IMMEDIATE');guarded.check()
             require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
+            require(db.execute("SELECT 1 FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN') LIMIT 1").fetchone() is None,'UNRESOLVED_OPERATION')
             require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
             db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
             guarded.check();db.execute('COMMIT')
