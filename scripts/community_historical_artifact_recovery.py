@@ -6,6 +6,7 @@ original outer transport digest and inner test-input digests remain mandatory.
 """
 import hashlib
 import io
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -78,7 +79,7 @@ def wrapper(label, files):
             dt = (2026, 10, 25, 3, 55, 48)
         time = (dt[3] << 11) | (dt[4] << 5) | (dt[5] // 2)
         date = ((dt[0] - 1980) << 9) | (dt[1] << 5) | dt[2]
-        compressed = subprocess.run(['node', '-e', NODE_DEFLATE], input=data,
+        compressed = subprocess.run([os.environ.get('COMMUNITY_ARTIFACT_NODE', 'node'), '-e', NODE_DEFLATE], input=data,
                                     capture_output=True, check=True).stdout
         encoded = name.encode('utf-8')
         offset = len(output)
@@ -100,7 +101,7 @@ def wrapper(label, files):
               'inner_sha256=' + digest(files[PREFIX + 'control-stopped-v1.zip']),
               'manifest_sha256=' + digest(files[PREFIX + 'manifest.json']),
               'python_zlib=' + zlib.ZLIB_RUNTIME_VERSION, file=sys.stderr)
-        print(subprocess.check_output(['node', '-p', 'JSON.stringify(process.versions)'],
+        print(subprocess.check_output([os.environ.get('COMMUNITY_ARTIFACT_NODE', 'node'), '-p', 'JSON.stringify(process.versions)'],
                                       text=True).strip(), file=sys.stderr)
     validate(label, body)
     return body
