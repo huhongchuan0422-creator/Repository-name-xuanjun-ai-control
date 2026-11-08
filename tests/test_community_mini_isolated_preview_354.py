@@ -22,8 +22,8 @@ check(()=>assert.equal(helper.verifyHealth(ready,1000),ready));
 for(const [key,value] of Object.entries({status:'NOT_READY',runtime_source_sha:'b'.repeat(40),version_source:'CALLER',production_acceptance:true,observed_at:0}))check(()=>assert.throws(()=>helper.verifyHealth({...ready,[key]:value},1000)));
 check(()=>assert.throws(()=>helper.verifyHealth({...ready,observed_at:1031},1000)));
 check(()=>assert.deepEqual(sourceManifest('./clients/community-mini'),Object.assign(Object.create(null),helper.HASHES)));
-// Current successor must not be relabelled as the historical frozen preview.
-check(()=>assert.throws(()=>verifySource(path.join(CURRENT_ROOT,'clients/community-mini'),helper.HASHES),/PREPARED_SOURCE_CHANGED/));
+// Reject the stale historical frontend pin against the exact current frontend.
+check(()=>assert.throws(()=>verifySource(path.join(CURRENT_ROOT,'clients/community-mini'),{...helper.HASHES,'merchant-form.js':'912cf6b8f746ec5a3027f9df667bf882e5344ccd1aa3085d7f67ff1bba8a6ca2'}),/PREPARED_SOURCE_CHANGED/));
 // Mock only in this offline test. No real network or SDK.
 const https=require('node:https');let requests=0;
 https.get=(url,opts,cb)=>{assert.equal(url,helper.BASE+'/community/health');requests++;const req=new events.EventEmitter();req.setTimeout=()=>{};req.destroy=()=>{};process.nextTick(()=>{const res=new events.EventEmitter();res.statusCode=200;res.headers={'content-type':'application/json'};cb(res);res.emit('data',Buffer.from(JSON.stringify({...ready,observed_at:Math.floor(Date.now()/1000)})));res.emit('end');});return req;};
@@ -46,19 +46,10 @@ https.get=(url,opts,cb)=>{assert.equal(url,helper.BASE+'/community/health');requ
  console.log('OFFLINE_PREVIEW_BOUNDARY_CHECKS='+checks);
 })().finally(()=>fs.rmSync(tmp,{recursive:true,force:true})).catch(e=>{console.error(e);process.exitCode=1;});
 '''
-        # Legacy positive fixture is exact public c879; helper pins/backend stay unchanged.
-        # CI fetches this original commit in its existing read-only fixture stage.
-        legacy='c8798565e16523c7ebc4e1e8dba9b50faad62012'
-        repo=os.environ.get('COMMUNITY_TEST_LEGACY_GIT_DIR',str(ROOT))
-        with tempfile.TemporaryDirectory(prefix='mini354-frozen-') as directory:
+        # Positive fixture uses this exact reviewed frontend; stale pins are rejected above.
+        with tempfile.TemporaryDirectory(prefix='mini354-current-') as directory:
             frozen=pathlib.Path(directory)
-            names=subprocess.check_output(['git','-C',repo,'ls-tree','-r','--name-only',legacy,'--','clients/community-mini'],text=True).splitlines()
-            self.assertTrue(names)
-            for name in names:
-                self.assertTrue(name.startswith('clients/community-mini/'))
-                self.assertNotIn('..',pathlib.PurePosixPath(name).parts)
-                target=frozen/name;target.parent.mkdir(parents=True,exist_ok=True)
-                target.write_bytes(subprocess.check_output(['git','-C',repo,'show',legacy+':'+name]))
+            shutil.copytree(ROOT/'clients/community-mini',frozen/'clients/community-mini')
             for name in ('scripts/community_mini_isolated_preview_354.cjs','scripts/community_mini_key.cjs','deploy/community-preview/endpoint.cjs','deploy/community-preview/endpoint-profiles.json'):
                 target=frozen/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,target)
             script='const CURRENT_ROOT='+json.dumps(str(ROOT))+';\n'+script
