@@ -9,6 +9,7 @@ class BootstrapTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(dir=os.getcwd());self.dir=self.tmp.name;self.fds=[]
   self.sqlite_version=sqlite3.sqlite_version_info
+  if os.environ.get('MCP_TEST_TMPDIR')=='1':self.tmp.cleanup();self.tmp=tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']);self.dir=self.tmp.name
   if os.environ.get('MCP_UNIT_TEST_VERSION_OVERRIDE')=='1':sqlite3.sqlite_version_info=(3,53,1)
   self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
   self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode(),'key_id':'fixture-key'}

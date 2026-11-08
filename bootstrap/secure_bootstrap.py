@@ -118,6 +118,9 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     return carrier,p
 
 def main():
+    # Reject unsupported runtime before opening or mutating any controller path.
+    if sqlite3.sqlite_version_info < (3,35,0):
+        print('HOLD SQLITE_VERSION_UNSUPPORTED',file=sys.stderr);return 1
     a=argparse.ArgumentParser()
     a.add_argument('--reconcile',action='store_true')
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
