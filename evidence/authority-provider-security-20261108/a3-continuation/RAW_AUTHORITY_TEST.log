@@ -1,0 +1,21 @@
+....../home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:34: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfxe8xcbl/one'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:34: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpfxe8xcbl/two'>
+  open(one,'wb').write(b'one'); open(two,'wb').write(b'two')
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:73: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfxe8xcbl/lifecycle/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:99: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfxe8xcbl/lifecycle/receipts/recover-f08558e2b892547da7e68d80b025700d9a9ff619f2e69810a50b7537f52ed616.json' mode='r' encoding='UTF-8'>
+  operation=json.load(open(operation_path))
+../home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:49: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpb_udxw_2/one'>
+  open(one,'wb').write(b'one'); lifecycle(root,'apply',one,{'verified':True})
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/../scripts/development_authority_release.py:73: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpb_udxw_2/recover-cas/state.json' mode='r' encoding='UTF-8'>
+  state=json.load(open(state_path)) if os.path.exists(state_path) else {'generation':0,'status':'EMPTY','active':None,'backup':None,'pending':None}
+./home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_authority_security_regressions.py:19: ResourceWarning: unclosed file <_io.BufferedWriter name='/tmp/tmpncqyim4h/artifact.tar'>
+  artifact=os.path.join(self.tmp.name,'artifact.tar'); open(artifact,'wb').write(b'bytes')
+...............
+----------------------------------------------------------------------
+Ran 24 tests in 1.227s
+
+OK
+{"authorized": false, "error": "AUTHORITY_NOT_AUTHORIZED"}
+{"authorized": false, "error": "AUTHORITY_TRUST_ANCHOR_MISMATCH"}

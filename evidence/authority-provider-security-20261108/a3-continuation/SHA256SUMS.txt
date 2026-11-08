@@ -1,0 +1,2 @@
+63cdcf5e04e84c0f5546a4d34c86019eb93b69e614d23715d2c9a0e66140107b  evidence/authority-provider-security-20261108/a3-continuation/RAW_AUTHORITY_TEST.log
+d796b591510845bed0d9600ba9cbbf2543adf0e20073d29f2491227c40ca39b3  evidence/authority-provider-security-20261108/a3-continuation/authority-provider-bb86700b.tar
