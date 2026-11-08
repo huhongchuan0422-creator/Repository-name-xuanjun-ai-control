@@ -459,6 +459,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          git fetch --no-tags --depth=1 origin 1d639347f404f952998b3b414a95e48f66571c3c 005c7448d5fe56b1def83fd4aa4cf9ffc4c8aaa1
+          PYTHONPATH=.:tests python3 -B -m unittest historical_artifact_recovery_checks -v
           : > community-tests.log
           python3 - <<'FIXTURE' 2>&1 | tee -a community-tests.log
           import hashlib,io,json,os,urllib.request,urllib.error,zipfile
@@ -483,7 +485,11 @@ jobs:
                   with github_artifact_opener().open(req,timeout=30) as response:
                       body=response.read(2*1024*1024+1)
               except urllib.error.HTTPError as error:
-                  raise SystemExit('ARTIFACT_DOWNLOAD_HTTP_'+str(error.code))
+                  if error.code != 404:
+                      raise SystemExit('ARTIFACT_DOWNLOAD_HTTP_'+str(error.code))
+                  from scripts.community_historical_artifact_recovery import recover_artifact
+                  body = recover_artifact(label)
+                  print(label.upper()+'_EXACT_HISTORICAL_ARTIFACT_REPRODUCED; ORIGINAL_OUTER_SHA_REQUIRED=true')
               except Exception as error:
                   raise SystemExit('ARTIFACT_DOWNLOAD_FAILED_'+type(error).__name__)
               if len(body)>2*1024*1024 or hashlib.sha256(body).hexdigest()!=outer_sha:
