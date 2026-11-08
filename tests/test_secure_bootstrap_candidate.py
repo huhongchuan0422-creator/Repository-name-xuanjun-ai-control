@@ -229,7 +229,11 @@ class InstallerTests(BootstrapTests):
    result=call(invalid);self.assertNotEqual(result.returncode,0);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce')
   result=call(payload,base64.b64encode(b'bad').decode());self.assertNotEqual(result.returncode,0)
   result=call(payload);self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+  with open(self.log,'rb') as f:events=[json.loads(x) for x in f if x.strip()]
+  self.assertEqual(sum(e.get('event')=='ROLLBACK_SWITCH' and e.get('operation')=='rollback:one' for e in events),1)
   again=call(payload);self.assertEqual(again.returncode,0,again.stderr);self.assertEqual(result.stdout,again.stdout)
+  with open(self.log,'rb') as f:events=[json.loads(x) for x in f if x.strip()]
+  self.assertEqual(sum(e.get('event')=='ROLLBACK_SWITCH' and e.get('operation')=='rollback:one' for e in events),1)
   receipt_path=os.path.join(self.root,'rollback-'+hashlib.sha256(b'rollback:one').hexdigest()+'.json')
   with open(receipt_path,'rb') as f:original=f.read()
   original_hash=hashlib.sha256(original).hexdigest();linkstat=os.lstat(os.path.join(self.root,'current'))
@@ -264,11 +268,31 @@ class InstallerTests(BootstrapTests):
      row=db.execute('select state,receipt_path,key_id,from_digest,to_digest,install_op,operation_id from rollbacks').fetchone()
      self.assertEqual(row[0],'SWITCHED' if i==2 else 'ROLLBACK_PREPARED');self.assertTrue(all(row[1:]));self.assertEqual(row[-2: ],('install:nonce','rollback:'+str(i)))
     self.assertEqual(os.readlink(os.path.join(self.root,'current')),current)
+    with open(self.log,'rb') as f:before=[json.loads(x) for x in f if x.strip()]
+    switches=lambda events:sum(e.get('event')=='ROLLBACK_SWITCH' and e.get('operation')=='rollback:'+str(i) for e in events)
+    self.assertEqual(switches(before),0 if i==0 else 1)
     r=subprocess.run(common+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertEqual(r.returncode,0 if state=='FAILED' else 1,r.stderr)
+    with open(self.log,'rb') as f:after=[json.loads(x) for x in f if x.strip()]
+    self.assertEqual(switches(before),switches(after))
     with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],state)
     if state=='UNKNOWN':
      r=subprocess.run(rb,pass_fds=fds+(afd,),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
+ def test_cli_rollback_missing_schema_columns(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  tf=self.fd('schema-trust',b.canonical(self.trust));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');cmd=[sys.executable,cli,'--reconcile','--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
+  columns=['operation_id','request_digest','install_op','attempt','from_target','to_target','from_digest','to_digest','state','receipt_json','receipt_path','key_id']
+  for missing in ('state','receipt_path','key_id','from_digest','to_digest','install_op','operation_id'):
+   with self.subTest(missing=missing):
+    with sqlite3.connect(self.ledger) as db:
+     db.execute('drop table rollbacks');remaining=[c for c in columns if c!=missing]
+     db.execute('create table rollbacks('+','.join(c+' text' for c in remaining)+')');db.execute('insert into rollbacks('+','.join(remaining)+') values('+','.join('?' for _ in remaining)+')',tuple('UNKNOWN' if c=='state' else 'fixture' for c in remaining))
+    r=subprocess.run(cmd,pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertNotEqual(r.returncode,0);self.assertIn(b'ROLLBACK_SCHEMA_REQUIRED',r.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+    with sqlite3.connect(self.ledger) as db:
+     if missing!='state':self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
  def test_cli_negative_cases(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')

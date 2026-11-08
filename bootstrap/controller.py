@@ -421,6 +421,7 @@ def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receip
         if failpoint=='before_rename':raise ControllerError('INJECTED_BEFORE_RENAME')
         if failpoint=='crash_before_rename':os._exit(91)
         link='.rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest();os.symlink(to_target,link,dir_fd=rootfd);os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd)
+        log(log_fd,{'event':'ROLLBACK_SWITCH','operation':rollback_op,'target':to_target},audit)
         if failpoint=='after_rename':raise ControllerError('INJECTED_AFTER_RENAME')
         if failpoint=='crash_after_rename':os._exit(92)
         os.fsync(rootfd)
