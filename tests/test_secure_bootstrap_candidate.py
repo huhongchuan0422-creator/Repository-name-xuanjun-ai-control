@@ -2,6 +2,7 @@ import base64, hashlib, importlib.util, io, json, os, sqlite3, sys, tarfile, tem
 sys.path.insert(0,os.path.join(os.path.dirname(__file__),"..","bootstrap"))
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
+import subprocess
 spec=importlib.util.spec_from_file_location('bootstrap_candidate',os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py'))
 b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 
@@ -13,6 +14,16 @@ class BootstrapTests(unittest.TestCase):
   if os.environ.get('MCP_UNIT_TEST_VERSION_OVERRIDE')=='1':sqlite3.sqlite_version_info=(3,53,1)
   self.key=Ed25519PrivateKey.generate(); pub=self.key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw)
   self.trust={'mode':'ED25519','environment':'TEST_ONLY','controller':'fixture','public_key':base64.b64encode(pub).decode(),'key_id':'fixture-key'}
+  with open(os.path.join(os.path.dirname(__file__),'..','bootstrap','DEPENDENCY_LOCK.json'),'rb') as f:self.lock_raw=f.read()
+  self.trust['dependency_lock_sha256']=hashlib.sha256(self.lock_raw).hexdigest()
+  verifier=os.path.realpath('/usr/bin/openssl');keypath=os.path.join(self.dir,'binding-public.pem')
+  with open(keypath,'wb') as f:f.write(self.key.public_key().public_bytes(Encoding.PEM,PublicFormat.SubjectPublicKeyInfo))
+  os.chmod(keypath,0o644);self.binding_public_key=open(keypath,'rb').read()
+  with open(verifier,'rb') as f:verifier_sha=hashlib.sha256(f.read()).hexdigest()
+  with open(keypath,'rb') as f:key_sha=hashlib.sha256(f.read()).hexdigest()
+  self.trust.update({'binding_key_id':'binding-test-only','binding_verifier_path':verifier,'binding_verifier_sha256':verifier_sha,'binding_public_key_path':keypath,'binding_public_key_sha256':key_sha})
+  bp={'schema':1,'environment':'TEST_ONLY','production_trust_anchor':'REQUIRED','expiry':int(time.time())+3600,'dependency_lock_sha256':self.trust['dependency_lock_sha256'],'vendor_tree_digest':self.trust['dependency_lock_sha256'],'bootstrap_manifest_sha256':'1'*64,'carrier_manifest_sha256':'2'*64,'tool_scope_sha256':'3'*64}
+  self.binding_raw=b.canonical({'payload':bp,'key_id':'binding-test-only','signature':base64.b64encode(self.key.sign(b.canonical(bp))).decode()})
   z=io.BytesIO()
   with tarfile.open(fileobj=z,mode='w') as t:
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
@@ -25,6 +36,8 @@ class BootstrapTests(unittest.TestCase):
   sqlite3.sqlite_version_info=self.sqlite_version;self.tmp.cleanup()
  def fd(self,name,data):
   p=os.path.join(self.dir,name);open(p,'wb').write(data);os.chmod(p,0o600);fd=os.open(p,os.O_RDONLY);self.fds.append(fd);return fd
+ def make_lock_fd(self):return self.fd('dependency-lock',self.lock_raw)
+ def make_binding_fd(self):return self.fd('binding',self.binding_raw)
  def verify(self, payload=None,signature=None,carrier=None,manifest=None,trust=None,scope=None):
   p=payload or self.payload; signature=signature if signature is not None else base64.b64encode(self.key.sign(b.canonical(p))).decode()
   cf=self.fd('carrier',self.carrier if carrier is None else carrier);mf=self.fd('manifest',self.manifest if manifest is None else manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':signature}));tf=self.fd('trust',b.canonical(trust or self.trust));lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
@@ -136,11 +149,11 @@ class InstallerTests(BootstrapTests):
   if os.getuid()!=0:
    self.skipTest('CLI enforces root-owned inputs; run in isolated uid-0 container')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd()
   rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
-  cmd=[sys.executable,cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
-  proc=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True)
+  cmd=[sys.executable,'-I',cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
+  proc=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True)
   if os.environ.get('MCP_EXPECT_OLD_SQLITE')=='1':
    self.assertLess(sqlite3.sqlite_version_info,(3,35,0));self.assertNotEqual(proc.returncode,0);self.assertIn('SQLITE_VERSION_UNSUPPORTED',proc.stderr)
    with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select count(*) from operations').fetchone()[0],0)
@@ -154,12 +167,12 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd()
   rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
-  base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
+  base=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
   install=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
-  fds=(cf,mf,rf,tf,kf,rd);r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd);r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   self.assertEqual(r.returncode,0,r.stderr);target=os.path.join(self.root,'release-nonce');receipt=os.path.join(self.root,'receipt-nonce.json')
   with open(receipt,'rb') as f:original=f.read()
   for mode in ('content','symlink','receipt'):
@@ -170,7 +183,7 @@ class InstallerTests(BootstrapTests):
     elif mode=='symlink':os.symlink('/etc/passwd',os.path.join(target,'evil'))
     else:
      with open(receipt,'wb') as f:f.write(b'bad')
-    r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertNotEqual(r.returncode,0);self.assertEqual(self.state(),'UNKNOWN')
     r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
     if mode=='content':
@@ -183,17 +196,18 @@ class InstallerTests(BootstrapTests):
   if os.getuid()!=0:self.skipTest('requires disposable root-owned container')
   uid=65534;gid=65534;p=self.payload;self.trust.update({'expected_controller_uid':uid,'expected_controller_gid':gid,'expected_receipt_owner':0,'expected_receipt_mode':0o555})
   sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd()
   os.chown(os.path.dirname(__file__),0,0);os.chmod(os.path.dirname(__file__),0o755)
   os.chown(os.path.join(os.path.dirname(__file__),'..','bootstrap'),0,0);os.chmod(os.path.join(os.path.dirname(__file__),'..','bootstrap'),0o755)
+  os.chown(os.path.join(os.path.dirname(__file__),'..','bootstrap','vendor'),0,0);os.chmod(os.path.join(os.path.dirname(__file__),'..','bootstrap','vendor'),0o755)
   for source in ('secure_bootstrap.py','controller.py','path_guard.py'):
    path=os.path.join(os.path.dirname(__file__),'..','bootstrap',source);os.chown(path,0,0);os.chmod(path,0o644)
   receipt_dir=os.path.join(self.dir,'locked-receipts');os.mkdir(receipt_dir,0o555);os.chmod(receipt_dir,0o555);rd=os.open(receipt_dir,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  for path in [self.dir,self.ledger,self.log,self.root,os.path.join(self.root,'base'),os.path.join(self.root,'base','.bootstrap-manifest.json')]+[os.path.join(self.dir,n) for n in ('carrier','manifest','receipt','trust','signing-key')]:os.chown(path,uid,gid)
+  for path in [self.dir,self.ledger,self.log,self.root,os.path.join(self.root,'base'),os.path.join(self.root,'base','.bootstrap-manifest.json')]+[os.path.join(self.dir,n) for n in ('carrier','manifest','receipt','trust','signing-key','dependency-lock','binding')]:os.chown(path,uid,gid)
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
-  cmd=[sys.executable,cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--receipt-dir-fd',str(rd),'--expected-controller-uid',str(uid),'--expected-controller-gid',str(gid),'--expected-receipt-owner','0','--expected-receipt-mode','0555','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
+  cmd=[sys.executable,'-I',cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--receipt-dir-fd',str(rd),'--expected-controller-uid',str(uid),'--expected-controller-gid',str(gid),'--expected-receipt-owner','0','--expected-receipt-mode','0555','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
   def demote():os.setgroups([]);os.setgid(gid);os.setuid(uid)
-  r=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd),preexec_fn=demote,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  r=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd),preexec_fn=demote,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   self.assertNotEqual(r.returncode,0);self.assertIn(b'RECEIPT_DIRECTORY_UNWRITABLE',r.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select count(*) from operations').fetchone()[0],0)
   print('NONROOT_TEST uid=%s gid=%s receipt=0:0 mode=0555 exit=%s ledger=empty current=base' %(uid,gid,r.returncode))
@@ -201,7 +215,7 @@ class InstallerTests(BootstrapTests):
   self.trust.update({'expected_receipt_owner':uid,'expected_receipt_mode':0o700})
   with open(os.path.join(self.dir,'trust'),'wb') as f:f.write(b.canonical(self.trust))
   cmd[cmd.index('--expected-receipt-owner')+1]=str(uid);cmd[cmd.index('--expected-receipt-mode')+1]='0700'
-  r=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd),preexec_fn=demote,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  r=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd),preexec_fn=demote,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce')
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],'SUCCEEDED')
   self.assertTrue(os.path.isfile(os.path.join(receipt_dir,'receipt-nonce.json')))
@@ -210,8 +224,8 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd)
   install=common+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
   r=subprocess.run(install,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,0,r.stderr)
   with sqlite3.connect(self.ledger) as db:pre=db.execute('select prestate_digest from operations').fetchone()[0]
@@ -248,8 +262,8 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');common=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd)
   cmd=common+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
   r=subprocess.run(cmd,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,0,r.stderr)
   with sqlite3.connect(self.ledger) as db:pre=db.execute('select prestate_digest from operations').fetchone()[0]
@@ -268,7 +282,7 @@ class InstallerTests(BootstrapTests):
     with open(self.log,'rb') as f:before=[json.loads(x) for x in f if x.strip()]
     switches=lambda events:sum(e.get('event')=='ROLLBACK_SWITCH' and e.get('operation')=='rollback:'+str(i) for e in events)
     self.assertEqual(switches(before),0 if i==0 else 1)
-    r=subprocess.run(common+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    r=subprocess.run(common+['--reconcile'],pass_fds=(tf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertEqual(r.returncode,0 if state=='FAILED' else 1,r.stderr)
     with open(self.log,'rb') as f:after=[json.loads(x) for x in f if x.strip()]
     self.assertEqual(switches(before),switches(after))
@@ -278,15 +292,15 @@ class InstallerTests(BootstrapTests):
  def test_cli_rollback_missing_schema_columns(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
-  tf=self.fd('schema-trust',b.canonical(self.trust));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');cmd=[sys.executable,cli,'--reconcile','--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
+  lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();tf=self.fd('schema-trust',b.canonical(self.trust));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');cmd=[sys.executable,'-I',cli,'--reconcile','--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root]
   columns=['operation_id','request_digest','install_op','attempt','from_target','to_target','from_digest','to_digest','state','receipt_json','receipt_path','key_id']
   for missing in ('state','receipt_path','key_id','from_digest','to_digest','install_op','operation_id'):
    with self.subTest(missing=missing):
     with sqlite3.connect(self.ledger) as db:
      db.execute('drop table rollbacks');remaining=[c for c in columns if c!=missing]
      db.execute('create table rollbacks('+','.join(c+' text' for c in remaining)+')');db.execute('insert into rollbacks('+','.join(remaining)+') values('+','.join('?' for _ in remaining)+')',tuple('UNKNOWN' if c=='state' else 'fixture' for c in remaining))
-    r=subprocess.run(cmd,pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    r=subprocess.run(cmd,pass_fds=(tf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertNotEqual(r.returncode,0);self.assertIn(b'ROLLBACK_SCHEMA_REQUIRED',r.stderr);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
     with sqlite3.connect(self.ledger) as db:
      if missing!='state':self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
@@ -294,8 +308,8 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd)
   cmd=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
   procs=[subprocess.Popen(cmd,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE) for _ in range(20)];results=[(p.wait(timeout=30),p.communicate()) for p in procs]
   self.assertEqual(sum(r[0]==0 for r in results),1)
@@ -312,22 +326,22 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd)
   install=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
   r=subprocess.run(install+['--test-only-crash-hook','install_crash_after_rename'],pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertEqual(r.returncode,94,r.stderr)
   self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce');before=os.lstat(os.path.join(self.root,'current')).st_ino
   with sqlite3.connect(self.ledger) as db:
    state,intent=db.execute('select state,switch_intent from operations').fetchone();self.assertEqual(state,'RUNNING');self.assertEqual(json.loads(intent)['operation_id'],'install:nonce')
-  r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
+  r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE);self.assertNotEqual(r.returncode,0)
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],'UNKNOWN')
   self.assertEqual(os.lstat(os.path.join(self.root,'current')).st_ino,before)
  def test_cli_three_install_crash_windows(self):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
-  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,cli,'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd)
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd();rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py');base=[sys.executable,'-I',cli,'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--ledger',self.ledger,'--audit',self.log,'--root',self.root];fds=(cf,mf,rf,tf,kf,rd,lockfd,bindingfd)
   install=base+['--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--task','task','--attempt','attempt']
   for hook,code,expected_current,expected_state in [('install_crash_before_rename',95,'base','FAILED'),('install_crash_after_rename',94,'release-nonce','UNKNOWN'),('install_crash_before_receipt',96,'release-nonce','UNKNOWN')]:
    with self.subTest(hook=hook):
@@ -335,7 +349,7 @@ class InstallerTests(BootstrapTests):
     with sqlite3.connect(self.ledger) as db:row=db.execute('select switch_intent,operation_id,attempt,prestate_dev,prestate_ino,prestate_digest,tree_digest from operations').fetchone()
     intent=json.loads(row[0]);self.assertEqual(intent['operation_id'],row[1]);self.assertEqual(intent['fence'],row[2]);self.assertEqual((intent['from_dev'],intent['from_ino']),(row[3],row[4]));self.assertEqual((intent['from_tree'],intent['to_tree']),(row[5],row[6]))
     st=os.stat(os.path.join(self.root,'release-nonce'));self.assertEqual((intent['to_dev'],intent['to_ino']),(st.st_dev,st.st_ino));self.assertEqual(os.readlink(os.path.join(self.root,'current')),expected_current)
-    before=os.lstat(os.path.join(self.root,'current')).st_ino;r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    before=os.lstat(os.path.join(self.root,'current')).st_ino;r=subprocess.run(base+['--reconcile'],pass_fds=(tf,rd,lockfd,bindingfd),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertEqual(r.returncode,0 if expected_state=='FAILED' else 1,r.stderr);self.assertEqual(os.lstat(os.path.join(self.root,'current')).st_ino,before)
     with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from operations').fetchone()[0],expected_state);db.execute('delete from operations')
     if expected_current!='base':os.unlink(os.path.join(self.root,'current'));os.symlink('base',os.path.join(self.root,'current'))
@@ -347,18 +361,18 @@ class InstallerTests(BootstrapTests):
   import subprocess
   if os.getuid()!=0:self.skipTest('requires isolated uid 0')
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
-  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()));lockfd=self.make_lock_fd();bindingfd=self.make_binding_fd()
   rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd)
   bad=self.fd('bad-key',Ed25519PrivateKey.generate().private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
   cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
-  common=[cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
-  fds=(cf,mf,rf,tf,kf,bad,rd)
+  common=[cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--binding-fd',str(bindingfd),'--dependency-lock-fd',str(lockfd),'--trust-fd',str(tf),'--receipt-dir-fd',str(rd),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
+  fds=(cf,mf,rf,tf,kf,bad,rd,lockfd,bindingfd)
   for name,extra in [('missing-key',[]),('wrong-key',['--receipt-signing-key-fd',str(bad)])]:
    with self.subTest(name=name):
-    proc=subprocess.run([sys.executable]+common+extra,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    proc=subprocess.run([sys.executable,'-I']+common+extra,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     self.assertNotEqual(proc.returncode,0);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
   with open(os.path.join(self.root,'receipt-nonce.json'),'wb') as f:f.write(b'conflict')
-  proc=subprocess.run([sys.executable]+common+['--receipt-signing-key-fd',str(kf)],pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  proc=subprocess.run([sys.executable,'-I']+common+['--receipt-signing-key-fd',str(kf)],pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
   self.assertNotEqual(proc.returncode,0);self.assertEqual(self.state(),'UNKNOWN')
  def test_old_schema_install_fails_closed(self):
   with sqlite3.connect(self.ledger) as db:
@@ -440,3 +454,29 @@ class SqlitePreflightTests(BootstrapTests):
   sqlite3.sqlite_version_info=(3,26,0)
   with self.assertRaisesRegex(b.Hold,'SQLITE_VERSION_UNSUPPORTED'):self.verify()
   with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select count(*) from operations').fetchone()[0],0)
+
+class UnknownToolTests(BootstrapTests):
+ def test_signed_unknown_tool_rejected(self):
+  manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{'dynamic_admin':'project-a'},'minimum_sqlite':[3,35,0]})
+  p=dict(self.payload,manifest_sha256=b.sha(manifest),tool_scope={'mode':'WRITE_ALLOWED','tools':{'dynamic_admin':'project-a'}})
+  with self.assertRaisesRegex(b.Hold,'UNKNOWN_TOOL_DENIED'):self.verify(payload=p,manifest=manifest)
+
+class VendorTamperTests(unittest.TestCase):
+ def test_vendor_tampering_and_isolated_paths(self):
+  import shutil,subprocess
+  source=os.path.abspath(os.path.join(os.path.dirname(__file__),'..','bootstrap'))
+  with tempfile.TemporaryDirectory(dir=os.getcwd()) as d:
+   copy=os.path.join(d,'bootstrap');shutil.copytree(source,copy,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+   raw=open(os.path.join(copy,'DEPENDENCY_LOCK.json'),'rb').read();digest=hashlib.sha256(raw).hexdigest()
+   script="import sys,hashlib;sys.path.insert(0,sys.argv[1]);import secure_bootstrap as b;raw=open(sys.argv[1]+'/DEPENDENCY_LOCK.json','rb').read();b.verify_dependency_lock(raw,{'dependency_lock_sha256':sys.argv[2]});import cryptography,cffi,_cffi_backend;print(cryptography.__file__,cffi.__file__,_cffi_backend.__file__)"
+   def run():return subprocess.run([sys.executable,'-I','-B','-c',script,copy,digest],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(os.environ,PYTHONPATH=d))
+   r=run();self.assertEqual(r.returncode,0,r.stderr);self.assertIn((copy+'/vendor/').encode(),r.stdout)
+   for rel in ('cryptography/__init__.py','_cffi_backend.cpython-312-x86_64-linux-gnu.so','cryptography-50.0.2.dist-info/METADATA','cryptography-50.0.2.dist-info/RECORD'):
+    path=os.path.join(copy,'vendor',rel);original=open(path,'rb').read()
+    with open(path,'wb') as f:f.write(original+b'x')
+    self.assertNotEqual(run().returncode,0,rel)
+    with open(path,'wb') as f:f.write(original)
+   target=os.path.join(copy,'vendor','cryptography','__init__.py');os.rename(target,target+'.bak')
+   self.assertNotEqual(run().returncode,0);os.rename(target+'.bak',target)
+   extra=os.path.join(copy,'vendor','extra.py');open(extra,'wb').close();self.assertNotEqual(run().returncode,0);os.unlink(extra)
+   self.assertEqual(run().returncode,0)

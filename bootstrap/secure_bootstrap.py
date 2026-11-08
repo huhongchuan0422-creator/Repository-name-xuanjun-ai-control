@@ -107,15 +107,95 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
     tool_scope=p['tool_scope'];require(isinstance(tool_scope,dict) and set(tool_scope)=={'mode','tools'},'TOOL_SCOPE_REQUIRED')
     require(tool_scope['mode'] in ('READ_ONLY','WRITE_ALLOWED') and isinstance(tool_scope['tools'],dict),'TOOL_SCOPE_INVALID')
     require(isinstance(manifest['tool_scope'],dict),'MANIFEST_SCOPE_INVALID')
+    # Exact known names only; a signed receipt cannot grant an unknown dynamic tool.
+    known_read={'task_list','task_read_context','task_query_result','task_dispatch_contract','task_capabilities','task_get','task_dispatch_status','task_candidate_status','task_development_status','task_development_gateway_readback','task_result_recovery_status'}
+    known_write={'task_claim','task_report_progress','task_save_checkpoint','task_submit_artifact','task_request_review','task_submit','task_assign_role','task_dispatch','task_cancel_dispatch','task_submit_candidate','task_review_candidate','task_accept_candidate','task_development_gateway_candidate','task_development_gateway_test_event','task_development_gateway','task_development_continue_review','task_development_verify_tests','task_development_apply','task_development_review','task_development_finalize','task_prepare_result_recovery','task_review_result_recovery','task_accept_result_recovery'}
+    require(not(set(tool_scope['tools'])-(known_read|known_write)),'UNKNOWN_TOOL_DENIED')
     for name,resource in manifest['tool_scope'].items():
+        require(name in known_read or name in known_write,'UNKNOWN_TOOL_DENIED')
         require(name in tool_scope['tools'] and tool_scope['tools'][name]==resource and isinstance(resource,str) and bool(resource),'TOOL_SCOPE_DENIED')
-        if tool_scope['mode']=='READ_ONLY':require(name in ('task_list','task_read_context','task_query_result','task_get','task_capabilities','task_dispatch_contract'),'WRITE_TOOL_DENIED')
+        if tool_scope['mode']=='READ_ONLY':require(name in known_read,'WRITE_TOOL_DENIED')
     inspect_archive(carrier,manifest['members'])
     consume(ledger_path,p,owner,evidence)
     record=(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode()
     if audit is None:os.write(log_fd,record);os.fsync(log_fd)
     else:audit.write(record)
     return carrier,p
+
+def verify_binding(binding_raw, trust, owner):
+    """Verify binding using an OS-provided Ed25519 verifier, never vendor code."""
+    import subprocess,tempfile
+    binding=parse(binding_raw)
+    require(isinstance(binding,dict) and set(binding)=={'payload','signature','key_id'},'BINDING_FORMAT')
+    payload=binding['payload'];require(isinstance(payload,dict) and binding['key_id']==trust.get('binding_key_id'),'BINDING_KEY_ID')
+    require(payload.get('schema')==1 and payload.get('production_trust_anchor')=='REQUIRED' and type(payload.get('expiry')) is int and payload['expiry']>int(time.time()),'BINDING_SCOPE')
+    require(payload.get('dependency_lock_sha256')==trust.get('dependency_lock_sha256'),'BINDING_LOCK_DIGEST')
+    verifier=trust.get('binding_verifier_path');digest=trust.get('binding_verifier_sha256');key_path=trust.get('binding_public_key_path')
+    require(isinstance(verifier,str) and os.path.isabs(verifier) and isinstance(key_path,str) and os.path.isabs(key_path) and isinstance(digest,str),'BINDING_TRUST_REQUIRED')
+    def read_protected(path,limit):
+        require(os.path.realpath(path)==path,'BINDING_TRUST_PATH');fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            st=os.fstat(fd);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==0 and not st.st_mode&0o022 and st.st_size<=limit,'BINDING_TRUST_FILE')
+            return os.read(fd,limit+1)
+        finally:os.close(fd)
+    require(sha(read_protected(verifier,32*1024*1024))==digest,'BINDING_VERIFIER_DIGEST')
+    key=read_protected(key_path,65536);require(sha(key)==trust.get('binding_public_key_sha256'),'BINDING_PUBLIC_KEY_DIGEST')
+    try:signature=base64.b64decode(binding['signature'],validate=True)
+    except Exception:raise Hold('BINDING_SIGNATURE_FORMAT')
+    require(len(signature)==64,'BINDING_SIGNATURE_FORMAT')
+    with tempfile.TemporaryDirectory(prefix='binding-') as d:
+        os.chmod(d,0o700);keyfile=os.path.join(d,'key');sigfile=os.path.join(d,'sig');message=os.path.join(d,'msg')
+        for path,data in ((keyfile,key),(sigfile,signature),(message,canonical(payload))):
+            fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+            try:require(os.write(fd,data)==len(data),'BINDING_TEMP_WRITE')
+            finally:os.close(fd)
+        proc=subprocess.run([verifier,'pkeyutl','-verify','-pubin','-inkey',keyfile,'-rawin','-in',message,'-sigfile',sigfile],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env={'PATH':'/usr/bin:/bin','LC_ALL':'C'},timeout=10)
+        require(proc.returncode==0,'BINDING_SIGNATURE_INVALID')
+    return payload
+
+def verify_dependency_lock(lock_raw, trust):
+    """Authenticate the isolated vendored dependency tree before importing it."""
+    import sysconfig
+    require(sys.flags.isolated==1,'PYTHON_ISOLATED_MODE_REQUIRED')
+    require(sha(lock_raw)==trust.get('dependency_lock_sha256'),'DEPENDENCY_LOCK_DIGEST')
+    lock=parse(lock_raw);require(lock.get('schema')==1 and lock.get('soabi')==sysconfig.get_config_var('SOABI'),'DEPENDENCY_ABI')
+    require(lock.get('platform')=='linux-x86_64-glibc' and sys.platform=='linux' and __import__('platform').machine()=='x86_64','DEPENDENCY_PLATFORM')
+    vendor=os.path.realpath(os.path.join(os.path.dirname(__file__),'vendor'))
+    require(os.path.isdir(vendor) and not os.path.islink(os.path.join(os.path.dirname(__file__),'vendor')),'VENDOR_DIRECTORY_REQUIRED')
+    for directory in (os.path.dirname(vendor),vendor):
+        info=os.stat(directory,follow_symlinks=False)
+        require(stat.S_ISDIR(info.st_mode) and info.st_uid in (0,os.geteuid()) and not info.st_mode&0o022,'VENDOR_DIRECTORY_POLICY')
+    files=lock.get('files');require(isinstance(files,list) and files,'DEPENDENCY_LOCK_FILES')
+    expected={}
+    for row in files:
+        require(isinstance(row,dict) and set(row)=={'path','sha256','size','mode'},'DEPENDENCY_LOCK_FIELDS')
+        name=row['path'];require(isinstance(name,str) and name and not name.startswith('/') and all(x not in ('','.','..') for x in name.split('/')) and name not in expected,'DEPENDENCY_PATH')
+        path=os.path.join(vendor,name);require(os.path.realpath(path)==path,'DEPENDENCY_PATH_LINK')
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        try:
+            st=os.fstat(fd);require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and not st.st_mode&0o022 and st.st_size==row['size'] and format(stat.S_IMODE(st.st_mode),'04o')==row['mode'],'DEPENDENCY_FILE_POLICY')
+            h=hashlib.sha256();offset=0
+            while offset<st.st_size:
+                chunk=os.pread(fd,min(1048576,st.st_size-offset),offset);require(bool(chunk),'DEPENDENCY_SHORT_READ');h.update(chunk);offset+=len(chunk)
+            end=os.fstat(fd);require((st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)==(end.st_dev,end.st_ino,end.st_size,end.st_mtime_ns,end.st_ctime_ns),'DEPENDENCY_CHANGED')
+            require(h.hexdigest()==row['sha256'],'DEPENDENCY_DIGEST');expected[name]=row['sha256']
+        finally:os.close(fd)
+    actual=set()
+    for directory,dirs,names in os.walk(vendor,followlinks=False):
+        info=os.stat(directory,follow_symlinks=False);require(info.st_uid in (0,os.geteuid()) and not info.st_mode&0o022,'VENDOR_DIRECTORY_POLICY')
+        require(not any(os.path.islink(os.path.join(directory,x)) for x in dirs),'DEPENDENCY_PATH_LINK')
+        for name in names:actual.add(os.path.relpath(os.path.join(directory,name),vendor))
+    require(actual==set(expected),'DEPENDENCY_FILE_SET')
+    sys.path[:]=[vendor,os.path.dirname(os.path.realpath(__file__))]+[p for p in sys.path if p and 'site-packages' not in p and 'dist-packages' not in p and os.path.realpath(p)!=vendor]
+    sys.dont_write_bytecode=True
+    import cryptography,cffi,_cffi_backend
+    import cryptography.hazmat.bindings._rust as rust
+    import importlib.metadata as metadata
+    for module in (cryptography,cffi,_cffi_backend,rust):
+        path=os.path.realpath(module.__file__);require(path.startswith(vendor+os.sep) and os.path.relpath(path,vendor) in expected,'DEPENDENCY_IMPORT_ORIGIN')
+    dist={d.metadata['Name'].lower():d.version for d in metadata.distributions(path=[vendor])}
+    require(all(dist.get(k)==v for k,v in lock.get('distributions',{}).items()),'DEPENDENCY_VERSION')
+
 
 def main():
     # Reject unsupported runtime before opening or mutating any controller path.
@@ -128,6 +208,8 @@ def main():
     a.add_argument('--test-only-crash-hook',choices=('crash_before_rename','crash_after_rename','crash_before_receipt','install_crash_after_rename','install_crash_before_rename','install_crash_before_receipt'))
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
     a.add_argument('--trust-fd',type=int,required=True)
+    a.add_argument('--dependency-lock-fd',type=int,required=True)
+    a.add_argument('--binding-fd',type=int,required=True)
     a.add_argument('--receipt-dir-fd',type=int,required=True)
     a.add_argument('--expected-controller-uid',type=int,default=0)
     a.add_argument('--expected-controller-gid',type=int,default=0)
@@ -137,10 +219,13 @@ def main():
     for n in ('task','attempt','receipt-key-id'):a.add_argument('--'+n)
     x=a.parse_args()
     try:
-        from controller import run,reconcile_pending,rollback
-        from path_guard import GuardedAudit
         require(os.geteuid()==x.expected_controller_uid and os.getegid()==x.expected_controller_gid,'CONTROLLER_IDENTITY_MISMATCH')
         trust=parse(stable_read(x.trust_fd,x.expected_controller_uid,65536))
+        binding=verify_binding(stable_read(x.binding_fd,x.expected_controller_uid,65536),trust,x.expected_controller_uid)
+        require(binding.get('environment')==trust.get('environment'),'BINDING_ENVIRONMENT')
+        verify_dependency_lock(stable_read(x.dependency_lock_fd,x.expected_controller_uid,8*1024*1024),trust)
+        from controller import run,reconcile_pending,rollback
+        from path_guard import GuardedAudit
         require(trust.get('expected_controller_uid',0)==x.expected_controller_uid and trust.get('expected_controller_gid',0)==x.expected_controller_gid,'CONTROLLER_TRUST_MISMATCH')
         require(trust.get('expected_receipt_owner',0)==x.expected_receipt_owner and trust.get('expected_receipt_mode',448)==x.expected_receipt_mode,'RECEIPT_TRUST_MISMATCH')
         rd=os.fstat(x.receipt_dir_fd)
