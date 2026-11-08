@@ -76,7 +76,7 @@ def consume(db_path, receipt, owner=0, evidence=None):
             if evidence is None:
                 db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
             else:
-                db.execute('INSERT INTO operations(nonce,task,attempt,state,prestate_target,prestate_hash,staging_target,manifest_hash,intended_target,receipt_hash) VALUES(?,?,?,?,?,?,?,?,?,NULL)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED',evidence['prestate_target'],evidence['prestate_hash'],'stage-'+receipt['nonce'],receipt['manifest_sha256'],'release-'+receipt['nonce']))
+                db.execute('INSERT INTO operations(nonce,task,attempt,state,prestate_target,prestate_hash,staging_target,manifest_hash,intended_target,receipt_hash,operation_id,carrier_digest,manifest_digest,prestate_digest,key_id,receipt_path) VALUES(?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED',evidence['prestate_target'],evidence['prestate_hash'],'stage-'+receipt['nonce'],receipt['manifest_sha256'],'release-'+receipt['nonce'],'install:'+receipt['nonce'],receipt['carrier_sha256'],receipt['manifest_sha256'],evidence['prestate_digest'],evidence['key_id'],'receipt-'+receipt['nonce']+'.json'))
             guarded.check();db.execute('COMMIT')
         except Exception:
             if db.in_transaction:db.execute('ROLLBACK')

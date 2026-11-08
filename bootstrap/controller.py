@@ -163,7 +163,7 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             g.check();db.execute('BEGIN IMMEDIATE')
             try:
                 columns={r[1] for r in db.execute('PRAGMA table_info(operations)')}
-                required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash'}
+                required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash','operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}
                 rows=db.execute("SELECT * FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchall()
                 for row in rows:
                     before=row['state'];outcome='UNKNOWN';reason='EVIDENCE_MISSING'
@@ -185,7 +185,7 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                             check(set(obj)=={'payload','signature','key_id'} and obj['key_id']==trust.get('key_id'),'RECEIPT_KEY_ID')
                             check(set(payload)=={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at'},'RECEIPT_FIELDS')
                             check(isinstance(payload['carrier_digest'],str) and re.fullmatch('[0-9a-f]{64}',payload['carrier_digest']) and type(payload['issued_at']) is int,'RECEIPT_FIELDS')
-                            check(payload['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['manifest_digest']==mh and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
+                            check(payload['operation_id']==row['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['carrier_digest']==row['carrier_digest'] and payload['manifest_digest']==row['manifest_digest']==mh and payload['tree_digest']==row['tree_digest'] and payload['prestate_digest']==row['prestate_digest'] and obj['key_id']==row['key_id'] and row['receipt_path']=='receipt-'+row['nonce']+'.json' and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
                             check(payload['tree_digest']==verified_tree(rootfd,target,owner) and payload['prestate_digest']==verified_tree(rootfd,pre,owner),'RECEIPT_TREE')
                             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
                             try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
@@ -229,8 +229,12 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
     try:
         pre=_current(currentfd);check(pre is not None,'PRESTATE_REQUIRED')
         prestate_tree=verified_tree(currentfd,pre,owner)
-        evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner)}
+        evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner),'prestate_digest':prestate_tree,'key_id':key_id}
     finally:os.close(currentfd)
+    from path_guard import GuardedLedger
+    with GuardedLedger(ledger_path,owner) as schema:
+        columns={r[1] for r in schema.db.execute('PRAGMA table_info(operations)')}
+        check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
     blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -253,6 +257,14 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
             os.fsync(stage)
         finally:os.close(stage)
         stage_tree=verified_tree(rootfd,name,owner)
+        from path_guard import GuardedLedger
+        with GuardedLedger(ledger_path,owner) as g:
+            g.db.execute('BEGIN IMMEDIATE')
+            try:
+                g.check();cur=g.db.execute("UPDATE operations SET tree_digest=? WHERE nonce=? AND state='RUNNING'",(stage_tree,nonce));check(cur.rowcount==1,'TREE_STATE');g.db.execute('COMMIT')
+            except BaseException:
+                if g.db.in_transaction:g.db.execute('ROLLBACK')
+                raise
         if failpoint=='after_extract':raise ControllerError('INJECTED')
         target='release-'+nonce
         os.rename(name,target,src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)

@@ -6,7 +6,7 @@ import secure_bootstrap as b
 class ReconcileTests(unittest.TestCase):
  def setUp(self):
   self.tmp=tempfile.TemporaryDirectory(dir=os.getcwd());self.home=self.tmp.name;self.root=os.path.join(self.home,'root');os.mkdir(self.root,0o700)
-  self.db=os.path.join(self.home,'ledger');db=sqlite3.connect(self.db);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text)');db.close();os.chmod(self.db,0o600)
+  self.db=os.path.join(self.home,'ledger');db=sqlite3.connect(self.db);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text)');db.close();os.chmod(self.db,0o600)
   self.audit=os.path.join(self.home,'audit');fd=os.open(self.audit,os.O_CREAT|os.O_WRONLY|os.O_APPEND,0o600);self.log=fd
   self.mk_target('base',b'base');os.symlink('base',os.path.join(self.root,'current'))
  def tearDown(self):os.close(self.log);self.tmp.cleanup()
@@ -14,7 +14,7 @@ class ReconcileTests(unittest.TestCase):
   path=os.path.join(self.root,name);os.mkdir(path,0o700)
   fd=os.open(os.path.join(path,'.bootstrap-manifest.json'),os.O_CREAT|os.O_WRONLY,0o600);os.write(fd,data);os.close(fd)
  def row(self,state='RUNNING',receipt_hash=None):
-  with sqlite3.connect(self.db) as db:db.execute('insert into operations values(?,?,?,?,?,?,?,?,?,?)',('n','t','a',state,'base',b.sha(b'base'),'stage-n',b.sha(b'new'),'release-n',receipt_hash))
+  with sqlite3.connect(self.db) as db:db.execute('insert into operations(nonce,task,attempt,state,prestate_target,prestate_hash,staging_target,manifest_hash,intended_target,receipt_hash) values(?,?,?,?,?,?,?,?,?,?)',('n','t','a',state,'base',b.sha(b'base'),'stage-n',b.sha(b'new'),'release-n',receipt_hash))
  def state(self):
   with sqlite3.connect(self.db) as db:return db.execute('select state from operations').fetchone()[0]
  def go(self):return c.reconcile_pending(self.db,os.getuid(),self.root,self.log)

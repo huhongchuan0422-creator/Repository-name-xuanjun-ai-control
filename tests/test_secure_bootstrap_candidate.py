@@ -16,7 +16,7 @@ class BootstrapTests(unittest.TestCase):
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
   self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
-  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text)');db.close();os.chmod(self.ledger,0o600)
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
@@ -131,6 +131,41 @@ class InstallerTests(BootstrapTests):
   self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
   with self.assertRaisesRegex(Exception,'UNKNOWN_RECONCILIATION_REQUIRED'):self.run_install()
   self.assertEqual(self.state(),'UNKNOWN')
+ def test_cli_install_with_actual_runtime(self):
+  import subprocess
+  if os.getuid()!=0:
+   self.skipTest('CLI enforces root-owned inputs; run in isolated uid-0 container')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
+  cmd=[sys.executable,cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-signing-key-fd',str(kf),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
+  proc=subprocess.run(cmd,pass_fds=(cf,mf,rf,tf,kf),stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True)
+  self.assertEqual(proc.returncode,0,proc.stderr);self.assertEqual(self.state(),'SUCCEEDED')
+  with open(os.path.join(self.root,'release-nonce','payload'),'rb') as f:self.assertEqual(f.read(),b'abc')
+  with open(os.path.join(self.root,'receipt-nonce.json'),'rb') as f:item=b.parse(f.read())
+  self.key.public_key().verify(base64.b64decode(item['signature']),b.canonical(item['payload']))
+  with open(self.log,'rb') as f:self.assertIn(b'SUCCEEDED',f.read())
+ def test_cli_negative_cases(self):
+  import subprocess
+  if os.getuid()!=0:self.skipTest('requires isolated uid 0')
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  cf=self.fd('carrier',self.carrier);mf=self.fd('manifest',self.manifest);rf=self.fd('receipt',b.canonical({'payload':p,'signature':sig}));tf=self.fd('trust',b.canonical(self.trust));kf=self.fd('signing-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  bad=self.fd('bad-key',Ed25519PrivateKey.generate().private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  cli=os.path.join(os.path.dirname(__file__),'..','bootstrap','secure_bootstrap.py')
+  common=[cli,'--carrier-fd',str(cf),'--manifest-fd',str(mf),'--receipt-fd',str(rf),'--trust-fd',str(tf),'--receipt-key-id','fixture-key','--ledger',self.ledger,'--audit',self.log,'--task','task','--attempt','attempt','--root',self.root]
+  fds=(cf,mf,rf,tf,kf,bad)
+  for name,extra in [('missing-key',[]),('wrong-key',['--receipt-signing-key-fd',str(bad)])]:
+   with self.subTest(name=name):
+    proc=subprocess.run([sys.executable]+common+extra,pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    self.assertNotEqual(proc.returncode,0);self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+  with open(os.path.join(self.root,'receipt-nonce.json'),'wb') as f:f.write(b'conflict')
+  proc=subprocess.run([sys.executable]+common+['--receipt-signing-key-fd',str(kf)],pass_fds=fds,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  self.assertNotEqual(proc.returncode,0);self.assertEqual(self.state(),'UNKNOWN')
+ def test_old_schema_install_fails_closed(self):
+  with sqlite3.connect(self.ledger) as db:
+   db.execute('drop table operations');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)')
+  with self.assertRaisesRegex(Exception,'LEDGER_SCHEMA_UPGRADE_REQUIRED'):self.run_install()
+  self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
  def test_recover_running_as_unknown(self):
   import sys
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller
