@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import re
 
 ENTRIES = ('WORK', 'CHATGPT', 'DOTS')
@@ -101,7 +102,7 @@ def review_bundle(contract,files,reviews,review_keys=None):
         manifest[path]=digest(raw)
     binding={'contract':contract,'files':manifest}
     bundle_sha=digest(canonical(binding))
-    roles=set();record_ids=set()
+    roles=set();record_ids=set();review_record_ids={}
     if not isinstance(reviews,list) or len(reviews)>2:raise ValueError('BOUNDED_REVIEWS_REQUIRED')
     for record in reviews:
         value=authenticated(record,review_keys)
@@ -112,13 +113,115 @@ def review_bundle(contract,files,reviews,review_keys=None):
                 or value['role'] in roles or record['record_id'] in record_ids
                 or value['bundle_sha256']!=bundle_sha or value['decision']!='PASS'):
             raise ValueError('INDEPENDENT_EXACT_VERSION_REVIEW_REQUIRED')
-        roles.add(value['role']);record_ids.add(record['record_id'])
+        roles.add(value['role']);record_ids.add(record['record_id']);review_record_ids[value['role']]=record['record_id']
     if roles=={'QA','SECURITY'}:
         values=[review_keys[p['key_id']] for p in policies.values()]
         if hmac.compare_digest(values[0],values[1]):
             raise ValueError('DISTINCT_REVIEW_AUTHORITY_KEYS_REQUIRED')
     return {'state':'ISOLATED_TEST_ELIGIBLE' if roles=={'QA','SECURITY'} else 'HOLD_INDEPENDENT_REVIEW_REQUIRED',
-            'bundle_sha256':bundle_sha,'binding':binding,'authority_effect':'NONE','release_approved':False}
+            'bundle_sha256':bundle_sha,'binding':binding,
+            'review_record_ids':review_record_ids,
+            'authority_effect':'NONE','release_approved':False}
+
+
+def complete_reviewed_candidate(supervisor, task_id, candidate_event_id,
+                                files, reviews, review_keys,
+                                reviewed_event_id):
+    """Record exact independent review evidence for the canonical candidate.
+
+    This never completes the task, releases dependencies, grants production
+    authority, or substitutes caller-provided candidate state.
+    """
+    candidate = supervisor.development_candidate(task_id, candidate_event_id)
+    contract = supervisor.development_contract(task_id)
+    review_contract = dict(contract)
+    review_contract['code_commit'] = candidate['code_commit']
+    result = review_bundle(review_contract, files, reviews, review_keys)
+    if result['state'] != 'ISOLATED_TEST_ELIGIBLE':
+        return dict(result,
+                    canonical_review='HOLD_INDEPENDENT_REVIEW_REQUIRED')
+    reviewed = supervisor.record_development_review(
+        task_id, candidate_event_id, files, result['bundle_sha256'],
+        result['review_record_ids'], reviewed_event_id)
+    return dict(result, canonical_review=reviewed)
+
+
+def finalize_reviewed_candidate(supervisor, task_id, reviewed_event_id,
+                                completion_event_id,
+                                next_action='DEPENDENCIES_RECHECK'):
+    """Release only after canonical revocation/coverage has completed."""
+    return supervisor.complete_development_candidate(
+        task_id, reviewed_event_id, completion_event_id,
+        next_action=next_action)
+
+
+def controlled_development_action(review_keys=None):
+    """Source-only CLI entry over an existing canonical ledger.
+
+    REVIEW additionally requires an exact clean local Git checkout. FINALIZE
+    requires prior canonical DEVELOPMENT_REVIEWED plus completed revocation.
+    Missing source inputs return HOLD and never create a ledger.
+    """
+    ledger=os.environ.get('XJ_CANONICAL_LEDGER_PATH')
+    root=os.environ.get('XJ_CANDIDATE_ROOT')
+    request_path=os.environ.get('XJ_DEVELOPMENT_REVIEW_INPUT')
+    if not ledger or not request_path:
+        return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                'authority_effect':'NONE'}
+    if not os.path.isfile(ledger) or not os.path.isfile(request_path):
+        return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                'authority_effect':'NONE'}
+    with open(request_path,'rb') as stream:
+        raw=stream.read(65537)
+    if len(raw)>65536:
+        raise ValueError('BOUNDED_REVIEW_REQUEST_REQUIRED')
+    request=json.loads(raw.decode('utf-8','strict'))
+    if not isinstance(request,dict) or request.get('action') not in ('REVIEW','FINALIZE'):
+        raise ValueError('EXACT_DEVELOPMENT_ACTION_REQUIRED')
+    from task_supervisor import Supervisor
+    supervisor=Supervisor(ledger)
+    try:
+        if request['action']=='FINALIZE':
+            required={'action','task_id','reviewed_event_id','completion_event_id'}
+            if set(request)!=required:
+                raise ValueError('EXACT_FINALIZE_REQUEST_REQUIRED')
+            result=finalize_reviewed_candidate(
+                supervisor,request['task_id'],request['reviewed_event_id'],
+                request['completion_event_id'])
+            return {'state':'CANONICAL_DEVELOPMENT_FINALIZED',
+                    'authority_effect':'NONE','result':result}
+        required={'action','task_id','candidate_event_id','reviewed_event_id',
+                  'reviews'}
+        if set(request)!=required or not root:
+            return {'state':'HOLD_CANONICAL_REVIEW_INPUT_UNAVAILABLE',
+                    'authority_effect':'NONE'}
+        if review_keys is None:
+            return {'state':'HOLD_TRUSTED_REVIEW_KEYS_UNAVAILABLE',
+                    'authority_effect':'NONE'}
+        candidate=supervisor.development_candidate(
+            request['task_id'],request['candidate_event_id'])
+        contract=supervisor.development_contract(request['task_id'])
+        receipt={'task_id':request['task_id'],
+                 'target_repository':contract['target_repository'],
+                 'code_commit':candidate['code_commit']}
+        from development_entry_intake import _controlled_candidate_files
+        files=_controlled_candidate_files(supervisor,receipt,root)
+        result=complete_reviewed_candidate(
+            supervisor,request['task_id'],request['candidate_event_id'],
+            files,request['reviews'],review_keys,request['reviewed_event_id'])
+        return {'state':'CANONICAL_DEVELOPMENT_REVIEW_RECORDED',
+                'authority_effect':'NONE','result':result}
+    finally:
+        supervisor.close()
+
+
+def main():
+    try:
+        result=controlled_development_action()
+    except Exception:
+        result={'state':'HOLD_CANONICAL_DEVELOPMENT_ACTION_ERROR',
+                'authority_effect':'NONE'}
+    print(json.dumps(result,sort_keys=True))
 
 
 def continuation_due(binding,receipt_read_at,now,evidence=None,ledger_keys=None):
@@ -181,3 +284,7 @@ def continuation_batch(records, now, ledger_keys=None):
             results.append({'index': index, 'state': 'HOLD_INVALID_CONTINUATION_EVIDENCE',
                             'authority_effect': 'NONE', 'takeover_allowed': False})
     return results
+
+
+if __name__ == '__main__':
+    main()
