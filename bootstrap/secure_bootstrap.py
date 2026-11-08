@@ -64,7 +64,7 @@ def checked_ledger_path(path, owner):
     with Guard(path,owner) as guard:
         fd=guard.open_file(os.O_RDWR);os.close(fd)
 
-def consume(db_path, receipt, owner=0):
+def consume(db_path, receipt, owner=0, evidence=None):
     from path_guard import GuardedLedger
     with GuardedLedger(db_path,owner) as guarded:
         db=guarded.db
@@ -73,13 +73,16 @@ def consume(db_path, receipt, owner=0):
             require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
             require(db.execute("SELECT 1 FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN') LIMIT 1").fetchone() is None,'UNRESOLVED_OPERATION')
             require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
-            db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
+            if evidence is None:
+                db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
+            else:
+                db.execute('INSERT INTO operations(nonce,task,attempt,state,prestate_target,prestate_hash,staging_target,manifest_hash,intended_target,receipt_hash) VALUES(?,?,?,?,?,?,?,?,?,NULL)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED',evidence['prestate_target'],evidence['prestate_hash'],'stage-'+receipt['nonce'],receipt['manifest_sha256'],'release-'+receipt['nonce']))
             guarded.check();db.execute('COMMIT')
         except Exception:
             if db.in_transaction:db.execute('ROLLBACK')
             raise
 
-def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None,audit=None):
+def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None,audit=None,evidence=None):
     # Check the supplied evidence sink before reserving a nonce or reading carrier.
     ls=os.fstat(log_fd);require(stat.S_ISREG(ls.st_mode) and ls.st_nlink==1 and ls.st_uid==owner and not ls.st_mode&0o022 and fcntl.fcntl(log_fd,fcntl.F_GETFL)&os.O_APPEND,'LOG_REQUIRED')
     trust=parse(stable_read(trust_fd,owner,65536));require(trust.get('mode') in ('ED25519','DIGEST_ALLOWLIST'),'TRUST_ANCHOR_REQUIRED')
@@ -108,7 +111,7 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
         require(name in tool_scope['tools'] and tool_scope['tools'][name]==resource and isinstance(resource,str) and bool(resource),'TOOL_SCOPE_DENIED')
         if tool_scope['mode']=='READ_ONLY':require(name in ('task_list','task_read_context','task_query_result','task_get','task_capabilities','task_dispatch_contract'),'WRITE_TOOL_DENIED')
     inspect_archive(carrier,manifest['members'])
-    consume(ledger_path,p,owner)
+    consume(ledger_path,p,owner,evidence)
     record=(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode()
     if audit is None:os.write(log_fd,record);os.fsync(log_fd)
     else:audit.write(record)

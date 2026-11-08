@@ -2,7 +2,7 @@
 
 No carrier code is imported or executed. Production integration is not provided.
 """
-import io, json, os, sqlite3, stat, tarfile, tempfile
+import fcntl, hashlib, io, json, os, re, sqlite3, stat, tarfile, tempfile
 import secure_bootstrap as verifylib
 
 class ControllerError(Exception): pass
@@ -58,12 +58,114 @@ def extract(blob, rootfd):
             finally:os.close(fd)
     os.fsync(rootfd)
 
-def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
+def _name(value):
+    check(isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}',value) and value not in ('.','..'),'EVIDENCE_NAME')
+    return value
+
+def _file_bytes(dfd, name, owner, limit=4*1024*1024):
+    fd=os.open(_name(name),os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=dfd)
+    try:return verifylib.stable_read(fd,owner,limit)
+    finally:os.close(fd)
+
+def _target_manifest(rootfd, target, owner):
+    d=open_dir(rootfd,_name(target))
+    try:
+        st=os.fstat(d);check(st.st_uid==owner and not st.st_mode&0o077,'TARGET_OWNER_MODE')
+        return verifylib.sha(_file_bytes(d,'.bootstrap-manifest.json',owner))
+    finally:os.close(d)
+
+def _current(rootfd):
+    try:
+        st=os.stat('current',dir_fd=rootfd,follow_symlinks=False)
+        check(stat.S_ISLNK(st.st_mode),'CURRENT_NOT_LINK')
+        return _name(os.readlink('current',dir_fd=rootfd))
+    except FileNotFoundError:return None
+
+def _exists(rootfd,name):
+    try:os.stat(_name(name),dir_fd=rootfd,follow_symlinks=False);return True
+    except FileNotFoundError:return False
+
+def _remove_tree(parent,name,owner):
+    """Validate entire tree before deletion; caller holds exclusive controller lock."""
+    def walk(parent_fd, item, remove):
+        d=open_dir(parent_fd,_name(item));st=os.fstat(d)
+        check(st.st_uid==owner and not st.st_mode&0o077,'STAGE_OWNER_MODE')
+        try:
+            for child in os.listdir(d):
+                c=os.stat(child,dir_fd=d,follow_symlinks=False)
+                if stat.S_ISDIR(c.st_mode):walk(d,child,remove)
+                else:
+                    check(stat.S_ISREG(c.st_mode) and c.st_nlink==1 and c.st_uid==owner and not c.st_mode&0o077,'UNSAFE_STAGE_ENTRY')
+                    if remove:os.unlink(child,dir_fd=d)
+            if remove:os.fsync(d)
+        finally:os.close(d)
+        current=os.stat(item,dir_fd=parent_fd,follow_symlinks=False)
+        check((st.st_dev,st.st_ino)==(current.st_dev,current.st_ino),'STAGE_REPLACED')
+        if remove:os.rmdir(item,dir_fd=parent_fd);os.fsync(parent_fd)
+    walk(parent,name,False);walk(parent,name,True)
+
+def _reconcile_pending_locked(path, owner, root, log_fd, audit=None):
+    """Reconcile under the caller-held controller lock; missing evidence holds."""
+    from path_guard import GuardedLedger
+    rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        with GuardedLedger(path,owner) as g:
+            db=g.db;db.row_factory=sqlite3.Row
+            g.check();db.execute('BEGIN IMMEDIATE')
+            try:
+                columns={r[1] for r in db.execute('PRAGMA table_info(operations)')}
+                required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash'}
+                rows=db.execute("SELECT * FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchall()
+                for row in rows:
+                    before=row['state'];outcome='UNKNOWN';reason='EVIDENCE_MISSING'
+                    try:
+                        check(required.issubset(columns),'EVIDENCE_SCHEMA')
+                        pre=_name(row['prestate_target']);stage=_name(row['staging_target']);target=_name(row['intended_target'])
+                        prehash=row['prestate_hash'];mh=row['manifest_hash'];rh=row['receipt_hash']
+                        check(all(isinstance(v,str) and re.fullmatch('[0-9a-f]{64}',v) for v in (prehash,mh)),'EVIDENCE_DIGEST')
+                        check(_target_manifest(rootfd,pre,owner)==prehash,'PRESTATE_MISMATCH')
+                        current=_current(rootfd);stage_exists=_exists(rootfd,stage);target_exists=_exists(rootfd,target)
+                        if current==target:
+                            check(not stage_exists and target_exists,'TARGET_CONFLICT')
+                            check(_target_manifest(rootfd,target,owner)==mh,'TARGET_MISMATCH')
+                            check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
+                            raw=_file_bytes(rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
+                            check(verifylib.sha(raw)==rh,'RECEIPT_MISMATCH')
+                            receipt=verifylib.parse(raw)
+                            check(receipt=={'nonce':row['nonce'],'target':target,'manifest_sha256':mh,'outcome':'SUCCEEDED'},'RECEIPT_SCOPE')
+                            outcome='SUCCEEDED';reason='RECEIPT_AND_CURRENT_MATCH'
+                        elif current==pre:
+                            check(not target_exists,'UNSWITCHED_TARGET_CONFLICT')
+                            if stage_exists:
+                                check(_target_manifest(rootfd,stage,owner)==mh,'STAGE_MISMATCH')
+                                _remove_tree(rootfd,stage,owner)
+                            outcome='FAILED';reason='PRESTATE_UNCHANGED'
+                        else:reason='CURRENT_CONFLICT'
+                    except (OSError,ValueError,TypeError,KeyError,ControllerError):
+                        outcome='UNKNOWN';reason='EVIDENCE_CONFLICT_OR_MISSING'
+                    if before!=outcome:
+                        log(log_fd,{'event':'RECONCILE','nonce':row['nonce'],'from':before,'to':outcome,'reason':reason},audit)
+                        g.check();db.execute('UPDATE operations SET state=? WHERE nonce=? AND state=?',(outcome,row['nonce'],before))
+                g.check();db.execute('COMMIT')
+            except BaseException:
+                if db.in_transaction:db.execute('ROLLBACK')
+                raise
+            return db.execute("SELECT COUNT(*) FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchone()[0]
+    finally:os.close(rootfd)
+
+def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
     """Fixture implementation only; caller must exclusively control root and ledger."""
     rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and not rootst.st_mode&0o077,'ROOT_PERMISSIONS')
+    check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit)==0,'UNKNOWN_RECONCILIATION_REQUIRED')
     # Before effects, verify complete signed input and atomically reserve nonce.
     if audit is not None: audit.write(b'{"event":"STARTING"}\n')
-    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit)
+    currentfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        pre=_current(currentfd);check(pre is not None,'PRESTATE_REQUIRED')
+        evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner)}
+    finally:os.close(currentfd)
+    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     running=False
@@ -74,7 +176,15 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
         name='stage-'+nonce
         os.mkdir(name,0o700,dir_fd=rootfd);os.fsync(rootfd)
         stage=open_dir(rootfd,name)
-        try:extract(blob,stage)
+        try:
+            extract(blob,stage)
+            manifest=verifylib.stable_read(manifest_fd,owner,4*1024*1024)
+            check(verifylib.sha(manifest)==p['manifest_sha256'],'MANIFEST_CHANGED')
+            fd=os.open('.bootstrap-manifest.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=stage)
+            try:
+                check(os.write(fd,manifest)==len(manifest),'SHORT_MANIFEST_WRITE');os.fsync(fd)
+            finally:os.close(fd)
+            os.fsync(stage)
         finally:os.close(stage)
         if failpoint=='after_extract':raise ControllerError('INJECTED')
         target='release-'+nonce
@@ -84,6 +194,19 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
         os.symlink(target,link,dir_fd=rootfd)
         os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
         if failpoint=='after_switch':raise ControllerError('INJECTED')
+        receipt=verifylib.canonical({'nonce':nonce,'target':target,'manifest_sha256':p['manifest_sha256'],'outcome':'SUCCEEDED'})
+        fd=os.open('receipt-'+nonce+'.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        try:check(os.write(fd,receipt)==len(receipt),'SHORT_RECEIPT_WRITE');os.fsync(fd)
+        finally:os.close(fd)
+        os.fsync(rootfd)
+        from path_guard import GuardedLedger
+        with GuardedLedger(ledger_path,owner) as g:
+            g.db.execute('BEGIN IMMEDIATE')
+            try:
+                g.check();cur=g.db.execute("UPDATE operations SET receipt_hash=? WHERE nonce=? AND state='RUNNING'",(verifylib.sha(receipt),nonce));check(cur.rowcount==1,'RECEIPT_STATE');g.db.execute('COMMIT')
+            except BaseException:
+                if g.db.in_transaction:g.db.execute('ROLLBACK')
+                raise
         log(log_fd,{'event':'SUCCEEDED','nonce':nonce,'target':target},audit)
         transition(ledger_path,owner,nonce,'RUNNING','SUCCEEDED');running=False
         return target
@@ -105,3 +228,29 @@ def recover(path, owner):
         except BaseException:
             if db.in_transaction:db.execute('ROLLBACK')
             raise
+
+
+def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
+    rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        lock=os.open('.bootstrap.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        try:
+            st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            return _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner,failpoint,audit)
+        finally:os.close(lock)
+    finally:os.close(rootfd)
+
+
+def reconcile_pending(path, owner, root, log_fd, audit=None):
+    rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        st=os.fstat(rootfd);check(st.st_uid==owner and not st.st_mode&0o077,'ROOT_PERMISSIONS')
+        lock=os.open('.bootstrap.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        try:
+            st=os.fstat(lock);check(stat.S_ISREG(st.st_mode) and st.st_uid==owner and st.st_nlink==1 and not st.st_mode&0o077,'LOCK_PERMISSIONS')
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            return _reconcile_pending_locked(path,owner,root,log_fd,audit)
+        finally:os.close(lock)
+    finally:os.close(rootfd)

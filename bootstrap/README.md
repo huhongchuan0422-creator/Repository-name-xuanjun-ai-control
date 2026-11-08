@@ -34,3 +34,19 @@ compromise is outside this boundary. These deployment facts remain unverified.
 The carrier manifest requires `minimum_sqlite: [3,35,0]`. Bootstrap refuses
 older SQLite before reservation. Tests of other paths on SQLite 3.26 override
 only the reported version for fixture coverage, not compatibility evidence.
+
+## Experimental reconciliation schema
+
+The controller-provisioned operations table must also contain TEXT columns
+`prestate_target`, `prestate_hash`, `staging_target`, `manifest_hash`,
+`intended_target`, `receipt_hash`. The private root must begin with `current`
+pointing at a private directory containing `.bootstrap-manifest.json`. The
+controller locks `.bootstrap.lock`, reconciles pending rows before install,
+and holds on ambiguous evidence. Success receipts are controller-owned files
+whose digest and expected fields are pinned in the ledger. Their credibility
+assumes the controller-only UID/directory contract above; they are not signed
+external authority receipts. A crash between switching current and persisting
+the success receipt hash deliberately stays UNKNOWN for independent review.
+Reconciliation compares the stored manifest file digest, not every installed
+file; complete tree-content verification remains a release blocker. This is
+still experimental and must not be used for production installation.

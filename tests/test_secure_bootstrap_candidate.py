@@ -16,7 +16,7 @@ class BootstrapTests(unittest.TestCase):
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
   self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
-  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)');db.close();os.chmod(self.ledger,0o600)
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
@@ -65,6 +65,9 @@ if __name__=='__main__':unittest.main()
 class InstallerTests(BootstrapTests):
  def setUp(self):
   super().setUp();self.root=os.path.join(self.dir,'root');os.mkdir(self.root,0o700)
+  os.mkdir(os.path.join(self.root,'base'),0o700)
+  with open(os.path.join(self.root,'base','.bootstrap-manifest.json'),'wb') as f:f.write(b'base')
+  os.chmod(os.path.join(self.root,'base','.bootstrap-manifest.json'),0o600);os.symlink('base',os.path.join(self.root,'current'))
  def run_install(self,failpoint=None):
   import sys
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'))
@@ -72,7 +75,7 @@ class InstallerTests(BootstrapTests):
   p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
   args=[self.fd('carrier',self.carrier),self.fd('manifest',self.manifest),self.fd('receipt',b.canonical({'payload':p,'signature':sig})),self.fd('trust',b.canonical(self.trust)),self.ledger]
   lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
-  return controller.run(*(args+[lf,{'task':'task','attempt':'attempt'},self.root]),owner=os.getuid(),failpoint=failpoint)
+  return controller.run(*(args+[lf,{'task':p['task'],'attempt':p['attempt']},self.root]),owner=os.getuid(),failpoint=failpoint)
  def state(self):
   with sqlite3.connect(self.ledger) as db:return db.execute('select state from operations').fetchone()[0]
  def test_install_and_reinstall(self):
@@ -84,10 +87,22 @@ class InstallerTests(BootstrapTests):
   with self.assertRaises(controller.ControllerError):self.run_install('after_switch')
   self.assertEqual(self.state(),'UNKNOWN')
   with self.assertRaises(Exception):self.run_install()
+ def test_next_start_auto_reconciles_before_new_reservation(self):
+  with self.assertRaises(Exception):self.run_install('after_extract')
+  self.assertEqual(self.state(),'UNKNOWN')
+  self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
+  self.assertEqual(self.run_install(),'release-next')
+  with sqlite3.connect(self.ledger) as db:
+   self.assertEqual(db.execute("select state from operations where nonce='nonce'").fetchone()[0],'FAILED')
+ def test_ambiguous_switch_blocks_next_install(self):
+  with self.assertRaises(Exception):self.run_install('after_switch')
+  self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
+  with self.assertRaisesRegex(Exception,'UNKNOWN_RECONCILIATION_REQUIRED'):self.run_install()
+  self.assertEqual(self.state(),'UNKNOWN')
  def test_recover_running_as_unknown(self):
   import sys
   sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller
-  with sqlite3.connect(self.ledger) as db:db.execute("insert into operations values('n','t','a','RUNNING')")
+  with sqlite3.connect(self.ledger) as db:db.execute("insert into operations(nonce,task,attempt,state) values('n','t','a','RUNNING')")
   controller.recover(self.ledger,os.getuid());self.assertEqual(self.state(),'UNKNOWN')
 
 class ScopeAndConcurrencyTests(BootstrapTests):
