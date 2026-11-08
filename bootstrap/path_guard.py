@@ -42,3 +42,49 @@ class Guard:
         if self.fd is not None:os.close(self.fd);self.fd=None
     def __enter__(self):return self
     def __exit__(self,*args):self.close()
+
+class GuardedLedger:
+    """SQLite handle bound to a held private parent dirfd, not the input path."""
+    def __init__(self,path,owner):
+        import sqlite3
+        self.guard=Guard(path,owner); self.file=None; self.db=None
+        try:
+            st=os.fstat(self.guard.fd)
+            guard(st.st_uid==owner and not st.st_mode&0o077,'PRIVATE_LEDGER_DIRECTORY_REQUIRED')
+            self.file=self.guard.open_file(os.O_RDWR)
+            self.check_sidecars()
+            proc='/proc/self/fd/%d/%s' % (self.guard.fd,self.guard.name)
+            guard(os.path.exists('/proc/self/fd/%d'%self.guard.fd),'PROC_FD_REQUIRED')
+            self.db=sqlite3.connect('file:'+proc+'?mode=rw',uri=True,timeout=5,isolation_level=None)
+            self.check()
+            guard(self.db.execute('PRAGMA journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
+            self.db.execute('PRAGMA busy_timeout=5000');self.db.execute('PRAGMA synchronous=FULL')
+            self.check()
+        except BaseException:self.close();raise
+    def check_sidecars(self):
+        for suffix in ('-wal','-shm','-journal'):
+            try: st=os.stat(self.guard.name+suffix,dir_fd=self.guard.fd,follow_symlinks=False)
+            except FileNotFoundError:continue
+            guard(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_uid==self.guard.owner and not st.st_mode&0o077,'SIDECAR_TRUST')
+    def check(self):
+        guard(self.guard.matches(self.file),'LEDGER_REPLACED');self.check_sidecars()
+    def close(self):
+        if self.db is not None:self.db.close();self.db=None
+        if self.file is not None:os.close(self.file);self.file=None
+        self.guard.close()
+    def __enter__(self):return self
+    def __exit__(self,*args):self.close()
+
+class GuardedAudit:
+    def __init__(self,path,owner):
+        self.guard=Guard(path,owner);self.file=None
+        try:self.file=self.guard.open_file(os.O_WRONLY|os.O_APPEND)
+        except BaseException:self.guard.close();raise
+    def write(self,data):
+        guard(self.guard.matches(self.file),'AUDIT_REPLACED')
+        guard(os.write(self.file,data)==len(data),'AUDIT_SHORT_WRITE');os.fsync(self.file)
+    def close(self):
+        if self.file is not None:os.close(self.file);self.file=None
+        self.guard.close()
+    def __enter__(self):return self
+    def __exit__(self,*args):self.close()

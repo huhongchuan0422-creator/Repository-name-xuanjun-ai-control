@@ -10,28 +10,22 @@ class ControllerError(Exception): pass
 def check(value, reason):
     if not value: raise ControllerError(reason)
 
-def ledger(path, owner):
-    verifylib.checked_ledger_path(path,owner)
-    db=sqlite3.connect('file:'+path+'?mode=rw',uri=True,timeout=5,isolation_level=None)
-    check(db.execute('pragma journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
-    db.execute('pragma busy_timeout=5000');db.execute('pragma synchronous=FULL')
-    return db
-
 def transition(path, owner, nonce, before, after):
-    db=ledger(path,owner)
-    try:
-        db.execute('BEGIN IMMEDIATE')
-        cur=db.execute('UPDATE operations SET state=? WHERE nonce=? AND state=?',(after,nonce,before))
-        check(cur.rowcount==1,'STATE_CONFLICT')
-        db.execute('COMMIT')
-    except BaseException:
-        if db.in_transaction:db.execute('ROLLBACK')
-        raise
-    finally:db.close()
+    from path_guard import GuardedLedger
+    with GuardedLedger(path,owner) as guarded:
+        db=guarded.db
+        try:
+            guarded.check();db.execute('BEGIN IMMEDIATE');guarded.check()
+            cur=db.execute('UPDATE operations SET state=? WHERE nonce=? AND state=?',(after,nonce,before))
+            check(cur.rowcount==1,'STATE_CONFLICT');guarded.check();db.execute('COMMIT')
+        except BaseException:
+            if db.in_transaction:db.execute('ROLLBACK')
+            raise
 
-def log(fd, event):
+def log(fd, event, audit=None):
     blob=(json.dumps(event,sort_keys=True,separators=(',',':'))+'\n').encode()
-    check(os.write(fd,blob)==len(blob),'SHORT_LOG');os.fsync(fd)
+    if audit is not None:audit.write(blob)
+    else:check(os.write(fd,blob)==len(blob),'SHORT_LOG');os.fsync(fd)
 
 def open_dir(parent, name):
     return os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent)
@@ -64,17 +58,18 @@ def extract(blob, rootfd):
             finally:os.close(fd)
     os.fsync(rootfd)
 
-def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None):
+def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None):
     """Fixture implementation only; caller must exclusively control root and ledger."""
     rootst=os.lstat(root);check(stat.S_ISDIR(rootst.st_mode) and rootst.st_uid==owner and not rootst.st_mode&0o077,'ROOT_PERMISSIONS')
     # Before effects, verify complete signed input and atomically reserve nonce.
-    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner)
+    if audit is not None: audit.write(b'{"event":"STARTING"}\n')
+    blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     running=False
     try:
         transition(ledger_path,owner,nonce,'RESERVED','RUNNING');running=True
-        log(log_fd,{'event':'RUNNING','nonce':nonce})
+        log(log_fd,{'event':'RUNNING','nonce':nonce},audit)
         if failpoint=='after_running':raise ControllerError('INJECTED')
         name='stage-'+nonce
         os.mkdir(name,0o700,dir_fd=rootfd);os.fsync(rootfd)
@@ -89,7 +84,7 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
         os.symlink(target,link,dir_fd=rootfd)
         os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
         if failpoint=='after_switch':raise ControllerError('INJECTED')
-        log(log_fd,{'event':'SUCCEEDED','nonce':nonce,'target':target})
+        log(log_fd,{'event':'SUCCEEDED','nonce':nonce,'target':target},audit)
         transition(ledger_path,owner,nonce,'RUNNING','SUCCEEDED');running=False
         return target
     except BaseException:
@@ -101,10 +96,12 @@ def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root
 
 def recover(path, owner):
     """Do not replay after a process crash. No automatic reconciliation."""
-    db=ledger(path,owner)
-    try:
-        db.execute('BEGIN IMMEDIATE');db.execute("UPDATE operations SET state='UNKNOWN' WHERE state='RUNNING'");db.execute('COMMIT')
-    except BaseException:
-        if db.in_transaction:db.execute('ROLLBACK')
-        raise
-    finally:db.close()
+    from path_guard import GuardedLedger
+    with GuardedLedger(path,owner) as guarded:
+        db=guarded.db
+        try:
+            guarded.check();db.execute('BEGIN IMMEDIATE');guarded.check()
+            db.execute("UPDATE operations SET state='UNKNOWN' WHERE state='RUNNING'");guarded.check();db.execute('COMMIT')
+        except BaseException:
+            if db.in_transaction:db.execute('ROLLBACK')
+            raise

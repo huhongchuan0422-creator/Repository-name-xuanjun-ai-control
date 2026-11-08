@@ -59,31 +59,26 @@ def inspect_archive(blob, members):
     require(seen==set(members),'MEMBER_SET')
 
 def checked_ledger_path(path, owner):
-    require(os.path.isabs(path), 'LEDGER_ABSOLUTE_REQUIRED')
-    parent=os.path.dirname(path); st=os.lstat(parent)
-    require(stat.S_ISDIR(st.st_mode) and st.st_uid==owner and not st.st_mode&0o077, 'LEDGER_PARENT_PERMISSIONS')
-    info=os.lstat(path)
-    require(stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_uid==owner and not info.st_mode&0o077, 'LEDGER_PERMISSIONS')
+    from path_guard import Guard
+    require(os.path.isabs(path),'LEDGER_ABSOLUTE_REQUIRED')
+    with Guard(path,owner) as guard:
+        fd=guard.open_file(os.O_RDWR);os.close(fd)
 
 def consume(db_path, receipt, owner=0):
-    # The controller provisions the DB and WAL mode. Do not create missing DB/schema.
-    require(os.path.isabs(db_path) and os.path.isfile(db_path) and not os.path.islink(db_path),'LEDGER_REQUIRED')
-    checked_ledger_path(db_path,owner)
-    db=sqlite3.connect('file:'+db_path+'?mode=rw',uri=True,timeout=5,isolation_level=None)
-    try:
-        require(db.execute('PRAGMA journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
-        db.execute('PRAGMA busy_timeout=5000');db.execute('PRAGMA synchronous=FULL')
-        db.execute('BEGIN IMMEDIATE')
-        require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
-        require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
-        db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
-        db.execute('COMMIT')
-    except Exception:
-        if db.in_transaction: db.execute('ROLLBACK')
-        raise
-    finally: db.close()
+    from path_guard import GuardedLedger
+    with GuardedLedger(db_path,owner) as guarded:
+        db=guarded.db
+        try:
+            guarded.check();db.execute('BEGIN IMMEDIATE');guarded.check()
+            require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
+            require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
+            db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
+            guarded.check();db.execute('COMMIT')
+        except Exception:
+            if db.in_transaction:db.execute('ROLLBACK')
+            raise
 
-def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None):
+def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=0,now=None,audit=None):
     # Check the supplied evidence sink before reserving a nonce or reading carrier.
     ls=os.fstat(log_fd);require(stat.S_ISREG(ls.st_mode) and ls.st_nlink==1 and ls.st_uid==owner and not ls.st_mode&0o022 and fcntl.fcntl(log_fd,fcntl.F_GETFL)&os.O_APPEND,'LOG_REQUIRED')
     trust=parse(stable_read(trust_fd,owner,65536));require(trust.get('mode') in ('ED25519','DIGEST_ALLOWLIST'),'TRUST_ANCHOR_REQUIRED')
@@ -112,17 +107,21 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
         if tool_scope['mode']=='READ_ONLY':require(name in ('task_list','task_read_context','task_query_result','task_get','task_capabilities','task_dispatch_contract'),'WRITE_TOOL_DENIED')
     inspect_archive(carrier,manifest['members'])
     consume(ledger_path,p,owner)
-    os.write(log_fd,(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode());os.fsync(log_fd)
+    record=(json.dumps({'event':'VERIFIED_RESERVED','nonce':p['nonce'],'carrier_sha256':p['carrier_sha256']},sort_keys=True)+'\n').encode()
+    if audit is None:os.write(log_fd,record);os.fsync(log_fd)
+    else:audit.write(record)
     return carrier,p
 
 def main():
     a=argparse.ArgumentParser();
-    for n in ('carrier-fd','manifest-fd','receipt-fd','trust-fd','log-fd'): a.add_argument('--'+n,type=int,required=True)
-    for n in ('ledger','task','attempt','root'):a.add_argument('--'+n,required=True)
+    for n in ('carrier-fd','manifest-fd','receipt-fd','trust-fd'): a.add_argument('--'+n,type=int,required=True)
+    for n in ('ledger','audit','task','attempt','root'):a.add_argument('--'+n,required=True)
     x=a.parse_args()
     try:
         from controller import run
-        target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,x.log_fd,{'task':x.task,'attempt':x.attempt},x.root);print('INSTALLED '+target)
+        from path_guard import GuardedAudit
+        with GuardedAudit(x.audit,0) as audit:
+            target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,audit=audit);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())
