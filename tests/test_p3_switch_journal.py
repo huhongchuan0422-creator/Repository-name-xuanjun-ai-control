@@ -51,6 +51,11 @@ class SwitchTests(unittest.TestCase):
         self.assertEqual('ROLLED_BACK',self.switch.rollback('rollback','install')['state'])
         self.assertEqual(b'old',self.read('current'))
 
+    def test_formal_install_switch_rejects_missing_owner_guard(self):
+        with self.assertRaisesRegex(PermissionError,'INSTALL_OWNERSHIP_GUARD_REQUIRED'):
+            self.switch.switch('p3-install:attempt','staged','current')
+        self.assertFalse(os.path.exists(os.path.join(self.root,'current')))
+
     def test_first_install_and_rollback(self):
         self.assertEqual('SWITCHED',self.switch.switch('install','staged','current')['state'])
         self.assertEqual('ROLLED_BACK',self.switch.rollback('rollback','install')['state'])

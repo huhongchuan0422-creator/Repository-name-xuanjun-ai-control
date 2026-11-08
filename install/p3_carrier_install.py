@@ -30,6 +30,17 @@ try:
 except ImportError:
     from p3_switch_journal import SwitchCoordinator
 
+try:
+    from p3_recovery_authority import OwnershipGuard, HeartbeatLease
+except ImportError:
+    try:
+        from src.p3_recovery_authority import OwnershipGuard, HeartbeatLease
+    except ImportError:
+        # Standalone verify/readback does not construct a guard. A host that
+        # cannot import the protected runtime module must never install.
+        OwnershipGuard = None
+        HeartbeatLease = None
+
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
@@ -229,7 +240,7 @@ def _archive_check(archive_path, manifest, expected):
 
 
 def _store_required(store):
-    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition", "reserve_owned", "transition_owned", "acquire_guard", "reserve_owned_with_guard", "claim_guard_recovery", "finish_guard_recovery")):
+    if store is None or not all(callable(getattr(store, name, None)) for name in ("get", "reserve", "transition", "reserve_owned", "transition_owned", "acquire_guard", "reserve_owned_with_guard", "claim_guard_recovery", "finish_guard_recovery", "has_matching_reservation")):
         raise PermissionError("DURABLE_OPERATION_STORE_REQUIRED")
 
 
@@ -249,12 +260,33 @@ def _fd_receipt(staging_fd, value):
     os.fsync(staging_fd)
 
 
+def _same_store(operation_store, guard):
+    """Reject non-file or different SQLite DBs for journal and ownership."""
+    paths=[]
+    for connect in (operation_store.connect, guard.store.connect):
+        db=connect()
+        try:
+            row=db.execute("PRAGMA database_list").fetchone()
+            path=row[2] if row else ''
+            if not path or not os.path.isabs(path):
+                raise PermissionError('SAME_DURABLE_DATABASE_REQUIRED')
+            info=os.stat(path)
+            paths.append((info.st_dev,info.st_ino))
+        finally:db.close()
+    if paths[0] != paths[1]:
+        raise PermissionError('SAME_DURABLE_DATABASE_REQUIRED')
+
+
 def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
             release_root, state_root, attempt_id, fresh_authority,
-            enforce_root=True, operation_store=None, archive_path=None, fault_hook=None):
+            enforce_root=True, operation_store=None, archive_path=None, fault_hook=None,
+            ownership_guard=None, lease_seconds=60):
     if enforce_root and os.geteuid() != 0:
         raise PermissionError("ROOT_INSTALL_REQUIRED")
     _store_required(operation_store)
+    if OwnershipGuard is None or not isinstance(ownership_guard, OwnershipGuard):
+        raise PermissionError("OWNERSHIP_GUARD_REQUIRED")
+    _same_store(operation_store, ownership_guard)
     for path in (root, manifest_path, release_root, state_root):
         _canonical(path)
     if not ATTEMPT.fullmatch(attempt_id or ""):
@@ -284,60 +316,83 @@ def install(root, manifest_path, manifest_sha256, carrier_archive_sha256,
     target = "p3-" + carrier_archive_sha256[:20]
     op = "p3-install:" + attempt_id
     coordinator = SwitchCoordinator(release_fd, operation_store)
+    owner = None
+    heartbeat = None
     try:
         from_stat = os.fstat(release_fd)
         stage_op = "p3-stage:" + attempt_id
         owner_fence = os.urandom(32).hex()
         owns_stage = False
-        created, _ = operation_store.reserve_owned(stage_op, {"kind":"install-stage"},
-            {"root_dev":from_stat.st_dev, "root_ino":from_stat.st_ino, "staged":staged,
-             "target":target, "manifest_sha256":manifest_sha256,
-             "artifact_digest":carrier_archive_sha256}, "stage", owner_fence)
+        stage_subject = {"kind":"install-stage"}
+        stage_request = {"root_dev":from_stat.st_dev, "root_ino":from_stat.st_ino, "staged":staged,
+                         "target":target, "manifest_sha256":manifest_sha256,
+                         "artifact_digest":carrier_archive_sha256}
+        if operation_store.has_matching_reservation(stage_op,stage_subject,stage_request,"stage"):
+            return {"state":"IN_PROGRESS_OR_HOLD", "automatic_retry":False}
+        created, _ = operation_store.reserve_owned(stage_op,stage_subject,stage_request,"stage",owner_fence)
         if not created:
             # Losing calls do not change, reconcile, clean up, or inspect staging.
             return {"state":"IN_PROGRESS_OR_HOLD", "automatic_retry":False}
         owns_stage = True
+        authority_context = {"manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}
+        owner = ownership_guard.claim_owner(op, attempt_id, lease_seconds, authority_context)
+        heartbeat_interval = max(0.01, min(lease_seconds / 4.0,
+                                           ownership_guard.store.stale_seconds / 3.0))
+        heartbeat = HeartbeatLease(ownership_guard.store, op, owner, lease_seconds,
+                                   heartbeat_interval).start()
+        ownership_guard.assert_owner(op, owner)
         try:
             os.stat(target, dir_fd=release_fd, follow_symlinks=False)
             raise ValueError("EXISTING_RELEASE_CONFLICT")
         except FileNotFoundError:
             pass
-        os.mkdir(staged, 0o700, dir_fd=release_fd)
-        os.fsync(release_fd)
-        staging_fd = os.open(staged, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=release_fd)
-        try:
-            if os.fstat(staging_fd).st_dev != from_stat.st_dev:
-                raise ValueError("CROSS_FILESYSTEM_REFUSED")
-            source_fd = open_absolute_dir(root, os.geteuid())
-            for name in sorted(manifest["release_files"]):
-                _copy_verified(source_fd, staging_fd, name, manifest["files"][name])
-            receipt = {"schema":1, "state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
-                       "source_commit":manifest["source_commit"], "source_tree":manifest["source_tree"],
-                       "carrier_manifest_sha256":manifest_sha256, "carrier_archive_sha256":carrier_archive_sha256,
-                       "execution_enabled":False, "notifications_enabled":False,
-                       "host_bound":False, "real_task_executed":False}
-            if fault_hook: fault_hook("before_receipt")
-            _fd_receipt(staging_fd, receipt)
-            if fault_hook: fault_hook("after_receipt")
-        finally:
-            if source_fd is not None: os.close(source_fd)
-            os.close(staging_fd)
+        with ownership_guard.with_owner_lock(op, owner):
+            os.mkdir(staged, 0o700, dir_fd=release_fd)
+            os.fsync(release_fd)
+            staging_fd = os.open(staged, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=release_fd)
+            try:
+                if os.fstat(staging_fd).st_dev != from_stat.st_dev:
+                    raise ValueError("CROSS_FILESYSTEM_REFUSED")
+                source_fd = open_absolute_dir(root, os.geteuid())
+                for name in sorted(manifest["release_files"]):
+                    _copy_verified(source_fd, staging_fd, name, manifest["files"][name])
+                receipt = {"schema":1, "state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
+                           "source_commit":manifest["source_commit"], "source_tree":manifest["source_tree"],
+                           "carrier_manifest_sha256":manifest_sha256, "carrier_archive_sha256":carrier_archive_sha256,
+                           "execution_enabled":False, "notifications_enabled":False,
+                           "host_bound":False, "real_task_executed":False}
+                if fault_hook: fault_hook("before_receipt")
+                _fd_receipt(staging_fd, receipt)
+                if fault_hook: fault_hook("after_receipt")
+            finally:
+                if source_fd is not None: os.close(source_fd)
+                os.close(staging_fd)
         _fresh_authority(fresh_authority)
-        if not coordinator.prepare(op, staged, target, context={
-                "manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}, require_absent=True):
-            raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
-        if not operation_store.transition_owned(stage_op, owner_fence, "RUNNING", "SUCCEEDED", {"phase":"STAGED"}):
-            raise RuntimeError("STAGING_JOURNAL_CONFLICT")
-        result = coordinator.switch(op, staged, target, fault_hook, prepared=True)
+        ownership_guard.assert_owner(op, owner)
+        with ownership_guard.with_owner_lock(op, owner):
+            if not coordinator.prepare(op, staged, target, context={
+                    "manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}, require_absent=True):
+                raise RuntimeError("INSTALL_ATTEMPT_RECONCILE_FIRST")
+            if not operation_store.transition_owned(stage_op, owner_fence, "RUNNING", "SUCCEEDED", {"phase":"STAGED"}):
+                raise RuntimeError("STAGING_JOURNAL_CONFLICT")
+        result = coordinator.switch(op, staged, target, fault_hook, prepared=True,
+                                    ownership_guard=ownership_guard, owner=owner, attempt_id=attempt_id,
+                                    authority_context=authority_context)
         if result["state"] != "SWITCHED":
             return {"state":"UNKNOWN", "automatic_retry":False}
         return {"state":"INSTALLED_DEFAULT_OFF_NOT_BOUND", "attempt_id":attempt_id,
                 "target":os.path.join(release_root,target), "verified":True}
     except BaseException:
-        if 'owns_stage' in locals() and owns_stage:
-            operation_store.transition_owned(stage_op, owner_fence, "RUNNING", "UNKNOWN", {"phase":"STAGING_UNKNOWN"})
+        if 'owns_stage' in locals() and owns_stage and owner is not None:
+            try:
+                with ownership_guard.with_exclusive_side_effect(op, owner, attempt_id, authority_context) as db:
+                    db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state=? AND adapter_correlation=?',
+                               ('UNKNOWN',json.dumps({'phase':'STAGING_UNKNOWN'},sort_keys=True,separators=(',',':')),stage_op,'RUNNING',owner_fence))
+            except PermissionError:
+                return {"state":"OWNER_LOST", "automatic_retry":False}
         raise
     finally:
+        if heartbeat is not None:heartbeat.stop()
         coordinator.close()
         os.close(release_fd)
 
@@ -355,43 +410,11 @@ def readback(root, manifest_path, manifest_sha256, carrier_archive_sha256,
 
 def recover(root, manifest_path, manifest_sha256, carrier_archive_sha256,
             release_root, state_root, attempt_id, operation_store=None, owner_fence=None):
+    """Recovery remains disabled until signed takeover is wired end to end."""
     _store_required(operation_store)
     if not ATTEMPT.fullmatch(attempt_id or ""):
         raise ValueError("VALID_ATTEMPT_REQUIRED")
-    stage = operation_store.get("p3-stage:" + attempt_id)
-    stored_fence = stage.get("adapter_correlation") if stage else None
-    if (not isinstance(owner_fence, str) or not isinstance(stored_fence, str)
-            or not hmac.compare_digest(owner_fence, stored_fence)):
-        return {"state":"UNKNOWN", "recovery":"OWNER_FENCE_MISMATCH_HOLD", "automatic_retry":False}
-    fd = open_absolute_dir(release_root, os.geteuid())
-    coordinator = SwitchCoordinator(fd, operation_store)
-    guard_id = "p3-recovery-guard:" + attempt_id
-    guard_scope = {"install_op":"p3-install:" + attempt_id}
-    guard_fence = os.urandom(32).hex()
-    guard_acquired = False
-    try:
-        op = "p3-install:" + attempt_id
-        row = operation_store.get(op)
-        if not row:
-            return {"state":"UNKNOWN", "recovery":"RESULT_MISSING_HOLD_NO_REPLAY", "automatic_retry":False}
-        binding = json.loads(row["request_json"])["admission"]
-        if (binding.get("context") != {"manifest_sha256":manifest_sha256, "artifact_digest":carrier_archive_sha256}
-                or binding.get("current") != "p3-" + carrier_archive_sha256[:20]):
-            return {"state":"UNKNOWN", "recovery":"SCOPE_CONFLICT_HOLD", "automatic_retry":False}
-        guard_acquired = operation_store.acquire_guard(guard_id, guard_scope, guard_fence)
-        if not guard_acquired:
-            return {"state":"IN_PROGRESS_OR_HOLD", "recovery":"EXCLUSIVE_RECOVERY_HOLD", "automatic_retry":False}
-        result = coordinator.reconcile(op)
-        state = result["state"]
-        return {"state":state,
-                "recovery":"INSTALLED_EFFECT_RECOVERED_NO_REPLAY" if state == "SWITCHED" else "RESULT_MISSING_HOLD_NO_REPLAY",
-                "automatic_retry":False}
-    finally:
-        try:
-            if guard_acquired and not operation_store.transition_owned(guard_id, guard_fence, "RUNNING", "SUCCEEDED", {"phase":"GUARD_RELEASED"}):
-                raise RuntimeError("RECOVERY_GUARD_RELEASE_CONFLICT")
-        finally:
-            coordinator.close(); os.close(fd)
+    return {"state":"RECOVERY_OWNER_ACTIVE", "recovery":"RECOVERY_OWNER_ACTIVE", "automatic_retry":False}
 
 def _rollback_checkpoint(path, manifest):
     receipt = os.path.join(path, "INSTALL_RECEIPT.json")

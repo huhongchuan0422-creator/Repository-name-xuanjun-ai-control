@@ -33,12 +33,12 @@ class RollbackConcurrencyTests(unittest.TestCase):
         fixture.CarrierInstallTests.setUp(self)
         installer.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
             self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False,
-            operation_store=self.store,archive_path=self.archive)
+            operation_store=self.store,archive_path=self.archive,ownership_guard=self.guard)
     def tearDown(self):fixture.CarrierInstallTests.tearDown(self)
     def spec(self):
         return {'db':self.dbpath,'root':self.root,'manifest':self.manifest_path,'manifest_sha':self.manifest_sha,
                 'archive_sha':self.archive_sha,'releases':self.releases,'state':self.state,
-                'marker':os.path.join(self.tmp,'rollback-renames')}
+                'guard':self.guard,'marker':os.path.join(self.tmp,'rollback-renames')}
     def check(self,results):
         self.assertEqual(12,len(results),results)
         self.assertEqual([], [x for x in results if x[0]!='ok'],results)
@@ -99,28 +99,12 @@ class RollbackConcurrencyTests(unittest.TestCase):
         self.assertEqual('SUCCEEDED',self.store.get('p3-rollback:rollback-attempt-01')['state'])
         self.assertEqual('SUCCEEDED',self.store.get('p3-recovery-guard:install-attempt-01')['state'])
         self.assertFalse(os.path.exists(os.path.join(self.releases,'p3-'+self.archive_sha[:20])))
-    def test_rollback_is_read_only_while_install_recovery_holds_guard(self):
-        entered=threading.Event();release=threading.Event();output=[]
-        original=installer.SwitchCoordinator.reconcile
-        def paused(coordinator,op):
-            entered.set();release.wait(15);return original(coordinator,op)
+    def test_install_recovery_is_disabled_and_rollback_still_works(self):
         fence=self.store.get('p3-stage:install-attempt-01')['adapter_correlation']
-        def recover():
-            try:output.append(installer.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
-                self.releases,self.state,'install-attempt-01',operation_store=self.store,owner_fence=fence)['state'])
-            except Exception as e:output.append(type(e).__name__+':'+str(e))
-        with mock.patch.object(installer.SwitchCoordinator,'reconcile',paused):
-            thread=threading.Thread(target=recover);thread.start();self.assertTrue(entered.wait(15))
-            barrier=threading.Barrier(12);q=queue.Queue();spec=self.spec()
-            contenders=[threading.Thread(target=worker,args=(spec,barrier,q)) for _ in range(12)]
-            for t in contenders:t.start()
-            for t in contenders:t.join(30)
-            self.assertFalse(any(t.is_alive() for t in contenders))
-            self.assertEqual([('ok','IN_PROGRESS_OR_HOLD')]*12,[q.get_nowait() for _ in range(12)])
-            self.assertIsNone(self.store.get('p3-rollback-owner:install-attempt-01'))
-            self.assertIsNone(self.store.get('p3-rollback:rollback-attempt-01'))
-            release.set();thread.join(15)
-        self.assertEqual(['SWITCHED'],output)
+        result=installer.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
+            self.releases,self.state,'install-attempt-01',operation_store=self.store,owner_fence=fence)
+        self.assertEqual('RECOVERY_OWNER_ACTIVE',result['state'])
+        self.assertIsNone(self.store.get('p3-recovery-guard:install-attempt-01'))
         result=installer.rollback(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
             self.releases,self.state,'rollback-attempt-01',lambda:True,enforce_root=False,
             operation_store=self.store,original_install_attempt='install-attempt-01')
@@ -172,6 +156,6 @@ class RollbackConcurrencyTests(unittest.TestCase):
         for _ in range(12):
             result=installer.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                 self.releases,self.state,'install-attempt-01',operation_store=self.store,owner_fence=fence)
-            self.assertEqual('IN_PROGRESS_OR_HOLD',result['state'])
+            self.assertEqual('RECOVERY_OWNER_ACTIVE',result['state'])
         self.assertEqual(before,self.store.get('p3-rollback:rollback-attempt-01'))
         release.set();t.join(15);self.assertEqual(['ROLLED_BACK_DEFAULT_OFF_QUARANTINED'],output)

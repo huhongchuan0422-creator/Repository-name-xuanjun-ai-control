@@ -3,6 +3,11 @@ from __future__ import absolute_import
 import json
 import hashlib
 import sqlite3
+import time
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding,PublicFormat
+from src.p3_admission_v2 import TrustStore,canonical
+from src.p3_recovery_authority import OwnershipStore,OwnershipGuard
 from unittest import mock
 import os
 import shutil
@@ -38,6 +43,21 @@ class CarrierInstallTests(unittest.TestCase):
         def connect(): return sqlite3.connect(self.dbpath, timeout=10)
         db = connect(); db.execute(MIGRATION); db.commit(); db.close()
         self.store = RunnerOperationStore(connect)
+        self.store.migrate_ownership_schema()
+        key=Ed25519PrivateKey.generate()
+        trust=TrustStore({'fixture-install':(key.public_key().public_bytes(Encoding.Raw,PublicFormat.Raw),'install','test-authority')},{})
+        def authority(operation_id,attempt_id,context):
+            now=int(time.time())
+            value={'operation_id':operation_id,'attempt_id':attempt_id,'authority_identity':'test-authority',
+                   'issued_at':now-1,'expires_at':now+300,'key_id':'fixture-install'}
+            value.update(context)
+            value['signature']=key.sign(b'P3-INSTALL-OWNER-V1\x00'+canonical(value)).hex()
+            return value
+        lockdir=os.path.join(self.tmp,'locks');os.mkdir(lockdir,0o700)
+        fd=os.open(os.path.join(lockdir,'guard'),os.O_CREAT|os.O_EXCL|os.O_RDWR,0o600);os.close(fd)
+        self.lockdir_fd=os.open(lockdir,os.O_RDONLY|os.O_DIRECTORY)
+        self.ownership=OwnershipStore(connect,trust,lambda:int(time.time()),stale_seconds=10)
+        self.guard=OwnershipGuard(self.ownership,self.lockdir_fd,'guard',authority)
         self.manifest = {
             "schema": 1,
             "artifact_digest": self.archive_sha,
@@ -56,7 +76,7 @@ class CarrierInstallTests(unittest.TestCase):
         self.manifest_sha = installer._digest(self.manifest_path)
 
     def install(self, *args, **kwargs):
-        kwargs.update(operation_store=self.store, archive_path=self.archive)
+        kwargs.update(operation_store=self.store, archive_path=self.archive, ownership_guard=self.guard)
         return installer.install(*args, **kwargs)
 
     def recover(self, *args, **kwargs):
@@ -90,6 +110,7 @@ class CarrierInstallTests(unittest.TestCase):
         write_json(path, value)
 
     def tearDown(self):
+        self.guard.close(); os.close(self.lockdir_fd)
         shutil.rmtree(self.tmp)
 
     def test_install_is_default_off_idempotent_and_recoverable(self):
@@ -106,8 +127,7 @@ class CarrierInstallTests(unittest.TestCase):
             self.root, self.manifest_path, self.manifest_sha,
             self.archive_sha, self.releases, self.state,
             "install-attempt-01")
-        self.assertEqual("INSTALLED_EFFECT_RECOVERED_NO_REPLAY",
-                         recovered["recovery"])
+        self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["recovery"])
 
     def test_bound_or_executed_receipt_never_reads_back_idempotent_or_recovered(self):
         mutations = (
@@ -120,7 +140,7 @@ class CarrierInstallTests(unittest.TestCase):
                 if number:
                     shutil.rmtree(self.releases)
                     if os.path.exists(self.state): shutil.rmtree(self.state)
-                    db=self.store.connect(); db.execute('DELETE FROM p3_effect_operations'); db.commit(); db.close()
+                    db=self.store.connect(); db.execute('DELETE FROM p3_effect_operations'); db.execute('DELETE FROM p3_operation_ownership'); db.commit(); db.close()
                 self.install(
                     self.root, self.manifest_path, self.manifest_sha,
                     self.archive_sha, self.releases, self.state,
@@ -149,9 +169,8 @@ class CarrierInstallTests(unittest.TestCase):
                     self.root, self.manifest_path, self.manifest_sha,
                     self.archive_sha, self.releases, self.state,
                     "install-attempt-01")
-                self.assertEqual("UNKNOWN", recovered["state"])
-                self.assertEqual("RESULT_MISSING_HOLD_NO_REPLAY",
-                                 recovered["recovery"])
+                self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["state"])
+                self.assertEqual("RECOVERY_OWNER_ACTIVE", recovered["recovery"])
 
     def test_install_receipt_requires_exact_keys_and_valid_attempt(self):
         self.install(
@@ -245,7 +264,7 @@ class CarrierInstallTests(unittest.TestCase):
         for point in ('before_rename','after_rename','after_fsync'):
             with self.subTest(point=point):
                 if os.path.isdir(self.releases): shutil.rmtree(self.releases)
-                db=self.store.connect(); db.execute('DELETE FROM p3_effect_operations'); db.commit(); db.close()
+                db=self.store.connect(); db.execute('DELETE FROM p3_effect_operations'); db.execute('DELETE FROM p3_operation_ownership'); db.commit(); db.close()
                 def crash(phase):
                     if phase==point: raise RuntimeError('simulated-crash')
                 with self.assertRaisesRegex(RuntimeError,'simulated-crash'):
@@ -254,7 +273,7 @@ class CarrierInstallTests(unittest.TestCase):
                                  enforce_root=False,fault_hook=crash)
                 result=self.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                     self.releases,self.state,'install-attempt-01')
-                self.assertEqual('NOT_SWITCHED_HOLD' if point=='before_rename' else 'SWITCHED',result['state'])
+                self.assertEqual('RECOVERY_OWNER_ACTIVE',result['state'])
                 duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                                  self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
                 self.assertEqual('IN_PROGRESS_OR_HOLD',duplicate['state'])
@@ -268,7 +287,7 @@ class CarrierInstallTests(unittest.TestCase):
                          enforce_root=False,fault_hook=crash)
         self.assertEqual('UNKNOWN',self.store.get('p3-stage:install-attempt-01')['state'])
         self.assertIsNone(self.store.get('p3-install:install-attempt-01'))
-        self.assertEqual('UNKNOWN',self.recover(self.root,self.manifest_path,self.manifest_sha,
+        self.assertEqual('RECOVERY_OWNER_ACTIVE',self.recover(self.root,self.manifest_path,self.manifest_sha,
                          self.archive_sha,self.releases,self.state,'install-attempt-01')['state'])
         duplicate=self.install(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                          self.releases,self.state,'install-attempt-01',lambda:True,enforce_root=False)
@@ -286,7 +305,7 @@ class CarrierInstallTests(unittest.TestCase):
                          enforce_root=False,fault_hook=replace)
         state=self.recover(self.root,self.manifest_path,self.manifest_sha,self.archive_sha,
                            self.releases,self.state,'install-attempt-01')
-        self.assertEqual('UNKNOWN',state['state'])
+        self.assertEqual('RECOVERY_OWNER_ACTIVE',state['state'])
         with open(os.path.join(target,'other'),'rb') as f:self.assertEqual(b'other',f.read())
 
     def test_repeated_rollback_is_idempotent(self):

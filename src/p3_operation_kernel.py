@@ -166,6 +166,31 @@ class RunnerOperationStore:
             raise TypeError('CONNECTION_FACTORY_REQUIRED')
         self.connect = connect
 
+    def migrate_ownership_schema(self):
+        """Explicit migration on the injected DB; never invoked automatically."""
+        try:
+            from p3_recovery_authority import OWNERSHIP_MIGRATION
+        except ImportError:
+            from .p3_recovery_authority import OWNERSHIP_MIGRATION
+        db=self.connect()
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            present=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='p3_operation_ownership'").fetchone()
+            if not present:
+                db.execute(OWNERSHIP_MIGRATION)
+            columns=db.execute('PRAGMA table_info(p3_operation_ownership)').fetchall()
+            expected=['operation_id','attempt_id','owner_token','epoch','fence','lease_expires_at',
+                      'heartbeat_seq','heartbeat_at','state','recovery_owner_token']
+            schema=db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='p3_operation_ownership'").fetchone()
+            if ([row[1] for row in columns] != expected or columns[0][5] != 1 or not schema
+                    or ' '.join(schema[0].lower().split()) != ' '.join(OWNERSHIP_MIGRATION.lower().split())):
+                raise ValueError('OWNERSHIP_SCHEMA_MISMATCH')
+            db.commit()
+        except BaseException:
+            db.rollback();raise
+        finally:
+            db.close()
+
     def get(self, operation_id):
         db = self.connect()
         try:
@@ -200,6 +225,18 @@ class RunnerOperationStore:
 
     def transition(self, operation_id, source, target, receipt=None, correlation=None):
         return OperationKernel._transition(self, operation_id, source, target, receipt, correlation)
+
+    def has_matching_reservation(self, operation_id, subject, admission, operation):
+        """Read-only fast path for callers contending with a live write txn."""
+        row = self.get(operation_id)
+        if not row:
+            return False
+        body = _json({'subject':subject,'admission':admission,'operation':operation})
+        identity = _json(subject)
+        digest = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        if row['request_digest'] != digest or row['identity_json'] != identity or row['request_json'] != body:
+            raise ValueError('OPERATION_ID_CONFLICT')
+        return True
 
     def reserve_owned(self, operation_id, subject, admission, operation, owner_fence):
         """Atomically create a RUNNING reservation owned by one fencing token."""

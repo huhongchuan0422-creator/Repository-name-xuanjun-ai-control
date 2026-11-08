@@ -113,7 +113,10 @@ class SwitchCoordinator:
         if not self.store.transition(op, 'RESERVED', 'RUNNING', {'phase':'SWITCH_PENDING'}):
             raise RuntimeError('RESERVATION_LOST')
         return True
-    def switch(self, op, staged, current, hook=None, rollback_of=None, prepared=False):
+    def switch(self, op, staged, current, hook=None, rollback_of=None, prepared=False,
+               ownership_guard=None, owner=None, attempt_id=None, authority_context=None):
+        if op.startswith('p3-install:') and (ownership_guard is None or owner is None or attempt_id is None):
+            raise PermissionError('INSTALL_OWNERSHIP_GUARD_REQUIRED')
         if not prepared and not self.prepare(op, staged, current, rollback_of):
             return self.reconcile(op)
         row = self.store.get(op)
@@ -128,17 +131,41 @@ class SwitchCoordinator:
             raise RuntimeError('SWITCH_ROOT_CHANGED')
         try:
             if hook: hook('before_rename')
-            if snapshot(self.root_fd, current) != before or snapshot(self.root_fd, staged) != after:
-                raise RuntimeError('SWITCH_PRESTATE_CHANGED')
-            _rename(self.root_fd, staged, current, RENAME_EXCHANGE if before else RENAME_NOREPLACE)
-            if hook: hook('after_rename')
-            os.fsync(self.root_fd)
-            if hook: hook('after_fsync')
-            if not self.store.transition(op, 'RUNNING', 'SUCCEEDED', {'phase':'SWITCHED'}):
-                raise RuntimeError('COMMIT_RACE')
+            if ownership_guard is not None:
+                # For the install entry, revalidate signed authority and owner
+                # under the same flock and SQLite write transaction that cover
+                # rename, fsync and the journal transition.
+                with ownership_guard.with_exclusive_side_effect(op,owner,attempt_id,authority_context) as db:
+                    if snapshot(self.root_fd, current) != before or snapshot(self.root_fd, staged) != after:
+                        raise RuntimeError('SWITCH_PRESTATE_CHANGED')
+                    _rename(self.root_fd,staged,current,RENAME_EXCHANGE if before else RENAME_NOREPLACE)
+                    if hook:hook('after_rename')
+                    os.fsync(self.root_fd)
+                    if hook:hook('after_fsync')
+                    changed=db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=?,adapter_correlation=? WHERE operation_id=? AND state=?',
+                        ('SUCCEEDED',json.dumps({'phase':'SWITCHED'},sort_keys=True,separators=(',',':')),None,op,'RUNNING')).rowcount
+                    if changed != 1:raise RuntimeError('COMMIT_RACE')
+            else:
+                # Legacy non-install callers remain out of scope for this slice.
+                if snapshot(self.root_fd, current) != before or snapshot(self.root_fd, staged) != after:
+                    raise RuntimeError('SWITCH_PRESTATE_CHANGED')
+                _rename(self.root_fd, staged, current, RENAME_EXCHANGE if before else RENAME_NOREPLACE)
+                if hook: hook('after_rename')
+                os.fsync(self.root_fd)
+                if hook: hook('after_fsync')
+                if not self.store.transition(op, 'RUNNING', 'SUCCEEDED', {'phase':'SWITCHED'}):
+                    raise RuntimeError('COMMIT_RACE')
             return {'state':'SWITCHED'}
         except BaseException:
-            self._hold(op)
+            if ownership_guard is None:
+                self._hold(op)
+            else:
+                try:
+                    with ownership_guard.with_exclusive_side_effect(op,owner,attempt_id,authority_context) as db:
+                        db.execute('UPDATE p3_effect_operations SET state=?,receipt_json=? WHERE operation_id=? AND state=?',
+                                   ('UNKNOWN',json.dumps({'phase':'UNKNOWN'},sort_keys=True,separators=(',',':')),op,'RUNNING'))
+                except (PermissionError,KeyError):
+                    pass
             raise
     def reconcile(self, op):
         row = self.store.get(op)
