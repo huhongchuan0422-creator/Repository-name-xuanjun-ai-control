@@ -62,6 +62,30 @@ class SupervisorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
             self.s.register_development_contract('t1',changed)
 
+    def test_first_development_claim_allocates_ids_and_projects_reader_v3(self):
+        self.registration()
+        self.s.register_development_contract('t1',self.development_contract())
+        caller={'caller_id':'writer','run_id':'run1',
+                'session_id':'session1','gateway_id':'gateway1'}
+        ticket=self.s.claim_development_writer(
+            't1','developer','WORK',caller,'provider1',
+            ['git:owner/repo/main'],1700)
+        self.assertRegex(ticket['attempt_id'],r'^attempt-[0-9a-f]{32}$')
+        self.assertRegex(ticket['lease_id'],r'^lease-[0-9a-f]{32}$')
+        self.assertEqual((ticket['fence'],ticket['epoch']),(1,1))
+        projection=Supervisor.authority_projection(
+            self.s._task('t1'),1001,'xuanjun-ledger','dispatcher-1','3.0.0',
+            'anchor-1')
+        self.assertEqual(projection['schema'],3)
+        self.assertEqual(projection['writer']['session_id'],'session1')
+        self.assertEqual(projection['assignment']['attempt_id'],
+                         ticket['attempt_id'])
+        self.assertEqual(projection['freshness']['status'],'FRESH')
+        with self.assertRaisesRegex(ValueError,'WRITER_AUTHORITY_NOT_CLAIMABLE'):
+            self.s.claim_development_writer(
+              't1','developer','WORK',caller,'provider1',
+              ['git:owner/repo/main'],1700)
+
     def test_failed_development_completion_never_unlocks_dependency(self):
         self.registration('t1')
         self.registration('child',['t1'])

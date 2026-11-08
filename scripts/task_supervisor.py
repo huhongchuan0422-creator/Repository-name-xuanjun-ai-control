@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import secrets
 import sqlite3
 import time
 
@@ -1228,6 +1229,64 @@ class Supervisor(object):
             'resource_keys': json.loads(task['resource_scope_json']),
         }
 
+    @classmethod
+    def authority_projection(cls, task, observed_at, issuer, instance_id,
+                             provider_version, trust_anchor_id):
+        """Build the complete read-only reader-v3 authority record."""
+        if (not isinstance(task, dict) or not finite(observed_at)
+                or any(not isinstance(value, str) or not value for value in
+                       (issuer, instance_id, provider_version,
+                        trust_anchor_id))):
+            raise ValueError('AUTHORITY_PROJECTION_CONTEXT_REQUIRED')
+        if not set(TASK_COLUMNS).issubset(set(task)):
+            raise ValueError('AUTHORITY_PROJECTION_ROW_INCOMPLETE')
+        state = task['authority_state']
+        valid_until = task['authority_valid_until']
+        fresh = (state == 'VALID' and finite(valid_until)
+                 and observed_at < valid_until)
+        return {
+            'schema': 3, 'kind': 'DEVELOPMENT_WRITER_AUTHORITY',
+            'issuer': issuer,
+            'provider': {'instance_id': instance_id,
+                         'version': provider_version},
+            'trust': {'algorithm': 'HMAC-SHA256',
+                      'anchor_id': trust_anchor_id},
+            'observed_at': observed_at,
+            'task': {'task_id': task['task_id'],
+                     'parent_task_id': task['parent_task_id'],
+                     'stage': task['stage'], 'state': task['state'],
+                     'spec_sha256': task['spec_sha256'],
+                     'checkpoint_sha256': task['checkpoint_sha256']},
+            'writer': {'writer_scope': task['writer_scope'],
+                       'owner': task['owner'], 'entry': task['entry'],
+                       'caller_id': task['authority_caller_id'],
+                       'run_id': task['authority_run_id'],
+                       'session_id': task['authority_session_id'],
+                       'gateway_id': task['authority_gateway_id']},
+            'assignment': {'attempt_id': task['attempt_id'],
+                           'lease_id': task['lease_id'],
+                           'fence': task['fence'], 'epoch': task['epoch'],
+                           'lock_provider_id':
+                               task['authority_lock_provider_id'],
+                           'resource_scope_digest':
+                               task['resource_scope_digest'],
+                           'resource_keys':
+                               json.loads(task['resource_scope_json'])},
+            'authority': {'state': state, 'valid_until': valid_until,
+                          'fresh': fresh},
+            'revocation': {
+                'state': ('NOT_STARTED' if state in ('NONE', 'VALID')
+                          else state),
+                'writer_stopped': task['writer_stopped'],
+                'effects_reconciled': task['effects_reconciled'],
+                'old_fence_invalidated': task['old_fence_invalidated'],
+                'coverage_digest': task['coverage_digest']},
+            'freshness': {'ledger_updated_at': task['updated_at'],
+                          'last_trusted_time': task['last_trusted_time'],
+                          'authority_valid_until': valid_until,
+                          'status': 'FRESH' if fresh else 'NOT_FRESH'},
+        }
+
     @staticmethod
     def _scope_digest(resource_keys):
         return hashlib.sha256(canonical(
@@ -1317,6 +1376,19 @@ class Supervisor(object):
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
             return self._authority_ticket(self._task(task_id))
+
+    def claim_development_writer(self, task_id, owner, entry, caller,
+                                 lock_provider_id, resource_keys,
+                                 valid_until):
+        """Allocate first-attempt and lease identities inside the writer CAS."""
+        contract = self.development_contract(task_id)
+        if contract['entry'] != entry:
+            raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
+        attempt_id = 'attempt-' + secrets.token_hex(16)
+        lease_id = 'lease-' + secrets.token_hex(16)
+        return self.claim_writer(task_id, attempt_id, owner, entry, caller,
+                                 lease_id, lock_provider_id, resource_keys,
+                                 valid_until)
 
     def _validate_writer_locked(self, ticket, caller, lock_provider_id):
         now = self.clock()

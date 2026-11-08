@@ -61,6 +61,21 @@ class WriterFenceTests(unittest.TestCase):
             'lease-' + attempt, resources or ['fake:account/a'],
             valid_until=1700)
 
+    def test_first_development_claim_uses_fixed_provider_and_ledger_ids(self):
+        self.s.register_development_contract('t1',dict(
+          task_id='t1',spec_sha256='b'*64,checkpoint_sha256='a'*64,
+          target_repository='owner/repo',target_base_sha='c'*40,entry='WORK',
+          developer={'issuer':'native','subject':'developer'},
+          allowed_files=['src/f.py'],trusted_reviewers=[
+            {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
+            {'issuer':'native','subject':'sec','key_id':'sec','role':'SECURITY'}]))
+        ticket=self.fence.claim_first_development_writer(
+          't1','developer','WORK',self.caller(),['git:owner/repo/main'],1700)
+        self.assertRegex(ticket['attempt_id'],r'^attempt-[0-9a-f]{32}$')
+        self.assertRegex(ticket['lease_id'],r'^lease-[0-9a-f]{32}$')
+        self.assertEqual(ticket['lock_provider_id'],self.fence.locks.provider_id)
+        self.assertEqual((ticket['fence'],ticket['epoch']),(1,1))
+
     def op(self, opid='op1', event='event1', resource='fake:account/a'):
         return {
             'operation_id': opid,
