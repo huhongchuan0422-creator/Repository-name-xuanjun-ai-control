@@ -267,7 +267,7 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
     from path_guard import GuardedLedger
     with GuardedLedger(ledger_path,owner) as schema:
         columns={r[1] for r in schema.db.execute('PRAGMA table_info(operations)')}
-        check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','prestate_dev','prestate_ino'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
+        check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','prestate_dev','prestate_ino','switch_intent'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
     blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -302,9 +302,27 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         target='release-'+nonce
         os.rename(name,target,src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
         if failpoint=='after_release':raise ControllerError('INJECTED')
+        # Durable switch intent is committed before the symlink rename.
+        prefd=open_dir(rootfd,pre);newfd=open_dir(rootfd,target)
+        try:
+            before=os.fstat(prefd);after=os.fstat(newfd)
+            check((before.st_dev,before.st_ino)==(evidence['prestate_dev'],evidence['prestate_ino']),'SWITCH_PRESTATE_CHANGED')
+            check(_current(rootfd)==pre and verified_tree(rootfd,pre,owner)==prestate_tree and verified_tree(rootfd,target,owner)==stage_tree,'SWITCH_TREE_CHANGED')
+            intent=verifylib.canonical({'operation_id':'install:'+nonce,'fence':p['attempt'],'from_dev':before.st_dev,'from_ino':before.st_ino,'from_tree':prestate_tree,'to_dev':after.st_dev,'to_ino':after.st_ino,'to_tree':stage_tree}).decode()
+        finally:os.close(prefd);os.close(newfd)
+        with GuardedLedger(ledger_path,owner) as g:
+            g.db.execute('BEGIN IMMEDIATE')
+            try:
+                g.check();cur=g.db.execute("UPDATE operations SET switch_intent=? WHERE nonce=? AND state='RUNNING'",(intent,nonce));check(cur.rowcount==1,'SWITCH_INTENT_STATE');g.db.execute('COMMIT')
+            except BaseException:
+                if g.db.in_transaction:g.db.execute('ROLLBACK')
+                raise
+        log(log_fd,{'event':'SWITCH_INTENT','nonce':nonce,'intent':verifylib.sha(intent.encode())},audit)
         link='.current-'+nonce
         os.symlink(target,link,dir_fd=rootfd)
-        os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd);os.fsync(rootfd)
+        os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd)
+        if failpoint=='install_crash_after_rename':os._exit(94)
+        os.fsync(rootfd)
         if failpoint=='after_switch':raise ControllerError('INJECTED')
         check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
         payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time())}

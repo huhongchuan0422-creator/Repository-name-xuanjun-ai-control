@@ -125,7 +125,7 @@ def main():
     a.add_argument('--reconcile',action='store_true')
     a.add_argument('--rollback',action='store_true')
     a.add_argument('--rollback-authorization-fd',type=int)
-    a.add_argument('--test-only-crash-hook',choices=('crash_before_rename','crash_after_rename','crash_before_receipt'))
+    a.add_argument('--test-only-crash-hook',choices=('crash_before_rename','crash_after_rename','crash_before_receipt','install_crash_after_rename'))
     for n in ('carrier-fd','manifest-fd','receipt-fd','receipt-signing-key-fd'):a.add_argument('--'+n,type=int)
     a.add_argument('--trust-fd',type=int,required=True)
     a.add_argument('--receipt-dir-fd',type=int,required=True)
@@ -165,7 +165,8 @@ def main():
                 require(result['state']=='SUCCEEDED','ROLLBACK_NOT_SUCCEEDED');print(json.dumps(result,sort_keys=True))
             else:
                 require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
-                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd);print('INSTALLED '+target)
+                require(x.test_only_crash_hook is None or (trust.get('environment')=='TEST_ONLY' and x.test_only_crash_hook=='install_crash_after_rename'),'TEST_HOOK_FORBIDDEN')
+                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd,failpoint=x.test_only_crash_hook);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())
