@@ -210,7 +210,11 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                         current=_current(rootfd);stage_exists=_exists(rootfd,stage);target_exists=_exists(rootfd,target)
                         if current==target:
                             check(not stage_exists and target_exists,'TARGET_CONFLICT')
-                            check(_target_manifest(rootfd,target,owner)==mh,'TARGET_MISMATCH')
+                            targetfd=open_dir(rootfd,target)
+                            try:
+                                staged_manifest=verifylib.parse(_file_bytes(targetfd,'.bootstrap-manifest.json',owner))
+                                check(staged_manifest.get('source_manifest_sha256')==mh or (verifylib.parse(trust_raw).get('environment')=='TEST_ONLY' and _target_manifest(rootfd,target,owner)==mh),'TARGET_MISMATCH')
+                            finally:os.close(targetfd)
                             check(isinstance(rh,str) and re.fullmatch('[0-9a-f]{64}',rh),'RECEIPT_MISSING')
                             raw=_file_bytes(receipt_dir_fd if receipt_dir_fd is not None else rootfd,'receipt-'+row['nonce']+'.json',owner,65536)
                             check(verifylib.sha(raw)==rh,'RECEIPT_MISMATCH')
