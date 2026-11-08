@@ -1,0 +1,11 @@
+test_concurrent_writer_lock_fails_closed (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+test_every_step_failure_rolls_back_and_retry_recovers (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+test_observed_backup_schema_pin (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... skipped 'production backup unavailable'
+test_restart_recovery_unknown_reconciliation_and_constraints (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+test_success_preserves_legacy_and_is_idempotent (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+test_wrong_sha_unknown_partial_and_missing_freeze_rejected (tests.test_legacy_authority_migration.LegacyAuthorityMigrationTest) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.299s
+
+OK (skipped=1)
