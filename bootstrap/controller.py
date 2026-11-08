@@ -163,6 +163,8 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
             g.check();db.execute('BEGIN IMMEDIATE')
             try:
                 columns={r[1] for r in db.execute('PRAGMA table_info(operations)')}
+                if db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rollbacks'").fetchone():
+                    check(db.execute("SELECT 1 FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN') LIMIT 1").fetchone() is None,'ROLLBACK_RECONCILIATION_REQUIRED')
                 required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash','operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}
                 rows=db.execute("SELECT * FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchall()
                 for row in rows:
@@ -232,12 +234,15 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
     try:
         pre=_current(currentfd);check(pre is not None,'PRESTATE_REQUIRED')
         prestate_tree=verified_tree(currentfd,pre,owner)
-        evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner),'prestate_digest':prestate_tree,'key_id':key_id}
+        pre_fd=open_dir(currentfd,pre)
+        try:prestat=os.fstat(pre_fd)
+        finally:os.close(pre_fd)
+        evidence={'prestate_target':pre,'prestate_hash':_target_manifest(currentfd,pre,owner),'prestate_digest':prestate_tree,'prestate_dev':prestat.st_dev,'prestate_ino':prestat.st_ino,'key_id':key_id}
     finally:os.close(currentfd)
     from path_guard import GuardedLedger
     with GuardedLedger(ledger_path,owner) as schema:
         columns={r[1] for r in schema.db.execute('PRAGMA table_info(operations)')}
-        check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
+        check({'operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','prestate_dev','prestate_ino'}.issubset(columns),'LEDGER_SCHEMA_UPGRADE_REQUIRED')
     blob,p=verifylib.verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,owner=owner,audit=audit,evidence=evidence)
     nonce=p['nonce']; check(nonce not in ('.','..') and '/' not in nonce,'NONCE_PATH')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -341,3 +346,69 @@ def reconcile_pending(path, owner, root, log_fd, audit=None, trust_raw=None,rece
             return _reconcile_pending_locked(path,owner,root,log_fd,audit,trust_raw,receipt_dir_fd)
         finally:os.close(lock)
     finally:os.close(rootfd)
+
+def rollback(ledger_path,root,owner,log_fd,trust_fd,signing_key_fd,key_id,receipt_dir_fd,install_op,rollback_op,request_digest,audit=None,failpoint=None):
+    """Experimental rollback. Caller must provide independent authorization."""
+    from path_guard import GuardedLedger
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    check(re.fullmatch(r'[A-Za-z0-9_.:-]{1,200}',rollback_op or '') and re.fullmatch('[0-9a-f]{64}',request_digest or ''),'ROLLBACK_ID')
+    check(os.access('.',os.W_OK|os.X_OK,dir_fd=receipt_dir_fd,effective_ids=True),'RECEIPT_DIRECTORY_UNWRITABLE')
+    trust=verifylib.parse(verifylib.stable_read(trust_fd,owner,65536));check(trust.get('mode')=='ED25519' and trust.get('key_id')==key_id,'SIGNING_KEY_ID')
+    keyinfo=os.fstat(signing_key_fd);check(keyinfo.st_uid==owner and stat.S_IMODE(keyinfo.st_mode)==0o600,'SIGNING_KEY_PERMISSIONS')
+    private=Ed25519PrivateKey.from_private_bytes(verifylib.stable_read(signing_key_fd,owner,32))
+    pub=private.public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
+    check(base64.b64encode(pub).decode()==trust.get('public_key'),'SIGNING_KEY_MISMATCH')
+    rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    lock=None;reserved=False
+    try:
+        st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
+        lock=os.open('.bootstrap.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600,dir_fd=rootfd);fcntl.flock(lock,fcntl.LOCK_EX)
+        check(_reconcile_pending_locked(ledger_path,owner,root,log_fd,audit,verifylib.canonical(trust),receipt_dir_fd)==0,'PENDING_INSTALL')
+        with GuardedLedger(ledger_path,owner) as g:
+            db=g.db;db.row_factory=sqlite3.Row;db.execute('BEGIN IMMEDIATE')
+            try:
+                old=db.execute('SELECT * FROM rollbacks WHERE operation_id=?',(rollback_op,)).fetchone()
+                if old:
+                    check(old['request_digest']==request_digest and old['install_op']==install_op,'ROLLBACK_REQUEST_CONFLICT')
+                    result={'state':old['state'],'receipt':old['receipt_json']};db.execute('COMMIT');return result
+                check(db.execute("SELECT 1 FROM rollbacks WHERE state IN ('ROLLBACK_PREPARED','SWITCHED','UNKNOWN')").fetchone() is None,'ROLLBACK_UNKNOWN_HOLD')
+                installed=db.execute("SELECT * FROM operations WHERE operation_id=? AND state='SUCCEEDED'",(install_op,)).fetchone();check(installed is not None,'INSTALL_OPERATION_REQUIRED')
+                from_target=_name(installed['intended_target']);to_target=_name(installed['prestate_target'])
+                check(_current(rootfd)==from_target,'ROLLBACK_CURRENT_MISMATCH')
+                fd=open_dir(rootfd,to_target)
+                try:st=os.fstat(fd);check((st.st_dev,st.st_ino)==(installed['prestate_dev'],installed['prestate_ino']),'PRESTATE_INODE_MISMATCH')
+                finally:os.close(fd)
+                check(verified_tree(rootfd,from_target,owner)==installed['tree_digest'] and verified_tree(rootfd,to_target,owner)==installed['prestate_digest'],'ROLLBACK_TREE_MISMATCH')
+                db.execute('INSERT INTO rollbacks(operation_id,request_digest,install_op,attempt,from_target,to_target,from_digest,to_digest,state,receipt_json) VALUES(?,?,?,?,?,?,?,?,?,NULL)',(rollback_op,request_digest,install_op,installed['attempt'],from_target,to_target,installed['tree_digest'],installed['prestate_digest'],'ROLLBACK_PREPARED'))
+                log(log_fd,{'event':'ROLLBACK_PREPARED','operation':rollback_op},audit);g.check();db.execute('COMMIT');reserved=True
+            except BaseException:
+                if db.in_transaction:db.execute('ROLLBACK')
+                raise
+        if failpoint=='before_rename':raise ControllerError('INJECTED_BEFORE_RENAME')
+        link='.rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest();os.symlink(to_target,link,dir_fd=rootfd);os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd)
+        if failpoint=='after_rename':raise ControllerError('INJECTED_AFTER_RENAME')
+        os.fsync(rootfd)
+        with GuardedLedger(ledger_path,owner) as g:
+            g.db.execute('BEGIN IMMEDIATE');g.db.execute("UPDATE rollbacks SET state='SWITCHED' WHERE operation_id=? AND state='ROLLBACK_PREPARED'",(rollback_op,));g.db.execute('COMMIT')
+        if failpoint=='before_receipt':raise ControllerError('INJECTED_BEFORE_RECEIPT')
+        check(_current(rootfd)==to_target and verified_tree(rootfd,to_target,owner)==installed['prestate_digest'],'ROLLBACK_POSTSTATE')
+        payload={'install_op':install_op,'rollback_op':rollback_op,'attempt':installed['attempt'],'request_digest':request_digest,'from_tree_digest':installed['tree_digest'],'to_tree_digest':installed['prestate_digest'],'controller_identity':trust['controller'],'issued_at':int(time.time())}
+        receipt=verifylib.canonical({'payload':payload,'key_id':key_id,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode()})
+        name='rollback-'+hashlib.sha256(rollback_op.encode()).hexdigest()+'.json';fd=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=receipt_dir_fd)
+        try:check(os.write(fd,receipt)==len(receipt),'RECEIPT_SHORT');os.fsync(fd)
+        finally:os.close(fd)
+        os.fsync(receipt_dir_fd);log(log_fd,{'event':'ROLLBACK_SUCCEEDED','operation':rollback_op},audit)
+        with GuardedLedger(ledger_path,owner) as g:
+            g.db.execute('BEGIN IMMEDIATE');g.db.execute("UPDATE rollbacks SET state='SUCCEEDED',receipt_json=? WHERE operation_id=? AND state='SWITCHED'",(receipt.decode(),rollback_op));g.db.execute('COMMIT')
+        return {'state':'SUCCEEDED','receipt':receipt.decode()}
+    except BaseException:
+        if reserved:
+            try:
+                with GuardedLedger(ledger_path,owner) as g:
+                    g.db.execute('BEGIN IMMEDIATE');g.db.execute("UPDATE rollbacks SET state='UNKNOWN' WHERE operation_id=? AND state IN ('ROLLBACK_PREPARED','SWITCHED')",(rollback_op,));g.db.execute('COMMIT')
+            except Exception:pass
+        raise
+    finally:
+        if lock is not None:os.close(lock)
+        os.close(rootfd)

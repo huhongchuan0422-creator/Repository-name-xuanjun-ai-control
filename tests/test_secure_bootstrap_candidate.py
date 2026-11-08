@@ -18,7 +18,7 @@ class BootstrapTests(unittest.TestCase):
    m=tarfile.TarInfo('payload');m.size=3;t.addfile(m,io.BytesIO(b'abc'))
   self.carrier=z.getvalue();self.manifest=b.canonical({'members':{'payload':{'type':'file','size':3,'sha256':b.sha(b'abc')}},'tool_scope':{},'minimum_sqlite':[3,35,0]})
   self.payload={'carrier_sha256':b.sha(self.carrier),'manifest_sha256':b.sha(self.manifest),'task':'task','attempt':'attempt','nonce':'nonce','expiry':int(time.time())+1000,'controller':'fixture','tool_scope':{'mode':'READ_ONLY','tools':{}}}
-  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text)');db.close();os.chmod(self.ledger,0o600)
+  self.ledger=os.path.join(self.dir,'ledger');db=sqlite3.connect(self.ledger);db.execute('pragma journal_mode=wal');db.execute('create table operations(nonce text primary key,task text,attempt text,state text,prestate_target text,prestate_hash text,staging_target text,manifest_hash text,intended_target text,receipt_hash text,operation_id text,carrier_digest text,manifest_digest text,tree_digest text,prestate_digest text,key_id text,receipt_path text,prestate_dev integer,prestate_ino integer)');db.execute('create table rollbacks(operation_id text primary key,request_digest text,install_op text,attempt text,from_target text,to_target text,from_digest text,to_digest text,state text,receipt_json text)');db.close();os.chmod(self.ledger,0o600)
   self.log=os.path.join(self.dir,'log');open(self.log,'wb').close();os.chmod(self.log,0o600)
  def tearDown(self):
   for fd in self.fds:os.close(fd)
@@ -230,6 +230,28 @@ class InstallerTests(BootstrapTests):
   with sqlite3.connect(self.ledger) as db:
    db.execute('drop table operations');db.execute('create table operations(nonce text primary key,task text,attempt text,state text)')
   with self.assertRaisesRegex(Exception,'LEDGER_SCHEMA_UPGRADE_REQUIRED'):self.run_install()
+  self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+ def test_rollback_success_and_idempotence(self):
+  import controller
+  self.run_install();trustfd=self.fd('rollback-trust',b.canonical(self.trust));keyfd=self.fd('rollback-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd);lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  args=(self.ledger,self.root,os.getuid(),lf,trustfd,keyfd,'fixture-key',rd,'install:nonce','rollback:one','a'*64)
+  result=controller.rollback(*args);self.assertEqual(result['state'],'SUCCEEDED');self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
+  item=b.parse(result['receipt'].encode());self.key.public_key().verify(base64.b64decode(item['signature']),b.canonical(item['payload']))
+  self.assertEqual(controller.rollback(*args),result)
+ def test_rollback_prestate_tampering_refused(self):
+  import controller
+  self.run_install();trustfd=self.fd('rollback-trust',b.canonical(self.trust));keyfd=self.fd('rollback-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd);lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  with open(os.path.join(self.root,'base','.bootstrap-manifest.json'),'wb') as f:f.write(b'tampered')
+  with self.assertRaises(Exception):controller.rollback(self.ledger,self.root,os.getuid(),lf,trustfd,keyfd,'fixture-key',rd,'install:nonce','rollback:one','a'*64)
+  self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce')
+ def test_rollback_faults_leave_unknown(self):
+  import controller
+  self.run_install();trustfd=self.fd('rollback-trust',b.canonical(self.trust));keyfd=self.fd('rollback-key',self.key.private_bytes(Encoding.Raw,PrivateFormat.Raw,NoEncryption()))
+  rd=os.open(self.root,os.O_RDONLY|os.O_DIRECTORY);self.fds.append(rd);lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  with self.assertRaises(controller.ControllerError):controller.rollback(self.ledger,self.root,os.getuid(),lf,trustfd,keyfd,'fixture-key',rd,'install:nonce','rollback:one','a'*64,failpoint='after_rename')
+  with sqlite3.connect(self.ledger) as db:self.assertEqual(db.execute('select state from rollbacks').fetchone()[0],'UNKNOWN')
   self.assertEqual(os.readlink(os.path.join(self.root,'current')),'base')
  def test_recover_running_as_unknown(self):
   import sys
