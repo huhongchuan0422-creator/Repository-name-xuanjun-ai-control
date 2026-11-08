@@ -1,0 +1,31 @@
+{
+  "schema": "community-successor-remote-handoff-v1",
+  "task": "issue-76",
+  "purpose": "immutable transport only; not installer; not merge approval",
+  "source_commit": "7ca1ac2a4e5a68704bb0cebe1c33049713070859",
+  "source_tree": "321134ffac48f3b960df051c53749a481aea872d",
+  "base_commit": "e23e1868b16f6c4c3f30f158418e6557037df28e",
+  "patch": {
+    "file": "community-7ca1ac2a.patch.gz",
+    "compression": "gzip -n -9",
+    "bytes": 31763,
+    "sha256": "97cdd8032bbfe4c2f6823ed9827084b730690560b9f41aed145c7cf74a96e2a2",
+    "uncompressed_bytes": 106056,
+    "uncompressed_sha256": "99e67fa116ca11b87285f4a1287be2ec7e9d8005dda28038b5c98d1dd9be6063"
+  },
+  "full_archive": {
+    "local_file": "community-admin-ocr-successor-7ca1ac2a.tar.gz",
+    "bytes": 3733775,
+    "sha256": "77161895e685d2aa3e4e1fb68bb7b77d9f2747d48207506a50526d0eee5e6489",
+    "published": false
+  },
+  "production_modified": false,
+  "gates": {
+    "developer": "PASS_WITH_ONE_ENV_SKIP",
+    "independent_qa": "NOT_STARTED",
+    "security": "NOT_STARTED",
+    "release": "NOT_STARTED",
+    "installation": "NOT_STARTED",
+    "mini_program_listing": "NOT_STARTED"
+  }
+}
