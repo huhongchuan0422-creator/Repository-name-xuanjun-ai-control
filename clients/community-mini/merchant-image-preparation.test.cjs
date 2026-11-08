@@ -29,7 +29,7 @@ test('file changes after stat cannot bypass saved-file identity/size check',asyn
 test('base64 read failure does not turn into a request',async()=>{const f=fixture({readFailure:true});await assert.rejects(f.run(),/IMAGE_READ_FAILED/);});
 test('malformed base64 rejected',async()=>{const f=fixture({badBase64:true});await assert.rejects(f.run(),/IMAGE_READ_FAILED/);});
 test('wx.getFileInfo fallback remains supported without reading source bytes',async()=>{const f=fixture();const original=f.api.getFileSystemManager;f.api.getFileSystemManager=()=>{const manager=original();delete manager.stat;return manager;};f.api.getFileInfo=o=>o.success({size:f.sizes[o.filePath]});assert.equal((await f.run()).size,900000);});
-test('page still restricts automatic OCR to original document types',()=>{assert.match(script,/const ocrKind=kind==='business_license'\?'business_license':kind==='identity_front'\?'id_front':kind==='identity_back'\?'id_back':''/);});
+test('page explicitly adds approved bank OCR to document types',()=>{assert.match(script,/const ocrKind=kind==='business_license'\?'business_license':kind==='identity_front'\?'id_front':kind==='identity_back'\?'id_back':kind==='bank_card'\?'bank_card':''/);});
 
 for(const size of [1499999,1500000])test('original '+size+' bytes does not trigger size compression',async()=>{const f=fixture({size});const r=await f.run();assert.equal(r.size,size);assert.equal(r.path,f.source);assert.equal(f.calls.some(x=>x[0]==='compress'),false);});
 test('original 1500001 bytes triggers automatic compression',async()=>{const f=fixture({size:1500001});const r=await f.run();assert.equal(r.size,900000);assert.equal(f.calls.some(x=>x[0]==='compress'),true);});

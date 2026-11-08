@@ -1,0 +1,179 @@
+--- a/services/ocr_engine/api.py
++++ b/services/ocr_engine/api.py
+@@ -18,10 +18,12 @@
+     from secure_store import SecureSQLiteJobStore
+ 
+ MAX_BYTES = 8 * 1024 * 1024
+-ALLOWED_HINTS = {"business_license", "id_front"}
++ALLOWED_HINTS = {"business_license", "id_front", "id_back", "bank_card"}
+ CONFIRM_KEYS = {
++    "bank_card": {"account_number", "account_bank"},
+     "business_license": {"company_name", "credit_code", "legal_representative", "registered_address", "business_scope"},
+     "id_front": {"id_name", "id_number", "registered_address"},
++    "id_back": {"issuing_authority", "valid_from", "valid_to"},
+ }
+ class Principal(BaseModel):
+     subject: str
+@@ -164,7 +166,7 @@
+                 "document_type": document_type, "attachment_id": attachment_id, "content_sha256": digest}
+     return binding == expected and isinstance(snapshot.get("confirmed_fields"), dict) and bool(snapshot.get("confirmed_fields"))
+ 
+-def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None) -> FastAPI:
++def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None, recovery=None) -> FastAPI:
+     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
+     # Persistence is only activated when an explicit absolute path is configured.
+     if store is None:
+@@ -187,6 +189,25 @@
+         if not p.tenant_id or not p.subject or "ocr:use" not in p.permissions:
+             raise HTTPException(status_code=403, detail="OCR_PERMISSION_DENIED")
+         return p
++    @app.post("/api/v1/ocr/recovery/{operation}")
++    async def recover(operation: str, request: Request, authorization: Optional[str] = Header(None)):
++        p=principal(authorization)
++        if recovery is None:raise HTTPException(status_code=403,detail="OCR_RECOVERY_NOT_CONFIGURED")
++        body=await request.json()
++        schemas={"view":{"application","document_type","locator","recovery_key"},
++                 "confirm":{"application","recovery_id","revision","fields","confirmation_key"},
++                 "apply":{"application","recovery_id","confirmation_id","confirmation_revision","writeback_key"}}
++        if operation not in schemas or type(body) is not dict or set(body)!=schemas[operation]:
++            raise HTTPException(status_code=400,detail="OCR_EXACT_REQUEST_REQUIRED")
++        try:
++            result=recovery(operation,p,body)
++        except (PermissionError,ValueError) as error:
++            code=str(error)
++            if not __import__('re').fullmatch('[A-Z_]{1,100}',code):code='OCR_RECOVERY_REJECTED'
++            raise HTTPException(status_code=403,detail=code)
++        # Internal identity/material references never leave the protected bridge.
++        return {k:v for k,v in result.items() if k not in {'subject','tenant_id','onboarding_application_id'}}
++
+     @app.post("/api/v1/ocr/jobs", status_code=202)
+     async def submit(file: UploadFile = File(...), document_type: str = Form(...),
+                      onboarding_application_id: str = Form(...), attachment_id: str = Form(...),
+@@ -237,8 +258,15 @@
+             jobs.update(job["job_id"], status="processing")
+         try:
+             result = infer(data, document_type, max_bytes=MAX_BYTES)
++            # Preserve only documented geometry/orientation evidence from the trusted
++            # local infer callback. No image, text dump or caller-provided metadata.
++            evidence = {key: result[key] for key in (
++                "orientation", "correction_counterclockwise_degrees", "input_dimensions",
++                "source_coordinate_space", "extraction_after_pixel_rotation",
++                "unresolved_validity_candidates") if key in result}
+             jobs.update(job["job_id"], status="needs_review", fields=result["fields"],
+-                        warnings=[], engine="RapidOCR", model_version="runtime-configured")
++                        warnings=result.get("warnings", []), engine="RapidOCR", model_version="runtime-configured",
++                        **evidence)
+         except Exception as exc:
+             code = "OCR_INFERENCE_FAILED"
+             jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code])
+--- a/services/ocr_engine/secure_store.py
++++ b/services/ocr_engine/secure_store.py
+@@ -305,6 +305,7 @@
+             changed = db.execute("DELETE FROM ocr_jobs WHERE job_id=? AND tenant_key=?",
+                                  (job_id, self._index(tenant_id))).rowcount
+             if changed:
++                self._delete_recovery_receipts(db,job_id,self._index(tenant_id))
+                 db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)", (self._index(job_id), "deleted"))
+             db.execute("COMMIT")
+         return changed == 1
+@@ -313,10 +314,99 @@
+         """Retention deletion by last update; never returns sensitive field values."""
+         with self._connect() as db:
+             db.execute("BEGIN IMMEDIATE")
+-            rows = db.execute("SELECT job_id FROM ocr_jobs WHERE updated_unix < ?", (cutoff_unix,)).fetchall()
++            rows = db.execute("SELECT job_id,tenant_key FROM ocr_jobs WHERE updated_unix < ?", (cutoff_unix,)).fetchall()
+             for row in rows:
++                self._delete_recovery_receipts(db,row['job_id'],row['tenant_key'])
+                 db.execute("INSERT INTO ocr_audit(job_key,event) VALUES(?,?)",
+                            (self._index(row["job_id"]), "retention_deleted"))
+             db.execute("DELETE FROM ocr_jobs WHERE updated_unix < ?", (cutoff_unix,))
+             db.execute("COMMIT")
+             return len(rows)
++
++    def resolve_material_recovery_job(self, tenant_id, subject, application, document_type, attachment_id, document_sha256):
++        """Read-only exact owner/material search. All states count; never choose newest."""
++        expected = dict(tenant_id=tenant_id,subject=subject,onboarding_application_id=application,
++                        document_type=document_type,attachment_id=attachment_id,document_sha256=document_sha256)
++        if any(type(v) is not str or not v for v in expected.values()):
++            raise ValueError('OCR_RECOVERY_BINDING_INVALID')
++        matches=[]
++        with self._connect() as db:
++            rows=db.execute('SELECT ciphertext FROM ocr_jobs WHERE tenant_key=? AND subject_key=?',
++                (self._index(tenant_id),self._index(tenant_id+'/'+subject)))
++            for row in rows:
++                job=self._open(row['ciphertext'])
++                if all(type(job.get(k)) is str and job[k]==v for k,v in expected.items()):
++                    matches.append(job)
++                    if len(matches)>1:raise ValueError('OCR_RECOVERY_MATERIAL_AMBIGUOUS')
++        if not matches:raise ValueError('OCR_RECOVERY_MATERIAL_NOT_FOUND')
++        return self.resolve_recovery_job(tenant_id,subject,application,document_type,job_id=matches[0]['job_id'])
++
++    def resolve_recovery_job(self, tenant_id, subject, application, document_type, *, job_id=None, original_key=None):
++        """Exact owned lookup only; never create/claim/infer or select latest."""
++        if bool(job_id) == bool(original_key):
++            raise ValueError('OCR_RECOVERY_EXACT_LOCATOR_REQUIRED')
++        if job_id:
++            job = self.get(job_id, tenant_id)
++        else:
++            with self._connect() as db:
++                row = db.execute('SELECT ciphertext FROM ocr_jobs WHERE tenant_key=? AND idem_key=?',
++                    (self._index(tenant_id), self._index(tenant_id + '/' + original_key))).fetchone()
++            job = self._open(row['ciphertext']) if row else None
++        if not job or any(job.get(k) != v for k, v in {
++                'tenant_id':tenant_id,'subject':subject,'onboarding_application_id':application,
++                'document_type':document_type}.items()):
++            raise PermissionError('OCR_RECOVERY_JOB_NOT_FOUND')
++        if not job.get('attachment_id') or not job.get('document_sha256') or not job.get('application_revision'):
++            raise PermissionError('OCR_RECOVERY_BINDING_MISSING')
++        return job
++
++    def recovery_record(self, tenant_id, subject, operation, key, payload, result):
++        """Append-only encrypted operation receipt. Caller reauthorizes every replay.
++
++        Recovery IDs are audit references, not authentication capabilities.
++        No original OCR job or original confirmation receipt is modified.
++        """
++        if operation not in ('view','confirm','apply') or not isinstance(key,str) or not key:
++            raise ValueError('OCR_RECOVERY_OPERATION_INVALID')
++        if type(payload) is not dict or type(result) is not dict:
++            raise ValueError('OCR_RECOVERY_PAYLOAD_INVALID')
++        tenant = self._index(tenant_id)
++        owner = self._index(tenant_id + '/' + subject)
++        idem = self._index('recovery/' + tenant_id + '/' + subject + '/' + operation + '/' + key)
++        digest = self._index(json.dumps(payload,sort_keys=True,separators=(',',':')))
++        with self._connect() as db:
++            db.execute('BEGIN IMMEDIATE')
++            db.execute('''CREATE TABLE IF NOT EXISTS ocr_recovery_receipts(
++                tenant_key TEXT NOT NULL, subject_key TEXT NOT NULL, operation TEXT NOT NULL,
++                idem_key TEXT NOT NULL, payload_hash TEXT NOT NULL, ciphertext BLOB NOT NULL,
++                PRIMARY KEY(tenant_key,subject_key,operation,idem_key))''')
++            row=db.execute('SELECT payload_hash,ciphertext FROM ocr_recovery_receipts WHERE tenant_key=? AND subject_key=? AND operation=? AND idem_key=?',
++                (tenant,owner,operation,idem)).fetchone()
++            if row:
++                if row['payload_hash'] != digest:
++                    db.execute('ROLLBACK')
++                    raise ValueError('OCR_RECOVERY_IDEMPOTENCY_CONFLICT')
++                stored=self._open(row['ciphertext']);db.execute('COMMIT');return stored
++            db.execute('INSERT INTO ocr_recovery_receipts VALUES(?,?,?,?,?,?)',
++                (tenant,owner,operation,idem,digest,self._seal(result)))
++            db.execute('COMMIT')
++        return json.loads(json.dumps(result))
++
++    def recovery_receipt(self, tenant_id, subject, operation, key):
++        if operation not in ('view','confirm','apply') or not isinstance(key,str) or not key:
++            raise ValueError('OCR_RECOVERY_OPERATION_INVALID')
++        with self._connect() as db:
++            exists=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ocr_recovery_receipts'").fetchone()
++            if not exists:return None
++            row=db.execute('SELECT ciphertext FROM ocr_recovery_receipts WHERE tenant_key=? AND subject_key=? AND operation=? AND idem_key=?',
++                (self._index(tenant_id),self._index(tenant_id+'/'+subject),operation,
++                 self._index('recovery/'+tenant_id+'/'+subject+'/'+operation+'/'+key))).fetchone()
++        return self._open(row['ciphertext']) if row else None
++
++    def _delete_recovery_receipts(self, db, job_id, tenant_key):
++        exists=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ocr_recovery_receipts'").fetchone()
++        if not exists:return
++        rows=db.execute('SELECT rowid,ciphertext FROM ocr_recovery_receipts WHERE tenant_key=?',(tenant_key,)).fetchall()
++        for row in rows:
++            if self._open(row['ciphertext']).get('job_id')==job_id:
++                db.execute('DELETE FROM ocr_recovery_receipts WHERE rowid=?',(row['rowid'],))

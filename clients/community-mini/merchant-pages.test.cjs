@@ -534,7 +534,7 @@ test('industry controls and explanatory prose stay hidden without inventing sett
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.step=2;f.page.refresh();
  assert.ok(!f.page.data.materialGroups.some(g=>g.id==='industry'));assert.ok(!f.page.data.fields.some(x=>x.path.startsWith('settlement_info.')));assert.equal(form.get(f.page.profile,'settlement_info.settlement_id'),undefined);
  const options={...f.page.data.options,category:'GENERAL'};assert.ok(form.materialGroups({},options,[{id:'industry_permit',required:true,connected:true}],2).find(g=>g.id==='qualification').materials.some(m=>m.id==='industry_permit'));
- const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(wxml,/\{\{group.note\}\}|行业资质材料适用情况|资料未齐可先保存草稿|本页不自动提交微信/);assert.match(wxml,/<button class="primary bank-ocr-entry" disabled="{{true}}">银行卡识别<\/button>/);assert.match(wxml,/识别功能尚未接通/);
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(wxml,/\{\{group.note\}\}|行业资质材料适用情况|资料未齐可先保存草稿|本页不自动提交微信/);assert.match(wxml,/<button class="primary bank-ocr-entry" data-kind="bank_card" bindtap="recognizeDocument" disabled="{{pending\|\|!application\|\|!application.materials.bank_card}}">银行卡识别<\/button>/);assert.match(wxml,/需人工核对后保存/);
 });
 test('both account choices remain visible and enterprise private status is honest without an added front-end gate',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.data.step=2;f.page.refresh();
@@ -639,11 +639,11 @@ test('new default donation unknown save cannot repeat a creation without authori
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.failNext('save',new Error('UNKNOWN'));await f.page.save();
  assert.equal(f.page.data.splitSaveUnknown,true);const count=f.calls.filter(x=>x.p.operation==='save').length;await f.page.save();assert.equal(f.calls.filter(x=>x.p.operation==='save').length,count);
 });
-test('personal holder is visible read-only and the unavailable bank OCR follows account type',async()=>{
+test('personal holder is visible read-only and the approved bank OCR follows account type',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});form.put(f.page.profile,'subject_info.identity_info.id_card_info.id_card_name','SYNTHETIC LEGAL');form.put(f.page.profile,'bank_account_info.bank_account_type','BANK_ACCOUNT_TYPE_PERSONAL');await f.page.save();f.page.setData({step:2});f.page.refresh();
  const bank=f.page.data.materialGroups.find(g=>g.id==='bank');assert.equal(bank.personalAccount,true);assert.equal(bank.personalAccountName,'SYNTHETIC LEGAL');assert.ok(!bank.fields.some(x=>x.path==='bank_account_info.account_name'));
- const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(w,/class="readonly-account-name" style="color:#83958b">{{group.personalAccountName}}/);assert.match(w,/返回第一步修改户名/);assert.match(w,/item.path==='bank_account_info.bank_account_type'[\s\S]*?class="primary bank-ocr-entry" disabled="{{true}}">银行卡识别/);
- const bankEntry=w.match(/<button class="primary bank-ocr-entry"[^>]*>/)[0];assert.doesNotMatch(bankEntry,/bindtap|chooseMedia|upload/);
+ const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(w,/class="readonly-account-name" style="color:#83958b">{{group.personalAccountName}}/);assert.match(w,/返回第一步修改户名/);assert.match(w,/item.path==='bank_account_info.bank_account_type'[\s\S]*?class="primary bank-ocr-entry" data-kind="bank_card" bindtap="recognizeDocument" disabled="{{pending\|\|!application\|\|!application.materials.bank_card}}">银行卡识别/);
+ const bankEntry=w.match(/<button class="primary bank-ocr-entry"[^>]*>/)[0];assert.match(bankEntry,/bindtap="recognizeDocument"/);assert.doesNotMatch(bankEntry,/chooseMedia|upload/);
 });
 
 

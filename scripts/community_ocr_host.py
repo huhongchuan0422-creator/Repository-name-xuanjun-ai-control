@@ -145,6 +145,11 @@ class OwnerCalls:
             if self.closed:raise PermissionError('OCR_HOST_STOPPED')
             if threading.get_ident()==self.owner:return operation()
             future=concurrent.futures.Future()
+            captured=contextvars.copy_context()
+            original_operation=operation
+            def operation():return captured.run(original_operation)
+            operation.ocr_context=context
+            operation.ocr_stage=stage
             try:self.pending.put_nowait((time.monotonic()+self.timeout,operation,future))
             except queue.Full:raise _attach_failure(PermissionError('OCR_OWNER_QUEUE_FULL'),context,stage=stage) from None
         try:return future.result(timeout=self.timeout)
@@ -281,7 +286,7 @@ class HostOcr:
             if self.inflight is None:
                 context.phase('QUEUE')
                 self.inflight_diagnostic=context
-                self.inflight=self.worker.submit(run);self.inflight_key=key
+                self.inflight=self.worker.submit(contextvars.copy_context().run,run);self.inflight_key=key
                 self.inflight_source=snapshot if action=='submit' else None
             elif action=='submit' and snapshot!=self.inflight_source:
                 raise PermissionError('OCR_SOURCE_CHANGED')

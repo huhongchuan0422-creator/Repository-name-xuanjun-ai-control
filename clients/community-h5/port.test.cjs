@@ -1,0 +1,8 @@
+const assert=require('node:assert/strict');const create=require('./center-web-port');
+const reply=(result,status=200)=>({ok:status===200,status,json:async()=>status===200?{result,payment_enabled:false}:result});
+(async()=>{
+ let calls=[],waiting;const p=create({fetch:async(path,options)=>{calls.push({path,options});if(path.endsWith('/login'))return reply({csrf:'csrf-fixture',user_id:'u1'});if(path.endsWith('/platform'))return reply({appid:'wx1d5f8873eaea5392',source:'ORIGINAL_CENTER_CONFIGURATION'});if(path.endsWith('/check'))return reply({user_id:'u1'});if(path.endsWith('/logout'))return reply({ok:true});return new Promise(r=>waiting=r)}});
+ let revoked=0;p.onRevoke(()=>revoked++);await p.login('synthetic@example.org','fixture');assert(p.isAuthenticated());assert(!calls[0].options.headers['X-CSRF-Token']);const stale=p.customer('directory');await p.login('synthetic2@example.org','fixture');waiting(reply({error:'ACCESS_DENIED'},403));await assert.rejects(stale,/STALE_SESSION/);assert(p.isAuthenticated());assert.equal(revoked,0);
+ const denied=p.customer('directory');waiting(reply({error:'ACCESS_DENIED'},403));await assert.rejects(denied,/SERVICE_REQUEST_REJECTED/);assert(!p.isAuthenticated());assert.equal(revoked,1);await assert.rejects(p.ensureLogin(),/先登录/);
+ const invalid=create({fetch:async()=>reply({csrf:'',user_id:'u'})});await assert.rejects(invalid.login('a','b'),/UNTRUSTED_SESSION/);assert(!invalid.isAuthenticated());await assert.rejects(p.payment(),/真实支付/);await assert.rejects(p.reviewerBrowser(),/审核/);console.log('PASS: login, cookie-only transport, stale403 isolation, current403 revoke, missing login, malformed session, real-payment/reviewer exclusion');
+})().catch(e=>{console.error(e);process.exit(1)});

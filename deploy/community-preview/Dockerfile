@@ -22,6 +22,8 @@ USER 10001:1008
 # Only CI runs this target; no real identities, secrets, network or UK host.
 FROM runtime AS verify
 COPY tests/ /app/tests/
+COPY --chown=10001:1008 verification-upstream/ /opt/verification-upstream/
+RUN COMMUNITY_TEST_PINNED_OCR_DIR=/opt/verification-upstream PYTHONPATH=/app:/app/tests python -B -m unittest test_community_bank_card_layout test_community_h5_bank_ocr.BankOcr -v
 RUN python -B -m unittest discover -s tests -p 'test_community_identity_layout.py' -v && python -B -m unittest discover -s tests -p 'test_community_document_orientation.py' -v
 RUN PYTHONPATH=/app:/app/tests python -B -m unittest test_community_license_address_boundary -v
 RUN python -B -m unittest discover -s tests -p 'test_community_license_partial_label.py' -v && python -B -m unittest discover -s tests -p 'test_community_license_layout.py' -v && python -B -m unittest discover -s tests -p 'test_community_license_raw_replay.py' -v && PYTHONPATH=/app:/app/tests python -B -m unittest community_license_runtime_checks -v

@@ -178,6 +178,9 @@ class WechatApplyment:
             expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
             confirmed_fields=confirmed_fields,source_check=source_check)
 
+    def fill_confirmed_bank_card_draft(self, session, csrf, application, **kwargs):
+        return self._fill_confirmed_document_draft(session,csrf,application,document_type='bank_card',**kwargs)
+
     def _fill_confirmed_document_draft(self, session, csrf, application, *,document_type,
                                      expected_application_revision, expected_wechat_version,
                                      confirmed_fields, source_check=None, recovery_receipt=None, recovery_replay_check=None):
@@ -199,8 +202,8 @@ class WechatApplyment:
                 or type(expected_wechat_version) is not int or expected_wechat_version<0):
             raise ValueError('EXPLICIT_DUAL_VERSIONS_REQUIRED')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
-        if document_type not in ('business_license','id_front','id_back'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
-        allowed={'business_license':{'company_name','registered_address'},'id_front':{'id_name','id_number','registered_address'},'id_back':{'valid_from','valid_to'}}[document_type]
+        if document_type not in ('business_license','id_front','id_back','bank_card'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
+        allowed={'business_license':{'company_name','registered_address'},'id_front':{'id_name','id_number','registered_address'},'id_back':{'valid_from','valid_to'},'bank_card':{'account_number','account_bank'}}[document_type]
         if recovery_receipt is not None and document_type=='business_license':
             allowed=allowed|{'credit_code','legal_representative'}
         if (type(confirmed_fields) is not dict or not confirmed_fields
@@ -301,6 +304,18 @@ class WechatApplyment:
                             if changed:applied.append('registered_address')
                     elif fields['address']:skipped.append('registered_address')
                     else:fields['address']=address;applied.append('registered_address')
+            elif document_type=='bank_card':
+                bank=profile.get('bank_account_info',{})
+                if type(bank) is not dict:raise ValueError('ORIGINAL_BANK_PROFILE_REQUIRED')
+                # Only human-confirmed printed fields; never infer ownership,
+                # account type, branch, or bank verification from OCR.
+                for key in ('account_number','account_bank'):
+                    if key not in confirmed_fields:continue
+                    existing=bank.get(key,'')
+                    if type(existing) is not str:raise ValueError('ORIGINAL_BANK_PROFILE_REQUIRED')
+                    if existing.strip():skipped.append(key)
+                    else:bank[key]=confirmed_fields[key];applied.append(key)
+                if applied:profile['bank_account_info']=bank
             else:
                 # Identity type belongs to the applicant's original provider
                 # draft. Never silently switch a passport/other document to ID.
@@ -333,7 +348,7 @@ class WechatApplyment:
                 raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             result.update(version=version+1,state='DRAFT')
             self._save(application,owner,result)
-            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL' if document_type=='business_license' else 'SHARED_IDCARD_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
+            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL' if document_type=='business_license' else 'SHARED_BANK_CARD_CONFIRMED_FILL' if document_type=='bank_card' else 'SHARED_IDCARD_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
             _,latest_meta,latest=self.onboarding._load(application,uid)
             if (c.session(session,csrf)!=uid or latest['revision']!=revision or latest['status']!='DRAFT'
                     or latest['fields']!=fields or latest_meta.get('reviews')!={}

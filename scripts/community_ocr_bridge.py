@@ -8,8 +8,9 @@ from scripts.community_mini_merchant import MiniMerchant
 
 OCR_SOURCE_SHA = '90aca1cfca1ec2a354950c394a4b0c2689b37d13'
 OCR_SOURCE_TREE = 'cdb3918520b176286af570101c75885bcf07cde4'
-KINDS = {'business_license': 'business_license', 'id_front': 'identity_front', 'id_back': 'identity_back'}
+KINDS = {'business_license': 'business_license', 'id_front': 'identity_front', 'id_back': 'identity_back', 'bank_card': 'bank_card'}
 CONFIRMED_KEYS = {
+    'bank_card': {'account_number','account_bank'},
     'business_license': {'company_name','credit_code','legal_representative','registered_address','business_scope'},
     'id_front': {'id_name','id_number','registered_address'},
     'id_back': {'issuing_authority','valid_from','valid_to'},
@@ -251,7 +252,7 @@ class CommunityOcrBridge:
         if original['attachment_id']!=binding['attachment_id'] or original['document_sha256']!=binding['content_sha256']:
             raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
         fields=confirmation['confirmed_fields']
-        allowed={'business_license':('company_name','credit_code','legal_representative','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to')}[doc]
+        allowed={'business_license':('company_name','credit_code','legal_representative','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to'),'bank_card':('account_number','account_bank')}[doc]
         selected={k:v for k,v in fields.items() if k in allowed and v.strip()}
         if not selected:
             self._recovery_current(p,application,confirmation)
@@ -324,7 +325,7 @@ class CommunityOcrBridge:
                 raise PermissionError('OCR_SHARED_DRAFT_WRITEBACK_VERSION_BINDING_REQUIRED')
             if source['wechat_version'] != version:
                 raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            allowed_fill={'business_license':('company_name','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to')}[job['document_type']]
+            allowed_fill={'business_license':('company_name','registered_address'),'id_front':('id_name','id_number','registered_address'),'id_back':('valid_from','valid_to'),'bank_card':('account_number','account_bank')}[job['document_type']]
             # The official provider schema has no issuing-authority field. It is
             # retained in the encrypted OCR confirmation, never sent as a made-up field.
             confirmed = {key:value for key,value in fields.items() if key in allowed_fill and value.strip()}
@@ -349,7 +350,7 @@ class CommunityOcrBridge:
                 current_version = 0 if provider is None else provider['version']
                 if type(current_version) is not int or current_version != provider_version:
                     raise PermissionError('OCR_PROVIDER_VERSION_CHANGED')
-            fill={'business_license':service.fill_confirmed_license_draft,'id_front':service.fill_confirmed_identity_draft,'id_back':service.fill_confirmed_identity_back_draft}[job['document_type']]
+            fill={'business_license':service.fill_confirmed_license_draft,'id_front':service.fill_confirmed_identity_draft,'id_back':service.fill_confirmed_identity_back_draft,'bank_card':service.fill_confirmed_bank_card_draft}[job['document_type']]
             return fill(p._community_token,csrf,job['onboarding_application_id'],
                 expected_application_revision=int(revision),expected_wechat_version=version,
                 confirmed_fields=confirmed,source_check=check)

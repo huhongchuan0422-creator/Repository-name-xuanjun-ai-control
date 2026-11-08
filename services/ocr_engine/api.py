@@ -18,8 +18,9 @@ except ImportError:
     from secure_store import SecureSQLiteJobStore
 
 MAX_BYTES = 8 * 1024 * 1024
-ALLOWED_HINTS = {"business_license", "id_front", "id_back"}
+ALLOWED_HINTS = {"business_license", "id_front", "id_back", "bank_card"}
 CONFIRM_KEYS = {
+    "bank_card": {"account_number", "account_bank"},
     "business_license": {"company_name", "credit_code", "legal_representative", "registered_address", "business_scope"},
     "id_front": {"id_name", "id_number", "registered_address"},
     "id_back": {"issuing_authority", "valid_from", "valid_to"},

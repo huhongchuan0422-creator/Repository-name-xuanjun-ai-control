@@ -55,6 +55,9 @@ class CenterIdentity(IdentityPort):
             # Share the original Center HTTP source quota, not a second counter.
             self.center.limit('auth-source:'+source,40,300)
     def _resolve(self,token,scene):
+        from scripts.community_h5_context import resolve
+        web=resolve(self,token,scene)
+        if web is not None:return web
         binding=self.scenes.get(scene)
         if binding is None:raise PermissionError('SCENE_NOT_REGISTERED')
         uid=self.center.session(token)
@@ -80,6 +83,11 @@ class CenterIdentity(IdentityPort):
         Legacy sessions without this metadata must log in again.
         """
         self._time(self.center.now())
+        from scripts.community_h5_context import current
+        web=current(self,token)
+        if web is not None:
+            uid,pid,principal=self._resolve(token,scene)
+            return uid,pid,web[1],principal
         uid,pid,principal=self._resolve(token,scene)
         row=self.center.db.execute("SELECT payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND project=? AND active=1",
             (self.center.idx('wechat-session:'+token),uid,pid)).fetchone()
@@ -92,6 +100,9 @@ class CenterIdentity(IdentityPort):
     def applicant_context(self,token):
         """Authenticate the existing mini applicant, without selecting a store or grant."""
         self._time(self.center.now())
+        from scripts.community_h5_context import current
+        web=current(self,token)
+        if web is not None:return web
         c=self.center;uid=c.session(token)
         rows=c.db.execute("SELECT project,payload FROM links WHERE channel='WECHAT_MINI_SESSION' AND subject_idx=? AND user_id=? AND active=1",
                           (c.idx('wechat-session:'+token),uid)).fetchall()

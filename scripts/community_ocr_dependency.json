@@ -2,7 +2,7 @@
   "source_sha": "90aca1cfca1ec2a354950c394a4b0c2689b37d13",
   "source_tree": "cdb3918520b176286af570101c75885bcf07cde4",
   "files": {
-    "api.py": "8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e",
+    "api.py": "65f7bc31e43d0104297aa574f4d42754288faab3c2d0e02fd37ab334742a877d",
     "secure_store.py": "30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25",
     "ocr_core.py": "bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308"
   },
@@ -13,13 +13,13 @@
   },
   "local_successor": {
     "status": "UNPUBLISHED_LOCAL_CANDIDATE",
-    "patch_path": "deploy/community-preview/ocr-recovery-api-store.patch",
-    "patch_sha256": "3653a2d7f45348379ec05c558529328b5e1dfa71df3e6d7ea4ec3e6140264d3b",
+    "patch_path": "deploy/community-preview/ocr-bank-card-successor.patch",
+    "patch_sha256": "636230f82b27afa1cf88412698a78f244eeb207d2b08bee7fbf1173bf35b9e21",
     "source_files": {
       "api.py": "services/ocr_engine/api.py",
       "secure_store.py": "services/ocr_engine/secure_store.py"
     },
-    "scope": "Explicit same-owner same-application same-material recovery views and separate current-version confirmation; immutable original jobs; no OCR resubmission. Original core/models unchanged."
+    "scope": "Explicit same-owner same-application same-material recovery views and separate current-version confirmation; immutable original jobs; no OCR resubmission. Original core/models unchanged. Bank-card OCR explicit successor: own original private BANK_CARD material, human confirmation and empty account_number/account_bank fill only; no role/media changes."
   },
   "source_repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control"
 }

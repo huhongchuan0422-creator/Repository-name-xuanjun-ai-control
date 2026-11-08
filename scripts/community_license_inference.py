@@ -11,6 +11,7 @@ from scripts.community_license_layout import (
     normalize_layout, extract_license_fields, _label_nodes, ALIASES, PATTERN,
 )
 from scripts.community_identity_layout import extract_identity_fields, FRONT, BACK
+from scripts.community_bank_card_layout import extract_bank_card_fields, ALIASES as BANK_ALIASES, PATTERN as BANK_PATTERN
 import re
 
 UPSTREAM_FILES = {
@@ -23,7 +24,9 @@ UPSTREAM_FILES = {
 # for same-model offline comparison. Core/store/model pins are unchanged.
 COMPATIBLE_API_SHA256 = '32cf647f56f9f1fbed9d0c7d15bb50a0f60a9cd5124bd5ff835129196766636e'
 RECOVERY_RUNTIME_FILES = {'api.py': '8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e', 'secure_store.py': '30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25', 'ocr_core.py': 'bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308'}
+BANK_CARD_RUNTIME_FILES = dict(RECOVERY_RUNTIME_FILES, **{'api.py':'65f7bc31e43d0104297aa574f4d42754288faab3c2d0e02fd37ab334742a877d'})
 EXPECTED_FIELDS = {
+    'bank_card': ('account_number','account_bank'),
     'business_license': ('company_name', 'credit_code', 'legal_representative', 'registered_address'),
     'id_front': ('id_name', 'id_number', 'registered_address'),
     'id_back': ('issuing_authority', 'valid_from', 'valid_to'),
@@ -39,8 +42,8 @@ def _orientation_evidence(rows, result, document_type):
     """
     fields = [f for key,f in result['fields'].items()
               if key in EXPECTED_FIELDS[document_type] and f.get('value')]
-    aliases = ALIASES if document_type == 'business_license' else FRONT if document_type == 'id_front' else BACK
-    pattern = PATTERN if document_type == 'business_license' else re.compile('|'.join(
+    aliases = BANK_ALIASES if document_type == 'bank_card' else ALIASES if document_type == 'business_license' else FRONT if document_type == 'id_front' else BACK
+    pattern = BANK_PATTERN if document_type == 'bank_card' else PATTERN if document_type == 'business_license' else re.compile('|'.join(
         '\\s*'.join(map(re.escape, label)) for label in sorted(aliases, key=len, reverse=True)))
     labels = _label_nodes(rows, 0, aliases, pattern)
     horizontal = [n for n in labels if any(key is not None for key,unused in n['parts']) and n['b'] is not None
@@ -141,7 +144,7 @@ def run_license_layout_ocr(image, document_type, max_bytes=8*1024*1024, max_pixe
     root = Path(ocr_core.__file__).resolve().parent
     observed={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in UPSTREAM_FILES}
     legacy=dict(UPSTREAM_FILES,**{'api.py':COMPATIBLE_API_SHA256})
-    if observed not in (UPSTREAM_FILES,legacy,RECOVERY_RUNTIME_FILES):
+    if observed not in (UPSTREAM_FILES,legacy,RECOVERY_RUNTIME_FILES,BANK_CARD_RUNTIME_FILES):
         raise PermissionError('LICENSE_OCR_UPSTREAM_PIN_MISMATCH')
     if document_type not in EXPECTED_FIELDS:
         raise ValueError('UNSUPPORTED_DOCUMENT_TYPE')
@@ -167,7 +170,7 @@ def run_license_layout_ocr(image, document_type, max_bytes=8*1024*1024, max_pixe
             raw = engine(rotated)
             rows = normalize_layout(raw)
             del raw, rotated  # Only detached Python text/scalars/quads remain.
-            result = extract_license_fields(rows, (0,)) if document_type == 'business_license' else extract_identity_fields(rows, document_type, (0,))
+            result = extract_bank_card_fields(rows, (0,)) if document_type == 'bank_card' else extract_license_fields(rows, (0,)) if document_type == 'business_license' else extract_identity_fields(rows, document_type, (0,))
             rank,evidence = _orientation_evidence(rows,result,document_type)
             result = _map_sources(result,turn,width,height)
             runs.append({'turn':turn,'rank':rank,'evidence':evidence,'result':result})

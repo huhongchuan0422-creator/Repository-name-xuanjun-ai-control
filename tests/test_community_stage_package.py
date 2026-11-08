@@ -174,8 +174,9 @@ class SourcePackage(unittest.TestCase):
             lock=json.loads(archive.read('scripts/community_ocr_dependency.json'))
             self.assertEqual(lock['local_successor']['source_files'],{
                 'api.py':'services/ocr_engine/api.py','secure_store.py':'services/ocr_engine/secure_store.py'})
-            patch='deploy/community-preview/ocr-recovery-api-store.patch'
-            self.assertEqual(lock['local_successor']['patch_path'],patch)
+            patch=lock['local_successor']['patch_path']
+            self.assertIn(patch,{'deploy/community-preview/ocr-recovery-api-store.patch',
+                                 'deploy/community-preview/ocr-bank-card-successor.patch'})
             for name,relative in lock['local_successor']['source_files'].items():
                 self.assertEqual(hashlib.sha256(archive.read(relative)).hexdigest(),lock['files'][name])
             self.assertEqual(hashlib.sha256(archive.read(patch)).hexdigest(),lock['local_successor']['patch_sha256'])
@@ -191,5 +192,29 @@ class SourcePackage(unittest.TestCase):
                 changed=json.loads(target.read_text());changed['local_successor']['source_files']['secure_store.py']='services/ocr_engine/unapproved.py'
                 target.write_text(json.dumps(changed))
                 with self.assertRaisesRegex(ValueError,'OCR_SUCCESSOR_PACKAGE_BINDING_MISMATCH'):build(tmp)
+
+
+    def test_successor_rejects_unapproved_patch_and_missing_bank_inputs(self):
+        data,_=build(Path(__file__).resolve().parents[1])
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for path in ['deploy/community-preview/not-approved.patch', '../outside.patch', '']:
+                with self.subTest(path=path),tempfile.TemporaryDirectory() as tmp:
+                    archive.extractall(tmp)
+                    target=Path(tmp)/'scripts/community_ocr_dependency.json'
+                    lock=json.loads(target.read_text());lock['local_successor']['patch_path']=path
+                    target.write_text(json.dumps(lock))
+                    with self.assertRaisesRegex(ValueError,'OCR_SUCCESSOR_PACKAGE_BINDING_MISMATCH'):build(tmp)
+            lock=json.loads(archive.read('scripts/community_ocr_dependency.json'))
+            if lock['local_successor']['patch_path']=='deploy/community-preview/ocr-bank-card-successor.patch':
+                for path in ['deploy/community-preview/ocr-bank-card-successor.patch',
+                             'scripts/community_bank_card_layout.py',
+                             'tests/test_community_bank_card_layout.py',
+                             'tests/test_community_h5_bank_ocr.py',
+                             'tests/test_community_h5_ocr.py',
+                             'scripts/community_h5.py',
+                             'scripts/community_h5_context.py']:
+                    with self.subTest(missing=path),tempfile.TemporaryDirectory() as tmp:
+                        archive.extractall(tmp);(Path(tmp)/path).unlink()
+                        with self.assertRaisesRegex(ValueError,'REQUIRED_SOURCE_MISSING'):build(tmp)
 
 if __name__=='__main__':unittest.main()
