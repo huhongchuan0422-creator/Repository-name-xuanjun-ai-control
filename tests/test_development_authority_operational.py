@@ -31,12 +31,12 @@ class OperationalTests(unittest.TestCase):
           'replay_db':os.path.join(self.root.name,'replay.db'),'anchor_id':'anchor-1',
           'issuer':'formal-issuer','instance_id':'provider-1','version':'3.0.1','service_id':'reader-1',
           'attempt_id':'attempt-1','lease_id':'lease-1','fence':1,'epoch':1,
-          'resource_scope_digest':'a'*64,'max_age':5.0}
+          'resource_scope_digest':'a'*64,'max_age':5.0,'target_sha256':'d'*64}
     def payload(self,authorized=True):
         return {'schema':3,'kind':'DEVELOPMENT_WRITER_AUTHORITY','issuer':'formal-issuer',
           'provider':{'instance_id':'provider-1','version':'3.0.1'},
           'reader':{'service_identity':'reader-1','permission':'development-authority:read'},
-          'request':{'request_id':'request-1','task_id':'task-1'},'observed_at':1000.0,
+          'request':{'request_id':'request-1','task_id':'task-1','purpose':'AUTHORIZATION_CONSUME','target_sha256':'d'*64},'observed_at':1000.0,
           'task':{'task_id':'task-1','state':'RUNNING','spec_sha256':'b'*64,'checkpoint_sha256':'c'*64},
           'writer':{},'assignment':{'attempt_id':'attempt-1','lease_id':'lease-1','fence':1,'epoch':1,
           'lock_provider_id':'p','resource_scope_digest':'a'*64,'resource_keys':['git:x']},

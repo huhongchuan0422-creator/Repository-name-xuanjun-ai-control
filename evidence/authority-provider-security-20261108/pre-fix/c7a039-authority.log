@@ -1,0 +1,18 @@
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+
+[notice] A new release of pip is available: 24.0 -> 26.3
+[notice] To update, run: pip install --upgrade pip
+test_anchor_key_future_illegal_state_and_invalid_expiry_reject (test_development_authority.DevelopmentAuthorityTests.test_anchor_key_future_illegal_state_and_invalid_expiry_reject) ... ok
+test_concurrent_replay_has_exactly_one_authorization (test_development_authority.DevelopmentAuthorityTests.test_concurrent_replay_has_exactly_one_authorization) ... ok
+test_corrupt_resource_scope_never_authorizes (test_development_authority.DevelopmentAuthorityTests.test_corrupt_resource_scope_never_authorizes) ... ok
+test_formal_ledger_rejects_symlink_and_hardlink_alias (test_development_authority.DevelopmentAuthorityTests.test_formal_ledger_rejects_symlink_and_hardlink_alias) ... ok
+test_ledger_path_replacement_is_detected (test_development_authority.DevelopmentAuthorityTests.test_ledger_path_replacement_is_detected) ... ok
+test_positive_and_all_trusted_request_bindings (test_development_authority.DevelopmentAuthorityTests.test_positive_and_all_trusted_request_bindings) ... ok
+test_reader_requires_explicit_exact_trust_inputs (test_development_authority.DevelopmentAuthorityTests.test_reader_requires_explicit_exact_trust_inputs) ... ok
+test_replay_guard_is_mandatory_persistent_atomic_and_fail_closed (test_development_authority.DevelopmentAuthorityTests.test_replay_guard_is_mandatory_persistent_atomic_and_fail_closed) ... ok
+test_schema_tamper_expiry_revocation_and_signature_are_denied (test_development_authority.DevelopmentAuthorityTests.test_schema_tamper_expiry_revocation_and_signature_are_denied) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.418s
+
+OK

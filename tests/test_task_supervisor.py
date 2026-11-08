@@ -9,7 +9,7 @@ import unittest
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
-from task_supervisor import Supervisor, UNKNOWN
+from task_supervisor import Supervisor, UNKNOWN, TestOnlyDevelopmentIdentityVerifier
 
 
 class SupervisorTests(unittest.TestCase):
@@ -17,8 +17,9 @@ class SupervisorTests(unittest.TestCase):
         handle, self.path = tempfile.mkstemp()
         os.close(handle)
         self.now = 1000.0
+        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
         self.s = Supervisor(self.path, lambda: self.now,
-                            self.authenticated_development_identity)
+          TestOnlyDevelopmentIdentityVerifier(self.authenticated_development_identity))
 
     @staticmethod
     def authenticated_development_identity(owner_grant, developer_credential,
@@ -36,6 +37,7 @@ class SupervisorTests(unittest.TestCase):
             pass
         if os.path.exists(self.path):
             os.unlink(self.path)
+        os.environ.pop('XUANJUN_TEST_ONLY_IDENTITY',None)
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',

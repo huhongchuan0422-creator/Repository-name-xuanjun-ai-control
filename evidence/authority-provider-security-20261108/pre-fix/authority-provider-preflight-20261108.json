@@ -1,0 +1,1 @@
+{"errors": ["PYTHON_3_11_REQUIRED", "SQLITE_3_40_REQUIRED", "CRYPTOGRAPHY_PIN_MISMATCH"], "facts": {"cryptography": "3.2.1", "python": "3.6.8", "sqlite": "3.26.0"}, "ok": false, "requirements": {"cryptography": "42.0.8", "python": "3.11+", "sqlite": "3.40+"}}

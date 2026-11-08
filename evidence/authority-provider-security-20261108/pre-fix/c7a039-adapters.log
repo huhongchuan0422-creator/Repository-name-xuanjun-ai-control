@@ -1,0 +1,81 @@
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+
+[notice] A new release of pip is available: 24.0 -> 26.3
+[notice] To update, run: pip install --upgrade pip
+==== test_authority_key_file.py
+test_both_entrypoints_reject_argument_conflict (test_authority_key_file.AuthorityKeyFileTests.test_both_entrypoints_reject_argument_conflict) ... ok
+test_both_entrypoints_reject_symbolic_link (test_authority_key_file.AuthorityKeyFileTests.test_both_entrypoints_reject_symbolic_link) ... ok
+test_both_entrypoints_reject_wrong_mode (test_authority_key_file.AuthorityKeyFileTests.test_both_entrypoints_reject_wrong_mode) ... ok
+test_cli_accepts_secure_key_file_and_does_not_put_key_in_argv (test_authority_key_file.AuthorityKeyFileTests.test_cli_accepts_secure_key_file_and_does_not_put_key_in_argv) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.903s
+
+OK
+==== test_codex_execution_adapter.py
+test_acked_cancel_is_request_not_false_terminal (test_codex_execution_adapter.CodexExecutionAdapterTests.test_acked_cancel_is_request_not_false_terminal) ... ok
+test_app_server_interleaved_notifications_approval_terminal_and_cancel (test_codex_execution_adapter.CodexExecutionAdapterTests.test_app_server_interleaved_notifications_approval_terminal_and_cancel) ... ok
+test_app_server_receipt_and_event_idempotency (test_codex_execution_adapter.CodexExecutionAdapterTests.test_app_server_receipt_and_event_idempotency) ... ok
+test_app_server_reconcile_pages_to_exact_turn_and_absence_is_unknown (test_codex_execution_adapter.CodexExecutionAdapterTests.test_app_server_reconcile_pages_to_exact_turn_and_absence_is_unknown) ... ok
+test_app_server_restart_reconciles_completed_turn_without_business_acceptance (test_codex_execution_adapter.CodexExecutionAdapterTests.test_app_server_restart_reconciles_completed_turn_without_business_acceptance) ... ok
+test_app_server_turn_receipt_rejects_other_identity (test_codex_execution_adapter.CodexExecutionAdapterTests.test_app_server_turn_receipt_rejects_other_identity) ... ok
+test_available_but_not_included_or_free_quota_is_rejected (test_codex_execution_adapter.CodexExecutionAdapterTests.test_available_but_not_included_or_free_quota_is_rejected) ... ok
+test_cancel_during_send_keeps_late_ids_and_converges_cancelled (test_codex_execution_adapter.CodexExecutionAdapterTests.test_cancel_during_send_keeps_late_ids_and_converges_cancelled) ... ok
+test_cancel_requested_survives_restart_and_reconciles_same_turn (test_codex_execution_adapter.CodexExecutionAdapterTests.test_cancel_requested_survives_restart_and_reconciles_same_turn) ... ok
+test_concrete_app_server_stdio_protocol (test_codex_execution_adapter.CodexExecutionAdapterTests.test_concrete_app_server_stdio_protocol) ... ok
+test_connection_and_malformed_receipt_after_send_are_unknown (test_codex_execution_adapter.CodexExecutionAdapterTests.test_connection_and_malformed_receipt_after_send_are_unknown) ... ok
+test_executor_role_revocation_after_intent_blocks_transport (test_codex_execution_adapter.CodexExecutionAdapterTests.test_executor_role_revocation_after_intent_blocks_transport) ... ok
+test_non_writer_cannot_cancel_codex_intent (test_codex_execution_adapter.CodexExecutionAdapterTests.test_non_writer_cannot_cancel_codex_intent) ... ok
+test_persistent_intent_duplicate_send_and_restart_unknown (test_codex_execution_adapter.CodexExecutionAdapterTests.test_persistent_intent_duplicate_send_and_restart_unknown) ... ok
+test_poll_skips_silent_first_intent_and_consumes_second_terminal (test_codex_execution_adapter.CodexExecutionAdapterTests.test_poll_skips_silent_first_intent_and_consumes_second_terminal) ... ok
+test_provider_change_after_queue_blocks_transport (test_codex_execution_adapter.CodexExecutionAdapterTests.test_provider_change_after_queue_blocks_transport) ... ok
+test_quota_rechecked_before_send_and_unknown_is_zero_call (test_codex_execution_adapter.CodexExecutionAdapterTests.test_quota_rechecked_before_send_and_unknown_is_zero_call) ... ok
+test_recent_verified_openai_promotional_credit_is_explicitly_admitted (test_codex_execution_adapter.CodexExecutionAdapterTests.test_recent_verified_openai_promotional_credit_is_explicitly_admitted) ... ok
+test_reviewer_assignment_never_authorizes_codex_transport (test_codex_execution_adapter.CodexExecutionAdapterTests.test_reviewer_assignment_never_authorizes_codex_transport) ... ok
+test_service_worker_dispatches_persisted_intent_without_client (test_codex_execution_adapter.CodexExecutionAdapterTests.test_service_worker_dispatches_persisted_intent_without_client) ... ok
+test_test_only_quota_on_known_paid_provider_is_rejected (test_codex_execution_adapter.CodexExecutionAdapterTests.test_test_only_quota_on_known_paid_provider_is_rejected) ... ok
+test_timeout_cancel_and_late_old_attempt_never_advance (test_codex_execution_adapter.CodexExecutionAdapterTests.test_timeout_cancel_and_late_old_attempt_never_advance) ... ok
+test_unassigned_actor_and_noncanonical_scope_have_zero_intents (test_codex_execution_adapter.CodexExecutionAdapterTests.test_unassigned_actor_and_noncanonical_scope_have_zero_intents) ... ok
+test_wrong_thread_and_old_turn_events_are_historical_only (test_codex_execution_adapter.CodexExecutionAdapterTests.test_wrong_thread_and_old_turn_events_are_historical_only) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 7.102s
+
+OK
+==== test_task_center_execution_contract.py
+test_cross_tenant_and_wrong_version_reject_without_writes (test_task_center_execution_contract.ExternalReceiptContractTests.test_cross_tenant_and_wrong_version_reject_without_writes) ... ok
+test_p2_p3_phase_mapping_is_validation_only (test_task_center_execution_contract.ExternalReceiptContractTests.test_p2_p3_phase_mapping_is_validation_only) ... ok
+test_raw_tenant_or_unknown_source_cannot_bypass_context (test_task_center_execution_contract.ExternalReceiptContractTests.test_raw_tenant_or_unknown_source_cannot_bypass_context) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.533s
+
+OK
+==== test_execution_policy_gateway.py
+test_accepted_request_never_claims_external_execution (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_accepted_request_never_claims_external_execution) ... ok
+test_action_scope_disguise_is_rejected_without_side_effect (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_action_scope_disguise_is_rejected_without_side_effect) ... ok
+test_cross_tenant_action_is_rejected_without_writes (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_cross_tenant_action_is_rejected_without_writes) ... ok
+test_dispatch_outcome_must_match_trusted_query_result (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_dispatch_outcome_must_match_trusted_query_result) ... ok
+test_duplicate_and_restart_are_idempotent_not_reexecuted (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_duplicate_and_restart_are_idempotent_not_reexecuted) ... ok
+test_executor_role_cannot_approve_scope_change (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_executor_role_cannot_approve_scope_change) ... ok
+test_expired_authorization_is_not_current_permission (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_expired_authorization_is_not_current_permission) ... ok
+test_expired_writer_blocks_valid_action_authorization (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_expired_writer_blocks_valid_action_authorization) ... ok
+test_historical_or_read_only_capability_cannot_authorize_write (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_historical_or_read_only_capability_cannot_authorize_write) ... ok
+test_idempotency_binds_authorization_writer_change_and_preflight (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_idempotency_binds_authorization_writer_change_and_preflight) ... ok
+test_missing_goal_or_acceptance_is_rejected (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_missing_goal_or_acceptance_is_rejected) ... ok
+test_old_attempt_preflight_and_change_cannot_be_reused (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_old_attempt_preflight_and_change_cannot_be_reused) ... ok
+test_preflight_can_bind_real_query_receipt_and_reject_unknown_id (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_preflight_can_bind_real_query_receipt_and_reject_unknown_id) ... ok
+test_preflight_change_and_authorization_bind_exact_asset_generation (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_preflight_change_and_authorization_bind_exact_asset_generation) ... ok
+test_same_preflight_body_can_be_recorded_for_new_attempt (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_same_preflight_body_can_be_recorded_for_new_attempt) ... ok
+test_scope_approval_invalidates_if_reviewer_later_becomes_executor (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_scope_approval_invalidates_if_reviewer_later_becomes_executor) ... ok
+test_scope_change_wrong_base_version_never_authorizes (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_scope_change_wrong_base_version_never_authorizes) ... ok
+test_scope_reviewer_role_check_and_action_insert_are_atomic (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_scope_reviewer_role_check_and_action_insert_are_atomic) ... ok
+test_unapproved_scope_expansion_and_self_review_are_rejected (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_unapproved_scope_expansion_and_self_review_are_rejected) ... ok
+test_unassigned_subject_cannot_approve_scope_change (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_unassigned_subject_cannot_approve_scope_change) ... ok
+test_unknown_asset_state_cannot_be_new_or_admitted (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_unknown_asset_state_cannot_be_new_or_admitted) ... ok
+test_wrong_writer_and_wrong_asset_version_are_rejected (test_execution_policy_gateway.ExecutionPolicyGatewayTests.test_wrong_writer_and_wrong_asset_version_are_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 3.645s
+
+OK

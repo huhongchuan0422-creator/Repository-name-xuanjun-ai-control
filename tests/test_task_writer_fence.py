@@ -11,7 +11,7 @@ import unittest
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
-from task_supervisor import Supervisor, UNKNOWN
+from task_supervisor import Supervisor, UNKNOWN, TestOnlyDevelopmentIdentityVerifier
 from task_writer_fence import (
     Fence, FakeTransactionalSink, LocalActionLocks, OfflineGitCAS,
     SourceResourceAdapter, production_fencing_verdict, reconcile_unknown,
@@ -24,11 +24,12 @@ class WriterFenceTests(unittest.TestCase):
         self.path = os.path.join(self.directory.name, 'ledger.sqlite')
         self.lock_root = os.path.join(self.directory.name, 'locks')
         self.now = 1000.0
+        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
         self.s = Supervisor(self.path, lambda: self.now,
-            lambda owner, developer, task, digest: {
+            TestOnlyDevelopmentIdentityVerifier(lambda owner, developer, task, digest: {
               'task_id':task,'contract_sha256':digest,
               'owner':{'issuer':'owner-auth','subject':'developer'},
-              'developer':{'issuer':'native','subject':'developer'}})
+              'developer':{'issuer':'native','subject':'developer'}}))
         self.fence = Fence(self.s, self.lock_root)
         self.register('t1')
 
@@ -42,6 +43,7 @@ class WriterFenceTests(unittest.TestCase):
         except Exception:
             pass
         self.directory.cleanup()
+        os.environ.pop('XUANJUN_TEST_ONLY_IDENTITY',None)
 
     def register(self, task):
         self.s.register(dict(

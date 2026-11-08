@@ -8,12 +8,13 @@ from secure_file_input import read_owned_secret_file
 
 REJECT=69
 
-def read(config,task_id,request_id,now=None):
+def read(config,task_id,request_id,purpose='AUTHORIZATION_CONSUME',now=None):
     required={'url','bearer_token_file','public_key_file','replay_db','anchor_id',
       'issuer','instance_id','version','service_id','attempt_id','lease_id','fence',
-      'epoch','resource_scope_digest','max_age'}
+      'epoch','resource_scope_digest','max_age','target_sha256'}
     if not isinstance(config,dict) or set(config)!=required: raise ValueError('EXACT_READER_CONFIG_REQUIRED')
-    query=urlencode({'task_id':task_id,'request_id':request_id})
+    query=urlencode({'task_id':task_id,'request_id':request_id,'purpose':purpose,
+      'target_sha256':config['target_sha256']})
     token=read_owned_secret_file(config['bearer_token_file'],'AUTHORITY_READER_TOKEN').strip()
     request=Request(config['url']+'?'+query,headers={'Authorization':'Bearer '+token,
       'X-Xuanjun-Service-Identity':config['service_id']})
@@ -24,7 +25,9 @@ def read(config,task_id,request_id,now=None):
       'AUTHORITY_PUBLIC_KEY').encode('ascii'))
     expected={key:config[key] for key in ('issuer','instance_id','version','service_id',
       'attempt_id','lease_id','fence','epoch','resource_scope_digest','max_age')}
-    expected.update(task_id=task_id,request_id=request_id,now=time.time() if now is None else now)
+    expected.update(task_id=task_id,request_id=request_id,purpose=purpose,
+      target_sha256=config['target_sha256'],
+      now=time.time() if now is None else now)
     guard=SQLiteReplayGuard(config['replay_db'])
     try: return verify_envelope(envelope,public,{'anchor_id':config['anchor_id']},expected,guard)
     finally: guard.close()

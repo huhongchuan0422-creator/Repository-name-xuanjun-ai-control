@@ -66,7 +66,7 @@ def make_server(config, host='127.0.0.1', port=8787):
                     or not hmac.compare_digest(service, config['service_id'])):
                 self.send_json(403, {'error': 'AUTHORITY_READER_FORBIDDEN'}); return
             query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
-            if (set(query) != {'task_id', 'request_id'}
+            if (set(query) != {'task_id', 'request_id', 'purpose', 'target_sha256'}
                     or any(len(query[x]) != 1 or not query[x][0] for x in query)):
                 self.send_json(400, {'error': 'EXACT_AUTHORITY_QUERY_REQUIRED'}); return
             connection = fd = None
@@ -77,7 +77,9 @@ def make_server(config, host='127.0.0.1', port=8787):
                     raise ValueError('FORMAL_LEDGER_IDENTITY_CHANGED')
                 request = {'task_id': query['task_id'][0],
                            'request_id': query['request_id'][0],
-                           'service_id': service}
+                           'service_id': service,
+                           'purpose': query['purpose'][0],
+                           'target_sha256': query['target_sha256'][0]}
                 trust = {x: config[x] for x in ('issuer', 'instance_id', 'version')}
                 payload = authority_payload(connection, request, trust)
                 self.send_json(200, sign_payload(payload, config['anchor_id'],

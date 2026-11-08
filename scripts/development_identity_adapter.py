@@ -2,6 +2,23 @@
 import argparse, hashlib, json, time
 from development_authority import canonical_bytes, load_public_key
 from secure_file_input import read_owned_secret_file
+from task_supervisor import DevelopmentIdentityVerifier
+
+class TrustedRegistrationVerifier(DevelopmentIdentityVerifier):
+    """Production adapter with a constructor-controlled owner trust key."""
+    production_trusted=True
+    def __init__(self, owner_key, clock=time.time):
+        self._owner_key=owner_key; self._clock=clock
+    def verify(self, owner_grant, developer_credential, task_id, contract_sha256):
+        if not isinstance(developer_credential,dict):
+            raise ValueError('AUTHENTICATED_DEVELOPER_CREDENTIAL_REQUIRED')
+        contract=developer_credential.get('contract')
+        if (not isinstance(contract,dict) or contract.get('task_id')!=task_id
+                or hashlib.sha256(canonical_bytes(contract)).hexdigest()!=contract_sha256):
+            raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
+        return verify_registration({'contract':contract,'owner_grant':owner_grant,
+          'developer_identity':developer_credential.get('developer_identity')},
+          self._owner_key,self._clock())
 
 def verify_registration(bundle, owner_key, now=None):
     required={'contract','owner_grant','developer_identity'}

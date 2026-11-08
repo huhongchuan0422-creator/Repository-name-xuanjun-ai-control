@@ -26,6 +26,22 @@ SUPERVISOR_APPLICATION_ID = 0x58534A31
 SUPERVISOR_SCHEMA_VERSION = 3
 AUTHORITY_STATES = frozenset(('NONE', 'VALID', 'REVOKING', 'REVOKED',
                               UNKNOWN))
+
+class DevelopmentIdentityVerifier(object):
+    """Sealed production boundary; arbitrary callables are never accepted."""
+    production_trusted = False
+    test_only = False
+    def verify(self, owner_grant, developer_credential, task_id, contract_sha256):
+        raise NotImplementedError
+
+class TestOnlyDevelopmentIdentityVerifier(DevelopmentIdentityVerifier):
+    test_only = True
+    def __init__(self, implementation):
+        if os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') != '1':
+            raise ValueError('TEST_ONLY_IDENTITY_ENV_REQUIRED')
+        self._implementation = implementation
+    def verify(self, *args):
+        return self._implementation(*args)
 V2_TASK_COLUMNS = (
     'task_id', 'parent_task_id', 'stage', 'writer_scope', 'state', 'owner',
     'entry', 'run_id', 'session_id', 'attempt_id', 'checkpoint_sha256',
@@ -116,6 +132,9 @@ class Supervisor(object):
     def __init__(self, path, clock=None, development_identity_verifier=None):
         self.path = path
         self.clock = clock or time.time
+        if (development_identity_verifier is not None
+                and not isinstance(development_identity_verifier, DevelopmentIdentityVerifier)):
+            raise ValueError('CONTROLLED_IDENTITY_VERIFIER_REQUIRED')
         self.development_identity_verifier = development_identity_verifier
         # Read-only immutable preflight prevents an old WAL-mode v1/v2 ledger
         # from creating wal/shm/journal sidecars merely because normal runtime
@@ -1330,8 +1349,11 @@ class Supervisor(object):
         if verifier is None:
             raise ValueError('AUTHENTICATED_DEVELOPMENT_IDENTITY_REQUIRED')
         contract_sha = hashlib.sha256(canonical(contract).encode('utf-8')).hexdigest()
-        identity = verifier(owner_grant, developer_credential, task_id,
-                            contract_sha)
+        if not (verifier.production_trusted or (verifier.test_only and
+                os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') == '1')):
+            raise ValueError('TRUSTED_IDENTITY_VERIFIER_REQUIRED')
+        identity = verifier.verify(owner_grant, developer_credential, task_id,
+                                   contract_sha)
         required = {'task_id', 'contract_sha256', 'owner', 'developer'}
         if (not isinstance(identity, dict) or set(identity) != required
                 or identity['task_id'] != task_id

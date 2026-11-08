@@ -1,0 +1,347 @@
+test_anchor_key_future_illegal_state_and_invalid_expiry_reject (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_concurrent_replay_has_exactly_one_authorization (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_corrupt_resource_scope_never_authorizes (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_formal_ledger_rejects_symlink_and_hardlink_alias (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_ledger_path_replacement_is_detected (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_positive_and_all_trusted_request_bindings (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_reader_requires_explicit_exact_trust_inputs (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_replay_guard_is_mandatory_persistent_atomic_and_fail_closed (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_schema_tamper_expiry_revocation_and_signature_are_denied (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_authenticated_first_registration_bundle (tests.test_development_authority_operational.OperationalTests) ... ok
+test_http_200_authorized_false_and_reader_exit_69 (tests.test_development_authority_operational.OperationalTests) ... ok
+test_reader_69_is_never_success_for_bad_anchor_or_future_time (tests.test_development_authority_operational.OperationalTests) ... ok
+test_runtime_preflight_is_verifiable_and_manifest_hash_is_fixed (tests.test_development_authority_operational.OperationalTests) ... ok
+test_5_10_15_recovery_is_bounded_and_no_takeover (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ack_commit_blocks_old_attempt_before_new_claim (tests.test_task_supervisor.SupervisorTests) ... ok
+test_assigned_responsibility_is_bound_to_claim (tests.test_task_supervisor.SupervisorTests) ... ok
+test_deadlines_trigger_even_before_generic_age (tests.test_task_supervisor.SupervisorTests) ... ok
+test_delayed_exact_replay_remains_idempotent (tests.test_task_supervisor.SupervisorTests) ... ok
+test_development_contract_is_canonical_idempotent_and_conflicting (tests.test_task_supervisor.SupervisorTests) ... ok
+test_event_id_reuse_with_different_bytes_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_exact_handoff_allows_new_claim_only_after_reconciliation (tests.test_task_supervisor.SupervisorTests) ... ok
+test_failed_development_completion_never_unlocks_dependency (tests.test_task_supervisor.SupervisorTests) ... ok
+test_fence_and_epoch_must_increase_after_handoff (tests.test_task_supervisor.SupervisorTests) ... ok
+test_first_development_claim_allocates_ids_and_projects_reader_v3 (tests.test_task_supervisor.SupervisorTests) ... ok
+test_first_development_claim_rejects_self_report_without_authenticator (tests.test_task_supervisor.SupervisorTests) ... ok
+test_future_or_reordered_event_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_future_schema_version_fails_closed (tests.test_task_supervisor.SupervisorTests) ... ok
+test_handoff_ack_exact_replay_survives_attempt_clear (tests.test_task_supervisor.SupervisorTests) ... ok
+test_handoff_rejects_empty_new_identity (tests.test_task_supervisor.SupervisorTests) ... ok
+test_heartbeat_cannot_delay_ten_or_fifteen_minute_actions (tests.test_task_supervisor.SupervisorTests) ... ok
+test_heartbeat_does_not_refresh_progress (tests.test_task_supervisor.SupervisorTests) ... ok
+test_late_handoff_requires_fresh_attempt_deadlines (tests.test_task_supervisor.SupervisorTests) ... ok
+test_lost_completion_notification_retries_bounded (tests.test_task_supervisor.SupervisorTests) ... ok
+test_malformed_auxiliary_schema_fails_at_initialization (tests.test_task_supervisor.SupervisorTests) ... ok
+test_missing_foreign_key_is_rejected (tests.test_task_supervisor.SupervisorTests) ... ok
+test_normal_exit_without_receipt_becomes_visible_hold_action (tests.test_task_supervisor.SupervisorTests) ... ok
+test_old_writer_cannot_resume_after_ack_and_new_attempt (tests.test_task_supervisor.SupervisorTests) ... ok
+test_quota_unavailable_is_terminal_durable_and_not_fake_running (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ready_fair_scan_and_dependencies (tests.test_task_supervisor.SupervisorTests) ... ok
+test_ready_scan_does_not_starve_later_eligible_task (tests.test_task_supervisor.SupervisorTests) ... ok
+test_real_progress_requires_bound_evidence (tests.test_task_supervisor.SupervisorTests) ... ok
+test_real_progress_resets_recovery_budget (tests.test_task_supervisor.SupervisorTests) ... ok
+test_receiver_without_ack_cannot_release_responsibility (tests.test_task_supervisor.SupervisorTests) ... ok
+test_recovery_generation_prevents_outbox_collision_after_progress (tests.test_task_supervisor.SupervisorTests) ... ok
+test_single_writer_cas_and_duplicate_event (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervision_action_and_hold_survive_restart (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervisor_liveness_never_claims_process_verified (tests.test_task_supervisor.SupervisorTests) ... ok
+test_supervisor_liveness_survives_restart (tests.test_task_supervisor.SupervisorTests) ... ok
+test_terminal_artifact_hash_is_strict (tests.test_task_supervisor.SupervisorTests) ... ok
+test_terminal_outbox_survives_restart_and_deduplicates (tests.test_task_supervisor.SupervisorTests) ... ok
+test_two_connections_serialize_ack_and_old_terminal (tests.test_task_supervisor.SupervisorTests) ... ok
+test_two_connections_serialize_terminal_and_l3_scan (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unclaimed_or_unsafe_success_cannot_unlock_dependency (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unknown_database_rejected_without_journal_mutation (tests.test_task_supervisor.SupervisorTests) ... ok
+test_unknown_side_effects_preserved_in_visible_hold (tests.test_task_supervisor.SupervisorTests) ... ok
+test_v1_normal_open_is_zero_write_hold (tests.test_task_supervisor.SupervisorTests) ... /home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_supervisor.py:324: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/tmpivux4obr'>
+  before_bytes=open(self.path,'rb').read()
+/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_supervisor.py:330: ResourceWarning: unclosed file <_io.BufferedReader name='/tmp/tmpivux4obr'>
+  self.assertEqual(before_bytes,open(self.path,'rb').read())
+ok
+test_v2_active_attempt_migrates_to_unknown_hold (tests.test_task_supervisor.SupervisorTests) ... ERROR
+test_v2_migration_failpoints_rollback_and_restart_cleanly (tests.test_task_supervisor.SupervisorTests) ... ERROR
+test_v2_normal_open_is_zero_write_then_explicit_migration (tests.test_task_supervisor.SupervisorTests) ... ERROR
+test_ack_binds_scope_and_coverage_and_is_append_once (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_arbitrary_or_missing_field_invalidation_receipt_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_clock_rollback_and_expiry_use_supervisor_clock_only (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_commit_api_has_no_per_call_lock_root_or_time_override (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_complete_revocation_cannot_bypass_drain_or_unknown (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_confirm_rejects_missing_fields_wrong_marker_and_content_match (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_cross_task_same_resource_conflicts (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_dispatch_current_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_drain_current_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_duplicate_operation_concurrent_has_one_row (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_fake_transaction_sink_produces_attributable_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_final_receipt_store_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_first_development_claim_uses_fixed_provider_and_ledger_ids (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_gapless_takeover_rejects_old_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_git_observed_revision_is_persisted_and_immutable (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_invalidation_receipt_must_bind_old_identity_spec_scope_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_kill_restart_preserves_dispatching_as_unresolved (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_local_only_production_verdict_is_fixed_hold_and_unknown_is_hold (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_lock_root_mode_symlink_and_path_swap_fail_closed (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_multi_resource_claim_rolls_back_atomically (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_offline_git_cas_binds_commit_and_canonical_segments (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_operation_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_os_exit_releases_shared_lock_but_unresolved_effect_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_prepared_can_only_reconcile_not_applied (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_reconcile_unknown_without_redispatch_and_one_final_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_resource_alias_whitespace_control_and_dot_paths_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoke_waits_shared_lease_times_out_then_resumes_same_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoking_rejects_new_intent_and_effect (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_stolen_ticket_caller_only_change_is_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_store_allocates_exact_max_plus_one_and_binds_caller (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_two_connections_claim_single_winner (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_full_source_recovery_persists_inventory_then_takeover (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_observations_append_without_consuming_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_recovery_insufficient_or_conflicting_inventory_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_changed_bundle_and_canonical_event_id_mismatch_rejected (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_completion_restart_idempotent_and_conflict_stays_closed (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_development_action_holds_without_existing_inputs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_and_finalize_entry_uses_existing_ledger_and_git (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_controlled_review_flow_is_isolated_across_two_same_process_runs (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_duplicate_module_import_keeps_controlled_fixture_isolated (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_exact_reviews_revoke_coverage_then_unlock_registered_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_final_completion_api_has_no_caller_now_override (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_missing_reviewer_holds_and_does_not_unlock_child (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_pass_does_not_complete_or_unlock_before_revocation (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_review_policy_and_wrong_commit_cannot_replace_canonical_contract (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_revoking_and_unresolved_operation_block_final_success (tests.test_entry_review_gate.CanonicalCompletionTests) ... ok
+test_ack_binds_scope_and_coverage_and_is_append_once (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_arbitrary_or_missing_field_invalidation_receipt_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_clock_rollback_and_expiry_use_supervisor_clock_only (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_commit_api_has_no_per_call_lock_root_or_time_override (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_complete_revocation_cannot_bypass_drain_or_unknown (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_confirm_rejects_missing_fields_wrong_marker_and_content_match (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_cross_task_same_resource_conflicts (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_dispatch_current_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_different_lock_root_cannot_drain_current_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_duplicate_operation_concurrent_has_one_row (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_fake_transaction_sink_produces_attributable_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_final_receipt_store_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_first_development_claim_uses_fixed_provider_and_ledger_ids (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_gapless_takeover_rejects_old_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_git_observed_revision_is_persisted_and_immutable (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_invalidation_receipt_must_bind_old_identity_spec_scope_ticket (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_kill_restart_preserves_dispatching_as_unresolved (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_local_only_production_verdict_is_fixed_hold_and_unknown_is_hold (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_lock_root_mode_symlink_and_path_swap_fail_closed (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_multi_resource_claim_rolls_back_atomically (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_offline_git_cas_binds_commit_and_canonical_segments (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_operation_same_bytes_idempotent_different_bytes_conflict (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_os_exit_releases_shared_lock_but_unresolved_effect_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_prepared_can_only_reconcile_not_applied (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_reconcile_unknown_without_redispatch_and_one_final_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_resource_alias_whitespace_control_and_dot_paths_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoke_waits_shared_lease_times_out_then_resumes_same_generation (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_revoking_rejects_new_intent_and_effect (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_stolen_ticket_caller_only_change_is_rejected (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_store_allocates_exact_max_plus_one_and_binds_caller (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_two_connections_claim_single_winner (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_full_source_recovery_persists_inventory_then_takeover (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_observations_append_without_consuming_receipt (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_unknown_recovery_insufficient_or_conflicting_inventory_holds (tests.test_task_writer_fence.WriterFenceTests) ... ok
+test_digital_twin_projection_is_admin_read_only_and_reference_based (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_manual_openai_channel_preference_persists_and_reads_back (tests.test_task_center_app.TaskCenterAppTests) ... ERROR
+test_model_admin_api_is_server_backed_masked_and_authorized (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_mutation_and_path_escape_are_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_non_loopback_bind_is_rejected (tests.test_task_center_app.TaskCenterAppTests) ... ok
+test_projection_get_is_read_only_with_active_wal (tests.test_task_center_app.TaskCenterAppTests) ... ERROR
+test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves (tests.test_task_center_app.TaskCenterAppTests) ... ERROR
+test_projection_rejects_existing_database_with_missing_schema (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_provider_connection_test_flag_is_separate_from_runtime_outbound (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_simple_provider_onboarding_http_chain_is_real_server_backed (tests.test_task_center_app.TaskCenterAppTests) ... ERROR
+test_test_only_app_has_no_formal_authority_signing_capability (tests.test_task_center_app.TaskCenterAppTests) ... FAIL
+test_workbench_host_and_admin_projection_are_read_only (tests.test_task_center_app.TaskCenterAppTests) ... ERROR
+
+======================================================================
+ERROR: test_v2_active_attempt_migrates_to_unknown_hold (tests.test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_supervisor.py", line 302, in test_v2_active_attempt_migrates_to_unknown_hold
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_v2_migration_failpoints_rollback_and_restart_cleanly (tests.test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_supervisor.py", line 357, in test_v2_migration_failpoints_rollback_and_restart_cleanly
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_v2_normal_open_is_zero_write_then_explicit_migration (tests.test_task_supervisor.SupervisorTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_supervisor.py", line 257, in test_v2_normal_open_is_zero_write_then_explicit_migration
+    db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+sqlite3.OperationalError: near "DROP": syntax error
+
+======================================================================
+ERROR: test_manual_openai_channel_preference_persists_and_reads_back (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 187, in test_manual_openai_channel_preference_persists_and_reads_back
+    'credential':'fixture-api-key'})
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 69, in post
+    return json.loads(urlopen(request, timeout=3).read().decode('utf-8'))
+  File "/usr/lib64/python3.6/urllib/request.py", line 223, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib64/python3.6/urllib/request.py", line 532, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.6/urllib/request.py", line 642, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.6/urllib/request.py", line 570, in error
+    return self._call_chain(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 504, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 650, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 502: Bad Gateway
+
+======================================================================
+ERROR: test_projection_get_is_read_only_with_active_wal (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 102, in test_projection_get_is_read_only_with_active_wal
+    status, _, body = self.get('/api/projection')
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 54, in get
+    response = urlopen(self.base + path, timeout=3)
+  File "/usr/lib64/python3.6/urllib/request.py", line 223, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib64/python3.6/urllib/request.py", line 532, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.6/urllib/request.py", line 642, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.6/urllib/request.py", line 570, in error
+    return self._call_chain(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 504, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 650, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 502: Bad Gateway
+
+======================================================================
+ERROR: test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 72, in test_projection_is_rebuilt_from_same_sqlite_and_static_app_serves
+    status, headers, body = self.get('/api/projection')
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 54, in get
+    response = urlopen(self.base + path, timeout=3)
+  File "/usr/lib64/python3.6/urllib/request.py", line 223, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib64/python3.6/urllib/request.py", line 532, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.6/urllib/request.py", line 642, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.6/urllib/request.py", line 570, in error
+    return self._call_chain(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 504, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 650, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 502: Bad Gateway
+
+======================================================================
+ERROR: test_simple_provider_onboarding_http_chain_is_real_server_backed (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 273, in test_simple_provider_onboarding_http_chain_is_real_server_backed
+    'platform':'siliconflow','credential':secret})
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 69, in post
+    return json.loads(urlopen(request, timeout=3).read().decode('utf-8'))
+  File "/usr/lib64/python3.6/urllib/request.py", line 223, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib64/python3.6/urllib/request.py", line 532, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.6/urllib/request.py", line 642, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.6/urllib/request.py", line 570, in error
+    return self._call_chain(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 504, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 650, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 502: Bad Gateway
+
+======================================================================
+ERROR: test_workbench_host_and_admin_projection_are_read_only (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 234, in test_workbench_host_and_admin_projection_are_read_only
+    status, headers, body = self.get('/workbench/')
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 54, in get
+    response = urlopen(self.base + path, timeout=3)
+  File "/usr/lib64/python3.6/urllib/request.py", line 223, in urlopen
+    return opener.open(url, data, timeout)
+  File "/usr/lib64/python3.6/urllib/request.py", line 532, in open
+    response = meth(req, response)
+  File "/usr/lib64/python3.6/urllib/request.py", line 642, in http_response
+    'http', request, response, code, msg, hdrs)
+  File "/usr/lib64/python3.6/urllib/request.py", line 570, in error
+    return self._call_chain(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 504, in _call_chain
+    result = func(*args)
+  File "/usr/lib64/python3.6/urllib/request.py", line 650, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 502: Bad Gateway
+
+======================================================================
+FAIL: test_digital_twin_projection_is_admin_read_only_and_reference_based (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 216, in test_digital_twin_projection_is_admin_read_only_and_reference_based
+    self.assertEqual(denied.exception.code, 403)
+AssertionError: 502 != 403
+
+======================================================================
+FAIL: test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 363, in test_invalid_project_task_and_unprepared_dispatch_leave_zero_side_effects
+    self.post({'action':'CREATE_PROJECT_TASK','task':bad},'NONEMPTY_GOAL_REQUIRED')
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 65, in post
+    self.assertEqual(caught.exception.code, 400)
+AssertionError: 502 != 400
+
+======================================================================
+FAIL: test_model_admin_api_is_server_backed_masked_and_authorized (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 148, in test_model_admin_api_is_server_backed_masked_and_authorized
+    self.assertEqual(denied.exception.code,403)
+AssertionError: 502 != 403
+
+======================================================================
+FAIL: test_projection_rejects_existing_database_with_missing_schema (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 127, in test_projection_rejects_existing_database_with_missing_schema
+    self.assertEqual(caught.exception.code, 500)
+AssertionError: 502 != 500
+
+======================================================================
+FAIL: test_provider_connection_test_flag_is_separate_from_runtime_outbound (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 352, in test_provider_connection_test_flag_is_separate_from_runtime_outbound
+    caught.exception.read().decode())
+AssertionError: 'PROVIDER_CONNECTION_TEST_DISABLED' not found in 'Secret egress proxy refused the request.\n'
+
+======================================================================
+FAIL: test_test_only_app_has_no_formal_authority_signing_capability (tests.test_task_center_app.TaskCenterAppTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xuanjun_dev/.openclaw/workspace-developer/project-task-center-blackbox/tests/test_task_center_app.py", line 89, in test_test_only_app_has_no_formal_authority_signing_capability
+    self.assertEqual(missing.exception.code, 404)
+AssertionError: 502 != 404
+
+----------------------------------------------------------------------
+Ran 152 tests in 13.244s
+
+FAILED (failures=6, errors=8)
+{"authorized": false, "error": "AUTHORITY_NOT_AUTHORIZED"}
+{"authorized": false, "error": "AUTHORITY_TRUST_ANCHOR_MISMATCH"}

@@ -1,0 +1,20 @@
+test_anchor_key_future_illegal_state_and_invalid_expiry_reject (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_concurrent_replay_has_exactly_one_authorization (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_corrupt_resource_scope_never_authorizes (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_formal_ledger_rejects_symlink_and_hardlink_alias (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_ledger_path_replacement_is_detected (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_positive_and_all_trusted_request_bindings (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_reader_requires_explicit_exact_trust_inputs (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_replay_guard_is_mandatory_persistent_atomic_and_fail_closed (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_schema_tamper_expiry_revocation_and_signature_are_denied (tests.test_development_authority.DevelopmentAuthorityTests) ... ok
+test_authenticated_first_registration_bundle (tests.test_development_authority_operational.OperationalTests) ... ok
+test_http_200_authorized_false_and_reader_exit_69 (tests.test_development_authority_operational.OperationalTests) ... ok
+test_reader_69_is_never_success_for_bad_anchor_or_future_time (tests.test_development_authority_operational.OperationalTests) ... ok
+test_runtime_preflight_is_verifiable_and_manifest_hash_is_fixed (tests.test_development_authority_operational.OperationalTests) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.505s
+
+OK
+{"authorized": false, "error": "AUTHORITY_NOT_AUTHORIZED"}
+{"authorized": false, "error": "AUTHORITY_TRUST_ANCHOR_MISMATCH"}

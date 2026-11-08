@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from development_authority import (authority_payload, close_verified_ledger,
     open_verified_ledger, sign_payload, verify_envelope, SQLiteReplayGuard)
 from task_supervisor import Supervisor
+from task_supervisor import TestOnlyDevelopmentIdentityVerifier
 
 
 class DevelopmentAuthorityTests(unittest.TestCase):
@@ -22,7 +23,8 @@ class DevelopmentAuthorityTests(unittest.TestCase):
           'task_id':task,'contract_sha256':digest,
           'owner':{'issuer':'owner-auth','subject':'developer'},
           'developer':{'issuer':'native','subject':'developer'}}
-        self.s=Supervisor(self.path,lambda:1000.0,verifier)
+        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
+        self.s=Supervisor(self.path,lambda:1000.0,TestOnlyDevelopmentIdentityVerifier(verifier))
         self.s.register(dict(task_id='task-1',parent_task_id='parent',stage='dev',
           owner='developer',entry='WORK',checkpoint_sha256='a'*64,
           spec_sha256='b'*64,next_action='implement',dependencies=[],
@@ -44,20 +46,21 @@ class DevelopmentAuthorityTests(unittest.TestCase):
         connection,fd,_=open_verified_ledger(self.path)
         try:
             payload=authority_payload(connection,{'task_id':'task-1','request_id':'nonce-1',
-              'service_id':'reader-1'},self.trust,now=1001.0)
+              'service_id':'reader-1','purpose':'AUTHORIZATION_CONSUME','target_sha256':'d'*64},self.trust,now=1001.0)
         finally: close_verified_ledger(connection,fd)
         self.envelope=sign_payload(payload,'anchor-1',self.private)
         self.expected={'issuer':'formal-issuer','instance_id':'provider-1','version':'3.0.1',
           'service_id':'reader-1','task_id':'task-1','attempt_id':self.ticket['attempt_id'],
           'lease_id':self.ticket['lease_id'],'fence':1,'epoch':1,
           'resource_scope_digest':self.ticket['resource_scope_digest'],
-          'request_id':'nonce-1','now':1002.0,'max_age':5.0}
+          'request_id':'nonce-1','purpose':'AUTHORIZATION_CONSUME','target_sha256':'d'*64,'now':1002.0,'max_age':5.0}
 
     def guard(self):
         return SQLiteReplayGuard(os.path.join(self.root.name, 'replay-' +
           str(len(os.listdir(self.root.name))) + '.db'))
 
-    def tearDown(self): self.root.cleanup()
+    def tearDown(self):
+        self.root.cleanup(); os.environ.pop('XUANJUN_TEST_ONLY_IDENTITY',None)
 
     def test_positive_and_all_trusted_request_bindings(self):
         used=set()
@@ -68,7 +71,7 @@ class DevelopmentAuthorityTests(unittest.TestCase):
             verify_envelope(self.envelope,self.public,{'anchor_id':'anchor-1'},
               self.expected,lambda key: False if key in used else not used.add(key))
         for field in ('issuer','instance_id','version','service_id','task_id','attempt_id',
-                      'lease_id','fence','epoch','resource_scope_digest','request_id'):
+                      'lease_id','fence','epoch','resource_scope_digest','request_id','purpose','target_sha256'):
             wrong=dict(self.expected); wrong[field]='wrong'
             with self.assertRaisesRegex(ValueError,'BINDING'):
                 verify_envelope(self.envelope,self.public,{'anchor_id':'anchor-1'},wrong,self.guard())
@@ -110,7 +113,7 @@ class DevelopmentAuthorityTests(unittest.TestCase):
         connection,fd,_=open_verified_ledger(self.path)
         try:
             payload=authority_payload(connection,{'task_id':'task-1','request_id':'nonce-2',
-              'service_id':'reader-1'},self.trust,now=1002.0)
+              'service_id':'reader-1','purpose':'STATUS_QUERY','target_sha256':'d'*64},self.trust,now=1002.0)
         finally: close_verified_ledger(connection,fd)
         self.assertFalse(payload['authority']['authorized'])
 

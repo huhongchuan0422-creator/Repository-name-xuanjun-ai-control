@@ -24,7 +24,9 @@ ACTIVE_TASK_STATES = frozenset(('RECEIVED', 'STARTED', 'RUNNING',
 EXPECTED_KEYS = frozenset(('issuer', 'instance_id', 'version', 'service_id',
                            'task_id', 'attempt_id', 'lease_id', 'fence',
                            'epoch', 'resource_scope_digest', 'request_id',
-                           'now', 'max_age'))
+                           'now', 'max_age', 'purpose', 'target_sha256'))
+PURPOSES = frozenset(('AUTHORIZATION_CONSUME', 'STATUS_QUERY', 'INSPECT',
+                      'RECOVER'))
 
 
 class SQLiteReplayGuard(object):
@@ -46,16 +48,17 @@ class SQLiteReplayGuard(object):
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.execute('PRAGMA synchronous=FULL')
         self.db.execute('''CREATE TABLE IF NOT EXISTS consumed_authority_requests(
-          issuer TEXT NOT NULL,instance_id TEXT NOT NULL,request_id TEXT NOT NULL,
-          consumed_at REAL NOT NULL,PRIMARY KEY(issuer,instance_id,request_id))''')
+          issuer TEXT NOT NULL,instance_id TEXT NOT NULL,purpose TEXT NOT NULL,
+          target_sha256 TEXT NOT NULL,request_id TEXT NOT NULL,consumed_at REAL NOT NULL,
+          PRIMARY KEY(issuer,instance_id,purpose,target_sha256,request_id))''')
 
     def __call__(self, key):
-        if (not isinstance(key, tuple) or len(key) != 3
+        if (not isinstance(key, tuple) or len(key) != 5
                 or any(not isinstance(x, str) or not x for x in key)):
             raise ValueError('EXACT_REPLAY_KEY_REQUIRED')
         try:
             self.db.execute('BEGIN IMMEDIATE')
-            self.db.execute('INSERT INTO consumed_authority_requests VALUES(?,?,?,?)',
+            self.db.execute('INSERT INTO consumed_authority_requests VALUES(?,?,?,?,?,?)',
                             key + (time.time(),))
             self.db.execute('COMMIT')
             return True
@@ -172,7 +175,7 @@ def sign_payload(payload, anchor_id, private_key):
 def authority_payload(connection, request, trust, now=None):
     """Issuer-only projection. Request values select; ledger values bind."""
     if not isinstance(request, dict) or set(request) != {
-            'task_id', 'request_id', 'service_id'}:
+            'task_id', 'request_id', 'service_id', 'purpose', 'target_sha256'}:
         raise ValueError('EXACT_AUTHORITY_REQUEST_REQUIRED')
     now = time.time() if now is None else now
     if not _finite(now):
@@ -212,7 +215,8 @@ def authority_payload(connection, request, trust, now=None):
                    'version': trust['version']},
       'reader': {'service_identity': request['service_id'],
                  'permission': 'development-authority:read'},
-      'request': {'request_id': request['request_id'],
+      'request': {'request_id': request['request_id'], 'purpose': request['purpose'],
+                  'target_sha256': request['target_sha256'],
                   'task_id': request['task_id']},
       'observed_at': now,
       'task': {'task_id': task['task_id'], 'state': task['state'],
@@ -272,7 +276,9 @@ def verify_envelope(envelope, public_key, trust, expected, replay_guard=None):
       'fence': payload.get('assignment', {}).get('fence'),
       'epoch': payload.get('assignment', {}).get('epoch'),
       'resource_scope_digest': payload.get('assignment', {}).get('resource_scope_digest'),
-      'request_id': payload.get('request', {}).get('request_id')}
+      'request_id': payload.get('request', {}).get('request_id'),
+      'purpose': payload.get('request', {}).get('purpose'),
+      'target_sha256': payload.get('request', {}).get('target_sha256')}
     expected_bindings = {key: expected[key] for key in bindings}
     if bindings != expected_bindings or payload.get('request', {}).get('task_id') != expected['task_id']:
         raise ValueError('AUTHORITY_REQUEST_BINDING_MISMATCH')
@@ -288,7 +294,10 @@ def verify_envelope(envelope, public_key, trust, expected, replay_guard=None):
             or payload.get('task', {}).get('state') not in ACTIVE_TASK_STATES
             or payload.get('revocation', {}).get('state') != 'VALID'):
         raise ValueError('AUTHORITY_NOT_AUTHORIZED')
-    replay_key = (expected['issuer'], expected['instance_id'], expected['request_id'])
+    if expected['purpose'] not in PURPOSES:
+        raise ValueError('AUTHORITY_PURPOSE_REJECTED')
+    replay_key = (expected['issuer'], expected['instance_id'], expected['purpose'],
+                  expected['target_sha256'], expected['request_id'])
     try:
         consumed = replay_guard(replay_key)
     except Exception:
