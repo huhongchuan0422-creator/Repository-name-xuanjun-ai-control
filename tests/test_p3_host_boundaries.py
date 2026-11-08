@@ -142,26 +142,48 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual([], self.runner.calls)
 
     def test_runner_ack_is_not_started(self):
-        result = self.controller().launch(SUBJECT, {"opaque": "admission"})
+        result = self.controller().launch(SUBJECT, admission())
         self.assertEqual("ACKNOWLEDGED_AWAITING_STARTED", result["state"])
         self.assertFalse(result["started"])
 
     def test_unknown_launch_effect_holds_without_retry(self):
         self.runner.fail = True
-        result = self.controller().launch(SUBJECT, {})
+        result = self.controller().launch(SUBJECT, admission())
         self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])
 
     def test_resume_revalidates_original_admission(self):
         called = []
         result = self.controller().resume(
-            SUBJECT, {"resume": 1}, lambda value: called.append(value) or True)
+            SUBJECT, admission(), lambda value: called.append(value) or True)
         self.assertEqual("ACKNOWLEDGED_AWAITING_STARTED", result["state"])
-        self.assertEqual([{"resume": 1}], called)
+        self.assertEqual([admission()], called)
 
     def test_resume_rejects_stale_admission_before_runner(self):
         with self.assertRaises(ValueError):
             self.controller().resume(SUBJECT, {}, lambda value: False)
+        self.assertEqual([], self.runner.calls)
+
+    def test_runner_rejects_each_changed_admission_field_before_effect(self):
+        for key, value in admission().items():
+            altered = admission()
+            if isinstance(value, bool):
+                altered[key] = not value
+            elif isinstance(value, (int, float)):
+                altered[key] = value + 1
+            else:
+                altered[key] = value + "x"
+            with self.assertRaises((PermissionError, ValueError)):
+                self.controller().launch(SUBJECT, altered)
+        self.assertEqual([], self.runner.calls)
+
+    def test_runner_rejects_missing_and_extra_fields_before_effect(self):
+        missing = admission()
+        del missing["task_id"]
+        extra = admission(extra="unexpected")
+        for value in (missing, extra):
+            with self.assertRaises(ValueError):
+                self.controller().launch(SUBJECT, value)
         self.assertEqual([], self.runner.calls)
 
     def test_started_receipt_is_forwarded_to_original_supervisor(self):

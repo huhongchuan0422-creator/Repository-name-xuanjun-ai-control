@@ -227,7 +227,7 @@ class QACounterexamples(unittest.TestCase):
     def test_unverifiable_post_launch_ack_is_explicit_hold(self):
         runner = TamperedAckRunner(self.provider)
         controller = RunnerController(self.gate, self.verifier, runner)
-        result = controller.launch(SUBJECT, {"opaque": "admission"})
+        result = controller.launch(SUBJECT, admission())
         self.assertEqual("UNKNOWN_RUNNER_EFFECT_HOLD", result["state"])
         self.assertFalse(result["automatic_retry"])
         self.assertEqual(1, runner.calls)

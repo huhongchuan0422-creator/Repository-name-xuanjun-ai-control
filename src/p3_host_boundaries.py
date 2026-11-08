@@ -158,7 +158,8 @@ class AdmissionGate(object):
                         "execution_authorized"))
                 or (notifications and proof["notification_authorized"] is not True)
                 or type(proof["notification_authorized"]) is not bool
-                or any(proof[k] != subject[k] for k in RUN_SUBJECT_KEYS)
+                or any(type(proof[k]) is not type(subject[k]) or proof[k] != subject[k]
+                       for k in RUN_SUBJECT_KEYS)
                 or not _finite(proof["valid_from"])
                 or not _finite(proof["valid_until"])
                 or not proof["valid_from"] <= now < proof["valid_until"]):
@@ -342,9 +343,16 @@ class RunnerController(object):
         self.gate, self.verifier, self.adapter = gate, verifier, adapter
 
     def _invoke(self, operation, subject, admission):
-        self.gate.check(subject)
+        proof = self.gate.check(subject)
+        # The supported carrier admission shape is the exact gate proof.  Do not
+        # pass opaque or independently supplied lineage through to the runner.
+        # This is not authentication of the reader, nor a replay reservation.
+        _exact(admission, AdmissionGate.KEYS, "EXACT_RUNNER_ADMISSION_REQUIRED")
+        if any(type(admission[k]) is not type(proof[k]) or admission[k] != proof[k]
+               for k in AdmissionGate.KEYS):
+            raise PermissionError("RUNNER_ADMISSION_MISMATCH")
         try:
-            evidence_ref = getattr(self.adapter, operation)(admission)
+            evidence_ref = getattr(self.adapter, operation)(dict(admission))
         except Exception:
             return {"state": "UNKNOWN_RUNNER_EFFECT_HOLD", "operation": operation,
                     "automatic_retry": False, "started": False}

@@ -24,7 +24,7 @@ except ImportError:  # package-form local tests; installed host uses flat module
 
 
 EXPECTED_MODULE_SHA256 = {
-    "p3_host_boundaries": "aa06589ab51298cd64ecd4ac8bb9af8746c692e6db7205da191ce7c718dfb17f",
+    "p3_host_boundaries": "23eadfcf3070be4a5a19bf6f0fc4fed2de14c6a04c89afef650be76d36b9c0e8",
     "p3_host_wiring": "e5b062ae99cbf2c5d8084c268de7da3dd72fa01de60e0200821892aa84ac49af",
     "p3_lifecycle": "d330b85d453d0d293cb62bbc931b1670d22f2112815ac84bf09d229021d02e30",
     "p3_owner_reminders": "ef52c2727978e6578d8875d2ff6212b5539fe3f42777bd4be0179cbb17094499",
