@@ -22,13 +22,11 @@ class ReconcileTests(unittest.TestCase):
  def receipt(self):
   raw=b.canonical({'nonce':'n','target':'release-n','manifest_sha256':b.sha(b'new'),'outcome':'SUCCEEDED'})
   fd=os.open(os.path.join(self.root,'receipt-n.json'),os.O_CREAT|os.O_WRONLY,0o600);os.write(fd,raw);os.close(fd);return b.sha(raw)
- def test_no_stage_is_failed_and_repeat_is_idempotent(self):
-  for state in ('RESERVED','RUNNING','UNKNOWN'):
-   with self.subTest(state=state):
-    self.row(state);self.assertEqual(self.go(),0);self.assertEqual(self.state(),'FAILED');size=os.stat(self.audit).st_size;self.assertEqual(self.go(),0);self.assertEqual(os.stat(self.audit).st_size,size)
-    with sqlite3.connect(self.db) as db:db.execute('delete from operations')
- def test_complete_stage_is_removed_and_failed(self):
-  self.mk_target('stage-n',b'new');self.row();self.assertEqual(self.go(),0);self.assertEqual(self.state(),'FAILED');self.assertFalse(os.path.exists(os.path.join(self.root,'stage-n')))
+ def test_legacy_missing_intent_is_unknown_and_idempotent(self):
+  self.row('RUNNING');self.assertEqual(self.go(),1);self.assertEqual(self.state(),'UNKNOWN')
+  size=os.stat(self.audit).st_size;self.assertEqual(self.go(),1);self.assertEqual(os.stat(self.audit).st_size,size)
+ def test_legacy_stage_missing_intent_is_not_deleted(self):
+  self.mk_target('stage-n',b'new');self.row();self.assertEqual(self.go(),1);self.assertEqual(self.state(),'UNKNOWN');self.assertTrue(os.path.exists(os.path.join(self.root,'stage-n')))
  def test_unsigned_legacy_receipt_stays_unknown(self):
   self.mk_target('release-n',b'new');self.switch('release-n');rh=self.receipt();self.row(receipt_hash=rh);self.assertEqual(self.go(),1);self.assertEqual(self.state(),'UNKNOWN')
  def test_receipt_missing_and_tampered_remain_unknown(self):

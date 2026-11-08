@@ -188,7 +188,7 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                         if new!=old:
                             log(log_fd,{'event':'ROLLBACK_RECONCILE','operation':rb['operation_id'],'from':old,'to':new},audit)
                             db.execute('UPDATE rollbacks SET state=? WHERE operation_id=? AND state=?',(new,rb['operation_id'],old))
-                required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash','operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path'}
+                required={'prestate_target','prestate_hash','staging_target','manifest_hash','intended_target','receipt_hash','operation_id','carrier_digest','manifest_digest','tree_digest','prestate_digest','key_id','receipt_path','switch_intent','prestate_dev','prestate_ino'}
                 rows=db.execute("SELECT * FROM operations WHERE state IN ('RESERVED','RUNNING','UNKNOWN')").fetchall()
                 for row in rows:
                     before=row['state'];outcome='UNKNOWN';reason='EVIDENCE_MISSING'
@@ -198,6 +198,15 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                         prehash=row['prestate_hash'];mh=row['manifest_hash'];rh=row['receipt_hash']
                         check(all(isinstance(v,str) and re.fullmatch('[0-9a-f]{64}',v) for v in (prehash,mh)),'EVIDENCE_DIGEST')
                         check(_target_manifest(rootfd,pre,owner)==prehash,'PRESTATE_MISMATCH')
+                        check(row['switch_intent'] is not None,'SWITCH_INTENT_REQUIRED')
+                        intent=verifylib.parse(row['switch_intent'].encode())
+                        check(set(intent)=={'operation_id','fence','from_dev','from_ino','from_tree','to_dev','to_ino','to_tree'} and intent['operation_id']==row['operation_id']=='install:'+row['nonce'] and intent['fence']==row['attempt'] and intent['from_tree']==row['prestate_digest'] and intent['to_tree']==row['tree_digest'] and (intent['from_dev'],intent['from_ino'])==(row['prestate_dev'],row['prestate_ino']),'SWITCH_INTENT_BINDING')
+                        pfd=open_dir(rootfd,pre)
+                        try:pi=os.fstat(pfd);check((pi.st_dev,pi.st_ino)==(intent['from_dev'],intent['from_ino']) and verified_tree(rootfd,pre,owner)==intent['from_tree'],'SWITCH_PRESTATE_MISMATCH')
+                        finally:os.close(pfd)
+                        tfd=open_dir(rootfd,target)
+                        try:ti=os.fstat(tfd);check((ti.st_dev,ti.st_ino)==(intent['to_dev'],intent['to_ino']) and verified_tree(rootfd,target,owner)==intent['to_tree'],'SWITCH_TARGET_MISMATCH')
+                        finally:os.close(tfd)
                         current=_current(rootfd);stage_exists=_exists(rootfd,stage);target_exists=_exists(rootfd,target)
                         if current==target:
                             check(not stage_exists and target_exists,'TARGET_CONFLICT')
@@ -208,16 +217,16 @@ def _reconcile_pending_locked(path, owner, root, log_fd, audit=None, trust_raw=N
                             check(trust_raw is not None,'RECEIPT_TRUST_REQUIRED')
                             obj=verifylib.parse(raw);payload=obj['payload'];trust=verifylib.parse(trust_raw)
                             check(set(obj)=={'payload','signature','key_id'} and obj['key_id']==trust.get('key_id'),'RECEIPT_KEY_ID')
-                            check(set(payload)=={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at'},'RECEIPT_FIELDS')
+                            check(set(payload)=={'operation_id','attempt_id','nonce','carrier_digest','manifest_digest','tree_digest','prestate_digest','current_target','controller_identity','issued_at','switch_intent_digest'},'RECEIPT_FIELDS')
                             check(isinstance(payload['carrier_digest'],str) and re.fullmatch('[0-9a-f]{64}',payload['carrier_digest']) and type(payload['issued_at']) is int,'RECEIPT_FIELDS')
-                            check(payload['operation_id']==row['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['carrier_digest']==row['carrier_digest'] and payload['manifest_digest']==row['manifest_digest']==mh and payload['tree_digest']==row['tree_digest'] and payload['prestate_digest']==row['prestate_digest'] and obj['key_id']==row['key_id'] and row['receipt_path']=='receipt-'+row['nonce']+'.json' and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
+                            check(payload['operation_id']==row['operation_id']=='install:'+row['nonce'] and payload['attempt_id']==row['attempt'] and payload['nonce']==row['nonce'] and payload['carrier_digest']==row['carrier_digest'] and payload['switch_intent_digest']==verifylib.sha(row['switch_intent'].encode()) and payload['manifest_digest']==row['manifest_digest']==mh and payload['tree_digest']==row['tree_digest'] and payload['prestate_digest']==row['prestate_digest'] and obj['key_id']==row['key_id'] and row['receipt_path']=='receipt-'+row['nonce']+'.json' and payload['current_target']==target and payload['controller_identity']==trust.get('controller'),'RECEIPT_BINDING')
                             check(payload['tree_digest']==verified_tree(rootfd,target,owner) and payload['prestate_digest']==verified_tree(rootfd,pre,owner),'RECEIPT_TREE')
                             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
                             try:Ed25519PublicKey.from_public_bytes(base64.b64decode(trust['public_key'],validate=True)).verify(base64.b64decode(obj['signature'],validate=True),verifylib.canonical(payload))
                             except Exception:raise ControllerError('RECEIPT_SIGNATURE')
                             outcome='SUCCEEDED';reason='SIGNED_RECEIPT_AND_TREE_MATCH'
                         elif current==pre:
-                            check(not target_exists,'UNSWITCHED_TARGET_CONFLICT')
+                            check(target_exists,'UNSWITCHED_TARGET_MISSING')
                             if stage_exists:
                                 check(_target_manifest(rootfd,stage,owner)==mh,'STAGE_MISMATCH')
                                 _remove_tree(rootfd,stage,owner)
@@ -320,12 +329,14 @@ def _run_locked(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,sc
         log(log_fd,{'event':'SWITCH_INTENT','nonce':nonce,'intent':verifylib.sha(intent.encode())},audit)
         link='.current-'+nonce
         os.symlink(target,link,dir_fd=rootfd)
+        if failpoint=='install_crash_before_rename':os._exit(95)
         os.rename(link,'current',src_dir_fd=rootfd,dst_dir_fd=rootfd)
         if failpoint=='install_crash_after_rename':os._exit(94)
         os.fsync(rootfd)
+        if failpoint=='install_crash_before_receipt':os._exit(96)
         if failpoint=='after_switch':raise ControllerError('INJECTED')
         check(_current(rootfd)==target and verified_tree(rootfd,target,owner)==stage_tree,'CURRENT_TREE_MISMATCH')
-        payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time())}
+        payload={'operation_id':'install:'+nonce,'attempt_id':p['attempt'],'nonce':nonce,'carrier_digest':p['carrier_sha256'],'manifest_digest':p['manifest_sha256'],'tree_digest':stage_tree,'prestate_digest':prestate_tree,'current_target':target,'controller_identity':p['controller'],'issued_at':int(time.time()),'switch_intent_digest':verifylib.sha(intent.encode())}
         receipt=verifylib.canonical({'payload':payload,'signature':base64.b64encode(private.sign(verifylib.canonical(payload))).decode(),'key_id':key_id})
         temp='.receipt-'+nonce+'.tmp';final='receipt-'+nonce+'.json'
         receiptfd=receipt_dir_fd if receipt_dir_fd is not None else rootfd

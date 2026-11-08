@@ -122,13 +122,10 @@ class InstallerTests(BootstrapTests):
   with self.assertRaises(controller.ControllerError):self.run_install('after_switch')
   self.assertEqual(self.state(),'UNKNOWN')
   with self.assertRaises(Exception):self.run_install()
- def test_next_start_auto_reconciles_before_new_reservation(self):
+ def test_missing_switch_intent_blocks_new_reservation(self):
   with self.assertRaises(Exception):self.run_install('after_extract')
-  self.assertEqual(self.state(),'UNKNOWN')
-  self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
-  self.assertEqual(self.run_install(),'release-next')
-  with sqlite3.connect(self.ledger) as db:
-   self.assertEqual(db.execute("select state from operations where nonce='nonce'").fetchone()[0],'FAILED')
+  self.assertEqual(self.state(),'UNKNOWN');self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
+  with self.assertRaisesRegex(Exception,'UNKNOWN_RECONCILIATION_REQUIRED'):self.run_install()
  def test_ambiguous_switch_blocks_next_install(self):
   with self.assertRaises(Exception):self.run_install('after_switch')
   self.payload=dict(self.payload,nonce='next',attempt='next-attempt')
