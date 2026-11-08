@@ -67,7 +67,7 @@ def consume(db_path, receipt, owner=0):
         require(db.execute('PRAGMA journal_mode').fetchone()[0].lower()=='wal','WAL_REQUIRED')
         db.execute('BEGIN IMMEDIATE')
         require(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='operations'").fetchone() is not None,'LEDGER_SCHEMA')
-        require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=? AND state IN ('RESERVED','RUNNING','UNKNOWN')",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
+        require(db.execute("SELECT 1 FROM operations WHERE task=? AND attempt=?",(receipt['task'],receipt['attempt'])).fetchone() is None,'ATTEMPT_IN_FLIGHT')
         db.execute('INSERT INTO operations(nonce,task,attempt,state) VALUES(?,?,?,?)',(receipt['nonce'],receipt['task'],receipt['attempt'],'RESERVED'))
         db.execute('COMMIT')
     except Exception:
@@ -103,10 +103,11 @@ def verify(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,o
 def main():
     a=argparse.ArgumentParser();
     for n in ('carrier-fd','manifest-fd','receipt-fd','trust-fd','log-fd'): a.add_argument('--'+n,type=int,required=True)
-    for n in ('ledger','task','attempt'):a.add_argument('--'+n,required=True)
+    for n in ('ledger','task','attempt','root'):a.add_argument('--'+n,required=True)
     x=a.parse_args()
     try:
-        verify(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,x.log_fd,{'task':x.task,'attempt':x.attempt});print('VERIFIED_RESERVED; execution not implemented')
+        from controller import run
+        target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,x.log_fd,{'task':x.task,'attempt':x.attempt},x.root);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())

@@ -59,3 +59,31 @@ class BootstrapTests(unittest.TestCase):
   os.unlink(self.ledger)
   with self.assertRaisesRegex(b.Hold,'LEDGER_REQUIRED'):self.verify()
 if __name__=='__main__':unittest.main()
+
+class InstallerTests(BootstrapTests):
+ def setUp(self):
+  super().setUp();self.root=os.path.join(self.dir,'root');os.mkdir(self.root,0o700)
+ def run_install(self,failpoint=None):
+  import sys
+  sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'))
+  import controller
+  p=self.payload;sig=base64.b64encode(self.key.sign(b.canonical(p))).decode()
+  args=[self.fd('carrier',self.carrier),self.fd('manifest',self.manifest),self.fd('receipt',b.canonical({'payload':p,'signature':sig})),self.fd('trust',b.canonical(self.trust)),self.ledger]
+  lf=os.open(self.log,os.O_WRONLY|os.O_APPEND);self.fds.append(lf)
+  return controller.run(*(args+[lf,{'task':'task','attempt':'attempt'},self.root]),owner=os.getuid(),failpoint=failpoint)
+ def state(self):
+  with sqlite3.connect(self.ledger) as db:return db.execute('select state from operations').fetchone()[0]
+ def test_install_and_reinstall(self):
+  self.assertEqual(self.run_install(),'release-nonce');self.assertEqual(os.readlink(os.path.join(self.root,'current')),'release-nonce');self.assertEqual(self.state(),'SUCCEEDED')
+  with self.assertRaises(Exception):self.run_install()
+ def test_failure_windows_unknown(self):
+  import sys
+  sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller
+  with self.assertRaises(controller.ControllerError):self.run_install('after_switch')
+  self.assertEqual(self.state(),'UNKNOWN')
+  with self.assertRaises(Exception):self.run_install()
+ def test_recover_running_as_unknown(self):
+  import sys
+  sys.path.insert(0,os.path.join(os.path.dirname(__file__),'..','bootstrap'));import controller
+  with sqlite3.connect(self.ledger) as db:db.execute("insert into operations values('n','t','a','RUNNING')")
+  controller.recover(self.ledger,os.getuid());self.assertEqual(self.state(),'UNKNOWN')
