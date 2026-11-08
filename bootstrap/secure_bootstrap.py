@@ -58,6 +58,28 @@ def inspect_archive(blob, members):
             require(len(data)==m.size and members.get(p)=={'type':'file','size':m.size,'sha256':sha(data)},'MEMBER_MISMATCH')
     require(seen==set(members),'MEMBER_SET')
 
+def verify_bound_artifacts(carrier_fd, manifest_fd, tool_scope_fd, binding, owner):
+    """Capture stable controller-opened bytes and enforce signed artifact binding."""
+    archive=stable_read(carrier_fd,owner,128*1024*1024)
+    manifest_raw=stable_read(manifest_fd,owner,4*1024*1024)
+    scope_raw=stable_read(tool_scope_fd,owner,1024*1024)
+    require(sha(archive)==binding.get('carrier_archive_sha256') and sha(manifest_raw)==binding.get('carrier_manifest_sha256') and sha(scope_raw)==binding.get('tool_scope_sha256'),'BINDING_ARTIFACT_MISMATCH')
+    manifest=parse(manifest_raw)
+    require(manifest.get('artifact_sha256')==sha(archive) and manifest.get('tool_scope_sha256')==sha(scope_raw),'BINDING_ARTIFACT_MISMATCH')
+    scope=parse(scope_raw)
+    require(scope.get('schema')==1 and scope.get('default_off') is True and scope.get('default_mode')=='READ_ONLY' and scope.get('allowed_write_tools')==[] and scope.get('unknown_dynamic_tools')=='DENY','CARRIER_TOOL_SCOPE_REQUIRED')
+    require(isinstance(manifest.get('members'),list),'BINDING_ARTIFACT_MISMATCH')
+    entries={}
+    for row in manifest['members']:
+        require(isinstance(row,dict) and isinstance(row.get('path'),str) and row['path'] not in entries,'BINDING_ARTIFACT_MISMATCH')
+        if row.get('type')=='directory':entries[row['path']]={'type':'directory'}
+        else:
+            require(row.get('type')=='file' and type(row.get('size')) is int and isinstance(row.get('sha256'),str),'BINDING_ARTIFACT_MISMATCH')
+            entries[row['path']]={'type':'file','size':row['size'],'sha256':row['sha256']}
+    require(entries.get('TOOL_SCOPE.json')=={'type':'file','size':len(scope_raw),'sha256':sha(scope_raw)},'CARRIER_TOOL_SCOPE_REQUIRED')
+    inspect_archive(archive,entries)
+    return archive,manifest_raw,scope_raw
+
 def checked_ledger_path(path, owner):
     from path_guard import Guard
     require(os.path.isabs(path),'LEDGER_ABSOLUTE_REQUIRED')
@@ -201,6 +223,7 @@ def main():
     a.add_argument('--dependency-lock-fd',type=int,required=True)
     a.add_argument('--binding-fd',type=int,required=True)
     a.add_argument('--receipt-dir-fd',type=int,required=True)
+    a.add_argument('--tool-scope-fd',type=int)
     a.add_argument('--expected-controller-uid',type=int,default=0)
     a.add_argument('--expected-controller-gid',type=int,default=0)
     a.add_argument('--expected-receipt-owner',type=int,default=0)
@@ -239,9 +262,10 @@ def main():
                 result=rollback(x.ledger,x.root,x.expected_controller_uid,audit.file,x.trust_fd,x.receipt_signing_key_fd,x.receipt_key_id,x.receipt_dir_fd,p['install_op'],p['rollback_op'],sha(canonical(p)),audit=audit,authorized_prestate_digest=p['prestate_digest'],failpoint=x.test_only_crash_hook)
                 require(result['state']=='SUCCEEDED','ROLLBACK_NOT_SUCCEEDED');print(json.dumps(result,sort_keys=True))
             else:
-                require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
+                require(all(getattr(x,n) is not None for n in ('carrier_fd','manifest_fd','tool_scope_fd','receipt_fd','receipt_signing_key_fd','task','attempt','receipt_key_id')),'INSTALL_ARGUMENTS_REQUIRED')
                 require(x.test_only_crash_hook is None or (trust.get('environment')=='TEST_ONLY' and x.test_only_crash_hook in ('install_crash_after_rename','install_crash_before_rename','install_crash_before_receipt')),'TEST_HOOK_FORBIDDEN')
-                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd,failpoint=x.test_only_crash_hook);print('INSTALLED '+target)
+                bound=verify_bound_artifacts(x.carrier_fd,x.manifest_fd,x.tool_scope_fd,binding,x.expected_controller_uid)
+                target=run(x.carrier_fd,x.manifest_fd,x.receipt_fd,x.trust_fd,x.ledger,audit.file,{'task':x.task,'attempt':x.attempt},x.root,owner=x.expected_controller_uid,audit=audit,signing_key_fd=x.receipt_signing_key_fd,key_id=x.receipt_key_id,receipt_dir_fd=x.receipt_dir_fd,failpoint=x.test_only_crash_hook,bound_artifacts=bound);print('INSTALLED '+target)
     except Exception as e: print('HOLD '+type(e).__name__+': '+str(e),file=sys.stderr);return 1
     return 0
 if __name__=='__main__':sys.exit(main())

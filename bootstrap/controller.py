@@ -376,7 +376,8 @@ def recover(path, owner):
             raise
 
 
-def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None):
+def run(carrier_fd,manifest_fd,receipt_fd,trust_fd,ledger_path,log_fd,scope,root,owner=0,failpoint=None,audit=None,signing_key_fd=None,key_id=None,receipt_dir_fd=None,bound_artifacts=None):
+    if bound_artifacts is not None:raise ControllerError('BOUND_ARTIFACT_INSTALL_NOT_YET_IMPLEMENTED')
     rootfd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
     try:
         st=os.fstat(rootfd);check(st.st_uid==owner and st.st_gid==os.getegid() and stat.S_IMODE(st.st_mode)==0o700,'ROOT_PERMISSIONS')
