@@ -14,6 +14,11 @@ on:
     branches: [feature/work-pr122-site-hub-integration-20261016]
     paths:
       - 'demos/xuanjun-site-hub/**'
+      - 'demos/pr122-patent-preview/**'
+      - 'scripts/pr122_patent_public_preview.py'
+      - 'tests/test_pr122_patent_public_preview.py'
+      - 'tests/pr122_patent_public_preview_browser.cjs'
+      - 'tests/fixtures/pr122-patent-observed-csp-20261109.json'
       - 'showcase/**'
       - 'scripts/pr122_showcase*.py'
       - 'scripts/community_saas_*.py'
@@ -178,6 +183,16 @@ jobs:
           subprocess.run(command,check=True)
           PYCODE
           python -m scripts.pr122_showcase_package --public /tmp/pr122-showcase-reviewed --output /tmp/pr122-site-hub/SHOWCASE_RELEASE.tar.gz
+      - name: Exact synthetic patent overlay under unchanged observed CSP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_pr122_patent_public_preview -v 2>&1 | tee /tmp/pr122-site-hub/PATENT_UNIT_TESTS.log
+          python -m scripts.pr122_patent_public_preview --source demos/pr122-patent-preview/original --output /tmp/pr122-site-hub/PATENT_PUBLIC_OVERLAY > /tmp/pr122-site-hub/PATENT_BUILD.log
+          cp tests/fixtures/pr122-patent-observed-csp-20261109.json /tmp/pr122-site-hub/PATENT_PUBLIC_OVERLAY/OBSERVED_SITE_POLICY.json
+          npm install --prefix "$RUNNER_TEMP/pr122-browser" --no-save playwright@1.55.0
+          "$RUNNER_TEMP/pr122-browser/node_modules/.bin/playwright" install --with-deps chromium
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/pr122-browser/node_modules/playwright" node tests/pr122_patent_public_preview_browser.cjs /tmp/pr122-site-hub/PATENT_PUBLIC_OVERLAY
       - name: Bind receipt to actual checkout
         run: |
           python - <<'PY'

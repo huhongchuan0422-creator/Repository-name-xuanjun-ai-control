@@ -1,0 +1,6 @@
+{
+  "source": "https://wenwenwenyiyiyi.work/labs/shiliu-20261104/",
+  "status": 200,
+  "csp": "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'sha256-Sg4KYlDGCbyhCCdgmcUVKuQYKu/5PsCXWS2hpIMwniE=' 'sha256-Y5PHZNg0/OMIDZ6nulMP27B1nz7Hkd/pbqpthRwUR7I=' 'sha256-dsx6uHU7D/pCkN0WEtxKPt+obyeSdroK0TpWAvI6flE='; style-src 'self' 'sha256-5hP2JM/qyQ65KoM0q0HQIv1UIE7cSSVuihQg1J0BIBY=' 'sha256-69qUZAx8CZFIxZuezWqUk9bJ59xkJr6lnpkQ5slbULs=' 'sha256-7iZaX7O9ydJ/lZEJAShzV5YhNz7cRzrL9Spt6a4b9ek=' 'sha256-GIe7k9Pn2MftUAP2PfA/D6mm91N10n9KsLeooORepxs=' 'sha256-M5GH2ZzVCUssDpceuw1A0zjEuqiaRrZzrMtx5FT6mD4=' 'sha256-SM4bonjDN8VRuSAmv0PcYpdbP5w6zSPrKXoqRKvVY/I=' 'sha256-VchLQzzT8PYPGGxfW/rb9VeVlA+SJDc76jn90szhLVE='; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:",
+  "x_frame_options": "DENY"
+}

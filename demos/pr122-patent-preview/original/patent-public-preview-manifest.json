@@ -1,0 +1,22 @@
+{
+  "scope": "Public synthetic prototype only; not production; do not add customer data",
+  "source_commit": "cba85bf2fb89c03ca46cd6ce0c343b0cbfb0ec93",
+  "files": {
+    "app.js": {
+      "bytes": 42128,
+      "sha256": "75b45df08ca18f2b7732ed57e26029b0b9b3d2ae782aa30c712ddbebea66f8ad"
+    },
+    "style.css": {
+      "bytes": 17515,
+      "sha256": "1fae7d55c4f3ae7a31d30bb8a72454dea71cf4bb177a0688e939d394efa69d5c"
+    },
+    "index.html": {
+      "bytes": 3482,
+      "sha256": "8c79f1f42d5f724cdcb3e5f76fffa3721214613017db6fec1e0d2498f25a4486"
+    },
+    "preview.html": {
+      "bytes": 2708,
+      "sha256": "6940295216949b2d8dcc535be44e8a89080219111846f133dfb7196974cba723"
+    }
+  }
+}
