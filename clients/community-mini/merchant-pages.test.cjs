@@ -696,3 +696,13 @@ test('read-only and pending industry changes cannot alter saved choice or identi
 });
 test('reselecting other industry preserves entered actual industry and draft',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.chooseIndustry({detail:{value:String(f.page.data.industryLabels.length-1)}});f.page.inputIndustry({detail:{value:'真实自填行业'}});const before=JSON.stringify(f.page.profile);f.page.chooseIndustry({detail:{value:String(f.page.data.industryLabels.length-1)}});assert.equal(JSON.stringify(f.page.profile),before);});
 test('platform subject edit does not mutate a read-only WeChat profile',async()=>{const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.chooseIndustry({detail:{value:'2'}});const before=JSON.stringify(f.page.profile);f.page.setData({canEditPlatform:true,canEditWechat:false});f.page.condition({currentTarget:{dataset:{key:'entity'}},detail:{value:'1'}});assert.equal(JSON.stringify(f.page.profile),before);assert.match(f.page.data.status,/只读.*保留/);});
+
+test('submit feedback is adjacent and remains visible for pending and failures',async()=>{
+ const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.match(markup,/class="status-notice submit-feedback"[^>]*aria-live="assertive"><text>{{pending\?'正在处理，请稍候。':status}}<\/text><\/view><button class="primary" bindtap="submitAllReview"/);
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ let finish;const wait=new Promise(resolve=>finish=resolve);
+ const pending=f.page.run(async()=>{await wait;const error=Error('请填写联系人手机号');error.submitPreflight=true;throw error;},'提交审核');
+ assert.equal(f.page.data.pending,true);assert.equal(f.page.data.status,'提交审核处理中，请稍候。');finish();await pending;
+ assert.equal(f.page.data.pending,false);assert.equal(f.page.data.status,'提交审核未完成：请填写联系人手机号');
+});
