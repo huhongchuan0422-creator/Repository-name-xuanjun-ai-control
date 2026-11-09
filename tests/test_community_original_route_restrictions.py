@@ -165,8 +165,8 @@ class OriginalRouteRestrictions(unittest.TestCase):
     def test_inventory_nine_routes_and_expected_current_operation_count(self):
         from scripts.community_admin_route_inventory import ROUTE_OPERATIONS, BUSINESS_CAPABILITIES
         self.assertCountEqual(ROUTE_OPERATIONS,ROUTE_FAMILIES)
-        self.assertEqual(len(BUSINESS_CAPABILITIES),153)
-        self.assertEqual(len(set(BUSINESS_CAPABILITIES)),153)
+        self.assertEqual(len(BUSINESS_CAPABILITIES),154)
+        self.assertEqual(len(set(BUSINESS_CAPABILITIES)),154)
     def test_nine_real_dispatch_entries_decorated(self):
         root=Path(__file__).resolve().parents[1]/'scripts';found=[]
         for p in root.glob('*.py'):
