@@ -29,3 +29,34 @@ test('failure is safe Chinese and retry recovers without new upload',async()=>{c
 test('processing does not invent missing rows; confirmed missing rows are not confirmation payload',async()=>{const f=fixture();f.setRead(result({status:'processing',fields:{}}));await f.start();assert.equal(f.page.data.ocrRows.length,0);assert.equal(f.timers.size,1);const g=fixture();g.setRead(result({status:'confirmed',confirmation_revision:1,confirmed_fields:{company_name:'HUMAN'}}));await g.start();assert.ok(g.page.data.ocrRows.slice(1).every(r=>r.value===''&&r.hint.includes('未确认')));let sent;g.handleConfirm(p=>{sent=clone(p.fields);return {result:{job_id:p.job_id,status:'confirmed',revision:p.revision,recorded:true,application_revision:p.application_revision,provider_version:p.provider_version}};});await g.page.confirmOcr();assert.deepEqual(sent,{company_name:'HUMAN'});assert.deepEqual(g.page.profile,{});});
 
 test('queue and unknown diagnostics do not claim execution; refusal does not claim absent result',()=>{const f=fixture();for(const d of [{stage:'QUEUE',request_retained:true},{stage:'UNKNOWN',request_retained:false},{stage:'EXECUTION',reason:'REQUEST_IN_PROGRESS',diagnostic_id:'PRIVATE'}]){f.page.waitForOcr({ocrCode:'OCR_REQUEST_PENDING',ocrDiagnostic:d});assert.doesNotMatch(f.page.data.ocrStatus,/EXECUTION|REQUEST_IN_PROGRESS|PRIVATE|正在识别证照/);assert.equal(f.page.data.ocrDiagnostic,d);}for(const e of [{ocrCode:'OCR_AUTH_DENIED',code:'ACCESS_DENIED'},{ocrCode:'OCR_SOURCE_CHANGED'},Error('PRIVATE raw secret')]){const message=f.page.ocrFeedback(e);assert.doesNotMatch(message,/未生成|未接通|重新.*识别|PRIVATE|raw secret/);assert.match(message,/读取|查询/);}});
+
+test('review presence counts same-application OCR without changing saved submit requirements',async()=>{
+ const f=fixture();f.page.profile={subject_info:{subject_type:'SUBJECT_TYPE_ENTERPRISE'}};f.page.data.options.scene='store';f.page.refresh();
+ const original=JSON.stringify(f.page.profile);f.setRead(result({fields:{company_name:{value:'SYNTHETIC COMPANY'},credit_code:{value:'SYNTHETIC-CODE'},legal_representative:{value:'SYNTHETIC PERSON'},registered_address:{value:'SYNTHETIC ADDRESS'}}}));await f.start();
+ const group=f.page.data.displayReviewGroups.find(g=>g.id==='license');assert.equal(group.completed,6);assert.equal(group.total,6);assert.match(group.pendingText,/待核对|待完成/);assert.equal(JSON.stringify(f.page.profile),original);
+ const strict=f.page.data.reviewGroups.find(g=>g.id==='license');assert.equal(strict.completed,1);assert.equal(strict.total,6);
+ const form=require('./merchant-form');assert.throws(()=>form.assertReviewComplete(f.page.data.reviewGroups,f.page.data.application,{wechat:true}),/必填/);
+ f.page.data.application.materials.business_license.object_id='replacement';f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='license').completed,2);
+});
+test('bank is four customer fields with auto-derived name; industry configuration is separate',()=>{
+ const f=fixture();f.page.profile={subject_info:{identity_info:{id_card_info:{id_card_name:'SYNTHETIC PERSON'}}},bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();
+ const bank=f.page.data.displayReviewGroups.find(g=>g.id==='bank');assert.equal(bank.total,4);assert.equal(bank.completed,4);assert.match(bank.pendingText,/结算开户名称/);assert.ok(!bank.items.some(i=>i.path.startsWith('settlement_info.')));
+ const configuration=f.page.data.displayReviewGroups.find(g=>g.configuration);assert.equal(configuration.total,2);assert.equal(configuration.completed,0);
+ assert.equal(f.page.profile.bank_account_info.account_name,undefined);assert.equal(f.page.data.reviewGroups.find(g=>g.id==='bank').completed,3);
+ f.page.profile.subject_info.business_license_info={legal_person:'DIFFERENT SYNTHETIC PERSON'};f.page.refresh();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
+ f.page.profile.bank_account_info.account_name='EXISTING SAVED NAME';f.page.refresh();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);assert.match(f.page.data.displayReviewGroups.find(g=>g.id==='bank').pendingText,/不一致/);
+});
+test('OCR updates refresh presence and application/session changes cannot reuse names',async()=>{
+ const f=fixture();f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
+ edit(f,'','legal_representative');assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
+ edit(f,'SYNTHETIC PERSON','legal_representative');assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
+ f.page.data.application={...f.page.data.application,application:'another-application'};f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
+});
+for(const change of ['session','generation','scene','source','logout'])test('display count rejects stale OCR after '+change,async()=>{
+ const f=fixture();f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
+ if(change==='session')f.page.session={...f.session};if(change==='generation')f.session.getGeneration=()=>2;if(change==='scene')f.page.scene='other';if(change==='source')f.page.data.application.materials.business_license.object_id='other';if(change==='logout')f.session.isAuthenticated=()=>false;
+ f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);assert.equal(f.page.profile.bank_account_info.account_name,undefined);
+});
+test('configuration notice is confined to review card and never replaces original edit/confirm actions',()=>{
+ const wxml=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxml'),'utf8');assert.equal((wxml.match(/由平台核定微信结算配置/g)||[]).length,1);assert.equal((wxml.match(/wx:if="\{\{!item.configuration\}\}"/g)||[]).length,1);assert.match(wxml,/displayReviewGroups/);assert.match(wxml,/bindtap="confirmReuse"/);
+});
