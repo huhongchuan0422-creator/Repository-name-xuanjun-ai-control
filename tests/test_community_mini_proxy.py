@@ -71,7 +71,9 @@ class UnixMiniProxy(unittest.TestCase):
         with self.fx.center.tx():
             for _ in range(40):self.fx.center.limit('auth-source:192.0.2.1',40,300)
         with patch.object(TrustedNginxSource,'__call__',return_value='192.0.2.1'):
-            self.assertEqual(self.request()[0],403)
+            status,body=self.request()
+            self.assertEqual(status,429)
+            self.assertEqual(body,{'error':'RATE_LIMIT'})
         self.app.gateway.provider.exchange.assert_not_called()
     def test_socket_close_never_deletes_replaced_file(self):
         self.path.rename(self.root/'old.sock');self.path.write_text('preserve')
