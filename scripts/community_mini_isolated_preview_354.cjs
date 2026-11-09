@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),https=require('node:https');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
 const {normalizeUploadKey}=require('./community_mini_key.cjs');
-const SOURCE='b24b09b1bfd79c97476bd494d2bf3020ea4ae2e2';
+const SOURCE='918a38dc166086bcf61d8715e9407830b324d018';
 const BASE='https://uk.wenwenwenyiyiyi.work/community-test-354d1fac';
 const SCENE='owner-test-354d1fac',APPID='wx1d5f8873eaea5392';
 const MARKER='[mini-test-preview-354]';
