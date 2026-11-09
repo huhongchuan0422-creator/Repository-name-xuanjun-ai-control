@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / 'deploy' / 'community-preview' / 'Dockerfile.ui-successor'
 STAMP = ROOT / 'deploy' / 'community-preview' / 'COMMUNITY_SOURCE_SHA.successor'
 RUNTIME_CHANGED = {
+    'scripts/community_industry_rules.py',
+    'clients/community-mini/merchant-official-industries.json',
     'scripts/community_bank_card_layout.py',
     'scripts/community_mini_center_identity.py',
     'scripts/community_h5_context.py',
@@ -94,6 +96,11 @@ class CommunityUiSuccessorPackage(unittest.TestCase):
             target = '/app/' + source
             self.assertEqual(copied[source], target)
             self.assertIn(target, read_only)
+
+    def test_industry_runtime_table_is_in_original_image(self):
+        base=(ROOT/'deploy/community-preview/Dockerfile').read_text()
+        self.assertIn('COPY scripts/ /app/scripts/',base)
+        self.assertIn('COPY clients/community-mini/merchant-official-industries.json /app/clients/community-mini/merchant-official-industries.json',base)
 
     def test_partial_label_regression_is_run_by_both_image_gates(self):
         self.assertIn(('tests/test_community_license_partial_label.py', '/tmp/community-layout-tests/test_community_license_partial_label.py'), self.copies)

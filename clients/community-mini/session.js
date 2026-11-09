@@ -159,7 +159,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       const applicantOcr=scene===''&&operation==='ocr'&&params&&['submit','read','confirm','delete','apply_confirmed','recover_view','recover_confirm','recover_apply'].includes(params.action);
       const applicantOnly=applicantOcr||scene===''&&operation==='onboarding'&&params&&
-        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link'].includes(params.operation);
+        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link','wechat_qualifications_select'].includes(params.operation);
       if((!applicantOnly&&(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)))||
          !['workspaces','onboarding','read','write','collection_code','ocr'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
       const version=generation;

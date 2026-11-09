@@ -348,13 +348,46 @@
   function getPath(o,path){return path.split('.').reduce((v,k)=>v?.[k],o);}
   function setPath(o,path,value){const parts=path.split('.');let at=o;for(let i=0;i<parts.length-1;i++)at=at[parts[i]]??=(/^\d+$/.test(parts[i+1])?[]:{});at[parts.at(-1)]=value;}
   const wechatStateText=value=>({DRAFT:'资料草稿',INTERNAL_REVIEW:'平台审核中',INTERNAL_APPROVED:'平台审核通过',CORRECTION:'待补充资料',SUBMITTED:'已提交微信',APPLYMENT_STATE_EDITTING:'待完善资料',APPLYMENT_STATE_AUDITING:'微信审核中',APPLYMENT_STATE_REJECTED:'微信审核驳回',APPLYMENT_STATE_TO_BE_CONFIRMED:'待账户确认',APPLYMENT_STATE_TO_BE_SIGNED:'待签约',APPLYMENT_STATE_SIGNING:'签约处理中',APPLYMENT_STATE_FINISHED:'签约完成',APPLYMENT_STATE_CANCELED:'申请已取消'}[value]||'状态待确认');
+  let industryReviewControls=[];
+  function renderIndustryReview(record,state){
+    industryReviewControls=[];
+    if(!reviewMode||!record.industry_review)return;
+    const section=document.createElement('section'),title=document.createElement('h3');title.textContent='行业资质条件审核';section.append(title);
+    const review=record.industry_review;
+    if(review.status!=='READY'){
+      const warning=document.createElement('p');warning.textContent='行业或当前资质资料尚不完整，请核对原申请并要求补充；不能按照片数量认定资质满足。';section.append(warning);state.append(section);return;
+    }
+    const plan=review.plan;
+    const heading=document.createElement('p');heading.textContent='实际行业：'+plan.qualification_type+'。请按真实业务核对官方条件，备选与同时提供要求不能混淆。';section.append(heading);
+    if(!plan.requires_explicit_review){const note=document.createElement('p');note.textContent='当前行业无额外条件分支；原资料审核仍须完成。';section.append(note);state.append(section);return;}
+    plan.branches.forEach((branch,index)=>{
+      const field=document.createElement('fieldset'),legend=document.createElement('legend'),description=document.createElement('p'),select=document.createElement('select'),reason=document.createElement('textarea');
+      legend.textContent='官方条件 '+(index+1);description.textContent=branch.description;
+      for(const [value,text] of [['','请选择实际适用结论'],['APPLICABLE_SATISFIED','适用，已核对完整满足'],['NOT_APPLICABLE','本商户实际业务不适用']]){const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);}
+      select.setAttribute('aria-label','条件'+(index+1)+'适用结论');reason.setAttribute('aria-label','条件'+(index+1)+'核验说明');reason.placeholder='说明所核证据或不适用原因，不得以照片张数替代条件判断';
+      const materials=[];field.append(legend,description,select);
+      for(const binding of plan.current_qualifications){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=binding.kind;label.append(input,document.createTextNode('本条件对应：'+binding.kind));field.append(label);materials.push(input);}
+      field.append(reason);section.append(field);industryReviewControls.push({branch_index:index,select,reason,materials});
+    });
+    state.append(section);
+  }
+  function industryBranchAssessments(){
+    const review=wechatRecord?.industry_review;
+    if(!review||review.status!=='READY')throw Error('请重新读取完整行业资料后审核');
+    if(!review.plan.requires_explicit_review)return undefined;
+    if(industryReviewControls.length!==review.plan.branches.length)throw Error('行业审核条件尚未完整载入');
+    return industryReviewControls.map(item=>{
+      if(!item.select.value||!item.reason.value.trim())throw Error('请逐项选择真实适用结论并填写核验说明');
+      return {branch_index:item.branch_index,applicability:item.select.value,material_kinds:item.materials.filter(x=>x.checked).map(x=>x.value),rationale:item.reason.value.trim()};
+    });
+  }
   function showWechat(r){
     wechatRecord=r;setScenes(r.profile?.business_info?.sales_info?.sales_scenes_type);
     const state=$('wechatState'),card=document.createElement('dl'),bucket=providerBucket(r.provider_state);state.replaceChildren();
     for(const [label,value]of [['资料状态',wechatStateText(r.state)],['微信处理阶段',providerBucketText(bucket)],['微信审核状态',wechatStateText(r.provider_state)],['微信申请编号',r.applyment_id||'尚未生成'],['最近同步',r.provider_observed_at||'尚未同步'],['审核意见',r.opinion||r.audit_detail||'暂无审核意见']]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=typeof value==='string'?value:JSON.stringify(value);card.append(dt,dd);
     }
-    const version=document.createElement('span');version.hidden=true;version.textContent='version '+String(r.version??0);state.append(card,version);
+    const version=document.createElement('span');version.hidden=true;version.textContent='version '+String(r.version??0);state.append(card,version);renderIndustryReview(r,state);
     if(bucket==='PENDING_CONFIRMATION'&&r.provider_sign_url&&r.provider_sign_url_proof){
       const actions=document.createElement('div'),hint=document.createElement('p'),link=document.createElement('a'),copy=button('复制微信实名确认链接',async()=>{await navigator.clipboard.writeText(r.provider_sign_url);message('官方实名确认链接已复制，可转发给商家超级管理员。');});actions.className='wechat-sign-actions';hint.textContent='微信审核已进入商家实名确认 / 签约阶段。以下入口来自微信支付已验签查询结果，可复制转发给商家超级管理员。';link.href=r.provider_sign_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='打开微信支付官方实名确认入口';actions.append(hint,link,copy);
       if(navigator.share){const share=button('转发确认入口',async()=>navigator.share({title:'微信支付商家实名确认',text:'请由商家超级管理员完成微信支付实名确认 / 签约。',url:r.provider_sign_url}));actions.append(share);}state.append(actions);
@@ -379,7 +412,7 @@
     else if(profile.contact_info.contact_id_doc_type===passport)delete profile.contact_info.contact_id_doc_copy_back;
     for(const ubo of profile.subject_info?.ubo_info_list||[])if(ubo.ubo_id_doc_type===passport)delete ubo.ubo_id_doc_copy_back;setPath(profile,'subject_info.subject_type',current.entity_type==='ENTERPRISE'?'SUBJECT_TYPE_ENTERPRISE':'SUBJECT_TYPE_INDIVIDUAL');setPath(profile,'subject_info.identity_info.id_holder_type','LEGAL');if(!profile.subject_info.identity_info.id_doc_type)setPath(profile,'subject_info.identity_info.id_doc_type',current.identity_type||'IDENTIFICATION_TYPE_IDCARD');if(!profile.contact_info?.contact_type)setPath(profile,'contact_info.contact_type','LEGAL');if(profile.subject_info.identity_info.id_doc_type==='IDENTIFICATION_TYPE_IDCARD')delete profile.subject_info.identity_info.id_doc_info;else delete profile.subject_info.identity_info.id_card_info;setPath(profile,'business_info.sales_info.sales_scenes_type',scenes);const saved=await request('wechat_save',{application,expected_version,profile});if(context!==materialContext||application!==current?.application)throw Error('资料条件已变化；保存结果请刷新后核对。');render(await request(reviewMode?'review_read':'read',{application}));showWechat(saved);});};
   $('wechatSubmitReview').onclick=()=>run(async()=>showWechat(await request('wechat_submit_review',{application:current.application,expected_version:wechatVersion()})));
-  for(const [id,decision]of [['wechatApprove','INTERNAL_APPROVED'],['wechatCorrect','CORRECTION']])$(id).onclick=()=>run(async()=>showWechat(await request('wechat_review',{application:current.application,expected_version:wechatVersion(),decision,opinion:$('wechatOpinion').value})));
+  for(const [id,decision]of [['wechatApprove','INTERNAL_APPROVED'],['wechatCorrect','CORRECTION']])$(id).onclick=()=>run(async()=>{const params={application:current.application,expected_version:wechatVersion(),decision,opinion:$('wechatOpinion').value};if(decision==='INTERNAL_APPROVED'&&wechatRecord?.industry_review){const assessments=industryBranchAssessments();if(assessments)params.industry_branch_assessments=assessments;}showWechat(await request('wechat_review',params));});
   $('wechatExecute').onclick=()=>run(async()=>showWechat(await request('wechat_execute',{application:current.application,expected_version:wechatVersion()})));
   $('wechatQuery').onclick=()=>run(async()=>showWechat(await request('wechat_query',{application:current.application})));
   // ADMISSION_REVIEW_LAYOUT_BEGIN: review route only, original controls moved not duplicated.

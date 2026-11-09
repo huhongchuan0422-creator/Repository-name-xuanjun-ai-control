@@ -23,9 +23,11 @@ MATERIALS={
     'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'bank_card':'银行卡照片', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人证件正面',
     'industry_permit':'行业经营许可（按经营类目）',
+    **{'industry_permit_'+str(i):'行业资质材料'+str(i) for i in range(2,6)},
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
     'operator_identity_back':'经办人证件反面',
     **{'ubo_'+str(i)+'_'+side:'受益人'+str(i)+('证件正面' if side=='front' else '证件反面') for i in range(1,5) for side in ('front','back')}}
+INDUSTRY_MATERIAL_KINDS=('industry_permit',)+tuple('industry_permit_'+str(i) for i in range(2,6))
 BASE=('business_license','identity_front','identity_back')
 STORE_SCENE='SALES_SCENES_STORE'
 MINI_SCENE='SALES_SCENES_MINI_PROGRAM'
@@ -248,16 +250,22 @@ class MerchantOnboarding:
         opening=self._decode(payload,'community-opening:'+key+':'+application)
         if opening.get('state')!='OPENED' or opening.get('scope')!=scope:raise PermissionError('MERCHANT_SPLIT_OPENING_REQUIRED')
         return self.split_admission_for_application(application)
-    def _required(self,meta):
+    def _required(self,meta,application=None):
         base=tuple(k for k in BASE if k!='identity_back' or meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
         # Old records without a declaration retain conservative offline requirements.
         # New UI always submits its selected scenes; no history is rewritten.
         scenes=checked_scenes(meta.get('sales_scenes_type',[STORE_SCENE]))
         scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes else ())
         operator=() if not meta['delegated'] else ('operator_identity',)+(('operator_identity_back',) if meta.get('operator_identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' else ())
-        return base+scene_materials+operator+(('industry_permit',) if meta['category']=='FOOD' else ())
+        selected=set()
+        if application and self.wechat_applyment is not None:
+            record=self.wechat_applyment._read(application) or {}
+            values=record.get('profile',{}).get('settlement_info',{}).get('qualifications',[])
+            selected={b['kind'] for b in record.get('industry_qualification_bindings',[]) if b.get('media_id') in values}
+        industry=tuple(k for k in INDUSTRY_MATERIAL_KINDS if k in selected or k=='industry_permit' and meta['category']=='FOOD')
+        return base+scene_materials+operator+industry
     def _check_materials(self,application,meta):
-        for kind in self._required(meta):
+        for kind in self._required(meta,application):
             material=meta['materials'].get(kind)
             if not material or (material['expires_at'] is not None and material['expires_at']<=self.center.now()):
                 raise ValueError('REQUIRED_MATERIAL_MISSING_OR_EXPIRED:'+kind)
@@ -277,7 +285,7 @@ class MerchantOnboarding:
         wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
         if wechat_record is not None:data['fields']=shared_application_fields(wechat_record.get('profile',{}),data['fields'])
         return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
-            delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
+            delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta,application)),
             redemption_percent=meta.get('redemption_percent',0),approved_redemption_percent=meta.get('approved_redemption_percent'),
             split_participation=meta.get('split_participation',False),requested_split_bps=meta.get('requested_split_bps',0),
             provider_max_split_bps=self._split_policy(meta,owner),effective_split_bps=meta.get('effective_split_bps',0),
@@ -462,6 +470,8 @@ class MerchantOnboarding:
                 if data['status'] not in ('DRAFT','CORRECTION_REQUIRED') or data['revision']!=params['revision']:raise ValueError('STATE_OR_REVISION_CONFLICT')
                 kind=params['kind'];expires=params['expires_at']
                 if type(kind) is not str or kind not in MATERIALS or expires is not None and (type(expires) is not int or expires<=c.now()):raise ValueError('INVALID_MATERIAL')
+                if kind in INDUSTRY_MATERIAL_KINDS and self.wechat_applyment is not None:
+                    self.wechat_applyment.clear_industry_material(application,owner,meta,kind)
                 if kind=='cashier_photo' and self.wechat_applyment is not None:
                     self.wechat_applyment.clear_cashier_media(application,owner)
                 value=params['content_base64']
@@ -539,7 +549,7 @@ class MerchantOnboarding:
                 if action=='APPROVE':
                     account=c.db.execute('SELECT verified FROM accounts WHERE id=?',(owner,)).fetchone()
                     if account is None or account[0]!=1:raise PermissionError('VERIFIED_APPLICANT_REQUIRED')
-                    for kind in self._required(meta):
+                    for kind in self._required(meta,application):
                         review=meta.get('reviews',{}).get(kind,{})
                         if review.get('decision')!='ACCEPTED' or review.get('sha256')!=meta['materials'][kind]['sha256']:
                             raise ValueError('MATERIAL_REVIEW_REQUIRED:'+kind)

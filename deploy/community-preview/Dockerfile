@@ -11,6 +11,7 @@ RUN dpkg -i /build/ocr/system-debs/*.deb && python -m pip install --no-index --n
 ENV OCR_DET_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_det_small.onnx OCR_REC_MODEL_PATH=/opt/ocr-bundle/models/PP-OCRv6_rec_small.onnx OCR_CLS_MODEL_PATH=/opt/ocr-bundle/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx
 ENV OCR_MODEL_SHA256='{"det":"090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f","rec":"6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884","cls":"e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"}'
 COPY scripts/ /app/scripts/
+COPY clients/community-mini/merchant-official-industries.json /app/clients/community-mini/merchant-official-industries.json
 COPY services/ocr_engine/api.py /app/services/ocr_engine/api.py
 COPY demos/community-stage/ /app/demos/community-stage/
 ARG SOURCE_SHA

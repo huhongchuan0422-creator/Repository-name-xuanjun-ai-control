@@ -439,6 +439,98 @@ class WechatApplyment:
             public=serialization.load_pem_public_key(self.reader._public)
             return base64.b64encode(public.encrypt(value.encode(),padding.OAEP(mgf=padding.MGF1(hashes.SHA1()),algorithm=hashes.SHA1(),label=None))).decode()
         return value
+    def industry_media_receipts(self, application, meta):
+        """Only current, scanned same-application industry slots and signed receipts."""
+        from scripts.community_merchant_onboarding import INDUSTRY_MATERIAL_KINDS
+        admitted={}
+        rows=self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)).fetchall()
+        for key,payload in rows:
+            value=json.loads(self.center.decrypt(payload,'wechat-media:'+key))
+            kind=value.get('kind')
+            if kind not in INDUSTRY_MATERIAL_KINDS:continue
+            material=meta['materials'].get(kind)
+            if not material or material['sha256']!=value.get('sha256') or material['expires_at'] is not None and material['expires_at']<=self.center.now():continue
+            expected=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+            if key!=expected or type(value.get('provider_response_sha256')) is not str or not re.fullmatch('[0-9a-f]{64}',value['provider_response_sha256']):continue
+            row=self.center.db.execute('SELECT project,sha,scan FROM objects WHERE id=?',(material['object_id'],)).fetchone()
+            if row is None or tuple(row)!=(application,material['sha256'],'CLEAN'):continue
+            raw=self.center.decrypt(private_path(self.center.objects/material['object_id']).read_bytes(),'object:'+application+':'+material['object_id'])
+            if hashlib.sha256(raw).hexdigest()!=material['sha256']:raise PermissionError('PRIVATE_INDUSTRY_MATERIAL_INTEGRITY')
+            media=value.get('media_id')
+            if type(media) is not str or not 1<=len(media)<=1024:continue
+            if media in admitted and admitted[media]['kind']!=kind:raise PermissionError('AMBIGUOUS_INDUSTRY_MEDIA_BINDING')
+            admitted[media]=dict(kind=kind,sha256=material['sha256'],media_id=media)
+        return admitted
+
+    def validate_industry_materials(self, profile, application, meta):
+        settlement=profile.get('settlement_info',{})
+        values=settlement.get('qualifications')
+        if values is None:
+            if meta['category']=='FOOD':raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
+            return []
+        from scripts.community_applyment_conditions import images
+        images(values,'settlement_info.qualifications')  # Original official max 5.
+        receipts=self.industry_media_receipts(application,meta)
+        if len(set(values))!=len(values) or any(v not in receipts for v in values):raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
+        bindings=[receipts[v] for v in values]
+        if len({v['kind'] for v in bindings})!=len(bindings):raise PermissionError('DUPLICATE_INDUSTRY_SLOT')
+        return bindings
+
+    def industry_review_plan(self, profile, application, meta):
+        from scripts.community_industry_rules import validate_selection
+        bindings=self.validate_industry_materials(profile,application,meta)
+        plan=validate_selection(profile,meta['entity_type'],meta['category'],bindings)
+        # Bind applicable subject/category as well as owner profile. A platform
+        # workflow-only revision is not a content change.
+        plan['profile_sha256']=hashlib.sha256(canonical(dict(profile=profile,entity_type=meta['entity_type'],category=meta['category']))).hexdigest()
+        return plan
+
+    def check_industry_review(self, record, application, owner, meta, platform):
+        from scripts.community_industry_rules import validate_review_evidence
+        plan=self.industry_review_plan(record['profile'],application,meta)
+        if plan['requires_explicit_review']:
+            reviewer=record.get('reviewer')
+            if type(reviewer) is not str or reviewer==owner:
+                raise PermissionError('CURRENT_INDEPENDENT_INDUSTRY_REVIEW_REQUIRED')
+            # Stored actor is not an authority token. Recheck original protected
+            # reviewer/project access; no new role or permission is introduced.
+            self.onboarding._load(application,reviewer,True)
+            evidence=record.get('industry_review_evidence')
+            reviewed_revision=evidence.get('application_revision') if type(evidence) is dict else None
+            if type(reviewed_revision) is not int or reviewed_revision>platform['revision'] or reviewed_revision<0:
+                raise PermissionError('CURRENT_INDEPENDENT_INDUSTRY_REVIEW_REQUIRED')
+            # Approval/status progression may increase the platform revision.
+            # Exact rule, subject/category, profile and selected media hashes
+            # still must match the independently reviewed content.
+            validate_review_evidence(plan,evidence,
+                application=application,application_revision=reviewed_revision,
+                profile_version=record['version'],owner_id=owner,authorized_reviewer_id=reviewer)
+        return plan
+
+    def clear_industry_material(self, application, owner, meta, kind):
+        """Called inside original upload transaction; only remove replaced slot."""
+        record=self._read(application)
+        if record is None:return
+        values=record.get('profile',{}).get('settlement_info',{}).get('qualifications')
+        if not values:return
+        # Retire this slot's prior receipt even when expired; it is not being
+        # admitted for new use. Otherwise replacing an expired selected file
+        # would strand its old media ID in qualifications forever.
+        removed=set();material=meta['materials'].get(kind)
+        if material:
+            key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+            row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=? AND active=1",(key,application)).fetchone()
+            if row:
+                receipt=json.loads(self.center.decrypt(row[0],'wechat-media:'+key))
+                if receipt.get('kind')==kind and receipt.get('sha256')==material['sha256']:removed.add(receipt['media_id'])
+        if not removed.intersection(values):return
+        if record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('INDUSTRY_REVIEW_SNAPSHOT_IMMUTABLE')
+        result=json.loads(canonical(record));remaining=[v for v in values if v not in removed]
+        if remaining:result['profile']['settlement_info']['qualifications']=remaining
+        else:result['profile']['settlement_info'].pop('qualifications',None)
+        result['industry_qualification_bindings']=[r for r in result.get('industry_qualification_bindings',[]) if r['kind']!=kind]
+        result['version']+=1;result['state']='DRAFT';self._save(application,owner,result)
+
     def _validate_media(self,profile,application,meta):
         rows=self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)).fetchall()
         admitted=set()
@@ -459,10 +551,11 @@ class WechatApplyment:
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:raise ValueError('INVALID_WECHAT_APPLYMENT_REQUEST')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf);op,p=body['operation'],body['params']
-        fields={'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
+        fields={'wechat_qualifications_select':{'application','expected_version','application_revision','kind','media_id','selected'},'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
             'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
             'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
-        if type(op) is not str or op not in fields or set(p)!=fields[op]:raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        allowed=fields.get(op) if type(op) is str else None
+        if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
@@ -483,7 +576,16 @@ class WechatApplyment:
             from qrcode.image.svg import SvgPathImage
             image=qrcode.make(record['provider_sign_url'],image_factory=SvgPathImage,box_size=8,border=4);output=BytesIO();image.save(output)
             svg=output.getvalue();return dict(application=application,applyment_id=record.get('applyment_id'),url_sha256=hashlib.sha256(record['provider_sign_url'].encode()).hexdigest(),svg_data='data:image/svg+xml;base64,'+base64.b64encode(svg).decode())
-        if op in ('wechat_read','wechat_review_read'):return record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')
+        if op in ('wechat_read','wechat_review_read'):
+            result=json.loads(canonical(record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')))
+            if op=='wechat_review_read':
+                try:
+                    plan=self.industry_review_plan((record or {}).get('profile',{}),application,meta)
+                    result['industry_review']=dict(status='READY',plan=plan,application_revision=platform['revision'])
+                except (ValueError,PermissionError):
+                    # Incomplete drafts remain readable; never invent a valid plan.
+                    result['industry_review']=dict(status='INCOMPLETE',error_code='INDUSTRY_SELECTION_OR_CURRENT_MATERIALS_INCOMPLETE',application_revision=platform['revision'])
+            return result
         if op=='wechat_query':
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')
             merchant=self._provider_domain(record)
@@ -571,6 +673,7 @@ class WechatApplyment:
             self._validate(record['profile'],meta['entity_type'])
             if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
             if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
+            self.check_industry_review(record,application,owner,meta,platform)
             self._validate_media(record['profile'],application,meta)
             code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([merchant,application,version])).hexdigest()[:30]
             correction=record.get('correction_receipt')
@@ -642,7 +745,62 @@ class WechatApplyment:
             if self.onboarding._load(application,uid,reviewer)[2]['status']=='WITHDRAWN':
                 raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
             if self._read(application)!=record:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
-            if op=='wechat_cashier_link':
+            if op in ('wechat_review','wechat_submit_review') and self.onboarding._load(application,uid,reviewer)!=(owner,meta,platform):raise ValueError('WECHAT_APPLYMENT_CHANGED')
+            if op=='wechat_qualifications_select':
+                from scripts.community_merchant_onboarding import INDUSTRY_MATERIAL_KINDS
+                _,meta,current_platform=self.onboarding._load(application,uid)
+                if uid!=owner or current_platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('OWNER_INDUSTRY_DRAFT_REQUIRED')
+                if type(p['application_revision']) is not int or p['application_revision']!=current_platform['revision']:raise ValueError('INDUSTRY_APPLICATION_REVISION_CONFLICT')
+                if type(p['kind']) is not str or p['kind'] not in INDUSTRY_MATERIAL_KINDS or type(p['selected']) is not bool:raise ValueError('INVALID_INDUSTRY_SELECTION')
+                receipts=self.industry_media_receipts(application,meta)
+                values=record.get('profile',{}).get('settlement_info',{}).get('qualifications',[])
+                if type(values) is not list:raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
+                # Removing a known retained slot is not admitting expired media.
+                # Bind the removal to the protected server record, never client SHA.
+                if not p['selected']:
+                    if p['media_id'] is not None:raise ValueError('DESELECT_WITHOUT_MEDIA_REQUIRED')
+                    removed={b['media_id'] for b in record.get('industry_qualification_bindings',[])
+                             if b.get('kind')==p['kind']}
+                    if 'industry_qualification_bindings' not in record:
+                        # Legacy single-slot profiles predate persisted bindings.
+                        # A protected historical receipt may prove removal only;
+                        # it is never added to the current admission set.
+                        material=meta['materials'].get(p['kind'])
+                        if material:
+                            key=hashlib.sha256(canonical([self.reader._mchid,application,p['kind'],material['sha256']])).hexdigest()
+                            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=?",(key,application)).fetchone()
+                            if row:
+                                historical=json.loads(c.decrypt(row[0],'wechat-media:'+key))
+                                media=historical.get('media_id')
+                                if (historical.get('kind')==p['kind'] and historical.get('sha256')==material['sha256']
+                                        and type(media) is str and media in values
+                                        and type(historical.get('provider_response_sha256')) is str
+                                        and re.fullmatch('[0-9a-f]{64}',historical['provider_response_sha256'])):
+                                    removed.add(media)
+                    values=[v for v in values if v not in removed]
+                available=receipts
+                if not p['selected']:
+                    # Retain other known (possibly expired) selections without
+                    # certifying them. They must still pass review/execute checks.
+                    retained={b['media_id']:b for b in record.get('industry_qualification_bindings',[])
+                              if b.get('kind') in INDUSTRY_MATERIAL_KINDS}
+                    available=dict(retained,**receipts)
+                if any(v not in available for v in values):raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
+                chosen={available[v]['kind']:available[v] for v in values}
+                if p['selected']:
+                    if type(p['media_id']) is not str:raise ValueError('INVALID_INDUSTRY_MEDIA_ID')
+                    receipt=receipts.get(p['media_id'])
+                    if receipt is None or receipt['kind']!=p['kind']:raise PermissionError('EXACT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
+                    chosen[p['kind']]=receipt
+                else:
+                    if p['media_id'] is not None:raise ValueError('DESELECT_WITHOUT_MEDIA_REQUIRED')
+                    chosen.pop(p['kind'],None)
+                bindings=[chosen[k] for k in INDUSTRY_MATERIAL_KINDS if k in chosen]
+                result=json.loads(canonical(record));settlement=result['profile'].setdefault('settlement_info',{})
+                if bindings:settlement['qualifications']=[v['media_id'] for v in bindings]
+                else:settlement.pop('qualifications',None)
+                result.update(industry_qualification_bindings=bindings,version=version+1,state='DRAFT')
+            elif op=='wechat_cashier_link':
                 if platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('CASHIER_DRAFT_REQUIRED')
                 material=meta['materials'].get('cashier_photo')
                 media=p['media_id']
@@ -682,11 +840,26 @@ class WechatApplyment:
                 require_confirmed_declarations(meta,(record or {}).get('profile'))
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
                 self._validate(record['profile'],meta['entity_type'])
+                self.industry_review_plan(record['profile'],application,meta)
                 if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
                 result=dict(record,version=version+1,state='PENDING_INTERNAL_REVIEW')
             else:
                 if uid==owner or record is None or record['state']!='PENDING_INTERNAL_REVIEW' or p['decision'] not in ('INTERNAL_APPROVED','CORRECTION') or type(p['opinion']) is not str or not 1<=len(p['opinion'])<=1000:raise PermissionError('INDEPENDENT_PAYMENT_APPLICATION_REVIEW_REQUIRED')
                 result=dict(record,version=version+1,state=p['decision'],opinion=p['opinion'],reviewer=uid)
+                result.pop('industry_review_evidence',None)
+                if p['decision']=='INTERNAL_APPROVED':
+                    from scripts.community_industry_rules import validate_review_evidence
+                    plan=self.industry_review_plan(record['profile'],application,meta)
+                    if plan['requires_explicit_review']:
+                        evidence=dict(application=application,application_revision=platform['revision'],
+                            profile_version=result['version'],reviewer_id=uid,decision='CONDITIONS_CONFIRMED',
+                            branch_assessments=p.get('industry_branch_assessments'),
+                            **{key:plan[key] for key in ('rule_sha256','materials_sha256','profile_sha256')})
+                        validate_review_evidence(plan,evidence,application=application,
+                            application_revision=platform['revision'],profile_version=result['version'],
+                            owner_id=owner,authorized_reviewer_id=uid)
+                        result['industry_review_evidence']=evidence
+
             self._save(application,owner,result);c.audit(application,uid,'WECHAT_'+op.upper(),str(result['version']))
         return result
     @staticmethod

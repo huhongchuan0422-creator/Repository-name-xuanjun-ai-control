@@ -41,7 +41,7 @@ test('review presence counts same-application OCR without changing saved submit 
 test('bank is four customer fields with auto-derived name; industry configuration is separate',()=>{
  const f=fixture();f.page.profile={subject_info:{identity_info:{id_card_info:{id_card_name:'SYNTHETIC PERSON'}}},bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();
  const bank=f.page.data.displayReviewGroups.find(g=>g.id==='bank');assert.equal(bank.total,4);assert.equal(bank.completed,4);assert.match(bank.pendingText,/结算开户名称/);assert.ok(!bank.items.some(i=>i.path.startsWith('settlement_info.')));
- const configuration=f.page.data.displayReviewGroups.find(g=>g.configuration);assert.equal(configuration.total,2);assert.equal(configuration.completed,0);
+ const industry=f.page.data.displayReviewGroups.find(g=>g.id==='industry');assert.equal(industry.total,1);assert.equal(industry.completed,0);assert.match(industry.industryStatus,/系统按当前主体匹配官方规则/);
  assert.equal(f.page.profile.bank_account_info.account_name,undefined);assert.equal(f.page.data.reviewGroups.find(g=>g.id==='bank').completed,3);
  f.page.profile.subject_info.business_license_info={legal_person:'DIFFERENT SYNTHETIC PERSON'};f.page.refresh();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
  f.page.profile.bank_account_info.account_name='EXISTING SAVED NAME';f.page.refresh();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);assert.match(f.page.data.displayReviewGroups.find(g=>g.id==='bank').pendingText,/不一致/);
@@ -57,6 +57,6 @@ for(const change of ['session','generation','scene','source','logout'])test('dis
  if(change==='session')f.page.session={...f.session};if(change==='generation')f.session.getGeneration=()=>2;if(change==='scene')f.page.scene='other';if(change==='source')f.page.data.application.materials.business_license.object_id='other';if(change==='logout')f.session.isAuthenticated=()=>false;
  f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);assert.equal(f.page.profile.bank_account_info.account_name,undefined);
 });
-test('configuration notice is confined to review card and never replaces original edit/confirm actions',()=>{
- const wxml=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxml'),'utf8');assert.equal((wxml.match(/由平台核定微信结算配置/g)||[]).length,1);assert.equal((wxml.match(/wx:if="\{\{!item.configuration\}\}"/g)||[]).length,1);assert.match(wxml,/displayReviewGroups/);assert.match(wxml,/bindtap="confirmReuse"/);
+test('industry UI hides internal field identifiers and preserves original edit/confirm actions',()=>{
+ const wxml=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxml'),'utf8');assert.equal((wxml.match(/bindchange="chooseIndustry"/g)||[]).length,1);assert.doesNotMatch(wxml,/settlement_id|qualification_type/);assert.match(wxml,/displayReviewGroups/);assert.match(wxml,/bindtap="confirmReuse"/);
 });

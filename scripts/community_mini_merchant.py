@@ -8,7 +8,7 @@ from scripts.community_mini_center_identity import CenterIdentity
 from scripts.community_merchant_onboarding import MerchantOnboarding,validate_mini_license_region
 
 APPLICANT={'material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
-           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link'}
+           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link','wechat_qualifications_select'}
 WRITES={'community.profile','community.item'}
 READS={'community.orders','community.summary','community.orders_page',
        'community.order_detail','community.merchant_settings','community.ads',

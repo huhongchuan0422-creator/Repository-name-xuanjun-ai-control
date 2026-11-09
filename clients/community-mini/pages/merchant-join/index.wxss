@@ -49,3 +49,9 @@
 .material-upload-label{display:block;max-width:100%;padding:18rpx 24rpx;border-radius:16rpx;background:rgba(25,46,48,.90);color:#fff;font-size:30rpx;font-weight:600;line-height:1.6;text-align:center;word-break:break-word}
 
 .material-ocr-overlay .material-ocr-label{font-size:36rpx;font-weight:700;line-height:1.5}
+
+/* The industry picker must shrink inside the mobile card, including long labels. */
+.industry-section{min-width:0;max-width:100%;box-sizing:border-box;}
+.industry-picker{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
+.industry-picker view{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-all;box-sizing:border-box;}
+.industry-section .hint{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;}
