@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Existing customer runtime dependencies for real HTTP tests
+        run: python -m pip install cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
       - name: Real isolated root tests with failure propagation
         shell: bash
         run: |
