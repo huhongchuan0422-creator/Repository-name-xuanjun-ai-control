@@ -347,8 +347,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(200,{'result':result,'payment_enabled':False})
             except LoginUnavailable:return self.answer(503,{'error':'LOGIN_UNKNOWN_OR_REJECTED'})
             except PermissionError as error:
+                from scripts.pr122_customer_core import Denied
+                if type(error) is Denied and str(error)=='RATE_LIMIT':return self.answer(429,{'error':'RATE_LIMIT'})
                 from scripts.community_ocr_host import OcrPublicError
-                from scripts.community_wechat_applyment import WechatMediaUnavailable
+                from scripts.community_wechat_applyment import WechatMediaUnavailable, WechatMediaPending
+                if type(error) is WechatMediaPending:return self.answer(409,{'error':'WECHAT_MEDIA_RESULT_UNKNOWN'})
                 if type(error) is OcrPublicError:return self.answer(403,error.public_payload())
                 return self.answer(403,{'error':'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except RegionValidationError as error:

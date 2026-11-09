@@ -37,3 +37,7 @@ for(const [status,operation,params,code,preserved] of [
  await assert.rejects(s.merchant('',operation,params),e=>e.code==='ACCESS_DENIED'&&(e.sessionPreserved===true)===preserved);
  assert.equal(s.isAuthenticated(),preserved);assert.equal(calls.length,2,'failed capability is never retried or represented as success');
 });
+for(const status of [409,408,502,503,504])test(`unknown media ${status} stays failed, preserves identity and does not retry`,async()=>{
+ const calls=[],wx={login:o=>o.success({code:'synthetic'}),request(o){calls.push(o);o.success(o.url.endsWith('/mini/login')?{statusCode:200,data:{payment_enabled:false,result:{provider:'WECHAT_MINIPROGRAM',session_token:'S'.repeat(32),expires_at:1100,payment_enabled:false}}}:{statusCode:status,data:{error:'WECHAT_MEDIA_RESULT_UNKNOWN'}});}};
+ const s=sessions.getSharedSession(wx,{baseUrl:'https://fixture.invalid'},()=>1000);await s.ensureLogin();await assert.rejects(s.merchant('','onboarding',{operation:'wechat_media',params:{}}),e=>e.mediaCode==='WECHAT_MEDIA_RESULT_UNKNOWN');assert.equal(s.isAuthenticated(),true);assert.equal(calls.length,2);
+});

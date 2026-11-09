@@ -13,6 +13,7 @@ RUNTIME_CHANGED = {
     'scripts/community_bank_card_layout.py',
     'scripts/community_mini_center_identity.py',
     'scripts/community_h5_context.py',
+    'scripts/community_h5.py',
     'scripts/community_platform_host.py',
     'demos/community-stage/ui-preview/sources.js',
     'services/ocr_engine/api.py',

@@ -118,7 +118,8 @@ def make_handler(h5, dist):
                 # as account revocation. No threshold/window or authority changes.
                 if type(error) is Denied and str(error)=='RATE_LIMIT':return self.answer(429,{'error':'RATE_LIMIT'})
                 from scripts.community_ocr_host import OcrPublicError
-                from scripts.community_wechat_applyment import WechatMediaUnavailable
+                from scripts.community_wechat_applyment import WechatMediaUnavailable, WechatMediaPending
+                if type(error) is WechatMediaPending:return self.answer(409,{'error':'WECHAT_MEDIA_RESULT_UNKNOWN'})
                 if type(error) is OrderUnavailable:return self.answer(403,{'error':'ORDER_UNAVAILABLE'})
                 self.answer(403,error.public_payload() if type(error) is OcrPublicError else {'error':'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except RegionValidationError as error:self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})

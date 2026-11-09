@@ -14,6 +14,7 @@ function customerError(error) {
   if(error&&error.networkKind==='DOMAIN')return '小程序服务域名校验未通过（NET_DOMAIN），请联系项目负责人';
   if(error&&error.networkKind==='TLS')return '安全连接未建立（NET_TLS），请联系项目负责人';
   if(error&&error.uploadResultUnknown===true)return '上传结果暂未确认，请先重新读取原申请，勿重复上传';
+  if(error&&error.mediaCode==='WECHAT_MEDIA_RESULT_UNKNOWN')return '微信材料处理结果待核实，原申请和已完成关联已保留；请刷新进度，系统不会重复发送该材料';
   if(error&&error.networkKind==='TIMEOUT')return '登录连接超时（NET_TIMEOUT），请点击重新登录；不会自动重复请求';
   if(error&&error.mediaCode==='WECHAT_MEDIA_UNAVAILABLE')return '照片已保存在原申请；微信材料关联服务尚未开放，未关联或提交微信，可继续保存资料';
   if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
@@ -45,14 +46,16 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       success:r=>{
         if(r.statusCode===200){resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
+        if(r.statusCode===429&&r.data&&r.data.error==='RATE_LIMIT'&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&typeof data.params.operation==='string'&&data.params.operation.startsWith('wechat_'))error.wechatRateLimited=true;
         if(path==='/mini/merchant'&&data.operation==='ocr')error.ocrDiagnostic=safeOcrDiagnostic(r.data&&r.data.ocr_diagnostic);
         // Gateway/server failures cannot prove whether this upload was persisted.
         // Keep it failed and require an original-application read before any retry.
         if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'&&[408,502,503,504].includes(r.statusCode))error.uploadResultUnknown=true;
+        if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='wechat_media'&&((r.statusCode===409&&r.data&&r.data.error==='WECHAT_MEDIA_RESULT_UNKNOWN')||[408,502,503,504].includes(r.statusCode)))error.mediaCode='WECHAT_MEDIA_RESULT_UNKNOWN';
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
         if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
-        if(r.statusCode===400&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&['submit','wechat_submit_review'].includes(data.params.operation)&&r.data&&r.data.error==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(r.data.reason))error.regionReason=r.data.reason;
+        if(r.statusCode===400&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&['submit','wechat_submit_review','wechat_apply'].includes(data.params.operation)&&r.data&&r.data.error==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(r.data.reason))error.regionReason=r.data.reason;
         // Preserve a credential only for exact, typed capability-unavailable replies.
         // The operation still fails; generic access denial and every 401 clear it.
         if(r.statusCode===403&&path==='/mini/merchant'){
@@ -71,6 +74,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         else if(/ssl|tls|certificate|cert authority/.test(message))error.networkKind='TLS';
         else if(/timeout|timed out/.test(message))error.networkKind='TIMEOUT';
         if(error.networkKind==='TIMEOUT'&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload')error.uploadResultUnknown=true;
+        if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='wechat_media'&&!['DOMAIN','TLS'].includes(error.networkKind))error.mediaCode='WECHAT_MEDIA_RESULT_UNKNOWN';
         reject(error);
       }});
   });
@@ -159,7 +163,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       const applicantOcr=scene===''&&operation==='ocr'&&params&&['submit','read','confirm','delete','apply_confirmed','recover_view','recover_confirm','recover_apply'].includes(params.action);
       const applicantOnly=applicantOcr||scene===''&&operation==='onboarding'&&params&&
-        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link','wechat_qualifications_select'].includes(params.operation);
+        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_apply','wechat_status','wechat_media','wechat_cashier_link','wechat_qualifications_select'].includes(params.operation);
       if((!applicantOnly&&(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)))||
          !['workspaces','onboarding','read','write','collection_code','ocr'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
       const version=generation;

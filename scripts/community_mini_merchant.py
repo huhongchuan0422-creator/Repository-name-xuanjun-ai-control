@@ -8,7 +8,7 @@ from scripts.community_mini_center_identity import CenterIdentity
 from scripts.community_merchant_onboarding import MerchantOnboarding,validate_mini_license_region
 
 APPLICANT={'material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
-           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_media','wechat_cashier_link','wechat_qualifications_select'}
+           'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_apply','wechat_status','wechat_media','wechat_cashier_link','wechat_qualifications_select'}
 WRITES={'community.profile','community.item'}
 READS={'community.orders','community.summary','community.orders_page',
        'community.order_detail','community.merchant_settings','community.ads',
@@ -94,7 +94,7 @@ class MiniMerchant:
         platform revision. Never substitute a phone from the other record.
         """
         op=body['operation']
-        if op not in ('submit','wechat_submit_review'):return
+        if op not in ('submit','wechat_submit_review','wechat_apply'):return
         params=body['params']
         version_key='revision' if op=='submit' else 'expected_version'
         if type(params) is not dict or set(params)!={'application',version_key}:
@@ -114,7 +114,7 @@ class MiniMerchant:
             raise ValueError('MINI_SUBMIT_VERSION_CONFLICT')
         if type(mobile) is not str or not re.fullmatch(r'[0-9]{11}',mobile):
             raise ValueError('INVALID_MINI_CONTACT_MOBILE')
-        if op=='wechat_submit_review':validate_mini_license_region(meta,profile)
+        if op in ('wechat_submit_review','wechat_apply'):validate_mini_license_region(meta,profile)
 
     def _dispatch_ocr(self,token,scene,p):
         from scripts.community_ocr_host import HostOcr, OcrPublicError

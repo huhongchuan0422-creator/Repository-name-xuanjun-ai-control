@@ -19,6 +19,10 @@ class WechatMediaUnavailable(PermissionError):
     """Explicitly disabled provider capability, never an authentication result."""
 
 
+class WechatMediaPending(PermissionError):
+    """A durable provider attempt lacks a verified receipt; never blindly resend."""
+
+
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
 
 PROVIDER_WORKFLOW={
@@ -552,13 +556,17 @@ class WechatApplyment:
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf);op,p=body['operation'],body['params']
         fields={'wechat_qualifications_select':{'application','expected_version','application_revision','kind','media_id','selected'},'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
-            'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
+            'wechat_apply':{'application','expected_version'},'wechat_status':{'application'},'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
             'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
         allowed=fields.get(op) if type(op) is str else None
         if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        applicant_action=op in ('wechat_apply','wechat_status')
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
+        if applicant_action:
+            if uid!=owner:raise PermissionError('ORIGINAL_APPLICANT_REQUIRED')
+            op='wechat_execute' if op=='wechat_apply' else 'wechat_query'
         if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
             raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
@@ -593,6 +601,8 @@ class WechatApplyment:
             verified=signed_response_context(verified)
             if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
             applyment_id=provider_applyment_id(data)
+            recovered_initial=(applicant_action and record['state']=='SUBMISSION_UNKNOWN'
+                and not record.get('replacement_submission',False) and record.get('applyment_id') is None)
             recovered_generation=(record['state']=='SUBMISSION_UNKNOWN'
                 and record.get('replacement_submission',False)
                 and record.get('applyment_id') is not None
@@ -603,7 +613,7 @@ class WechatApplyment:
             if data['applyment_state'] not in allowed:raise ValueError('UNKNOWN_PROVIDER_APPLICATION_STATE')
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                self.onboarding._load(application,uid,True)
+                _,_,live_platform=self.onboarding._load(application,uid,reviewer)
                 current=self._read(application)
                 if current!=record:raise ValueError('APPLYMENT_CHANGED')
                 if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
@@ -625,7 +635,7 @@ class WechatApplyment:
                     provider_query_signature_sha256=verified['signature_sha256'])
                 current['provider_query_signatures']=sorted(
                     set(current.get('provider_query_signatures',[]))|{verified['signature_sha256']})
-                if recovered_generation:
+                if recovered_generation or recovered_initial:
                     # A previously unseen provider identity, explicitly returned
                     # for this business_code, distinguishes the new application.
                     # Same-ID status changes alone cannot recover an unknown POST.
@@ -659,6 +669,12 @@ class WechatApplyment:
                             applyment_id=applyment_id,
                             signature_sha256=verified['signature_sha256'],signed_at=verified['signed_at'],
                             response_sha256=digest,observed_at=c.now()))
+                if (current.get('applicant_direct_submission') and current['state']=='CORRECTION'
+                        and live_platform['status'] in ('SUBMITTED','IN_REVIEW')):
+                    from scripts import community_onboarding_offline as workflow
+                    revision=live_platform['revision']+1
+                    c.db.execute("UPDATE onboarding SET status='CORRECTION_REQUIRED',revision=? WHERE tenant=? AND application=?",(revision,owner,application))
+                    workflow._append(c.db,owner,application,revision,uid,'WECHAT_OFFICIAL_CORRECTION',{'response_sha256':digest})
                 self._check_response_owner(application,record['business_code'],merchant,applyment_id,verified)
                 current['provider_sp_mchid']=merchant
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
@@ -667,14 +683,24 @@ class WechatApplyment:
         if type(p['expected_version']) is not int or p['expected_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
         if op=='wechat_execute':
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
-            if record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
+            if applicant_action:
+                from scripts.community_merchant_onboarding import require_confirmed_declarations
+                require_confirmed_declarations(meta,(record or {}).get('profile'))
+                if record is None or record['state'] not in ('DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'):raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
+            elif record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
             merchant=self._provider_domain(record,submission=True)
             self.onboarding._check_materials(application,meta)
             self._validate(record['profile'],meta['entity_type'])
             if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
             if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
-            self.check_industry_review(record,application,owner,meta,platform)
+            if applicant_action:self.industry_review_plan(record['profile'],application,meta)
+            else:self.check_industry_review(record,application,owner,meta,platform)
             self._validate_media(record['profile'],application,meta)
+            if applicant_action and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
+                # Freeze this submitted snapshot through the original owner action.
+                # This is not platform approval and grants no operational access.
+                self.onboarding.dispatch(session,csrf,{'operation':'submit','params':{'application':application,'revision':platform['revision']}})
+                owner,meta,platform=self.onboarding._load(application,uid)
             code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([merchant,application,version])).hexdigest()[:30]
             correction=record.get('correction_receipt')
             if record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
@@ -692,7 +718,7 @@ class WechatApplyment:
             payload=dict(self._encrypt(record['profile']),business_code=code)
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                current_owner,current_meta,current_platform=self.onboarding._load(application,uid,True)
+                current_owner,current_meta,current_platform=self.onboarding._load(application,uid,reviewer)
                 if (current_owner,current_meta,current_platform)!=(owner,meta,platform):raise ValueError('WECHAT_APPLYMENT_CHANGED')
                 current=self._read(application)
                 if current!=record:raise ValueError('WECHAT_APPLYMENT_CHANGED')
@@ -703,6 +729,7 @@ class WechatApplyment:
                 if correction:
                     current['consumed_rejections']=[*current.get('consumed_rejections',[]),
                         dict(correction,submission_version=version)]
+                if applicant_action:current['applicant_direct_submission']=True
                 current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
             data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
@@ -722,7 +749,7 @@ class WechatApplyment:
                 raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                self.onboarding._load(application,uid,True)
+                self.onboarding._load(application,uid,reviewer)
                 current=self._read(application)
                 if not original_submission_intent(current,code,version):
                     raise ValueError('APPLYMENT_SUBMISSION_RACE_QUERY_EXISTING_ONLY')
@@ -915,15 +942,34 @@ class WechatApplyment:
         boundary='xj'+secrets.token_hex(24)
         body=('--'+boundary+'\r\nContent-Disposition: form-data; name="meta"\r\nContent-Type: application/json\r\n\r\n').encode()+metadata+('\r\n--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="'+filename+'"\r\nContent-Type: '+row[3]+'\r\n\r\n').encode()+raw+('\r\n--'+boundary+'--\r\n').encode()
         if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
-        if self.onboarding._load(application,uid)[2]['status']=='WITHDRAWN':raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
-        # Once sent, retain the original response evidence even if the applicant
-        # later withdraws locally. Withdrawal never cancels a provider operation.
-        data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
-        if type(data.get('media_id')) is not str or not 1<=len(data['media_id'])<=1024:raise ValueError('INVALID_PROVIDER_MEDIA_ID')
+        _,fresh_meta,fresh_platform=self.onboarding._load(application,uid)
+        if fresh_platform['status']=='WITHDRAWN':raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
+        if fresh_meta['materials'].get(kind)!=material:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_CHANGED')
+        key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+        # The source/session checks above apply to reuse as well as first transmission.
         with c.tx():
-            if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
-            self.onboarding._load(application,uid)
-            key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,owner,application)).fetchone()
+            if row is not None:
+                receipt=json.loads(c.decrypt(row['payload'],'wechat-media:'+key))
+                if (receipt.get('kind')!=kind or receipt.get('sha256')!=material['sha256']
+                        or type(receipt.get('media_id')) is not str or not 1<=len(receipt['media_id'])<=1024):
+                    raise ValueError('INVALID_SAVED_PROVIDER_MEDIA_RECEIPT')
+                return dict(media_id=receipt['media_id'],kind=kind,source_sha256=material['sha256'])
+            if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_MEDIA_ATTEMPT' AND event_id=?",(key,)).fetchone():
+                raise WechatMediaPending('WECHAT_MEDIA_RESULT_UNKNOWN')
+            c.db.execute("INSERT INTO events VALUES('WECHAT_MEDIA_ATTEMPT',?,?)",(key,c.now()))
+            c.audit(application,uid,'WECHAT_MEDIA_UPLOAD_ATTEMPT',key)
+        try:
+            data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
+            if type(data.get('media_id')) is not str or not 1<=len(data['media_id'])<=1024:raise ValueError('INVALID_PROVIDER_MEDIA_ID')
+        except Exception as error:
+            raise WechatMediaPending('WECHAT_MEDIA_RESULT_UNKNOWN') from error
+        # Persist an authentic response even if identity/source changes during the request.
+        # A later call must still pass current source/session checks before reuse.
+        with c.tx():
             c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_WECHAT_MEDIA',?,?,?,?,1)",(key,owner,application,c.encrypt(canonical(dict(media_id=data['media_id'],kind=kind,sha256=material['sha256'],provider_response_sha256=digest)),'wechat-media:'+key)))
             c.audit(application,uid,'WECHAT_MEDIA_UPLOADED',key)
+        if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+        _,current_meta,current_platform=self.onboarding._load(application,uid)
+        if current_meta['materials'].get(kind)!=material:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_CHANGED')
         return dict(media_id=data['media_id'],kind=kind,source_sha256=material['sha256'])

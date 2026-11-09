@@ -294,6 +294,7 @@ class MerchantOnboarding:
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
             opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
             opening_workspaces=workspaces,
+            application_result=(wechat_record.get('provider_state') if wechat_record.get('provider_state') not in (None,'NOT_SUBMITTED','NOT_VERIFIED') else 'PROVIDER_ACCEPTED' if wechat_record.get('state')=='SUBMITTED_TO_PROVIDER' else 'SUBMISSION_UNKNOWN' if wechat_record.get('state')=='SUBMISSION_UNKNOWN' else 'DRAFT') if wechat_record and wechat_record.get('applicant_direct_submission') else None,
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',
             wechat_provider_workflow=provider_workflow_view(wechat_record),payment_enabled=False)
     def _material_preview(self,session,csrf,uid,params):

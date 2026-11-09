@@ -72,7 +72,7 @@ function reviewRequirements(profile,options,materials,application){
  const result=[];
  for(const step of [0,1,2])for(const group of materialGroups(profile,options,materials,step)){
   const items=[],seen=new Set();
-  const add=(path,label,value=get(profile,path))=>{if(seen.has(path))return;seen.add(path);items.push({path,label,complete:present(value)});};
+  const add=(path,label,value=get(profile,path))=>{if(seen.has(path))return;seen.add(path);items.push({path,label,complete:path==='contact_info.mobile_phone'?!mobilePhoneError(value,true):present(value)});};
   for(const f of group.fields)if(f.required){
    if(f.path.endsWith('mini_program_appid'))add('mini_appid','小程序 AppID（服务商或商户任选一项）',present(get(profile,f.path))||present(get(profile,f.path.replace('mini_program_appid','mini_program_sub_appid'))));
    else add(f.path,f.label);
@@ -92,20 +92,34 @@ function reviewRequirements(profile,options,materials,application){
   }
   for(const m of group.materials){
    if(group.optional||m.id==='cashier_photo')continue;
-   if(industryMaterialKind(m.id)&&!m.required&&!(m.id==='industry_permit'&&options.category==='FOOD'))continue;
-   items.push({path:'material:'+m.id,label:m.title,complete:!!m.uploaded&&(industryMaterialKind(m.id)||!!m.synced),material:true,uploaded:!!m.uploaded,wechatRequired:!industryMaterialKind(m.id),synced:!!m.synced});
+   if(industryMaterialKind(m.id)&&!(group.industryUploadAllowed&&m.uploaded)&&!m.required&&!(m.id==='industry_permit'&&options.category==='FOOD'))continue;
+   items.push({path:'material:'+m.id,label:m.title,complete:!!m.uploaded&&(industryMaterialKind(m.id)||!!m.synced),material:true,uploaded:!!m.uploaded,wechatRequired:!industryMaterialKind(m.id),autoWechat:industryMaterialKind(m.id)&&group.industryUploadAllowed===true,synced:!!m.synced});
   }
   if(group.id==='license'&&get(profile,'subject_info.finance_institution')===true){add('subject_info.finance_institution_info.finance_type','金融机构类型');add('subject_info.finance_institution_info.finance_license_pics','金融业务许可证资料');}
   if(group.id==='bank'&&get(profile,'settlement_info.activities_id')){add('settlement_info.debit_activities_rate','优惠活动借记卡费率');add('settlement_info.credit_activities_rate','优惠活动信用卡费率');}
   const missing=items.filter(x=>!x.complete);
-  result.push({id:group.id,title:group.title,step,items,total:items.length,completed:items.length-missing.length,missing:missing.map(x=>x.label+(x.material&&x.uploaded?'（尚未用于微信申请）':'')),missingText:missing.map(x=>x.label+(x.material&&x.uploaded?'（尚未用于微信申请）':'')).join('、')});
+  result.push({id:group.id,title:group.title,step,items,total:items.length,completed:items.length-missing.length,missing:missing.map(x=>x.label+(x.material&&x.uploaded?'（提交时自动处理）':'')),missingText:missing.map(x=>x.label+(x.material&&x.uploaded?'（提交时自动处理）':'')).join('、')});
  }
  return result;
 }
 function assertReviewComplete(groups,application,{platform,wechat}){
- const missing=[];
- if(wechat)for(const g of groups)for(const item of g.items)if(item.material?item.wechatRequired&&!item.synced:!item.complete)missing.push((item.path==='settlement_info.settlement_id'||item.path==='settlement_info.qualification_type'?'经营行业：请选择真实行业，结算配置待系统或平台核定':g.title+'：'+item.label)+(item.material&&item.uploaded?'（已上传，尚未用于微信申请）':''));
- if(platform&&application){for(const kind of application.required_materials||[])if(!(application.materials||{})[kind]){const item=groups.flatMap(g=>g.items).find(x=>x.path==='material:'+kind);const label=item?item.label:kind;if(!missing.some(x=>x.includes(label)))missing.push('原申请证照：'+label);}}
- if(missing.length){const e=Error('必填资料尚未完成，请补齐：'+missing.join('；'));e.submitPreflight=true;e.issues=missing;throw e;}
+ const issues=[];
+ const add=(g,item,message)=>{if(issues.some(i=>i.path===item.path))return;issues.push({id:issues.length,message,step:g.step,group:['settlement_info.settlement_id','settlement_info.qualification_type'].includes(item.path)?'industry':g.id,path:item.path});};
+ if(wechat)for(const g of groups)for(const item of g.items)if(item.material?item.wechatRequired&&!item.synced:!item.complete)add(g,item,(item.path==='settlement_info.settlement_id'||item.path==='settlement_info.qualification_type'?'经营行业：请选择真实行业，结算配置待系统或平台核定':g.title+'：'+item.label)+(item.material&&item.uploaded?'（已上传，待自动处理）':''));
+ if(platform&&application)for(const kind of application.required_materials||[])if(!(application.materials||{})[kind]){const g=groups.find(g=>g.items.some(x=>x.path==='material:'+kind))||{id:'license',step:0,items:[]};const item=g.items.find(x=>x.path==='material:'+kind)||{path:'material:'+kind,label:kind};add(g,item,'原申请证照：'+item.label);}
+ if(issues.length){const e=Error('必填资料尚未完成，请补齐：'+issues.map(i=>i.message).join('；'));e.submitPreflight=true;e.issues=issues.map(i=>i.message);e.submitIssues=issues;throw e;}
 }
-module.exports={industryMaterialKind,industryMaterialSynced,assertReviewComplete,reviewRequirements,get,put,rows,platformFields,docs,materialGroups,mobilePhoneError,legalContactName,storeReuseFields,reuseStoreFields,servicePhoneReuse,reuseServicePhone,reuseHint,reusedFieldLinks,syncReusedFields,personalAccountReuse,legalContactReuse,reusedFields,regionReuse};
+// Plan only already-uploaded required originals. This does not claim provider acceptance.
+function reviewMaterialPlan(groups,application,sides){
+ const kinds=[];
+ const projected=groups.map(group=>({...group,items:group.items.map(item=>{
+  if(sides.wechat&&item.material&&(item.wechatRequired||item.autoWechat)&&!item.synced&&item.uploaded){
+   const kind=item.path.startsWith('material:')?item.path.slice(9):'';
+   if(kind&&kind!=='bank_card'&&application&&application.materials&&application.materials[kind]){if(!kinds.includes(kind))kinds.push(kind);return {...item,synced:true,complete:true};}
+  }
+  return item;
+ })}));
+ assertReviewComplete(projected,application,sides);
+ return kinds;
+}
+module.exports={reviewMaterialPlan,industryMaterialKind,industryMaterialSynced,assertReviewComplete,reviewRequirements,get,put,rows,platformFields,docs,materialGroups,mobilePhoneError,legalContactName,storeReuseFields,reuseStoreFields,servicePhoneReuse,reuseServicePhone,reuseHint,reusedFieldLinks,syncReusedFields,personalAccountReuse,legalContactReuse,reusedFields,regionReuse};

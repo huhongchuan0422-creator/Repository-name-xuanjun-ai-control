@@ -55,3 +55,5 @@
 .industry-picker{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;}
 .industry-picker view{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-all;box-sizing:border-box;}
 .industry-section .hint{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;}
+
+.missing-field-highlight{outline:4rpx solid #b94732;background:#fff4ef}.missing-summary{border:2rpx solid #b94732}.missing-summary button{white-space:normal;text-align:left;color:#8d2f20}
