@@ -1,0 +1,21 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+function setup(confirm=false){
+ let epoch=0,definition;const sessions=[];
+ const auth={current:()=>epoch,active:e=>e===epoch};
+ const module={parseScene:()=>{},createSession:()=>{const s={valid:false,cleared:0,loginCount:0,isAuthenticated(){return this.valid;},clear(){this.valid=false;this.cleared++;},async login(){this.valid=true;this.loginCount++;},async customer(){return {contexts:[{scene:'fixture'}],has_more:false};},async h5Browser(){return {origin:'https://uk.wenwenwenyiyiyi.work',scene:'fixture',verification:'a'.repeat(32),expires_at:9999999999};}};sessions.push(s);return s;}};
+ vm.runInNewContext(fs.readFileSync(__dirname+'/pages/h5-confirm/index.js','utf8'),{Page:p=>definition=p,require:p=>p==='../../session'?module:auth,wx:{showModal:o=>o.success({confirm})}});
+ const page={...definition,data:{...definition.data},setData(p){Object.assign(this.data,p);}};page.onLoad();page.data.challenge='a'.repeat(43);
+ return {page,sessions,revoke(){epoch++;}};
+}
+test('H5 account epoch change clears independent token before fresh wx login',async()=>{const e=setup();await e.page.describe();assert.equal(e.sessions.length,1);e.revoke();await e.page.describe();assert.equal(e.sessions[0].cleared,1);assert.equal(e.sessions.length,2);assert.equal(e.sessions[1].loginCount,1);});
+test('H5 revoke and unload discard token and previous authorization contexts',async()=>{const e=setup();await e.page.describe();e.page.customerSessionRevoked();assert.equal(e.page.session,null);assert.equal(e.page.data.contexts.length,0);assert.equal(e.page.data.description,null);await e.page.describe();e.page.onUnload();assert.equal(e.sessions[1].cleared,1);assert.equal(e.page.session,null);});
+test('H5 cancel invalidates pending confirmation without automatic approval',async()=>{const e=setup();await e.page.describe();e.page.cancel();await e.page.confirm();assert.equal(e.page.request,null);assert.equal(e.page.data.description,null);});
+
+test('H5 delayed confirmation cannot display success after identity epoch changes',async()=>{const e=setup(true);await e.page.describe();let release; e.sessions[0].h5Browser=()=>new Promise(r=>release=r);const pending=e.page.confirm();await Promise.resolve();e.revoke();release({approved:true});await pending;assert.equal(e.page.session,null);assert.equal(e.page.data.description,null);assert.match(e.page.data.status,/微信登录已变化/);});
+test('H5 delayed response after page cancel cannot revive confirmation',async()=>{const e=setup(true);await e.page.describe();let release;e.sessions[0].h5Browser=()=>new Promise(r=>release=r);const pending=e.page.confirm();await Promise.resolve();e.page.cancel();const status=e.page.data.status;release({approved:true});await pending;assert.equal(e.page.data.status,status);assert.equal(e.page.data.description,null);});
+test('H5 unloaded page ignores delayed confirmation and clears token',async()=>{const e=setup(true);await e.page.describe();let release;e.sessions[0].h5Browser=()=>new Promise(r=>release=r);const pending=e.page.confirm();await Promise.resolve();e.page.onUnload();let writes=0;e.page.setData=()=>writes++;release({approved:true});await pending;assert.equal(writes,0);assert.equal(e.page.session,null);});
+test('H5 confirmation failure is unknown and never automatically retried',async()=>{const e=setup(true);await e.page.describe();let calls=0;e.sessions[0].h5Browser=async()=>{calls++;throw Error('NETWORK');};await e.page.confirm();assert.equal(calls,1);assert.match(e.page.data.status,/未知/);await e.page.confirm();assert.equal(calls,1);});
+for(const rejectOld of [false,true])test('H5 late old '+(rejectOld?'failure':'success')+' cannot clear new identity session',async()=>{const e=setup(true);await e.page.describe();let release;e.sessions[0].h5Browser=()=>new Promise((resolve,reject)=>release=rejectOld?()=>reject(Error('old')):()=>resolve({approved:true}));const old=e.page.confirm();await Promise.resolve();e.revoke();await e.page.describe();const newer=e.page.session,description=e.page.data.description;release();await old;assert.equal(e.page.session,newer);assert.equal(newer.isAuthenticated(),true);assert.equal(e.page.data.description,description);});

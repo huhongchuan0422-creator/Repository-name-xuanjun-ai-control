@@ -1,6 +1,7 @@
 const {parseScene,getSharedSession,customerError}=require('../../session');
 const auth=require('../../customer-auth');
 Page({
+  openH5Confirm(){if(!this.data.pending)wx.navigateTo({url:"/pages/h5-confirm/index"});},
   reviewerInput(e){
     this._reviewerRequest=null;
     const field=e.currentTarget.dataset.field;
@@ -43,9 +44,9 @@ Page({
     this.setData({privacyStatus:''});
     try{wx.openPrivacyContract({fail});}catch(_){fail();}
   },
-  data:{pageMode:'profile',privacyStatus:'',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度',status:'',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
+  data:{h5EntryAvailable:false,pageMode:'profile',privacyStatus:'',merchantEntry:'unknown',merchantEntryPending:false,merchantEntryLabel:'商家入驻',merchantEntryHint:'申请入驻或查看进度',status:'',authenticated:false,pending:false,loaded:false,activeSection:'profile',needsScene:true,version:null,nickname:'',contact:'',userId:'',customerId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',selectedNotice:null,noticeDetailOpen:false},
   async onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前客户资料已清除，请重新进入对应门店',false);}if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this.sceneInvalid&&!this._sceneStale&&!this.sceneStale){await this.loginAndLoad({automatic:true});}if(this.data.authenticated&&!this.data.merchantEntryPending&&!this._sceneStale)this.loadMerchantEntry();},
-  async onLoad(options){this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.clearPrivate('');this.setData({needsScene:true});if(!this.sceneInvalid&&getApp().globalData.baseUrl)await this.loginAndLoad({automatic:true});return;}this.setData({needsScene:false});await this.loginAndLoad({automatic:true});},
+  async onLoad(options){this.setData({h5EntryAvailable:typeof window==='undefined'});this._dead=false;this._sceneStale=false;this._authEpoch=auth.current();try{this.scene=parseScene(options&&options.scene?options:{scene:getApp().globalData.scene});}catch(e){this.scene=null;this.sceneInvalid=!!(options&&options.scene);this.clearPrivate('');this.setData({needsScene:true});if(!this.sceneInvalid&&getApp().globalData.baseUrl)await this.loginAndLoad({automatic:true});return;}this.setData({needsScene:false});await this.loginAndLoad({automatic:true});},
   onUnload(){this._dead=true;this._noticeRequest=null;if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
   async loginAndLoad(options={}){
     if(this.data.pending)return;

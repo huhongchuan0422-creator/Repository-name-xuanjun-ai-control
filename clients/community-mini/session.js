@@ -37,7 +37,7 @@ function parseScene(options) {
 function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
   if (!/^https:\/\/[A-Za-z0-9.-]+(?::443)?$/.test(baseUrl) &&
       !/^http:\/\/127\.0\.0\.1:[0-9]{4,5}$/.test(baseUrl) &&
-      baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview')throw Error('TRUSTED_BACKEND_REQUIRED');
+      baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview' && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-h5-test')throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
     wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'?30000:path==='/mini/merchant'&&data.operation==='ocr'?15000:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
@@ -220,6 +220,22 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       if(reply.payment_enabled!==true||!reply.result)throw Error('PAYMENT_NOT_ENABLED');
       return reply.result;
     },
+    async h5Browser(scene, action, challenge, description) {
+      if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
+      if(!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)||!['DESCRIBE','CONFIRM_THIS_BROWSER'].includes(action))throw Error('INVALID_HANDOFF');
+      const version=generation,body={scene,action,challenge};
+      if(action==='CONFIRM_THIS_BROWSER'){
+        if(!description||description.origin!=='https://uk.wenwenwenyiyiyi.work'||!/^[0-9a-f]{32}$/.test(description.verification))throw Error('EXPLICIT_BROWSER_CONFIRMATION_REQUIRED');
+        body.origin=description.origin;body.verification=description.verification;
+      }
+      const reply=await request('/mini/h5-login',body,token);
+      if(version!==generation)throw Error('STALE_SESSION');
+      if(reply.payment_enabled!==false||!reply.result)throw Error('UNTRUSTED_REPLY');
+      const r=reply.result;
+      if(action==='DESCRIBE'&&(r.origin!=='https://uk.wenwenwenyiyiyi.work'||r.scene!==scene||!/^[0-9a-f]{32}$/.test(r.verification)||!Number.isSafeInteger(r.expires_at)||r.expires_at<=now()))throw Error('UNTRUSTED_DESCRIPTION');
+      if(action==='CONFIRM_THIS_BROWSER'&&r.approved!==true)throw Error('APPROVAL_UNKNOWN');
+      return r;
+    },
     async reviewerBrowser(scene, action, challenge, verification) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
       if(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)||typeof challenge!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(challenge)||!['DESCRIBE','CONFIRM_THIS_BROWSER'].includes(action))throw Error('INVALID_REVIEWER_BROWSER_REQUEST');
@@ -263,7 +279,7 @@ function getSharedSession(wx, config, now, page) {
   let epoch=auth.current(),flight=null;
   const authenticated=session.isAuthenticated.bind(session);
   session.isAuthenticated=()=>auth.active(epoch)&&authenticated();
-  for(const method of ['transport','customer','commerce','merchant','projectDocument','payment','reviewerBrowser']){
+  for(const method of ['transport','customer','commerce','merchant','projectDocument','payment','reviewerBrowser','h5Browser']){
     const original=session[method].bind(session);
     session[method]=async function(...args){
       if(!auth.active(epoch)){session.clear();throw Error('STALE_SESSION');}
