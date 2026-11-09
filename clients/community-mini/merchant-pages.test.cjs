@@ -491,7 +491,7 @@ test('second stage hides duplicate name address and service phone, retains short
  assert.match(wxml,/wx:if="{{group.hasOcrFields}}" class="fields-heading"/);
  assert.match(wxml,/'收起修改':'点击修改'/);assert.match(wxml,/>修改资料<\/button>/);
  assert.match(wxml,/'修改本组资料':'查看本组资料（当前只读）'/);
- assert.equal((wxml.match(/>返回第一步完善<\/button>/g)||[]).length,1);
+ assert.equal((wxml.match(/>返回第一步完善<\/button>/g)||[]).length,0);assert.match(wxml,/group.reuseHint && \(step!==0 \|\| group.conflictActions.length\)/);assert.match(wxml,/<text wx:if="{{step!==0}}" class="hint">{{group.reuseHint}}/);
  f.page.returnMaterial({currentTarget:{dataset:{step:0,group:'license'}}});assert.equal(f.page.data.step,0);
 });
 test('manual first-step name address and current operator mobile reuse into original fields and survive save/reopen',async()=>{
@@ -662,7 +662,7 @@ test('all three successful next and back transitions request top after render, r
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  for(let step=1;step<=3;step++){await f.page.next();assert.equal(f.page.data.step,step);assert.deepEqual(f.scrolls.at(-1),{scrollTop:0,duration:0,step});}
  for(let step=2;step>=0;step--){f.page.back();assert.equal(f.page.data.step,step);assert.deepEqual(f.scrolls.at(-1),{scrollTop:0,duration:0,step});}
- const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(w,/只整理微信支付进件所需资料|mode="multiSelector"/);assert.match(w,/wx:if="{{step===0}}"[^>]*>返回第一步完善/);assert.match(w,/返回第一步修改户名/);
+ const w=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.doesNotMatch(w,/只整理微信支付进件所需资料|mode="multiSelector"/);assert.doesNotMatch(w,/wx:if="{{step===0}}"[^>]*>返回第一步完善/);assert.match(w,/返回第一步修改户名/);
 });
 
 test('retained license address resolves original code on save and invalidates only its linked automatic code',async()=>{
