@@ -1,4 +1,5 @@
 "use strict";
+// Preview control continuation: unchanged a942 frontend bytes, existing 148b isolated backend; no install.
 // One isolated preview. No development-version upload, release, review or payment API.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),https=require('node:https');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
