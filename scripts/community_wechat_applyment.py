@@ -337,7 +337,12 @@ class WechatApplyment:
                     if (existing.strip() if recovery_receipt is not None else existing):skipped.append(key)
                     else:card[target]=confirmed_fields[key];applied.append(key)
                 if applied:identity['id_card_info']=card
-            if not applied:
+            from scripts.community_ocr_draft import resolve_confirmed, MATERIAL
+            old_drafts=result.get('ocr_drafts',{})
+            cleared_drafts=resolve_confirmed(old_drafts,document_type,meta['materials'].get(MATERIAL.get(document_type,document_type),{}),confirmed_fields)
+            draft_changed=cleared_drafts!=old_drafts
+            if draft_changed:result['ocr_drafts']=cleared_drafts
+            if not applied and not draft_changed:
                 if source_check is not None:source_check(platform['revision'],version)
                 return retain_receipt(owner,dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped))
             if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
@@ -559,7 +564,7 @@ class WechatApplyment:
             'wechat_apply':{'application','expected_version'},'wechat_status':{'application'},'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
             'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
         allowed=fields.get(op) if type(op) is str else None
-        if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and set(p)==allowed|{'ocr_drafts','application_revision'}):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
         applicant_action=op in ('wechat_apply','wechat_status')
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
@@ -570,7 +575,10 @@ class WechatApplyment:
         if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
             raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
-        if op=='wechat_media':return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
+        if op=='wechat_media':
+            from scripts.community_ocr_draft import current_pending
+            if current_pending((self._read(application) or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
+            return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
         record=self._read(application)
         if op=='wechat_sign_qr':
             proof=record.get('provider_sign_url_proof') if type(record) is dict else None
@@ -586,6 +594,8 @@ class WechatApplyment:
             svg=output.getvalue();return dict(application=application,applyment_id=record.get('applyment_id'),url_sha256=hashlib.sha256(record['provider_sign_url'].encode()).hexdigest(),svg_data='data:image/svg+xml;base64,'+base64.b64encode(svg).decode())
         if op in ('wechat_read','wechat_review_read'):
             result=json.loads(canonical(record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')))
+            from scripts.community_ocr_draft import current_drafts
+            if 'ocr_drafts' in result:result['ocr_drafts']=current_drafts(result['ocr_drafts'],meta['materials'])
             if op=='wechat_review_read':
                 try:
                     plan=self.industry_review_plan((record or {}).get('profile',{}),application,meta)
@@ -682,6 +692,8 @@ class WechatApplyment:
         version=record['version'] if record else 0
         if type(p['expected_version']) is not int or p['expected_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
         if op=='wechat_execute':
+            from scripts.community_ocr_draft import current_pending
+            if current_pending((record or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
             if applicant_action:
                 from scripts.community_merchant_onboarding import require_confirmed_declarations
@@ -848,6 +860,20 @@ class WechatApplyment:
             elif op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                from scripts.community_ocr_draft import merge_drafts, MATERIAL, FIELDS
+                updates=None
+                if 'ocr_drafts' in p:
+                    current_owner,current_meta,current_platform=self.onboarding._load(application,uid)
+                    if (current_owner!=owner or current_meta!=meta or current_platform!=platform
+                            or type(p['application_revision']) is not int or p['application_revision']!=platform['revision']):
+                        raise ValueError('PRIVATE_OCR_DRAFT_APPLICATION_CHANGED')
+                    if type(p['ocr_drafts']) is not dict or set(p['ocr_drafts'])-set(FIELDS):raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
+                    updates={}
+                    for kind,draft in p['ocr_drafts'].items():
+                        material=meta['materials'].get(MATERIAL.get(kind,kind))
+                        if not material or type(draft) is not dict or set(draft)!={'fields'}:raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
+                        updates[kind]=dict(object_id=material['object_id'],sha256=material['sha256'],fields=draft['fields'])
+                drafts=merge_drafts((record or {}).get('ocr_drafts'),updates,meta['materials'])
                 values=self.cashier_values(p['profile'])
                 self.check_cashier_binding(application,values,(record or {}).get('cashier_media_id'))
                 from scripts.community_merchant_onboarding import profile_scenes
@@ -860,7 +886,7 @@ class WechatApplyment:
                     from scripts import community_onboarding_offline as workflow
                     workflow.save_draft(c.db,owner,application,uid,dict(shared,license_ref='PRIVATE_ONBOARDING_MATERIALS'),platform['revision'],
                         encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
-                result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
+                result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'],ocr_drafts=drafts)
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':
                 from scripts.community_merchant_onboarding import require_confirmed_declarations
