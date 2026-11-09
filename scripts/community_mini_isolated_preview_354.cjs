@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),https=require('node:https');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
 const {normalizeUploadKey}=require('./community_mini_key.cjs');
-const SOURCE='148b5bc57b79223dead8366763b3872a09af4189';
+const SOURCE='a942fe4511b26d7c7923dd1307eb40062bcbd36d';
 const BASE='https://uk.wenwenwenyiyiyi.work/community-test-354d1fac';
 const SCENE='owner-test-354d1fac',APPID='wx1d5f8873eaea5392';
 const MARKER='[mini-test-preview-354]';
