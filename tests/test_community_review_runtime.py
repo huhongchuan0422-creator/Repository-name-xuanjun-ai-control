@@ -54,7 +54,7 @@ class IntegratedReview(unittest.TestCase):
   self.ready(page);page.locator('#apply').click();page.wait_for_function('window.reviewPage?.data.ready === true')
   self.assertEqual(page.evaluate('window.reviewPage.data.applications.length'),0)
   self.assertIsNone(page.evaluate('window.reviewPage.data.application'))
-  expect(page.get_by_role('button',name='保存同一份申请草稿，暂不离开',exact=True)).to_be_enabled()
+  expect(page.get_by_role('button',name='仅保存草稿，暂不确认或离开',exact=True)).to_be_enabled()
   expect(page.locator('#native [data-path="subject_info.identity_info.id_doc_type"] select')).to_be_enabled()
   merchant_name=self.visible_field(page,'input[data-path="subject_info.business_license_info.merchant_name"]','stage0 merchant_name')
   merchant_name.fill('同版本测试主体')
