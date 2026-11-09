@@ -9,6 +9,23 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
 
+class TestModuleLocation(unittest.TestCase):
+    def test_reviewed_tests_cannot_be_shadowed_by_root_uploads(self):
+        names = (
+            'community_industry_review_dom.cjs',
+            'community_mini_native_render.cjs',
+            'test_community_applyment_conditions.py',
+            'test_community_industry_materials.py',
+            'test_community_industry_review.py',
+            'test_community_industry_review_ui.py',
+            'test_community_industry_rules.py',
+            'test_community_ui_successor_package.py',
+        )
+        for name in names:
+            with self.subTest(name=name):
+                self.assertTrue((ROOT / 'tests' / name).is_file(), name)
+                self.assertFalse((ROOT / name).exists(), 'root test shadows tests/: ' + name)
+
 class NativeSourceRender(unittest.TestCase):
     def test_first_visit_admission_four_steps_tabs_back_and_safe_failure(self):
         out=ROOT/'native-evidence';out.mkdir(exist_ok=True)
