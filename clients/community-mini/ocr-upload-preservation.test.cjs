@@ -136,3 +136,27 @@ test('Next after lost recovery writeback ACK must not issue a new draft save or 
  assert.equal(f.calls.slice(before).filter(c=>['save','wechat_save'].includes(c.action)).length,0);assert.equal(f.page.data.step,0);assert.ok(f.page.ocrCapture.recovery_apply_pending);
  await f.tick();assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');assert.equal(f.calls.filter(c=>c.action==='recover_apply').length,2);
 });
+
+test('one explicit UI confirmation saves recovered original material without second button or new OCR',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});const before=f.calls.length;
+ await f.page.confirmAndSaveOcr();assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');assert.equal(f.calls.slice(before).filter(x=>x.action==='recover_confirm').length,1);assert.equal(f.calls.slice(before).filter(x=>x.action==='recover_apply').length,1);assert.equal(f.calls.slice(before).filter(x=>['submit','upload','wechat_apply','wechat_media'].includes(x.action)).length,0);
+ await f.page.confirmAndSaveOcr();assert.equal(f.calls.slice(before).filter(x=>x.action==='recover_apply').length,1);
+});
+test('single confirmation lost ACK resumes original confirmation then saves without a second user action',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});f.failRecoveryOnce('recover_confirm');await f.page.confirmAndSaveOcr();assert.equal(f.calls.filter(c=>c.action==='recover_apply').length,0);const key=f.page.ocrCapture.recovery_confirmation.confirmation_key;await f.tick();assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');assert.equal(f.calls.filter(c=>c.action==='recover_apply').length,1);assert.ok(f.calls.filter(c=>c.action==='recover_confirm').every(c=>c.params.confirmation_key===key));
+});
+test('single confirmation lost writeback ACK resumes same receipt without re-confirming',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});f.failRecoveryOnce('recover_apply');await f.page.confirmAndSaveOcr();const key=f.page.ocrCapture.recovery_writeback_key;await f.tick();assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');assert.equal(f.calls.filter(c=>c.action==='recover_confirm').length,1);assert.ok(f.calls.filter(c=>c.action==='recover_apply').every(c=>c.params.writeback_key===key));
+});
+test('saved draft missing issue opens matching original confirmation area without OCR submit or writes',async()=>{
+ const f=coldThree();await f.page.load('synthetic-app');await drainRestores(f);f.page.ocrDrafts={id_front:{fields:{id_name:'SYNTHETIC NAME'}}};const issue={path:name,group:'legal',step:0,message:'姓名待核对'};f.page.setData({submitIssues:[issue],step:3});const before=f.calls.length;await f.page.goToSubmitIssue({currentTarget:{dataset:{index:0}}});assert.equal(f.page.data.ocrKind,'id_front');assert.equal(f.page.data.step,0);f.flush();assert.equal(f.scrolls.at(-1).selector,'#ocr-review-legal');assert.equal(f.page.data.ocrConfirmed,false);assert.equal(f.calls.slice(before).filter(c=>['submit','confirm','recover_confirm','recover_apply','wechat_save'].includes(c.action)).length,0);
+});
+test('edited content after uncertain one-click confirmation is never silently saved',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});f.failRecoveryOnce('recover_confirm');await f.page.confirmAndSaveOcr();f.page.editOcrSuggestion({currentTarget:{dataset:{key:'id_name'}},detail:{value:'NEW UNCONFIRMED NAME'}});await f.page.readOcr();assert.equal(f.calls.filter(c=>c.action==='recover_apply').length,0);assert.equal(form.get(f.page.profile,name),undefined);
+});
+test('one-click confirmation intent survives same-session interrupted original receipt lookup',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});f.failRecoveryOnce('recover_confirm');await f.page.confirmAndSaveOcr();const session=f.page.session;f.page.onUnload();f.page.session=session;f.page.dead=false;f.page.ocrHidden=false;f.page.ocrFlight=false;await f.page.run(()=>f.page.restoreKnownOcr());assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');assert.equal(f.calls.filter(c=>c.action==='recover_apply').length,1);
+});
+test('already confirmed current original result writes once without another confirmation',async()=>{
+ const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});await f.page.confirmOcr();const before=f.calls.length;await f.page.confirmAndSaveOcr();assert.equal(f.calls.slice(before).filter(c=>c.action==='recover_confirm').length,0);assert.equal(f.calls.slice(before).filter(c=>c.action==='recover_apply').length,1);assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');
+});
