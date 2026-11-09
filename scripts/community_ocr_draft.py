@@ -49,13 +49,18 @@ def current_pending(drafts, materials):
 
 
 def resolve_confirmed(drafts, kind, material, confirmed_fields):
-    """Call ONLY after the original server confirmation/ownership checks succeed."""
+    """Call ONLY inside the original verified confirmation + dual-version CAS.
+
+    A human correction supersedes the old suggestion for each confirmed key.
+    Comparing values would leave a corrected old draft permanently pending.
+    Ordinary saves cannot call this; other keys and materials stay untouched.
+    """
     result = deepcopy(drafts or {})
     pending = result.get(kind)
     if not pending or not all(pending.get(k) == material.get(k) for k in ('object_id', 'sha256')):
         return result
     remaining = {key: value for key, value in pending['fields'].items()
-                 if confirmed_fields.get(key) != value}
+                 if key not in confirmed_fields}
     if remaining:
         result[kind]['fields'] = remaining
     else:

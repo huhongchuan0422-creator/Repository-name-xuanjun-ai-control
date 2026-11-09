@@ -20,9 +20,10 @@ class PrivateDraftTests(unittest.TestCase):
         self.assertEqual({},current_pending(draft,changed))
         with self.assertRaises(ValueError):merge_drafts(draft,self.update,changed)
         self.assertEqual(draft,resolve_confirmed(draft,'business_license',changed['business_license'],{'company_name':'human edit'}))
-    def test_confirmation_exact_values_only(self):
+    def test_verified_confirmation_resolves_explicit_keys_including_corrections(self):
         draft=merge_drafts({},self.update,self.materials)
-        self.assertEqual(draft,resolve_confirmed(draft,'business_license',self.material,{'company_name':'old OCR'}))
+        self.assertEqual({},resolve_confirmed(draft,'business_license',self.material,{'company_name':'corrected human value'}))
+        self.assertEqual(draft,resolve_confirmed(draft,'business_license',self.material,{'registered_address':'unrelated field'}))
         self.assertEqual({},resolve_confirmed(draft,'business_license',self.material,{'company_name':'human edit'}))
     def test_partial_update_preserves_other_same_material_fields(self):
         draft=merge_drafts({}, {'business_license':dict(self.material,fields={'company_name':'human edit','registered_address':'kept address'})},self.materials)

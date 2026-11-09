@@ -39,6 +39,37 @@ class PrivateDraftIntegration(SharedLicenseCas):
   saved=self.service._read(self.app['application'])
   self.assertEqual({},saved['ocr_drafts'])
   self.assertEqual('SYNTHETIC CONFIRMED',saved['profile']['subject_info']['business_license_info']['merchant_name'])
+ def test_partial_human_confirmation_keeps_other_material_and_unconfirmed_fields(self):
+  self.app=self.fx.upload(self.app,'identity_front')
+  self.rev=self.app['revision']
+  drafts={'business_license':{'fields':{'company_name':'SYNTHETIC CONFIRMED','registered_address':'SYNTHETIC ADDRESS'}},'id_front':{'fields':{'id_name':'SYNTHETIC PERSON'}}}
+  r=self.save_private(ocr_drafts=drafts);self.version=r['version']
+  self.rev=self.platform()['revision']
+  self.call(confirmed_fields={'company_name':'SYNTHETIC CONFIRMED'})
+  saved=self.fx.call('wechat_read',{'application':self.app['application']})
+  self.assertEqual(saved['ocr_drafts']['business_license']['fields'],{'registered_address':'SYNTHETIC ADDRESS'})
+  self.assertEqual(saved['ocr_drafts']['id_front']['fields'],{'id_name':'SYNTHETIC PERSON'})
+  self.assertEqual(saved['profile']['subject_info']['business_license_info']['merchant_name'],'SYNTHETIC CONFIRMED')
+  again=self.fx.call('wechat_save',dict(application=self.app['application'],expected_version=saved['version'],profile=saved['profile']))
+  self.assertEqual(again['ocr_drafts'],saved['ocr_drafts'])
+
+ def test_corrected_confirmation_resolves_old_suggestion_and_survives_reread(self):
+  r=self.save_private();self.version=r['version'];self.rev=self.platform()['revision']
+  self.call(confirmed_fields={'company_name':'NEW HUMAN CORRECTION'})
+  saved=self.fx.call('wechat_read',{'application':self.app['application']})
+  self.assertEqual(saved['profile']['subject_info']['business_license_info']['merchant_name'],'NEW HUMAN CORRECTION')
+  self.assertEqual(saved['ocr_drafts']['business_license']['fields'],{'registered_address':'SYNTHETIC ADDRESS'})
+  again=self.fx.call('wechat_save',dict(application=self.app['application'],expected_version=saved['version'],profile=saved['profile']))
+  self.assertEqual(again['ocr_drafts'],saved['ocr_drafts'])
+
+ def test_newer_private_edit_cannot_be_cleared_by_old_confirmation_version(self):
+  r=self.save_private();self.version=r['version'];self.rev=self.platform()['revision']
+  newer=self.save_private(ocr_drafts={'business_license':{'fields':{'company_name':'NEWER UNSUBMITTED EDIT'}}})
+  before=self.snapshot()
+  with self.assertRaises(ValueError):self.call(confirmed_fields={'company_name':'OLDER CONFIRMATION'})
+  self.assertEqual(before,self.snapshot())
+  self.assertEqual(self.service._read(self.app['application'])['ocr_drafts'],newer['ocr_drafts'])
+
  def test_replaced_material_not_reused(self):
   self.save_private()
   self.app=self.fx.upload(self.app,'business_license',raw=b'%PDF-replacement synthetic')

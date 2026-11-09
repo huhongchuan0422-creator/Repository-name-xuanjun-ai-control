@@ -23,6 +23,23 @@ class RecoveryIntegration(SharedOcrComposition):
   before=self.snapshot();replay=self.recovery_call('apply',dict(application=self.app['application'],recovery_id='recovery-one',confirmation_id='confirmation-one',confirmation_revision=1,writeback_key='writeback-one'))
   self.assertEqual(replay.status_code,200,replay.text);self.assertEqual(saved.json(),replay.json());self.assertEqual(before,self.snapshot())
   self.assertEqual(old,self.store.get(job_id,self.source['tenant_id']))
+ def test_saved_old_draft_corrected_by_real_recovery_http_clears_only_confirmed_key(self):
+  path=self.job();job_id=path.rsplit('/',1)[1];old=self.store.get(job_id,self.source['tenant_id'])
+  r=self.wechat._read(self.app['application'])
+  self.fx.call('onboarding',{'operation':'wechat_save','params':dict(application=self.app['application'],expected_version=r['version'],profile=r['profile'],application_revision=int(self.source['application_revision']),ocr_drafts={'business_license':{'fields':{'company_name':'OLD SAVED SUGGESTION','registered_address':'UNCONFIRMED ADDRESS'}}})})
+  view=self.recovery_call('view',dict(application=self.app['application'],document_type='business_license',locator={'current_material':True},recovery_key='corrected-draft-view'))
+  self.assertEqual(view.status_code,200,view.text)
+  confirm=self.recovery_call('confirm',dict(application=self.app['application'],recovery_id='corrected-draft-view',revision=1,fields={'company_name':'NEW HUMAN CORRECTION'},confirmation_key='corrected-draft-confirm'))
+  self.assertEqual(confirm.status_code,200,confirm.text)
+  payload=dict(application=self.app['application'],recovery_id='corrected-draft-view',confirmation_id='corrected-draft-confirm',confirmation_revision=1,writeback_key='corrected-draft-writeback')
+  saved=self.recovery_call('apply',payload);self.assertEqual(saved.status_code,200,saved.text)
+  record=self.wechat._read(self.app['application'])
+  self.assertEqual(record['profile']['subject_info']['business_license_info']['merchant_name'],'NEW HUMAN CORRECTION')
+  self.assertEqual(record['ocr_drafts']['business_license']['fields'],{'registered_address':'UNCONFIRMED ADDRESS'})
+  before=self.snapshot();replay=self.recovery_call('apply',payload)
+  self.assertEqual(replay.status_code,200,replay.text);self.assertEqual(saved.json(),replay.json());self.assertEqual(before,self.snapshot())
+  self.assertEqual(old,self.store.get(job_id,self.source['tenant_id']))
+
  def test_api_material_lookup_without_pointer_or_inference(self):
   path=self.job();job_id=path.rsplit('/',1)[1];old=self.store.get(job_id,self.source['tenant_id'])
   self.provider_edit()

@@ -160,3 +160,27 @@ test('one-click confirmation intent survives same-session interrupted original r
 test('already confirmed current original result writes once without another confirmation',async()=>{
  const f=await beforeUpload();await uploadBack(f);await f.page.recognizeCurrentDocument('id_front',{newIntent:true,existingMaterial:true});await f.page.confirmOcr();const before=f.calls.length;await f.page.confirmAndSaveOcr();assert.equal(f.calls.slice(before).filter(c=>c.action==='recover_confirm').length,0);assert.equal(f.calls.slice(before).filter(c=>c.action==='recover_apply').length,1);assert.equal(form.get(f.page.profile,name),'SYNTHETIC NAME');
 });
+
+test('dirty final-step correction saves original draft before navigating to OCR review, no extra save button',async()=>{
+ const f=coldThree();await f.page.load('synthetic-app');await drainRestores(f);
+ await f.page.saveDraft();await drainRestores(f);
+ f.page.profile.contact_info={mobile_phone:'13800000000'};
+ const issue={path:name,group:'legal',step:0,message:'姓名待核对'};
+ f.page.setData({submitIssues:[issue],step:3,dirty:true});f.page.refresh();const before=f.calls.length;
+ await f.page.goToSubmitIssue({currentTarget:{dataset:{index:0}}});f.flush();
+ assert.equal(f.page.data.dirty,false);assert.equal(f.page.data.step,0);assert.equal(f.page.data.ocrKind,'id_front');
+ assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'13800000000');
+ const calls=f.calls.slice(before);assert.deepEqual(calls.filter(c=>['save','wechat_save'].includes(c.action)).map(c=>c.action),['save','wechat_save']);
+ assert.ok(calls.findIndex(c=>c.action==='recover_view')>calls.findIndex(c=>c.action==='wechat_save'));
+ assert.equal(f.scrolls.at(-1).selector,'#ocr-review-legal');
+ assert.equal(calls.filter(c=>['submit','upload','recover_confirm','recover_apply','wechat_apply','wechat_media'].includes(c.action)).length,0);
+});
+test('dirty issue navigation does not move or recover when original draft save fails',async()=>{
+ const f=coldThree();await f.page.load('synthetic-app');await drainRestores(f);await f.page.saveDraft();await drainRestores(f);
+ const issue={path:name,group:'legal',step:0,message:'姓名待核对'};
+ f.page.profile.contact_info={mobile_phone:'13800000000'};f.page.setData({submitIssues:[issue],step:3,dirty:true});f.page.refresh();
+ const request=f.page.request;f.page.request=async function(op,p){if(op==='save')throw Error('SYNTHETIC_SAVE_FAILED');return request.call(this,op,p);};
+ const before=f.calls.length;await f.page.goToSubmitIssue({currentTarget:{dataset:{index:0}}});
+ assert.equal(f.page.data.step,3);assert.equal(f.page.data.dirty,true);assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'13800000000');
+ assert.equal(f.calls.slice(before).filter(c=>c.operation==='ocr').length,0);
+});
