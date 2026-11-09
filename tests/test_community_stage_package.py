@@ -35,6 +35,8 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(raw).hexdigest(),expected)
                 self.assertEqual(raw,(root/name).read_bytes())
             self.assertEqual(manifest['production_payment'],'HOLD')
+            for suffix in ('js','json','wxml','wxss'):
+                self.assertIn('clients/community-mini/pages/h5-confirm/index.'+suffix,manifest['files'])
             for name in ('tests/test_community_portal_pagination.mjs',
                          'tests/community_project_review_dom.cjs',
                          'docs/development/COMMUNITY_BILL_CONTRACT_EVIDENCE.json',
@@ -128,7 +130,7 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),42)
+                self.assertEqual(len(receipt['prepared_files']),46)
                 for name in ('material-private-preview.js','merchant-fields-data.js','merchant-official-areas-data.js',
                              'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
                     source='clients/community-mini/'+name
