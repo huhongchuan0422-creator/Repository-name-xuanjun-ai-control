@@ -50,3 +50,33 @@ python -m scripts.pr122_showcase_register display unlist --expected-revision 1 -
 独立`/delivery/cases.html`与宿主共享同一目录读取、投影和卡片渲染。公开演示链接许可与精选素材许可分开：受控record可选case_assets（kind/value/public_consent_ref），并用case_snapshot_sha256绑定准确原验收快照。素材种类description/image/video/link；不是默认公开全部页面。无精选素材授权或快照不符时，项目不会被重新塞回开发中，也不会生成公开案例。原记录不含这些可选字段仍可读写，历史保留。示例项目拾陆未提供实际验收和精选素材，不补造。
 
 安装前由玄钧AI新核：现场HEAD/未知修改与lease/attempt；已安装showcase及nginx真实状态；原发布器准确源码/制品/Manifest/现行许可绑定；静态官网路由同版替换及外置目录GET读回。原showcase安装器是首次安装入口，会拒绝既有安装对象，不能拿本包盲目重跑；已有安装须沿原获准更新路径核差异。此处不签发许可、不新增安装通道，不替现场确认SENT/ACK。受控管理仍需原有操作员；本版没有客户登录或匿名管理写入。
+
+
+## 2026-11-09 原项目目录／权限／评论增量
+
+最新基线dbc5b811。本次不发生产，不切current，不改权限或凭据，原唯一Writer续接。
+
+公开演示拟接入原件：deploy/pr122-showcase/project-display-proposed-20261109.json，保留视频/labs/shiliu-20261104/和社区模板，加入GEO、数字人、专利。逐项使用原display put及expected-revision；该JSON不是自动写入任务。未知历史记录不批量改公开。原受控display record新增可选visibility，旧已知公开记录兼容PUBLIC；PRIVATE必须指定原source_project_id，原state/history仍私有，公开catalog不包含这些记录。真正私有页面只能走原客户预览鉴权，隐藏目录不能保护一个早已公开的独立Sites链接，切换既有访问范围仍由Owner确认、原责任方执行。
+
+GEO原Sites appgprj_6ae8cd2496188191a100ab382ac88e31，数字人appgprj_6aeaf38634b481919b693a0ee196ee25均custom访问，记录RESTRICTED且官网不画可用预览按钮。专利appgprj_6af17629f78c8191bca8f182dd8e2c08为public/active，浏览器跳转/preview成功，页面明确全部案例为示例且未接真实检索/模型/官方递交/客户资料库；普通HTTP403仍保留UNVERIFIED，不冒所有客户可达。全部真实任务ID及阶段来源未核到，不编造。
+
+### 复用身份与每项目授权
+
+GET /customer/center/api/delivery_projects 是现有FULL App内新增只读投影；通过现有__Host-xj_customer会话及Center.projects/project查询原members/tenant/customer关系，不引入第二身份、ACL或资料库。匿名拒绝；其他客户看不到该项目，旧预览URL直接请求仍由原后端逐次鉴权，撤权后拒绝。响应只给获授权的项目标题/角色/已审核页面入口，绝不返回上传材料、合同内容或外部私有URL。
+
+原审阅页面、change_context及change_submit_idempotent仅OWNER可用，本版保留；VIEWER/EDITOR/REVIEWER未被擅自扩权。网站“我的定制项目”显示原角色门禁，不让前端声称授权。正式登录仍由OpenClaw负责，本版不改注册/密码/OAuth/会话/成员签发。LOGIN_ONLY原allowlist仍拒绝此项目接口，不擅自切FULL。
+
+### 持久评论
+
+复用原change_events加密、追加式、项目/页面/SHA绑定账本与change_submit_idempotent。原feedback.js增加已保存意见读取，重载时用GET changes/{project}回读当前页当前版；未知结果只保存原请求键到原sessionStorage并读回，不储存评论正文，不重POST。签名审核过的页面由原后端注入页脚；公开独立演示内存评论仍只是原型。
+
+真实隔离HTTP测试覆盖原登录→会话→提交→数据库重新打开→新HTTP读取；跨客户/项目/版本/CSRF/角色拒绝，撤权后拒绝，重复键只留一条。Node DOM夹具另测feedback.js重载与UNKNOWN不重发，不能把它冒实际浏览器或生产验收。
+
+### 安装与未接契约（准确责任）
+
+- 玄钧AI新：核现场HEAD/lease/attempt/current与后继目录、同版静态/客户中心代码差异、目录初始化及HTTPS读回。现场视频/labs/shiliu-20261104/不在旧1303文件基础包内：旧基础重构候选仅供隔离验证，**不能单独全量替换现站**。正式整合需先取得并绑定现场后继视频目录原字节，沿既有升级路径保留，不盲用首次安装器。
+- OpenClaw（原登录／身份）：给出现行生产GET me的稳定user_id、已有同源Secure/HttpOnly会话、原登录返回csrf及xj_csrf前端桥接、FULL业务接口实际启用状态/版本。候选API依赖这些原契约，不新开跨域、凭据或权限；目前无真实统一库及现场接通ACK。
+- 原任务／客户项目权威责任方：五项目准确project_id、tenant/customer/OWNER关系；原签名authority及TRUSTED_CUSTOMER_FRONTEND页面manifest、源commit/artifact/review_ref、page/version/blobs绑定。缺少则私有审阅显示版本来源未接，不把公共Sites页冒成已获权私有页。
+- 各项目Owner/交付责任方：真实阶段、验收记录及精选素材公开许可，当前未知，不由官网写状态源。
+
+现有限制未新增：HTTP socket 30秒、JSON体7,000,000字节、OWNER意见每300秒30次及原safe_text约束；签名源有效期、CSRF、同源、角色和审阅资源CSP均沿用。上述是原技术事实，本次不擅自取消或扩大。当前环境非root、/和/tmp由本执行UID拥有；仅隔离测试custody夹具适配此命名空间，生产root custody门禁不改，Hosted原root回归另核。用户真实资料永不随公开演示收包。

@@ -20,14 +20,16 @@ FIELDS = {'id','title','summary','preview_url','content_kind','public_consent_re
 
 
 def validate(record):
-    need(type(record) is dict and FIELDS<=set(record)<=FIELDS|{'case_assets','case_snapshot_sha256'}, 'DISPLAY_FIELDS')
+    need(type(record) is dict and FIELDS<=set(record)<=FIELDS|{'case_assets','case_snapshot_sha256','visibility'}, 'DISPLAY_FIELDS')
     need(type(record['id']) is str and ID.fullmatch(record['id']), 'DISPLAY_ID')
     for name in ('title','summary','source_ref','public_consent_ref'):
         need(type(record[name]) is str and record[name].strip(), 'DISPLAY_TEXT:'+name)
     need(type(record['listed']) is bool, 'DISPLAY_LISTED')
     need(record['content_kind'] in ('SAMPLE_DATA_PROTOTYPE','PUBLIC_PROJECT_PREVIEW'), 'DISPLAY_CONTENT_KIND')
     need(record['preview_access'] in ('UNVERIFIED','AVAILABLE','RESTRICTED'), 'DISPLAY_ACCESS_STATE')
+    need(record.get('visibility','PUBLIC') in ('PUBLIC','PRIVATE'), 'DISPLAY_VISIBILITY')
     project=record['source_project_id']
+    need(record.get('visibility','PUBLIC')!='PRIVATE' or project is not None, 'DISPLAY_PRIVATE_PROJECT_MAPPING')
     need(project is None or (type(project) is str and ID.fullmatch(project)), 'DISPLAY_SOURCE_PROJECT')
     url=record['preview_url']
     need(type(url) is str and not any(c.isspace() or ord(c)<32 for c in url) and '\\' not in url, 'DISPLAY_PREVIEW_URL')
@@ -78,7 +80,7 @@ def load():
 
 def public_catalog(state):
     return {'schema':1,'revision':state['revision'],'source':'SHOWCASE_CONTROLLED_DISPLAY_METADATA',
-            'stage_source':'/showcase/catalog.json','unlisted_project_ids':[r['source_project_id'] for r in state['records'].values() if not r['listed'] and r['source_project_id']], 'projects':[dict(record) for _,record in sorted(state['records'].items()) if record['listed']]}
+            'stage_source':'/showcase/catalog.json','unlisted_project_ids':[r['source_project_id'] for r in state['records'].values() if not r['listed'] and r['source_project_id'] and r.get('visibility','PUBLIC')=='PUBLIC'], 'projects':[dict(record) for _,record in sorted(state['records'].items()) if record['listed'] and record.get('visibility','PUBLIC')=='PUBLIC']}
 
 
 def atomic(path, data, mode):

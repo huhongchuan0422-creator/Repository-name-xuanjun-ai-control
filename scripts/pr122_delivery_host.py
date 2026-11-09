@@ -50,6 +50,12 @@ def integrate(root, public):
         target = public/'delivery'/name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
+    acceptance=public/'customer/projects/acceptance/index.html'
+    if acceptance.is_file():
+        text=patches.get(acceptance,acceptance.read_text())
+        entry='<p><a href="/delivery/#my-projects">查看我的项目与逐页审阅 →</a></p>'
+        if '/delivery/#my-projects' not in text:
+            patches[acceptance]=text.replace('</main>',entry+'</main>',1)
     for path, text in patches.items():
         path.write_text(text)
     return {'template_commit':'60f1dcd2dd1313fe91919ae1b75b21feb9693916',

@@ -9,7 +9,7 @@ from scripts.pr122_showcase_package import tar_bytes
 ROOT=Path(__file__).resolve().parents[1]
 
 def code_files():
-    pending=list((ROOT/'scripts').glob('pr122_showcase*.py'))+[ROOT/'scripts/pr122_website_release.py',ROOT/'scripts/pr122_delivery_host.py'];seen=set()
+    pending=list((ROOT/'scripts').glob('pr122_showcase*.py'))+[ROOT/'scripts/pr122_website_release.py',ROOT/'scripts/pr122_delivery_host.py',ROOT/'scripts/pr122_customer_http.py'];seen=set()
     while pending:
         path=pending.pop();name=path.relative_to(ROOT).as_posix()
         if name in seen:continue
@@ -24,7 +24,8 @@ def code_files():
     return sorted(seen)
 
 def build(output,commit):
-    names=code_files()+['deploy/pr122-showcase/'+name for name in ('locations.conf','xuanjun-showcase-publish.service','xuanjun-showcase-publish.timer','xuanjun-showcase-build.service','build-channel','build-sudoers','policy.example.json','shiliu-display-proposed.json')]
+    names=code_files()+['deploy/pr122-showcase/'+name for name in ('locations.conf','xuanjun-showcase-publish.service','xuanjun-showcase-publish.timer','xuanjun-showcase-build.service','build-channel','build-sudoers','policy.example.json','shiliu-display-proposed.json','project-display-proposed-20261109.json')]
+    names+=['deploy/pr122-customer-center/ui/feedback.js','deploy/pr122-customer-center/ui/feedback.css']
     names+=['.github/workflows/pr122-showcase-protected-builder.yml','.github/workflows/pr122-site-hub-preflight.yml','.github/workflows/pr122-showcase-review-event.yml','docs/development/PR122_DYNAMIC_SHOWCASE_PROTOCOL_20261016.md','docs/development/PR122_DELIVERY_DISPLAY_MANAGEMENT_20261104.md','docs/development/PR122_CUSTOMER_CENTER_PRIVATE_MATERIALS_RULES_V1_20261016.md']
     names+=[p.relative_to(ROOT).as_posix() for p in (ROOT/'showcase').rglob('*') if p.is_file()]
     from scripts.pr122_delivery_host import HOST_FILES,FROZEN

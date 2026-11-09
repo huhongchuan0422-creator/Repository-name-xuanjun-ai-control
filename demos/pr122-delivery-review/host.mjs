@@ -65,7 +65,7 @@ export async function connectReviewHost({snapshotProvider,bindingProvider}) {
     $('source-status').textContent=data.connected?'已读取原项目阶段；运行状态与交付验收分别显示。':'任务中心阶段尚未接通。';
     $('project-cards').replaceChildren(...data.developing.map(p=>{const a=node('article');a.className='card';a.append(node('h3',p.title),node('p',p.summary||''),node('p',p.phase));
       if(p.content_kind==='SAMPLE_DATA_PROTOTYPE')a.append(node('p','示例数据原型 · 不执行真实发布或互动'));
-      const href=previewUrl(p.preview_url);if(href){const link=node('a','打开项目预览 →');link.className='btn';link.href=href;link.target='_blank';link.rel='noopener noreferrer';a.append(link);}
+      const href=previewUrl(p.preview_url);if(href&&p.preview_access!=='RESTRICTED'){const link=node('a','打开项目预览 →');link.className='btn';link.href=href;link.target='_blank';link.rel='noopener noreferrer';a.append(link);}
       if(p.preview_access!=='AVAILABLE')a.append(node('p',p.preview_access==='RESTRICTED'?'预览访问受限，正在核对。':'预览访问状态待核实。'));
       return a;}));
     renderCaseCards($('case-cards'),data.cases);
@@ -75,7 +75,24 @@ if(location.hash==='#review')openDemo();
 
 // Bootstrap the existing host from public projections; no login module changes.
 let directoryRequest=0;
-async function refreshDirectory(){const request=++directoryRequest;try{const snapshot=await loadPublicDirectory();if(request!==directoryRequest)return;await connectReviewHost({snapshotProvider:async()=>snapshot});$('source-status').textContent=(snapshot.display_connected?'已读取受控展示目录。':'展示管理来源未接通；显示原已公开目录。')+(snapshot.stage_connected?' 已读取原项目阶段来源。':' 原项目阶段尚未接通。');if(!snapshot.projects.length)$('source-status').textContent+=' 暂无已上架的公开项目。';}catch(e){if(request!==directoryRequest)return;$('project-cards').replaceChildren();$('case-cards').replaceChildren();$('source-status').textContent='项目目录尚未接通：'+e.message;}}
+async function refreshDirectory(){const request=++directoryRequest;try{const snapshot=await loadPublicDirectory();if(request!==directoryRequest)return;await connectReviewHost({snapshotProvider:async()=>snapshot});$('source-status').textContent=(snapshot.display_connected?'已读取受控展示目录。':'展示管理来源未接通；显示原已公开目录。')+(snapshot.stage_connected?' 已读取原项目阶段来源。':' 原项目阶段尚未接通。');$('shiliu-demo-card').hidden=snapshot.projects.some(p=>p.id==='shiliu-media');$('community-demo-card').hidden=snapshot.projects.some(p=>p.id==='community-review');if(!snapshot.projects.length)$('source-status').textContent+=' 暂无已上架的公开项目。';}catch(e){if(request!==directoryRequest)return;$('project-cards').replaceChildren();$('case-cards').replaceChildren();$('community-demo-card').hidden=false;$('shiliu-demo-card').hidden=false;$('source-status').textContent='项目目录尚未接通：'+e.message;}}
 const refresh=node('button','刷新项目');refresh.type='button';refresh.onclick=refreshDirectory;$('source-status').after(refresh);
 refreshDirectory();
 addEventListener('focus',refreshDirectory);
+
+// Separate authenticated source: public demos cannot assert membership or versions.
+let privateRequest=0;
+async function refreshPrivateProjects(){
+ const request=++privateRequest,container=$('private-project-cards');if(!container)return;
+ try{const response=await fetch('/customer/center/api/delivery_projects',{credentials:'same-origin',cache:'no-store',redirect:'error'});
+  if(request!==privateRequest)return;
+  if(!response.ok){container.replaceChildren();$('private-source-status').textContent=[401,403].includes(response.status)?'请沿官网账户登录；当前项目接口未开放或无访问权限。':'项目身份接口暂不可用；未展示任何私有资料。';return;}
+  const data=await response.json();if(request!==privateRequest)return;
+  if(!Array.isArray(data.projects))throw Error('项目来源格式不符');
+  container.replaceChildren(...data.projects.map(p=>{const card=node('article');card.className='card';card.append(node('h3',p.title));
+   for(const page of p.pages||[]){const prefix='/customer/center/preview/'+encodeURIComponent(p.id)+'/';if(typeof page.url!=='string'||!page.url.startsWith(prefix)||!/^[a-f0-9]{64}$/.test(page.sha256))continue;const a=node('a','审阅页面 '+page.path+' →');a.href=page.url;a.target='_blank';a.rel='noopener noreferrer';card.append(a);}
+   if(!p.pages?.length)card.append(node('p',p.review_state==='ORIGINAL_REVIEW_ROLE_REQUIRED'?'当前角色尚未开放页面审阅。':'页面版本来源尚未接通。'));
+   return card;}));$('private-source-status').textContent=data.projects.length?'已读取您获授权的项目；页面意见沿原项目账本保存。':'当前账户尚无获授权项目。';
+ }catch(error){if(request===privateRequest){container.replaceChildren();$('private-source-status').textContent='项目身份或版本来源暂不可用，未使用演示资料代替。';}}
+}
+refreshPrivateProjects();addEventListener('focus',refreshPrivateProjects);

@@ -57,6 +57,7 @@ export async function loadPublicDirectory(fetcher=fetch) {
       .map(a=>({...a,public_approved:true}))},accepted_version:original.version});
 
   for(const item of display?.projects||[]){
+    if(item.visibility&&item.visibility!=='PUBLIC')throw Error('私有记录不得出现在公开目录');
     if(item.listed!==true||!item.public_consent_ref||typeof item.id!=='string'||typeof item.title!=='string'||!item.title||!previewUrl(item.preview_url))throw Error('公开展示记录不完整');
     if(seen.has(item.id))throw Error('重复展示记录');seen.add(item.id);
     const original=sources.get(item.source_project_id);

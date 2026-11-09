@@ -60,3 +60,28 @@ test('unavailable management source cannot resurrect a previously unlisted proje
  const {loadPublicDirectory}=await import('../demos/pr122-delivery-review/project-projection.mjs');
  await assert.rejects(loadPublicDirectory(async path=>path.includes('/delivery/')?{ok:false,status:503}:response({schema:1,projects:[{project_id:'old',visibility:'PUBLIC',pages:[{href:'/old/',visibility:'PUBLIC'}]}]})),/未回退/);
 });
+
+import vm from 'node:vm';
+import fs from 'node:fs';
+function feedbackHarness({ledger=[],pending=new Map(),post=async body=>{ledger.push({id:'case-1',events:[{kind:'REQUEST',payload:{...body,request:body.text,page_sha256:body.version}}]});return response({id:'case-1'});}}={}){
+ class Element{constructor(tag){this.tag=tag;this.children=[];this.textContent='';this.value='';this.handlers={};this.dataset={};}append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;}setAttribute(){}addEventListener(name,fn){this.handlers[name]=fn;}}
+ const slot=new Element('section');slot.dataset={projectFeedback:'project-a',pagePath:'/review/consumer/',pageSha256:'a'.repeat(64)};
+ const requests=[];const context={document:{querySelectorAll:()=>[slot],createElement:tag=>new Element(tag)},sessionStorage:{getItem:k=>pending.get(k)||null,setItem:(k,v)=>pending.set(k,v),removeItem:k=>pending.delete(k)},crypto:{randomUUID:()=> 'logical-request-00001'},fetch:async(url,options)=>{
+  const operation=url.split('/api/')[1];requests.push(operation);
+  if(operation==='me')return response({user_id:'user-a',projects:[{id:'project-a'}]});
+  if(operation==='changes/project-a')return response({cases:ledger});
+  if(operation==='change_context')return response({});if(operation==='change_updates')return response({updates:[]});
+  if(operation==='change_submit_idempotent')return post(JSON.parse(options.body));throw Error(operation);
+ }};
+ return {slot,pending,requests,load:()=>vm.runInNewContext(fs.readFileSync('deploy/pr122-customer-center/ui/feedback.js','utf8'),context),form:()=>slot.children.find(n=>n.tag==='form'),history:()=>slot.children.find(n=>n.tag==='section').children.map(n=>n.textContent)};
+}
+test('original feedback UI saves then reloads the same project/page/version history',async()=>{
+ const ledger=[],pending=new Map();let ui=feedbackHarness({ledger,pending});await ui.load();const form=ui.form();form.children[1].children[0].value='本页永久归档意见';await form.handlers.submit({preventDefault(){}});
+ assert.equal(ledger.length,1);assert.ok(ui.requests.includes('change_submit_idempotent'));
+ ui=feedbackHarness({ledger,pending});await ui.load();assert.ok(ui.history().includes('本页永久归档意见'));assert.equal(ui.requests.includes('change_submit_idempotent'),false);
+});
+test('unknown feedback result survives reload and is queried without a duplicate write',async()=>{
+ const pending=new Map();let writes=0;const post=async()=>{writes++;throw Error('connection lost');};
+ let ui=feedbackHarness({pending,post});await ui.load();ui.form().children[1].children[0].value='保留草稿';await ui.form().handlers.submit({preventDefault(){}});assert.equal(writes,1);assert.equal(pending.size,1);
+ ui=feedbackHarness({pending,post});await ui.load();await ui.form().handlers.submit({preventDefault(){}});assert.equal(writes,1);assert.equal(pending.size,1);
+});

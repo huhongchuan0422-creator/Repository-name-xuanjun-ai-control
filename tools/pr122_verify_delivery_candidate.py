@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory() as td:
   changed+=1
   for addition in ['<a href="/delivery/">开发中项目</a><a href="/delivery/cases.html">已完成案例</a>','<a href="/delivery/">Developing projects · Chinese review</a><a href="/delivery/cases.html">Completed cases</a>']:
    after=after.replace(addition.encode(),b'')
+  after=after.replace('<p><a href="/delivery/#my-projects">查看我的项目与逐页审阅 →</a></p>'.encode(),b'')
   after=after.replace('href="/delivery/">查看开发中的作品'.encode(),'href="/visual/community-payment/">查看开发中的作品'.encode())
   if after!=before:unexpected.append(name)
  assert not unexpected,unexpected

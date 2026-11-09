@@ -105,7 +105,9 @@ class PreviewHTTPTests(HttpTests):
     def setUp(self):
         HttpTests.setUp(self);self.path='/preview/consumer/';self.body=b'<!doctype html><title>Private HTTP preview</title>';self.sha=digest(self.body);self.revision=1;PreviewTests.install(self)
     request=HttpTests.request
-    auth_headers=HttpTests.auth_headers
+    def auth_headers(self,who='owner'):
+        from scripts.pr122_customer_http import COOKIE
+        return {'Cookie':COOKIE+'='+self.users[who]['token'],'X-CSRF-Token':self.users[who]['csrf']}
     def test_real_authenticated_http_page_and_no_anonymous_or_range_access(self):
         url=route('project-a',self.path,self.sha).removeprefix('/customer/center/')
         status,h,raw=self.request(url,headers=self.auth_headers());self.assertEqual(status,200);self.assertIn(b'data-project-feedback',raw);self.assertIn('no-store',h['Cache-Control']);self.assertIn("frame-ancestors 'none'",h['Content-Security-Policy'])
@@ -307,3 +309,73 @@ class PreviewHTTPTests(HttpTests):
 # Reuse the HTTP fixture without re-running already covered HTTP/core cases.
 for _name in HttpTests.__dict__:
     if _name.startswith('test_'):setattr(PreviewHTTPTests,_name,None)
+
+
+class DeliveryDirectoryHttpTests(unittest.TestCase):
+    imported=CustomerTests.imported
+    request=HttpTests.request
+    def auth_headers(self,who='owner'):
+        from scripts.pr122_customer_http import COOKIE
+        return {'Cookie':COOKIE+'='+self.users[who]['token'],'X-CSRF-Token':self.users[who]['csrf']}
+    finish=HttpTests.finish
+    def setUp(self):
+        CustomerTests.setUp(self)
+        import threading
+        from http.server import HTTPServer
+        from scripts.pr122_customer_core import Center
+        from scripts.pr122_customer_http import App
+        from scripts.pr122_customer_providers import Providers
+        root=self.root;key=self.key
+        def factory():return Center(root,{'v1':key},'v1',clock=lambda:self.now,mail_ready=True,scanner=lambda b:True)
+        self.server=HTTPServer(('127.0.0.1',0),App(factory,Providers({}),'https://wenwenwenyiyiyi.work','deploy/pr122-customer-center/ui',source_identity=lambda connection,headers:'fixture-client').handler())
+        self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start();self.addCleanup(self.finish)
+        self.path='/preview/consumer/'
+        self.body=b'<!doctype html><html><title>Private fixture</title><body>Fixture-only project</body></html>'
+        self.sha=digest(self.body)
+        envelope=snapshot(self);entry=envelope['payload']['previews'][0]
+        manifest=entry['manifest'];manifest['execution_scope']='TRUSTED_CUSTOMER_FRONTEND';manifest['pages']=[{'path':self.path,'sha256':self.sha}]
+        entry['manifest_sha256']=digest(canonical(manifest));entry['blobs']={self.sha:base64.b64encode(self.body).decode()}
+        envelope['signature']=hmac.new(self.auth,canonical(envelope['payload']),hashlib.sha256).hexdigest()
+        import_snapshot(self.c,envelope,self.auth)
+    def test_real_session_lists_only_original_authorized_project_and_preview(self):
+        status,headers,raw=self.request('api/delivery_projects',headers=self.auth_headers())
+        self.assertEqual(status,200);self.assertIn('private',headers['Cache-Control'])
+        projects=json.loads(raw)['projects'];self.assertEqual([p['id'] for p in projects],['project-a'])
+        self.assertEqual(projects[0]['pages'][0]['sha256'],self.sha)
+        self.assertNotIn('contract-a',raw.decode());self.assertNotIn('owner@example.com',raw.decode())
+    def test_anonymous_and_other_customer_cannot_read_private_pages_or_comments(self):
+        self.assertEqual(self.request('api/delivery_projects')[0],403)
+        status,_,raw=self.request('api/delivery_projects',headers=self.auth_headers('other'))
+        self.assertEqual(status,200);self.assertEqual(json.loads(raw)['projects'],[])
+        url=route('project-a',self.path,self.sha).removeprefix('/customer/center/')
+        self.assertEqual(self.request(url,headers=self.auth_headers('other'))[0],403)
+        self.assertEqual(self.request('api/changes/project-a',headers=self.auth_headers('other'))[0],403)
+    def test_comment_persists_across_real_db_reopen_and_authenticated_read(self):
+        from scripts.pr122_customer_http import COOKIE
+        status,headers,login_raw=self.request('api/login',{'email':'owner@example.com','password':'correct-password-123'})
+        self.assertEqual(status,200);login=json.loads(login_raw)
+        self.users['owner']['token']=headers['Set-Cookie'].split(';',1)[0].split('=',1)[1]
+        self.users['owner']['csrf']=login['csrf']
+        body={'project':'project-a','page':self.path,'version':self.sha,'text':'只属于本项目的意见','intent':'RECTIFICATION','idempotency_key':'delivery-comment-request-0001'}
+        status,_,raw=self.request('api/change_submit_idempotent',body,self.auth_headers());self.assertEqual(status,200)
+        case=json.loads(raw)['id']
+        # Every HTTP request creates/closes a fresh Center; reopen explicitly too.
+        from scripts.pr122_customer_core import Center
+        reopened=Center(self.root,{'v1':self.key},'v1',clock=lambda:self.now,mail_ready=True,scanner=lambda b:True)
+        self.assertEqual(Changes(reopened).list(self.owner,'project-a')['cases'][0]['id'],case);reopened.db.close()
+        status,_,raw=self.request('api/changes/project-a',headers=self.auth_headers());self.assertEqual(status,200)
+        event=json.loads(raw)['cases'][0]['events'][0]
+        self.assertEqual(event['payload']['request'],body['text']);self.assertEqual(event['payload']['page_sha256'],self.sha)
+        self.assertEqual(self.request('api/change_submit_idempotent',body,self.auth_headers())[0],200)
+        self.assertEqual(self.c.db.execute("SELECT COUNT(*) FROM change_events WHERE kind='REQUEST'").fetchone()[0],1)
+    def test_wrong_project_version_csrf_and_other_role_writes_denied(self):
+        body={'project':'project-a','page':self.path,'version':self.sha,'text':'fixture','intent':'RECTIFICATION','idempotency_key':'delivery-comment-request-0002'}
+        for updates,headers in [({'project':'project-b'},self.auth_headers()),({'version':'f'*64},self.auth_headers()),({},self.auth_headers('other')),({},self.auth_headers('reviewer')),({}, {**self.auth_headers(),'X-CSRF-Token':'wrong'})]:
+            with self.subTest(updates=updates,role=headers.get('Cookie')):
+                self.assertEqual(self.request('api/change_submit_idempotent',{**body,**updates},headers)[0],403)
+        self.assertEqual(self.c.db.execute("SELECT COUNT(*) FROM change_events WHERE kind='REQUEST'").fetchone()[0],0)
+    def test_revocation_removes_directory_and_rejects_cached_url_and_comment(self):
+        self.imported(2,[])
+        self.assertEqual(json.loads(self.request('api/delivery_projects',headers=self.auth_headers())[2])['projects'],[])
+        self.assertEqual(self.request(route('project-a',self.path,self.sha).removeprefix('/customer/center/'),headers=self.auth_headers())[0],403)
+        self.assertEqual(self.request('api/changes/project-a',headers=self.auth_headers())[0],403)

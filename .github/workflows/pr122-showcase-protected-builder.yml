@@ -8,6 +8,10 @@ on:
       - 'deploy/pr122-showcase/**'
       - 'demos/pr122-delivery-review/**'
       - 'scripts/pr122_delivery_host.py'
+      - 'scripts/pr122_customer_http.py'
+      - 'scripts/pr122_customer_preview.py'
+      - 'deploy/pr122-customer-center/ui/feedback.js'
+      - 'tests/test_pr122_customer_preview.py'
       - 'tests/test_pr122_delivery_host.py'
       - 'tests/pr122_delivery_review.test.mjs'
       - 'docs/development/PR122_DELIVERY_DISPLAY_MANAGEMENT_20261104.md'
@@ -41,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m unittest tests.test_pr122_showcase_display tests.test_pr122_delivery_host -v 2>&1 | tee /tmp/pr122-protected-builder/DISPLAY_TEST_LOG.txt
+          python -m unittest tests.test_pr122_showcase_display tests.test_pr122_delivery_host tests.test_pr122_customer_preview.DeliveryDirectoryHttpTests -v 2>&1 | tee /tmp/pr122-protected-builder/DISPLAY_TEST_LOG.txt
           node --test tests/pr122_delivery_review.test.mjs > /tmp/pr122-protected-builder/DISPLAY_NODE_LOG.txt
       - name: Real Hosted systemd sandbox probe; not domestic acceptance
         shell: bash

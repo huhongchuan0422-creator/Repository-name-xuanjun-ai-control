@@ -1,0 +1,70 @@
+{
+  "state": "PROPOSED_NOT_APPLIED",
+  "records": [
+    {
+      "id": "shiliu-media",
+      "title": "拾陆传媒 · 视频工作台",
+      "summary": "公开界面演示，使用示例资料；真实阶段待原项目来源接通。",
+      "preview_url": "/labs/shiliu-20261104/",
+      "content_kind": "SAMPLE_DATA_PROTOTYPE",
+      "public_consent_ref": "Owner 2026-11-09 本轮官网项目演示要求；不包含真实技术资料",
+      "source_project_id": null,
+      "source_ref": "原官网现有视频入口；保留不覆盖",
+      "listed": true,
+      "preview_access": "UNVERIFIED",
+      "visibility": "PUBLIC"
+    },
+    {
+      "id": "community-review",
+      "title": "社区服务项目",
+      "summary": "公开界面演示，使用示例资料；真实阶段待原项目来源接通。",
+      "preview_url": "/delivery/#review",
+      "content_kind": "SAMPLE_DATA_PROTOTYPE",
+      "public_consent_ref": "Owner 2026-11-09 本轮官网项目演示要求；不包含真实技术资料",
+      "source_project_id": null,
+      "source_ref": "原冻结模板60f1dcd2；内存演示意见不是客户归档",
+      "listed": true,
+      "preview_access": "AVAILABLE",
+      "visibility": "PUBLIC"
+    },
+    {
+      "id": "geo-growth",
+      "title": "GEO · 品牌增长",
+      "summary": "公开界面演示，使用示例资料；真实阶段待原项目来源接通。",
+      "preview_url": "https://xuanjun-geo-design-20261102.alive-gnat-7824.chatgpt.site",
+      "content_kind": "SAMPLE_DATA_PROTOTYPE",
+      "public_consent_ref": "Owner 2026-11-09 本轮官网项目演示要求；不包含真实技术资料",
+      "source_project_id": null,
+      "source_ref": "Sites:appgprj_6ae8cd2496188191a100ab382ac88e31；custom访问待原协调处理",
+      "listed": true,
+      "preview_access": "RESTRICTED",
+      "visibility": "PUBLIC"
+    },
+    {
+      "id": "digital-human",
+      "title": "数字人工作台",
+      "summary": "公开界面演示，使用示例资料；真实阶段待原项目来源接通。",
+      "preview_url": "https://xuanjun-digital-human-workbench.alive-gnat-7824.chatgpt.site",
+      "content_kind": "SAMPLE_DATA_PROTOTYPE",
+      "public_consent_ref": "Owner 2026-11-09 本轮官网项目演示要求；不包含真实技术资料",
+      "source_project_id": null,
+      "source_ref": "Sites:appgprj_6aeaf38634b481919b693a0ee196ee25；custom访问待原协调处理",
+      "listed": true,
+      "preview_access": "RESTRICTED",
+      "visibility": "PUBLIC"
+    },
+    {
+      "id": "patent-workbench",
+      "title": "专利申请工具",
+      "summary": "公开界面演示，使用示例资料；真实阶段待原项目来源接通。",
+      "preview_url": "https://patent-workbench-review-20261109.alive-gnat-7824.chatgpt.site/preview",
+      "content_kind": "SAMPLE_DATA_PROTOTYPE",
+      "public_consent_ref": "Owner 2026-11-09 本轮官网项目演示要求；不包含真实技术资料",
+      "source_project_id": null,
+      "source_ref": "Sites:appgprj_6af17629f78c8191bca8f182dd8e2c08；浏览器可达且全部案例为示例；普通HTTP403",
+      "listed": true,
+      "preview_access": "UNVERIFIED",
+      "visibility": "PUBLIC"
+    }
+  ]
+}

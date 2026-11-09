@@ -27,6 +27,22 @@ def listing(c,uid,project):
     _,rows=records(c,uid,project)
     return {'project':project,'pages':[{'path':r['page'],'sha256':r['page_sha256'],'url':route(project,r['page'],r['page_sha256'])} for r in rows if r['page'].endswith(('.html','/')) and r.get('execution_scope')=='TRUSTED_CUSTOMER_FRONTEND']}
 
+def delivery_projects(c,uid):
+    """Authenticated projection of the original per-project authority only.
+    No public display declarations, customer documents or new ACL store.
+    """
+    result=[]
+    for project in c.projects(uid):
+        # Recheck original membership on every read, including revocation.
+        c.project(uid,project['id'])
+        pages=[];state='ORIGINAL_REVIEW_ROLE_REQUIRED'
+        if project['role']=='OWNER':
+            try:pages=listing(c,uid,project['id'])['pages'];state='READY' if pages else 'VERSION_SOURCE_NOT_CONNECTED'
+            except Denied:state='VERSION_SOURCE_NOT_CONNECTED'
+        result.append({'id':project['id'],'title':project['title'],'role':project['role'],
+                       'pages':pages,'review_state':state})
+    return {'projects':result,'source':'ORIGINAL_PROJECT_AUTHORITY_AND_REVIEWED_VERSION_REGISTRY'}
+
 def original(c,uid,project,page_key,version):
     d,rows=records(c,uid,project)
     found=next((r for r in rows if digest(r['page'].encode())==page_key and r['page_sha256']==version),None)

@@ -185,6 +185,9 @@ class App:
                         if operation.startswith('previews/'):
                             from scripts.pr122_customer_preview import listing
                             return self.reply(200,listing(center,uid,operation[len('previews/'):]))
+                        if operation=='delivery_projects':
+                            from scripts.pr122_customer_preview import delivery_projects
+                            return self.reply(200,delivery_projects(center,uid))
                         if operation=='me':return self.reply(200,{'user_id':uid,'projects':center.projects(uid),'channels':app.providers.status()})
                         parts=operation.split('/')
                         if len(parts)==3 and parts[0]=='edit_candidate':

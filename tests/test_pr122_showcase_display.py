@@ -23,9 +23,15 @@ class DisplayTests(unittest.TestCase):
         if sandbox_uid!=0:
             def trusted(path,**kwargs):
                 info=path.lstat()
-                if path.is_relative_to(self.root):
-                    display.need(not path.is_symlink() and info.st_uid==sandbox_uid and not info.st_mode&0o022, 'DISPLAY_PATH_CUSTODY')
-                    if not kwargs.get('directory'):self.assertEqual(info.st_nlink,1)
+                if path.is_relative_to(self.root) or path in self.root.parents:
+                    import stat
+                    display.need(not path.is_symlink() and info.st_uid in (0,sandbox_uid), 'DISPLAY_PATH_CUSTODY')
+                    directory=kwargs.get('directory',False)
+                    display.need(not info.st_mode&0o022 or (directory and bool(info.st_mode&stat.S_ISVTX)), 'DISPLAY_PATH_CUSTODY')
+                    display.need(stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode), 'DISPLAY_PATH_TYPE')
+                    if not directory:
+                        display.need(info.st_nlink==1,'DISPLAY_PATH_LINKS')
+                        display.need(stat.S_IMODE(info.st_mode)==(0o644 if kwargs.get('public') else 0o600),'DISPLAY_PATH_MODE')
                     return info
                 return real(path,**kwargs)
             p=patch.object(display,'trusted',side_effect=trusted);p.start();self.addCleanup(p.stop)
@@ -128,3 +134,11 @@ console.log('ORIGINAL_COMPILER_ACCEPTED_AND_HISTORICAL_CASE_PASS');
 """
         result=subprocess.run(['node','--input-type=module','-e',code,module,str(fixture)],text=True,capture_output=True)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_private_display_is_not_in_public_catalog_or_old_private_records_promoted(self):
+        private={**RECORD,'id':'private-project','visibility':'PRIVATE','source_project_id':'original-private-project'}
+        display.manage('put',0,private)
+        catalog=display.public_catalog(display.load())
+        self.assertNotIn('private-project',json.dumps(catalog));self.assertEqual(catalog['projects'],[])
+        self.assertEqual(display.load()['records']['private-project']['visibility'],'PRIVATE')
+        with self.assertRaisesRegex(ValueError,'PRIVATE_PROJECT_MAPPING'):display.validate({**private,'source_project_id':None})
