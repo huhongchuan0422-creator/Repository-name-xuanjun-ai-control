@@ -1,0 +1,36 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const form=require('./merchant-form');
+const C='BANK_ACCOUNT_TYPE_CORPORATE',P='BANK_ACCOUNT_TYPE_PERSONAL',path='bank_account_info.bank_account_type';
+function profile(type=P){return {subject_info:{subject_type:'SUBJECT_TYPE_ENTERPRISE',business_license_info:{merchant_name:'Synthetic Company',legal_person:'Synthetic Owner'},identity_info:{id_doc_type:form.docs[0],id_card_info:{id_card_name:'Synthetic Owner'}}},bank_account_info:{bank_account_type:type,account_name:'Synthetic Owner',account_number:'SYNTHETIC_ORIGINAL_ACCOUNT',account_bank:'Synthetic Bank'},settlement_info:{settlement_id:'716',qualification_type:'Synthetic Industry'}};}
+const options=entity=>({entity,contact:'LEGAL',scene:'mini',doc:form.docs[0],ubos:0});
+function pageFixture(entity='ENTERPRISE',p=profile()){
+ let page;vm.runInNewContext(fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8'),{Page:v=>page=v,require:name=>name==='../../session'?{customerError:()=>'',profileValidationDetails:require('./submission-diagnostic').profileValidationDetails}:name==='../../customer-auth'?{}:name==='../../merchant-form'?form:name==='../../merchant-submit'?require('./merchant-submit'):name==='../../merchant-official-fields'?require('./merchant-official-fields'):name==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):(()=>{throw Error('unexpected dependency');})()});
+ page.data=structuredClone(page.data);page.profile=p;page.data.options=options(entity);page.data.canEditPlatform=true;page.data.canEditWechat=true;page.data.step=2;page.current=()=>true;page.syncLeaveGuard=()=>{};page.clearIndustryRule=()=>{};page.setData=function(v){Object.assign(this.data,v);};page.refresh=function(){this.data.fields=form.rows(this.profile,this.data.options,2);this.data.materialGroups=form.materialGroups(this.profile,this.data.options,[],2);};page.refresh();return page;
+}
+const choose=(page,index)=>page.choice({currentTarget:{dataset:{index:page.data.fields.findIndex(f=>f.path===path)}},detail:{value:String(index)}});
+test('choices mirror only existing submit types, with explicit unselected prompt',()=>{assert.deepEqual(form.bankAccountChoices('ENTERPRISE'),['',C]);assert.deepEqual(form.bankAccountChoices('SOLE_PROPRIETOR'),['',C,P]);});
+for(const value of [undefined,'',null,'PERSONAL','private',7,{},[],P])test('enterprise invalid type never counts as complete '+JSON.stringify(value),()=>{
+ const p=profile(value);if(value===undefined)delete p.bank_account_info.bank_account_type;const before=JSON.stringify(p),groups=form.reviewRequirements(p,options('ENTERPRISE'),[]),bank=groups.find(g=>g.id==='bank'),item=bank.items.find(i=>i.path===path);
+ assert.equal(item.complete,false);assert.ok(item.validationError);assert.throws(()=>form.assertReviewComplete([bank],null,{wechat:true,platform:false}),e=>e.submitIssues.some(i=>i.path===path&&i.group==='bank'&&i.step===2));assert.equal(JSON.stringify(p),before);
+});
+for(const [entity,type,name] of [['ENTERPRISE',C,'Synthetic Company'],['SOLE_PROPRIETOR',C,'Synthetic Company'],['SOLE_PROPRIETOR',P,'Synthetic Owner']])test('valid original combination stays accepted '+entity+'/'+type,()=>{
+ const p=profile(type);p.bank_account_info.account_name=name;const bank=form.reviewRequirements(p,options(entity),[]).find(g=>g.id==='bank');assert.doesNotThrow(()=>form.assertReviewComplete([bank],null,{wechat:true,platform:false}));
+});
+test('old enterprise personal draft remains intact and visible outside the permitted picker options',()=>{
+ const p=profile(),before=JSON.stringify(p),page=pageFixture('ENTERPRISE',p);const field=page.data.materialGroups.find(g=>g.id==='bank').fields.find(f=>f.path===path);
+ assert.deepEqual(field.choices,['',C]);assert.equal(field.value,P);assert.match(field.choiceLabel,/已保留/);assert.match(page.data.materialGroups.find(g=>g.id==='bank').accountTypeMessage,/企业主体当前仅接受对公/);assert.equal(JSON.stringify(p),before);
+ choose(page,0);assert.equal(JSON.stringify(p),before);choose(page,2);assert.equal(JSON.stringify(p),before);
+});
+test('explicit corporate choice changes only type and preserves actual name and account',()=>{
+ const p=profile(),before=structuredClone(p),page=pageFixture('ENTERPRISE',p);choose(page,1);assert.equal(p.bank_account_info.bank_account_type,C);before.bank_account_info.bank_account_type=C;assert.deepEqual(p,before);
+ assert.match(page.data.status,/核对实际开户主体、户名和账号/);assert.match(page.data.materialGroups.find(g=>g.id==='bank').accountTypeRule,/营业执照商户名称一致/);
+});
+test('subject toggles retain type/name/account and mark mismatch instead of defaulting corporate',()=>{
+ const p=profile(),before=JSON.stringify(p),page=pageFixture('SOLE_PROPRIETOR',p);page.condition({currentTarget:{dataset:{key:'entity'}},detail:{value:'0'}});assert.equal(page.data.options.entity,'ENTERPRISE');assert.deepEqual(page.data.fields.find(f=>f.path===path).choices,['',C]);assert.equal(JSON.stringify(p),before);assert.match(page.data.status,/企业主体当前仅接受对公/);
+ page.condition({currentTarget:{dataset:{key:'entity'}},detail:{value:'1'}});assert.equal(page.data.options.entity,'SOLE_PROPRIETOR');assert.deepEqual(page.data.fields.find(f=>f.path===path).choices,['',C,P]);assert.equal(JSON.stringify(p),before);assert.equal(form.bankAccountTypeError(page.data.options.entity,P),'');
+});
+test('unknown historical enum is preserved and requires actual type confirmation',()=>{const p=profile('SYNTHETIC_UNKNOWN_ENUM'),before=JSON.stringify(p),page=pageFixture('SOLE_PROPRIETOR',p);assert.match(page.data.materialGroups.find(g=>g.id==='bank').accountTypeMessage,/无法识别/);assert.match(page.data.materialGroups.find(g=>g.id==='bank').fields.find(f=>f.path===path).choiceLabel,/待核对/);choose(page,0);assert.equal(JSON.stringify(p),before);});
+test('old scalar/table rendering cannot upgrade incompatible account completeness via OCR presentation',()=>{const page=pageFixture();page.ocrCurrent=()=>false;page.retainedOcrCapture=()=>null;page.ocrPathKey=()=>'';const view=page.reviewPresentation({...page.data,materials:[]});assert.equal(view.find(g=>g.id==='bank').items.find(i=>i.path===path).complete,false);});
+test('stale individual picker index cannot write personal after entity became enterprise',()=>{const page=pageFixture('SOLE_PROPRIETOR',profile(C));const saved=JSON.stringify(page.profile);page.data.options.entity='ENTERPRISE';choose(page,2);assert.equal(JSON.stringify(page.profile),saved);});
+test('original backend account mismatch diagnostic points to the precise bank type field',()=>{const diag={operation:'wechat_apply',stage:'PROFILE',code:'PROFILE_CHECK_FAILED',status:'FAILED',timestamp:1794300000,correlation_id:'a'.repeat(32),profile_issue:{reason:'OFFICIAL_BANK_ACCOUNT_TYPE_MISMATCH',fields:[path]}};const groups=form.reviewRequirements(profile(),options('ENTERPRISE'),[]),result=require('./submission-diagnostic').profileValidationDetails({submissionDiagnostic:diag},groups);assert.equal(result.issues[0].path,path);assert.equal(result.issues[0].group,'bank');assert.equal(result.issues[0].step,2);});

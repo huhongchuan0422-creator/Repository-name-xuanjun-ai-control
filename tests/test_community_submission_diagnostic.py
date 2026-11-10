@@ -18,7 +18,7 @@ class Diagnostics(unittest.TestCase):
    d.mark('PROFILE');d.failure(ValueError('NEVER_LOG_ID_ADDRESS_TOKEN'))
    return d.response(400,{'error':'INVALID_REQUEST'})['submission_diagnostic']
   value=self.trace(fn)
-  self.assertEqual(set(value),{'operation','stage','correlation_id','timestamp','status','code'})
+  self.assertEqual(set(value),{'operation','stage','correlation_id','timestamp','status','code','profile_issue'})
   self.assertEqual(value['code'],'PROFILE_CHECK_FAILED');self.assertNotIn('NEVER_LOG',json.dumps(value))
   self.assertRegex(value['correlation_id'],r'^[a-f0-9]{32}$');self.assertIsNone(d._CONTEXT.get())
  def test_request_ids_distinct_and_context_reset_on_exception(self):
@@ -112,3 +112,65 @@ class ApplyDiagnostic(ApplicantApplyment):
   self.assertEqual(len(self.attempts()),1);self.provider.reset_mock()
   with self.assertRaises(PermissionError):self.apply()
   self.provider.assert_not_called()
+
+class ProfileDiagnostics(unittest.TestCase):
+ def test_missing_fields_and_known_conditions_are_specific(self):
+  expected={'reason':'MISSING_OFFICIAL_FIELDS','fields':['contact_info.contact_email']}
+  self.assertEqual(d.profile_issue(ValueError('MISSING_OFFICIAL_FIELDS:contact_info.contact_email')),expected)
+  self.assertEqual(d.profile_issue(ValueError('OFFICIAL_ACCOUNT_HOLDER_NAME_MISMATCH')),{'reason':'OFFICIAL_ACCOUNT_HOLDER_NAME_MISMATCH','fields':['bank_account_info.account_name']})
+  self.assertEqual(d.profile_issue(ValueError('INVALID_OR_EXPIRED_OFFICIAL_PERIOD:subject_info.identity_info.id_card_info'))['fields'],['subject_info.identity_info.id_card_info'])
+ def test_local_errors_never_expose_exception_details(self):
+  for typ,reason in [(TypeError,'LOCAL_TYPE_ERROR'),(KeyError,'LOCAL_KEY_ERROR'),(AttributeError,'LOCAL_ATTRIBUTE_ERROR')]:
+   self.assertEqual(d.profile_issue(typ('SYNTHETIC_PRIVATE_VALUE')),{'reason':reason,'fields':[]})
+ def test_unknown_forged_and_subclass_messages_are_not_echoed(self):
+  class Sneaky(ValueError):
+   def __str__(self):raise AssertionError('Exception must not be stringified')
+  errors=[ValueError('SYNTHETIC_PRIVATE_VALUE'),ValueError('MISSING_OFFICIAL_FIELDS:SYNTHETIC_PRIVATE_VALUE'),ValueError('MISSING_OFFICIAL_FIELDS:contact_info.contact_email,SYNTHETIC_PRIVATE_VALUE'),ValueError('MISSING_OFFICIAL_FIELDS:contact_info.contact_email,contact_info.contact_email'),ValueError('INVALID_OFFICIAL_TEXT:contact_info\nSYNTHETIC_PRIVATE_VALUE'),Sneaky('MISSING_OFFICIAL_FIELDS:contact_info.contact_email'),ValueError({'value':'SYNTHETIC_PRIVATE_VALUE'}),RuntimeError('SYNTHETIC_PRIVATE_VALUE')]
+  for error in errors:self.assertEqual(d.profile_issue(error),{'reason':'UNCLASSIFIED','fields':[]})
+ def test_profile_issue_is_scoped_to_failed_profile_only(self):
+  @d.request_scope
+  def run():
+   d.select({'operation':'onboarding','params':{'operation':'wechat_apply'}})
+   d.mark('PROFILE');d.failure(ValueError('MISSING_OFFICIAL_FIELDS:contact_info.contact_email'))
+   self.assertIn('profile_issue',d.response(400,{})['submission_diagnostic'])
+   self.assertNotIn('profile_issue',d.snapshot('SUCCEEDED'))
+   self.assertNotIn('profile_issue',d.snapshot('STARTED'))
+   d.mark('IDENTITY');self.assertNotIn('profile_issue',d.snapshot('STARTED'))
+  run()
+  self.assertIsNone(d._CONTEXT.get())
+ def test_backend_frontend_enum_sets_match(self):
+  import subprocess
+  from pathlib import Path
+  source=(Path(__file__).resolve().parents[1]/'clients/community-mini/submission-diagnostic.js').read_text()
+  import re
+  paths=json.loads(re.search(r'const PROFILE_PATHS=new Set\((\[.*?\])\);',source).group(1))
+  reasons=json.loads(re.search(r'const PROFILE_REASONS=new Set\((\[.*?\])\);',source).group(1))
+  self.assertEqual(set(paths),d._PROFILE_PATHS)
+  self.assertEqual(set(reasons),set(d._PROFILE_EXACT)|d._PROFILE_PREFIXES|{'LOCAL_TYPE_ERROR','LOCAL_KEY_ERROR','LOCAL_ATTRIBUTE_ERROR','UNCLASSIFIED'})
+ def test_actual_http_failed_profile_has_specific_safe_reason_and_zero_post(self):
+  import copy
+  from scripts.community_mini_http import serve
+  ApplicantApplyment.setUpClass();fx=ApplicantApplyment();fx.setUp();self.addCleanup(fx.doCleanups)
+  app=fx.call('read');fx.fx.draft(app,fields={**app['fields'],'contact':'13800000000'},sales_scenes_type=['SALES_SCENES_MINI_PROGRAM'])
+  profile=copy.deepcopy(fx.read()['profile']);profile['subject_info']['business_license_info']['license_address']='北京市东城区合成地址'
+  profile['contact_info']['contact_email']='SYNTHETIC_PRIVATE_INVALID_EMAIL'
+  fx.call('wechat_save',expected_version=fx.read()['version'],profile=profile)
+  before=copy.deepcopy(fx.read());platform=fx.call('read');token=fx.fx.fx.token()
+  server=serve(fx.fx.fx.gateway,onboarding=fx.fx.service);self.addCleanup(server.server_close);server.timeout=2
+  responses=[]
+  def client():
+   body={'operation':'onboarding','params':{'operation':'wechat_apply','params':{'application':fx.application,'expected_version':before['version'],'application_revision':platform['revision']}}}
+   req=urllib.request.Request('http://127.0.0.1:'+str(server.server_port)+'/mini/merchant',data=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-Community-Scene':'shop1','X-Community-Session':token})
+   try:
+    with urllib.request.urlopen(req,timeout=3) as r:responses.append((r.status,json.load(r)))
+   except urllib.error.HTTPError as e:responses.append((e.code,json.load(e)))
+  # Repeated clicks stay validation failures and do not reserve an intent.
+  for _ in range(2):
+   t=threading.Thread(target=client);t.start();server.handle_request();t.join(4);self.assertFalse(t.is_alive())
+  for status,body in responses:
+   self.assertEqual(status,400,body);self.assertEqual(body['error'],'INVALID_REQUEST')
+   diag=body['submission_diagnostic'];self.assertEqual((diag['operation'],diag['stage'],diag['code']),('wechat_apply','PROFILE','PROFILE_CHECK_FAILED'))
+   self.assertEqual(diag['profile_issue'],{'reason':'INVALID_OFFICIAL_CONTACT_FORMAT','fields':['contact_info.mobile_phone','contact_info.contact_email']})
+   self.assertNotIn('SYNTHETIC_PRIVATE',json.dumps(body))
+  self.assertNotEqual(responses[0][1]['submission_diagnostic']['correlation_id'],responses[1][1]['submission_diagnostic']['correlation_id'])
+  fx.provider.assert_not_called();self.assertEqual(fx.attempts(),[]);self.assertEqual(fx.read(),before);self.assertEqual(fx.call('read'),platform)

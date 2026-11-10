@@ -39,7 +39,7 @@ test('review presence counts same-application OCR without changing saved submit 
  f.page.data.application.materials.business_license.object_id='replacement';f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='license').completed,2);
 });
 test('bank is four customer fields with auto-derived name; industry configuration is separate',()=>{
- const f=fixture();f.page.profile={subject_info:{identity_info:{id_card_info:{id_card_name:'SYNTHETIC PERSON'}}},bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();
+ const f=fixture();f.page.data.options.entity='SOLE_PROPRIETOR';f.page.profile={subject_info:{identity_info:{id_card_info:{id_card_name:'SYNTHETIC PERSON'}}},bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();
  const bank=f.page.data.displayReviewGroups.find(g=>g.id==='bank');assert.equal(bank.total,4);assert.equal(bank.completed,4);assert.match(bank.pendingText,/结算开户名称/);assert.ok(!bank.items.some(i=>i.path.startsWith('settlement_info.')));
  const industry=f.page.data.displayReviewGroups.find(g=>g.id==='industry');assert.equal(industry.total,1);assert.equal(industry.completed,0);assert.match(industry.industryStatus,/系统按当前主体匹配官方规则/);
  assert.equal(f.page.profile.bank_account_info.account_name,undefined);assert.equal(f.page.data.reviewGroups.find(g=>g.id==='bank').completed,3);
@@ -47,13 +47,13 @@ test('bank is four customer fields with auto-derived name; industry configuratio
  f.page.profile.bank_account_info.account_name='EXISTING SAVED NAME';f.page.refresh();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);assert.match(f.page.data.displayReviewGroups.find(g=>g.id==='bank').pendingText,/不一致/);
 });
 test('OCR updates refresh presence and application/session changes cannot reuse names',async()=>{
- const f=fixture();f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
+ const f=fixture();f.page.data.options.entity='SOLE_PROPRIETOR';f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
  edit(f,'','legal_representative');assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
  edit(f,'SYNTHETIC PERSON','legal_representative');assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
  f.page.data.application={...f.page.data.application,application:'another-application'};f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);
 });
 for(const change of ['session','generation','scene','source','logout'])test('display count rejects stale OCR after '+change,async()=>{
- const f=fixture();f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
+ const f=fixture();f.page.data.options.entity='SOLE_PROPRIETOR';f.page.profile={bank_account_info:{bank_account_type:'BANK_ACCOUNT_TYPE_PERSONAL',account_bank:'SYNTHETIC BANK',account_number:'SYNTHETIC ACCOUNT'}};f.page.refresh();f.setRead(result({fields:{legal_representative:{value:'SYNTHETIC PERSON'}}}));await f.start();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,4);
  if(change==='session')f.page.session={...f.session};if(change==='generation')f.session.getGeneration=()=>2;if(change==='scene')f.page.scene='other';if(change==='source')f.page.data.application.materials.business_license.object_id='other';if(change==='logout')f.session.isAuthenticated=()=>false;
  f.page.updateOcrView();assert.equal(f.page.data.displayReviewGroups.find(g=>g.id==='bank').completed,3);assert.equal(f.page.profile.bank_account_info.account_name,undefined);
 });

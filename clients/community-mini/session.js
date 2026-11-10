@@ -1,5 +1,5 @@
 'use strict';
-const {safeSubmissionDiagnostic,submissionDiagnosticFeedback}=require('./submission-diagnostic');
+const {safeSubmissionDiagnostic,submissionDiagnosticFeedback,profileValidationDetails}=require('./submission-diagnostic');
 function safeOcrDiagnostic(value) {
   if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1||
      !["ADMISSION", "QUEUE", "AUTHENTICATION", "APPLICATION_AUTHORIZATION", "SOURCE_BINDING", "EXECUTION", "RESULT_READ", "CONFIRMATION", "WRITEBACK"].includes(value.stage)||!["HOST_NOT_READY", "REQUEST_IN_PROGRESS", "ANOTHER_REQUEST_IN_PROGRESS", "OWNER_QUEUE_FULL", "OWNER_WAIT_TIMEOUT", "HOST_STOPPED", "OWNER_THREAD_REQUIRED", "AUTHENTICATION_FAILED", "APPLICATION_ACCESS_DENIED", "SOURCE_BINDING_CHANGED", "APPLICATION_REVISION_CHANGED", "PROVIDER_VERSION_CHANGED", "ATTACHMENT_CHANGED", "SOURCE_EXPIRED", "JOB_NOT_FOUND", "IDEMPOTENCY_CONFLICT", "RATE_LIMITED", "IMAGE_INVALID", "MODEL_UNAVAILABLE", "MODEL_PIN_MISMATCH", "INFERENCE_FAILED", "RESULT_READ_FAILED", "CONFIRMATION_FAILED", "WRITEBACK_FAILED", "UNEXPECTED_FAILURE"].includes(value.reason)||
@@ -321,4 +321,4 @@ function getSharedSession(wx, config, now, page) {
   sharedSessions.set(config,{baseUrl:config.baseUrl,wx,session,pages});
   return session;
 }
-module.exports={parseScene,createSession,getSharedSession,customerError,safeOcrDiagnostic,submissionDiagnosticFeedback};
+module.exports={parseScene,createSession,getSharedSession,customerError,safeOcrDiagnostic,submissionDiagnosticFeedback,profileValidationDetails};
