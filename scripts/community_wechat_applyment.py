@@ -5,6 +5,7 @@ Internal approval and provider acceptance are independent states. Host must
 explicitly admit real submissions; no payment merchant binding is auto-created.
 """
 import base64
+from scripts import community_submission_diagnostic as submission_diagnostic
 import hashlib
 import json
 import re
@@ -14,6 +15,29 @@ from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from scripts.pr122_customer_core import canonical,private_path
 from scripts.community_provider_transport import request
+
+def mini_program_appids(profile):
+    sales=profile.get('business_info',{}).get('sales_info',{}) if type(profile) is dict else {}
+    mini=sales.get('mini_program_info',{}) if type(sales) is dict else {}
+    return {k:mini[k] for k in ('mini_program_appid','mini_program_sub_appid') if type(mini) is dict and type(mini.get(k)) is str and mini[k].strip()}
+
+
+def mini_program_is_live(record):
+    return (type(record) is dict and record.get('mini_program_live') is True
+            and bool(mini_program_appids(record.get('profile')))
+            and record.get('mini_program_live_appids')==mini_program_appids(record.get('profile')))
+
+
+def provider_submission_profile(profile):
+    # Only the outgoing copy is projected. Stored history and other scene data
+    # remain intact, and every selected scene retains its original fields.
+    result=json.loads(canonical(profile))
+    sales=result.get('business_info',{}).get('sales_info',{})
+    scenes=sales.get('sales_scenes_type',[])
+    if 'SALES_SCENES_MINI_PROGRAM' not in scenes:sales.pop('mini_program_info',None)
+    if 'SALES_SCENES_STORE' not in scenes:sales.pop('biz_store_info',None)
+    return result
+
 
 class WechatMediaUnavailable(PermissionError):
     """Explicitly disabled provider capability, never an authentication result."""
@@ -404,7 +428,7 @@ class WechatApplyment:
                 or domain in (None,merchant) and applyment_id in ids)
             if collision and (row['subject_idx']!=application or other_code!=code):
                 raise ValueError('PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT')
-    def _validate(self,profile,entity):
+    def _validate(self,profile,entity,*,mini_program_live=False):
         required={'contact_info','subject_info','business_info','settlement_info','bank_account_info'}
         if type(profile) is not dict or not required.issubset(profile) or set(profile)-required-{'addition_info'} or any(type(profile[k]) is not dict for k in profile):raise ValueError('OFFICIAL_APPLYMENT_SECTIONS_REQUIRED')
         if len(canonical(profile))>100000:raise ValueError('APPLYMENT_PROFILE_TOO_LARGE')
@@ -438,7 +462,7 @@ class WechatApplyment:
             if type(mini) is not dict or not (mini.get('mini_program_appid') or mini.get('mini_program_sub_appid')):missing.append('business_info.sales_info.mini_program_info.appid')
         if missing:raise ValueError('MISSING_OFFICIAL_FIELDS:'+','.join(missing))
         from scripts.community_applyment_conditions import validate
-        validate(profile,entity,self.center.now())
+        validate(profile,entity,self.center.now(),mini_program_live=mini_program_live)
         # Current official industry/bank catalogs and provider review remain authoritative.
     def _encrypt(self,value,key=None):
         if type(value) is dict:return {k:self._encrypt(v,k) for k,v in value.items()}
@@ -564,7 +588,7 @@ class WechatApplyment:
             'wechat_apply':{'application','expected_version'},'wechat_status':{'application'},'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
             'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
         allowed=fields.get(op) if type(op) is str else None
-        if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and set(p)==allowed|{'ocr_drafts','application_revision'}):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        if allowed is None or set(p)!=allowed and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and allowed<=set(p)<=allowed|{'ocr_drafts','application_revision','mini_program_live'} and ('ocr_drafts' in p)==('application_revision' in p)):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
         applicant_action=op in ('wechat_apply','wechat_status')
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
@@ -576,6 +600,7 @@ class WechatApplyment:
             raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
         if op=='wechat_media':
+            submission_diagnostic.mark('OCR_CONFIRMATION')
             from scripts.community_ocr_draft import current_pending
             if current_pending((self._read(application) or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
             return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
@@ -594,6 +619,7 @@ class WechatApplyment:
             svg=output.getvalue();return dict(application=application,applyment_id=record.get('applyment_id'),url_sha256=hashlib.sha256(record['provider_sign_url'].encode()).hexdigest(),svg_data='data:image/svg+xml;base64,'+base64.b64encode(svg).decode())
         if op in ('wechat_read','wechat_review_read'):
             result=json.loads(canonical(record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')))
+            if 'mini_program_live' in result:result['mini_program_live']=mini_program_is_live(record)
             from scripts.community_ocr_draft import current_drafts
             if 'ocr_drafts' in result:result['ocr_drafts']=current_drafts(result['ocr_drafts'],meta['materials'])
             if op=='wechat_review_read':
@@ -605,6 +631,7 @@ class WechatApplyment:
                     result['industry_review']=dict(status='INCOMPLETE',error_code='INDUSTRY_SELECTION_OR_CURRENT_MATERIALS_INCOMPLETE',application_revision=platform['revision'])
             return result
         if op=='wechat_query':
+            submission_diagnostic.mark('PROVIDER_QUERY')
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')
             merchant=self._provider_domain(record)
             data,digest,verified=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
@@ -689,25 +716,35 @@ class WechatApplyment:
                 current['provider_sp_mchid']=merchant
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
             return current
+        submission_diagnostic.mark('VERSION')
         version=record['version'] if record else 0
         if type(p['expected_version']) is not int or p['expected_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
         if op=='wechat_execute':
+            submission_diagnostic.mark('OCR_CONFIRMATION')
             from scripts.community_ocr_draft import current_pending
             if current_pending((record or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
+            submission_diagnostic.mark('SUBMISSION_GATE')
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
             if applicant_action:
                 from scripts.community_merchant_onboarding import require_confirmed_declarations
+                submission_diagnostic.mark('DECLARATIONS')
                 require_confirmed_declarations(meta,(record or {}).get('profile'))
                 if record is None or record['state'] not in ('DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'):raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
             elif record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
+            submission_diagnostic.mark('PROVIDER_BINDING')
             merchant=self._provider_domain(record,submission=True)
+            submission_diagnostic.mark('MATERIALS')
             self.onboarding._check_materials(application,meta)
-            self._validate(record['profile'],meta['entity_type'])
+            submission_diagnostic.mark('PROFILE')
+            self._validate(record['profile'],meta['entity_type'],mini_program_live=mini_program_is_live(record))
+            submission_diagnostic.mark('IDENTITY')
             if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
             if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
+            submission_diagnostic.mark('INDUSTRY')
             if applicant_action:self.industry_review_plan(record['profile'],application,meta)
             else:self.check_industry_review(record,application,owner,meta,platform)
-            self._validate_media(record['profile'],application,meta)
+            submission_diagnostic.mark('MEDIA')
+            self._validate_media(provider_submission_profile(record['profile']),application,meta)
             if applicant_action and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
                 # Freeze this submitted snapshot through the original owner action.
                 # This is not platform approval and grants no operational access.
@@ -727,7 +764,9 @@ class WechatApplyment:
             # Initial legacy attempts keep their original key; corrected revisions
             # have their own consumed intent, retaining the original provider ID.
             attempt=code if not correction else code+':revision:'+str(version)
-            payload=dict(self._encrypt(record['profile']),business_code=code)
+            submission_diagnostic.mark('ENCRYPTION')
+            payload=dict(self._encrypt(provider_submission_profile(record['profile'])),business_code=code)
+            submission_diagnostic.mark('INTENT_TRANSACTION')
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 current_owner,current_meta,current_platform=self.onboarding._load(application,uid,reviewer)
@@ -744,6 +783,7 @@ class WechatApplyment:
                 if applicant_action:current['applicant_direct_submission']=True
                 current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
+            submission_diagnostic.mark('PROVIDER_POST')
             data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
             verified=signed_response_context(verified)
             # The submit response contains only applyment_id. A signed GET
@@ -759,6 +799,7 @@ class WechatApplyment:
                 raise ValueError('STALE_PROVIDER_APPLYMENT_SUBMISSION_RESPONSE')
             if applyment_id!=record.get('applyment_id') and applyment_id in known_applyment_ids(record):
                 raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
+            submission_diagnostic.mark('RECEIPT_TRANSACTION')
             with c.tx():
                 if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
                 self.onboarding._load(application,uid,reviewer)
@@ -887,12 +928,19 @@ class WechatApplyment:
                     workflow.save_draft(c.db,owner,application,uid,dict(shared,license_ref='PRIVATE_ONBOARDING_MATERIALS'),platform['revision'],
                         encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
                 result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'],ocr_drafts=drafts)
+                if 'mini_program_live' in p:
+                    if type(p['mini_program_live']) is not bool:raise ValueError('MINI_PROGRAM_LIVE_DECLARATION_REQUIRED')
+                    if p['mini_program_live'] and not mini_program_appids(p['profile']):raise ValueError('MINI_PROGRAM_APPID_REQUIRED_FOR_LIVE_DECLARATION')
+                    result['mini_program_live']=p['mini_program_live']
+                    result['mini_program_live_appids']=mini_program_appids(p['profile']) if p['mini_program_live'] else {}
+                elif not mini_program_is_live(result):
+                    result.pop('mini_program_live',None);result.pop('mini_program_live_appids',None)
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':
                 from scripts.community_merchant_onboarding import require_confirmed_declarations
                 require_confirmed_declarations(meta,(record or {}).get('profile'))
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
-                self._validate(record['profile'],meta['entity_type'])
+                self._validate(record['profile'],meta['entity_type'],mini_program_live=mini_program_is_live(record))
                 self.industry_review_plan(record['profile'],application,meta)
                 if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
                 result=dict(record,version=version+1,state='PENDING_INTERNAL_REVIEW')

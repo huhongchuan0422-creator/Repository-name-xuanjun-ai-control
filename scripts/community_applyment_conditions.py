@@ -30,7 +30,8 @@ def document(number,kind,path):
 def images(value,path,max_count=5):
     if type(value) is not list or not 1<=len(value)<=max_count or any(type(v) is not str or not 1<=len(v)<=1024 for v in value):raise ValueError('INVALID_OFFICIAL_MEDIA_LIST:'+path)
 
-def validate(profile,entity,now):
+def validate(profile,entity,now,*,mini_program_live=False):
+    if type(mini_program_live) is not bool:raise ValueError('MINI_PROGRAM_LIVE_DECLARATION_REQUIRED')
     today=dt.datetime.fromtimestamp(now,dt.timezone(dt.timedelta(hours=8))).date()
     contact=profile['contact_info'];subject=profile['subject_info'];identity=subject['identity_info'];bank=profile['bank_account_info']
     required(contact,('contact_type','contact_name','mobile_phone','contact_email'),'contact_info')
@@ -82,7 +83,8 @@ def validate(profile,entity,now):
     if 'SALES_SCENES_MINI_PROGRAM' in scenes:
         mini=sales.get('mini_program_info')
         if type(mini) is not dict:raise ValueError('OFFICIAL_MINI_SCENE_REQUIRED')
-        images(mini.get('mini_program_pics'),'business_info.sales_info.mini_program_info.mini_program_pics')
+        if not mini_program_live or 'mini_program_pics' in mini:
+            images(mini.get('mini_program_pics'),'business_info.sales_info.mini_program_info.mini_program_pics')
     if 'SALES_SCENES_STORE' in scenes:
         store=sales.get('biz_store_info');required(store,('biz_store_name','biz_address_code','biz_store_address'),'business_info.sales_info.biz_store_info')
         for field in ('store_entrance_pic','indoor_pic'):images(store.get(field),'business_info.sales_info.biz_store_info.'+field)

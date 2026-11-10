@@ -136,7 +136,12 @@
   },
   {
     "path": "business_info.sales_info.mini_program_info.mini_program_appid",
-    "label": "服务商小程序AppID",
+    "label": "服务商小程序 AppID（须已绑定服务商）",
+    "stage": 1
+  },
+  {
+    "path": "business_info.sales_info.mini_program_info.mini_program_sub_appid",
+    "label": "商户小程序 AppID（须有权用于本次进件）",
     "stage": 1
   },
   {

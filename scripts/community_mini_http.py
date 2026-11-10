@@ -4,6 +4,7 @@ A deployment must terminate trusted HTTPS separately and supply admitted Identit
 No direct callback, payment submission or root/host operation exists here.
 """
 import json
+from scripts import community_submission_diagnostic as submission_diagnostic
 import os
 import re
 from pathlib import Path
@@ -93,6 +94,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
         def setup(self):
             super().setup();self.rfile.close();self.rfile=_HeaderDeadlineReader(self.connection)
         def answer(self,status,value,*,cookie=None):
+            value=submission_diagnostic.response(status,value)
             raw=json.dumps(value,ensure_ascii=False,allow_nan=False).encode()
             self.send_response(status)
             for k,v in [('Content-Type','application/json; charset=utf-8'),('Content-Length',str(len(raw))),
@@ -181,7 +183,9 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             self.end_headers()
             if self.command!='HEAD':self.wfile.write(raw)
             self.close_connection=True
+        @submission_diagnostic.request_scope
         def do_POST(self):
+            if self.path=='/mini/merchant':submission_diagnostic.begin()
             host=proxy_origin[len('https://'):] if proxy_origin else '127.0.0.1:'+str(self.server.server_port)
             if (self.headers.get_all('Host') != [host] or
                     self.headers.get_all('Origin',[]) not in ([],[proxy_origin or 'http://'+host])):
@@ -220,6 +224,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 session=self.headers.get('X-Center-Session','')
                 csrf=self.headers.get('X-Center-CSRF','')
                 if self.path=='/mini/merchant':
+                    submission_diagnostic.mark('AUTHENTICATION')
                     from scripts.community_mini_merchant import MiniMerchant
                     if session or csrf or self.headers.get('Cookie') or self.headers.get('X-CSRF-Token') or self.headers.get_all('Authorization',[]):
                         raise PermissionError('MINI_BEARER_SESSION_REQUIRED')
@@ -227,6 +232,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     scene=self.headers.get('X-Community-Scene','')
                     if scene == '':gateway.identity.applicant_context(self.headers.get('X-Community-Session',''))
                     else:mini_merchant.context(self.headers.get('X-Community-Session',''),scene)
+                    submission_diagnostic.mark('REQUEST_BODY')
                     limit=7_000_000
                 if self.path=='/mini/project-materials':
                     from scripts.community_project_materials import MAX_UPLOAD_BODY
@@ -279,6 +285,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     value=float(token)
                     if not math.isfinite(value):raise ValueError('NONFINITE')
                     return value
+                submission_diagnostic.mark('BODY_PARSE')
                 body=json.loads(b''.join(chunks),object_pairs_hook=pairs,parse_float=finite,
                                 parse_constant=lambda _:(_ for _ in ()).throw(ValueError('NONFINITE')))
                 if self.path in ('/community/session/wechat','/mini/reviewer-login'):
@@ -295,6 +302,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                     return self.answer(200,{'result':result,'payment_enabled':False},cookie=cookie)
                 token=self.headers.get('X-Community-Session','')
                 if self.path=='/mini/merchant':
+                    submission_diagnostic.select(body)
                     result=mini_merchant.dispatch(token,self.headers.get('X-Community-Scene',''),body)
                     return self.answer(200,{'result':result,'payment_enabled':False})
                 if self.path=='/mini/project-materials':
@@ -347,6 +355,7 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 return self.answer(200,{'result':result,'payment_enabled':False})
             except LoginUnavailable:return self.answer(503,{'error':'LOGIN_UNKNOWN_OR_REJECTED'})
             except PermissionError as error:
+                submission_diagnostic.failure(error)
                 from scripts.pr122_customer_core import Denied
                 if type(error) is Denied and str(error)=='RATE_LIMIT':return self.answer(429,{'error':'RATE_LIMIT'})
                 from scripts.community_ocr_host import OcrPublicError
@@ -355,10 +364,17 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                 if type(error) is OcrPublicError:return self.answer(403,error.public_payload())
                 return self.answer(403,{'error':'WECHAT_MEDIA_UNAVAILABLE' if type(error) is WechatMediaUnavailable else 'ACCESS_DENIED'})
             except RegionValidationError as error:
+                submission_diagnostic.failure(error)
                 return self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})
-            except (ValueError,TypeError,KeyError):return self.answer(400,{'error':'INVALID_REQUEST'})
-            except (socket.timeout,TimeoutError):return self.answer(408,{'error':'REQUEST_TIMEOUT'})
-            except Exception:return self.answer(503,{'error':'SERVICE_UNAVAILABLE'})
+            except (ValueError,TypeError,KeyError) as error:
+                submission_diagnostic.failure(error)
+                return self.answer(400,{'error':'INVALID_REQUEST'})
+            except (socket.timeout,TimeoutError) as error:
+                submission_diagnostic.failure(error)
+                return self.answer(408,{'error':'REQUEST_TIMEOUT'})
+            except Exception as error:
+                submission_diagnostic.failure(error)
+                return self.answer(503,{'error':'SERVICE_UNAVAILABLE'})
     return Handler
 
 

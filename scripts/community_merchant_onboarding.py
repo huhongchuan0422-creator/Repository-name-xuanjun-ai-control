@@ -5,6 +5,7 @@ An applicant needs an existing verified account, not a fictitious signed project
 """
 from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, has_admin_templates
 import base64
+from scripts import community_submission_diagnostic as submission_diagnostic
 import hashlib
 import json
 import secrets
@@ -255,7 +256,11 @@ class MerchantOnboarding:
         # Old records without a declaration retain conservative offline requirements.
         # New UI always submits its selected scenes; no history is rewritten.
         scenes=checked_scenes(meta.get('sales_scenes_type',[STORE_SCENE]))
-        scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes else ())
+        live=False
+        if application and self.wechat_applyment is not None:
+            from scripts.community_wechat_applyment import mini_program_is_live
+            live=mini_program_is_live(self.wechat_applyment._read(application))
+        scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes and not live else ())
         operator=() if not meta['delegated'] else ('operator_identity',)+(('operator_identity_back',) if meta.get('operator_identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' else ())
         selected=set()
         if application and self.wechat_applyment is not None:
@@ -265,7 +270,18 @@ class MerchantOnboarding:
         industry=tuple(k for k in INDUSTRY_MATERIAL_KINDS if k in selected or k=='industry_permit' and meta['category']=='FOOD')
         return base+scene_materials+operator+industry
     def _check_materials(self,application,meta):
-        for kind in self._required(meta,application):
+        kinds=list(self._required(meta,application))
+        # Optional means it may be absent, never that a supplied screenshot
+        # bypasses the original object binding, scan and integrity checks.
+        if self.wechat_applyment is not None:
+            record=self.wechat_applyment._read(application) or {}
+            profile=record.get('profile',{})
+            sales=profile.get('business_info',{}).get('sales_info',{})
+            mini=sales.get('mini_program_info',{})
+            if (MINI_SCENE in sales.get('sales_scenes_type',[]) and type(mini) is dict
+                    and 'mini_program_pics' in mini and 'mini_program_screenshot' not in kinds):
+                kinds.append('mini_program_screenshot')
+        for kind in kinds:
             material=meta['materials'].get(kind)
             if not material or (material['expires_at'] is not None and material['expires_at']<=self.center.now()):
                 raise ValueError('REQUIRED_MATERIAL_MISSING_OR_EXPIRED:'+kind)
@@ -543,10 +559,13 @@ class MerchantOnboarding:
                         raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM')
                     # Unknown configuration may reach internal review; the original
                     # APPROVE check below still requires a verified configured cap.
+                    submission_diagnostic.mark('DECLARATIONS')
                     require_confirmed_declarations(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
                 action='SUBMIT' if op=='submit' else 'WITHDRAW' if op=='withdraw' else params['action']
                 if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
-                if action in ('SUBMIT','APPROVE'):self._check_materials(application,meta)
+                if action in ('SUBMIT','APPROVE'):
+                    submission_diagnostic.mark('MATERIALS')
+                    self._check_materials(application,meta)
                 if action=='APPROVE':
                     account=c.db.execute('SELECT verified FROM accounts WHERE id=?',(owner,)).fetchone()
                     if account is None or account[0]!=1:raise PermissionError('VERIFIED_APPLICANT_REQUIRED')

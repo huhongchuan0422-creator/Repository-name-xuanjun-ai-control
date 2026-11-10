@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const form=require('./merchant-form');const auth=require('./customer-auth');
-function fixture(name,options={}){let authenticated=false;let definition,calls=[],scrolls=[],pending=null,failure=null,storedProfile={},storedOcrDrafts={},cashierMediaId='',ocrStatus='needs_review',ocrConfirmedFields=null,ocrConfirmationRevision=0;const app={application:'ma_'+ '1'.repeat(32),revision:1,status:'DRAFT',fields:{store_name:'Fixture Shop',address:'Fixture Address'},entity_type:'ENTERPRISE',delegated:false,identity_type:'IDENTIFICATION_TYPE_IDCARD',sales_scenes_type:['SALES_SCENES_MINI_PROGRAM'],required_materials:['business_license'],materials:{},wechat_submerchant_state:'NOT_VERIFIED',opening_state:'NOT_APPROVED'};
+function fixture(name,options={}){let authenticated=false;let definition,calls=[],scrolls=[],pending=null,failure=null,storedProfile={},storedMiniLive=false,storedOcrDrafts={},cashierMediaId='',ocrStatus='needs_review',ocrConfirmedFields=null,ocrConfirmationRevision=0;const app={application:'ma_'+ '1'.repeat(32),revision:1,status:'DRAFT',fields:{store_name:'Fixture Shop',address:'Fixture Address'},entity_type:'ENTERPRISE',delegated:false,identity_type:'IDENTIFICATION_TYPE_IDCARD',sales_scenes_type:['SALES_SCENES_MINI_PROGRAM'],required_materials:['business_license'],materials:{},wechat_submerchant_state:'NOT_VERIFIED',opening_state:'NOT_APPROVED'};
 const session={clear(){authenticated=false;},login:async()=>{authenticated=true;},async merchant(scene,op,p){if(options.beforeOperation)await options.beforeOperation(op,p);calls.push({scene,op,p:structuredClone(p)});if(failure&&failure.operation===p.operation){const e=failure.error;failure=null;throw e;}if(pending)return pending;
  if(op==='ocr'){if(p.action==='submit')return {result:{job_id:'synthetic-ocr'}};if(p.action==='read')return {result:{job_id:p.job_id,application_revision:String(app.revision),provider_version:1,status:ocrStatus,document_type:'business_license',...(ocrStatus==='confirmed'?{confirmed_fields:structuredClone(ocrConfirmedFields),confirmation_revision:ocrConfirmationRevision}:{fields:{company_name:{value:'Fixture Company'},registered_address:{value:'OCR Address'}}})}};if(p.action==='confirm'){ocrStatus='confirmed';ocrConfirmedFields=structuredClone(p.fields);ocrConfirmationRevision=p.revision;return {result:{job_id:p.job_id,status:'confirmed',revision:p.revision,recorded:true,application_revision:p.application_revision,provider_version:p.provider_version}};}}
  if(op==='workspaces')return {workspaces:['merchant']};if(op==='read')return p.operation==='community.orders'?{orders:[]}:{counts:{},order_total_minor:0};
- if(p.operation==='mine')return {applications:options.duplicateApplications?[structuredClone(app),{...structuredClone(app),application:'ma_'+ '2'.repeat(32),status:'APPROVED'}]:[]};if(p.operation==='catalog')return {materials:[{id:'business_license',title:'营业执照'}]};if(p.operation==='save'){if(typeof p.params.split_participation==='boolean'){app.split_participation=p.params.split_participation;app.requested_split_bps=p.params.requested_split_bps;app.effective_split_bps=0;}if(Number.isInteger(p.params.redemption_percent))app.redemption_percent=p.params.redemption_percent;if(p.params.declarations)app.declarations=structuredClone(p.params.declarations);if(p.params.sales_scenes_type)app.sales_scenes_type=structuredClone(p.params.sales_scenes_type);app.entity_type=p.params.entity_type;app.category=p.params.category;app.delegated=p.params.delegated;app.identity_type=p.params.identity_type;return structuredClone(app);}if(p.operation==='read'){if(p.params.application!==app.application)return {...structuredClone(app),application:p.params.application,status:'APPROVED'};return structuredClone(app);}if(p.operation==='upload'){app.materials[p.params.kind]={uploaded:true,review:'PENDING'};app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='remove_material'){delete app.materials.cashier_photo;app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='wechat_media')return {media_id:'synthetic-admitted-media'};if(p.operation==='wechat_cashier_link'){cashierMediaId=p.params.media_id;return {version:2};}if(p.operation==='submit'){app.status='SUBMITTED';return structuredClone(app);}if(p.operation==='wechat_submit_review'){app.wechatReview='PENDING_INTERNAL_REVIEW';return {state:app.wechatReview};}if(p.operation==='wechat_apply'){app.wechatReview='SUBMITTED_TO_PROVIDER';return {state:app.wechatReview,applyment_id:'123456'};}if(p.operation==='wechat_status'){return {state:app.wechatReview,provider_state:'APPLYMENT_STATE_AUDITING'};}if(p.operation==='wechat_read')return {version:1,state:app.wechatReview||'DRAFT',profile:structuredClone(storedProfile),ocr_drafts:structuredClone(storedOcrDrafts),cashier_media_id:cashierMediaId};if(p.operation==='wechat_save'){if(p.params.ocr_drafts)storedOcrDrafts={...storedOcrDrafts,...structuredClone(p.params.ocr_drafts)};storedProfile=structuredClone(p.params.profile);return {version:2,profile:structuredClone(storedProfile)};}throw Error('unplanned');}};
+ if(p.operation==='mine')return {applications:options.duplicateApplications?[structuredClone(app),{...structuredClone(app),application:'ma_'+ '2'.repeat(32),status:'APPROVED'}]:[]};if(p.operation==='catalog')return {materials:[{id:'business_license',title:'营业执照'}]};if(p.operation==='save'){if(typeof p.params.split_participation==='boolean'){app.split_participation=p.params.split_participation;app.requested_split_bps=p.params.requested_split_bps;app.effective_split_bps=0;}if(Number.isInteger(p.params.redemption_percent))app.redemption_percent=p.params.redemption_percent;if(p.params.declarations)app.declarations=structuredClone(p.params.declarations);if(p.params.sales_scenes_type)app.sales_scenes_type=structuredClone(p.params.sales_scenes_type);app.entity_type=p.params.entity_type;app.category=p.params.category;app.delegated=p.params.delegated;app.identity_type=p.params.identity_type;return structuredClone(app);}if(p.operation==='read'){if(p.params.application!==app.application)return {...structuredClone(app),application:p.params.application,status:'APPROVED'};return structuredClone(app);}if(p.operation==='upload'){app.materials[p.params.kind]={uploaded:true,review:'PENDING'};app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='remove_material'){delete app.materials.cashier_photo;app.revision++;cashierMediaId='';return structuredClone(app);}if(p.operation==='wechat_media')return {media_id:'synthetic-admitted-media'};if(p.operation==='wechat_cashier_link'){cashierMediaId=p.params.media_id;return {version:2};}if(p.operation==='submit'){app.status='SUBMITTED';return structuredClone(app);}if(p.operation==='wechat_submit_review'){app.wechatReview='PENDING_INTERNAL_REVIEW';return {state:app.wechatReview};}if(p.operation==='wechat_apply'){app.wechatReview='SUBMITTED_TO_PROVIDER';return {state:app.wechatReview,applyment_id:'123456'};}if(p.operation==='wechat_status'){return {state:app.wechatReview,provider_state:'APPLYMENT_STATE_AUDITING'};}if(p.operation==='wechat_read')return {version:1,state:app.wechatReview||'DRAFT',mini_program_live:storedMiniLive,profile:structuredClone(storedProfile),ocr_drafts:structuredClone(storedOcrDrafts),cashier_media_id:cashierMediaId};if(p.operation==='wechat_save'){if(typeof p.params.mini_program_live==='boolean')storedMiniLive=p.params.mini_program_live;if(p.params.ocr_drafts)storedOcrDrafts={...storedOcrDrafts,...structuredClone(p.params.ocr_drafts)};storedProfile=structuredClone(p.params.profile);return {version:2,profile:structuredClone(storedProfile)};}throw Error('unplanned');}};
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/'+name+'/index.js','utf8'),{Page:p=>definition=p,wx:{pageScrollTo(o){scrolls.push({...o,step:page.data.step});},navigateTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},redirectTo(o){calls.push({navigation:o.url});if(o.success)o.success();if(o.complete)o.complete();},chooseMedia(o){if(options.chooseMedia)return options.chooseMedia(o);calls.push({p:{operation:'media_choice'},mediaChoice:{sourceType:o.sourceType,mediaType:o.mediaType,sizeType:o.sizeType}});o.success({tempFiles:[{tempFilePath:'synthetic-cashier.png',size:options.largeMedia?6000000:32}]});},getImageInfo(o){o.success({width:1280,height:1706});},compressImage(o){if(options.compressImage)return options.compressImage(o);calls.push({compress:{src:o.src,quality:o.quality}});o.success({tempFilePath:'synthetic-compressed.png'});},getFileSystemManager(){return {stat(o){o.success({stats:{size:options.largeMedia&&o.path==='synthetic-cashier.png'?6000000:17}});},readFile(o){calls.push({p:{operation:'read_file'},readFile:o.filePath});o.success({data:options.largeMedia&&o.filePath==='synthetic-cashier.png'?'A'.repeat(6666672):'iVBORw0KGgpzeW50aGV0aWM='});}}}},getApp:()=>({globalData:{baseUrl:'https://fixture.invalid'}}),require:p=>{if(p.endsWith('.json'))throw Error('WECHAT_JSON_MODULE_UNAVAILABLE');return p==='../../session'?{parseScene:()=> 'shop1',getSharedSession:()=>({...session,ensureLogin:session.login,isAuthenticated:()=>authenticated}),customerError:options.customerError||(()=> 'error')}:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:p==='../../merchant-submit'?require('./merchant-submit'):p==='../../merchant-official-fields'?require('./merchant-official-fields'):p==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):require(p);},encodeURIComponent});
 const page={...definition,data:structuredClone(definition.data),setData(p,afterRender){Object.assign(this.data,p);if(afterRender)afterRender();}};return {page,calls,scrolls,app,hold(p){pending=p;},failNext(operation,error){failure={operation,error};},get storedProfile(){return storedProfile;}};}
 test('new admission defaults to LEGAL and places business-license fields and upload on the first screen',async()=>{
@@ -474,7 +474,7 @@ test('preexisting overlong phone is never truncated by render save or reread and
 test('latest reread mobile is checked at submit transport boundary, not only before the shared flow',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
  form.put(f.page.profile,'contact_info.mobile_phone','123456789012');await f.page.save();
- form.put(f.page.profile,'contact_info.mobile_phone','13800138000');f.page.data.dirty=false;f.page.platformAppid='wx'+'1'.repeat(16);f.app.required_materials=[];f.page.data.application.required_materials=[];
+ form.put(f.page.profile,'contact_info.mobile_phone','13800138000');f.page.data.dirty=false;form.put(f.page.profile,'business_info.sales_info.mini_program_info.mini_program_appid','wx'+'1'.repeat(16));f.app.required_materials=[];f.page.data.application.required_materials=[];
  const refresh=f.page.refresh.bind(f.page);f.page.refresh=function(...args){refresh(...args);this.data.reviewGroups=[{id:'contact',step:0,title:'联系人',items:[{path:'contact_info.mobile_phone',label:'手机号',complete:!form.mobilePhoneError(form.get(this.profile,'contact_info.mobile_phone'),true)}]}];};
  const before=f.calls.length;await f.page.submitAllReview();
  assert.ok(f.calls.length>before,'shared flow rereads the authoritative draft: '+f.page.data.status);
@@ -720,7 +720,7 @@ test('upload and each Next save privately without sending materials or applicati
 test('final Submit automatically associates an eligible uploaded original before both review queues',async()=>{
  const f=fixture('merchant-join',{customerError:e=>e.stack||e.message});await f.page.onLoad({scene:'shop1'});
  await f.page.upload({currentTarget:{dataset:{kind:'business_license'}}});
- form.put(f.page.profile,'contact_info.mobile_phone','13800000000');f.page.platformAppid='wx'+'1'.repeat(16);await f.page.save();
+ form.put(f.page.profile,'contact_info.mobile_phone','13800000000');form.put(f.page.profile,'business_info.sales_info.mini_program_info.mini_program_appid','wx'+'1'.repeat(16));await f.page.save();
  // Isolate page orchestration with a minimal complete review model; form validation has its own tests.
  const refresh=f.page.refresh.bind(f.page);f.page.refresh=function(...args){refresh(...args);this.data.reviewGroups=[{id:'license',step:0,title:'营业执照',items:[{path:'material:business_license',label:'营业执照',material:true,uploaded:true,wechatRequired:true,synced:!!form.get(this.profile,'subject_info.business_license_info.license_copy')}]}];};f.page.refresh();
  const begin=f.calls.length;await f.page.submitAllReview();const ops=f.calls.slice(begin).map(c=>c.p&&c.p.operation);
@@ -764,4 +764,80 @@ test('Next saves unconfirmed OCR edits privately and advances without confirming
  assert.equal(field.value,'HUMAN CORRECTED COMPANY');assert.equal(field.ocrSuggestion,true);
  assert.equal(f.calls.some(c=>c.op==='ocr'&&['confirm','recover_confirm','recover_apply'].includes(c.p.action)),false);
  assert.equal(f.calls.some(c=>c.p&&['wechat_media','wechat_apply'].includes(c.p.operation)),false);
+});
+
+test('runtime AppID is never silently inserted for any merchant scene',async()=>{
+ for(const scene of ['unknown','store','mini','both']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+  f.page.platformAppid='wx1d5f8873eaea5392';f.page.setData({options:{...f.page.data.options,scene},dirty:true});
+  await f.page.save();
+  assert.equal(form.get(f.storedProfile,'business_info.sales_info.mini_program_info.mini_program_appid'),undefined);
+  assert.equal(form.get(f.storedProfile,'business_info.sales_info.mini_program_info.mini_program_sub_appid'),undefined);
+  assert.equal(f.page.data.options.scene,scene);
+  assert.equal(f.calls.some(c=>c.p&&['wechat_media','wechat_apply'].includes(c.p.operation)),false);
+ }
+});
+test('existing merchant-supplied AppIDs and original store data survive save and reload',async()=>{
+ for(const key of ['mini_program_appid','mini_program_sub_appid']){
+  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+  f.page.platformAppid='wx1d5f8873eaea5392';f.page.setData({options:{...f.page.data.options,scene:'store'},dirty:true});
+  const path='business_info.sales_info.mini_program_info.'+key;
+  form.put(f.page.profile,path,'wx2222222222222222');
+  form.put(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address','Synthetic original address');
+  await f.page.save();await f.page.load(f.app.application);
+  assert.equal(form.get(f.page.profile,path),'wx2222222222222222');
+  assert.equal(form.get(f.page.profile,'business_info.sales_info.biz_store_info.biz_store_address'),'Synthetic original address');
+  assert.equal(f.page.data.options.scene,'store');
+ }
+});
+test('AppID field remains editable rather than promising automatic runtime reuse',()=>{
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
+ assert.equal(wxml.includes('无需商家手填 AppID'),false);
+ assert.equal(wxml.includes('wx:elif="{{item.path===\'business_info.sales_info.mini_program_info.mini_program_appid\'}}"'),false);
+ assert.ok(wxml.includes('bindinput="inputUnifiedField"'));
+});
+
+test('live mini declaration is explicit, persists through original save/read, and does not submit',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ f.page.setData({options:{...f.page.data.options,scene:'mini'}});
+ form.put(f.page.profile,'business_info.sales_info.mini_program_info.mini_program_appid','wx2222222222222222');
+ assert.equal(f.page.data.options.miniLive,false);
+ f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,true);
+ await f.page.save();await f.page.load(f.app.application);
+ assert.equal(f.page.data.options.miniLive,true);
+ assert.equal(f.calls.filter(c=>c.p&&c.p.operation==='wechat_save').at(-1).p.params.mini_program_live,true);
+ assert.equal(f.calls.some(c=>c.p&&['wechat_apply','wechat_media','submit'].includes(c.p.operation)),false);
+});
+test('live mini cannot silently borrow runtime AppID and changing declared ID clears live fact',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.platformAppid='wx1d5f8873eaea5392';
+ f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,false);assert.match(f.page.data.status,/有权/);
+ const path='business_info.sales_info.mini_program_info.mini_program_appid';form.put(f.page.profile,path,'wx2222222222222222');
+ f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,true);
+ f.page.input({currentTarget:{dataset:{path}},detail:{value:'wx3333333333333333'}});
+ assert.equal(f.page.data.options.miniLive,false);await f.page.save();
+ assert.equal(f.calls.filter(c=>c.p&&c.p.operation==='wechat_save').at(-1).p.params.mini_program_live,false);
+});
+test('live mini screenshot is optional while unknown/unlaunched stays required and uploaded originals remain reusable',()=>{
+ const profile={business_info:{sales_info:{mini_program_info:{mini_program_appid:'wx2222222222222222'},sales_scenes_type:['SALES_SCENES_MINI_PROGRAM']}}};
+ const options={entity:'ENTERPRISE',contact:'LEGAL',doc:'IDENTIFICATION_TYPE_IDCARD',scene:'mini',ubos:0,category:'GENERAL'};
+ for(const live of [false,true]){
+  const groups=form.reviewRequirements(profile,{...options,miniLive:live},[],{});
+  const item=groups.flatMap(g=>g.items).find(i=>i.path==='material:mini_program_screenshot');
+  assert.equal(item.wechatRequired,!live);assert.equal(item.complete,live);
+ }
+ const materials=[{id:'mini_program_screenshot',title:'截图',uploaded:true,synced:false}];
+ const item=form.reviewRequirements(profile,{...options,miniLive:true},materials,{}).flatMap(g=>g.items).find(i=>i.path==='material:mini_program_screenshot');
+ assert.equal(item.autoWechat,true);assert.equal(item.uploaded,true);
+ const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(wxml,/服务页面截图：选填/);assert.match(wxml,/未上线时必填/);assert.match(wxml,/group.id==='mini'/);
+});
+test('service and merchant AppIDs have distinct editable fields with one combined required choice',()=>{
+ const options={entity:'ENTERPRISE',contact:'LEGAL',doc:'IDENTIFICATION_TYPE_IDCARD',scene:'mini',ubos:0,category:'GENERAL',miniLive:true};
+ for(const key of ['mini_program_appid','mini_program_sub_appid']){
+  const profile={business_info:{sales_info:{mini_program_info:{[key]:'wx2222222222222222'}}}};
+  const fields=form.rows(profile,options,1).filter(f=>/mini_program_(?:sub_)?appid$/.test(f.path));
+  assert.equal(fields.length,2);assert.ok(fields.every(f=>f.required===false));
+  const item=form.reviewRequirements(profile,options,[],{}).flatMap(g=>g.items).filter(i=>i.path==='mini_appid');
+  assert.equal(item.length,1);assert.equal(item[0].complete,true);
+ }
+ const item=form.reviewRequirements({},options,[],{}).flatMap(g=>g.items).find(i=>i.path==='mini_appid');assert.equal(item.complete,false);
 });
