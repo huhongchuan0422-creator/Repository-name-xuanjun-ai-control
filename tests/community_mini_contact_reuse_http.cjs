@@ -9,6 +9,7 @@ function page(){let definition;vm.runInNewContext(fs.readFileSync(root+'/pages/m
  const edit=(field,value)=>p.input({currentTarget:{dataset:{path:field}},detail:{value}});
  const choose=(key,value)=>p.condition({currentTarget:{dataset:{key}},detail:{value}});
  const get=field=>form.get(p.profile,field);
+ choose('entity',1);assert.equal(p.data.options.entity,'SOLE_PROPRIETOR');
  choose('scene',3);choose('ubos',1);
  edit('subject_info.business_license_info.merchant_name','SYNTHETIC COMPANY ONE');
  edit('subject_info.business_license_info.license_address','SYNTHETIC STREET ONE');
@@ -21,7 +22,7 @@ function page(){let definition;vm.runInNewContext(fs.readFileSync(root+'/pages/m
  edit('subject_info.business_license_info.merchant_name','SYNTHETIC COMPANY TWO');edit('subject_info.business_license_info.license_address','SYNTHETIC STREET TWO');edit('contact_info.mobile_phone','13800138001');await p.save();
  assert.equal(get('business_info.sales_info.biz_store_info.biz_store_name'),'SYNTHETIC COMPANY TWO');assert.equal(get('business_info.sales_info.biz_store_info.biz_store_address'),'SYNTHETIC STREET TWO');assert.equal(get('business_info.service_phone'),'13800138001');
  choose('contact',1);edit('contact_info.contact_name','INDEPENDENT OPERATOR');edit('contact_info.mobile_phone','13800138002');p.setData({step:2});p.refresh();
- const account=p.data.fields.findIndex(f=>f.path==='bank_account_info.bank_account_type');p.choice({currentTarget:{dataset:{index:account}},detail:{value:'1'}});await p.save();
+ const account=p.data.fields.findIndex(f=>f.path==='bank_account_info.bank_account_type');const personal=p.data.fields[account].choices.indexOf('BANK_ACCOUNT_TYPE_PERSONAL');assert.ok(personal>0);p.choice({currentTarget:{dataset:{index:account}},detail:{value:String(personal)}});await p.save();
  assert.equal(get('contact_info.contact_name'),'INDEPENDENT OPERATOR');assert.equal(get('business_info.service_phone'),'13800138002');assert.equal(get('bank_account_info.account_name'),'SYNTHETIC LEGAL');assert.equal(get('bank_account_info.bank_account_type'),'BANK_ACCOUNT_TYPE_PERSONAL');assert.ok(!p.data.fields.some(f=>f.path==='bank_account_info.account_name'));
  form.put(p.profile,'business_info.sales_info.biz_store_info.biz_store_name','HISTORICAL NAME');form.put(p.profile,'business_info.sales_info.biz_store_info.biz_store_address','HISTORICAL ADDRESS');form.put(p.profile,'business_info.service_phone','555-0100');form.put(p.profile,'bank_account_info.account_name','HISTORICAL HOLDER');p.setData({dirty:true});await p.save();p.onUnload();p=page();await p.onLoad({scene:'shop1'});
  edit('subject_info.business_license_info.merchant_name','SYNTHETIC COMPANY THREE');edit('subject_info.business_license_info.license_address','SYNTHETIC STREET THREE');edit('contact_info.mobile_phone','13800138003');await p.save();
