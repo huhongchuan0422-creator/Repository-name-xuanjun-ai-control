@@ -1,10 +1,10 @@
 "use strict";
-// Exact candidate frontend binding only; existing backend pin and opt-in preview gates unchanged.
+// Exact 6b3e diagnostic frontend and backend; existing preview identity and gates unchanged.
 // One isolated preview. No development-version upload, release, review or payment API.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),https=require('node:https');
 const {sourceManifest,verifySource}=require('../deploy/community-preview/endpoint.cjs');
 const {normalizeUploadKey}=require('./community_mini_key.cjs');
-const SOURCE='a942fe4511b26d7c7923dd1307eb40062bcbd36d';
+const SOURCE='6b3e78112da13d766a6d68e4ceafc0c301e004ac';
 const BASE='https://uk.wenwenwenyiyiyi.work/community-test-354d1fac';
 const SCENE='owner-test-354d1fac',APPID='wx1d5f8873eaea5392';
 const MARKER='[mini-test-preview-354]';
@@ -62,16 +62,16 @@ async function prepare(env){
  const ready=await health();const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(out)),'.isolated-mini-'));
  try{for(const name of fs.readdirSync(source))fs.cpSync(path.join(source,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});fs.writeFileSync(path.join(temp,'app.js'),updated);fs.writeFileSync(path.join(temp,'session.js'),derivedSession(fs.readFileSync(path.join(source,'session.js'),'utf8')));preparedSource(temp);fs.renameSync(temp,out);}finally{fs.rmSync(temp,{recursive:true,force:true});}
  const output=env.COMMUNITY_PREVIEW_OUTPUT;requireTrue(output&&!fs.existsSync(output),'NEW_TEST_RECEIPT_DIRECTORY_REQUIRED');fs.mkdirSync(output);
- fs.writeFileSync(path.join(output,'backend-readiness.json'),JSON.stringify({status:'BACKEND_HEALTH_VERIFIED',control_source_sha:control,frontend_source_sha:control,backend_source_sha:ready.runtime_source_sha,baseUrl:BASE,scene:SCENE,compatibility:'FRONTEND_ONLY_PINNED_BACKEND',observed_at:Math.floor(Date.now()/1000),login_verified:false,customer_acceptance:false,payment_enabled:false},null,2));
+ fs.writeFileSync(path.join(output,'backend-readiness.json'),JSON.stringify({status:'BACKEND_HEALTH_VERIFIED',control_source_sha:control,frontend_source_sha:SOURCE,backend_source_sha:ready.runtime_source_sha,baseUrl:BASE,scene:SCENE,compatibility:'EXACT_SOURCE_MATCH',observed_at:Math.floor(Date.now()/1000),login_verified:false,customer_acceptance:false,payment_enabled:false},null,2));
 }
 async function preview(env){
  const control=context(env),projectPath=env.COMMUNITY_MINI_PROJECT_PATH,out=env.COMMUNITY_PREVIEW_OUTPUT;
  requireTrue(projectPath&&out,'PREPARED_TEST_PREVIEW_REQUIRED');preparedSource(projectPath);
  const r=JSON.parse(fs.readFileSync(path.join(out,'backend-readiness.json'),'utf8')),now=Math.floor(Date.now()/1000);
- requireTrue(r.status==='BACKEND_HEALTH_VERIFIED'&&r.control_source_sha===control&&r.frontend_source_sha===control&&r.backend_source_sha===SOURCE&&r.compatibility==='FRONTEND_ONLY_PINNED_BACKEND'&&r.baseUrl===BASE&&r.scene===SCENE&&r.login_verified===false&&r.customer_acceptance===false&&r.payment_enabled===false&&Number.isSafeInteger(r.observed_at)&&now-r.observed_at<=600&&r.observed_at<=now+30,'FRESH_TEST_READINESS_REQUIRED');
+ requireTrue(r.status==='BACKEND_HEALTH_VERIFIED'&&r.control_source_sha===control&&r.frontend_source_sha===SOURCE&&r.backend_source_sha===SOURCE&&r.compatibility==='EXACT_SOURCE_MATCH'&&r.baseUrl===BASE&&r.scene===SCENE&&r.login_verified===false&&r.customer_acceptance===false&&r.payment_enabled===false&&Number.isSafeInteger(r.observed_at)&&now-r.observed_at<=600&&r.observed_at<=now+30,'FRESH_TEST_READINESS_REQUIRED');
  requireTrue(!fs.existsSync(path.join(out,'receipt.json'))&&!fs.existsSync(path.join(out,'preview.png')),'TEST_PREVIEW_ALREADY_ATTEMPTED');
  await health();
- const receipt={status:'NOT_RUN',operation:'ISOLATED_TEST_PREVIEW_ONLY',head:control,frontend_source_sha:control,backend_source_sha:SOURCE,compatibility:'FRONTEND_ONLY_PINNED_BACKEND',control_source_sha:control,appid:APPID,backend_base_url:BASE,entry_page:'pages/home/index',scene:SCENE,search_query:'scene='+SCENE,public_release:false,development_upload:false,payment_enabled:false,login_verified:false,customer_acceptance:false,source_hashes:preparedSource(projectPath),session_binding:sessionBinding(projectPath)};
+ const receipt={status:'NOT_RUN',operation:'ISOLATED_TEST_PREVIEW_ONLY',head:control,frontend_source_sha:SOURCE,backend_source_sha:SOURCE,compatibility:'EXACT_SOURCE_MATCH',control_source_sha:control,appid:APPID,backend_base_url:BASE,entry_page:'pages/home/index',scene:SCENE,search_query:'scene='+SCENE,public_release:false,development_upload:false,payment_enabled:false,login_verified:false,customer_acceptance:false,source_hashes:preparedSource(projectPath),session_binding:sessionBinding(projectPath)};
  const save=()=>fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(receipt,null,2));
  requireTrue(env.WECHAT_MINIPROGRAM_APPID===APPID,'EXACT_APPID_REQUIRED');
  let key;try{key=normalizeUploadKey(env.WECHAT_MINIPROGRAM_PRIVATE_KEY);}catch(_){receipt.status='UPLOAD_KEY_INVALID_OR_UNAVAILABLE';save();throw Error(receipt.status);}
@@ -81,10 +81,10 @@ async function preview(env){
   console.log=console.error=console.warn=()=>{};process.stdout.write=process.stderr.write=()=>true;
   const project=new ci.Project({appid:APPID,type:'miniProgram',projectPath,privateKey:key,ignores:['**/*.test.cjs','node_modules/**/*']});
   const compiled=await ci.getCompiledResult({project,setting:{es6:true,es7:true,minify:true},threads:1,onProgressUpdate:()=>{}});
-  for(const file of ['pages/merchant-join/index.js','merchant-fields-data.js','merchant-official-areas-data.js','merchant-official-industries-data.js','merchant-platform-reference-data.js'])requireTrue(Object.hasOwn(compiled,file),'MERCHANT_RUNTIME_MODULE_MISSING');
+  for(const file of ['pages/merchant-join/index.js','merchant-fields-data.js','merchant-official-areas-data.js','merchant-official-industries-data.js','merchant-platform-reference-data.js','submission-diagnostic.js'])requireTrue(Object.hasOwn(compiled,file),'MERCHANT_RUNTIME_MODULE_MISSING');
   requireTrue(!Object.entries(compiled).some(([n,b])=>n.endsWith('.js')&&/require\s*\([^)]*\.json/.test(String(b))),'RUNTIME_JSON_REQUIRE_REMAINS');receipt.compiled_runtime_check='PASS';
   invoked=true;receipt.status='PREVIEW_STARTED_OUTCOME_PENDING';save();
-  await ci.preview({project,desc:'Isolated community 354 backend with verified frontend update',setting:{es6:true,es7:true,minify:true},robot:1,threads:1,qrcodeFormat:'image',qrcodeOutputDest:path.join(out,'preview.png'),pagePath:'pages/home/index',searchQuery:'scene='+SCENE,onProgressUpdate:()=>{}});
+  await ci.preview({project,desc:'6b3e diagnostic test preview for owner reproduction',setting:{es6:true,es7:true,minify:true},robot:1,threads:1,qrcodeFormat:'image',qrcodeOutputDest:path.join(out,'preview.png'),pagePath:'pages/home/index',searchQuery:'scene='+SCENE,onProgressUpdate:()=>{}});
   requireTrue(fs.existsSync(path.join(out,'preview.png')),'PREVIEW_QR_MISSING');receipt.status='ISOLATED_TEST_PREVIEW_GENERATED';
  }catch(e){receipt.status=invoked?'PREVIEW_FAILED_OR_UNKNOWN':'COMPILED_RUNTIME_INVALID';const code=e&&(e.errCode||e.code);if(Number.isSafeInteger(code))receipt.provider_error_code=code;throw Error(receipt.status);}
  finally{[console.log,console.error,console.warn,process.stdout.write,process.stderr.write]=old;key=null;delete env.WECHAT_MINIPROGRAM_PRIVATE_KEY;save();}
