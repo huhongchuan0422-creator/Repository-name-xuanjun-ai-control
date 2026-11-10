@@ -717,7 +717,7 @@ test('upload and each Next save privately without sending materials or applicati
  assert.equal(f.calls.some(c=>c.p&&['wechat_media','wechat_cashier_link','wechat_qualifications_select','wechat_execute','wechat_submit_review','submit'].includes(c.p.operation)),false);
  assert.ok(f.page.data.application.materials.business_license);
 });
-test('final Submit automatically associates an eligible uploaded original before both review queues',async()=>{
+test('final Submit associates eligible original before single applicant backend submission',async()=>{
  const f=fixture('merchant-join',{customerError:e=>e.stack||e.message});await f.page.onLoad({scene:'shop1'});
  await f.page.upload({currentTarget:{dataset:{kind:'business_license'}}});
  form.put(f.page.profile,'contact_info.mobile_phone','13800000000');form.put(f.page.profile,'business_info.sales_info.mini_program_info.mini_program_appid','wx'+'1'.repeat(16));await f.page.save();
@@ -725,7 +725,7 @@ test('final Submit automatically associates an eligible uploaded original before
  const refresh=f.page.refresh.bind(f.page);f.page.refresh=function(...args){refresh(...args);this.data.reviewGroups=[{id:'license',step:0,title:'营业执照',items:[{path:'material:business_license',label:'营业执照',material:true,uploaded:true,wechatRequired:true,synced:!!form.get(this.profile,'subject_info.business_license_info.license_copy')}]}];};f.page.refresh();
  const begin=f.calls.length;await f.page.submitAllReview();const ops=f.calls.slice(begin).map(c=>c.p&&c.p.operation);
  assert.equal(ops.filter(x=>x==='wechat_media').length,1);
- assert.ok(ops.indexOf('wechat_media')<ops.indexOf('submit'),JSON.stringify({ops,status:f.page.data.status}));assert.ok(ops.indexOf('submit')<ops.indexOf('wechat_apply'));
+ assert.equal(ops.filter(x=>x==='submit').length,0);assert.equal(ops.filter(x=>x==='wechat_apply').length,1);assert.ok(ops.indexOf('wechat_media')<ops.indexOf('wechat_apply'),JSON.stringify({ops,status:f.page.data.status}));
  assert.equal(form.get(f.storedProfile,'subject_info.business_license_info.license_copy'),'synthetic-admitted-media');
  assert.match(f.page.data.status,/提交成功，请等待微信审核/);assert.match(f.page.data.status,/已取得微信真实受理/);
  const second=f.calls.length;await f.page.submitAllReview();assert.equal(f.calls.slice(second).some(c=>['wechat_media','submit','wechat_submit_review','wechat_apply'].includes(c.p.operation)),false);

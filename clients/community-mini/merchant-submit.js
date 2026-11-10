@@ -44,9 +44,11 @@ async function submitApplicantApplication({read,current,prepareMaterials,preflig
  if(!current()||state.application!==id)return {cancelled:true};
  if(preflight)await preflight(state,{platform:['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState),wechat:true});
  if(!current())return {cancelled:true};
- if(['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState)){await submitPlatform({application:id,revision:state.revision});if(!current())return {cancelled:true};state=await read();}
+ // The original applicant backend validates and freezes the platform draft.
+ // Do not split that action with a redundant client submit/read round trip.
  if(!current()||state.application!==id)return {cancelled:true};
- await submitProvider({application:id,expected_version:state.version});
+ if(!Number.isSafeInteger(state.revision))throw Error('申请版本未确认，请刷新原申请');
+ await submitProvider({application:id,expected_version:state.version,application_revision:state.revision});
  if(!current())return {cancelled:true};state=await read();
  if(!current()||state.application!==id)return {cancelled:true};
  // A verified POST receipt is acceptance, not approval or payment activation.
