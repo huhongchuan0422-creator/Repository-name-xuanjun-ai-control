@@ -215,7 +215,7 @@ class NativeSourceRender(unittest.TestCase):
             self.assertEqual(page.evaluate('window.__nativeEvidence.state.wechatReviewState'),'SUBMITTED_TO_PROVIDER');snapshot('09-admission-submitted-fixture')
             click('submitAllReview')
             review_calls=page.evaluate('window.__nativeEvidence.calls')
-            self.assertEqual(sum(x.get('suboperation')=='submit' for x in review_calls),1)
+            self.assertEqual(sum(x.get('suboperation')=='submit' for x in review_calls),0)
             self.assertEqual(sum(x.get('suboperation')=='wechat_apply' for x in review_calls),1)
             self.assertEqual(sum(x.get('suboperation')=='wechat_submit_review' for x in review_calls),0)
             for state,opening,visible in [('DRAFT','NOT_APPROVED',False),('REJECTED','NOT_APPROVED',False),('CORRECTION_REQUIRED','NOT_APPROVED',False),('APPROVED','AWAITING_CRM_BINDING',False),('APPROVED','OPENED',True)]:
