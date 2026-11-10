@@ -67,7 +67,7 @@ class ReviewRuntime:
                     if not self._local():return self.answer(403,{'error':'LOOPBACK_REVIEW_ONLY'})
                     parsed=urllib.parse.urlsplit(self.path)
                     if parsed.path=='/review/sources':
-                        names={'app.wxss','session.js','client.js','payment.js','customer-auth.js','merchant-form.js','merchant-license-region.js','material-private-preview.js','merchant-fields.json','merchant-submit.js','merchant-official-fields.js','merchant-official-areas.json','merchant-official-industries.json','merchant-platform-reference.json'}
+                        names={'app.wxss','session.js','submission-diagnostic.js','client.js','payment.js','customer-auth.js','merchant-form.js','merchant-license-region.js','material-private-preview.js','merchant-fields.json','merchant-submit.js','merchant-official-fields.js','merchant-official-areas.json','merchant-official-industries.json','merchant-platform-reference.json'}
                         names.update({'merchant-fields-data.js','merchant-official-areas-data.js',
                                       'merchant-official-industries-data.js','merchant-platform-reference-data.js'})
                         names.update(p.relative_to(ROOT/'clients/community-mini').as_posix() for p in (ROOT/'clients/community-mini/pages').glob('*/index.*') if p.suffix in ('.js','.wxml','.wxss'))

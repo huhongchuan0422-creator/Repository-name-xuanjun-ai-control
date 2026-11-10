@@ -39,7 +39,7 @@ class IntegratedReview(unittest.TestCase):
   self.assertIs(payload['isolated'],True)
   for name in ('merchant-fields-data.js','merchant-official-areas-data.js',
                'merchant-official-industries-data.js','merchant-platform-reference-data.js','merchant-license-region.js',
-               'material-private-preview.js'):
+               'material-private-preview.js','submission-diagnostic.js'):
    self.assertEqual(payload['sources'][name],(ROOT/'clients/community-mini'/name).read_text())
   # Every literal local require in the real Page/module sources must be supplied.
   import posixpath,re
