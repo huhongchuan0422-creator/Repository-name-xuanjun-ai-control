@@ -1,0 +1,48 @@
+name: Work cost and canary source gates
+on:
+  push:
+    branches: [build/work-cost-canary-source-20261013]
+    paths: ['.github/workflows/work-cost-canary-gates.yml']
+  pull_request:
+    paths:
+      - scripts/task_cost_projection.py
+      - scripts/canary_evidence_coverage.py
+      - tests/test_task_cost_projection.py
+      - tests/test_canary_evidence_coverage.py
+      - docs/TASK_COST_PROJECTION.md
+      - docs/CANARY_EVIDENCE_COVERAGE.md
+      - .github/workflows/work-cost-canary-gates.yml
+permissions:
+  contents: read
+jobs:
+  offline-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate isolated source boundaries
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_task_cost_projection.py' -v
+          python3 -B -m unittest discover -s tests -p 'test_canary_evidence_coverage.py' -v
+
+  uk-isolated:
+    if: github.event_name == 'push'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: UK Python 3.6.8 isolated foundation fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -c 'import sys; assert sys.version_info[:3] == (3,6,8)'
+          /usr/bin/python3 -B -m unittest discover -s tests -p 'test_task_cost_projection.py' -v
+          /usr/bin/python3 -B -m unittest discover -s tests -p 'test_canary_evidence_coverage.py' -v
+          echo WORK_FOUNDATION_UK_FIXTURES=PASS
+          echo INSTALLED_INTEGRATION=NOT_RUN
+          echo MODEL_CALLS=0
