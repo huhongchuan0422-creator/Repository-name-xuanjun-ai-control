@@ -33,3 +33,41 @@ Continue under existing Issue #76 without creating a duplicate issue queue. All 
 ## 2026-10-14 reconciled source checkpoint (not a change to acceptance)
 
 Current stack order: PR94 -> PR101 -> PR103 -> PR104 -> PR105 -> PR106. PR94 and this PR96 still require independent review; no release permitted. PR105 alone fixes the prior per-page simulated event/transaction ID collision using browser crypto.randomUUID; never deploy the older PR101-only source as a complete UI. PR106 runs Stage5 Python, JavaScript and Chromium against one exact stacked head, but does not prove a verified payment, role-based access, merchant/ad HTTP source, unified DB atomicity or production availability. All PR numbers above are historical snapshot references; before merge inspect latest GitHub state again. **PHASE1_ACCEPTANCE=NO.**
+
+## 2026-10-14 continued business implementation checkpoint — PR118 DRAFT, NOT MERGED
+
+This later checkpoint supersedes earlier historical PR-state wording **for development status only**. It does not overwrite earlier independent-review evidence or authorize production.
+
+| Item | Implemented local simulated capability in PR118 or merged main | Unresolved external / acceptance limit |
+|---|---|---|
+| P1-01 | Local merchant/platform capability secrets are owner-provisioned via environment, bound server-side to role/scope; negative HTTP and Chromium tests | Not real customer, WeChat or provider identity; production RBAC / session revocation absent |
+| P1-02 | SQLite merchant and catalog rendered in consumer and management Chromium via scoped localhost HTTP | Merchant onboarding and real account provisioning absent |
+| P1-03 | Server-keyed short-lived signed QR create/verify plus QR-validated PENDING order in actual Chromium | Demonstration QR issuance is not authority over live merchant payment |
+| P1-04 | Executable local mini-style shell and real browser QR-to-order path | Not compiled/published native WeChat Mini Program |
+| P1-05 | Executable local official H5-style shell and real browser QR-to-order path | Not deployed through verified WeChat Official Account OAuth |
+| P1-06 | SQLite order, append-only simulated event and restart persistence regression | Provider transaction events/callbacks absent |
+| P1-07 | Loopback exact-route HTTP with body/header absolute deadline, fail-closed JSON/Origin/Host protections | Not a public service |
+| P1-08 | Consumer HTML/JS real Chromium storefront, order and simulation result | Does not execute payment |
+| P1-09 | Merchant local page: scoped orders, catalog, ads, order metrics, refund previews, capability-gated edit | Not real merchant customer portal |
+| P1-10 | Platform local page: scoped read, creative review, campaign states, reconciliation preview, role token tests | Not real production staff IAM |
+| P1-11 | Both ad slots persisted, moderation/activation flow; AMOUNT active creative rendered; SUCCESS hidden without provider proof | Real receipt advertising requires verified provider event |
+| P1-12 | Offline append-only refund previews, no-refund effect, simulated split conservation and reconciliation reporting actual provider settlement UNKNOWN | Real split/refund/clearing excluded and must not be marked zero |
+| P1-13 | Actual Chromium: signed QR -> consumer storefront+approved ad -> PENDING SQLite order -> merchant & platform read with scope isolation | Only local simulation |
+| P1-14 | Cross-scope denial, role-bound admin, malformed/slow HTTP, tampered QR, reset/SQLite durable restart and append-only invariants | Operational production disaster recovery/real auth not performed |
+| P1-15 | Single PR118 incremental branch, full community+Stage5+JS+real Chromium on GitHub hosted exact PR HEAD | Final independent integrated review and merged-main acceptance not yet performed |
+
+**Actual development evidence at pre-checkpoint HEAD bf695fccdd51a7e6cab15392da42cf9a43ff6804:**
+Stage5 Full Local Integration Gate run 38594543490 / job 115957745804: SUCCESS, exact checkout, community Python 144/144, Stage5 Python 67/67, five JavaScript groups 14+4+4+8+7 all PASS, separately repeated original Chromium 4 PASS. Stage5 Current Main Source Gate run 38594543459 / job 115957747545: SUCCESS, same exact HEAD and tests. Integrated restart, signed QR and end-to-end management browser tests actually executed and passed.
+
+**Scope markers (never infer from CI labels):**
+- PHASE1_LOCAL_SIMULATION_SOURCE_CANDIDATE=YES
+- PHASE1_INDEPENDENT_INTEGRATED_REVIEW=PENDING
+- PHASE1_ACCEPTANCE=NO
+- REAL_WECHAT_MINI_PROGRAM=NOT_DEPLOYED
+- REAL_WECHAT_OFFICIAL_H5=NOT_DEPLOYED
+- REAL_PAYMENT_PROVIDER_SETTLEMENT=NOT_CONNECTED
+- REAL_REFUND_AND_SPLIT=NOT_EXECUTED
+- PRODUCTION_DEPLOYMENT=NO
+- UK_P2_RELEASE=HOLD
+
+PR118 is a development candidate. No merge, host access, real payment, merchant funds, approval or owner P2 grant is implied.
