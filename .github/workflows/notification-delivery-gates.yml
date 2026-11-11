@@ -1,0 +1,82 @@
+name: Notification delivery diagnostics gates
+on:
+  push:
+    branches: [build/dots-delivery-view-20261013]
+    paths: ['.github/workflows/notification-delivery-gates.yml']
+  pull_request:
+    paths:
+      - scripts/notification_delivery_view.py
+      - tests/test_notification_delivery_view.py
+      - docs/NOTIFICATION_DELIVERY_VIEW.md
+      - .github/workflows/notification-delivery-gates.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  offline-fixtures:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      P2_INTEGRATION_ARCHIVE: ${{ github.workspace }}/p2-11786072168.zip
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Fetch exact frozen producer artifact (no host execution)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11786072168/zip" > "$P2_INTEGRATION_ARCHIVE"
+          test -s "$P2_INTEGRATION_ARCHIVE"
+      - name: Validate existing-schema read-only delivery pages
+        run: |
+          python3 -m py_compile scripts/notification_delivery_view.py
+          python3 -B -m unittest discover -s tests -p 'test_notification_delivery_view.py' -v
+
+  uk-isolated:
+    if: github.event_name == 'push' && github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.ref == 'refs/heads/build/dots-delivery-view-20261013'
+    runs-on: [self-hosted, linux, x64, xuanjun-uk-dev]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: UK exact frozen producer compatibility only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = iZd7oeikknn1z21sq6ji6zZ
+          /usr/bin/python3 -I -B - <<'PYCODE'
+          import os, sys, tempfile, subprocess, urllib.request, urllib.parse
+          assert sys.version_info[:3] == (3, 6, 8)
+          class SafeRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  target = urllib.parse.urlparse(newurl)
+                  if target.scheme != 'https' or not target.hostname or target.username or target.password:
+                      raise ValueError('UNSAFE_ARTIFACT_REDIRECT')
+                  moved = urllib.request.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
+                  if moved is not None and urllib.parse.urlparse(req.full_url).netloc != target.netloc:
+                      moved.remove_header('Authorization')
+                  return moved
+          url = 'https://api.github.com/repos/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/artifacts/11786072168/zip'
+          request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'User-Agent': 'dots-frozen-producer-compatibility'})
+          with urllib.request.build_opener(SafeRedirect()).open(request, timeout=30) as response:
+              raw = response.read(8 * 1024 * 1024 + 1)
+          if len(raw) > 8 * 1024 * 1024:
+              raise ValueError('ARTIFACT_SIZE_BOUND')
+          with tempfile.TemporaryDirectory(prefix='dots-producer-', dir=os.environ['RUNNER_TEMP']) as directory:
+              archive = os.path.join(directory, 'p2-11786072168.zip')
+              with open(archive, 'xb') as stream:
+                  stream.write(raw)
+              env = dict(os.environ, P2_INTEGRATION_ARCHIVE=archive)
+              env.pop('GH_TOKEN', None)
+              subprocess.check_call([sys.executable, '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_notification_delivery_view.py', '-v'], env=env)
+          print('DOTS_UK_FROZEN_PRODUCER_FIXTURES=PASS')
+          print('CURRENT_P2_INSTALLED_ACCEPTANCE=NOT_RUN')
+          print('MODEL_CALLS=0')
+          PYCODE
