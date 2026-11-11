@@ -1,0 +1,44 @@
+[
+  {
+    "name": "task_cost_projection.py",
+    "path": "scripts/task_cost_projection.py",
+    "commit": "2c7182d3d13180365a9d9d044c953940e28e3553",
+    "sha256": "95ad809c67aff8929f0dc4ecfad68ca96be72cabe426cde90021dd515fef3334"
+  },
+  {
+    "name": "canary_evidence_coverage.py",
+    "path": "scripts/canary_evidence_coverage.py",
+    "commit": "2c7182d3d13180365a9d9d044c953940e28e3553",
+    "sha256": "73aea0debf015888732c23fe161193d831ed6d4b5a87809c27879e785c21c98c"
+  },
+  {
+    "name": "dependency_evidence_view.py",
+    "path": "scripts/dependency_evidence_view.py",
+    "commit": "820b2bec119799acf6d0424a9c120ba25ce26acc",
+    "sha256": "fc4debda2f0d89988ca2677bc8b940b39c9a4f735316fbe38497f6d0cdb9d890"
+  },
+  {
+    "name": "resume_prerequisite_view.py",
+    "path": "scripts/resume_prerequisite_view.py",
+    "commit": "820b2bec119799acf6d0424a9c120ba25ce26acc",
+    "sha256": "73f88960b63d34e31307b1d7f38e071e41892355aa7bd85fd95b4a14ea0f790c"
+  },
+  {
+    "name": "human_alert_payload.py",
+    "path": "scripts/human_alert_payload.py",
+    "commit": "820b2bec119799acf6d0424a9c120ba25ce26acc",
+    "sha256": "7242e9d35202b50a2d17cdf6905c4fdce98b56b2ed337950d22b9d60221149c6"
+  },
+  {
+    "name": "run_usage_projection.py",
+    "path": "scripts/run_usage_projection.py",
+    "commit": "820b2bec119799acf6d0424a9c120ba25ce26acc",
+    "sha256": "80eeee872493fe894540efd954715972cc802ceea20a1dd483396c974ad012f1"
+  },
+  {
+    "name": "handoff_evidence_view.py",
+    "path": "scripts/handoff_evidence_view.py",
+    "commit": "820b2bec119799acf6d0424a9c120ba25ce26acc",
+    "sha256": "e70cd0a1248211eaa232f79f007345a02132f0bc315c34dd481d961b92afd7c0"
+  }
+]

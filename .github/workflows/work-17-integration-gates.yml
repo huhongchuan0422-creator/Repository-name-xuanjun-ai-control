@@ -1,0 +1,37 @@
+name: Work seventeen foundation integration gates
+on:
+  pull_request:
+    paths:
+      - evidence/work-17-integration-20261014/**
+      - .github/workflows/work-17-integration-gates.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  hosted-integration:
+    if: github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Exact reviewed foundations and frozen producer fixtures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B evidence/work-17-integration-20261014/bootstrap.py "$RUNNER_TEMP/work17-fixtures"
+      - name: Read-only SQLite integration and negative checks
+        env:
+          XJ_FOUNDATION_FIXTURES: ${{ runner.temp }}/work17-fixtures
+        run: |
+          python3 -B evidence/work-17-integration-20261014/test_foundation_integration.py -v
+          python3 -B evidence/work-17-integration-20261014/test_producer_inventory.py -v
+          python3 -B evidence/work-17-integration-20261014/test_owner_foundation_reader.py -v
+          python3 -B evidence/work-17-integration-20261014/test_owner_access_gate.py -v
+          python3 -B evidence/work-17-integration-20261014/test_owner_controller_adapter.py -v
+          echo HOSTED_ISOLATED_FIXTURE_INTEGRATION=PASS
+          echo UK_INSTALLED_RUNTIME_ACCEPTANCE=NOT_RUN
+      - name: Remove fixture material
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/work17-fixtures"
