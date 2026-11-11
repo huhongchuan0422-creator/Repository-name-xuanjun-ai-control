@@ -1,0 +1,11 @@
+{
+  "artifact_id": 11778162510,
+  "artifact_tar_sha256": "dcbf83bdeca806f159b66d889ef071423827569a32c94f7d1608a441afb47317",
+  "target": "stage1/execution_supervision.py",
+  "base_source_sha256": "4de3ad4210912ef79935aadb0d4b2de06159a38546a6aec3830d9b46dbef1d53",
+  "proposed_source_sha256": "3ae832e93f276c421597e31c08aaad9228a2481503c433365dbe045feb096997",
+  "patch_sha256": "c9acd93164d247d04aa95f681a70f0cca875973eaab6c2f9ad43c5ccf515f287",
+  "fixture_sha256": "5d3148f639f3c3f38fcf1afddecc20b8db5f1109b79d7ee30e01e90d3c8aa2e0",
+  "status": "PROPOSED_TO_P2_OWNER_NOT_INSTALLED",
+  "runtime_authority": "NONE"
+}

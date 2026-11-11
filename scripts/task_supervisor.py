@@ -700,8 +700,10 @@ class Supervisor(object):
             attempts = row['attempts'] + 1
             if attempts >= 5:
                 next_at = now
-                self.db.execute("UPDATE tasks SET state='HOLD',next_action=? WHERE task_id=?",
-                                ('OWNER_VISIBLE_OUTBOX_FAILURE', row['task_id']))
+                self.db.execute("UPDATE tasks SET state='HOLD',next_action=? "
+                                "WHERE task_id=? AND attempt_id=?",
+                                ('OWNER_VISIBLE_OUTBOX_FAILURE', row['task_id'],
+                                 row['attempt_id']))
                 self.db.execute('''UPDATE outbox SET attempts=?,dead_lettered_at=?,
                   last_error=? WHERE outbox_id=?''',
                   (attempts, now, error[:256], outbox_id))
