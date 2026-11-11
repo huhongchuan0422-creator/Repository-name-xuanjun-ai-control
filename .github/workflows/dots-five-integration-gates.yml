@@ -1,0 +1,49 @@
+name: Dots five independent integration gates
+on:
+  pull_request:
+    paths:
+      - scripts/ci_receipt_collection.py
+      - scripts/source_diff_collection.py
+      - tests/test_ci_receipt_collection.py
+      - tests/test_source_diff_collection.py
+      - tests/test_owner_digest_canonical_integration.py
+      - tests/test_delivery_restart_paging_integration.py
+      - tests/test_supervisor_restart_integration.py
+      - evidence/dots-five-integration-20261013/**
+      - .github/workflows/dots-five-integration-gates.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  hosted-integration:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Pinned dependencies and complete historical package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B evidence/dots-five-integration-20261013/bootstrap.py "$RUNNER_TEMP/dots-five-fixtures"
+      - name: Five scoped integration checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$PWD/evidence/dots-five-integration-20261013:$PWD"
+          export DOTS_TEST_DEPENDENCIES="$RUNNER_TEMP/dots-five-fixtures/dependencies"
+          export P2_TEST_PACKAGE="$RUNNER_TEMP/dots-five-fixtures/xuanjun-p2-package"
+          for test in test_ci_receipt_collection test_source_diff_collection test_owner_digest_canonical_integration test_delivery_restart_paging_integration test_supervisor_restart_integration; do
+            python3 -B -m unittest discover -s tests -p "$test.py" -v
+          done
+          echo HOSTED_FIXTURE_INTEGRATION=PASS
+          echo UK_INSTALLED_ACCEPTANCE=NOT_RUN
+      - name: Remove temporary fixture material
+        if: always()
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/dots-five-fixtures"

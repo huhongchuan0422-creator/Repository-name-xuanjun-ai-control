@@ -1,0 +1,38 @@
+[
+  {
+    "name": "owner_action_digest.py",
+    "commit": "b8e30e7e9180fb6dbac2fb951701ba242e5f67c1",
+    "path": "scripts/owner_action_digest.py",
+    "sha256": "12c1382526b5683cc0327cf3c73fe1d0d9cd9dd9424bd6b22a1c7528b9918e6e"
+  },
+  {
+    "name": "notification_delivery_view.py",
+    "commit": "a68a319db669e21a0a70eb3858297af226a4dd8a",
+    "path": "scripts/notification_delivery_view.py",
+    "sha256": "201cc0527508b34c11c7431d448811959e5967f55ad224a86618d36d3ca5ff21"
+  },
+  {
+    "name": "task_supervisor_runtime.py",
+    "commit": "3c9c48c86ac05ea0baa30a02a035feb12b46b31d",
+    "path": "scripts/task_supervisor_runtime.py",
+    "sha256": "51ecad9c92613a14b0abd20e5a815a61a90a02f09a10c0d9c3f194ecb929d29e"
+  },
+  {
+    "name": "task_supervisor.py",
+    "commit": "3c9c48c86ac05ea0baa30a02a035feb12b46b31d",
+    "path": "scripts/task_supervisor.py",
+    "sha256": "4fa5e95e1d4fefb6860b446fc2b53014c1e2b14b5b0700609d66d2aae9768924"
+  },
+  {
+    "name": "ci_receipt_binding.py",
+    "commit": "e457c81100badcdf1af036154b5944aa757a9708",
+    "path": "scripts/ci_receipt_binding.py",
+    "sha256": "faaf21137601cf1b87964f3d2d91a5b4e5eadae257719901ecf474909e82e71b"
+  },
+  {
+    "name": "source_path_ownership.py",
+    "commit": "c5c9280d16e12c5c9e02ba2965476e131a8bb712",
+    "path": "scripts/source_path_ownership.py",
+    "sha256": "d6032af924c12f20c600149974a477afc815597905aba23e86913133da560184"
+  }
+]
