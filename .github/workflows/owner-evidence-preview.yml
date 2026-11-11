@@ -1,0 +1,18 @@
+name: Owner Evidence Preview CI
+on:
+  pull_request:
+    paths:
+      - 'tools/owner_evidence_preview.py'
+      - 'tests/test_owner_evidence_preview.py'
+      - '.github/workflows/owner-evidence-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -p 'test_owner_evidence_preview.py' -v
+      - run: python3 tools/owner_evidence_preview.py --canonical canonical/PROJECT_STATE.md --output /tmp/xuanjun-owner-preview.html
